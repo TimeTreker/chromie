@@ -928,20 +928,21 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             route="robot_action",
         )
 
-        self.assertIn("Use the supplied owner-approved self model", prompt)
+        self.assertIn("Use the supplied owner-approved identity and self model", prompt)
         self.assertIn('"entity_id":"chromie"', prompt)
         self.assertIn('"social_presentation"', prompt)
         self.assertIn('"self_reference":"Chromie"', prompt)
-        self.assertNotIn('"kind":"embodied robot"', prompt)
-        self.assertNotIn('"age_description"', prompt)
+        self.assertIn('"kind":"embodied robot"', prompt)
+        self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn('"component_id":"language_reasoner"', prompt)
         self.assertIn('"speaker_entity":false', prompt)
-        self.assertNotIn("If the user asks who you are", prompt)
+        self.assertIn("identity.identity_answer_guidance", prompt)
         self.assertNotIn("Never say you are text-based", prompt)
         self.assertIn("Direct fallback reason: agent_exception", prompt)
         self.assertIn("Route hint: robot_action", prompt)
         self.assertIn("Hello. I am listening.", prompt)
         self.assertIn("no valid motion result was produced", prompt)
+        self.assertTrue(prompt.endswith("Chromie:"))
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

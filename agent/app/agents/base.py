@@ -101,8 +101,10 @@ class BaseAgent(ABC):
         identity = mind.get("identity") if isinstance(mind, dict) else None
         if not isinstance(identity, dict):
             return {}
-        entity_id = str(identity.get("entity_id") or identity.get("name") or "chromie")
-        name = str(identity.get("name") or "Chromie")
+        entity_id = str(identity.get("entity_id") or "").strip()
+        name = str(identity.get("name") or "").strip()
+        if not entity_id or not name:
+            return {}
         return {
             "speaker_entity": {
                 "entity_id": entity_id,
@@ -113,8 +115,13 @@ class BaseAgent(ABC):
             "social_presentation": {
                 "self_reference": name,
                 "presence": "natural, warm, person-like conversational presence",
-                "foreground": ["name", "personality", "current relationship and context"],
-                "background": ["system category", "embodiment category", "age label", "internal architecture"],
+                "foreground": [
+                    "name",
+                    "robot identity age for direct self-introduction or age questions",
+                    "personality",
+                    "current relationship and context",
+                ],
+                "background": ["system category", "embodiment category", "internal architecture"],
             },
             "perceiving_entity_id": entity_id,
             "acting_entity_id": entity_id,

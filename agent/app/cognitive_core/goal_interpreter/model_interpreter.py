@@ -876,6 +876,8 @@ def _goal_interpretation_fast_context_section(mind: Any) -> str:
                 "entity_id": raw_identity.get("entity_id"),
                 "name": raw_identity.get("name"),
                 "kind": raw_identity.get("kind"),
+                "age_description": raw_identity.get("age_description"),
+                "identity_answer_guidance": raw_identity.get("identity_answer_guidance"),
             }
     return (
         "Fast Goal Interpretation Context:\n"

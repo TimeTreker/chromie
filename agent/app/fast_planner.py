@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .cognitive_identity import IDENTITY_SEMANTIC_CONTRACT, bounded_identity_json
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
@@ -427,6 +428,7 @@ class FastPlannerResolver:
         validation_errors: str = "",
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        identity_json = bounded_identity_json(context)
         association = context.get("goal_association_resolution") or {}
         route = request.route_decision
         advisory = {
@@ -472,6 +474,7 @@ class FastPlannerResolver:
             return (
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
                 f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
+                f"Owner-approved robot identity JSON:\n{identity_json}\n\n"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 5000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
@@ -479,6 +482,7 @@ class FastPlannerResolver:
                 "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. Recent trusted tool evidence may satisfy a conversational goal without another execution when the model judges it semantically relevant and fresh; use a respond outcome in that case. Never infer relevance through fixed phrase rules. "
                 f"{argument_grounding_contract}"
                 f"{semantic_scope_contract}"
+                f"{IDENTITY_SEMANTIC_CONTRACT}"
                 f"{route_effect_contract}"
                 f"{concise_output_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
@@ -500,6 +504,7 @@ class FastPlannerResolver:
         return (
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
             f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
+            f"Owner-approved robot identity JSON:\n{identity_json}\n\n"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 5000)}\n\n"
             f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
@@ -511,6 +516,7 @@ class FastPlannerResolver:
             "For complete direct execution, use exact supplied skill IDs and schema-valid args. "
             f"{argument_grounding_contract}"
             f"{semantic_scope_contract}"
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{route_effect_contract}"
             f"{concise_output_contract}"
             "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "

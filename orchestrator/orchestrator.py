@@ -2238,6 +2238,8 @@ class VoiceAssistant:
         route: str | None = None,
     ) -> str:
         mind_summary = self._direct_llm_mind_summary()
+        identity_json = self._direct_llm_identity_json()
+        speaker_name = self._direct_llm_speaker_name()
         self_model_json = self._direct_llm_self_model_json()
         context_json = self._direct_llm_context_json(session_id)
         fallback_line = (
@@ -2248,13 +2250,14 @@ class VoiceAssistant:
         route_line = f"Route hint: {route}." if route else "Route hint: unknown."
         return (
             f"{self.voice_system_prompt}\n\n"
-            "Use the supplied owner-approved self model as the ontology for the speaking entity.\n"
+            "Use the supplied owner-approved identity and self model as the ontology for the speaking entity.\n"
+            f"Owner-approved identity JSON: {identity_json}\n"
             f"Self model JSON: {self_model_json}\n"
             "Owner-approved mind summary:\n"
             f"{mind_summary}\n\n"
             "Response contract:\n"
             "- Generate first-person speech for self_model.speaker_entity.\n"
-            "- Follow self_model.social_presentation: speak naturally as Chromie and foreground name, personality, relationship, and current context rather than volunteering system category, embodiment category, age label, or internal architecture.\n"
+            "- Follow self_model.social_presentation. When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age in unrelated conversation.\n"
             "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners.\n"
             "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
             "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
@@ -2264,9 +2267,29 @@ class VoiceAssistant:
             f"{route_line}\n"
             f"Bounded runtime context JSON: {context_json}\n\n"
             f"User: {user_text}\n"
-            "Chromie:"
+            f"{speaker_name}:"
         )
 
+
+    def _direct_llm_speaker_name(self) -> str:
+        try:
+            identity = self.mind.profile.identity
+            name = str(identity.name or "").strip()
+        except Exception as exc:
+            logger.warning("direct_llm_speaker_name_failed: %s", exc)
+            name = ""
+        return name or "Assistant"
+
+    def _direct_llm_identity_json(self) -> str:
+        try:
+            context = self.mind.context()
+            identity = context.get("identity", {}) if isinstance(context, dict) else {}
+        except Exception as exc:
+            logger.warning("direct_llm_identity_failed: %s", exc)
+            identity = {}
+        if not isinstance(identity, dict):
+            identity = {}
+        return json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def _direct_llm_self_model_json(self) -> str:
         try:

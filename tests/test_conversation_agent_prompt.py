@@ -22,7 +22,7 @@ class _CapturingOllama:
 
 class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
     async def test_identity_question_uses_owner_approved_mind_profile(self) -> None:
-        ollama = _CapturingOllama("I'm Chromie.")
+        ollama = _CapturingOllama("I'm Chromie, and I'm 6 years old.")
         agent = ConversationAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
@@ -49,7 +49,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict("os.environ", {}, clear=True):
             result = await agent.run(request, AgentResult())
 
-        self.assertEqual(result.speak_immediate[0].text, "I'm Chromie.")
+        self.assertEqual(result.speak_immediate[0].text, "I'm Chromie, and I'm 6 years old.")
         self.assertEqual(len(ollama.calls), 1)
         self.assertIn("Self model, owner-approved", ollama.calls[0]["prompt"])
         self.assertIn("speaker entity: chromie", ollama.calls[0]["prompt"])
@@ -57,7 +57,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("natural, warm, person-like conversational presence", ollama.calls[0]["prompt"])
         self.assertIn("language_reasoner", ollama.calls[0]["prompt"])
         self.assertNotIn("embodied robot", ollama.calls[0]["prompt"])
-        self.assertNotIn("6 years old", ollama.calls[0]["prompt"])
+        self.assertIn("6 years old", ollama.calls[0]["prompt"])
         self.assertIn("First-person words refer to Self model.speaker_entity", ollama.calls[0]["system"])
         self.assertIn("Internal components are resources", ollama.calls[0]["system"])
         self.assertNotIn("If the user asks who you are", ollama.calls[0]["system"])
@@ -65,8 +65,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 2048)
         self.assertEqual(ollama.calls[0]["options"]["num_predict"], 64)
 
-    async def test_identity_age_question_keeps_internal_age_out_of_ordinary_prompt(self) -> None:
-        ollama = _CapturingOllama("I'm Chromie; I don't usually introduce myself by an age.")
+    async def test_identity_age_question_uses_owner_configured_robot_age(self) -> None:
+        ollama = _CapturingOllama("I'm Chromie, and I'm 6 years old.")
         agent = ConversationAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
@@ -94,11 +94,11 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "I'm Chromie; I don't usually introduce myself by an age.",
+            "I'm Chromie, and I'm 6 years old.",
         )
         self.assertEqual(len(ollama.calls), 1)
         self.assertIn("social_presentation", ollama.calls[0]["prompt"])
-        self.assertNotIn("age: 6 years old", ollama.calls[0]["prompt"])
+        self.assertIn("robot identity age: 6 years old", ollama.calls[0]["prompt"])
         self.assertNotIn("not a human biological age", ollama.calls[0]["prompt"])
 
     async def test_identity_gender_question_uses_she_her_pronouns(self) -> None:

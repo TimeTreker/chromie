@@ -17,6 +17,7 @@ from shared.chromie_contracts.mind import (
     SocialInteractionStyle,
     MindUpdateProposal,
     default_mind_profile,
+    default_mind_profile_path,
 )
 
 
@@ -29,7 +30,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "embodied robot")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.3.0")
+        self.assertEqual(profile.version, "0.4.0")
         self.assertIn("keep people company", profile.identity.short_self_description)
         self.assertIn("internal components", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)
@@ -85,6 +86,37 @@ class MindProfileTests(unittest.TestCase):
         )
 
 
+
+    def test_default_identity_is_loaded_from_owner_editable_json(self) -> None:
+        path = default_mind_profile_path(Path(__file__).resolve().parents[1])
+        self.assertEqual(path.as_posix().split("/")[-3:], ["config", "mind", "chromie_default.json"])
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["identity"]["name"], "Chromie")
+        self.assertEqual(payload["identity"]["age_description"], "6 years old")
+        self.assertTrue(
+            MindProfile.model_fields["identity"].is_required(),
+            "MindProfile identity must come from configuration, not a Python default",
+        )
+
+    def test_owner_can_change_identity_without_code_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "mind.json"
+            payload = default_mind_profile().model_dump(mode="json")
+            payload["profile_id"] = "owner_custom_identity"
+            payload["identity"]["name"] = "Nova"
+            payload["identity"]["age_description"] = "3 years old"
+            payload["identity"]["short_self_description"] = "I'm Nova, a 3-year-old companion robot."
+            payload["identity"]["identity_answer_guidance"] = (
+                "Use the configured name Nova and robot identity age 3 years old for direct identity questions."
+            )
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with patch.dict(os.environ, {"ORCH_MIND_PROFILE_PATH": str(path)}, clear=False):
+                manager = MindManager.from_env(project_root=Path(tmp))
+
+        self.assertEqual(manager.profile.identity.name, "Nova")
+        self.assertEqual(manager.profile.identity.age_description, "3 years old")
+        self.assertEqual(manager.profile_path, path)
+
     def test_social_interaction_style_presets_are_operator_selectable(self) -> None:
         courteous = SocialInteractionStyle(preset="courteous")
         neutral = SocialInteractionStyle(preset="neutral")
@@ -117,6 +149,7 @@ class MindProfileTests(unittest.TestCase):
     def test_rejects_experience_mutable_core_principle(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot be mutable by experience"):
             MindProfile(
+                identity=default_mind_profile().identity,
                 core_principles=[
                     CorePrinciple(
                         principle_id="bad",

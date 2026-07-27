@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationErr
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .cognitive_identity import IDENTITY_SEMANTIC_CONTRACT, bounded_identity_json
 from .schema import AgentRunRequest
 
 try:
@@ -612,10 +613,12 @@ class ResponseComposerResolver:
         validation_errors: str = "",
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        identity_json = bounded_identity_json(context)
         return (
             f"User turn:\n{request.text}\n\n"
             f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
+            f"Owner-approved robot identity JSON:\n{identity_json}\n\n"
             f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 6000)}\n\n"
             f"Pending execution capability semantics JSON:\n{self._bounded(context.get('execution_capabilities') or [], 3000)}\n\n"
             f"Recent conversation JSON:\n{self._bounded((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
@@ -628,6 +631,7 @@ class ResponseComposerResolver:
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
             "Compose one ResponsePlan and, only when socially useful, an optional SocialAttentionPlan that coordinates language expression and body expression under one scene-specific purpose. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. Recent trusted tool evidence and conversation context may ground a respond outcome or conversational repair, but never claim facts absent from that evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
             "For a pending safe_read or external_read capability, acknowledge only that information will be checked. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "

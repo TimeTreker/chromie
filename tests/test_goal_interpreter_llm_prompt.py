@@ -312,7 +312,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
         self.assertIn("chromie_default_mind", prompt)
         self.assertIn("Chromie", prompt)
-        self.assertNotIn("6 years old in robot identity terms", prompt)
+        self.assertIn("6 years old in robot identity terms", prompt)
         self.assertNotIn("Protect humans first.", prompt)
         self.assertNotIn("Become a useful companion robot.", prompt)
         self.assertNotIn("soridormi.walk_velocity", prompt)

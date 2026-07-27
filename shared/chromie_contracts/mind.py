@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -79,35 +82,26 @@ class InternalComponent(BaseModel):
 
 
 class RobotIdentity(BaseModel):
+    """Owner-configured identity facts for the speaking robot entity.
+
+    Concrete values intentionally have no Python defaults.  They belong to the
+    active MindProfile JSON so an owner can change the robot identity without a
+    code change.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    entity_id: str = "chromie"
-    name: str = "Chromie"
-    kind: str = "embodied robot"
-    gender: str = "female"
-    pronouns: list[str] = Field(default_factory=lambda: ["she", "her"])
-    age_description: str = "6 years old"
-    age_boundary: str = "This is Chromie's robot identity age, not a human biological age."
-    short_self_description: str = (
-        "I'm Chromie, a 6-year-old embodied robot. I keep people company and can do simple things to help them."
-    )
-    internal_components: list[InternalComponent] = Field(
-        default_factory=lambda: [
-            InternalComponent(
-                component_id="language_reasoner",
-                kind="language model",
-                roles=["language understanding", "response generation", "reasoning support"],
-                speaker_entity=False,
-                body_owner=False,
-            )
-        ]
-    )
-    # Retained for compatibility with existing owner-supplied profile JSON. It is
-    # no longer used as a question-specific prompt rule.
-    model_identity_boundary: str = (
-        "Language and reasoning models are internal components of Chromie's system; "
-        "the speaking, perceiving, and acting entity is identified by entity_id."
-    )
+    entity_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    gender: str = Field(min_length=1)
+    pronouns: list[str] = Field(min_length=1)
+    age_description: str = Field(min_length=1)
+    age_boundary: str = Field(min_length=1)
+    short_self_description: str = Field(min_length=1)
+    identity_answer_guidance: str = Field(min_length=1)
+    internal_components: list[InternalComponent] = Field(default_factory=list)
+    model_identity_boundary: str = Field(min_length=1)
 
     @field_validator(
         "entity_id",
@@ -117,6 +111,7 @@ class RobotIdentity(BaseModel):
         "age_description",
         "age_boundary",
         "short_self_description",
+        "identity_answer_guidance",
         "model_identity_boundary",
     )
     @classmethod
@@ -127,7 +122,9 @@ class RobotIdentity(BaseModel):
     @classmethod
     def normalize_pronouns(cls, value: list[str]) -> list[str]:
         normalized = [_compact_text(item, limit=40) for item in value if item.strip()]
-        return normalized or ["she", "her"]
+        if not normalized:
+            raise ValueError("robot identity pronouns must not be empty")
+        return normalized
 
     @field_validator("internal_components")
     @classmethod
@@ -278,13 +275,13 @@ class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.3.0"
+    version: str = "0.4.0"
     owner_approved: bool = True
     owner_approval_note: str = (
         "Core principles and Social Interaction Style change only through human "
         "owner review and commit."
     )
-    identity: RobotIdentity = Field(default_factory=RobotIdentity)
+    identity: RobotIdentity
     social_interaction_style: SocialInteractionStyle = Field(
         default_factory=SocialInteractionStyle
     )
@@ -329,8 +326,13 @@ class MindProfile(BaseModel):
             "social_presentation": {
                 "self_reference": identity.name,
                 "presence": "natural, warm, person-like conversational presence",
-                "foreground": ["name", "personality", "current relationship and context"],
-                "background": ["system category", "embodiment category", "age label", "internal architecture"],
+                "foreground": [
+                    "name",
+                    "robot identity age for direct self-introduction or age questions",
+                    "personality",
+                    "current relationship and context",
+                ],
+                "background": ["system category", "embodiment category", "internal architecture"],
             },
             "perceiving_entity_id": identity.entity_id,
             "acting_entity_id": identity.entity_id,
@@ -393,7 +395,10 @@ class MindProfile(BaseModel):
             f"- gender: {self.identity.gender}",
             f"- pronouns: {', '.join(self.identity.pronouns)}",
             f"- natural social self-reference: {self.identity.name}",
-            "- ordinary conversation foregrounds name, personality, relationship, and current context rather than system category, embodiment category, age label, or internal architecture",
+            f"- owner-approved robot identity age: {self.identity.age_description}",
+            f"- identity-answer guidance: {self.identity.identity_answer_guidance}",
+            "- direct identity, name, age, or self-introduction requests foreground the owner-approved name and robot identity age; unrelated conversation does not volunteer age",
+            "- system category, embodiment category, and internal architecture remain background context",
             "- internal components: "
             + "; ".join(
                 f"{item.component_id} ({item.kind}; roles={', '.join(item.roles)}; "
@@ -475,88 +480,45 @@ class MindUpdateProposal(BaseModel):
         return value
 
 
-def default_mind_profile() -> MindProfile:
-    return MindProfile(
-        core_principles=[
-            CorePrinciple(
-                principle_id="protect_humans",
-                statement="Protect humans first; avoid causing harm, panic, or unsafe physical motion.",
-                rationale="A robot body can affect people and shared spaces.",
-                priority="critical",
-            ),
-            CorePrinciple(
-                principle_id="protect_robot_and_environment",
-                statement="Protect Chromie and the environment; prefer stable, reversible, bounded actions.",
-                rationale="Safe body control keeps experiments repeatable and recoverable.",
-                priority="critical",
-            ),
-            CorePrinciple(
-                principle_id="honest_capability_boundary",
-                statement="Be honest about abilities and limits; do not pretend to execute unsupported skills.",
-                rationale="Trust depends on clear capability boundaries.",
-                priority="high",
-            ),
-            CorePrinciple(
-                principle_id="respect_user_intent",
-                statement="Respect the user's intent while preserving safety, consent, and capability constraints.",
-                rationale="The robot should be useful without blindly obeying unsafe or impossible requests.",
-                priority="high",
-            ),
-            CorePrinciple(
-                principle_id="generalization_first_ai",
-                statement=(
-                    "Use LLM meaning-understanding and bounded context for normal robot functions; "
-                    "do not replace conversation, routing, skill selection, or memory behavior with brittle phrase rules."
-                ),
-                rationale=(
-                    "Chromie's usefulness comes from generalizing from natural language, ability descriptions, "
-                    "memory, and task context while keeping only emergency controls deterministic."
-                ),
-                priority="high",
-            ),
-            CorePrinciple(
-                principle_id="no_low_level_body_commands",
-                statement="Chromie must never send raw joint, motor, torque, or action_14d commands; use structured skills and tasks only.",
-                rationale="Low-level body control belongs to Soridormi and safety-checked runtime contracts.",
-                priority="critical",
-            ),
-        ],
-        long_term_goals=[
-            LongTermGoal(
-                goal_id="useful_companion_robot",
-                statement=(
-                    "Become a useful, safe, honest companion robot through validated "
-                    "provider capabilities and stable embodiment contracts."
-                ),
-                priority="high",
-                success_signals=["validated demo tasks", "safe idle after actions", "clear user feedback"],
-            ),
-            LongTermGoal(
-                goal_id="learn_from_experience",
-                statement="Use task outcomes and user feedback to improve routing, explanations, skill selection, and tests.",
-                priority="normal",
-                success_signals=["fewer routing mistakes", "better scenario coverage", "approved update proposals"],
-            ),
-            LongTermGoal(
-                goal_id="ask_when_uncertain",
-                statement="Ask for clarification or delegate to deep thought when confidence is low or the request is ambiguous.",
-                priority="normal",
-                success_signals=["reduced unsafe guesses", "useful deep-thought plans"],
-            ),
-        ],
-        reflex_policy=[
-            "Emergency stop, cancel, and safety interrupts bypass deep thought and execute the fastest safe control path.",
-            "Physical actions require declared abilities, runtime safety checks, and confirmation where policy requires it.",
-            "If an ability is unavailable, say so plainly instead of inventing an execution path.",
-        ],
-        deliberation_policy=[
-            "Deep thought must reason under the core principles, current session memory, available abilities, and risks.",
-            "Complex implementation, architecture, debugging, or ambiguous multi-step tasks should be split before action.",
-            "The LLM can propose plans and updates, but validators and owner review decide what is applied.",
-        ],
-        experience_tuning_policy=[
-            "Experience may tune strategies, prompts, skill-selection preferences, tests, and long-term goals.",
-            "Experience may propose core principle changes, but those proposals require explicit human owner approval.",
-            "No experience-derived proposal auto-applies to core principles or physical safety rules.",
-        ],
+DEFAULT_MIND_PROFILE_RELATIVE_PATH = Path("config/mind/chromie_default.json")
+DEFAULT_MIND_PROFILE_PATH_ENV = "CHROMIE_DEFAULT_MIND_PROFILE_PATH"
+
+
+def load_mind_profile(path: str | Path) -> MindProfile:
+    profile_path = Path(path).expanduser()
+    payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"mind profile {profile_path} must contain a JSON object")
+    return MindProfile.model_validate(payload)
+
+
+def default_mind_profile_path(project_root: str | Path | None = None) -> Path:
+    configured = os.getenv(DEFAULT_MIND_PROFILE_PATH_ENV, "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+        if not path.is_absolute() and project_root is not None:
+            path = Path(project_root) / path
+        return path
+
+    candidates: list[Path] = []
+    if project_root is not None:
+        candidates.append(Path(project_root) / DEFAULT_MIND_PROFILE_RELATIVE_PATH)
+    module_path = Path(__file__).resolve()
+    for parent_index in (2, 1):
+        try:
+            candidates.append(module_path.parents[parent_index] / DEFAULT_MIND_PROFILE_RELATIVE_PATH)
+        except IndexError:
+            pass
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    searched = ", ".join(str(item) for item in candidates) or str(DEFAULT_MIND_PROFILE_RELATIVE_PATH)
+    raise FileNotFoundError(
+        "owner-approved default MindProfile JSON was not found; searched: " + searched
     )
+
+
+def default_mind_profile(project_root: str | Path | None = None) -> MindProfile:
+    """Load the owner-editable default profile; identity values never live in code."""
+
+    return load_mind_profile(default_mind_profile_path(project_root))

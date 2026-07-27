@@ -5,7 +5,7 @@
 Implemented as a structured context layer in the Orchestrator and shared
 contracts. The first version provides:
 
-- an owner-approved default mind profile;
+- an owner-approved default mind profile loaded from `config/mind/chromie_default.json`;
 - an owner-approved structured self model for the speaking, perceiving, acting, and body-owning entity;
 - an owner-approved Social Interaction Style for bounded courtesy,
   expressiveness, initiative, restraint, cooldown, and repetition guidance;
@@ -37,6 +37,19 @@ Chromie's brain context has these layers:
 | Reflex policy | Always available | No automatic change | Fast emergency stop, cancel, and safety behavior |
 | Experience journal | Durable local JSONL | Appended | Evidence for future tuning and tests |
 | Update proposals | Durable local JSONL | Proposed only | Human-reviewed changes to strategies, goals, prompts, or tests |
+
+
+## Owner-editable identity configuration
+
+Concrete robot identity values live in [`config/mind/chromie_default.json`](../config/mind/chromie_default.json). `RobotIdentity` in Python defines only required fields and validation; it does not supply a name, age, or self-description. The maintained runtime selects the JSON through:
+
+```bash
+ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json
+```
+
+An owner may change the configured name, robot identity age, pronouns, self-description, or identity-answer guidance without changing code. Increment the profile version and review the complete profile before retaining `owner_approved=true`.
+
+The Orchestrator turns the loaded profile into one bounded owner-approved identity snapshot. Goal Interpretation, Goal Association, Fast Planner, Deep Planner, Response Composer, conversation, and direct fallback prompts all receive that same snapshot. Models still infer whether a user is asking about identity and choose natural wording; the Host does not detect name or age questions with keywords or return a fixed answer.
 
 ## Social Interaction Style configuration
 
@@ -197,7 +210,7 @@ or apply any update automatically.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ORCH_MIND_PROFILE_PATH` | unset | Optional JSON mind profile. Relative paths resolve from the repo root. |
+| `ORCH_MIND_PROFILE_PATH` | `config/mind/chromie_default.json` | Owner-editable concrete identity and complete MindProfile JSON. Relative paths resolve from the repo root. |
 | `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600` | Maximum prompt-summary size attached to routed context. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1` | Enable local experience/proposal JSONL writes. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl` | Durable local experience journal path. |
@@ -211,7 +224,7 @@ or apply any update automatically.
 Focused checks:
 
 ```bash
-PYTHONPATH=agent python -m unittest tests.test_mind_profile
+PYTHONPATH=. python -m pytest -q tests/test_mind_profile.py tests/test_cognitive_identity_context.py
 PYTHONPATH=agent python -m unittest tests.test_router_llm_prompt tests.test_conversation_agent_prompt tests.test_deepthinking_agent
 ```
 

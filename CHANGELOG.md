@@ -4,6 +4,13 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Owner-editable robot identity and cognitive propagation
+
+- Moved the maintained robot name, age, self-description, pronouns, internal-component boundary, and identity-answer guidance from Python defaults into `config/mind/chromie_default.json`, selected by `ORCH_MIND_PROFILE_PATH`.
+- Made `MindProfile.identity` required schema data and kept code responsible only for loading, validation, owner-approval boundaries, and prompt-safe projection.
+- Added one owner-approved identity context shared by Goal Interpretation, Goal Association, Fast Planner, Deep Planner, Response Composer, conversation fallback, and direct LLM fallback. Identity questions remain model-understood conversation rather than Host phrase rules.
+- Changed direct fallback speaker labeling to use the configured identity name instead of a hard-coded prompt suffix.
+
 ### Development/qualification LLM budget integrity
 
 - Raised the maintained RTX 5090 cognitive runner topology from 8192 to 32768

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
-from shared.chromie_contracts.mind import MindProfile, SocialInteractionStyle, default_mind_profile
+from shared.chromie_contracts.mind import (
+    MindProfile,
+    SocialInteractionStyle,
+    default_mind_profile,
+    default_mind_profile_path,
+    load_mind_profile,
+)
 
 
 class MindManager:
@@ -25,10 +30,13 @@ class MindManager:
     @classmethod
     def from_env(cls, *, project_root: Path | None = None) -> "MindManager":
         raw_path = os.getenv("ORCH_MIND_PROFILE_PATH", "").strip()
-        profile_path = Path(raw_path).expanduser() if raw_path else None
-        if profile_path and not profile_path.is_absolute() and project_root is not None:
-            profile_path = project_root / profile_path
-        profile = cls._load_profile(profile_path) if profile_path else default_mind_profile()
+        if raw_path:
+            profile_path = Path(raw_path).expanduser()
+            if not profile_path.is_absolute() and project_root is not None:
+                profile_path = project_root / profile_path
+        else:
+            profile_path = default_mind_profile_path(project_root)
+        profile = cls._load_profile(profile_path)
         social_style_preset = os.getenv("ORCH_SOCIAL_INTERACTION_STYLE_PRESET", "").strip().lower()
         if social_style_preset:
             profile = profile.model_copy(
@@ -48,10 +56,7 @@ class MindManager:
     def _load_profile(path: Path | None) -> MindProfile:
         if path is None:
             return default_mind_profile()
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError(f"mind profile {path} must contain a JSON object")
-        return MindProfile.model_validate(payload)
+        return load_mind_profile(path)
 
     def context(self) -> dict[str, Any]:
         context = self.profile.prompt_context(max_chars=self.context_max_chars)

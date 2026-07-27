@@ -86,6 +86,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
 - [Tool Result Interpretation](TOOL_RESULT_INTERPRETATION.md)
 - [Built-In TTS Voice Catalog](../assets/tts/voices/README.md)
+- [Owner-Editable Mind Profile](../config/mind/README.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)

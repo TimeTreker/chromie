@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .cognitive_identity import IDENTITY_SEMANTIC_CONTRACT, bounded_identity_json
 from .schema import AgentRunRequest
 
 try:
@@ -553,6 +554,7 @@ class GoalAssociationResolver:
         ),
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        identity_json = bounded_identity_json(context)
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
@@ -585,12 +587,15 @@ class GoalAssociationResolver:
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
             "The clarification field is only a concise user-facing question. Never put analysis, rationale, translation, route labels, validator errors, model failures, or system diagnostics in clarification. Put optional compact rationale in reason_summary. If the user meaning is materially ambiguous, use decision=clarify; otherwise keep clarification empty.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
             + "Each new_goals object contains exactly one field: description.\n\n"
+            "Owner-approved robot identity JSON:\n"
+            f"{identity_json}\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 6500)}\n\n"
             "Recent conversation JSON:\n"
@@ -616,6 +621,8 @@ class GoalAssociationResolver:
         raw: dict[str, Any],
         validation_error: str,
     ) -> str:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_json = bounded_identity_json(context)
         if output_type is GoalSegmentationModelOutput:
             contract_name = "Goal Segmentation"
             revision_action = "Re-evaluate the independent goal segmentation"
@@ -643,6 +650,10 @@ class GoalAssociationResolver:
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             + state_instructions
+            + "\n\n"
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
+            + "\n\nOwner-approved robot identity JSON:\n"
+            + identity_json
             + "\n\n"
             f"Latest user turn:\n{request.text}\n\n"
             "Bounded active goals JSON:\n"

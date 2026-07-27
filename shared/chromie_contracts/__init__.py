@@ -51,6 +51,8 @@ from .mind import (
     SocialInteractionPreset,
     SocialInteractionStyle,
     default_mind_profile,
+    default_mind_profile_path,
+    load_mind_profile,
 )
 from .session import SessionContext
 from .response_composition import (
@@ -180,6 +182,8 @@ __all__ = [
     "SocialInteractionPreset",
     "SocialInteractionStyle",
     "default_mind_profile",
+    "default_mind_profile_path",
+    "load_mind_profile",
     "SessionContext",
     "ResponseCompositionStatus",
     "ResponseCompositionPhase",

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .cognitive_identity import IDENTITY_SEMANTIC_CONTRACT, bounded_identity_json
 from .schema import AgentRunRequest
 
 try:
@@ -371,6 +372,7 @@ class DeepPlannerResolver:
         expected_goal_ids: list[str],
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        identity_json = bounded_identity_json(context)
         fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
         goals = context.get("active_goal_snapshots") or []
         association = context.get("goal_association_resolution") or {}
@@ -390,6 +392,7 @@ class DeepPlannerResolver:
             f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 1800)}\n\n"
             f"Goal association advisory JSON:\n{self._bounded(association, 3200)}\n\n"
             f"Active goals JSON:\n{self._bounded(goals, 3200)}\n\n"
+            f"Owner-approved robot identity JSON:\n{identity_json}\n\n"
             f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
             f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 6000)}\n\n"
             f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
@@ -397,6 +400,7 @@ class DeepPlannerResolver:
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. Recent trusted tool evidence may satisfy or ground a conversational response without another skill execution when the model judges it semantically relevant and fresh. Do not repeat a lookup solely because the latest utterance is elliptical; do not decide relevance through phrase tables or fixed recency rules. "
             f"{route_effect_contract}"
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
