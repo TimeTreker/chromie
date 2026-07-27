@@ -27,7 +27,7 @@ Cognitive Gateway admission
 The common safe base enables structured interaction and authoritative
 cognitive `apply` for `chat` while leaving Soridormi disabled. The maintained
 `scripts/start_chromie.sh` Soridormi launcher enables the trusted provider and
-widens authoritative lanes to `chat,robot_action`. Both profiles use
+widens authoritative lanes to `chat,robot_action,tool`. Both profiles use
 `fail_closed` after the Goal-driven Runtime acquires a turn. The standalone
 Goal Association, Fast Planner, Deep Planner, Response Composer, and task
 continuity observer switches are off because the unified coordinator owns
@@ -131,7 +131,7 @@ conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --cognitive-runtime \
-  --cognitive-apply-lanes chat,robot_action \
+  --cognitive-apply-lanes chat,robot_action,tool \
   --no-speaker
 ```
 

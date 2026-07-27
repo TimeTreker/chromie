@@ -12,6 +12,8 @@ from typing import Any, Awaitable, Callable, Literal, Protocol
 from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field
 
+from orchestrator.schemas.route import RouteDecision as CompatibilityRouteDecision
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
     execution_outcome_fingerprint,
@@ -1434,12 +1436,47 @@ class GoalDrivenRuntimeCoordinator:
         *,
         text: str,
         sid: str,
-        route_decision: Any,
+        route_decision: Any | None = None,
+        core_interpretation: CoreInterpretationResult | None = None,
         context: dict[str, Any],
         history: list[dict[str, Any]],
         language: str,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
+        if core_interpretation is not None:
+            if turn_envelope is None:
+                raise ValueError(
+                    "Core interpretation requires its admitted UserTurnEnvelope"
+                )
+            if core_interpretation.turn_id != turn_envelope.turn_id:
+                raise ValueError(
+                    "Core interpretation turn does not match UserTurnEnvelope"
+                )
+            if core_interpretation.session_id != turn_envelope.session_id:
+                raise ValueError(
+                    "Core interpretation session does not match UserTurnEnvelope"
+                )
+            route_decision = CompatibilityRouteDecision.model_validate(
+                core_interpretation.route_decision_projection().model_dump(
+                    mode="json"
+                )
+            )
+            context = {
+                **context,
+                "core_interpretation": core_interpretation.model_dump(
+                    mode="json",
+                    exclude={"compatibility_projection"},
+                ),
+                "core_interpretation_projection_digest": (
+                    core_interpretation.projection_digest
+                ),
+            }
+        if route_decision is None:
+            raise ValueError(
+                "Goal-driven Runtime requires a Core interpretation or explicit "
+                "compatibility RouteDecision"
+            )
+
         if turn_envelope is not None:
             if turn_envelope.admission not in {"admit", "reflex_and_admit"}:
                 raise ValueError(

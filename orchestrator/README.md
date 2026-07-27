@@ -52,10 +52,13 @@ plan/runtime bindings, validates Skill Runtime receipts, atomically reconciles
 Goal state, and rebuilds an unaffected confirmation remainder when possible.
 A shared-owner pending request fails closed without changing its token, while a
 post-dispatch reconciliation failure is surfaced as an uncertain final state.
-Goal Interpretation still hosts addressedness review and mixed compatibility semantics,
-so physical extraction of the five Gateway modules remains open. Existing
-legacy routing APIs, service names, environment variables, and log fields remain
-current compatibility surfaces.
+Input Normalization, Protective Reflex, Context Assembly, focused Attention
+Review, and Turn Admission are physically distinct modules. Admission completes
+before ordinary Goal Interpretation. The Core endpoint accepts only an admitted
+`CoreTurnRequest`; it returns a Core-owned `CoreInterpretationResult`, while the
+legacy `RouteDecision` shape survives only as a digest-bound internal projection
+for dependent planner contracts. Existing compatibility service names, environment
+variables, and log fields remain migration surfaces rather than semantic authority.
 
 ## Current interaction paths
 

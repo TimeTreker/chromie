@@ -330,14 +330,14 @@ ORCH_ENABLE_SORIDORMI_SKILLS=0
 ORCH_CONFIRMATION_TTL_SEC=20
 ORCH_SKILL_MAX_CONCURRENCY=8
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat
+ORCH_COGNITIVE_APPLY_LANES=chat,tool
 AGENT_INTERACTION_OUTPUT_MODE=native
 AGENT_NATIVE_INTERACTION_FALLBACK=0
 ```
 
-The common safe base owns the `chat` lane through the unified cognitive runtime
-while leaving Soridormi skills off. The maintained Soridormi launcher widens
-authority to `chat,robot_action`; provider-backed simulator acceptance must still
+The common safe base owns the `chat,tool` lanes through the unified cognitive
+runtime while leaving Soridormi skills off. The maintained Soridormi launcher
+widens authority to `chat,robot_action,tool`; provider-backed simulator acceptance must still
 close before any supervised physical deployment. Runtime confirmation policy is
 not selected from backend identity.
 

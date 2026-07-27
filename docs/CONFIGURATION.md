@@ -198,6 +198,24 @@ Inside Docker, use Compose service names such as
 `http://chromie-llm:11434`; do not copy host loopback URLs into container
 configuration.
 
+## Cognitive Gateway attention review inside Agent
+
+| Variable | Default or profile behavior |
+|---|---|
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED` | `1`; enables the focused pre-Core addressedness classifier. Disabled or unavailable review admits the turn and cannot block direct/unclear speech. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Defaults to `AGENT_GOAL_INTERPRETER_MODEL`; the launcher-effective model identity must be retained with cognitive evidence. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS` | `2500`; bounded model-call deadline. Timeout and transport failure fail open to Core admission. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE` | `0.72`; applies only to inactive ambient speech acts. It is not a normal-intent or capability threshold. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX` | `2048`; bounded engagement and latest-transcript context. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT` | `96`; schema-constrained addressedness, speech-act, and confidence output. |
+
+Attention Review runs after deterministic Protective Reflex and Context Assembly,
+but before ordinary Goal Interpretation. Its schema contains no route, intent,
+goal, capability, tool, action, plan, or response fields. Active interaction
+context admits without a model call. Inactive suppression requires a valid
+high-confidence ambient speech act; direct question form, directed speech acts,
+uncertainty, malformed output, and model failure all fail open.
+
 ## Goal Interpretation inside Agent
 
 | Variable | Default or profile behavior |
@@ -372,16 +390,14 @@ how many catalog items were visible, what route/intent the raw model JSON
 contained, and whether normalization changed the final route. Full raw model
 JSON and prompt text require the debug flags above.
 
-Goal Interpretation has a hard operational filter, a focused addressedness gate,
-normal semantic stages, and deterministic validation guardrails. Interrupt,
-silence, and unusable-audio handling stay deterministic in every mode. When
-host engagement is inactive, the focused classifier returns only `addressed`
-and confidence; deterministic code may map a high-confidence false result to
-non-speaking ambient `ignore`, while failure or uncertainty preserves the
-original route. The optional post-interrupt review runs only after
-that interrupt is already applied, so it cannot delay cancellation; it may only
-confirm the stop or attach a corrected follow-up route. The quick intent stage
-uses catalog-bounded LLM routing when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
+Cognitive Gateway owns the hard operational filter and focused addressedness
+review before Core entry. Interrupt, silence, and unusable-audio handling stay
+deterministic in every mode. Goal Interpretation receives only an admitted
+envelope and no longer performs ambient suppression. The optional
+post-interrupt semantic review runs only after that interrupt is already applied,
+so it cannot delay cancellation; it may only confirm the stop or attach a
+corrected follow-up interpretation. The quick intent stage uses catalog-bounded
+LLM reasoning when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
 The deep-thought stage is reached when quick intent returns low confidence or
 explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
 module, not by the fast Goal Interpreter model. Soft deterministic validators may correct

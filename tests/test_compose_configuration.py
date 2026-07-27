@@ -64,6 +64,16 @@ class ComposeConfigurationTests(unittest.TestCase):
 
         self.assertIn("AGENT_GOAL_INTERPRETER_USE_LLM: ${AGENT_GOAL_INTERPRETER_USE_LLM:-1}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL: ${AGENT_GOAL_INTERPRETER_MODEL:-qwen3:4b}", agent_block)
+        self.assertIn(
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED: "
+            "${AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED:-1}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL: "
+            "${AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL:-qwen3:4b}",
+            agent_block,
+        )
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE:-24h}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)

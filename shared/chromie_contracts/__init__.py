@@ -1,4 +1,5 @@
 from .route import RouteDecision, RouteItem, RouteRequest
+from .core_interpretation import CoreInterpretationResult
 from .agent import AgentRequest, AgentResult, SpeechItem
 from .action import ActionCommand, ActionResult
 from .interaction import (
@@ -75,8 +76,13 @@ from .reflex import (
 from .user_turn import (
     AttentionDisposition,
     AttentionFinding,
+    AttentionReviewRequest,
+    AttentionReviewResult,
+    AttentionSpeechAct,
     ContextFreshness,
     ContextReference,
+    CoreTurnRequest,
+    GatewayContextSnapshot,
     InputQualityEvidence,
     InputQualitySource,
     NormalizedTurnInput,
@@ -193,8 +199,13 @@ __all__ = [
     "ReflexTrigger",
     "AttentionDisposition",
     "AttentionFinding",
+    "AttentionReviewRequest",
+    "AttentionReviewResult",
+    "AttentionSpeechAct",
     "ContextFreshness",
     "ContextReference",
+    "CoreTurnRequest",
+    "GatewayContextSnapshot",
     "InputQualityEvidence",
     "InputQualitySource",
     "NormalizedTurnInput",

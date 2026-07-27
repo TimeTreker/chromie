@@ -523,6 +523,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     # Import after environment defaults are set; the Orchestrator module loads
     # .env.runtime on import but does not override already-exported values.
     from orchestrator.orchestrator import VoiceAssistant  # noqa: PLC0415
+    from orchestrator.schemas.route import RouteDecision  # noqa: PLC0415
 
     assistant = VoiceAssistant()
     errors: list[str] = []
@@ -576,16 +577,45 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         )
         context["robot_state"] = robot_state
 
-        route_start = time.perf_counter()
-        route = await assistant.agent_client.interpret_turn(
+        gateway = assistant._cognitive_gateway_adapter()
+        turn_capture = gateway.capture(
+            args.text,
+            session_id=sid,
+            conversation_id=context.get("conversation_id"),
+            channel="text",
+        )
+        context_snapshot = gateway.assemble_context(turn_capture, context)
+        attention_review = await assistant.agent_client.review_attention(
             session,
-            text=args.text,
-            sid=sid,
-            language=args.language,
-            context=context,
+            request=gateway.attention_request(turn_capture, context_snapshot),
+        )
+        turn_envelope = gateway.admit_attention(
+            turn_capture,
+            context_snapshot,
+            attention_review,
+        )
+        if turn_envelope.admission != "admit":
+            raise RuntimeError(
+                "text-to-MuJoCo acceptance input was suppressed before Core entry"
+            )
+
+        route_start = time.perf_counter()
+        core_interpretation = await assistant.agent_client.interpret_turn(
+            session,
+            turn_envelope=turn_envelope,
+            context_snapshot=context_snapshot,
+        )
+        route = RouteDecision.model_validate(
+            core_interpretation.route_decision_projection().model_dump(
+                mode="json"
+            )
         )
         route_ms = (time.perf_counter() - route_start) * 1000.0
         timings_ms["route_ms"] = route_ms
+        _write_json(
+            evidence_dir / "core_interpretation.json",
+            core_interpretation.model_dump(mode="json"),
+        )
         _write_json(evidence_dir / "route.json", route.model_dump(mode="json"))
         assistant.session_log(
             sid,
@@ -604,26 +634,14 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             enabled=bool(args.cognitive_runtime),
             apply_lanes=str(args.cognitive_apply_lanes),
         )
-        turn_envelope = None
         if cognitive_runtime_selected:
-            gateway = assistant._cognitive_gateway_adapter()
-            turn_capture = gateway.capture(
-                args.text,
-                session_id=sid,
-                conversation_id=context.get("conversation_id"),
-                channel="text",
-            )
-            turn_envelope = gateway.for_core_review(
-                turn_capture,
-                context=context,
-                decision=route,
-            )
             cognitive_resolution = await assistant._run_cognitive_runtime_pipeline(
                 session,
                 user_text=args.text,
                 session_id=sid,
                 context=context,
                 decision=route,
+                core_interpretation=core_interpretation,
                 record_evidence=False,
                 turn_envelope=turn_envelope,
             )

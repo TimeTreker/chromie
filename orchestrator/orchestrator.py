@@ -83,6 +83,7 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -3068,6 +3069,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
+        core_interpretation: CoreInterpretationResult | None = None,
         record_evidence: bool = True,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
@@ -3127,7 +3129,10 @@ class VoiceAssistant:
                     session,
                     text=resolved_text,
                     sid=resolved_session_id,
-                    route_decision=decision,
+                    route_decision=(
+                        decision if core_interpretation is None else None
+                    ),
+                    core_interpretation=core_interpretation,
                     context=authority_context,
                     history=resolved_history,
                     language=resolved_language,
@@ -3437,6 +3442,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
+        core_interpretation: CoreInterpretationResult | None = None,
         core_interpretation_latency_ms: float,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> tuple[bool, RouteDecision]:
@@ -3464,6 +3470,7 @@ class VoiceAssistant:
             session_id=session_id,
             context=context,
             decision=decision,
+            core_interpretation=core_interpretation,
             record_evidence=False,
             turn_envelope=turn_envelope,
         )
@@ -4332,21 +4339,93 @@ class VoiceAssistant:
                 separators=(",", ":"),
             ),
         )
-        core_start_ms = now_ms()
-        self.session_log(session_id, "cognitive_core_start: text_chars=%s text=%r", len(user_text), user_text)
+        context_snapshot = gateway.assemble_context(turn_capture, context)
+        attention_request = gateway.attention_request(
+            turn_capture,
+            context_snapshot,
+        )
         try:
-            decision = await self.agent_client.interpret_turn(session, text=user_text, sid=session_id, context=context)
+            review_attention = getattr(self.agent_client, "review_attention")
+            attention_review = await review_attention(
+                session,
+                request=attention_request,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Cognitive Gateway attention review failed open: %s",
+                exc,
+            )
+            attention_review = gateway.attention_fail_open(
+                attention_request,
+                reason=f"attention review unavailable: {type(exc).__name__}",
+            )
+        turn_envelope = gateway.admit_attention(
+            turn_capture,
+            context_snapshot,
+            attention_review,
+        )
+        self.session_log(
+            session_id,
+            "cognitive_gateway_attention_done: disposition=%s speech_act=%s confidence=%.2f source=%s",
+            attention_review.disposition,
+            attention_review.speech_act,
+            attention_review.confidence,
+            attention_review.source,
+        )
+        if turn_envelope.admission == "suppress":
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route="ignore",
+                intent="ambient_speech",
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": attention_review.source,
+                        "confidence": attention_review.confidence,
+                        "speech_act": attention_review.speech_act,
+                        "reason": attention_review.reason,
+                    },
+                    turn_envelope,
+                ),
+            )
+            state = self.sessions.state.get(session_id)
+            if state is not None:
+                state["llm_done"] = True
+            self.maybe_session_done(session_id)
+            return
+
+        core_start_ms = now_ms()
+        self.session_log(
+            session_id,
+            "cognitive_core_start: text_chars=%s text=%r admission=%s",
+            len(user_text),
+            user_text,
+            turn_envelope.admission,
+        )
+        try:
+            core_interpretation = await self.agent_client.interpret_turn(
+                session,
+                turn_envelope=turn_envelope,
+                context_snapshot=context_snapshot,
+            )
+            decision = RouteDecision.model_validate(
+                core_interpretation.route_decision_projection().model_dump(
+                    mode="json"
+                )
+            )
             core_interpretation_latency_ms = now_ms() - core_start_ms
             self.session_log(
                 session_id,
-                "cognitive_core_done: core_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
+                "cognitive_core_done: core_ms=%.1f lane=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s authority=%s projection=%s",
                 core_interpretation_latency_ms,
-                decision.route,
+                core_interpretation.lane,
                 ",".join(decision.agents),
-                decision.intent,
-                decision.confidence,
+                core_interpretation.intent,
+                core_interpretation.confidence,
                 decision.interrupt_current,
                 decision.needs_agent,
+                core_interpretation.authority,
+                core_interpretation.projection_digest[:12],
             )
         except Exception as exc:
             self.session_log(session_id, "cognitive_core_exception: core_ms=%.1f error=%s", now_ms() - core_start_ms, exc)
@@ -4355,56 +4434,26 @@ class VoiceAssistant:
                 user_text,
                 context=context,
             )
-            turn_envelope = gateway.for_direct(
-                turn_capture,
-                context=context,
-                source="orchestrator.cognitive_core_exception",
-                reason="Cognitive Core interpretation failed; preserving safe fallback",
-            )
-            if safe_response is not None:
-                self.conversation_state.record_user_turn(
-                    session_id,
-                    user_text,
-                    route="safe_fallback",
-                    intent="cognitive_core_exception_embodied",
-                    metadata=self._metadata_with_turn_envelope(
-                        {"source": "cognitive_core_exception", "error": str(exc)},
-                        turn_envelope,
-                    ),
-                )
-                self.session_log(
-                    session_id,
-                    "cognitive_core_exception_safe_fallback: reason=embodied_request text=%r",
-                    user_text,
-                )
-                self.conversation_state.record_agent_result(session_id, safe_response)
-                self._launch_interaction(safe_response, session_id)
-                return
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
-                route="direct_llm",
+                route="safe_fallback",
                 intent="cognitive_core_exception",
                 metadata=self._metadata_with_turn_envelope(
                     {"source": "cognitive_core_exception", "error": str(exc)},
                     turn_envelope,
                 ),
             )
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    fallback_reason="cognitive_core_exception",
-                    route="direct_llm",
-                )
+            self.session_log(
+                session_id,
+                "cognitive_core_exception_safe_fallback: embodied=%s text=%r",
+                bool(safe_response.metadata.get("embodied_request")),
+                user_text,
             )
+            self.conversation_state.record_agent_result(session_id, safe_response)
+            self._launch_interaction(safe_response, session_id)
             return
 
-        turn_envelope = gateway.for_core_review(
-            turn_capture,
-            context=context,
-            decision=decision,
-        )
         if self.cognitive_runtime_mode == "apply":
             handled, decision = await self._try_apply_cognitive_runtime(
                 session,
@@ -4412,6 +4461,7 @@ class VoiceAssistant:
                 session_id=session_id,
                 context=context,
                 decision=decision,
+                core_interpretation=core_interpretation,
                 core_interpretation_latency_ms=core_interpretation_latency_ms,
                 turn_envelope=turn_envelope,
             )
@@ -5385,19 +5435,34 @@ class VoiceAssistant:
         user_text: str,
         *,
         context: dict[str, Any] | None = None,
-    ) -> InteractionResponse | None:
-        if not self._looks_like_embodied_request(user_text, context=context):
-            return None
+    ) -> InteractionResponse:
+        embodied = self._looks_like_embodied_request(user_text, context=context)
         zh = self._looks_zh(user_text)
-        text = (
-            "我听到了动作请求，但路由没有生成有效的动作结果，所以我不会移动。"
-            if zh
-            else "I heard a movement request, but routing did not produce a valid motion result, so I will not move."
-        )
-        return self._host_speech_response(
+        if embodied:
+            text = (
+                "我听到了动作请求，但这次认知处理没有完成，所以我不会执行动作。"
+                if zh
+                else "I heard an action request, but cognitive processing did not complete, so I will not perform it."
+            )
+        else:
+            text = (
+                "我这次没能处理好你的请求，请再说一次。"
+                if zh
+                else "I couldn't complete that request. Please try again."
+            )
+        response = self._host_speech_response(
             text,
             style="warning",
             source="host_cognitive_core_exception_safe_fallback",
+        )
+        return response.model_copy(
+            update={
+                "metadata": {
+                    **response.metadata,
+                    "embodied_request": embodied,
+                    "semantic_fallback": False,
+                }
+            }
         )
 
     def _agent_exception_safe_response(

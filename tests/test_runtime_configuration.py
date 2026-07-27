@@ -57,6 +57,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_USE_LLM"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:4b")
+        self.assertEqual(
+            values["AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"],
+            "1",
+        )
+        self.assertEqual(
+            values["AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"],
+            "qwen3:4b",
+        )
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE"], "24h")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
@@ -372,6 +380,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", verifier)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", verifier)
         self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", verifier)
+        self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL", verifier)
         self.assertNotIn('check_value "$name"', verifier)
 
     def test_start_chromie_waits_for_application_health(self) -> None:

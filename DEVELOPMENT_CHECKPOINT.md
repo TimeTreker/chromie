@@ -18,14 +18,14 @@
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-26
-**Current focus:** Execute Social Attention Baseline Qualification. Effective
-model/runtime identity, first-party adapter boundaries, lifecycle evidence,
-semantic cohort selection, homogeneous mode/style report bundling, complete
-128-case coverage validation, and deterministic hard-gate reporting are
-implemented. The remaining evidence work is to connect maintained
-live-model/live-service harnesses and retain the first real baseline without
-adding Runtime behavior policy.
+**Status refresh date:** 2026-07-27
+**Current focus:** Qualify the implemented Cognitive Gateway/Core migration. The
+five Gateway modules, pre-Core admission, admitted-envelope-only Core API,
+Core-owned interpretation result, and digest-bound compatibility projection are
+implemented and automatically verified. The remaining work is source-bound
+live-text, cancellation, tool-follow-up, multi-goal, MuJoCo, and safe-idle
+evidence followed by the final audit. Social Attention qualification remains
+paused until this checkpoint closes.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -71,6 +71,22 @@ coverage of all 128 cases. The implementation observes explicit facts only and
 does not infer gestures from text, select a model winner, or grant release
 qualification. See
 [Social Attention Baseline Qualification](docs/SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md).
+
+## Active mainline — Cognitive Gateway/Core boundary
+
+The manager-owned Cognitive Turn Loop covers Goal Association, Fast and terminal
+Deep planning, plan validation, prospective composition, trusted execution,
+`ExecutionOutcomeBundle` reconciliation, exact Goal-state application, and
+bounded final speech. The upstream authority migration is now implemented: five
+logical Gateway modules run normalization, deterministic reflex, context
+assembly, focused attention review, and final admission before ordinary Goal
+Interpretation. The Core accepts the admitted envelope and returns
+`CoreInterpretationResult`; a digest-bound `RouteDecision` projection is retained
+only for dependent planner contracts.
+
+Do not reopen this boundary with phrase routing, Benchmark-conditioned behavior,
+a second semantic authority, or automatic physical replay. Resume from the
+source-bound evidence checkpoint, then complete the final authority audit.
 
 ## Resume point
 
@@ -326,9 +342,9 @@ The current development implementation is present:
 - unified Goal Association, complete-coverage Fast Planning, terminal Deep
   Planning, Response Composition, atomic Goal-state application, and trusted
   Skill Runtime adaptation behind one host coordinator;
-- a common safe base with structured interaction and authoritative `chat`
-  `apply`, plus a maintained Soridormi launcher that enables the provider and
-  widens authority to `chat,robot_action`; both fail closed after ownership;
+- a common safe base with structured interaction and authoritative
+  `chat,tool` `apply`, plus a maintained Soridormi launcher that enables the
+  provider and widens authority to `chat,robot_action,tool`; both fail closed after ownership;
 - a single-semantic-authority boundary: exact Goal Interpretation actions are adapter-only,
   and the old CapabilityAgent planner is emergency-only behind host and Agent
   gates plus a non-empty matching-turn authoritative claim;
@@ -504,8 +520,8 @@ completed target validation.
    clean paired checkout; the functional simulator matrix already passes at
    diagnostic Level C.
 2. Keep the single-authority boundary fail closed: the common safe base owns
-   `chat`, the maintained Soridormi launcher widens ownership to
-   `chat,robot_action`, exact Goal Interpretation actions remain adapter-only, and the legacy
+   `chat,tool`, the maintained Soridormi launcher widens ownership to
+   `chat,robot_action,tool`, exact Goal Interpretation actions remain adapter-only, and the legacy
    CapabilityAgent planner may run only with both service gates and a fresh
    authoritative emergency claim matching the request turn.
 3. Verify evidence and artifact provenance before any preview packaging:
@@ -758,8 +774,8 @@ post-fix localhost rerun remains pending because the execution platform denied
 command approval. That session limitation is not a product blocker, and no target validation or
 deployment-readiness claim is made.
 
-The common safe base enables structured interaction and authoritative `chat`
-apply without Soridormi. The maintained Soridormi launcher enables that
-provider and widens authority to `chat,robot_action`. Both fail closed after
+The common safe base enables structured interaction and authoritative
+`chat,tool` apply without Soridormi. The maintained Soridormi launcher enables
+that provider and widens authority to `chat,robot_action,tool`. Both fail closed after
 ownership acquisition. Level A coverage exists; retained live-text and MuJoCo
 target evidence for this path remains open.

@@ -16,22 +16,37 @@ from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
+from .cognitive_gateway import AttentionReviewer
 
 try:
+    from chromie_contracts.core_interpretation import CoreInterpretationResult
+    from chromie_contracts.route import RouteDecision as SharedRouteDecision
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
         ToolResultInterpretationRequest,
+    )
+    from chromie_contracts.user_turn import (
+        AttentionReviewRequest,
+        AttentionReviewResult,
+        CoreTurnRequest,
     )
     from chromie_contracts.social_attention import (
         SocialAttentionMode,
         normalize_social_attention_mode,
     )
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+    from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
         ToolResultInterpretationRequest,
+    )
+    from shared.chromie_contracts.user_turn import (
+        AttentionReviewRequest,
+        AttentionReviewResult,
+        CoreTurnRequest,
     )
     from shared.chromie_contracts.social_attention import (
         SocialAttentionMode,
@@ -277,6 +292,49 @@ class Settings(BaseModel):
     capability_prompt_tier_overrides: str = Field(
         default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES", "")
     )
+    cognitive_gateway_attention_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED",
+            "1",
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    cognitive_gateway_attention_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
+        )
+    )
+    cognitive_gateway_attention_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS", "2500")
+        ),
+        ge=100,
+        le=120000,
+    )
+    cognitive_gateway_attention_min_suppression_confidence: float = Field(
+        default_factory=lambda: float(
+            os.getenv(
+                "AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE",
+                "0.72",
+            )
+        ),
+        ge=0.0,
+        le=1.0,
+    )
+    cognitive_gateway_attention_num_ctx: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX", "2048")
+        ),
+        ge=512,
+        le=131072,
+    )
+    cognitive_gateway_attention_num_predict: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT", "96")
+        ),
+        ge=32,
+        le=1024,
+    )
     task_continuity_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_TASK_CONTINUITY_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -456,6 +514,25 @@ social_attention_client = (
     if settings.use_llm and settings.social_attention_mode != "off"
     else None
 )
+cognitive_gateway_attention_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.cognitive_gateway_attention_model,
+        timeout_ms=settings.cognitive_gateway_attention_timeout_ms,
+        purpose="cognitive_gateway_attention_review",
+    )
+    if settings.use_llm and settings.cognitive_gateway_attention_enabled
+    else None
+)
+cognitive_gateway_attention_reviewer = AttentionReviewer(
+    cognitive_gateway_attention_client,
+    min_suppression_confidence=(
+        settings.cognitive_gateway_attention_min_suppression_confidence
+    ),
+    num_ctx=settings.cognitive_gateway_attention_num_ctx,
+    num_predict=settings.cognitive_gateway_attention_num_predict,
+)
+
 task_continuity_client = (
     OllamaClient(
         settings.ollama_url,
@@ -805,10 +882,47 @@ async def agents() -> dict:
 
 
 
-@app.post("/cognitive-core/interpret", response_model=CoreRouteDecision)
-async def interpret_cognitive_turn(request: CoreRouteRequest) -> CoreRouteDecision:
-    """Interpret one admitted turn inside the Goal-Driven Cognitive Core."""
-    return await interpret_turn(request)
+@app.post(
+    "/cognitive-gateway/attention-review",
+    response_model=AttentionReviewResult,
+)
+async def review_cognitive_gateway_attention(
+    request: AttentionReviewRequest,
+) -> AttentionReviewResult:
+    """Review bounded addressedness before ordinary Core semantics."""
+    return await cognitive_gateway_attention_reviewer.review(request)
+
+
+@app.post(
+    "/cognitive-core/interpret",
+    response_model=CoreInterpretationResult,
+)
+async def interpret_cognitive_turn(
+    request: CoreTurnRequest,
+) -> CoreInterpretationResult:
+    """Interpret one already-admitted immutable turn inside the Core."""
+    envelope = request.turn_envelope
+    context = dict(request.context_snapshot.context)
+    context["user_turn_envelope"] = envelope.model_dump(mode="json")
+    context["gateway_context_snapshot"] = request.context_snapshot.model_dump(
+        mode="json"
+    )
+    context["gateway_admission_complete"] = True
+    decision = await interpret_turn(
+        CoreRouteRequest(
+            sid=envelope.session_id,
+            text=envelope.normalized_input.text,
+            language=envelope.normalized_input.language,
+            context=context,
+        )
+    )
+    projection = SharedRouteDecision.model_validate(
+        decision.model_dump(mode="json")
+    )
+    return CoreInterpretationResult.from_route_decision(
+        envelope=envelope,
+        decision=projection,
+    )
 
 @app.post("/fast-plan")
 async def resolve_fast_plan(request: AgentRunRequest):

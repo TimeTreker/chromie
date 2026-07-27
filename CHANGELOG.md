@@ -1,12 +1,38 @@
 # Changelog
 
-- Removed legacy CapabilityAgent semantic skill substitution and argument reinterpretation; compatibility planning now preserves the exact model-selected named skill and schema-valid arguments.
-
-
-- Removed provider backend identity and calibrated yaw/pitch details from model-facing Social Attention candidates and target evidence; provider-owned calibration schemas now fail closed from cognitive discovery.
 All notable user-visible changes should be recorded here.
 
 ## Unreleased
+
+### Cognitive Gateway/Core mainline restored
+
+- Restored Cognitive Gateway decomposition and Core-entry migration as the sole
+  active architecture issue; Social Attention qualification is paused until the
+  single-authority cognitive path is complete.
+- Defined the implementation target: five explicit Gateway modules, pre-Core
+  admission, envelope-first Core API, isolated compatibility route projection,
+  and source-bound live-text/MuJoCo evidence.
+- Implemented the five physical Gateway modules, digest-bound context snapshots,
+  focused fail-open attention review, and final Turn Admission before Goal
+  Interpretation.
+- Changed `/cognitive-core/interpret` to require `CoreTurnRequest` and return a
+  Core-owned `CoreInterpretationResult`; the Goal-driven Runtime validates and
+  consumes that result while retaining `RouteDecision` only as a digest-bound
+  compatibility projection.
+- Added launcher-effective Gateway Attention model identity and automatic
+  contract, configuration, profile, Compose, and runtime-verification coverage.
+- Removed the post-admission direct-LLM fallback on Core failure. A failed Core
+  turn now returns only a conservative language-matched, speech-only operational
+  failure response and never creates a second semantic authority.
+
+### Prior architecture corrections
+
+- Removed legacy CapabilityAgent semantic skill substitution and argument
+  reinterpretation; compatibility planning preserves the exact model-selected
+  named skill and schema-valid arguments.
+- Removed provider backend identity and calibrated yaw/pitch details from
+  model-facing Social Attention candidates and target evidence; provider-owned
+  calibration schemas fail closed from cognitive discovery.
 
 ### Social Attention qualification run-scope integrity
 

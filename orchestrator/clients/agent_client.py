@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import quote
 
 import aiohttp
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -16,6 +17,13 @@ from shared.chromie_contracts.tool_result import (
     ToolExecutionResponse,
     ToolResultInterpretation,
     ToolResultInterpretationRequest,
+)
+from shared.chromie_contracts.user_turn import (
+    AttentionReviewRequest,
+    AttentionReviewResult,
+    CoreTurnRequest,
+    GatewayContextSnapshot,
+    UserTurnEnvelope,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
@@ -80,25 +88,41 @@ class AgentClient:
                 raise RuntimeError(f"Agent returned HTTP {resp.status}: {body[:500]}")
             return AgentResult.model_validate_json(body)
 
+    async def review_attention(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: AttentionReviewRequest,
+    ) -> AttentionReviewResult:
+        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
+        async with session.post(
+            f"{self.base_url}/cognitive-gateway/attention-review",
+            json=request.model_dump(mode="json"),
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    f"Cognitive Gateway attention review returned HTTP "
+                    f"{resp.status}: {body[:500]}"
+                )
+            return AttentionReviewResult.model_validate_json(body)
+
     async def interpret_turn(
         self,
         session: aiohttp.ClientSession,
         *,
-        text: str,
-        sid: str | None = None,
-        language: str | None = None,
-        context: dict[str, Any] | None = None,
-    ) -> RouteDecision:
-        payload = {
-            "sid": sid,
-            "text": text,
-            "language": language,
-            "context": context or {},
-        }
+        turn_envelope: UserTurnEnvelope,
+        context_snapshot: GatewayContextSnapshot,
+    ) -> CoreInterpretationResult:
+        request = CoreTurnRequest(
+            turn_envelope=turn_envelope,
+            context_snapshot=context_snapshot,
+        )
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
         async with session.post(
             f"{self.base_url}/cognitive-core/interpret",
-            json=payload,
+            json=request.model_dump(mode="json"),
             timeout=timeout,
         ) as resp:
             body = await resp.text()
@@ -106,7 +130,7 @@ class AgentClient:
                 raise RuntimeError(
                     f"Cognitive Core returned HTTP {resp.status}: {body[:500]}"
                 )
-            return RouteDecision.model_validate_json(body)
+            return CoreInterpretationResult.model_validate_json(body)
 
     async def health(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)

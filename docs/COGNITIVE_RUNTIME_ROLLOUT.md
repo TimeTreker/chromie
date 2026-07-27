@@ -176,13 +176,14 @@ applies only after all trusted validation and response-composition gates pass.
 Initial recommended lanes:
 
 ```env
-ORCH_COGNITIVE_APPLY_LANES=chat
+ORCH_COGNITIVE_APPLY_LANES=chat,tool
 ```
 
-The common safe base applies only `chat`. The maintained Soridormi launcher
-widens the set to `chat,robot_action` after enabling the trusted provider. Tool
-and memory lanes remain outside apply until their own retained live scenarios
-prove authorization, result truthfulness, and rollback.
+The common safe base applies `chat,tool`. The maintained Soridormi launcher
+widens the set to `chat,robot_action,tool` after enabling the trusted provider.
+The tool lane is constrained to registered schema-validated local providers and
+evidence-bound outcome composition. Memory remains outside apply until its own
+retained live scenarios prove authorization, result truthfulness, and rollback.
 
 ## 4. Lane classification
 
@@ -544,7 +545,7 @@ Review:
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat
+ORCH_COGNITIVE_APPLY_LANES=chat,tool
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
@@ -554,7 +555,7 @@ Retain successful and failure cases before widening lanes.
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
+ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
@@ -569,7 +570,7 @@ The text-to-MuJoCo checker uses the unified PR8 authority path by default:
 python scripts/interaction_text_mujoco_check.py \
   "Walk forward for five seconds, then nod." \
   --cognitive-runtime \
-  --cognitive-apply-lanes chat,robot_action \
+  --cognitive-apply-lanes chat,robot_action,tool \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker \
@@ -602,7 +603,7 @@ required.
 Remove the affected route before rollout:
 
 ```env
-ORCH_COGNITIVE_APPLY_LANES=chat
+ORCH_COGNITIVE_APPLY_LANES=chat,tool
 ```
 
 A routed `robot_action` turn is then excluded before Goal-driven authority

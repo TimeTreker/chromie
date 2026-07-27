@@ -28,6 +28,7 @@ MODEL_PLAN_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
     "AGENT_GOAL_INTERPRETER_MODEL",
+    "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
@@ -42,6 +43,7 @@ MODEL_PLAN_KEYS = (
 COGNITIVE_BUDGET_KEYS = (
     "CHROMIE_COGNITIVE_BUDGET_PROFILE",
     "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+    "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
     "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
     "AGENT_FAST_PLANNER_TIMEOUT_MS",
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
@@ -348,6 +350,8 @@ def active_models(values: Mapping[str, str]) -> list[str]:
             or enabled(values.get("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED"), default=True)
         ):
             append(values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL"))
+    if enabled(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"), default=True):
+        append(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"))
 
     if enabled(values.get("AGENT_USE_LLM"), default=True):
         append(values.get("AGENT_MODEL") or values.get("OLLAMA_MODEL"))
@@ -506,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[env] Auto-detected hardware profile: {manifest['active_profile']}")
     print(
         "[env] Model plan: "
+        f"gateway_attention={models['AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL']} "
         f"goal_interpreter={models['AGENT_GOAL_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "

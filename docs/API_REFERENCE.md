@@ -9,7 +9,8 @@ here. Current revision and verification status are maintained in
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/cognitive-core/interpret` | Interpret one admitted `UserTurnEnvelope` projection into a bounded cognitive decision for downstream goal association, planning, and response composition. |
+| `POST` | `/cognitive-gateway/attention-review` | Return only bounded addressedness admission evidence for one inactive turn; it cannot author route, intent, capability, action, plan, or response. |
+| `POST` | `/cognitive-core/interpret` | Interpret one admitted `CoreTurnRequest` containing an immutable `UserTurnEnvelope` and digest-bound `GatewayContextSnapshot`. |
 
 The Cognitive Gateway remains an embedded Host boundary and does not expose a
 separate semantic-routing service. It owns input normalization, protective
@@ -17,9 +18,17 @@ reflexes, attention review, bounded context assembly, and turn admission. The
 Goal-Driven Cognitive Core owns ordinary meaning, goal interpretation, task
 continuity proposals, capability intent, planning handoff, and response intent.
 
-`POST /cognitive-core/interpret` accepts the admitted text, session identity,
-optional language, and bounded source-attributed context. The result is advisory
-cognitive evidence; it does not authorize side effects. The Orchestrator still
+`POST /cognitive-gateway/attention-review` accepts only normalized turn identity,
+text, language, and bounded host engagement evidence. Suppression is limited to
+high-confidence inactive ambient speech; direct, unclear, malformed, unavailable,
+or failed review admits the turn.
+
+`POST /cognitive-core/interpret` accepts only a schema-valid admitted
+`CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,
+or a context digest mismatch is rejected before Goal Interpretation. The result
+is a `CoreInterpretationResult` bound to the turn and a SHA-256 digest of its
+internal `RouteDecision` compatibility projection. It is advisory cognitive
+evidence and does not authorize side effects. The Orchestrator still
 validates schemas, authorization, confirmation, resource conflicts, commitment,
 and trusted execution evidence before any effectful request runs.
 
@@ -40,6 +49,8 @@ running.
 | `GET` | `/health` | Return model/runtime state, loaded capability sources, feature gates, scheduler counters, and the legacy CapabilityAgent emergency gate. |
 | `GET` | `/semantic-authority` | Return the machine-readable single-authority route matrix and current Agent emergency-fallback gate. |
 | `GET` | `/agents` | List specialized agents and ownership notes. |
+| `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
+| `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |

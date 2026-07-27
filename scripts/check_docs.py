@@ -290,7 +290,7 @@ def check_project_direction(errors: list[str]) -> None:
         "## Completed phase - Text-to-MuJoCo interaction closure",
         "## Open evidence track - Physical audio validation",
         "## Completed phase - Robust simulation and provider readiness",
-        "## Current checkpoint - Cognitive authority and evidence validation",
+        "## Evidence checkpoint for the active Gateway/Core issue",
         "## Future phase - Physical pilot preparation",
         "## Later work",
     ):

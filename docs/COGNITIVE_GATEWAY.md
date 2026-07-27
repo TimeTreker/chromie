@@ -1,14 +1,14 @@
 # Cognitive Gateway / 认知网关
 
-Status: authoritative architecture and terminology decision. The versioned,
-immutable `UserTurnEnvelope`, shared `ReflexOutcome`/`ReflexFilter`, host
-admission adapter, deterministic stop/cancel path, and deterministic local
-suppression path are implemented. Admitted envelopes are projected into the
-current Goal-Driven Cognitive Core without changing the legacy routing path
-or Agent wire contracts. Physical extraction of the five logical modules,
-dedicated Soridormi E-stop/safe-idle evidence, and service-name migration
-remain open. Current implementation and evidence are owned by
-[STATUS.md](STATUS.md).
+Status: authoritative architecture with the code migration implemented. Input
+Normalization, Protective Reflex, Context Assembly, Attention Review, and Turn
+Admission are explicit modules. The normal order completes admission before
+ordinary Goal Interpretation; the admitted immutable `UserTurnEnvelope` and
+digest-bound `GatewayContextSnapshot` form `CoreTurnRequest`; and the Core returns
+`CoreInterpretationResult`. `RouteDecision` survives only as a digest-bound
+internal compatibility projection for dependent planner contracts. Dedicated
+Soridormi E-stop/safe-idle evidence and source-bound target qualification remain
+open. Current implementation and evidence are owned by [STATUS.md](STATUS.md).
 
 ## 1. Name and purpose
 

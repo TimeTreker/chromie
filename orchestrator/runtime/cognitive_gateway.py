@@ -1,48 +1,37 @@
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable
 
-from shared.chromie_contracts.reflex import (
-    DEFAULT_REFLEX_FILTER,
-    ReflexOutcome,
-)
+from shared.chromie_contracts.reflex import ReflexOutcome
 from shared.chromie_contracts.user_turn import (
-    AttentionFinding,
-    ContextReference,
+    AttentionReviewRequest,
+    AttentionReviewResult,
+    CoreTurnRequest,
+    GatewayContextSnapshot,
     InputQualityEvidence,
-    NormalizedTurnInput,
-    OriginalTurnInput,
     UserTurnEnvelope,
     normalize_turn_text,
 )
 
+from .cognitive_gateway_modules import (
+    AttentionReview,
+    ContextAssembly,
+    GatewayTurnCapture,
+    InputNormalization,
+    ProtectiveReflex,
+    TurnAdmission,
+)
+
 
 USER_TURN_ENVELOPE_CONTEXT_KEY = "user_turn_envelope"
-
-
-@dataclass(frozen=True)
-class GatewayTurnCapture:
-    """Pre-admission evidence retained while compatibility review runs."""
-
-    turn_id: str
-    session_id: str
-    conversation_id: str
-    channel: str
-    received_at: datetime
-    original_text: str
-    normalized_text: str
-    language: str
-    quality: InputQualityEvidence
-    reflex_candidate: ReflexOutcome
+GATEWAY_CONTEXT_SNAPSHOT_CONTEXT_KEY = "gateway_context_snapshot"
 
 
 @dataclass(frozen=True)
 class CoreTurnProjection:
-    """Legacy call arguments projected from one admitted envelope."""
+    """Compatibility call arguments projected from an admitted Core request."""
 
     text: str
     sid: str
@@ -52,23 +41,22 @@ class CoreTurnProjection:
 
 
 class CognitiveGateway:
-    """Build the canonical turn envelope before Goal-Driven Core reasoning."""
+    """Facade over the five physical Gateway modules.
 
-    _CONTEXT_SOURCES = {
-        "conversation": "orchestrator.conversation_state",
-        "history": "orchestrator.conversation_state",
-        "active_goal_snapshots": "orchestrator.conversation_state",
-        "interaction_engagement": "orchestrator.attention_policy",
-        "mind": "orchestrator.mind",
-        "robot_state": "orchestrator.runtime_state",
-    }
+    The facade preserves current host call sites while the modules own distinct
+    contracts and can be tested independently.
+    """
 
     def __init__(
         self,
         *,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self.input_normalization = InputNormalization(clock=clock)
+        self.protective_reflex = ProtectiveReflex()
+        self.attention_review = AttentionReview()
+        self.context_assembly = ContextAssembly(clock=clock)
+        self.turn_admission = TurnAdmission()
 
     def capture(
         self,
@@ -79,52 +67,64 @@ class CognitiveGateway:
         channel: str = "voice",
         quality: InputQualityEvidence | None = None,
     ) -> GatewayTurnCapture:
-        received_at = self._aware_now()
-        reflex = DEFAULT_REFLEX_FILTER.evaluate(text)
-        resolved_session_id = normalize_turn_text(session_id)
-        if not resolved_session_id:
-            raise ValueError("Gateway capture requires a non-empty session_id")
-        resolved_conversation_id = (
-            normalize_turn_text(conversation_id or "") or resolved_session_id
-        )
-        return GatewayTurnCapture(
-            turn_id=resolved_session_id,
-            session_id=resolved_session_id,
-            conversation_id=resolved_conversation_id,
+        normalized = self.input_normalization.capture(
+            text,
+            session_id=session_id,
+            conversation_id=conversation_id,
             channel=channel,
-            received_at=received_at,
-            original_text=text or "",
-            normalized_text=normalize_turn_text(text or ""),
-            language=reflex.language or "auto",
-            quality=quality
-            or InputQualityEvidence(
-                source="asr_final" if channel == "voice" else channel,
-                usable=True,
-                reason="accepted by the existing transport boundary",
-            ),
-            reflex_candidate=reflex,
+            quality=quality,
         )
+        return self.protective_reflex.evaluate(normalized)
 
-    @staticmethod
     def with_conversation_id(
+        self,
         capture: GatewayTurnCapture,
         conversation_id: str | None,
     ) -> GatewayTurnCapture:
-        normalized = normalize_turn_text(conversation_id or "")
-        if not normalized or normalized == capture.conversation_id:
-            return capture
-        return replace(capture, conversation_id=normalized)
+        normalized = self.input_normalization.with_conversation_id(
+            capture,
+            conversation_id,
+        )
+        if not isinstance(normalized, GatewayTurnCapture):
+            raise TypeError("Gateway conversation update lost reflex evidence")
+        return normalized
 
-    @staticmethod
     def with_reflex_outcome(
+        self,
         capture: GatewayTurnCapture,
         outcome: ReflexOutcome,
     ) -> GatewayTurnCapture:
-        return replace(
-            capture,
-            language=outcome.language or capture.language,
-            reflex_candidate=outcome,
-        )
+        return self.protective_reflex.with_outcome(capture, outcome)
+
+    def assemble_context(
+        self,
+        capture: GatewayTurnCapture,
+        context: dict[str, Any] | None,
+    ) -> GatewayContextSnapshot:
+        return self.context_assembly.assemble(capture, context)
+
+    def attention_request(
+        self,
+        capture: GatewayTurnCapture,
+        snapshot: GatewayContextSnapshot,
+    ) -> AttentionReviewRequest:
+        return self.attention_review.request(capture, snapshot)
+
+    def attention_fail_open(
+        self,
+        request: AttentionReviewRequest,
+        *,
+        reason: str,
+    ) -> AttentionReviewResult:
+        return self.attention_review.fail_open(request, reason=reason)
+
+    def admit_attention(
+        self,
+        capture: GatewayTurnCapture,
+        snapshot: GatewayContextSnapshot,
+        review: AttentionReviewResult,
+    ) -> UserTurnEnvelope:
+        return self.turn_admission.from_attention(capture, snapshot, review)
 
     def for_reflex(
         self,
@@ -132,37 +132,11 @@ class CognitiveGateway:
         *,
         context: dict[str, Any] | None = None,
     ) -> UserTurnEnvelope:
-        if capture.reflex_candidate.action != "interrupt":
-            raise ValueError("for_reflex requires an interrupt ReflexOutcome")
-        return self._envelope(
-            capture,
-            reflex=capture.reflex_candidate,
-            attention=AttentionFinding(
-                disposition="admit",
-                source="cognitive_gateway.protective_reflex",
-                confidence=1.0,
-                reason="protective control is retained for cognitive reconciliation",
-            ),
-            context=context,
-            admission="reflex_and_admit",
-        )
+        snapshot = self.assemble_context(capture, context) if context else None
+        return self.turn_admission.for_reflex(capture, snapshot)
 
-    def for_confirmation(
-        self,
-        capture: GatewayTurnCapture,
-    ) -> UserTurnEnvelope:
-        return self._envelope(
-            capture,
-            reflex=self._continued_reflex(capture),
-            attention=AttentionFinding(
-                disposition="admit",
-                source="orchestrator.confirmation_dialogue",
-                confidence=1.0,
-                reason="input is evaluated against a pending confirmation",
-            ),
-            context=None,
-            admission="admit",
-        )
+    def for_confirmation(self, capture: GatewayTurnCapture) -> UserTurnEnvelope:
+        return self.turn_admission.for_confirmation(capture)
 
     def for_direct(
         self,
@@ -172,21 +146,12 @@ class CognitiveGateway:
         source: str,
         reason: str,
     ) -> UserTurnEnvelope:
-        if capture.reflex_candidate.action != "continue":
-            raise ValueError(
-                "direct admission cannot override a deterministic reflex"
-            )
-        return self._envelope(
+        snapshot = self.assemble_context(capture, context) if context else None
+        return self.turn_admission.for_direct(
             capture,
-            reflex=self._continued_reflex(capture),
-            attention=AttentionFinding(
-                disposition="admit",
-                source=source,
-                confidence=1.0,
-                reason=reason,
-            ),
-            context=context,
-            admission="admit",
+            snapshot,
+            source=source,
+            reason=reason,
         )
 
     def for_suppression(
@@ -197,21 +162,12 @@ class CognitiveGateway:
         source: str = "cognitive_gateway.reflex_filter",
         reason: str | None = None,
     ) -> UserTurnEnvelope:
-        if capture.reflex_candidate.action != "ignore":
-            raise ValueError(
-                "for_suppression requires an ignore ReflexOutcome"
-            )
-        return self._envelope(
+        snapshot = self.assemble_context(capture, context) if context else None
+        return self.turn_admission.for_suppression(
             capture,
-            reflex=capture.reflex_candidate,
-            attention=AttentionFinding(
-                disposition="suppress",
-                source=source,
-                confidence=capture.reflex_candidate.confidence,
-                reason=reason or capture.reflex_candidate.reason,
-            ),
-            context=context,
-            admission="suppress",
+            snapshot,
+            source=source,
+            reason=reason,
         )
 
     def for_core_review(
@@ -221,71 +177,66 @@ class CognitiveGateway:
         context: dict[str, Any],
         decision: Any,
     ) -> UserTurnEnvelope:
-        metadata = (
-            decision.metadata if isinstance(getattr(decision, "metadata", None), dict) else {}
-        )
-        reflex = self._core_reflex(metadata) or capture.reflex_candidate
-        route = str(getattr(decision, "route", "") or "")
-        if route == "ignore" or reflex.action == "ignore":
-            confidence = self._bounded_confidence(
-                metadata.get("addressedness_confidence"),
-                fallback=(
-                    reflex.confidence
-                    if reflex.action == "ignore"
-                    else getattr(decision, "confidence", 0.0)
-                ),
-            )
-            return self._envelope(
-                capture,
-                reflex=(
-                    reflex
-                    if reflex.action == "ignore"
-                    else self._continued_reflex(capture)
-                ),
-                attention=AttentionFinding(
-                    disposition="suppress",
-                    source=(
-                        "cognitive_gateway.reflex_filter"
-                        if reflex.action == "ignore"
-                        else "cognitive_core.attention_review"
-                    ),
-                    confidence=confidence,
-                    reason=str(
-                        (
-                            reflex.reason
-                            if reflex.action == "ignore"
-                            else getattr(decision, "reason", "")
-                        )
-                        or "input was suppressed"
-                    ),
-                ),
-                context=context,
-                admission="suppress",
-            )
+        """Deprecated compatibility projection for historical tests/replays.
 
-        if reflex.action != "interrupt":
-            reflex = self._continued_reflex(capture)
-        admission = (
-            "reflex_and_admit" if reflex.action == "interrupt" else "admit"
+        Production admission no longer depends on a semantic RouteDecision.
+        """
+
+        snapshot = self.assemble_context(capture, context)
+        metadata = (
+            decision.metadata
+            if isinstance(getattr(decision, "metadata", None), dict)
+            else {}
         )
-        attention_confidence = self._bounded_confidence(
-            metadata.get("addressedness_confidence"),
-            fallback=1.0,
-        )
-        return self._envelope(
-            capture,
-            reflex=reflex,
-            attention=AttentionFinding(
-                disposition="admit",
-                source="cognitive_core.attention_review",
-                confidence=attention_confidence,
+        route = str(getattr(decision, "route", "") or "")
+        if route == "ignore":
+            review = AttentionReviewResult(
+                turn_id=capture.turn_id,
+                session_id=capture.session_id,
+                context_digest=snapshot.digest,
+                disposition="suppress",
+                speech_act=str(
+                    metadata.get("addressedness_speech_act") or "unclear"
+                ),
+                confidence=self._bounded_confidence(
+                    metadata.get("addressedness_confidence"),
+                    fallback=getattr(decision, "confidence", 0.0),
+                ),
+                source="cognitive_gateway.compatibility_route_projection",
                 reason=str(
                     getattr(decision, "reason", "")
-                    or "input admitted after Cognitive Core attention review"
+                    or "compatibility ignore projection"
                 ),
-            ),
-            context=context,
-            admission=admission,
+            )
+        else:
+            review = AttentionReviewResult(
+                turn_id=capture.turn_id,
+                session_id=capture.session_id,
+                context_digest=snapshot.digest,
+                disposition="admit",
+                speech_act=str(
+                    metadata.get("addressedness_speech_act") or "unclear"
+                ),
+                confidence=self._bounded_confidence(
+                    metadata.get("addressedness_confidence"),
+                    fallback=1.0,
+                ),
+                source="cognitive_gateway.compatibility_route_projection",
+                reason=str(
+                    getattr(decision, "reason", "")
+                    or "compatibility admitted projection"
+                ),
+            )
+        return self.admit_attention(capture, snapshot, review)
+
+    def core_request(
+        self,
+        envelope: UserTurnEnvelope,
+        snapshot: GatewayContextSnapshot,
+    ) -> CoreTurnRequest:
+        return CoreTurnRequest(
+            turn_envelope=envelope,
+            context_snapshot=snapshot,
         )
 
     def project_for_core(
@@ -309,6 +260,7 @@ class CognitiveGateway:
         projected_context[USER_TURN_ENVELOPE_CONTEXT_KEY] = envelope.model_dump(
             mode="json"
         )
+        projected_context["gateway_admission_complete"] = True
         projected_context["turn_id"] = envelope.turn_id
         projected_context["user_turn_schema_version"] = envelope.schema_version
         history = projected_context.get("history")
@@ -323,90 +275,6 @@ class CognitiveGateway:
         )
 
     @staticmethod
-    def metadata(
-        envelope: UserTurnEnvelope,
-    ) -> dict[str, Any]:
-        return {
-            USER_TURN_ENVELOPE_CONTEXT_KEY: envelope.model_dump(mode="json"),
-            "user_turn_envelope_schema_version": envelope.schema_version,
-            "turn_id": envelope.turn_id,
-        }
-
-    def _envelope(
-        self,
-        capture: GatewayTurnCapture,
-        *,
-        reflex: ReflexOutcome,
-        attention: AttentionFinding,
-        context: dict[str, Any] | None,
-        admission: str,
-    ) -> UserTurnEnvelope:
-        return UserTurnEnvelope(
-            turn_id=capture.turn_id,
-            session_id=capture.session_id,
-            conversation_id=capture.conversation_id,
-            channel=capture.channel,
-            received_at=capture.received_at,
-            original_input=OriginalTurnInput(text=capture.original_text),
-            normalized_input=NormalizedTurnInput(
-                text=capture.normalized_text,
-                language=reflex.language or capture.language or "auto",
-            ),
-            quality=capture.quality,
-            reflex=reflex,
-            attention=attention,
-            context_refs=self._context_refs(context),
-            admission=admission,
-        )
-
-    def _context_refs(
-        self,
-        context: dict[str, Any] | None,
-    ) -> tuple[ContextReference, ...]:
-        if not isinstance(context, dict):
-            return ()
-        captured_at = self._aware_now()
-        references: list[ContextReference] = []
-        for context_type, source in self._CONTEXT_SOURCES.items():
-            if context_type not in context:
-                continue
-            value = context.get(context_type)
-            digest = hashlib.sha256(
-                json.dumps(
-                    value,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    default=str,
-                ).encode("utf-8")
-            ).hexdigest()[:20]
-            references.append(
-                ContextReference(
-                    context_type=context_type,
-                    reference_id=f"ctx_{context_type}_{digest}",
-                    source=source,
-                    captured_at=captured_at,
-                    freshness="current",
-                    age_ms=0,
-                )
-            )
-        return tuple(references)
-
-    @staticmethod
-    def _core_reflex(metadata: dict[str, Any]) -> ReflexOutcome | None:
-        raw = metadata.get("reflex_outcome")
-        if not isinstance(raw, dict):
-            return None
-        try:
-            return ReflexOutcome.model_validate(raw)
-        except Exception:
-            return None
-
-    @staticmethod
-    def _continued_reflex(capture: GatewayTurnCapture) -> ReflexOutcome:
-        return ReflexOutcome(language=capture.language or "auto")
-
-    @staticmethod
     def _bounded_confidence(value: Any, *, fallback: Any) -> float:
         try:
             resolved = float(value if value is not None else fallback)
@@ -414,16 +282,19 @@ class CognitiveGateway:
             resolved = 0.0
         return max(0.0, min(1.0, resolved))
 
-    def _aware_now(self) -> datetime:
-        value = self._clock()
-        if value.tzinfo is None or value.utcoffset() is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value
+    @staticmethod
+    def metadata(envelope: UserTurnEnvelope) -> dict[str, Any]:
+        return {
+            USER_TURN_ENVELOPE_CONTEXT_KEY: envelope.model_dump(mode="json"),
+            "user_turn_envelope_schema_version": envelope.schema_version,
+            "turn_id": envelope.turn_id,
+        }
 
 
 __all__ = [
     "CoreTurnProjection",
     "CognitiveGateway",
+    "GATEWAY_CONTEXT_SNAPSHOT_CONTEXT_KEY",
     "GatewayTurnCapture",
     "USER_TURN_ENVELOPE_CONTEXT_KEY",
 ]

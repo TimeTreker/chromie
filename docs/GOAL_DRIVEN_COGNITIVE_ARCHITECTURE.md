@@ -2,17 +2,16 @@
 
 Status: Maintained architecture constitution
 Scope: Chromie cognition, planning, interaction, validation, and execution
-Implementation state: PR1-PR9 implement the maintained goal-association,
-planning, validation, pre-execution composition, trusted-execution, and
-post-execution closure path. A frozen version 1 Gateway-to-Core
-`UserTurnEnvelope`, exact immutable plan/request/result reconciliation,
-per-goal `ExecutionOutcomeBundle`, and speech-only final outcome response are
-integrated as defined by the
-[Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). Retained live-text and MuJoCo
-evidence for the authoritative path remains open. The logical Cognitive
-Gateway contract is active, but the current Goal Interpreter service still contains
-attention and compatibility semantics and has not completed physical
-decomposition.
+Implementation state: the maintained goal-association, planning, validation,
+pre-execution composition, trusted-execution, and post-execution closure path is
+implemented. Exact immutable plan/request/result reconciliation, per-goal
+`ExecutionOutcomeBundle`, and speech-only final outcome response are integrated
+as defined by the [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). The upstream
+boundary migration is also implemented: five explicit Cognitive Gateway modules
+complete admission before ordinary Goal Interpretation, the frozen version 1
+`UserTurnEnvelope` is required at Core entry, and a Core-owned interpretation
+result isolates the digest-bound compatibility route projection. Retained
+source-bound live-text and MuJoCo evidence remains open.
 
 ## 1. Purpose
 

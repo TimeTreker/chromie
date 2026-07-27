@@ -1,10 +1,4 @@
-- [x] Finalize Social Attention architecture documentation and regression guards.
-- [x] Reconcile MindProfile approval and Social Attention health defaults across contracts, runtime, tests, and docs.
-- [x] Move remaining Social Attention calibration and embodiment-specific argument ownership entirely into Soridormi/provider contracts.
 # Chromie Roadmap
-
-
-- [x] Remove backend identity and calibrated yaw/pitch details from model-facing Social Attention contracts.
 This document is the authority for delivery order and milestone exit criteria.
 The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
@@ -26,6 +20,36 @@ the former component, but no current architecture or production dependency may
 do so.
 
 The final closure audit also removed stale 8091 developer-tool/configuration contracts, integrated-container tests, Router-named metadata/provenance fields, and unused Host-authored weather acknowledgement composition. The maintained full test entrypoint and Benchmark checks must pass before the Social Attention benchmark expansion begins.
+
+## Active issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
+
+The Goal-Driven Cognitive Turn Loop and the Gateway/Core code migration are now
+implemented. The active Issue remains open for source-bound qualification and the
+final post-evidence audit:
+
+- [x] expose explicit contracts and implementations for Input Normalization,
+  Protective Reflex, Attention Review, Context Assembly, and Turn Admission;
+- [x] perform bounded Attention Review and final admission before ordinary Goal
+  Interpretation;
+- [x] make an admitted immutable `UserTurnEnvelope` the required normal input to
+  the Cognitive Core API;
+- [x] move addressedness suppression out of the authoritative Goal Interpretation
+  path and retain fail-open direct/unclear-speech behavior;
+- [x] confine `RouteDecision` to a digest-bound internal compatibility projection
+  while the Goal-driven Runtime consumes `CoreInterpretationResult`;
+- [x] keep stop, cancel, emergency, silence, and unusable-input handling
+  deterministic and evidence-bound;
+- [x] fail closed with a speech-only operational response when Core
+  interpretation fails, rather than invoking an independent direct-LLM fallback;
+- [ ] retain source-bound live-text, cancellation, tool-follow-up, multi-goal,
+  MuJoCo, and safe-idle evidence for the completed path;
+- [ ] complete the final repository-wide authority and documentation audit after
+  the retained evidence is available.
+
+`Issue: Social Attention Baseline Qualification` is paused, not cancelled. It
+resumes only after the Gateway/Core path above is the deployed single semantic
+authority. Benchmark remains an evaluator and must not supply cognition or
+Runtime behavior policy.
 
 ## Chromie Benchmark Suite
 
@@ -87,7 +111,7 @@ The Benchmark infrastructure issue is complete. Future work uses the suite to
 collect real model/service/MuJoCo/physical evidence and to promote reviewed gaps,
 not to add another evaluation-policy layer.
 
-Active issue — Social Attention Baseline Qualification:
+Paused issue — Social Attention Baseline Qualification:
 
 - [x] define the versioned qualification identity and deterministic hard gates;
 - [x] record launcher-effective model topology, MindProfile, style, authority,
@@ -192,7 +216,7 @@ Exit criteria before widening voice-device or profile support:
 - retained evidence uses the four-axis status vocabulary and does not turn a
   benchmark into release readiness.
 
-## Active engineering track - CosyVoice quality and interruption resilience
+## Open engineering track — CosyVoice quality and interruption resilience
 
 Chromie's framework-neutral TTS contract remains intact, but the maintained
 default is now Fun-CosyVoice3 0.5B. OuteTTS is an explicit low-resource fallback
@@ -228,7 +252,7 @@ Completion criteria:
 
 See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
 
-## Active architecture correction - Embodiment-independent Social Attention
+## Implemented architecture correction — Embodiment-independent Social Attention
 
 Chromie should decide social intent, style, and optional semantic expression
 without knowing whether Soridormi currently targets a simulator or a physical
@@ -242,6 +266,13 @@ The authoritative decision, migration sequence, and acceptance criteria are in
 
 Implemented scope:
 
+- Social Attention architecture documentation and regression guards are finalized;
+- MindProfile approval and Social Attention health defaults are reconciled across
+  contracts, runtime, tests, and documentation;
+- calibration and embodiment-specific argument ownership live entirely in
+  Soridormi/provider contracts;
+- backend identity and calibrated yaw/pitch details are absent from model-facing
+  Social Attention contracts;
 - public modes are `off`, `report_only`, and `on`, with maintained default `on`;
 - the static Chromie ability ontology has no simulator-only or hardware-only
   lifecycle states and does not activate provider body skills from Host mode;
@@ -348,8 +379,9 @@ state, and rebuilds unaffected pending confirmation work as a fresh child plan
 and token. Broad fixed-reflex receipts now reconcile request-level cancellation,
 partial work, provider uncertainty, Host-preflight cancellation, conservative
 confirmation revocation, and provider widening into canonical Goal state through
-one durable transaction. Retained E-stop/safe-idle evidence and physical
-five-module extraction remain open.
+one durable transaction. The five physical Gateway modules and their contracts are now implemented
+and automatically verified. Retained E-stop, safe-idle, live-text, and MuJoCo
+evidence remains open.
 
 Exit criteria before treating the Gateway/Core migration as complete:
 
@@ -418,7 +450,7 @@ Exit criteria before treating the implemented loop as target-qualified:
 - provider-backed live-text, simulator, microphone, E-stop, safe-idle, and
   physical-robot behavior remain separate evidence claims.
 
-## Current checkpoint - Cognitive authority and evidence validation
+## Evidence checkpoint for the active Gateway/Core issue
 
 The active milestone is to validate the implemented Goal-driven Runtime as the
 single semantic authority on the intended live-text and MuJoCo target, and to
@@ -426,8 +458,8 @@ make retained evidence provenance strong enough that an older run cannot be
 mistaken for validation of newer source.
 
 The common safe base enables structured interaction and authoritative `apply`
-for `chat` while leaving Soridormi off. The maintained Soridormi launcher
-enables that trusted provider and widens authority to `chat,robot_action`. Both
+for `chat,tool` while leaving Soridormi off. The maintained Soridormi launcher
+enables that trusted provider and widens authority to `chat,robot_action,tool`. Both
 fail closed after the Goal-driven Runtime acquires a turn. Exact Goal Interpretation actions
 are adapter-only; the old CapabilityAgent semantic planner is emergency-only
 behind both service gates and a non-empty matching-turn authority claim. That
@@ -709,8 +741,8 @@ verifiable plan completely satisfies them?”
 
 This track is implemented through PR8 with dependency-light automated evidence.
 The unified runtime is authoritative in lane-gated `apply`: the common safe
-base owns `chat`, and the maintained Soridormi launcher widens ownership to
-`chat,robot_action`. Both fail closed after ownership acquisition and preserve
+base owns `chat,tool`, and the maintained Soridormi launcher widens ownership to
+`chat,robot_action,tool`. Both fail closed after ownership acquisition and preserve
 explicit rollback controls. Retained live-text and MuJoCo target evidence
 remain open.
 

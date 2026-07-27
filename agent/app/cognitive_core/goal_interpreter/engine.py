@@ -1492,7 +1492,14 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
 
     decision: RouteDecision | None = None
     emergency_matched = False
-    priority = route_by_priority_rules(request)
+    gateway_admission_complete = bool(
+        request.context.get("gateway_admission_complete")
+    )
+    priority = (
+        None
+        if gateway_admission_complete
+        else route_by_priority_rules(request)
+    )
     if priority is not None:
         decision = await _review_priority_interrupt(request, priority)
         emergency_matched = True

@@ -7,6 +7,8 @@ from typing import Any
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.schemas.route import RouteDecision
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
 
 
 class _Sessions:
@@ -99,9 +101,19 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         class _CoreInterpreter:
-            async def interpret_turn(self, *args: Any, **kwargs: Any) -> RouteDecision:
-                del args, kwargs
-                return routed_interrupt
+            async def interpret_turn(
+                self,
+                *args: Any,
+                **kwargs: Any,
+            ) -> CoreInterpretationResult:
+                del args
+                envelope = kwargs["turn_envelope"]
+                return CoreInterpretationResult.from_route_decision(
+                    envelope=envelope,
+                    decision=SharedRouteDecision.model_validate(
+                        routed_interrupt.model_dump(mode="json")
+                    ),
+                )
 
         async def get_http_session(self: VoiceAssistant) -> object:
             return object()

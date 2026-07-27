@@ -2575,7 +2575,12 @@ class OllamaGoalInterpreter:
         # deterministic host checks only the model-authored contract and never
         # infers weather, tool, or physical intent from user-text keywords.
         decision = await self._repair_route_intent_contract(request, decision)
-        decision = await self._review_inactive_addressedness(request, decision)
+        # The deployed Core entry receives a Gateway-admitted envelope, so
+        # addressedness has already been decided upstream. Preserve the old
+        # reviewer only for explicit compatibility entrypoints and historical
+        # replays that do not carry the admission marker.
+        if request.context.get("gateway_admission_complete") is not True:
+            decision = await self._review_inactive_addressedness(request, decision)
         decision = await self._review_generic_chat_affordance(request, decision)
 
         if decision.route == "ignore":

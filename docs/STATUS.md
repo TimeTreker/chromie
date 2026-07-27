@@ -12,15 +12,18 @@
 **Status authority:** this file describes what is present in the repository snapshot.
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
-**Status refresh date:** 2026-07-26
-**Current focus:** **Run Social Attention Baseline Qualification. The repository
-now records launcher-effective model/runtime identity, provides first-party E2E
-adapter contracts, distinguishes proposal/materialization/provider lifecycle
-evidence, selects semantic cohorts, and produces deterministic hard-gate reports.
-Qualification now requires repeated homogeneous launcher-effective mode/style
-reports and exact non-duplicated 128-case coverage. The next evidence increment
-connects maintained live-model and authoritative live-service harnesses without
-turning Benchmark observations into Runtime behavior policy.**
+**Status refresh date:** 2026-07-27
+**Current focus:** **Qualify the implemented Cognitive Gateway/Core migration.
+Input Normalization, Protective Reflex, Context Assembly, focused Attention
+Review, and Turn Admission are explicit modules; admission completes before
+ordinary Goal Interpretation; `/cognitive-core/interpret` accepts only an admitted
+`CoreTurnRequest`; and the Goal-driven Runtime consumes a digest-bound
+`CoreInterpretationResult`. `RouteDecision` remains only as an internal
+compatibility projection for downstream contracts. Core failure no longer
+falls through to an independent direct-LLM path; it produces only a conservative
+speech-only operational failure response. Source-bound live-text, cancellation,
+tool-follow-up, multi-goal, MuJoCo, and safe-idle evidence remains open. Social Attention Baseline Qualification stays paused until that evidence
+checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -33,8 +36,9 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The final Router-removal closure audit passes the maintained `./scripts/run_tests.sh`
-entrypoint with 1,357 primary tests plus 20 legacy Agent tests. The completed
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,375 primary
+tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
+to their recorded revisions. The completed
 Benchmark foundation inventories 527 entries, normalizes 526 semantic scenarios,
 retains 128 reviewed Social Attention cases, adds E2E evidence profiles and six
 stress workload families, reconciles every maintained source through one
@@ -52,6 +56,13 @@ contracts, non-blocking primary work, and backend neutrality. First-party E2E
 adapters resolve deployment harnesses only through configured URL/callable
 boundaries; they do not embed endpoints or behavior rules. Qualification output
 remains non-release-qualified and requires human review.
+
+The Gateway/Core migration automated gate now passes 1,375 primary tests plus 20
+legacy Agent tests. Focused coverage verifies the five physical modules,
+digest-bound context, fail-open attention review, admitted-envelope-only Core
+entry, Core interpretation projection integrity, and preservation of the
+deterministic reflex path. This is implementation and automatic verification,
+not source-bound live-text, MuJoCo, E-stop, safe-idle, or physical evidence.
 
 The current branch closes two July 24 live-conversation regressions. With no
 active Goals, the constrained Goal Segmentation schema now requires a social
@@ -191,23 +202,23 @@ it is not Linux/GPU MuJoCo, audio-device, or physical-robot evidence.
 
 The current semantic layer is the Goal-Driven Cognitive Core, implemented by
 the unified Goal-driven Runtime and its single-semantic-authority boundary. Its
-upstream Cognitive Gateway is the ingress, protective-reflex, and
-attention/admission boundary. Its logical version 1 ingress contract is now
-implemented: the host preserves immutable input and correlation data in a
-frozen `UserTurnEnvelope`, applies shared deterministic stop/emergency or local
-suppression before ordinary cognition, records bounded attention/context
-evidence, and projects only admitted envelopes into the Core through a
-compatibility adapter. Fixed reflex cancellation now distinguishes
-`output_only`, `embodied_motion`, `current_interaction`, and
-`global_emergency`; the host records a structured dispatch receipt and the
-emergency path cancels every unfinished host interaction workflow and
-separately attempts Soridormi's dedicated E-stop. The host sweep remains
-fail-closed if runtime cancellation dispatch fails. The
-legacy routing path consumes the same reflex contract and still owns the
-deployed addressedness review plus semantic/advisory route, intent, affordance,
-action, and task proposals. Therefore the contract boundary is active while
-physical five-module extraction and the service/API migration remain
-incomplete. Named `specific_goal` cancellation is closed across Core, host,
+upstream Cognitive Gateway is the ingress, protective-reflex, context, and
+attention/admission boundary. Five explicit modules now preserve immutable input,
+apply deterministic protection, assemble a digest-bound source-attributed context
+snapshot, perform focused fail-open Attention Review, and create the final
+`UserTurnEnvelope` before ordinary Goal Interpretation. The Core endpoint rejects
+bare text, suppressed envelopes, identity drift, and context-digest mismatch. It
+returns a Core-owned `CoreInterpretationResult`; the remaining `RouteDecision` is
+a digest-bound compatibility projection validated inside the authoritative
+runtime. Historical compatibility entrypoints may still execute the old focused
+addressedness reviewer, but the deployed admitted path marks
+`gateway_admission_complete` and never delegates admission back to Goal
+Interpretation. Fixed reflex cancellation now distinguishes `output_only`,
+`embodied_motion`, `current_interaction`, and `global_emergency`; the host records
+a structured dispatch receipt and the emergency path cancels every unfinished
+host interaction workflow and separately attempts Soridormi's dedicated E-stop.
+The host sweep remains fail-closed if runtime cancellation dispatch fails. Named
+`specific_goal` cancellation is closed across Core, host,
 Skill Runtime, and Conversation State: semantic target IDs are resolved to exact
 plan bindings, receipts are validated before atomic Goal-state mutation,
 provider widening is reconciled, separable pending confirmations receive a
@@ -447,8 +458,8 @@ parameters as structured information gaps, and clarification answers remain
 attached to the original task. Immediate ResponsePlan commitments are checked
 against current task state and trusted evidence before fast-first playback. This
 is dependency-light automated evidence only. The common safe base applies the
-unified path to `chat`; the maintained Soridormi launcher widens it to
-`chat,robot_action`. Standalone Goal Association, planner, Response Composer,
+unified path to `chat,tool`; the maintained Soridormi launcher widens it to
+`chat,robot_action,tool`. Standalone Goal Association, planner, Response Composer,
 and task-continuity observer modes are off because the coordinator owns those
 stages. Semantic multi-goal response composition covers per-goal outcomes and
 exact step ownership, including mixed execute/respond/clarify/unavailable
@@ -547,12 +558,12 @@ Target validation or Release readiness.
 | Six maintained Compose services (ASR, three selectable TTS providers, LLM, Agent) plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR and routed execution have separate lifecycles, playback is ordered, delivery/effect barriers prevent motion before audible acknowledgement, and fast-first cache entries are provider/model/reference bound plus duration/ASR checked | Concurrency/cancellation, playback barriers, busy-ASR queue, cleanup, reference binding, TTS readiness, cache identity/content, timing, benchmark, and speech-path coverage | Oute diagnostics exposed enrollment-text leakage and poor Chinese; CosyVoice service startup and nonempty PCM were observed, but a retained Mandarin listening bundle remains open | SenseVoice CUDA and CosyVoice3 are defaults; late or mismatched audio fails closed |
 | Framework-neutral TTS providers | Contract version 1 with default CosyVoice3, explicit Oute and Qwen alternatives, immutable locks, authorized reference installation, common matrix, application readiness, warm synthesis, and bounded drain/restart cancellation | Provider/adapter/reference, cancellation, matrix, benchmark, cache, readiness, timeout, default/fallback wiring, and GPU-verifier tests | Repeated isolated runs: CosyVoice3 3.0987 s/0.5419 ordinary median first-binary/RTF; Qwen3-TTS 5.6786 s/0.9364; forced-restart recovery favored Qwen. Historical Oute listening diagnostics failed Chinese quality | `CHROMIE_TTS_BACKEND=cosyvoice3`, provider `fun-cosyvoice3-0.5b`, port 5000, one host request/worker; Oute on 5001 and Qwen on 5002 are explicit alternatives |
-| Cognitive Gateway ingress foundation | Logical contract implemented; deployment decomposition partial. Frozen version 1 `UserTurnEnvelope` and `ReflexOutcome` contracts preserve immutable input, normalized evidence, quality, attention, source/freshness context references, admission, and stable correlation. Fixed reflex scopes cover output, embodied motion, the foreground interaction, and global emergency. They retain active/queued dispatch receipts; output-only preserves pending approval, while a motion stop revokes the whole shared confirmation token if any confirmed request is motion-bound or unknown. Revocation happens before the first await; global emergency cancels every unfinished host interaction workflow even if runtime dispatch fails and separately attempts the dedicated Soridormi E-stop without waiting for audio teardown. Gateway admission and Attention Review are Host-owned; admitted semantic work enters the Agent-owned Goal-Driven Cognitive Core. The five Gateway responsibilities remain logically distinct even when co-deployed. Named `specific_goal` Core dispatch, exact receipt-to-Goal reconciliation, provider-widening reconciliation, partial confirmation-token rebuilding, and broad fixed-reflex receipt reconciliation are implemented | The current cancellation-closure gate passed 1,324 primary plus 20 legacy Agent tests, following the scoped and named-Goal foundations. Shared-envelope invariants and immutability, bilingual scope classification/contextual rejection, blocked-audio and real VAD/ASR safety dispatch, concurrent protective-reflex priority, active/queued isolation, queued-before-start closure, foreground launch reservation/restoration, global host-task fallback, shared-token approval widening, exact named-Goal dispatch, atomic target/coaffected reconciliation, confirmation-remainder rebuilding, broad request-to-Goal reconciliation, partial cancellation retention, Host-preflight unknown-start handling, shared-owner/stale binding, output/motion provider-scope widening, non-interruptible and cancellation-failure evidence, TaskGraph cancel-before-start/replay/fingerprint validation, dedicated E-stop postcondition checks, historical Router/direct-fallback suppression, and host/Core integration tests passed. The relevant Level A classes passed 4/4 deterministic safety cases and 5/5 evidence-bound closure cases | No retained post-change microphone, active-task cancellation, dedicated E-stop, safe-idle, simulator, or hardware evidence | Gateway/Core boundary active; Goal Interpretation is embedded in Agent and Attention Review remains Gateway-owned |
-| Cognitive Gateway and embedded Goal Interpretation | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Embedded Goal Interpretation uses catalog context, bounded host engagement evidence supplied by the Gateway, structural validation, semantic repair, clarification, or deep handoff. Its semantic route/intent, affordance, action, and task outputs are migration advisories, not final Core authority. Only high-confidence explicitly ambient inactive speech may use semantic `ignore`; direct/unclear contradictions fail open, ignored turns do not open engagement, and retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Goal Interpreter rules, Gateway addressedness/engagement, direct-question false-review, low-information retained-task, capability interpretation, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose repeated ambient `capability_inquiry` and isolated `I.` failures; the July 23 trace diagnoses the inverse direct-weather-question false negative. A rebuilt retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window; Gateway/Core ownership split is implemented; retained live post-removal evidence remains open |
+| Cognitive Gateway ingress foundation | Five explicit modules implement Input Normalization, Protective Reflex, Context Assembly, focused Attention Review, and Turn Admission. A frozen version 1 `UserTurnEnvelope` preserves immutable input, quality, reflex, attention, context provenance, and admission. Attention review is bound to the exact turn/session/context digest and completes before ordinary Goal Interpretation. Stop, cancel, emergency, silence, and unusable-input controls remain deterministic. | The current full gate passes 1,375 primary tests plus 20 legacy Agent tests. Focused tests cover module separation, digest-bound context and review evidence, fail-open direct/unclear speech, pre-Core suppression, admitted-envelope-only Core entry, reflex priority, and cross-turn/context rejection. Benchmark, documentation, Router-removal, compilation, shell-syntax, and diff-hygiene gates pass. | No retained post-change live-text, microphone, cancellation, dedicated E-stop, MuJoCo, safe-idle, or physical-hardware evidence yet. | Enabled on maintained profiles; the focused attention model defaults to `qwen3:4b`, while explicitly disabled profiles fail open to Core rather than inventing semantics. |
+| Cognitive Gateway and Core Goal Interpretation | Gateway admission is complete before the Core API. `/cognitive-core/interpret` accepts only `CoreTurnRequest`, Goal Interpretation skips compatibility addressedness on admitted turns, and the Core returns a digest-bound `CoreInterpretationResult`. `RouteDecision` is an internal compatibility projection only; it is not a Gateway output or independent authority. Historical direct Goal Interpreter tests/replays retain compatibility review behavior. | Contract/API, focused Attention Review, Goal Interpreter compatibility, route-contract repair, capability grounding, multi-turn, deepthinking, and host/Core integration coverage pass. | A source-bound live-text rerun of direct questions, ambient speech, tool follow-ups, and multi-goal turns remains open. | Normal production path enabled; high-confidence inactive ambient speech may suppress, while direct, active, unclear, unavailable, malformed, or failed review admits to Core. |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
 | Native structured Interaction Agent | Implemented as the strict output and compatibility surface for `InteractionSpeech`/`SkillRequest` accumulation, TaskGraph requests, and optional `SocialAttentionPlan` coordination. Under cognitive `apply`, fingerprint-bound Response Composition remains authoritative. Candidate discovery is embodiment-independent; the Host validates target evidence, schemas, parallel timing, provider-declared confirmation policy, and conflicts; Response Composer receives the owner-approved Social Interaction Style plus bounded recent accepted-request evidence. Ordinary deployments select `courteous`, `neutral`, or `reserved` through `ORCH_SOCIAL_INTERACTION_STYLE_PRESET`; reviewed full profiles may use `custom`. The Host no longer stores provider mode or grants simulator-derived confirmation | Native route, TaskGraph, validation, fail-closed, response-composition, public-mode/default/migration, backend-independence, provider-confirmation parity, style/evidence, parallel-only, selection/none/invalid/latency/target/conflict, exact-intent, and file-backed backend-parity tests | Historical live simulator evidence predates this change; retained provider-backed Social Attention qualification remains open | Maintained policy `on`; public modes `off`, `report_only`, `on`. Soridormi/provider owns backend selection, controller adaptation, calibration, motion limits, collision safety, stop, and recovery. Legacy Host cue deletion is complete; backend identity and calibrated target values are excluded from the model-facing Social Attention projection; legacy CapabilityAgent skill substitution and cross-schema argument reinterpretation are removed |
-| Goal-Driven Cognitive Core and single semantic authority | PR1–PR9 contracts and stages are integrated through the current unified Goal-driven Runtime in one host coordinator: state-specific exact-schema Goal Association, exact flat Fast/Deep Planner DTOs with host-owned canonical envelopes, goal-keyed model outcomes, prospective Goal Satisfaction, exact-schema fingerprint-bound Response Composition, response-transport separation, one bounded same-stage repair, source-route effect authority, atomic Goal-state application, goal-scoped runtime evidence, mixed-plan execution, confirmation, playback-gated Skill Runtime execution, and evidence-bound turn closure. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Goal Interpretation actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | The latest July 23 gate passed 1291 primary plus 20 legacy Agent tests. The `evidence_bound_cognitive_turn_closure` Level A class passed 5/5 deterministic cases; focused reconciliation, cancellation, delivery, stale-response, and recovery audits passed; documentation validation and diff hygiene passed. The earlier July 22 pre-PR9 gate passed 1164 primary plus 20 legacy Agent tests, 382/382 declarative scenarios, and 53/53 then-current Level A cases | The final July 21 diagnostic live-text simulator suite passed 10/10 with complete execution receipts and safe idle. All four daily-life cases terminated at Fast; the explicit numeric three-action compound safely rejected a bad Fast substitution and recovered through Deep with 0.2 m/s preserved. That live evidence predates the July 22 lifecycle/effect-envelope repair and PR9 closure; a post-fix supervised rerun remains open. Daily-life median cognitive runtime was 40.321 seconds, above the 15.46-second target. Dirty checkouts and absent endpoint revision identity prevent source-bound Target validation | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
+| Goal-Driven Cognitive Core and single semantic authority | The manager-owned runtime implements Goal Association, Fast/terminal Deep Planning, canonical validation, prospective Response Composition, trusted execution, immutable outcome reconciliation, exact per-goal state commit, and a speech-only final outcome response. Its normal entry is a Core-owned `CoreInterpretationResult` tied to an admitted turn; the remaining `RouteDecision` DTO is validated as a digest-bound internal projection for dependent planner contracts. Applied lanes fail closed after ownership acquisition. | The current repository gate passes 1,375 primary tests plus 20 legacy Agent tests; focused Core entry/projection, planning, reconciliation, cancellation, stale-response, delivery, tool-grounding, and recovery coverage passes. | Historical July 21 diagnostic live-text/MuJoCo evidence predates the current Gateway/Core migration and is not source-bound Target validation. A clean current live-text and MuJoCo rerun remains open. | Common safe base: authoritative `chat,tool` apply with Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action,tool` with Soridormi enabled. Legacy semantic fallback gates remain off. |
 | Cognitive Turn Loop closure | Implemented in the manager-owned host path. The admitted envelope is preserved through Core acquisition; effectful responses carry an immutable plan/fingerprint; committed requests must match exact step, skill, arguments, timing, goals, and output-schema digest; unknown results fail exact reconciliation; results/traces produce a deterministic `ExecutionOutcomeBundle`; exact per-goal statuses are committed before one speech-only final response. Missing results become `not_run`, while propagated cancellation without terminal per-request evidence remains conservatively `cancelled` with unknown-start diagnostics. `partial` requires real completed plus unresolved work; heterogeneous all-uncompleted outcomes aggregate conservatively without erasing exact statuses. Output exposure is schema-bound and bounded, only playback-start-verified confirmation/recovery/final speech enters history, stale/cancelled/superseded final speech is suppressed while evidence remains, and recovery requires terminal evidence for every committed sibling before creating a newly fingerprinted confirmation-bound child plan over the recoverable subset | The latest July 23 full suite passed 1291 primary plus 20 legacy Agent tests. Focused contract, host-integration, multi-goal terminal-state, missing-result, exact-correlation, schema identity/projection, low-level-field variant rejection, cancellation/preemption, unknown-start cancellation, delivery-bound history, stale-response, conservative-response, and recovery-child-plan coverage passed. The deterministic Level A class `evidence_bound_cognitive_turn_closure` passed 5/5; this is automatic evidence only | No retained provider-backed, live-text, microphone, simulator, dedicated E-stop, safe-idle, or physical-robot evidence for the closed loop | Implemented for configured cognitive `apply` lanes; not yet a release or target-behavior claim; see `docs/COGNITIVE_TURN_LOOP.md` |
 | Semantic compound capability planning | Implemented inside Fast/Deep canonical planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A fast Goal Interpreter that cannot account for the complete effectful goal hands the original utterance to the unified planner instead of declaring the ability missing or invoking the legacy CapabilityAgent planner. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Goal-Interpreter-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | The July 21 diagnostic compound case executed sequential walk at exactly 0.2 m/s, two nods, and a left turn through Deep recovery, then returned safe idle. This is simulator evidence only and makes no claim that concurrent walking and blinking are physically compatible on a particular robot | Unified cognitive planning enabled for configured apply lanes; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
 | Trusted host Skill Runtime | Implemented, including durable active-and-queued cancellation rules, fixed execution domains, exact goal/plan/fingerprint selection, explicit stale/shared-owner/non-interruptible/provider-failure evidence, provider-granularity widening, and rejection of concurrent interaction-ID reuse | Scheduling, confirmation, timeout, scoped active/queued cancellation, independent-sibling isolation, stale/conflict/no-op, provider-failure truthfulness, widening, and cross-interaction tests | The final July 21 diagnostic 10/10 suite exercised speech and Soridormi requests, sequential multi-step execution, normalized receipts, and safe-idle closure on the then-current Goal-driven path; it predates this scoped-cancellation change | Used only by structured path; natural-language named-Goal dispatch is host-bound and fail-closed |
@@ -703,8 +714,8 @@ fresh confirmation for material alternatives independent of provider backend, an
 clarification or blocked results from leaking effectful skills. The former
 normal-language count/speed/action fast-path parsers were removed. PR1 through
 PR8 now provide the Goal-driven contracts, unified runtime, and single-authority
-boundary. The common safe base authoritatively applies `chat`; the maintained
-Soridormi launcher widens authority to `chat,robot_action`. Both use
+boundary. The common safe base authoritatively applies `chat,tool`; the maintained
+Soridormi launcher widens authority to `chat,robot_action,tool`. Both use
 fail-closed behavior after ownership acquisition. Atomic Goal-state commit,
 bounded host replan, classified operational evidence, and cognitive
 text-to-MuJoCo entry points are automatically verified. Historical July 21 diagnostic
@@ -819,10 +830,10 @@ These legacy evidence tracks do not define the current delivery:
 
 ## Known limitations
 
-- Structured interaction and authoritative goal-driven `apply` for `chat` are
-  enabled in the common safe base. Soridormi skills and physical execution remain
+- Structured interaction and authoritative goal-driven `apply` for `chat,tool`
+  are enabled in the common safe base. Soridormi skills and physical execution remain
   off there; the maintained Soridormi launcher
-  explicitly widens authority to `chat,robot_action` after enabling the trusted
+  explicitly widens authority to `chat,robot_action,tool` after enabling the trusted
   provider.
 - `AGENT_NATIVE_INTERACTION_FALLBACK` is default-off so malformed native output
   fails closed unless an operator explicitly enables adapter fallback.
@@ -900,9 +911,9 @@ attention is revalidated by the host for target evidence, schema correctness,
 and primary-plan resource conflicts.
 
 The common safe base now enables structured interaction and authoritative
-`apply` for `chat` while leaving the Soridormi provider off. The maintained
-Soridormi launcher enables that trusted provider and widens authority to
-`chat,robot_action`. A turn that enters the Goal-driven Runtime cannot fall
+`apply` for `chat,tool` while leaving the Soridormi provider off. The
+maintained Soridormi launcher enables that trusted provider and widens authority
+to `chat,robot_action,tool`. A turn that enters the Goal-driven Runtime cannot fall
 through to the old CapabilityAgent planner. Exact Goal Interpretation actions are
 adapter-only, and the retained old semantic planner requires host and Agent
 gates plus a non-empty authoritative emergency claim whose `turn_id` matches

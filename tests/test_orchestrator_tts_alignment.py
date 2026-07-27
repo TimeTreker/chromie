@@ -883,14 +883,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "I heard a movement request, but routing did not produce a valid motion result, so I will not move.",
+            "I heard an action request, but cognitive processing did not complete, so I will not perform it.",
         )
         self.assertEqual(
             response.metadata["source"],
             "host_cognitive_core_exception_safe_fallback",
         )
 
-    def test_cognitive_core_exception_on_plain_text_can_use_direct_llm(self) -> None:
+    def test_cognitive_core_exception_on_plain_text_does_not_create_second_semantic_authority(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
         response = assistant._cognitive_core_exception_safe_response(
@@ -898,7 +898,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             context={},
         )
 
-        self.assertIsNone(response)
+        self.assertEqual(
+            response.speech[0].text,
+            "I couldn't complete that request. Please try again.",
+        )
+        self.assertFalse(response.metadata["embodied_request"])
+        self.assertFalse(response.metadata["semantic_fallback"])
 
     def test_direct_llm_prompt_uses_chromie_social_self_model(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

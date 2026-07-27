@@ -53,8 +53,8 @@ Soridormi 负责：
 
 - 原生严格 `/interaction`；
 - Goal Association、Fast/Deep Planner、Response Composition 与统一主机协调器；
-- 公共安全配置对 `chat` 使用权威 `apply`，维护的 Soridormi 启动器在启用可信
-  Provider 后把权威范围扩大到 `chat,robot_action`；
+- 公共安全配置对 `chat,tool` 使用权威 `apply`，维护的 Soridormi 启动器在启用可信
+  Provider 后把权威范围扩大到 `chat,robot_action,tool`；
 - 请求绑定的口头确认与拒绝；
 - Soridormi 命名技能；
 - 打断、取消、停止与恢复；
