@@ -36,6 +36,12 @@ All notable user-visible changes should be recorded here.
 - Included Tool Result Interpretation in the CosyVoice one-resident-model override
   so weather/tool turns use the recorded launcher-effective topology rather than
   cold-loading an omitted profile model.
+- Added a bounded Skill Runtime execution observation, active-Goal cancellation
+  qualification after real Provider start, exact stop/reflex verification, and
+  post-cancel safe-idle evidence.
+- Tightened Issue closure so it requires live-text, normal MuJoCo, active
+  cancellation, exact identity/provenance, and a fingerprint-bound approved human
+  review; release qualification remains false.
 
 ### Prior architecture corrections
 

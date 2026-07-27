@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -566,6 +567,45 @@ async def wait_for_session_done(assistant: Any, sid: str, *, timeout_s: float) -
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")
 
 
+async def wait_for_provider_started(
+    runtime: Any,
+    *,
+    interaction_id: str,
+    skill_prefix: str,
+    timeout_s: float,
+) -> dict[str, Any]:
+    """Wait until a matching provider request has actually started.
+
+    Cancellation qualification must not issue the interrupt while work is only
+    planned or queued. The trusted Skill Runtime observation excludes request
+    arguments and provider payloads; it is used only to establish the timing
+    boundary for the retained stop command.
+    """
+
+    observe = getattr(runtime, "execution_observation", None)
+    if not callable(observe):
+        raise RuntimeError("Skill Runtime execution observation is unavailable")
+    deadline = time.monotonic() + timeout_s
+    last_observation: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        observation = await observe()
+        last_observation = observation.model_dump(mode="json")
+        for request in observation.requests:
+            if (
+                request.interaction_id == interaction_id
+                and request.skill_id.startswith(skill_prefix)
+                and request.provider_started
+                and not request.task_done
+            ):
+                return last_observation
+        await asyncio.sleep(0.05)
+    raise TimeoutError(
+        "no matching provider request started within "
+        f"{timeout_s:.1f}s for interaction={interaction_id!r} "
+        f"skill_prefix={skill_prefix!r}; last_observation={last_observation!r}"
+    )
+
+
 async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     evidence_dir = Path(args.evidence_dir or DEFAULT_EVIDENCE_ROOT / acceptance_id())
     evidence_dir = evidence_dir.expanduser().resolve()
@@ -586,6 +626,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     status_before: dict[str, Any] | None = None
     status_after: dict[str, Any] | None = None
     cognitive_runtime_selected = False
+    interrupt_payload: dict[str, Any] | None = None
 
     try:
         health_start = time.perf_counter()
@@ -812,13 +853,57 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
 
         if not errors and not args.preview_only:
             execution_start = time.perf_counter()
-            execution = await assistant.execute_interaction_response(
-                response,
-                sid,
-                confirmed_request_ids=(
-                    confirmation_request_ids if args.grant_confirmation else None
-                ),
-            )
+            confirmed = confirmation_request_ids if args.grant_confirmation else None
+            if args.interrupt_text:
+                assistant._launch_interaction(
+                    response,
+                    sid,
+                    confirmed_request_ids=confirmed,
+                )
+                execution_task = assistant.active_interaction_task
+                if execution_task is None:
+                    raise RuntimeError("interaction task was not registered")
+                provider_observation = await wait_for_provider_started(
+                    assistant.interaction_runtime,
+                    interaction_id=response.interaction_id,
+                    skill_prefix=args.interrupt_skill_prefix,
+                    timeout_s=args.interrupt_start_timeout_s,
+                )
+                interrupt_sid = assistant.create_session()
+                interrupt_started = time.perf_counter()
+                await assistant.handle_routed_text(
+                    args.interrupt_text,
+                    interrupt_sid,
+                    channel="text",
+                )
+                await wait_for_session_done(
+                    assistant,
+                    interrupt_sid,
+                    timeout_s=args.timeout_s,
+                )
+                execution = await asyncio.wait_for(
+                    asyncio.shield(execution_task),
+                    timeout=args.timeout_s,
+                )
+                interrupt_payload = {
+                    "text": args.interrupt_text,
+                    "text_sha256": hashlib.sha256(
+                        args.interrupt_text.encode("utf-8")
+                    ).hexdigest(),
+                    "sid": interrupt_sid,
+                    "duration_ms": round(
+                        (time.perf_counter() - interrupt_started) * 1000.0, 1
+                    ),
+                    "provider_observation_before_interrupt": provider_observation,
+                    "session_state": assistant.sessions.state.get(interrupt_sid),
+                }
+                _write_json(evidence_dir / "interrupt.json", interrupt_payload)
+            else:
+                execution = await assistant.execute_interaction_response(
+                    response,
+                    sid,
+                    confirmed_request_ids=confirmed,
+                )
             timings_ms["execution_ms"] = (
                 time.perf_counter() - execution_start
             ) * 1000.0
@@ -826,19 +911,37 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 raise RuntimeError("Interaction execution returned no result")
             execution_payload = execution.model_dump(mode="json")
             _write_json(evidence_dir / "execution.json", execution_payload)
-            if execution.status != "completed":
-                errors.append(f"Skill Runtime status was {execution.status!r}")
             body_results = [
                 result
                 for result in execution.results
                 if result.skill_id.startswith("soridormi.")
             ]
-            for result in body_results:
-                if result.status != "completed":
+            if args.expect_cancelled:
+                if not args.interrupt_text:
+                    errors.append("--expect-cancelled requires --interrupt-text")
+                if execution.status != "cancelled":
                     errors.append(
-                        f"{result.skill_id} ended with status {result.status!r}: "
-                        f"{result.reason_code or result.message}"
+                        f"Skill Runtime status was {execution.status!r}; expected 'cancelled'"
                     )
+                cancelled_body = [
+                    result
+                    for result in body_results
+                    if result.status == "cancelled"
+                    and str(result.reason_code or "").startswith("cancelled")
+                ]
+                if not cancelled_body:
+                    errors.append(
+                        "no Soridormi result retained trusted cancellation evidence"
+                    )
+            else:
+                if execution.status != "completed":
+                    errors.append(f"Skill Runtime status was {execution.status!r}")
+                for result in body_results:
+                    if result.status != "completed":
+                        errors.append(
+                            f"{result.skill_id} ended with status {result.status!r}: "
+                            f"{result.reason_code or result.message}"
+                        )
             try:
                 await wait_for_session_done(assistant, sid, timeout_s=args.timeout_s)
             except Exception as exc:
@@ -898,6 +1001,10 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "interaction_response": response.model_dump(mode="json"),
             "cognitive_runtime": cognitive_resolution_payload,
             "execution": execution_payload,
+            "interrupt": interrupt_payload,
+            "cognitive_events": str(
+                evidence_dir / "cognitive_runtime_events.jsonl"
+            ),
             "status_before": status_before,
             "status_after": status_after,
             "session_state": assistant.sessions.state.get(sid),
@@ -1046,6 +1153,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout-s", type=float, default=90.0)
     parser.add_argument(
+        "--interrupt-text",
+        default="",
+        help=(
+            "Optional deterministic interrupt utterance sent only after a matching "
+            "provider request has started. Intended for supervised cancellation "
+            "qualification, not normal interaction."
+        ),
+    )
+    parser.add_argument(
+        "--interrupt-skill-prefix",
+        default="soridormi.",
+        help="Skill prefix whose provider-start boundary triggers the interrupt.",
+    )
+    parser.add_argument(
+        "--interrupt-start-timeout-s",
+        type=float,
+        default=30.0,
+        help="Maximum wait for the selected provider-start boundary.",
+    )
+    parser.add_argument(
+        "--expect-cancelled",
+        action="store_true",
+        help=(
+            "Require a cancelled Skill Runtime result with trusted Soridormi "
+            "cancellation evidence."
+        ),
+    )
+    parser.add_argument(
         "--skill-timeout-s",
         type=float,
         default=120.0,
@@ -1062,6 +1197,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.expect_no_skills and args.expect_skill:
         parser.error("--expect-no-skills cannot be combined with --expect-skill")
+    if args.expect_cancelled and not args.interrupt_text:
+        parser.error("--expect-cancelled requires --interrupt-text")
+    if args.interrupt_text and args.preview_only:
+        parser.error("--interrupt-text cannot be used with --preview-only")
     try:
         summary = asyncio.run(run_check(args))
     except Exception as exc:

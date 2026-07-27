@@ -13,9 +13,10 @@ A passing bundle may support this narrow claim:
 > The evaluated Chromie revision admitted or suppressed each retained turn at the
 > Cognitive Gateway before ordinary semantic interpretation, used the Goal-Driven
 > Cognitive Core as the single semantic authority for admitted turns, preserved
-> trusted tool evidence across a follow-up, executed the retained compound body
+> trusted tool evidence across a follow-up, cancelled an active Goal only after
+> its Soridormi provider request had started, executed the retained compound body
 > request through the evaluated Soridormi `sim` endpoint, and returned to an
-> explicitly reported safe-idle state.
+> explicitly reported safe-idle state after both normal completion and cancellation.
 
 A passing bundle is not evidence of physical-robot operation, microphone or
 speaker quality, unattended autonomy, or release readiness.
@@ -60,6 +61,26 @@ The retained set covers:
 
 No scenario ID, expected lane, expected skill, or expected answer is passed to
 Chromie's cognitive models.
+
+## Retained active-Goal cancellation case
+
+The cancellation runner starts the manifest-owned walking request through the
+authoritative Gateway/Core and trusted Skill Runtime path. It waits on a bounded
+read-only Skill Runtime observation until `soridormi.walk_velocity` has actually
+entered its Provider, then sends the exact manifest-owned `Stop.` turn through
+the normal Gateway. Qualification requires:
+
+- a non-empty semantic Goal binding on the started request;
+- `reflex_and_admit` with deterministic `interrupt` and
+  `current_interaction` scope;
+- no ordinary Core planning for the stop turn;
+- a trusted cancelled Soridormi result rather than inferred cancellation;
+- endpoint-reported source identity and the same runtime-identity digest;
+- explicit safe idle before the request and after cancellation.
+
+The observation contains request identity, named skill, Provider identity, Goal
+ownership, and started/done state only. It excludes arguments and Provider
+payloads and does not authorize cancellation.
 
 ## Retained MuJoCo case
 
@@ -130,6 +151,39 @@ python scripts/interaction_text_mujoco_check.py \
   --reject-internal-speech
 ```
 
+Run active-Goal cancellation with the exact manifest-owned texts:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "Walk forward at 0.2 meters per second for 20 seconds." \
+  --runtime-identity "${EVIDENCE_ROOT}/runtime-identity.json" \
+  --soridormi-repo ../soridormi \
+  --evidence-dir "${EVIDENCE_ROOT}/active-cancel" \
+  --no-speaker \
+  --expect-route robot_action \
+  --interrupt-text "Stop." \
+  --interrupt-skill-prefix soridormi.walk_velocity \
+  --expect-cancelled \
+  --reject-internal-speech
+```
+
+Create a fingerprint-bound review template after inspecting the retained
+responses, traces, cancellation timing, and simulator behavior:
+
+```bash
+python scripts/create_cognitive_gateway_core_review.py \
+  --runtime-identity "${EVIDENCE_ROOT}/runtime-identity.json" \
+  --live-summary "${EVIDENCE_ROOT}/live-text/summary.json" \
+  --mujoco-summary "${EVIDENCE_ROOT}/mujoco/summary.json" \
+  --cancellation-summary "${EVIDENCE_ROOT}/active-cancel/summary.json" \
+  --reviewer "<reviewer identity>" \
+  --output "${EVIDENCE_ROOT}/human-review.json"
+```
+
+The generated record is deliberately `pending`. The reviewer must set every
+required qualitative check to `pass` and set `decision` to `approve`; the
+verifier rejects stale or substituted artifact fingerprints.
+
 Verify the complete bundle:
 
 ```bash
@@ -137,6 +191,8 @@ python scripts/verify_cognitive_gateway_core_qualification.py \
   --runtime-identity "${EVIDENCE_ROOT}/runtime-identity.json" \
   --live-summary "${EVIDENCE_ROOT}/live-text/summary.json" \
   --mujoco-summary "${EVIDENCE_ROOT}/mujoco/summary.json" \
+  --cancellation-summary "${EVIDENCE_ROOT}/active-cancel/summary.json" \
+  --human-review "${EVIDENCE_ROOT}/human-review.json" \
   --output "${EVIDENCE_ROOT}/qualification.json"
 ```
 
@@ -149,9 +205,10 @@ The report always retains:
 }
 ```
 
-`issue_closure_eligible=true` means the automatic evidence contracts passed. It
-still requires review of the retained responses, traces, source identities, and
-provider behavior before closing the Issue.
+`issue_closure_eligible=true` now means the live-text, normal MuJoCo, active-Goal
+cancellation, identity/provenance, safe-idle, and fingerprint-bound human-review
+contracts all passed. It remains a project-Issue closure signal, not release
+qualification.
 
 ## Failure handling
 
@@ -166,7 +223,11 @@ Failures are classified at the earliest evidence boundary:
 - execution evidence: missing outcome bundle, unexpected named skills, Provider
   refusal/failure, or incomplete result;
 - provenance: mismatched Chromie/Soridormi revision or missing endpoint revision;
-- simulator safety: wrong backend/mode or missing explicit pre/post safe idle.
+- simulator safety: wrong backend/mode or missing explicit pre/post safe idle;
+- cancellation: interrupt before Provider start, missing Goal binding, wrong
+  scope, inferred cancellation, or missing post-cancel safe idle;
+- human review: stale artifact digest, incomplete qualitative checks, or a
+  non-approved decision.
 
 A failed run is retained as evidence. It must not be repaired by adding phrase
 rules, scenario branches, fixed outputs, or Benchmark-authored Runtime policy.

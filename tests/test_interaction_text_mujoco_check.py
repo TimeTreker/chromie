@@ -22,6 +22,7 @@ from scripts.interaction_text_mujoco_check import (
     should_require_tts_speech,
     validate_contract,
     validate_speech_contract,
+    wait_for_provider_started,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -39,6 +40,12 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             .soridormi_repo,
             "/tmp/soridormi-checkout",
         )
+        cancellation = build_parser().parse_args(
+            ["--interrupt-text", "Stop.", "--expect-cancelled"]
+        )
+        self.assertEqual(cancellation.interrupt_text, "Stop.")
+        self.assertTrue(cancellation.expect_cancelled)
+        self.assertEqual(cancellation.interrupt_skill_prefix, "soridormi.")
 
     def test_endpoint_source_revision_accepts_direct_and_nested_status(self) -> None:
         self.assertEqual(
@@ -555,6 +562,61 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         self.assertEqual(updated.skills[0].timeout_ms, 120000)
         self.assertEqual(updated.skills[1].timeout_ms, 1000)
+
+
+class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_skill_runtime_empty_execution_observation_is_bounded(self) -> None:
+        from orchestrator.runtime.skill_runtime import SkillRegistry, SkillRuntime
+
+        observation = await SkillRuntime(SkillRegistry()).execution_observation()
+        self.assertEqual(observation.open_interaction_ids, [])
+        self.assertEqual(observation.executing_interaction_ids, [])
+        self.assertEqual(observation.requests, [])
+
+    async def test_wait_for_provider_started_returns_bound_observation(self) -> None:
+        from orchestrator.runtime.skill_runtime import (
+            SkillRuntimeExecutionObservation,
+            SkillRuntimeRequestObservation,
+        )
+
+        class Runtime:
+            async def execution_observation(self):
+                return SkillRuntimeExecutionObservation(
+                    captured_at="2026-07-27T00:00:00+00:00",
+                    open_interaction_ids=["interaction-1"],
+                    executing_interaction_ids=["interaction-1"],
+                    requests=[
+                        SkillRuntimeRequestObservation(
+                            interaction_id="interaction-1",
+                            request_id="request-1",
+                            skill_id="soridormi.walk_velocity",
+                            provider_id="soridormi.mcp",
+                            source_goal_ids=["goal-1"],
+                            provider_started=True,
+                            task_done=False,
+                        )
+                    ],
+                )
+
+        observation = await wait_for_provider_started(
+            Runtime(),
+            interaction_id="interaction-1",
+            skill_prefix="soridormi.",
+            timeout_s=0.2,
+        )
+        self.assertEqual(
+            observation["requests"][0]["source_goal_ids"],
+            ["goal-1"],
+        )
+
+    async def test_wait_for_provider_started_rejects_missing_observer(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "observation is unavailable"):
+            await wait_for_provider_started(
+                object(),
+                interaction_id="interaction-1",
+                skill_prefix="soridormi.",
+                timeout_s=0.01,
+            )
 
 
 if __name__ == "__main__":

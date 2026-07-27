@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/benchmarks/contracts/cognitive-gateway-core-human-review.schema.json",
+  "title": "Cognitive Gateway/Core Human Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_id",
+    "runtime_identity_sha256",
+    "artifact_sha256",
+    "reviewer",
+    "reviewed_at",
+    "decision",
+    "checks",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "qualification_id": {"type": "string", "minLength": 1},
+    "runtime_identity_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["live_summary", "mujoco_summary", "cancellation_summary"],
+      "properties": {
+        "live_summary": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mujoco_summary": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "cancellation_summary": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "reviewer": {"type": "string", "minLength": 1},
+    "reviewed_at": {"type": "string", "format": "date-time"},
+    "decision": {"enum": ["pending", "approve", "reject"]},
+    "checks": {
+      "type": "object",
+      "additionalProperties": {"enum": ["pending", "pass", "fail"]}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "notes": {"type": "string"}
+  }
+}

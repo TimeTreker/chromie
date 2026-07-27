@@ -43,13 +43,16 @@ final post-evidence audit:
   interpretation fails, rather than invoking an independent direct-LLM fallback;
 - [x] implement digest-bound runtime identity capture, Gateway/Core live-service
   text execution, deterministic stop/tool-continuity gates, MuJoCo provenance and
-  safe-idle verification, and one fail-closed qualification report;
+  safe-idle verification, Provider-start-bound active-Goal cancellation, and one
+  fail-closed qualification report;
+- [x] require a fingerprint-bound human-review record before Issue closure;
 - [ ] retain a clean source-bound live-text bundle from the deployed services and
   review the ambient, stop, direct-question, and tool-follow-up behavior;
 - [ ] retain a clean paired-source MuJoCo bundle with endpoint-reported Soridormi
   revision, compound named-skill execution, and explicit pre/post safe idle;
-- [ ] retain an active-goal cancellation run; the deterministic no-active-work
-  stop probe does not by itself prove provider cancellation or final safe idle;
+- [ ] retain an active-goal cancellation run that proves started Provider work,
+  semantic Goal ownership, trusted cancellation, and final safe idle;
+- [ ] complete and approve the fingerprint-bound qualitative review;
 - [ ] complete the final repository-wide authority and documentation audit after
   the retained evidence is available.
 

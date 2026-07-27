@@ -24,7 +24,10 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
 )
-from scripts.cognitive_runtime_acceptance import _simulator_report  # noqa: E402
+from scripts.cognitive_runtime_acceptance import (  # noqa: E402
+    _run_provenance,
+    _simulator_report,
+)
 
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
@@ -36,6 +39,25 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path}: expected a JSON object")
     return payload
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _records_safe_idle(status: Any) -> bool:
+    return bool(
+        isinstance(status, dict)
+        and status.get("safe_idle") is True
+        and "active_task" in status
+        and status.get("active_task") is None
+        and status.get("emergency_stop") is False
+        and status.get("fallen") is False
+    )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -365,6 +387,241 @@ def _validate_turn(
     return report, errors
 
 
+def _validate_cancellation_summary(
+    summary: dict[str, Any],
+    *,
+    summary_path: Path,
+    expectations: dict[str, Any],
+    identity_sha256: str,
+    expected_chromie_revision: str | None,
+    expected_soridormi_revision: str | None,
+) -> tuple[dict[str, Any], list[str]]:
+    errors: list[str] = []
+    expected_command = str(expectations.get("command_text") or "")
+    expected_interrupt = str(expectations.get("interrupt_text") or "")
+    if summary.get("ok") is not True:
+        errors.append("cancellation summary records one or more execution errors")
+    if str(summary.get("text") or "") != expected_command:
+        errors.append("cancellation command text does not match the manifest")
+    interrupt = summary.get("interrupt")
+    if not isinstance(interrupt, dict):
+        interrupt = {}
+        errors.append("cancellation summary has no interrupt evidence")
+    if str(interrupt.get("text") or "") != expected_interrupt:
+        errors.append("cancellation interrupt text does not match the manifest")
+    expected_interrupt_sha = hashlib.sha256(expected_interrupt.encode("utf-8")).hexdigest()
+    if interrupt.get("text_sha256") != expected_interrupt_sha:
+        errors.append("cancellation interrupt text digest does not match the manifest")
+
+    interaction = summary.get("interaction_response")
+    interaction_id = (
+        str(interaction.get("interaction_id") or "")
+        if isinstance(interaction, dict)
+        else ""
+    )
+    observation = interrupt.get("provider_observation_before_interrupt")
+    requests = (
+        observation.get("requests")
+        if isinstance(observation, dict) and isinstance(observation.get("requests"), list)
+        else []
+    )
+    required_skill = str(expectations.get("required_skill") or "")
+    started_requests = [
+        item
+        for item in requests
+        if isinstance(item, dict)
+        and item.get("interaction_id") == interaction_id
+        and item.get("skill_id") == required_skill
+        and item.get("provider_started") is True
+        and item.get("task_done") is False
+    ]
+    if expectations.get("provider_started_required") is True and not started_requests:
+        errors.append("interrupt was not bound to a started required provider request")
+    if started_requests and not any(item.get("source_goal_ids") for item in started_requests):
+        errors.append("started cancellation request has no active semantic Goal binding")
+
+    execution = summary.get("execution")
+    execution_status = execution.get("status") if isinstance(execution, dict) else None
+    expected_status = str(expectations.get("execution_status") or "")
+    if expected_status and execution_status != expected_status:
+        errors.append(
+            f"cancellation execution status {execution_status!r} != {expected_status!r}"
+        )
+    results = (
+        execution.get("results")
+        if isinstance(execution, dict) and isinstance(execution.get("results"), list)
+        else []
+    )
+    cancelled_results = [
+        item
+        for item in results
+        if isinstance(item, dict)
+        and item.get("skill_id") == required_skill
+        and item.get("status") == "cancelled"
+        and str(item.get("reason_code") or "").startswith("cancelled")
+    ]
+    if not cancelled_results:
+        errors.append("required Soridormi request has no trusted cancelled result")
+
+    status_before = summary.get("status_before")
+    status_after = summary.get("status_after")
+    for label, status in (("before", status_before), ("after", status_after)):
+        if not isinstance(status, dict) or status.get("mode") != "sim" or status.get("backend") != "runtime":
+            errors.append(f"cancellation {label} status is not Soridormi runtime sim")
+    if expectations.get("safe_idle_required") is True:
+        if not _records_safe_idle(status_before):
+            errors.append("cancellation run lacks explicit safe idle before execution")
+        if not _records_safe_idle(status_after):
+            errors.append("cancellation run lacks explicit safe idle after interruption")
+
+    provenance = _run_provenance(summary)
+    if provenance.get("chromie_revision") != expected_chromie_revision:
+        errors.append("cancellation Chromie revision does not match the evaluated source")
+    if provenance.get("chromie_dirty") is not False:
+        errors.append("cancellation run did not record a clean Chromie worktree")
+    if provenance.get("soridormi_revision") != expected_soridormi_revision:
+        errors.append("cancellation Soridormi revision does not match the expected source")
+    if provenance.get("soridormi_checkout_revision") != expected_soridormi_revision:
+        errors.append("cancellation run does not bind the paired Soridormi checkout")
+    if provenance.get("soridormi_checkout_dirty") is not False:
+        errors.append("cancellation run did not record a clean paired Soridormi checkout")
+    if provenance.get("soridormi_source_binding") != "endpoint_reported_revision":
+        errors.append("cancellation run lacks endpoint-reported Soridormi source binding")
+    if provenance.get("soridormi_endpoint_revision") != expected_soridormi_revision:
+        errors.append("cancellation endpoint revision does not match Soridormi source")
+    if provenance.get("semantic_runtime_path") != "goal_driven_cognitive_runtime":
+        errors.append("cancellation run did not use the Goal-Driven Cognitive Runtime")
+    if provenance.get("cognitive_runtime_mode") != "apply":
+        errors.append("cancellation run did not use cognitive runtime apply mode")
+    if provenance.get("cognitive_runtime_selected_for_route") is not True:
+        errors.append("cancellation run did not select the cognitive runtime")
+    provenance_payload = summary.get("provenance")
+    identity_ref = (
+        provenance_payload.get("runtime_identity")
+        if isinstance(provenance_payload, dict)
+        else None
+    )
+    if (
+        not isinstance(identity_ref, dict)
+        or identity_ref.get("identity_sha256") != identity_sha256
+        or identity_ref.get("complete") is not True
+    ):
+        errors.append("cancellation summary is not bound to the retained runtime identity")
+
+    cognitive_events = Path(str(summary.get("cognitive_events") or ""))
+    if not cognitive_events.is_absolute():
+        cognitive_events = (summary_path.parent / cognitive_events).resolve()
+    if not cognitive_events.is_file():
+        errors.append("cancellation cognitive event file is missing")
+        events: list[dict[str, Any]] = []
+    else:
+        events = _read_jsonl(cognitive_events)
+    interrupt_sid = str(interrupt.get("sid") or "")
+    gateway_events = _event_by_type(
+        events,
+        sid=interrupt_sid,
+        event_type="cognitive_gateway_admission",
+    )
+    if len(gateway_events) != 1:
+        errors.append(
+            "cancellation interrupt requires exactly one Gateway admission event"
+        )
+        gateway = gateway_events[-1] if gateway_events else {}
+    else:
+        gateway = gateway_events[0]
+    if gateway.get("admission") != expectations.get("gateway_admission"):
+        errors.append("cancellation Gateway admission does not match the manifest")
+    reflex = gateway.get("reflex") if isinstance(gateway.get("reflex"), dict) else {}
+    if reflex.get("action") != expectations.get("reflex_action"):
+        errors.append("cancellation reflex action does not match the manifest")
+    if reflex.get("cancellation_scope") != expectations.get("cancellation_scope"):
+        errors.append("cancellation scope does not match the manifest")
+    identity_ref = gateway.get("run_identity")
+    if not isinstance(identity_ref, dict) or identity_ref.get("identity_sha256") != identity_sha256:
+        errors.append("cancellation Gateway event is not runtime-identity bound")
+    runtime_events = _event_by_type(
+        events,
+        sid=interrupt_sid,
+        event_type="cognitive_runtime_resolution",
+    )
+    if runtime_events:
+        errors.append("deterministic cancellation interrupt entered ordinary Core planning")
+
+    report = {
+        "passed": not errors,
+        "interaction_id": interaction_id,
+        "provider_started_requests": started_requests,
+        "execution_status": execution_status,
+        "cancelled_results": cancelled_results,
+        "safe_idle_before": _records_safe_idle(status_before),
+        "safe_idle_after": _records_safe_idle(status_after),
+        "gateway": gateway,
+        "provenance": provenance,
+        "errors": errors,
+    }
+    return report, errors
+
+
+def _validate_human_review(
+    review: dict[str, Any],
+    *,
+    manifest: dict[str, Any],
+    identity_sha256: str,
+    live_summary_path: Path,
+    mujoco_summary_path: Path,
+    cancellation_summary_path: Path,
+) -> tuple[dict[str, Any], list[str]]:
+    errors: list[str] = []
+    if review.get("schema_version") != 1:
+        errors.append("human review schema_version must be 1")
+    if review.get("qualification_id") != manifest.get("qualification_id"):
+        errors.append("human review qualification ID does not match the manifest")
+    if review.get("runtime_identity_sha256") != identity_sha256:
+        errors.append("human review is not bound to the retained runtime identity")
+    artifacts = review.get("artifact_sha256")
+    expected_artifacts = {
+        "live_summary": _file_sha256(live_summary_path),
+        "mujoco_summary": _file_sha256(mujoco_summary_path),
+        "cancellation_summary": _file_sha256(cancellation_summary_path),
+    }
+    if not isinstance(artifacts, dict):
+        errors.append("human review has no artifact fingerprint map")
+    else:
+        for key, expected in expected_artifacts.items():
+            if artifacts.get(key) != expected:
+                errors.append(f"human review artifact fingerprint mismatch: {key}")
+    if not str(review.get("reviewer") or "").strip():
+        errors.append("human review has no reviewer identity")
+    try:
+        datetime.fromisoformat(str(review.get("reviewed_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        errors.append("human review reviewed_at is not a valid date-time")
+    expectations = manifest.get("human_review_expectations")
+    required_checks = (
+        expectations.get("required_checks")
+        if isinstance(expectations, dict)
+        and isinstance(expectations.get("required_checks"), list)
+        else []
+    )
+    checks = review.get("checks")
+    if not isinstance(checks, dict):
+        errors.append("human review has no qualitative checks")
+        checks = {}
+    for key in required_checks:
+        if checks.get(key) != "pass":
+            errors.append(f"human review check {key!r} is not pass")
+    if review.get("decision") != "approve":
+        errors.append("human review decision is not approve")
+    return {
+        "passed": not errors,
+        "decision": review.get("decision"),
+        "reviewer": review.get("reviewer"),
+        "checks": checks,
+        "findings": review.get("findings") or [],
+        "errors": errors,
+    }, errors
+
+
 def verify(
     *,
     manifest_path: Path,
@@ -372,6 +629,8 @@ def verify(
     runtime_identity_path: Path,
     cognitive_events_path: Path | None = None,
     mujoco_summary_path: Path | None = None,
+    cancellation_summary_path: Path | None = None,
+    human_review_path: Path | None = None,
     expected_chromie_revision: str | None = None,
     expected_soridormi_revision: str | None = None,
 ) -> dict[str, Any]:
@@ -474,7 +733,14 @@ def verify(
         errors.extend(f"{scenario_id}: {item}" for item in scenario_errors)
 
     simulator = None
-    if mujoco_summary_path is not None:
+    simulator_required = bool(
+        isinstance(manifest.get("simulator_expectations"), dict)
+        and manifest["simulator_expectations"].get("required") is True
+    )
+    if mujoco_summary_path is None:
+        if simulator_required:
+            errors.append("required source-bound MuJoCo summary is missing")
+    else:
         simulator_summary = _read_json(mujoco_summary_path)
         simulator = _simulator_report(
             simulator_summary,
@@ -533,6 +799,56 @@ def verify(
                     "MuJoCo summary is not bound to the retained runtime identity"
                 )
 
+    cancellation = None
+    cancellation_expectations = manifest.get("cancellation_expectations")
+    cancellation_required = bool(
+        isinstance(cancellation_expectations, dict)
+        and cancellation_expectations.get("required") is True
+    )
+    if cancellation_summary_path is None:
+        if cancellation_required:
+            errors.append("required active-goal cancellation summary is missing")
+    else:
+        cancellation_summary = _read_json(cancellation_summary_path)
+        cancellation, cancellation_errors = _validate_cancellation_summary(
+            cancellation_summary,
+            summary_path=cancellation_summary_path,
+            expectations=(
+                cancellation_expectations
+                if isinstance(cancellation_expectations, dict)
+                else {}
+            ),
+            identity_sha256=identity["identity_sha256"],
+            expected_chromie_revision=expected_chromie_revision,
+            expected_soridormi_revision=expected_soridormi_revision,
+        )
+        errors.extend(f"active_goal_cancellation: {item}" for item in cancellation_errors)
+
+    human_review = None
+    human_review_expectations = manifest.get("human_review_expectations")
+    human_review_required = bool(
+        isinstance(human_review_expectations, dict)
+        and human_review_expectations.get("required") is True
+    )
+    if human_review_path is None:
+        if human_review_required:
+            errors.append("required fingerprint-bound human review is missing")
+    elif mujoco_summary_path is None or cancellation_summary_path is None:
+        errors.append(
+            "human review cannot be validated without MuJoCo and cancellation summaries"
+        )
+    else:
+        review_payload = _read_json(human_review_path)
+        human_review, human_review_errors = _validate_human_review(
+            review_payload,
+            manifest=manifest,
+            identity_sha256=identity["identity_sha256"],
+            live_summary_path=live_summary_path,
+            mujoco_summary_path=mujoco_summary_path,
+            cancellation_summary_path=cancellation_summary_path,
+        )
+        errors.extend(f"human_review: {item}" for item in human_review_errors)
+
     required_scenarios = {
         str(item.get("scenario_id"))
         for item in manifest.get("scenarios") or []
@@ -543,9 +859,28 @@ def verify(
     unexpected = sorted(retained_scenarios - required_scenarios)
     if missing:
         errors.append("missing scenarios: " + ", ".join(missing))
+    if unexpected:
+        errors.append("unexpected scenarios: " + ", ".join(unexpected))
+
+    identity_valid = not _validate_runtime_identity(
+        identity,
+        expected_revision=expected_chromie_revision,
+    )
+    live_valid = all(item["passed"] for item in case_reports) and not missing and not unexpected
+    simulator_valid = bool(simulator and simulator.get("target_validated") is True)
+    cancellation_valid = bool(cancellation and cancellation.get("passed") is True)
+    human_review_approved = bool(human_review and human_review.get("passed") is True)
+    closure_eligible = bool(
+        not errors
+        and identity_valid
+        and live_valid
+        and simulator_valid
+        and cancellation_valid
+        and human_review_approved
+    )
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "qualification_id": manifest.get("qualification_id"),
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "runtime_identity_sha256": identity["identity_sha256"],
@@ -560,24 +895,22 @@ def verify(
             "unexpected": unexpected,
         },
         "live_text": {
-            "passed": all(item["passed"] for item in case_reports) and not missing,
+            "passed": live_valid,
             "scenarios": case_reports,
         },
         "simulator": simulator,
+        "active_goal_cancellation": cancellation,
+        "human_review": human_review,
         "qualification": {
             "implementation_verified": True,
-            "live_text_target_validated": all(item["passed"] for item in case_reports)
-            and not missing
-            and not _validate_runtime_identity(
-                identity,
-                expected_revision=expected_chromie_revision,
-            ),
-            "simulator_target_validated": bool(
-                simulator and simulator.get("target_validated") is True
-            ),
+            "runtime_identity_valid": identity_valid,
+            "live_text_target_validated": live_valid and identity_valid,
+            "simulator_target_validated": simulator_valid,
+            "active_goal_cancellation_target_validated": cancellation_valid,
+            "human_review_approved": human_review_approved,
             "release_qualified": False,
             "human_review_required": True,
-            "issue_closure_eligible": not errors and simulator is not None,
+            "issue_closure_eligible": closure_eligible,
         },
         "errors": errors,
         "passed": not errors,
@@ -591,6 +924,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-identity", type=Path, required=True)
     parser.add_argument("--cognitive-events", type=Path)
     parser.add_argument("--mujoco-summary", type=Path)
+    parser.add_argument("--cancellation-summary", type=Path)
+    parser.add_argument("--human-review", type=Path)
     parser.add_argument("--expected-chromie-revision")
     parser.add_argument("--expected-soridormi-revision")
     parser.add_argument("--output", type=Path)
@@ -612,6 +947,16 @@ def main(argv: list[str] | None = None) -> int:
             mujoco_summary_path=(
                 args.mujoco_summary.expanduser().resolve()
                 if args.mujoco_summary
+                else None
+            ),
+            cancellation_summary_path=(
+                args.cancellation_summary.expanduser().resolve()
+                if args.cancellation_summary
+                else None
+            ),
+            human_review_path=(
+                args.human_review.expanduser().resolve()
+                if args.human_review
                 else None
             ),
             expected_chromie_revision=args.expected_chromie_revision,

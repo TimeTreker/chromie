@@ -279,9 +279,17 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 expected_chromie_revision="chromie-current",
                 expected_soridormi_revision="soridormi-current",
             )
-        self.assertTrue(report["passed"], report["errors"])
+        self.assertFalse(report["passed"])
         self.assertTrue(report["qualification"]["live_text_target_validated"])
         self.assertFalse(report["qualification"]["issue_closure_eligible"])
+        self.assertIn(
+            "required source-bound MuJoCo summary is missing",
+            report["errors"],
+        )
+        self.assertIn(
+            "required active-goal cancellation summary is missing",
+            report["errors"],
+        )
         self.assertFalse(report["qualification"]["release_qualified"])
 
     def test_repeated_weather_lookup_fails_continuity_gate(self) -> None:
@@ -332,11 +340,12 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             "\n".join(report["errors"]),
         )
 
-    def test_source_bound_mujoco_constraints_make_issue_closure_eligible(self) -> None:
+    def test_complete_bound_bundle_makes_issue_closure_eligible(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             identity_path, events_path, summary_path = self.build_fixture(root)
             identity = json.loads(identity_path.read_text(encoding="utf-8"))
+            digest = identity["identity_sha256"]
             mujoco_path = root / "mujoco-summary.json"
             mujoco_path.write_text(
                 json.dumps(
@@ -352,10 +361,141 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                         },
                         "provenance": {
                             "runtime_identity": {
-                                "identity_sha256": identity["identity_sha256"],
+                                "identity_sha256": digest,
                                 "complete": True,
                             }
                         },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            cancellation_events = root / "cancellation-events.jsonl"
+            cancellation_events.write_text(
+                json.dumps(
+                    gateway_event(
+                        "sid-active-stop",
+                        "conv-active-cancel",
+                        "reflex_and_admit",
+                        digest,
+                        reflex_action="interrupt",
+                        cancellation_scope="current_interaction",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            cancellation_path = root / "cancellation-summary.json"
+            cancellation_path.write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "text": "Walk forward at 0.2 meters per second for 20 seconds.",
+                        "interaction_response": {
+                            "interaction_id": "interaction-active-cancel"
+                        },
+                        "interrupt": {
+                            "text": "Stop.",
+                            "text_sha256": hashlib.sha256(
+                                b"Stop."
+                            ).hexdigest(),
+                            "sid": "sid-active-stop",
+                            "provider_observation_before_interrupt": {
+                                "requests": [
+                                    {
+                                        "interaction_id": "interaction-active-cancel",
+                                        "request_id": "request-walk",
+                                        "skill_id": "soridormi.walk_velocity",
+                                        "provider_id": "soridormi.mcp",
+                                        "source_goal_ids": ["goal-walk"],
+                                        "provider_started": True,
+                                        "task_done": False,
+                                    }
+                                ]
+                            },
+                        },
+                        "execution": {
+                            "status": "cancelled",
+                            "results": [
+                                {
+                                    "request_id": "request-walk",
+                                    "skill_id": "soridormi.walk_velocity",
+                                    "status": "cancelled",
+                                    "reason_code": "cancelled_current_interaction",
+                                }
+                            ],
+                        },
+                        "status_before": {
+                            "mode": "sim",
+                            "backend": "runtime",
+                            "safe_idle": True,
+                            "active_task": None,
+                            "emergency_stop": False,
+                            "fallen": False,
+                        },
+                        "status_after": {
+                            "mode": "sim",
+                            "backend": "runtime",
+                            "safe_idle": True,
+                            "active_task": None,
+                            "emergency_stop": False,
+                            "fallen": False,
+                        },
+                        "cognitive_events": str(cancellation_events),
+                        "provenance": {
+                            "chromie": {
+                                "revision": "chromie-current",
+                                "dirty": False,
+                            },
+                            "soridormi": {
+                                "upstream_revision": "soridormi-current",
+                                "checkout_revision": "soridormi-current",
+                                "checkout_dirty": False,
+                                "source_binding": "endpoint_reported_revision",
+                                "endpoint_revision": "soridormi-current",
+                            },
+                            "semantic_runtime": {
+                                "path": "goal_driven_cognitive_runtime",
+                                "configured_cognitive_runtime_mode": "apply",
+                                "cognitive_runtime_selected_for_route": True,
+                            },
+                            "runtime_identity": {
+                                "identity_sha256": digest,
+                                "complete": True,
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            review_path = root / "human-review.json"
+            review_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "qualification_id": "cognitive_gateway_core_entry_v1",
+                        "runtime_identity_sha256": digest,
+                        "artifact_sha256": {
+                            "live_summary": hashlib.sha256(
+                                summary_path.read_bytes()
+                            ).hexdigest(),
+                            "mujoco_summary": hashlib.sha256(
+                                mujoco_path.read_bytes()
+                            ).hexdigest(),
+                            "cancellation_summary": hashlib.sha256(
+                                cancellation_path.read_bytes()
+                            ).hexdigest(),
+                        },
+                        "reviewer": "reviewer-one",
+                        "reviewed_at": "2026-07-27T12:00:00+00:00",
+                        "decision": "approve",
+                        "checks": {
+                            "gateway_attention_quality": "pass",
+                            "direct_answer_quality": "pass",
+                            "tool_continuity_quality": "pass",
+                            "cancellation_feedback_quality": "pass",
+                            "no_internal_contract_leakage": "pass",
+                        },
+                        "findings": [],
                     }
                 ),
                 encoding="utf-8",
@@ -373,12 +513,19 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                     runtime_identity_path=identity_path,
                     cognitive_events_path=events_path,
                     mujoco_summary_path=mujoco_path,
+                    cancellation_summary_path=cancellation_path,
+                    human_review_path=review_path,
                     expected_chromie_revision="chromie-current",
                     expected_soridormi_revision="soridormi-current",
                 )
         self.assertTrue(report["passed"], report["errors"])
+        self.assertTrue(
+            report["qualification"]["active_goal_cancellation_target_validated"]
+        )
+        self.assertTrue(report["qualification"]["human_review_approved"])
         self.assertTrue(report["qualification"]["issue_closure_eligible"])
         self.assertFalse(report["qualification"]["release_qualified"])
+
 
 
 if __name__ == "__main__":

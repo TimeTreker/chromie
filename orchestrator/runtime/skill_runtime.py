@@ -351,6 +351,23 @@ class SkillRuntimeSchedulerStatus(BaseModel):
     active_interaction_ids: list[str] = Field(default_factory=list)
 
 
+class SkillRuntimeRequestObservation(BaseModel):
+    interaction_id: str
+    request_id: str
+    skill_id: str
+    provider_id: str
+    source_goal_ids: list[str] = Field(default_factory=list)
+    provider_started: bool
+    task_done: bool
+
+
+class SkillRuntimeExecutionObservation(BaseModel):
+    captured_at: datetime
+    open_interaction_ids: list[str] = Field(default_factory=list)
+    executing_interaction_ids: list[str] = Field(default_factory=list)
+    requests: list[SkillRuntimeRequestObservation] = Field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class _CancellationRule:
     directive: CancellationDirective
@@ -393,6 +410,50 @@ class SkillRuntime:
 
     def provider_ids(self) -> set[str]:
         return set(self._providers)
+
+    async def execution_observation(self) -> SkillRuntimeExecutionObservation:
+        """Return a bounded read-only view of scheduled/active execution.
+
+        This is an observability boundary for qualification and operator tools.
+        It intentionally excludes request arguments and provider payloads while
+        exposing enough trusted state to prove that a cancellation was issued
+        after an effectful provider request had actually started.
+        """
+
+        async with self._active_lock:
+            requests: list[SkillRuntimeRequestObservation] = []
+            for interaction_id in sorted(self._scheduled):
+                for request_id in sorted(self._scheduled[interaction_id]):
+                    request, definition = self._scheduled[interaction_id][request_id]
+                    active = self._active.get((interaction_id, request_id))
+                    context = active[3] if active is not None else None
+                    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+                    source_goal_ids = metadata.get("source_goal_ids") or []
+                    if not isinstance(source_goal_ids, list):
+                        source_goal_ids = []
+                    requests.append(
+                        SkillRuntimeRequestObservation(
+                            interaction_id=interaction_id,
+                            request_id=request.request_id,
+                            skill_id=request.skill_id,
+                            provider_id=definition.provider_id,
+                            source_goal_ids=[
+                                str(value) for value in source_goal_ids if str(value).strip()
+                            ],
+                            provider_started=bool(
+                                context is not None and context.provider_started
+                            ),
+                            task_done=bool(
+                                active is not None and active[0].done()
+                            ),
+                        )
+                    )
+            return SkillRuntimeExecutionObservation(
+                captured_at=datetime.now(timezone.utc),
+                open_interaction_ids=sorted(self._open_interactions),
+                executing_interaction_ids=sorted(self._executing_interactions),
+                requests=requests,
+            )
 
     def begin_interaction(self, interaction_id: str) -> bool:
         """Keep scoped directives alive across one coordinator-owned execution."""

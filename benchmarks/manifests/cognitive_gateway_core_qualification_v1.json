@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "qualification_id": "cognitive_gateway_core_entry_v1",
-  "description": "Source-bound live-text qualification for pre-Core admission, single Core authority, and conversational tool continuity.",
+  "description": "Source-bound live-text, active-cancellation, and simulator qualification for pre-Core admission, single Core authority, and conversational continuity.",
   "runtime_policy_authority": false,
   "release_qualified": false,
   "human_review_required": true,
@@ -101,6 +101,28 @@
       "soridormi.walk_velocity",
       "soridormi.nod_yes",
       "soridormi.turn_in_place"
+    ]
+  },
+  "cancellation_expectations": {
+    "required": true,
+    "command_text": "Walk forward at 0.2 meters per second for 20 seconds.",
+    "interrupt_text": "Stop.",
+    "required_skill": "soridormi.walk_velocity",
+    "provider_started_required": true,
+    "gateway_admission": "reflex_and_admit",
+    "reflex_action": "interrupt",
+    "cancellation_scope": "current_interaction",
+    "execution_status": "cancelled",
+    "safe_idle_required": true
+  },
+  "human_review_expectations": {
+    "required": true,
+    "required_checks": [
+      "gateway_attention_quality",
+      "direct_answer_quality",
+      "tool_continuity_quality",
+      "cancellation_feedback_quality",
+      "no_internal_contract_leakage"
     ]
   }
 }
