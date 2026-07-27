@@ -110,6 +110,8 @@ done
 
 for name in \
   AGENT_MODEL \
+  AGENT_GOAL_INTERPRETER_MODEL \
+  AGENT_GOAL_INTERPRETER_REVIEW_MODEL \
   AGENT_GOAL_ASSOCIATION_MODEL \
   AGENT_FAST_PLANNER_MODEL \
   AGENT_DEEP_PLANNER_MODEL \
@@ -118,9 +120,6 @@ for name in \
   AGENT_SOCIAL_ATTENTION_MODEL \
   AGENT_RESPONSE_REVIEW_MODEL; do
   check_value chromie-agent "$name"
-done
-for name in AGENT_GOAL_INTERPRETER_MODEL AGENT_GOAL_INTERPRETER_REVIEW_MODEL; do
-  check_value "$name"
 done
 check_value "$tts_service" TTS_CUDA_ARCH
 actual_tts_provider="$(value_from_dump "${service_env[$tts_service]}" TTS_PROVIDER)"

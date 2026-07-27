@@ -370,6 +370,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", verifier)
+        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", verifier)
+        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", verifier)
+        self.assertNotIn('check_value "$name"', verifier)
 
     def test_start_chromie_waits_for_application_health(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
