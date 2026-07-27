@@ -27,9 +27,12 @@ runtime-identity capture, a maintained live-service text runner, deterministic
 stop and tool-follow-up checks, source-bound MuJoCo/safe-idle verification, a
 Provider-start-bound active-Goal cancellation path, fingerprint-bound human
 review, and a maintained resumable `collect/status/finalize` workflow whose state
-records exact commands, logs, and artifact digests. The remaining work is to
-execute that workflow from a clean committed deployment, review and approve the
-exact artifacts, and complete the final audit.
+records exact commands, logs, and artifact digests. Collection now begins with a
+read-only fail-fast preflight that requires clean paired repositories, a healthy
+manifest-grounded Agent, safe-idle Soridormi `sim`, and endpoint-reported source
+identity matching both the checkout and capability manifest. The remaining work
+is to execute that workflow from a clean committed deployment, review and
+approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
 This file is a short resume marker, not a second status or roadmap. Use

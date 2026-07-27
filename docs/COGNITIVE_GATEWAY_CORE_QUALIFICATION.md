@@ -99,10 +99,37 @@ trusted Skill Runtime to Soridormi. Qualification requires:
 A provider revision declared only by the local capability manifest is not enough.
 The running Soridormi endpoint must report its own source revision.
 
+## Fail-fast deployment preflight
+
+Before identity capture or any retained model/MuJoCo case, the workflow runs a
+read-only deployment preflight. It requires:
+
+- clean committed Chromie and Soridormi worktrees;
+- the Chromie capability manifest upstream revision to match the paired
+  Soridormi checkout;
+- a healthy Chromie Agent that loaded the Soridormi capability source;
+- the running Soridormi endpoint to report `sim`, no active task, no emergency
+  stop, no fallen state, and `safe_idle=true`;
+- `robot.get_status` to report its own source/provider revision;
+- that endpoint revision to match both the paired checkout and the Chromie
+  capability manifest.
+
+The preflight sends no user utterance and executes no motion. Missing or
+mismatched endpoint identity fails before any expensive evidence stage starts.
+Its retained `preflight.json` is diagnostic readiness evidence only and cannot
+make the Issue closure-eligible or release-qualified. Run it independently with:
+
+```bash
+python scripts/preflight_cognitive_gateway_core_qualification.py \
+  --soridormi-repo ../soridormi \
+  --output .chromie/acceptance/cognitive-gateway-core/preflight.json
+```
+
 ## Run the qualification
 
-The maintained entrypoint is a single resumable workflow. It coordinates the
-existing collectors and verifier without injecting expectations into cognition:
+The maintained entrypoint is a single resumable workflow. It runs the fail-fast
+preflight first, then coordinates the existing collectors and verifier without
+injecting expectations into cognition:
 
 ```bash
 python scripts/run_cognitive_gateway_core_qualification.py collect \

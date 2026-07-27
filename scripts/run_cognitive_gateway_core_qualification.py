@@ -34,6 +34,7 @@ class WorkflowPaths:
     root: Path
     state: Path
     logs: Path
+    preflight: Path
     runtime_identity: Path
     live_dir: Path
     live_summary: Path
@@ -92,6 +93,7 @@ def _paths(root: Path) -> WorkflowPaths:
         root=resolved,
         state=resolved / "workflow-state.json",
         logs=resolved / "logs",
+        preflight=resolved / "preflight.json",
         runtime_identity=resolved / "runtime-identity.json",
         live_dir=resolved / "live-text",
         live_summary=resolved / "live-text" / "summary.json",
@@ -255,6 +257,23 @@ def _collect_stages(
     if not command_text or not interrupt_text or not required_skill:
         raise ValueError("qualification cancellation expectations are incomplete")
 
+    preflight_command: list[str] = [
+        python,
+        "scripts/preflight_cognitive_gateway_core_qualification.py",
+        "--soridormi-repo",
+        str(args.soridormi_repo),
+        "--capability-manifest",
+        str(args.capability_manifest),
+        "--agent-url",
+        args.agent_url,
+        "--soridormi-mcp-url",
+        args.soridormi_mcp_url,
+        "--timeout-s",
+        str(args.preflight_timeout_s),
+        "--output",
+        str(paths.preflight),
+    ]
+
     identity_command: list[str] = [
         python,
         "scripts/capture_runtime_identity.py",
@@ -357,6 +376,7 @@ def _collect_stages(
     ]
 
     return [
+        StageSpec("preflight", tuple(preflight_command), (paths.preflight,)),
         StageSpec("runtime-identity", tuple(identity_command), (paths.runtime_identity,)),
         StageSpec("live-text", tuple(live_command), (paths.live_summary,)),
         StageSpec("mujoco", tuple(mujoco_command), (paths.mujoco_summary,)),
@@ -486,6 +506,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--soridormi-mcp-url",
         default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
     )
+    collect_parser.add_argument("--preflight-timeout-s", type=float, default=5.0)
     collect_parser.add_argument("--timeout-s", type=float, default=180.0)
     collect_parser.add_argument("--interrupt-start-timeout-s", type=float, default=30.0)
     collect_parser.add_argument(

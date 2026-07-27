@@ -4,6 +4,13 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Gateway/Core qualification preflight
+
+- Added a read-only fail-fast preflight before runtime identity, live-model, or
+  MuJoCo collection. It rejects dirty paired repositories, capability-manifest
+  revision drift, unhealthy or ungrounded Agent deployments, non-sim/non-idle
+  providers, and missing or mismatched endpoint-reported Soridormi revisions.
+
 ### Gateway/Core qualification workflow
 
 - Added one maintained, resumable `collect` / `status` / `finalize` command for

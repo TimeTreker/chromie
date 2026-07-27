@@ -49,6 +49,9 @@ final post-evidence audit:
 - [x] provide one maintained resumable qualification workflow that records exact
   commands/logs, fingerprints every artifact, creates only a pending review, and
   delegates final closure to the fail-closed verifier;
+- [x] run a read-only fail-fast preflight before evidence collection and reject
+  dirty paired repositories, manifest/revision drift, unhealthy Agent state,
+  non-idle Soridormi state, or missing/mismatched endpoint source identity;
 - [ ] retain a clean source-bound live-text bundle from the deployed services and
   review the ambient, stop, direct-question, and tool-follow-up behavior;
 - [ ] retain a clean paired-source MuJoCo bundle with endpoint-reported Soridormi

@@ -31,6 +31,7 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
             capability_manifest=root / "soridormi.json",
             agent_url="http://agent:8092",
             soridormi_mcp_url="http://soridormi:8000/mcp",
+            preflight_timeout_s=4.0,
             timeout_s=123.0,
             interrupt_start_timeout_s=17.0,
             speaker=False,
@@ -61,6 +62,31 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
         self.assertIn("Manifest-owned stop.", cancellation)
         self.assertIn("soridormi.walk_velocity", cancellation)
         self.assertNotIn("approve", " ".join(by_name["human-review-template"].command))
+
+
+    def test_collect_plan_runs_fail_fast_preflight_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "manifest.json"
+            manifest = {
+                "qualification_id": "qualification-one",
+                "simulator_expectations": {"required_terminal_skills": []},
+                "cancellation_expectations": {
+                    "command_text": "Walk.",
+                    "interrupt_text": "Stop.",
+                    "required_skill": "soridormi.walk_velocity",
+                },
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            paths = _paths(root / "evidence")
+            stages = _collect_stages(self._args(root, manifest_path), paths, manifest)
+
+        self.assertEqual(stages[0].name, "preflight")
+        command = list(stages[0].command)
+        self.assertIn("scripts/preflight_cognitive_gateway_core_qualification.py", command)
+        self.assertIn(str(paths.preflight), command)
+        self.assertIn("http://agent:8092", command)
+        self.assertIn("http://soridormi:8000/mcp", command)
 
     def test_resume_requires_matching_artifact_digest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
