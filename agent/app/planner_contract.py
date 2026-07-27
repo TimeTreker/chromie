@@ -1590,6 +1590,60 @@ def planner_contract_diagnostics(
     return unique
 
 
+def _normalize_redundant_planner_response_fields(
+    raw: dict[str, Any],
+    *,
+    expected_goal_ids_for_turn: list[str],
+) -> dict[str, Any]:
+    """Normalize duplicate response fields without inventing semantics.
+
+    Planner models occasionally place the exact response only inside the sole
+    per-Goal outcome while omitting the same required top-level transport field,
+    or omit outcome disposition/coverage that are already explicit at the top
+    level.  The Host may copy those identical structural facts; it may not choose
+    a capability, rewrite a Goal, or synthesize response content.
+    """
+
+    normalized = dict(raw)
+    outcomes = normalized.get("goal_outcomes")
+    if not isinstance(outcomes, dict):
+        return normalized
+
+    normalized_outcomes: dict[str, Any] = {}
+    for goal_id, value in outcomes.items():
+        if not isinstance(value, dict):
+            normalized_outcomes[str(goal_id)] = value
+            continue
+        outcome = dict(value)
+        response_text = str(outcome.get("response_text") or "").strip()
+        step_ids = outcome.get("step_ids")
+        if not outcome.get("disposition"):
+            if isinstance(step_ids, list) and step_ids:
+                outcome["disposition"] = "execute"
+            elif response_text:
+                outcome["disposition"] = "respond"
+        if (
+            not outcome.get("coverage")
+            and normalized.get("coverage") == "complete"
+            and outcome.get("disposition") in {"execute", "respond"}
+        ):
+            outcome["coverage"] = "complete"
+        normalized_outcomes[str(goal_id)] = outcome
+    normalized["goal_outcomes"] = normalized_outcomes
+
+    if (
+        normalized.get("disposition") == "respond"
+        and not str(normalized.get("response_text") or "").strip()
+        and len(expected_goal_ids_for_turn) == 1
+    ):
+        sole = normalized_outcomes.get(expected_goal_ids_for_turn[0])
+        if isinstance(sole, dict):
+            response_text = str(sole.get("response_text") or "").strip()
+            if response_text:
+                normalized["response_text"] = response_text
+    return normalized
+
+
 def validate_planner_model_output(
     raw: dict[str, Any],
     *,
@@ -1598,7 +1652,10 @@ def validate_planner_model_output(
 ) -> PlannerModelOutput:
     """Validate the semantic DTO and reject conflicting legacy goal echoes."""
 
-    model_raw = dict(raw)
+    model_raw = _normalize_redundant_planner_response_fields(
+        dict(raw),
+        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+    )
     echoed_goal_ids = model_raw.pop("goal_ids", None)
     for field_name in ("schema_version", "plan_id", "planner_tier"):
         model_raw.pop(field_name, None)

@@ -1808,7 +1808,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("semantically unresolved", decision.reason or "")
         self.assertEqual(
             [payload["model"] for payload in interpreter.payloads],
-            ["test-model", "review-model", "test-model"],
+            ["test-model", "review-model", "review-model"],
         )
 
     async def test_ambiguous_deep_thought_review_recovers_chinese_walk_command(self) -> None:
@@ -1903,7 +1903,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.intent, "clarify_uncertain_request")
-        self.assertIn("semantically unresolved", decision.reason or "")
+        self.assertIn("semantic repair failed", decision.reason or "")
 
     async def test_placeholder_capability_intent_is_repaired_before_agent(self) -> None:
         class PlaceholderInterpreter(OllamaGoalInterpreter):

@@ -3,7 +3,7 @@
   "id": "chinese_walk_after_weather_intent_repaired",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The Chinese walking request observed in live logs must not inherit the previous weather intent; semantic repair must ground it to the bounded walking skill.",
+  "description": "The Chinese walking request observed in live logs must not inherit the previous weather intent; semantic repair must ground the lane and exact capability identity without authoring planner arguments.",
   "tags": [
     "voice-log",
     "router-contract",
@@ -29,7 +29,10 @@
           "prompt_tier": "common",
           "available": true,
           "interaction_executable": true,
-          "effects": ["read_only", "weather_lookup"],
+          "effects": [
+            "read_only",
+            "weather_lookup"
+          ],
           "safety_class": "safe_read"
         },
         {
@@ -40,16 +43,25 @@
           "prompt_tier": "common",
           "available": true,
           "interaction_executable": true,
-          "effects": ["physical_motion"],
+          "effects": [
+            "physical_motion"
+          ],
           "safety_class": "physical_motion",
           "requires_confirmation": true,
           "input_schema": {
             "type": "object",
             "properties": {
-              "vx_mps": {"type": "number"},
-              "duration_s": {"type": "number"}
+              "vx_mps": {
+                "type": "number"
+              },
+              "duration_s": {
+                "type": "number"
+              }
             },
-            "required": ["vx_mps", "duration_s"]
+            "required": [
+              "vx_mps",
+              "duration_s"
+            ]
           }
         }
       ]
@@ -62,7 +74,9 @@
           "intent": "weather_query",
           "confidence": 0.95,
           "language": "zh-CN",
-          "metadata": {"tool_name": "weather"}
+          "metadata": {
+            "tool_name": "weather"
+          }
         }
       },
       {
@@ -70,17 +84,7 @@
         "decision": {
           "route": "robot_action",
           "intent": "capability:soridormi.walk_velocity",
-          "confidence": 0.96,
-          "language": "zh-CN",
-          "actions": [
-            {
-              "capability_id": "soridormi.walk_velocity",
-              "args": {"vx_mps": 0.25, "duration_s": 10.0},
-              "sequence": 0,
-              "timing": "sequential",
-              "confidence": 0.96
-            }
-          ]
+          "confidence": 0.96
         }
       }
     ]
@@ -90,15 +94,18 @@
     "intent": "capability:soridormi.walk_velocity",
     "source": "llm",
     "llm_calls": 2,
-    "llm_stages": ["quick_intent", "semantic_route_repair"],
-    "actions": [
-      {
-        "capability_id": "soridormi.walk_velocity",
-        "args": {"vx_mps": 0.25, "duration_s": 10.0}
-      }
+    "llm_stages": [
+      "quick_intent",
+      "semantic_route_repair"
     ],
-    "task_types_include": ["task.execute_skill"],
-    "task_types_forbid": ["task.use_tool", "speech.answer"],
+    "actions": [],
+    "task_types_include": [
+      "task.execute_skill"
+    ],
+    "task_types_forbid": [
+      "task.use_tool",
+      "speech.answer"
+    ],
     "metadata_json_contains": [
       "semantic_route_repair",
       "weather_semantics_require_tool_route",

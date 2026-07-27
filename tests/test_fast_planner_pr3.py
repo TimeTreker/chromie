@@ -4,6 +4,7 @@ import asyncio
 import unittest
 
 from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_contract import validate_planner_model_output
 from agent.app.schema import AgentRunRequest, RouteDecision
 from agent.app.capabilities.catalog import CatalogCapability
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -244,6 +245,35 @@ class CanonicalPlanContractTests(unittest.TestCase):
             goal_satisfaction={"score": 1.0, "status": "exact"},
         )
         self.assertEqual(plan.disposition, "mixed")
+
+
+class PlannerStructuralNormalizationTests(unittest.TestCase):
+    def test_single_response_goal_outcome_populates_redundant_top_level_fields(self):
+        output = validate_planner_model_output(
+            {
+                "disposition": "respond",
+                "coverage": "complete",
+                "confidence": 0.95,
+                "steps": [],
+                "goal_satisfaction": {
+                    "score": 1.0,
+                    "status": "exact",
+                },
+                "goal_outcomes": {
+                    "goal-weather": {
+                        "response_text": "I can help with that.",
+                        "step_ids": [],
+                    }
+                },
+            },
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-weather"],
+        )
+
+        self.assertEqual(output.response_text, "I can help with that.")
+        outcome = output.goal_outcomes["goal-weather"]
+        self.assertEqual(outcome.disposition, "respond")
+        self.assertEqual(outcome.coverage, "complete")
 
 
 class FastPlannerResolverTests(unittest.TestCase):

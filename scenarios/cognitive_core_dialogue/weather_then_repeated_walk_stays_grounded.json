@@ -3,7 +3,7 @@
   "id": "weather_then_repeated_walk_stays_grounded",
   "suite": "cognitive_core_dialogue",
   "level": "integration",
-  "description": "After a weather query, repeated walking requests must remain grounded to the walking skill even when the mocked quick model repeatedly emits the stale weather intent.",
+  "description": "After a weather query, repeated walking requests must remain grounded to the walking capability even when the mocked quick model repeatedly emits the stale weather intent; semantic route repair must not author planner arguments or execution requests.",
   "tags": [
     "voice-log",
     "multi-turn",
@@ -114,7 +114,6 @@
       "ask": "walk forward for 15 seconds quickly",
       "language": "en-US",
       "stub": {
-        "run_interaction": true,
         "llm_script": [
           {
             "stage": "quick_intent",
@@ -133,20 +132,7 @@
             "decision": {
               "route": "robot_action",
               "intent": "capability:soridormi.walk_velocity",
-              "confidence": 0.97,
-              "language": "en-US",
-              "actions": [
-                {
-                  "capability_id": "soridormi.walk_velocity",
-                  "args": {
-                    "vx_mps": 0.25,
-                    "duration_s": 15.0
-                  },
-                  "sequence": 0,
-                  "timing": "sequential",
-                  "confidence": 0.97
-                }
-              ]
+              "confidence": 0.97
             }
           }
         ]
@@ -163,33 +149,13 @@
         "history_contains": [
           "What is the weather in Beijing today?"
         ],
-        "actions": [
-          {
-            "capability_id": "soridormi.walk_velocity",
-            "args": {
-              "vx_mps": 0.25,
-              "duration_s": 15.0
-            }
-          }
+        "actions": [],
+        "task_types_include": [
+          "task.execute_skill"
         ],
-        "skills": [
+        "metadata_json_contains": [
+          "semantic_route_repair",
           "soridormi.walk_velocity"
-        ],
-        "skill_args": [
-          {
-            "vx_mps": 0.25,
-            "duration_s": 15.0
-          }
-        ],
-        "requires_confirmation": true,
-        "status": "ok",
-        "speech_all": [
-          "I will run that action."
-        ],
-        "forbidden_speech_any": [
-          "weather",
-          "forecast",
-          "please say that again"
         ]
       }
     },
@@ -198,7 +164,6 @@
       "ask": "walk forward for 15 seconds quickly",
       "language": "en-US",
       "stub": {
-        "run_interaction": true,
         "llm_script": [
           {
             "stage": "quick_intent",
@@ -217,20 +182,7 @@
             "decision": {
               "route": "robot_action",
               "intent": "capability:soridormi.walk_velocity",
-              "confidence": 0.97,
-              "language": "en-US",
-              "actions": [
-                {
-                  "capability_id": "soridormi.walk_velocity",
-                  "args": {
-                    "vx_mps": 0.25,
-                    "duration_s": 15.0
-                  },
-                  "sequence": 0,
-                  "timing": "sequential",
-                  "confidence": 0.97
-                }
-              ]
+              "confidence": 0.97
             }
           }
         ]
@@ -248,33 +200,13 @@
           "What is the weather in Beijing today?",
           "walk forward for 15 seconds quickly"
         ],
-        "actions": [
-          {
-            "capability_id": "soridormi.walk_velocity",
-            "args": {
-              "vx_mps": 0.25,
-              "duration_s": 15.0
-            }
-          }
+        "actions": [],
+        "task_types_include": [
+          "task.execute_skill"
         ],
-        "skills": [
+        "metadata_json_contains": [
+          "semantic_route_repair",
           "soridormi.walk_velocity"
-        ],
-        "skill_args": [
-          {
-            "vx_mps": 0.25,
-            "duration_s": 15.0
-          }
-        ],
-        "requires_confirmation": true,
-        "status": "ok",
-        "speech_all": [
-          "I will run that action."
-        ],
-        "forbidden_speech_any": [
-          "weather",
-          "forecast",
-          "please say that again"
         ]
       }
     }

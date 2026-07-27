@@ -37,17 +37,14 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 
 ### Default model topology
 
-The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Goal
-Association, Fast Planning, and the standalone compatibility Social Attention
-planner, while Deep Planning, Response Composition, and response review use
-`gemma4:26b`. Other profiles use their declared Gemma variant for the heavier
-components.
-
-The launchers may change that topology. With the maintained CosyVoice shared-GPU
-compact-cognition setting enabled, all cognition components, including Response
-Composer and Social Attention, resolve to `qwen3:4b` and Ollama keeps one resident
-model. Qualification therefore records launcher-effective component identities;
-a static hardware-profile name is not sufficient evidence.
+The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Fast
+Planning, Task Continuity, and Social Attention, while Goal Association, Deep
+Planning, Tool Result Interpretation, Response Composition, and response review
+use `gemma4:26b`. It explicitly opts out of CosyVoice compact cognition and keeps
+two Ollama models resident. Other profiles may retain the one-model compact
+topology when their committed profile leaves that setting enabled. Qualification
+therefore records launcher-effective component identities; a static
+hardware-profile name is not sufficient evidence.
 
 ### Social Attention runtime entrances
 

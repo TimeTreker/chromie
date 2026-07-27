@@ -195,8 +195,14 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIsInstance(schema, dict)
         self.assertEqual(
             set(schema["properties"]),
-            {"associations", "new_goals", "clarification", "confidence", "reason_summary"},
+            {"decision", "associations", "new_goals", "clarification", "confidence", "reason_summary"},
         )
+        self.assertEqual(
+            schema["properties"]["decision"]["enum"],
+            ["associate", "create_goals", "clarify"],
+        )
+        self.assertIn("decision", schema["required"])
+        self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
             {"description"},
@@ -309,23 +315,14 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("associations", schema["properties"])
         self.assertNotIn("GoalAssociationModelAssociation", schema.get("$defs", {}))
         self.assertFalse(schema["additionalProperties"])
-        self.assertEqual(len(schema["oneOf"]), 2)
         self.assertEqual(
-            schema["oneOf"][0]["properties"]["clarification"]["minLength"],
-            1,
+            schema["properties"]["decision"]["enum"],
+            ["create_goals", "clarify"],
         )
-        self.assertEqual(
-            schema["oneOf"][0]["properties"]["new_goals"]["maxItems"],
-            0,
-        )
-        self.assertEqual(
-            schema["oneOf"][1]["properties"]["clarification"]["maxLength"],
-            0,
-        )
-        self.assertEqual(
-            schema["oneOf"][1]["properties"]["new_goals"]["minItems"],
-            1,
-        )
+        self.assertIn("decision", schema["required"])
+        self.assertIn("new_goals", schema["required"])
+        self.assertIn("clarification", schema["required"])
+        self.assertNotIn("oneOf", schema)
         prompt = ollama.prompts[0][0]
         self.assertIn("contract intentionally has no associations field", prompt)
         self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
@@ -463,6 +460,38 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.associations, [])
         self.assertEqual(result.new_goals, [])
         self.assertEqual(result.clarification, "Which object should I look at?")
+
+    def test_create_goals_discriminant_ignores_inactive_clarification_branch(self):
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {"description": "Check today's weather in Chongqing"}
+                ],
+                "clarification": (
+                    "The request is already explicit; this explanatory text belongs "
+                    "to no user-facing clarification branch."
+                ),
+                "confidence": 0.96,
+                "reason_summary": "One explicit information goal.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("今天重庆热不热？", language="zh-CN")
+            )
+        )
+
+        self.assertEqual(result.clarification, "")
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Check today's weather in Chongqing"],
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+        prompt = ollama.prompts[0][0]
+        self.assertNotIn("Cognitive Core interpretation output", prompt)
+        self.assertIn("runtime diagnostics", prompt)
 
     def test_dynamic_schema_limits_existing_targets_to_active_goal_ids(self):
         ollama = FakeOllama({

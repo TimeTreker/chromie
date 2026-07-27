@@ -224,6 +224,16 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_CONTEXT_SIZE=8192", rtx5090)
         self.assertIn("TTS_MAX_LENGTH=8192", rtx5090)
         self.assertIn("TTS_RESET_LLAMA_STATE=1", rtx5090)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:26b", rtx5090)
+        self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:26b", rtx5090)
+        self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:26b", rtx5090)
+        self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", rtx5090)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", rtx5090)
+        self.assertIn("OLLAMA_NUM_CTX=8192", rtx5090)
+        self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=8192", rtx5090)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=8192", rtx5090)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=8192", rtx5090)
+        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX=8192", rtx5090)
 
     def test_episode_recording_is_enabled_by_default(self) -> None:
         values = _common_env()

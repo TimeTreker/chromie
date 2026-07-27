@@ -45,25 +45,8 @@ class _SemanticRepairInterpreter(OllamaGoalInterpreter):
                 "content": json.dumps(
                     {
                         "route": "tool",
-                        "agents": ["tool_agent", "speaker_agent"],
                         "intent": "weather_query",
                         "confidence": 0.96,
-                        "language": "en-US",
-                        "fast_speech": {
-                            "text": "I’ll check the weather in Chongqing.",
-                            "purpose": "acknowledge_and_check",
-                            "commitment": "checking_only",
-                            "must_not_claim_completion": True,
-                        },
-                        "metadata": {
-                            "tool_name": "weather",
-                            "weather_query": {
-                                "location": "Chongqing",
-                                "date": "today",
-                                "units": "metric",
-                            },
-                        },
-                        "reason": "semantic repair grounded the weather request",
                     }
                 )
             },
@@ -124,11 +107,8 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(repaired.route, "tool")
         self.assertEqual(repaired.intent, "weather_query")
-        self.assertEqual(repaired.metadata.get("tool_name"), "weather")
-        self.assertEqual(
-            repaired.metadata.get("weather_query", {}).get("location"),
-            "Chongqing",
-        )
+        self.assertNotIn("tool_name", repaired.metadata)
+        self.assertNotIn("weather_query", repaired.metadata)
         self.assertEqual(
             repaired.metadata.get("semantic_route_repair", {}).get("status"),
             "repaired",

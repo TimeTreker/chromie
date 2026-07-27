@@ -135,9 +135,24 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
 
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:26b")
+        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
+        for key in (
+            "OLLAMA_NUM_CTX",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
+            "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
+            "AGENT_GOAL_ASSOCIATION_NUM_CTX",
+            "AGENT_FAST_PLANNER_NUM_CTX",
+            "AGENT_DEEP_PLANNER_NUM_CTX",
+            "AGENT_RESPONSE_COMPOSER_NUM_CTX",
+            "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
+        ):
+            self.assertEqual(values[key], "8192", key)
         self.assertEqual(manifest["active_profile"], "rtx5090")
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
@@ -73,6 +73,16 @@ _GENERIC_CHAT_INTENTS = {
     "acknowledgement",
     "response",
 }
+class SemanticRouteRepairOutput(BaseModel):
+    """Minimal repair DTO; it cannot carry planner or runtime diagnostics."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    route: str
+    intent: str = Field(min_length=1, max_length=120)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
 PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability",
     "capability:",
@@ -1343,48 +1353,37 @@ class OllamaGoalInterpreter:
         abilities_json = _bounded_json(
             _compact_candidate_capabilities(
                 _review_capabilities_from_request(request),
-                limit=20,
+                limit=12,
             ),
-            max_chars=3000,
+            max_chars=1600,
         )
         session_context = _bounded_json(
             _goal_interpretation_prompt_context(request.context),
-            max_chars=2400,
+            max_chars=900,
         )
-        decision_json = _bounded_json(
-            decision.model_dump(mode="json", exclude_none=True),
-            max_chars=1800,
-        )
+        previous = {
+            "route": decision.route,
+            "intent": decision.intent,
+            "confidence": decision.confidence,
+        }
         return {
-            "model": self.model,
+            "model": self.review_model or self.model,
             "stream": False,
             "think": False,
-            "format": "json",
+            "format": SemanticRouteRepairOutput.model_json_schema(),
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
                     "content": (
-                        "Current Job:\n"
-                        "- Independently repair an uncertain or internally inconsistent semantic route.\n"
-                        "- Reinterpret only the latest user input using bounded session/task context and supplied ability descriptions.\n"
-                        "- The previous decision is evidence of a routing failure, not a semantic instruction; do not preserve a stale intent merely because it appears there.\n"
-                        "- Decide by meaning. Do not create phrase rules, regex rules, keyword tables, lexical-overlap rules, or recency-only rules.\n\n"
-                        "Routing Contract:\n"
-                        "- chat is speech-only conversation or a direct factual/social answer.\n"
-                        "- robot_action is an explicit current request for one or more supplied executable body/embodied abilities. Use capability:<exact capability_id> when clear.\n"
-                        "- tool is an external/changing lookup. Weather semantics require route=tool and intent=weather_query.\n"
-                        "- memory is a requested memory operation.\n"
-                        "- deep_thought is clear complex reasoning, situational planning, or multi-step task work.\n"
-                        "- clarify is required when the current input remains referential, fragmentary, or semantically underdetermined after using supplied context.\n"
-                        "- capability_inquiry is only an inquiry about Chromie's bounded abilities, not technical discussion about some other person, model, vehicle, sensor, or system.\n"
-                        "- Never return interrupt or ignore; focused addressedness is a separate stage.\n\n"
-                        "Output Contract:\n"
-                        "- Return compact RouteDecision JSON only with route, intent, and confidence.\n"
-                        "- Optional actions must use exact supplied capability IDs.\n"
-                        "- Use confidence >= 0.72 only when the repaired meaning is clear.\n"
-                        "- When it is not clear, return route=clarify with one short semantic intent and confidence <= 0.55.\n"
-                        "- Do not output chain-of-thought, hidden analysis, markdown, or text outside JSON."
+                        "Repair one semantic route from the latest user turn. "
+                        "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
+                        "Return exactly route, intent, and confidence. "
+                        "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
+                        "Use tool for changing external facts, including current weather. "
+                        "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
+                        "Use clarify only when the user meaning remains genuinely underdetermined. "
+                        "No analysis, rationale, metadata, actions, markdown, or extra fields."
                     ),
                 },
                 {
@@ -1393,9 +1392,9 @@ class OllamaGoalInterpreter:
                         f"Repair reason: {reason}\n"
                         f"Latest user input: {request.text}\n"
                         f"Language hint: {request.language or 'auto'}\n"
-                        f"Bounded session/task context JSON: {session_context}\n"
-                        f"Supplied common abilities JSON: {abilities_json}\n"
-                        f"Rejected previous decision JSON: {decision_json}"
+                        f"Bounded context JSON: {session_context}\n"
+                        f"Supplied abilities JSON: {abilities_json}\n"
+                        f"Rejected minimal decision JSON: {_bounded_json(previous, max_chars=500)}"
                     ),
                 },
             ],
@@ -1403,7 +1402,7 @@ class OllamaGoalInterpreter:
                 "temperature": 0,
                 "top_p": 0.9,
                 "num_ctx": self.num_ctx,
-                "num_predict": max(128, self.num_predict),
+                "num_predict": 96,
             },
         }
 
@@ -2043,10 +2042,20 @@ class OllamaGoalInterpreter:
                 stage="semantic_route_repair",
                 request=request,
             )
-            repaired_decision = self._decision_from_response(
+            content = str(repaired.get("message", {}).get("content") or "")
+            minimal = SemanticRouteRepairOutput.model_validate(
+                _extract_json_object(content)
+            )
+            repaired_decision = finalize_decision(
+                RouteDecision(
+                    route=minimal.route,
+                    intent=minimal.intent,
+                    confidence=minimal.confidence,
+                    language=request.language or "auto",
+                    source="llm",
+                ),
                 request,
-                repaired,
-                stage="semantic_route_repair",
+                source="llm",
             )
         except Exception as exc:
             logger.warning(
@@ -2110,9 +2119,10 @@ class OllamaGoalInterpreter:
             "original_confidence": decision.confidence,
         }
         repaired_decision = repaired_decision.model_copy(update={"metadata": metadata})
+        repair_model = self.review_model or self.model
         repaired_decision.reason = (
             f"{repaired_decision.reason}; " if repaired_decision.reason else ""
-        ) + f"fast_model:{self.model} semantic route repair after {reason}"
+        ) + f"repair_model:{repair_model} semantic route repair after {reason}"
         logger.info(
             "semantic route repaired sid=%s reason=%s original=%s/%s repaired=%s/%s confidence=%.2f",
             request.sid,

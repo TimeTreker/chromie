@@ -4,6 +4,24 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### RTX 5090 cognitive topology and contract hardening
+
+- Restored the intended RTX 5090 two-model topology while CosyVoice is active:
+  `qwen3:4b` owns narrow fast stages and `gemma4:26b` owns Goal Association,
+  Deep Planning, Tool Result Interpretation, and Response Composition. The
+  profile explicitly opts out of the low-memory one-model compact override.
+- Unified every active RTX 5090 cognitive stage on an 8192-token runner context
+  so Ollama does not repeatedly evict and reload the same model at 2K/4K/8K.
+- Replaced mutually exclusive Goal Association payload branches with an explicit
+  decision discriminant; inactive branch content is structurally ignored rather
+  than triggering another self-repair call. Runtime routing/validation failures
+  are no longer supplied as semantic evidence to Goal Association.
+- Replaced generic RouteDecision repair output with a minimal
+  `route`/`intent`/`confidence` schema and uses the configured review model for
+  correctness recovery.
+- Added deterministic structural normalization for redundant planner response
+  fields, without inventing goals, capabilities, arguments, or response text.
+
 ### Goal-scope and read-only tool truthfulness
 
 - Preserved temporal/comparison qualifiers through Goal Association and exposed

@@ -409,11 +409,19 @@ acquisition.
 ### 5.1 Model-facing Goal Association boundary
 
 Goal Association must not expose Chromie's persistence and lifecycle objects
-directly to the language model. Its model-facing output is intentionally small:
+directly to the language model. Its model-facing output is intentionally small
+and explicitly discriminated:
 
-- relationships to exact active goal IDs;
-- one natural-language description per independent new goal;
-- or one natural clarification.
+- `associate` for relationships to exact active goal IDs;
+- `create_goals` for one natural-language description per independent new goal;
+- `clarify` for one concise user-facing question.
+
+The declared decision selects the active branch. Harmless content emitted in an
+inactive branch is ignored structurally; it does not trigger semantic repair.
+`clarification` never carries reasoning, translations, route labels, model
+failures, or validator diagnostics. Goal Association also does not receive prior
+routing or validation failures as semantic evidence; the admitted user turn,
+bounded Goal/dialogue state, and trusted evidence remain authoritative.
 
 The host owns all transport and persistence mechanics, including turn IDs,
 association IDs, goal IDs, versions, source text, default object/constraint

@@ -38,6 +38,10 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.goal_association")
 
 
+GoalSegmentationDecision = Literal["create_goals", "clarify"]
+GoalAssociationDecision = Literal["associate", "create_goals", "clarify"]
+
+
 GoalAssociationModelRelationship = Literal[
     "continue",
     "modify",
@@ -119,10 +123,16 @@ class GoalAssociationModelGoal(BaseModel):
 
 
 class GoalSegmentationModelOutput(BaseModel):
-    """Semantic goal segmentation used when no association target exists."""
+    """Semantic goal segmentation used when no association target exists.
+
+    The discriminant is authoritative.  The Host may receive harmless content in
+    the inactive branch from a small structured-output model, but it never asks a
+    second model call to decide which mutually exclusive branch was intended.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
+    decision: GoalSegmentationDecision | None = None
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
@@ -130,6 +140,22 @@ class GoalSegmentationModelOutput(BaseModel):
     clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def select_branch(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        decision = str(normalized.get("decision") or "").strip()
+        if decision not in {"create_goals", "clarify"}:
+            decision = "create_goals" if normalized.get("new_goals") else "clarify"
+        normalized["decision"] = decision
+        if decision == "create_goals":
+            normalized["clarification"] = ""
+        else:
+            normalized["new_goals"] = []
+        return normalized
 
     @field_validator("clarification", "reason_summary", mode="before")
     @classmethod
@@ -140,23 +166,48 @@ class GoalSegmentationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
-        if self.clarification and self.new_goals:
-            raise ValueError("clarification must not be mixed with new goals")
-        if not self.clarification and not self.new_goals:
-            raise ValueError("output must contain new_goals or clarification")
+        if self.decision == "create_goals" and not self.new_goals:
+            raise ValueError("decision=create_goals requires new_goals")
+        if self.decision == "clarify" and not self.clarification:
+            raise ValueError("decision=clarify requires clarification")
         return self
 
 
 class GoalAssociationModelOutput(BaseModel):
-    """Small semantic DTO returned by the Goal Association model."""
+    """Small discriminated semantic DTO returned by Goal Association."""
 
     model_config = ConfigDict(extra="ignore")
 
+    decision: GoalAssociationDecision | None = None
     associations: list[GoalAssociationModelAssociation] = Field(default_factory=list)
     new_goals: list[GoalAssociationModelGoal] = Field(default_factory=list)
     clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def select_branch(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        decision = str(normalized.get("decision") or "").strip()
+        if decision not in {"associate", "create_goals", "clarify"}:
+            if normalized.get("associations"):
+                decision = "associate"
+            elif normalized.get("new_goals"):
+                decision = "create_goals"
+            else:
+                decision = "clarify"
+        normalized["decision"] = decision
+        if decision == "clarify":
+            normalized["associations"] = []
+            normalized["new_goals"] = []
+        else:
+            normalized["clarification"] = ""
+            if decision == "create_goals":
+                normalized["associations"] = []
+        return normalized
 
     @field_validator("clarification", "reason_summary", mode="before")
     @classmethod
@@ -167,10 +218,12 @@ class GoalAssociationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelOutput":
-        if self.clarification and (self.associations or self.new_goals):
-            raise ValueError("clarification must not be mixed with goal changes")
-        if not self.clarification and not self.associations and not self.new_goals:
-            raise ValueError("output must contain associations, new_goals, or clarification")
+        if self.decision == "clarify" and not self.clarification:
+            raise ValueError("decision=clarify requires clarification")
+        if self.decision == "associate" and not self.associations:
+            raise ValueError("decision=associate requires associations")
+        if self.decision == "create_goals" and not self.new_goals:
+            raise ValueError("decision=create_goals requires new_goals")
         return self
 
 
@@ -433,50 +486,36 @@ class GoalAssociationResolver:
                     constrain(value)
 
         constrain(schema)
+        properties = schema.setdefault("properties", {})
+        required = list(schema.get("required") or [])
         if output_type is GoalSegmentationModelOutput:
-            # Pydantic model validators are not represented in model_json_schema().
-            # Without an explicit structural alternative the constrained decoder
-            # may legally emit both an empty new_goals list and an empty
-            # clarification, even though that payload is rejected after
-            # generation.  Make the same semantic invariant visible to the
-            # decoder: every accepted turn must either describe at least one new
-            # Goal or ask one non-empty clarification question.
-            schema["oneOf"] = [
-                {
-                    "properties": {
-                        "clarification": {"type": "string", "minLength": 1},
-                        "new_goals": {"type": "array", "maxItems": 0},
-                    },
-                    "required": ["clarification", "new_goals"],
-                },
-                {
-                    "properties": {
-                        "clarification": {"type": "string", "maxLength": 0},
-                        "new_goals": {"type": "array", "minItems": 1},
-                    },
-                    "required": ["clarification", "new_goals"],
-                },
+            properties["decision"] = {
+                "type": "string",
+                "enum": ["create_goals", "clarify"],
+            }
+            ordered_required = [
+                "decision",
+                "new_goals",
+                "clarification",
+                "confidence",
+                "reason_summary",
             ]
-            return schema
-
-        schema["oneOf"] = [
-            {
-                "properties": {
-                    "clarification": {"type": "string", "minLength": 1},
-                    "associations": {"type": "array", "maxItems": 0},
-                    "new_goals": {"type": "array", "maxItems": 0},
-                },
-                "required": ["clarification", "associations", "new_goals"],
-            },
-            {
-                "properties": {"clarification": {"type": "string", "maxLength": 0}},
-                "anyOf": [
-                    {"properties": {"associations": {"type": "array", "minItems": 1}}},
-                    {"properties": {"new_goals": {"type": "array", "minItems": 1}}},
-                ],
-                "required": ["clarification", "associations", "new_goals"],
-            },
-        ]
+        else:
+            properties["decision"] = {
+                "type": "string",
+                "enum": ["associate", "create_goals", "clarify"],
+            }
+            ordered_required = [
+                "decision",
+                "associations",
+                "new_goals",
+                "clarification",
+                "confidence",
+                "reason_summary",
+            ]
+        schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
+        schema.pop("oneOf", None)
+        schema.pop("anyOf", None)
         return schema
 
     def _active_goals(self, request: AgentRunRequest) -> list[dict[str, Any]]:
@@ -514,23 +553,14 @@ class GoalAssociationResolver:
         ),
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
-        route = request.route_decision
-        route_advisory = {
-            "route": route.route,
-            "intent": route.intent,
-            "confidence": route.confidence,
-            "routes": [
-                {"route": item.route, "intent": item.intent, "confidence": item.confidence}
-                for item in route.routes[:8]
-            ],
-        }
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
                 "Segment the authoritative user turn into independent new Goals, or return a clarification if the meaning is materially ambiguous. "
             )
             output_instructions = (
-                "Return only JSON with new_goals, clarification, confidence, and reason_summary. "
+                "Return only JSON with decision, new_goals, clarification, confidence, and reason_summary. "
+                "Use decision=create_goals for a clear turn and decision=clarify only for a genuinely ambiguous user meaning. "
                 "The decoder enforces the exact GoalSegmentationModelOutput JSON Schema. "
             )
         else:
@@ -541,7 +571,8 @@ class GoalAssociationResolver:
                 "Associations may target only IDs from the active-goal list. "
             )
             output_instructions = (
-                "Return only JSON with associations, new_goals, clarification, confidence, and reason_summary. "
+                "Return only JSON with decision, associations, new_goals, clarification, confidence, and reason_summary. "
+                "Use decision=associate for continuity, decision=create_goals for independent work, or decision=clarify only for genuine ambiguity. "
                 "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
             )
         return (
@@ -555,7 +586,7 @@ class GoalAssociationResolver:
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
-            "If the user meaning is materially ambiguous, return only one concise clarification.\n\n"
+            "The clarification field is only a concise user-facing question. Never put analysis, rationale, translation, route labels, validator errors, model failures, or system diagnostics in clarification. Put optional compact rationale in reason_summary. If the user meaning is materially ambiguous, use decision=clarify; otherwise keep clarification empty.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
@@ -567,8 +598,8 @@ class GoalAssociationResolver:
             "Recent trusted tool evidence JSON:\n"
             f"{self._bounded_json(context.get('recent_tool_evidence') or [], 5000)}\n\n"
             "Use recent trusted tool evidence only when it is semantically relevant and fresh enough for the current request. It may resolve references, ellipsis, or a request to interpret a result already obtained; do not create a duplicate lookup merely because the latest sentence omits previously established entities. The model owns that semantic judgment. "
-            "Cognitive Core interpretation output is advisory JSON:\n"
-            f"{self._bounded_json(route_advisory, 1400)}\n\n"
+            "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
+            f"Language hint: {request.language or 'auto'}\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL ACTIVE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in active_goals], 1600)}"
         )
@@ -595,7 +626,7 @@ class GoalAssociationResolver:
             )
             output_instructions = (
                 "The exact GoalSegmentationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
-                "Return only new_goals, clarification, confidence, and reason_summary. "
+                "Return only decision, new_goals, clarification, confidence, and reason_summary. "
             )
         else:
             contract_name = "Goal Association"
@@ -605,7 +636,7 @@ class GoalAssociationResolver:
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
-                "Return only associations, new_goals, clarification, confidence, and reason_summary. "
+                "Return only decision, associations, new_goals, clarification, confidence, and reason_summary. "
             )
         return (
             f"The previous minimal {contract_name} semantic DTO failed its exact contract. {revision_action} and "
@@ -621,7 +652,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Each new_goals item contains only description. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains only description. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )

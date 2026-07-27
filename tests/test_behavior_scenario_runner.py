@@ -146,9 +146,11 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             turns[1]["llm_stages"],
             ["quick_intent", "semantic_route_repair"],
         )
-        self.assertEqual(
-            turns[2]["interaction"]["skills"],
-            ["soridormi.walk_velocity"],
+        self.assertIsNone(turns[2]["interaction"])
+        self.assertEqual(turns[2]["route"]["actions"], [])
+        self.assertIn(
+            "soridormi.walk_velocity",
+            str(turns[2]["route"]["metadata"].get("task_list") or []),
         )
         self.assertIn(
             "What is the weather in Beijing today?",

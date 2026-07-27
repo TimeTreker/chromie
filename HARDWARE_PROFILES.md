@@ -109,14 +109,18 @@ launcher option and are regenerated automatically with the detected profile.
 | `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `rtx4090` | Desktop RTX 4090 | `gemma4:e2b` | `qwen3:4b` | 4096 |
 | `rtx4090_laptop` | RTX 4090 Laptop GPU | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx5090` | Desktop RTX 5090 | `gemma4:26b` | `qwen3:4b` | 4096 |
+| `rtx5090` | Desktop RTX 5090 | `gemma4:26b` | `qwen3:4b` | 8192 |
 | `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:26b` | `qwen3:4b` | 4096 |
 
 The quality model is used by Deep Planner and Response Composer. The fast model
-is used by Goal Interpretation, Goal Association, Fast Planner, Task Continuity, and Social
-Attention unless the profile explicitly states otherwise.
+is used by Goal Interpretation, Fast Planner, Task Continuity, and Social
+Attention unless the profile explicitly states otherwise. RTX 5090 also assigns
+Goal Association and Tool Result Interpretation to `gemma4:26b`, opts out of the
+CosyVoice one-model compact override, keeps two Ollama models resident, and uses
+one 8192-token context topology for every cognitive stage to avoid runner
+eviction caused only by context-size changes.
 
 ## Detection order
 

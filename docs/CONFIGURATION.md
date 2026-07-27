@@ -133,15 +133,17 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default. Limits the shared-GPU topology to one resident Ollama model while CosyVoice is selected. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default for constrained profiles. Limits the shared-GPU topology to one resident Ollama model while CosyVoice is selected. The RTX 5090 profile explicitly sets `0` and preserves its two-model quality topology. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
 source-controlled `assets/tts/voices` catalog before service creation.
 `chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
-request for the singleton CosyVoice worker and limits Ollama to one resident
-model when compact cognition is enabled. Select a fallback explicitly with
+request for the singleton CosyVoice worker. Profiles with compact cognition
+enabled limit Ollama to one resident model; the RTX 5090 profile opts out and
+keeps `qwen3:4b` plus `gemma4:26b` resident with one 8192-token context topology
+per model. Select a fallback explicitly with
 `--tts-backend oute` or `--tts-backend qwen3`; the selection is scoped to that
 launch and does not rewrite `.env.local`.
 
@@ -256,7 +258,7 @@ not selected by phrase rules.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b`; compact semantic model for continuity-before-creation and independent-goal segmentation. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; the RTX 5090 profile uses `gemma4:26b` for stronger continuity-before-creation and independent-goal segmentation. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a non-authoritative clarification result. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -264,17 +266,21 @@ not selected by phrase rules.
 | `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
 
 Goal Association sends a compact state-specific model schema to Ollama's
-`format` field. With active Goal IDs it uses
-`GoalAssociationModelOutput.model_json_schema()` for existing-goal
-relationships, independent new-goal descriptions, or a clarification. With no
-active Goal IDs it uses `GoalSegmentationModelOutput.model_json_schema()`,
-which contains no association property or definition and permits only new-goal
-descriptions or a clarification. Chromie generates identifiers, versions,
-source text, default containers, persistence metadata, and the canonical
-`GoalAssociationResolution` after model validation. Contract validation may
-invoke one bounded schema-constrained model revision using the same selected
-schema; there is no local relationship synonym, phrase mapping, or word-form
-normalization fallback.
+`format` field. Both schemas contain an explicit decision discriminant. With
+active Goal IDs the decision is `associate`, `create_goals`, or `clarify`; with
+no active Goal IDs it is `create_goals` or `clarify`, and the schema contains no
+association property or definition. The inactive branch is discarded
+deterministically from the declared decision, so explanatory text in an
+inactive field cannot turn a clear request into a contract failure.
+`clarification` is reserved for one concise user-facing question, never rationale
+or runtime diagnostics. Chromie generates identifiers, versions, source text,
+default containers, persistence metadata, and the canonical
+`GoalAssociationResolution` after validation. Goal Association receives the
+immutable user turn, bounded dialogue/Goal state, and trusted evidence; prior
+routing labels, planner failures, and validator diagnostics are deliberately not
+semantic inputs. Contract validation may still invoke one bounded
+schema-constrained revision for genuinely malformed output; there is no local
+relationship synonym, phrase mapping, or word-form normalization fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified `ORCH_COGNITIVE_RUNTIME_MODE=off`. Goal Association is an integrated stage in unified `apply`/`report_only`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
