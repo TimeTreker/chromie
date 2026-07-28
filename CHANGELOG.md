@@ -4,6 +4,21 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Explicit Social Attention decisions and bounded compatibility join
+
+- Required Response Composer to return an explicit `decision=none` or
+  `decision=express` Social Attention plan whenever policy is enabled and
+  reviewed candidates are available. The Host still never chooses a gesture.
+- Made the owner-approved Social Interaction Style an active model preference
+  while preserving scene-specific stillness, cooldown, repetition restraint,
+  primary-task priority, and deterministic capability/safety validation.
+- Added model-decision, candidate-count, validation, proposed-skill, and
+  materialized-skill evidence so live runs distinguish no candidate, explicit
+  stillness, validation rejection, and successful body-action delivery.
+- Restored the compatibility planner's configured bounded post-response join.
+  A zero budget remains non-blocking; a positive budget is now honored instead
+  of being recorded and ignored.
+
 ### Parallel safe reads and recoverable query continuity
 
 - Started validated `safe_read` capabilities in parallel with optional micro

@@ -62,8 +62,9 @@ class ResponseComposerModelOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     response_plan: ResponsePlan
-    # Keep the real model-facing schema while preserving the existing fail-soft
-    # deterministic validation of optional social attention below.
+    # Keep the DTO fail-soft for policy-off and compatibility callers. The
+    # resolver makes this field decoder-required and non-null whenever Social
+    # Attention is enabled and reviewed candidates are available.
     social_attention_plan: SkipValidation[SocialAttentionPlan | None] = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
@@ -127,6 +128,26 @@ class ResponseComposerResolver:
                 metadata={"authority": "advisory", "resolver": "response_composer"},
             )
         composition_id = self._composition_id(request, plan)
+        social_attention_mode = self._social_attention_mode(request.context)
+        social_attention_candidate_count = self._social_attention_candidate_count(
+            request.context
+        )
+        social_attention_decision_required = (
+            self._social_attention_decision_required(request.context)
+        )
+        target_evidence = request.context.get("social_attention_target_evidence")
+        target_available = bool(
+            isinstance(target_evidence, dict) and target_evidence.get("available")
+        )
+        logger.info(
+            "response_composer_social_attention_context sid=%s mode=%s "
+            "candidates=%s decision_required=%s target_available=%s",
+            request.sid,
+            social_attention_mode,
+            social_attention_candidate_count,
+            str(social_attention_decision_required).lower(),
+            str(target_available).lower(),
+        )
         response_schema = self._response_schema(plan, request.context)
         previous_raw: Any = None
         initial_validation_errors = ""
@@ -157,6 +178,10 @@ class ResponseComposerResolver:
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
                 model_output = ResponseComposerModelOutput.model_validate(raw)
+                self._validate_social_attention_decision(
+                    model_output.social_attention_plan,
+                    context=request.context,
+                )
                 self._validate_safe_read_acknowledgement(
                     model_output.response_plan,
                     plan=plan,
@@ -178,6 +203,33 @@ class ResponseComposerResolver:
                     plan=plan,
                     context=request.context,
                 )
+                model_social_decision = self._social_attention_decision(
+                    model_output.social_attention_plan
+                )
+                model_social_behavior_count = self._social_attention_behavior_count(
+                    model_output.social_attention_plan
+                )
+                validated_social_decision = (
+                    social_plan.decision if social_plan is not None else "missing"
+                )
+                validated_social_behavior_count = (
+                    len(social_plan.behaviors) if social_plan is not None else 0
+                )
+                logger.info(
+                    "response_composer_social_attention_decision sid=%s mode=%s "
+                    "candidates=%s required=%s model_decision=%s "
+                    "model_behaviors=%s validated_decision=%s "
+                    "validated_behaviors=%s validation_reasons=%s",
+                    request.sid,
+                    social_attention_mode,
+                    social_attention_candidate_count,
+                    str(social_attention_decision_required).lower(),
+                    model_social_decision,
+                    model_social_behavior_count,
+                    validated_social_decision,
+                    validated_social_behavior_count,
+                    ",".join(social_reasons) or "none",
+                )
                 composition = CoordinatedResponsePlan(
                     composition_id=composition_id,
                     canonical_plan_id=plan.plan_id,
@@ -193,11 +245,26 @@ class ResponseComposerResolver:
                         "task_plan_immutable": True,
                         "social_attention_validation_reasons": social_reasons,
                         "social_attention_policy": {
-                            "mode": self._social_attention_mode(request.context),
-                            "execution_enabled": self._social_attention_mode(request.context)
-                            == "on",
+                            "mode": social_attention_mode,
+                            "execution_enabled": social_attention_mode == "on",
                             "embodiment_independent": True,
                         },
+                        "social_attention_decision_required": (
+                            social_attention_decision_required
+                        ),
+                        "social_attention_candidate_count": (
+                            social_attention_candidate_count
+                        ),
+                        "social_attention_model_decision": model_social_decision,
+                        "social_attention_model_behavior_count": (
+                            model_social_behavior_count
+                        ),
+                        "social_attention_validated_decision": (
+                            validated_social_decision
+                        ),
+                        "social_attention_validated_behavior_count": (
+                            validated_social_behavior_count
+                        ),
                         "contract_schema": "ResponseComposerModelOutput",
                         "safe_read_speech_optional": self._is_safe_read_plan(
                             plan, request.context
@@ -209,11 +276,21 @@ class ResponseComposerResolver:
                 return ResponseCompositionResolution(
                     status="resolved",
                     composition=composition,
-                    reason_summary="Task, speech, and optional attention plans were coordinated.",
+                    reason_summary="Task, speech, and an explicit social-attention decision were coordinated.",
                     metadata={
                         "authority": "advisory",
                         "resolver": "response_composer",
                         "contract_schema": "ResponseComposerModelOutput",
+                        "social_attention_decision_required": (
+                            social_attention_decision_required
+                        ),
+                        "social_attention_candidate_count": (
+                            social_attention_candidate_count
+                        ),
+                        "social_attention_model_decision": model_social_decision,
+                        "social_attention_validated_decision": (
+                            validated_social_decision
+                        ),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
                     },
@@ -376,12 +453,87 @@ class ResponseComposerResolver:
             raise ValueError("bare greeting exceeds six words")
 
     @staticmethod
+    def _social_attention_candidate_count(
+        context: dict[str, Any] | None,
+    ) -> int:
+        if not isinstance(context, dict):
+            return 0
+        values = context.get("social_attention_candidates")
+        if not isinstance(values, list):
+            return 0
+        return sum(1 for item in values if isinstance(item, dict))
+
+    @classmethod
+    def _social_attention_decision_required(
+        cls,
+        context: dict[str, Any] | None,
+    ) -> bool:
+        if not isinstance(context, dict):
+            return False
+        return (
+            cls._social_attention_mode(context) != "off"
+            and cls._social_attention_candidate_count(context) > 0
+        )
+
+    @classmethod
+    def _validate_social_attention_decision(
+        cls,
+        value: Any,
+        *,
+        context: dict[str, Any] | None,
+    ) -> None:
+        if cls._social_attention_decision_required(context) and value is None:
+            raise ValueError(
+                "social_attention_plan is required when Social Attention policy "
+                "is enabled and reviewed candidates are available; return an "
+                "explicit decision=none or decision=express plan"
+            )
+
+    @staticmethod
+    def _social_attention_decision(value: Any) -> str:
+        if isinstance(value, SocialAttentionPlan):
+            return value.decision
+        if isinstance(value, dict):
+            decision = str(value.get("decision") or "").strip()
+            return decision or "missing"
+        return "missing"
+
+    @staticmethod
+    def _social_attention_behavior_count(value: Any) -> int:
+        if isinstance(value, SocialAttentionPlan):
+            return len(value.behaviors)
+        if isinstance(value, dict):
+            behaviors = value.get("behaviors")
+            return len(behaviors) if isinstance(behaviors, list) else 0
+        return 0
+
+    @staticmethod
     def _response_schema(
         plan: CanonicalPlan,
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "ResponseComposerModelOutput"
+        if ResponseComposerResolver._social_attention_decision_required(context):
+            required = schema.setdefault("required", [])
+            if "social_attention_plan" not in required:
+                required.append("social_attention_plan")
+            social_schema = schema.get("properties", {}).get(
+                "social_attention_plan"
+            )
+            if isinstance(social_schema, dict):
+                alternatives = social_schema.get("anyOf")
+                if isinstance(alternatives, list):
+                    non_null = [
+                        item
+                        for item in alternatives
+                        if not (
+                            isinstance(item, dict)
+                            and item.get("type") == "null"
+                        )
+                    ]
+                    if len(non_null) == 1:
+                        schema["properties"]["social_attention_plan"] = non_null[0]
         goal_ids = list(dict.fromkeys(plan.goal_ids))
 
         def constrain(node: Any) -> None:
@@ -581,7 +733,11 @@ class ResponseComposerResolver:
         if mode == "off":
             return None, (["policy_off"] if value is not None else [])
         if value is None:
-            return None, []
+            return None, (
+                ["missing_social_attention_decision"]
+                if self._social_attention_decision_required(context)
+                else []
+            )
         try:
             proposed = SocialAttentionPlan.model_validate(value)
         except ValidationError as exc:
@@ -794,7 +950,7 @@ class ResponseComposerResolver:
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
             f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
-            "Compose one ResponsePlan and, only when socially useful, an optional SocialAttentionPlan that coordinates language expression and body expression under one scene-specific purpose. "
+            "Compose one ResponsePlan and one explicit social-attention decision. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. Recent trusted tool evidence and conversation context may ground a respond outcome or conversational repair, but never claim facts absent from that evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -805,15 +961,15 @@ class ResponseComposerResolver:
             "For a pending safe_read or external_read capability, acknowledgement is optional. If silence would feel awkward, emit only one tiny everyday micro acknowledgement, normally no more than a few words, such as ‘我看看。’ or ‘哦，是上海，我看看。’. Do not restate the full request, narrate the workflow, promise a result, or mention tools, APIs, data, execution, or waiting. The lookup and this optional speech will start in parallel. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
-            "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires no SocialAttentionPlan and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style semantically; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
+            "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because expression is auxiliary. Under a courteous style, direct engagement, greeting, gratitude, apology, listening, or meaningful turn-taking can support one subtle eligible behavior when the scene, recent evidence, and primary-task priority make it natural. This is semantic scene judgment, not phrase matching. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
-            "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
+            "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, social_attention_plan, confidence, and rationale only."
         )
 
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's Response Composer. Coordinate truthful language expression and optional body expression around an immutable CanonicalPlan using a scene-specific social-attention purpose. "
+            "You are Chromie's Response Composer. Coordinate truthful language expression and an explicit social-attention decision around an immutable CanonicalPlan using a scene-specific purpose. When policy is enabled and reviewed candidates exist, always choose decision=none or decision=express instead of omitting the responsibility. "
             "You do not plan tasks, mutate goals, execute, authorize, or claim unobserved completion. Return JSON only."
         )
 
@@ -821,5 +977,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal, while safe-read work may omit pre-execution speech or use one tiny acknowledgement; always omit progress and final and keep must_not_claim_completion=true. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal, while safe-read work may omit pre-execution speech or use one tiny acknowledgement; always omit progress and final and keep must_not_claim_completion=true. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
         )

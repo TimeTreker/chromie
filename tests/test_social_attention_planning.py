@@ -309,7 +309,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["social_attention_status"], "not_applied")
         self.assertIn("invalid_args:soridormi.blink_eyes", response.metadata["social_attention_validation_reasons"][0])
 
-    async def test_social_attention_does_not_extend_response_beyond_budget(self) -> None:
+    async def test_configured_social_attention_wait_allows_bounded_completion(self) -> None:
         attention = _AttentionOllama(
             {
                 "decision": "express",
@@ -340,15 +340,59 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
-                social_attention_wait_after_response_ms=120000,
+                social_attention_wait_after_response_ms=200,
+            )
+        ).run(self._request())
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            ["soridormi.blink_eyes"],
+        )
+        self.assertEqual(response.metadata["social_attention_status"], "applied")
+
+    async def test_zero_social_attention_wait_preserves_non_blocking_skip(self) -> None:
+        attention = _AttentionOllama(
+            {
+                "decision": "express",
+                "target": {
+                    "target_ref": "none",
+                    "source": "none",
+                    "confidence": 0.0,
+                    "metadata": {},
+                },
+                "behaviors": [
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "parallel",
+                        "reason": "Optional blink.",
+                    }
+                ],
+                "confidence": 0.7,
+                "reason": "Optional cue.",
+            },
+            delay_s=0.05,
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ConversationOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
+                social_attention_mode="on",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+                social_attention_wait_after_response_ms=0,
             )
         ).run(self._request())
 
         self.assertEqual(response.skills, [])
-        self.assertEqual(response.metadata["social_attention_status"], "skipped_latency_budget")
-        self.assertEqual(response.metadata["social_attention_failure"]["configured_wait_after_response_ms"], 120000)
-        self.assertEqual(response.metadata["social_attention_failure"]["effective_wait_after_response_ms"], 0)
-
+        self.assertEqual(
+            response.metadata["social_attention_status"],
+            "skipped_latency_budget",
+        )
+        failure = response.metadata["social_attention_failure"]
+        self.assertEqual(failure["configured_wait_after_response_ms"], 0)
+        self.assertEqual(failure["effective_wait_after_response_ms"], 0)
 
 
     async def test_live_target_evidence_is_used_when_supplied(self) -> None:

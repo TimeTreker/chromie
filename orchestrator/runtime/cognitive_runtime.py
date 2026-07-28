@@ -1520,6 +1520,16 @@ class CanonicalPlanRuntimeAdapter:
                             f"invalid:{behavior.skill_id}:{type(exc).__name__}"
                         )
 
+        proposed_social_skill_ids = (
+            [behavior.skill_id for behavior in attention.behaviors]
+            if attention is not None and attention.decision == "express"
+            else []
+        )
+        materialized_social_skill_ids = [
+            request.skill_id
+            for request in skills
+            if request.metadata.get("auxiliary_social_attention") is True
+        ]
         for request in skills:
             self._record_auxiliary_behavior_request(
                 request,
@@ -1565,6 +1575,16 @@ class CanonicalPlanRuntimeAdapter:
             ),
             "omitted_social_attention": omitted_attention,
             "social_attention_policy_mode": policy_mode,
+            "social_attention_model_decision": (
+                attention.decision if attention is not None else "missing"
+            ),
+            "social_attention_proposed_skill_ids": proposed_social_skill_ids,
+            "social_attention_materialized_skill_ids": (
+                materialized_social_skill_ids
+            ),
+            "social_attention_materialized_count": len(
+                materialized_social_skill_ids
+            ),
             "recent_auxiliary_behavior_evidence": (
                 self.recent_auxiliary_behavior_evidence(session_id)
             ),
