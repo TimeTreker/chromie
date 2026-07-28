@@ -29,10 +29,31 @@ from shared.chromie_contracts.interaction import InteractionResponse, SkillResul
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
-    async def test_runtime_ready_greeting_uses_tts_before_live_microphone_turns(self) -> None:
+    def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm, curious, and natural",
+            assistant,
+        )
+
+        prompt = assistant._runtime_ready_greeting_prompt()
+
+        self.assertIn("has just woken up", prompt)
+        self.assertIn("naturally says after waking up", prompt)
+        self.assertIn("Local time:", prompt)
+        self.assertIn("Speak only in zh-CN", prompt)
+        self.assertIn("rather than like a device reporting status", prompt)
+        self.assertIn("Avoid service-desk wording", prompt)
+
+    async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
-        assistant.runtime_ready_greeting_text = "你好，我已经准备好了。"
+        assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_timeout_ms = 1000
         assistant.audio_input_mode = "device"
         assistant.audio_output_mode = "device"
@@ -46,6 +67,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         assistant.is_valid_tts_text = MethodType(
             lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+
+        async def generate_runtime_ready_greeting(
+            self: VoiceAssistant,
+        ) -> tuple[str, str]:
+            del self
+            return "嗨，我醒啦！", "llm:qwen3:4b"
+
+        assistant._generate_runtime_ready_greeting = MethodType(
+            generate_runtime_ready_greeting,
             assistant,
         )
 
@@ -78,18 +110,65 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             scheduled_texts,
-            [("你好，我已经准备好了。", None)],
+            [("嗨，我醒啦！", None)],
         )
         self.assertEqual(assistant.next_playback_order, 1)
+
+    async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_model = "qwen3:4b"
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.ollama_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
+            assistant,
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm and curious",
+            assistant,
+        )
+
+        async def get_http_session(self: VoiceAssistant) -> Any:
+            del self
+            raise RuntimeError("Ollama unavailable")
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
-        assistant.runtime_ready_greeting_text = "你好，我已经准备好了。"
+        assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_timeout_ms = 1000
         assistant.audio_input_mode = "stdin"
         assistant.audio_output_mode = "discard"
         scheduled = False
+        generated = False
+
+        async def generate_runtime_ready_greeting(
+            self: VoiceAssistant,
+        ) -> tuple[str, str]:
+            del self
+            nonlocal generated
+            generated = True
+            return "嗨，我醒啦！", "llm:qwen3:4b"
 
         async def schedule_tts_text(
             self: VoiceAssistant,
@@ -101,10 +180,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             scheduled = True
             return {"scheduled": True}
 
+        assistant._generate_runtime_ready_greeting = MethodType(
+            generate_runtime_ready_greeting,
+            assistant,
+        )
         assistant.schedule_tts_text = MethodType(schedule_tts_text, assistant)
 
         await assistant._announce_runtime_ready()
 
+        self.assertFalse(generated)
         self.assertFalse(scheduled)
 
     def test_post_interrupt_corrected_decision_is_normal_followup(self) -> None:

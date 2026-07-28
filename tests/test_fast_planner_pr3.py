@@ -315,6 +315,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             schema["properties"]["disposition"]["enum"],
             ["respond", "escalate"],
         )
+        self.assertIn("response_text", schema["required"])
+        self.assertIn("escalation_reason", schema["required"])
+        self.assertIn("goal_outcomes", schema["required"])
+        self.assertEqual(
+            schema["properties"]["goal_outcomes"]["maxProperties"],
+            0,
+        )
 
     def test_contract_repair_receives_all_compound_shape_defects(self):
         invalid = {

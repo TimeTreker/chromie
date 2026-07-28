@@ -571,8 +571,30 @@ class VoiceAssistant:
         )
         self.runtime_ready_greeting_text = os.getenv(
             "ORCH_RUNTIME_READY_GREETING_TEXT",
-            "你好，我已经准备好了。",
+            "",
         ).strip()
+        self.runtime_ready_greeting_fallback_text = os.getenv(
+            "ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT",
+            "嗨，我醒啦！",
+        ).strip()
+        self.runtime_ready_greeting_language = os.getenv(
+            "ORCH_RUNTIME_READY_GREETING_LANGUAGE",
+            "zh-CN",
+        ).strip() or "zh-CN"
+        self.runtime_ready_greeting_model = os.getenv(
+            "ORCH_RUNTIME_READY_GREETING_MODEL",
+            "",
+        ).strip()
+        self.runtime_ready_greeting_num_predict = env_int(
+            "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
+            64,
+            minimum=16,
+        )
+        self.runtime_ready_greeting_generation_timeout_ms = env_int(
+            "ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS",
+            15000,
+            minimum=1000,
+        )
         self.runtime_ready_greeting_timeout_ms = env_int(
             "ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS",
             45000,
@@ -7989,14 +8011,98 @@ class VoiceAssistant:
         )
         return stats
 
-    async def _announce_runtime_ready(self) -> None:
-        """Speak one readiness greeting before accepting live microphone turns.
+    def _runtime_ready_greeting_prompt(self) -> str:
+        language = self.runtime_ready_greeting_language
+        identity_json = self._direct_llm_identity_json()
+        mind_summary = self._direct_llm_mind_summary()
+        local_time = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+        timezone_name = (
+            os.getenv("CHROMIE_HOST_TIMEZONE", "").strip()
+            or os.getenv("TZ", "").strip()
+            or time.tzname[0]
+        )
+        return (
+            "Chromie has just woken up and can now hear and talk with the people "
+            "nearby. Write the single short sentence she naturally says after waking "
+            "up. The wording belongs to you, not to the host runtime. Sound warm, "
+            "spontaneous, and human-like according to Chromie's owner-approved "
+            "identity and mind profile, rather than like a device reporting status. "
+            "Use the supplied local time only when a time-of-day greeting feels "
+            "natural; do not mechanically announce the clock. "
+            f"Speak only in {language}. "
+            "Do not mention readiness, startup, initialization, systems, services, "
+            "models, being an assistant, or operational status. Do not introduce "
+            "yourself or recite identity facts. Avoid service-desk wording such as "
+            "asking what help is required. Do not use emoji, markdown, labels, "
+            "quotation marks, or more than one sentence. Keep it brief enough to say "
+            "naturally in about two seconds. Output only the spoken sentence.\n\n"
+            f"Local time: {local_time}\n"
+            f"Timezone: {timezone_name}\n"
+            f"Owner-approved identity JSON: {identity_json}\n"
+            f"Owner-approved mind summary: {mind_summary}\n"
+        )
 
-        This is an operator-configurable runtime notification, not a semantic
-        response or a substitute for LLM-owned social behavior. It deliberately
-        uses the same synthesis and ordered playback pipeline as ``chromie.speak``
-        while no user session is active, so startup cannot create a fake
-        conversation turn or contaminate conversation memory.
+    async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
+        configured = self.normalize_tts_candidate(self.runtime_ready_greeting_text)
+        if self.is_valid_tts_text(configured):
+            return configured, "configured"
+
+        model = (
+            self.runtime_ready_greeting_model
+            or os.getenv("AGENT_FAST_PLANNER_MODEL", "").strip()
+            or os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "").strip()
+            or self.ollama_model
+        )
+        payload = {
+            "model": model,
+            "prompt": self._runtime_ready_greeting_prompt(),
+            "stream": False,
+            "think": False,
+            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+            "options": {
+                "num_ctx": int(
+                    os.getenv(
+                        "AGENT_FAST_PLANNER_NUM_CTX",
+                        os.getenv("OLLAMA_NUM_CTX", "2048"),
+                    )
+                ),
+                "num_predict": self.runtime_ready_greeting_num_predict,
+                "temperature": 0.75,
+                "top_p": 0.9,
+            },
+        }
+        timeout_s = self.runtime_ready_greeting_generation_timeout_ms / 1000.0
+        try:
+            session = await self.get_http_session()
+            async with asyncio.timeout(timeout_s):
+                async with session.post(self.llm_url, json=payload) as response:
+                    body = await response.text()
+                    if response.status != 200:
+                        raise RuntimeError(
+                            f"runtime greeting model returned HTTP {response.status}: "
+                            f"{body[:300]}"
+                        )
+                    data = json.loads(body)
+            generated = self.normalize_tts_candidate(data.get("response", ""))
+            if not self.is_valid_tts_text(generated):
+                raise RuntimeError("runtime greeting model returned no valid spoken text")
+            return generated, f"llm:{model}"
+        except Exception as exc:
+            logger.warning("Runtime ready greeting generation failed: %s", exc)
+            fallback = self.normalize_tts_candidate(
+                self.runtime_ready_greeting_fallback_text
+            )
+            if self.is_valid_tts_text(fallback):
+                return fallback, "fallback"
+            return "", "unavailable"
+
+    async def _announce_runtime_ready(self) -> None:
+        """Speak one natural wake-up greeting before live microphone turns.
+
+        The fast language model owns the normal wording using the owner-approved
+        identity, mind profile, language, and local time. The host only schedules
+        the resulting speech before the microphone opens, so startup creates no
+        fake user turn and cannot feed its own greeting back through ASR.
         """
 
         if not self.runtime_ready_greeting_enabled:
@@ -8010,12 +8116,18 @@ class VoiceAssistant:
             )
             return
 
-        text = self.normalize_tts_candidate(self.runtime_ready_greeting_text)
+        text, source = await self._generate_runtime_ready_greeting()
         if not self.is_valid_tts_text(text):
-            logger.warning("Runtime ready greeting skipped because text is empty or invalid")
+            logger.warning(
+                "Runtime ready greeting skipped because no valid text was produced"
+            )
             return
 
-        logger.info("Runtime ready greeting scheduled: text=%r", text)
+        logger.info(
+            "Runtime ready greeting scheduled: source=%s text=%r",
+            source,
+            text,
+        )
         scheduled = await self.schedule_tts_text(text, session_id=None)
         if scheduled.get("scheduled") is not True:
             logger.warning(

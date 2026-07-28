@@ -217,9 +217,17 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_TTS_CJK_CHUNK_CHARS"], "36")
         self.assertEqual(values["ORCH_TTS_CJK_MIN_CHUNK_CHARS"], "8")
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_ENABLED"], "1")
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_TEXT"], "")
         self.assertEqual(
-            values["ORCH_RUNTIME_READY_GREETING_TEXT"],
-            "你好，我已经准备好了。",
+            values["ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT"],
+            "嗨，我醒啦！",
+        )
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "64")
+        self.assertEqual(
+            values["ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS"],
+            "15000",
         )
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS"],

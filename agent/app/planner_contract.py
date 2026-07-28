@@ -530,7 +530,21 @@ def canonical_plan_response_schema(
     )
     properties = schema.setdefault("properties", {})
     required = schema.setdefault("required", [])
-    for field_name in ("disposition", "coverage", "confidence", "steps", "goal_satisfaction"):
+    for field_name in (
+        "disposition",
+        "coverage",
+        "confidence",
+        "goal_summary",
+        "response_text",
+        "steps",
+        "escalation_reason",
+        "unresolved",
+        "parameter_resolutions",
+        "goal_outcomes",
+        "goal_satisfaction",
+        "plan_relation",
+        "user_confirmation_required",
+    ):
         if field_name not in required:
             required.append(field_name)
 
@@ -571,34 +585,49 @@ def canonical_plan_response_schema(
 
     goal_outcomes = properties.get("goal_outcomes")
     if isinstance(goal_outcomes, dict):
-        outcome_properties = {
-            goal_id: {
-                "$ref": "#/$defs/PlannerModelGoalOutcome",
-                "description": (
-                    "Outcome for this exact canonical goal. Decide only this "
-                    "goal's disposition, coverage, response, and owned step IDs."
-                ),
-            }
-            for goal_id in allowed_goals
-        }
-        goal_outcomes.clear()
-        goal_outcomes.update(
-            {
-                "type": "object",
-                "properties": outcome_properties,
-                "additionalProperties": False,
-                "maxProperties": len(allowed_goals),
-            }
-        )
-        if allowed_goals and planner_tier == "deep":
+        if planner_tier == "fast" and len(allowed_goals) <= 1:
+            # A single-goal fast plan already has one unambiguous semantic owner
+            # for the top-level response/step fields. Hiding the redundant nested
+            # map avoids an Ollama decoder failure mode where it emits a partial
+            # $ref object that necessarily fails PlannerModelGoalOutcome.
+            goal_outcomes.clear()
             goal_outcomes.update(
                 {
-                    "required": allowed_goals,
-                    "minProperties": len(allowed_goals),
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                    "maxProperties": 0,
                 }
             )
-        elif allowed_goals and planner_tier == "fast":
-            goal_outcomes["minProperties"] = 0
+        else:
+            outcome_properties = {
+                goal_id: {
+                    "$ref": "#/$defs/PlannerModelGoalOutcome",
+                    "description": (
+                        "Outcome for this exact canonical goal. Decide only this "
+                        "goal's disposition, coverage, response, and owned step IDs."
+                    ),
+                }
+                for goal_id in allowed_goals
+            }
+            goal_outcomes.clear()
+            goal_outcomes.update(
+                {
+                    "type": "object",
+                    "properties": outcome_properties,
+                    "additionalProperties": False,
+                    "maxProperties": len(allowed_goals),
+                }
+            )
+            if allowed_goals and planner_tier == "deep":
+                goal_outcomes.update(
+                    {
+                        "required": allowed_goals,
+                        "minProperties": len(allowed_goals),
+                    }
+                )
+            elif allowed_goals and planner_tier == "fast":
+                goal_outcomes["minProperties"] = 0
 
     outcome_schema = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
     if isinstance(outcome_schema, dict):

@@ -398,6 +398,41 @@ class ResponseComposerResolverTests(unittest.TestCase):
             stage["properties"]["must_not_claim_completion"]["const"]
         )
 
+    def test_execute_decoder_schema_requires_pre_execution_delivery_stage(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                }
+            ],
+        )
+        schema = ResponseComposerResolver._response_schema(canonical)
+        response_plan = schema["$defs"]["ResponsePlan"]
+
+        self.assertEqual(response_plan["properties"]["final"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["progress"]["maxItems"], 0)
+        self.assertEqual(
+            response_plan["anyOf"],
+            [
+                {
+                    "required": ["immediate"],
+                    "properties": {
+                        "immediate": {"$ref": "#/$defs/ResponseStage"}
+                    },
+                },
+                {
+                    "required": ["pre_action"],
+                    "properties": {
+                        "pre_action": {"$ref": "#/$defs/ResponseStage"}
+                    },
+                },
+            ],
+        )
+
     def test_response_composer_prompt_preserves_user_language(self):
         canonical = plan(goals=["goal-greeting"])
         output = {
@@ -418,8 +453,41 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         prompt = ollama.prompts[0][0]
         self.assertIn("Language hint: zh-CN", prompt)
-        self.assertIn("A Chinese turn receives Chinese speech", prompt)
+        self.assertIn("Language hint is authoritative", prompt)
+        self.assertIn("When it is zh-CN, speak Chinese only", prompt)
         self.assertIn("exactly one final stage", prompt)
+
+    def test_execute_prompt_requires_immediate_or_pre_action(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                }
+            ],
+        )
+        output = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "我查一下。",
+                    "speech_act": "inform",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            }
+        }
+        ollama = FakeOllama(output)
+
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "resolved")
+        prompt = ollama.prompts[0][0]
+        self.assertIn("immediate and/or pre_action stage covering every canonical goal", prompt)
+        self.assertIn("omit progress and final", prompt)
 
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])

@@ -339,17 +339,42 @@ class ResponseComposerResolver:
                     must_not_claim["const"] = False
 
         response_plan_schema = schema.get("$defs", {}).get("ResponsePlan")
-        if isinstance(response_plan_schema, dict) and plan.disposition == "respond":
+        if isinstance(response_plan_schema, dict):
             response_properties = response_plan_schema.get("properties", {})
-            response_properties["immediate"] = {"type": "null"}
-            response_properties["pre_action"] = {"type": "null"}
-            progress = response_properties.get("progress")
-            if isinstance(progress, dict):
-                progress["maxItems"] = 0
-            response_properties["final"] = {"$ref": "#/$defs/ResponseStage"}
             response_required = response_plan_schema.setdefault("required", [])
-            if "final" not in response_required:
-                response_required.append("final")
+            if plan.disposition == "respond":
+                response_properties["immediate"] = {"type": "null"}
+                response_properties["pre_action"] = {"type": "null"}
+                progress = response_properties.get("progress")
+                if isinstance(progress, dict):
+                    progress["maxItems"] = 0
+                response_properties["final"] = {"$ref": "#/$defs/ResponseStage"}
+                if "final" not in response_required:
+                    response_required.append("final")
+            elif plan.disposition == "execute":
+                # The runtime has a delivery/effect barrier: an executable plan
+                # cannot start until immediate and/or pre_action speech covering
+                # every goal begins playback. Make that topology visible at the
+                # decoder boundary instead of asking the host to reinterpret a
+                # final or progress stage after generation.
+                response_properties["final"] = {"type": "null"}
+                progress = response_properties.get("progress")
+                if isinstance(progress, dict):
+                    progress["maxItems"] = 0
+                response_plan_schema["anyOf"] = [
+                    {
+                        "required": ["immediate"],
+                        "properties": {
+                            "immediate": {"$ref": "#/$defs/ResponseStage"}
+                        },
+                    },
+                    {
+                        "required": ["pre_action"],
+                        "properties": {
+                            "pre_action": {"$ref": "#/$defs/ResponseStage"}
+                        },
+                    },
+                ]
         return schema
 
     @staticmethod
@@ -651,10 +676,10 @@ class ResponseComposerResolver:
             "Compose one ResponsePlan and, only when socially useful, an optional SocialAttentionPlan that coordinates language expression and body expression under one scene-specific purpose. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. Recent trusted tool evidence and conversation context may ground a respond outcome or conversational repair, but never claim facts absent from that evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
-            "Use the user turn's primary language for all spoken text unless the user explicitly asks for translation or a different language. A Chinese turn receives Chinese speech; do not switch to English merely because identity or internal context is written in English. "
+            "The explicit Language hint is authoritative for spoken output unless the user explicitly asks for translation or a different language. When it is zh-CN, speak Chinese only; do not mirror a bilingual greeting, switch to English, or follow the language of identity/internal context. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. "
-            "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
+            "For execute plans this is pre-execution composition: emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech as a short natural acknowledgement of what will be checked or done. "
             "For a pending safe_read or external_read capability, acknowledge only that information will be checked. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
@@ -674,5 +699,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the user turn primary language, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. For execute, use immediate and/or pre_action covering every canonical goal, omit progress and final, and keep must_not_claim_completion=true. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
         )
