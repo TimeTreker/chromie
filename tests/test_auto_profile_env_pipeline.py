@@ -59,6 +59,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "\n".join(
                 (
                     "CHROMIE_OS_KERNEL='Linux test'",
+                    "CHROMIE_HOST_TIMEZONE=Asia/Shanghai",
                     "CHROMIE_CPU_ARCH=x86_64",
                     "CHROMIE_CPU_MODEL='Test CPU'",
                     "CHROMIE_CPU_CORES=24",
@@ -135,6 +136,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
 
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
+        self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:26b")
@@ -412,6 +414,40 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         dockerfile = (ROOT / "tts" / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn('org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"', dockerfile)
         self.assertIn('org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}"', dockerfile)
+
+    def test_system_info_collector_records_host_timezone(self) -> None:
+        source = (ROOT / "scripts" / "collect_system_info.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("timedatectl show --property=Timezone --value", source)
+        self.assertIn("emit CHROMIE_HOST_TIMEZONE", source)
+        self.assertIn('host_timezone="UTC"', source)
+
+    def test_compose_aligns_every_service_to_detected_host_timezone(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        services = (
+            "chromie-asr",
+            "chromie-tts",
+            "chromie-tts-oute",
+            "chromie-tts-qwen3",
+            "chromie-llm",
+            "chromie-agent",
+        )
+        for index, service in enumerate(services):
+            start = compose.index(f"  {service}:")
+            next_positions = [
+                compose.find(f"  {candidate}:", start + 1)
+                for candidate in services[index + 1 :]
+            ]
+            next_positions = [position for position in next_positions if position >= 0]
+            end = min(next_positions) if next_positions else compose.index("\nnetworks:", start)
+            block = compose[start:end]
+            with self.subTest(service=service):
+                self.assertIn(
+                    "TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}",
+                    block,
+                )
+                self.assertIn("- /etc/localtime:/etc/localtime:ro", block)
 
     def test_supported_build_and_start_paths_regenerate_and_verify_profile(self) -> None:
         sources = {

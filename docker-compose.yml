@@ -27,6 +27,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       ASR_HOST: "0.0.0.0"
       ASR_PORT: "9001"
       ASR_MODE: ${ASR_MODE:-final}
@@ -66,6 +67,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./hf_cache:/root/.cache/huggingface
     networks:
       - chromie-net
@@ -116,6 +118,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
@@ -146,6 +149,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./hf_cache:/root/.cache/huggingface
       - ./hf_cache/modelscope:/root/.cache/modelscope
       - type: bind
@@ -208,6 +212,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
@@ -259,6 +264,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./hf_cache:/root/.cache/huggingface
       - ./hf_cache/outeai:/root/.cache/outeai
       - ./hf_cache/whisper:/root/.cache/whisper
@@ -308,6 +314,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
@@ -332,6 +339,7 @@ services:
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./hf_cache:/root/.cache/huggingface
       - type: bind
         source: ${TTS_VOICE_ROOT:-./assets/tts/voices}/chromie_mixed
@@ -379,6 +387,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       OLLAMA_HOST: "0.0.0.0:11434"
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
       OLLAMA_LOAD_TIMEOUT: ${OLLAMA_LOAD_TIMEOUT:-10m}
@@ -398,6 +407,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama
     networks:
       - chromie-net
@@ -433,6 +443,7 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
       AGENT_HOST: "0.0.0.0"
       AGENT_PORT: "8092"
       AGENT_GOAL_INTERPRETER_MODE: ${AGENT_GOAL_INTERPRETER_MODE:-hybrid}
@@ -579,6 +590,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - ./capabilities:/app/capabilities:ro
     depends_on:
       chromie-llm:

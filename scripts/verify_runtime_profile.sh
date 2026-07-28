@@ -18,6 +18,8 @@ set -a
 source .env.runtime
 set +a
 
+export TZ="${CHROMIE_HOST_TIMEZONE:-UTC}"
+
 if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
   if [ ! -f "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE" ]; then
     echo "[profile-check][error] Service runtime override file not found: $CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE" >&2
@@ -106,6 +108,13 @@ check_value() {
 for service in "${services[@]}"; do
   check_value "$service" CHROMIE_ACTIVE_PROFILE
   check_value "$service" CHROMIE_RUNTIME_ENV_FINGERPRINT
+  check_value "$service" TZ
+  container_id="$(docker compose "${compose_args[@]}" ps -q "$service")"
+  localtime_mount="$(docker inspect "$container_id" --format '{{range .Mounts}}{{if eq .Destination "/etc/localtime"}}{{println .Source}}{{end}}{{end}}')"
+  if [ -z "$localtime_mount" ]; then
+    echo "[profile-check][error] $service does not mount host /etc/localtime." >&2
+    failures=$((failures + 1))
+  fi
 done
 
 for name in \
@@ -191,6 +200,7 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 echo "[profile-check] Auto-detected profile: ${CHROMIE_ACTIVE_PROFILE}"
+echo "[profile-check] Runtime timezone: ${TZ}"
 echo "[profile-check] Runtime fingerprint: ${CHROMIE_RUNTIME_ENV_FINGERPRINT}"
 echo "[profile-check] TTS: backend=${tts_backend} service=${tts_service} provider=${tts_provider} built_profile=${built_profile} cuda_arch=${built_cuda_arch}"
 echo "[profile-check] Active Ollama models: $(./scripts/list_runtime_ollama_models.sh | paste -sd, -)"

@@ -423,6 +423,19 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", verifier)
         self.assertNotIn('check_value "$name"', verifier)
 
+    def test_runtime_verifier_checks_timezone_environment_and_mount(self) -> None:
+        verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
+            encoding="utf-8"
+        )
+        orchestrator = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('export TZ="${CHROMIE_HOST_TIMEZONE:-UTC}"', verifier)
+        self.assertIn('check_value "$service" TZ', verifier)
+        self.assertIn('eq .Destination "/etc/localtime"', verifier)
+        self.assertIn("Runtime timezone:", verifier)
+        self.assertIn('export TZ="${CHROMIE_HOST_TIMEZONE:-UTC}"', orchestrator)
+
     def test_start_chromie_waits_for_application_health(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"

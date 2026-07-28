@@ -27,6 +27,21 @@ cpu_cores="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 
 mem_total_mib="$(awk '/MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)"
 kernel="$(uname -sr 2>/dev/null || echo unknown)"
 
+host_timezone=""
+if command -v timedatectl >/dev/null 2>&1; then
+  host_timezone="$(timedatectl show --property=Timezone --value 2>/dev/null || true)"
+fi
+if [ -z "$host_timezone" ] && [ -r /etc/timezone ]; then
+  host_timezone="$(head -n1 /etc/timezone 2>/dev/null | trim || true)"
+fi
+if [ -z "$host_timezone" ] && [ -e /etc/localtime ]; then
+  localtime_target="$(readlink -f /etc/localtime 2>/dev/null || true)"
+  case "$localtime_target" in
+    /usr/share/zoneinfo/*) host_timezone="${localtime_target#/usr/share/zoneinfo/}" ;;
+  esac
+fi
+[ -n "$host_timezone" ] || host_timezone="UTC"
+
 cpu_model=""
 if [ -r /proc/cpuinfo ]; then
   cpu_model="$(awk -F': ' '/model name/ {print $2; exit} /Hardware/ {print $2; exit} /Processor/ {print $2; exit}' /proc/cpuinfo || true)"
@@ -76,6 +91,7 @@ if [ -n "$gpu_compute_cap" ]; then
 fi
 
 emit CHROMIE_OS_KERNEL "$kernel"
+emit CHROMIE_HOST_TIMEZONE "$host_timezone"
 emit CHROMIE_CPU_ARCH "$cpu_arch"
 emit CHROMIE_CPU_MODEL "$cpu_model"
 emit CHROMIE_CPU_CORES "$cpu_cores"

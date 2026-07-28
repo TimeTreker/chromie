@@ -19,6 +19,8 @@ if [ -f ".env.runtime" ]; then
   set +a
 fi
 
+export TZ="${CHROMIE_HOST_TIMEZONE:-UTC}"
+
 # Optional late-bound overrides are useful for supervised acceptance runs. They
 # are sourced after .env.runtime so the runner can enable evidence capture and
 # structured interaction without editing the operator's tracked/local config.

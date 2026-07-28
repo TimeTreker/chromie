@@ -35,6 +35,12 @@ is `scripts/build_runtime_env.sh`.
 
 Do not edit or commit generated files.
 
+The generated runtime also records `CHROMIE_HOST_TIMEZONE`. Every supported
+container receives that value as `TZ` and mounts the host `/etc/localtime`, while
+the host Orchestrator exports the same timezone. Human-readable service log
+prefixes therefore use one wall-clock timezone. Protocol timestamps and evidence
+fields explicitly named `*_utc` or carrying a `Z` suffix remain UTC by design.
+
 ## Automatic entrypoints
 
 These supported entrypoints regenerate and validate the runtime environment

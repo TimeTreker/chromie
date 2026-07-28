@@ -376,6 +376,51 @@ class ResponseComposerResolverTests(unittest.TestCase):
             stage["properties"]["covers_goal_ids"]["maxItems"], 0
         )
 
+    def test_respond_decoder_schema_requires_one_truthful_final_stage(self):
+        canonical = plan(goals=["goal-greeting"])
+        schema = ResponseComposerResolver._response_schema(canonical)
+        response_plan = schema["$defs"]["ResponsePlan"]
+        stage = schema["$defs"]["ResponseStage"]
+
+        self.assertIn("final", response_plan["required"])
+        self.assertEqual(response_plan["properties"]["immediate"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["pre_action"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["progress"]["maxItems"], 0)
+        self.assertEqual(
+            response_plan["properties"]["final"],
+            {"$ref": "#/$defs/ResponseStage"},
+        )
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["completed"],
+        )
+        self.assertFalse(
+            stage["properties"]["must_not_claim_completion"]["const"]
+        )
+
+    def test_response_composer_prompt_preserves_user_language(self):
+        canonical = plan(goals=["goal-greeting"])
+        output = {
+            "response_plan": {
+                "final": {
+                    "text": "你好，我是 Chromie。",
+                    "speech_act": "greeting",
+                    "commitment_state": "completed",
+                    "must_not_claim_completion": False,
+                    "covers_goal_ids": ["goal-greeting"],
+                }
+            }
+        }
+        ollama = FakeOllama(output)
+
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "resolved")
+        prompt = ollama.prompts[0][0]
+        self.assertIn("Language hint: zh-CN", prompt)
+        self.assertIn("A Chinese turn receives Chinese speech", prompt)
+        self.assertIn("exactly one final stage", prompt)
+
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])
         response_plan = {

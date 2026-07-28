@@ -3632,9 +3632,9 @@ class VoiceAssistant:
             )
             if safe_response is None:
                 text = (
-                    "我没能可靠地完成这次理解，所以先不继续。你可以换一种说法。"
+                    "这次处理流程没有正确完成，所以我先停下了。请再试一次。"
                     if self._looks_zh(user_text)
-                    else "I could not resolve that reliably, so I stopped before acting. Please rephrase it."
+                    else "I could not finish processing that correctly, so I stopped. Please try again."
                 )
                 safe_response = self._host_speech_response(
                     text,

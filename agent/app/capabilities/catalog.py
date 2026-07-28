@@ -19,12 +19,20 @@ logger = logging.getLogger("chromie.agent.capability_catalog")
 CapabilityInvocationKind = Literal["mcp_tool", "named_skill"]
 CapabilityRoute = Literal["chat", "robot_action", "tool", "memory"]
 CapabilityPromptTier = Literal["common", "rare"]
-DEFAULT_PROMPT_TIER_PRESET_PATH = (
-    Path(__file__).resolve().parents[3] / "capabilities" / "prompt_tiers.json"
-)
-DEFAULT_BEHAVIOR_DOMAIN_PRESET_PATH = (
-    Path(__file__).resolve().parents[3] / "capabilities" / "behavior_domains.json"
-)
+def _default_capability_asset(name: str) -> Path:
+    module_path = Path(__file__).resolve()
+    candidates = (
+        module_path.parents[2] / "capabilities" / name,
+        module_path.parents[3] / "capabilities" / name,
+    )
+    return next(
+        (candidate for candidate in candidates if candidate.is_file()),
+        candidates[0],
+    )
+
+
+DEFAULT_PROMPT_TIER_PRESET_PATH = _default_capability_asset("prompt_tiers.json")
+DEFAULT_BEHAVIOR_DOMAIN_PRESET_PATH = _default_capability_asset("behavior_domains.json")
 
 SAFETY_LOCKED_PROMPT_TIER_SAFETY_CLASSES = {
     "guarded_operation",
