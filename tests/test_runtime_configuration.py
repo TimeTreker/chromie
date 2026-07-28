@@ -203,10 +203,28 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_PREDICT"], "256")
 
+    def test_runtime_ready_greeting_precedes_live_microphone_loop(self) -> None:
+        source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertLess(
+            source.index("await self._announce_runtime_ready()"),
+            source.index("await self.mic_stream()"),
+        )
+
     def test_chinese_tts_uses_smaller_chunks_for_lower_first_audio_latency(self) -> None:
         values = _common_env()
         self.assertEqual(values["ORCH_TTS_CJK_CHUNK_CHARS"], "36")
         self.assertEqual(values["ORCH_TTS_CJK_MIN_CHUNK_CHARS"], "8")
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_ENABLED"], "1")
+        self.assertEqual(
+            values["ORCH_RUNTIME_READY_GREETING_TEXT"],
+            "你好，我已经准备好了。",
+        )
+        self.assertEqual(
+            values["ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS"],
+            "45000",
+        )
 
     def test_default_tts_is_cosyvoice_with_oute_diagnostics_retained_for_fallback(self) -> None:
         values = _common_env()

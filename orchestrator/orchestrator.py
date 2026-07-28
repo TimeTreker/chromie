@@ -565,6 +565,19 @@ class VoiceAssistant:
             "ORCH_DISCARD_PLAYBACK_REALTIME",
             True,
         )
+        self.runtime_ready_greeting_enabled = env_bool(
+            "ORCH_RUNTIME_READY_GREETING_ENABLED",
+            True,
+        )
+        self.runtime_ready_greeting_text = os.getenv(
+            "ORCH_RUNTIME_READY_GREETING_TEXT",
+            "你好，我已经准备好了。",
+        ).strip()
+        self.runtime_ready_greeting_timeout_ms = env_int(
+            "ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS",
+            45000,
+            minimum=1000,
+        )
 
         self.audio_mgr = AudioDeviceManager()
         if self.audio_input_mode == "device":
@@ -7976,6 +7989,86 @@ class VoiceAssistant:
         )
         return stats
 
+    async def _announce_runtime_ready(self) -> None:
+        """Speak one readiness greeting before accepting live microphone turns.
+
+        This is an operator-configurable runtime notification, not a semantic
+        response or a substitute for LLM-owned social behavior. It deliberately
+        uses the same synthesis and ordered playback pipeline as ``chromie.speak``
+        while no user session is active, so startup cannot create a fake
+        conversation turn or contaminate conversation memory.
+        """
+
+        if not self.runtime_ready_greeting_enabled:
+            logger.info("Runtime ready greeting disabled")
+            return
+        if self.audio_input_mode != "device" or self.audio_output_mode != "device":
+            logger.info(
+                "Runtime ready greeting skipped: input_mode=%s output_mode=%s",
+                self.audio_input_mode,
+                self.audio_output_mode,
+            )
+            return
+
+        text = self.normalize_tts_candidate(self.runtime_ready_greeting_text)
+        if not self.is_valid_tts_text(text):
+            logger.warning("Runtime ready greeting skipped because text is empty or invalid")
+            return
+
+        logger.info("Runtime ready greeting scheduled: text=%r", text)
+        scheduled = await self.schedule_tts_text(text, session_id=None)
+        if scheduled.get("scheduled") is not True:
+            logger.warning(
+                "Runtime ready greeting could not be scheduled: reason=%s",
+                scheduled.get("reason") or "unknown",
+            )
+            return
+
+        generation = int(scheduled["generation"])
+        first_order = int(scheduled["order"])
+        last_order = int(scheduled.get("last_order", first_order))
+        first_key = self.playback_start_key(generation, first_order, None)
+        first_waiter = self.playback_start_waiters.get(first_key)
+        timeout_s = self.runtime_ready_greeting_timeout_ms / 1000.0
+        deadline = asyncio.get_running_loop().time() + timeout_s
+
+        if first_waiter is None:
+            logger.warning("Runtime ready greeting lost its playback-start waiter")
+            return
+
+        try:
+            started = await asyncio.wait_for(
+                asyncio.shield(first_waiter),
+                timeout=timeout_s,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Runtime ready greeting did not begin playback within timeout_ms=%s; "
+                "opening the microphone anyway",
+                self.runtime_ready_greeting_timeout_ms,
+            )
+            return
+
+        if not started:
+            logger.warning(
+                "Runtime ready greeting synthesis completed without starting playback; "
+                "opening the microphone anyway"
+            )
+            return
+
+        while self.next_playback_order <= last_order:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                logger.warning(
+                    "Runtime ready greeting playback did not finish within timeout_ms=%s; "
+                    "opening the microphone anyway",
+                    self.runtime_ready_greeting_timeout_ms,
+                )
+                return
+            await asyncio.sleep(min(0.05, remaining))
+
+        logger.info("Runtime ready greeting completed; live microphone turns are enabled")
+
     async def run(self):
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
@@ -7990,6 +8083,7 @@ class VoiceAssistant:
         self.asr_ws = await gate.wait_until_ready()
         await self._prime_fast_first_audio()
         self.playback_task = asyncio.create_task(self.playback_worker())
+        await self._announce_runtime_ready()
         if self.audio_input_mode == "stdin":
             await self.injected_audio_stream()
         else:

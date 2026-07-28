@@ -591,6 +591,9 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
+| `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; after ASR, TTS, Agent, Ollama, Soridormi, and optional cache warm-up are ready, speak one readiness announcement before opening the live microphone. Stdin/discard acceptance modes skip it automatically. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Owner-editable readiness sentence; maintained default `你好，我已经准备好了。`. It is an operational notification and does not create a user turn or conversation memory. |
+| `ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS` | `45000`; bounded synthesis plus playback wait. Expiry is non-fatal and the microphone still opens. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
 
 ## Orchestrator audio and VAD

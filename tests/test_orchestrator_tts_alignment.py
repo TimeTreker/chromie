@@ -29,6 +29,84 @@ from shared.chromie_contracts.interaction import InteractionResponse, SkillResul
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    async def test_runtime_ready_greeting_uses_tts_before_live_microphone_turns(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_enabled = True
+        assistant.runtime_ready_greeting_text = "你好，我已经准备好了。"
+        assistant.runtime_ready_greeting_timeout_ms = 1000
+        assistant.audio_input_mode = "device"
+        assistant.audio_output_mode = "device"
+        assistant.playback_start_waiters = {}
+        assistant.next_playback_order = 0
+        scheduled_texts: list[tuple[str, str | None]] = []
+
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
+            assistant,
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+
+        async def schedule_tts_text(
+            self: VoiceAssistant,
+            text: str,
+            session_id: str | None,
+        ) -> dict[str, Any]:
+            scheduled_texts.append((text, session_id))
+            key = self.playback_start_key(0, 0, session_id)
+            waiter = asyncio.get_running_loop().create_future()
+            self.playback_start_waiters[key] = waiter
+
+            async def complete() -> None:
+                await asyncio.sleep(0)
+                waiter.set_result(True)
+                self.next_playback_order = 1
+
+            asyncio.create_task(complete())
+            return {
+                "scheduled": True,
+                "generation": 0,
+                "order": 0,
+                "last_order": 0,
+            }
+
+        assistant.schedule_tts_text = MethodType(schedule_tts_text, assistant)
+
+        await assistant._announce_runtime_ready()
+
+        self.assertEqual(
+            scheduled_texts,
+            [("你好，我已经准备好了。", None)],
+        )
+        self.assertEqual(assistant.next_playback_order, 1)
+
+    async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_enabled = True
+        assistant.runtime_ready_greeting_text = "你好，我已经准备好了。"
+        assistant.runtime_ready_greeting_timeout_ms = 1000
+        assistant.audio_input_mode = "stdin"
+        assistant.audio_output_mode = "discard"
+        scheduled = False
+
+        async def schedule_tts_text(
+            self: VoiceAssistant,
+            text: str,
+            session_id: str | None,
+        ) -> dict[str, Any]:
+            del self, text, session_id
+            nonlocal scheduled
+            scheduled = True
+            return {"scheduled": True}
+
+        assistant.schedule_tts_text = MethodType(schedule_tts_text, assistant)
+
+        await assistant._announce_runtime_ready()
+
+        self.assertFalse(scheduled)
+
     def test_post_interrupt_corrected_decision_is_normal_followup(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         interrupt = RouteDecision(
