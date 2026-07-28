@@ -144,6 +144,27 @@ Paused issue — Social Attention Baseline Qualification:
 - [ ] retain selected MuJoCo evidence, classify earliest error boundaries, and promote reviewed regressions.
 
 
+## Queued engineering sustainability program
+
+A repository-wide external review identified useful engineering improvements in
+local network exposure, failure-path clarity, executable policy enforcement,
+static analysis, test ownership, configuration structure, Orchestrator
+maintainability, and documentation authority. The accepted recommendations,
+constraints, explicit non-goals, dependency order, and Issue closure criteria are
+maintained in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+
+This is a queued Issue registry, not a broad active refactor and not a replacement
+for the active Goal-driven Gateway/Core qualification. When engineering work is
+selected from this registry, only one named Issue may be active. The first
+implementation candidate is `Issue: Secure Local Runtime Exposure`; later Issues
+must be re-audited against the then-current tree before activation.
+
+The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
+strict typing, blanket removal of source-level tests, Git LFS for the current
+small audio footprint, and unmeasured hard resource limits in the main
+qualification profile.
+
 ## Planning model
 
 Chromie plans and reports work by the problem being solved, the capability being

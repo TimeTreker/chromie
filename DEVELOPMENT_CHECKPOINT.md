@@ -1,8 +1,10 @@
-- Final architecture closure: architecture documentation and offline semantic-authority guards now match the final embodiment-independent Social Attention implementation.
+# Development Checkpoint
 
+## Recent completed architecture corrections
+
+- Final architecture closure: architecture documentation and offline semantic-authority guards now match the final embodiment-independent Social Attention implementation.
 - Mind and health contract alignment: active MindProfiles now require owner approval and health/configuration defaults consistently report Social Attention `on`.
 - Provider calibration ownership: Social Attention target evidence is semantic-only; calibration and embodiment-specific arguments are exclusively Soridormi/provider responsibilities.
-# Development Checkpoint
 
 > **Router terminology note:** References to Router below are retained only when
 > describing historical revisions, evidence bundles, scenario provenance, or
@@ -38,6 +40,16 @@ Social Attention qualification remains paused until this checkpoint closes.
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
 milestone intent.
+
+## Queued engineering sustainability Issues
+
+The accepted repository-review recommendations are now retained in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+That plan is a queued registry and does not supersede the active Goal-driven
+Gateway/Core qualification. When the owner chooses to begin the engineering
+program, resume with `Issue: Secure Local Runtime Exposure`, work only one named
+Issue at a time, and update the plan registry plus this checkpoint at activation
+and closure.
 
 A July 24 live voice trace exposed two user-visible response-quality defects.
 The then-current Goal Interpreter correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal
