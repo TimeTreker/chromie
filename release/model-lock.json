@@ -12,7 +12,7 @@
   "ollama": {
     "agent_models": [
       "gemma4:e2b",
-      "gemma4:26b"
+      "gemma4:12b"
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "goal_interpreter_models": [

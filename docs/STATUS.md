@@ -65,24 +65,24 @@ adapters resolve deployment harnesses only through configured URL/callable
 boundaries; they do not embed endpoints or behavior rules. Qualification output
 remains non-release-qualified and requires human review.
 
-A subsequent July 27 live rerun exposed a separate cognitive-topology and
-model-contract failure. The RTX 5090 profile had correctly declared
-`gemma4:26b` for quality stages, but the CosyVoice one-model launcher override
-replaced Goal Association, Deep Planner, Tool Result Interpretation, and
-Response Composer with `qwen3:4b`. The RTX 5090 profile now explicitly preserves
-a two-model topology, assigns Goal Association and quality stages to
-`gemma4:26b`, keeps narrow stages on `qwen3:4b`, and uses one 32768-token
-correctness-first development/qualification topology for both resident models.
-Every request reserves its declared output budget plus a safety margin before
-inference; prompt truncation and `done_reason=length` are fail-closed LLM-budget
-failures. The rare host direct-LLM fallback buffers and verifies the full stream
-before scheduling TTS. Goal Association now uses an explicit decision
+A July 27 live rerun exposed a cognitive-topology and model-contract failure:
+the CosyVoice compact override had replaced the RTX 5090 quality stages with
+`qwen3:4b`. A later retained run with the restored two-model topology proved
+that `gemma4:26b`, `qwen3:4b`, and CosyVoice could exhaust the 32GB GPU and crash
+TTS. The maintained RTX 5090 profile now assigns Goal Association and quality
+stages to `gemma4:12b`, keeps narrow stages on `qwen3:4b`, opts out of compact
+cognition, and uses one 32768-token correctness-first topology for both resident
+models. RTX 4090 Laptop names `gemma4:12b` as its future visual-quality source
+plan but keeps the maintained CosyVoice runtime compact and Qwen-only on its
+16GB GPU. Every request reserves its declared output budget plus a safety margin
+before inference; prompt truncation and `done_reason=length` are fail-closed
+LLM-budget evidence. The rare host direct-LLM fallback buffers and verifies the
+full stream before scheduling TTS. Goal Association uses an explicit decision
 discriminant and excludes routing/validation diagnostics from semantic input;
 semantic route repair uses a minimal three-field schema and the configured
 review model; planner validation may only copy redundant response fields already
-present in the sole per-Goal outcome. This is a model-topology and
-contract-boundary correction, not a weather phrase rule.
-
+present in the sole per-Goal outcome. Camera observations are not yet part of
+the runtime input contract.
 The maintained robot identity is now owner-editable configuration at `config/mind/chromie_default.json`, selected through `ORCH_MIND_PROFILE_PATH`. Python contracts require and validate identity fields but no longer carry concrete name, age, or self-description defaults. One owner-approved identity snapshot is propagated through Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. This preserves the unified Cognitive Gateway/Core architecture for simple identity conversation without adding phrase-specific Host shortcuts.
 
 A July 27 live weather regression exposed a general Goal/capability truthfulness

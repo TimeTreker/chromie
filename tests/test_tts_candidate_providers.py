@@ -72,6 +72,7 @@ class FakeStreamingWorker:
     cancel_restart_count = 0
     failure_restart_count = 0
     cancellation_mode = "bounded_drain_then_restart_worker"
+    worker_warmed = True
     ready_payload = {"fixture": True}
 
     async def start(self) -> None:
@@ -191,6 +192,36 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                     pass
             self.assertFalse(worker.is_alive)
             self.assertEqual(worker.failure_restart_count, 1)
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_uses_cold_timeout_until_first_completion(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-cold-watchdog-worker",
+            startup_timeout_s=5.0,
+            first_audio_timeout_s=0.02,
+            request_timeout_s=0.04,
+            cold_first_audio_timeout_s=0.2,
+            cold_request_timeout_s=0.3,
+        )
+        await worker.start()
+        try:
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "slow-complete"}
+                )
+            ]
+            self.assertEqual([event["type"] for event in events], ["audio", "complete"])
+            self.assertTrue(worker.worker_warmed)
+
+            with self.assertRaisesRegex(TimeoutError, "did not complete"):
+                async for _event in worker.stream(
+                    {"type": "synthesize", "text": "audio-then-stall"}
+                ):
+                    pass
+            self.assertFalse(worker.is_alive)
         finally:
             await worker.stop()
 

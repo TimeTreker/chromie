@@ -36,6 +36,8 @@ class StreamingProcessWorker:
         cancel_drain_timeout_s: float = 0.0,
         first_audio_timeout_s: float = 0.0,
         request_timeout_s: float = 0.0,
+        cold_first_audio_timeout_s: float = 0.0,
+        cold_request_timeout_s: float = 0.0,
         context_name: str = "spawn",
     ) -> None:
         self._target = target
@@ -44,6 +46,10 @@ class StreamingProcessWorker:
         self._cancel_drain_timeout_s = max(0.0, cancel_drain_timeout_s)
         self._first_audio_timeout_s = max(0.0, first_audio_timeout_s)
         self._request_timeout_s = max(0.0, request_timeout_s)
+        self._cold_first_audio_timeout_s = max(
+            0.0, cold_first_audio_timeout_s
+        )
+        self._cold_request_timeout_s = max(0.0, cold_request_timeout_s)
         self._context = multiprocessing.get_context(context_name)
         self._process: multiprocessing.Process | None = None
         self._connection: Connection | None = None
@@ -53,10 +59,15 @@ class StreamingProcessWorker:
         self.cancel_restart_count = 0
         self.failure_restart_count = 0
         self.ready_payload: dict[str, Any] = {}
+        self._worker_warmed = False
 
     @property
     def is_alive(self) -> bool:
         return self._process is not None and self._process.is_alive()
+
+    @property
+    def worker_warmed(self) -> bool:
+        return self._worker_warmed
 
     @property
     def cancellation_mode(self) -> str:
@@ -83,6 +94,17 @@ class StreamingProcessWorker:
                 raise RuntimeError(f"{self._name} is not started")
             terminal_received = False
             first_audio_received = False
+            cold_request = not self._worker_warmed
+            first_audio_timeout_s = (
+                self._cold_first_audio_timeout_s
+                if cold_request and self._cold_first_audio_timeout_s > 0
+                else self._first_audio_timeout_s
+            )
+            request_timeout_s = (
+                self._cold_request_timeout_s
+                if cold_request and self._cold_request_timeout_s > 0
+                else self._request_timeout_s
+            )
             started_at = time.monotonic()
             try:
                 connection.send(payload)
@@ -101,6 +123,8 @@ class StreamingProcessWorker:
                         if event_type == "audio":
                             first_audio_received = True
                         terminal_received = event_type in TERMINAL_TYPES
+                        if event_type == "complete":
+                            self._worker_warmed = True
                         yield event
                         if terminal_received:
                             return
@@ -109,19 +133,19 @@ class StreamingProcessWorker:
                     now = time.monotonic()
                     if (
                         not first_audio_received
-                        and self._first_audio_timeout_s > 0
-                        and now - started_at >= self._first_audio_timeout_s
+                        and first_audio_timeout_s > 0
+                        and now - started_at >= first_audio_timeout_s
                     ):
-                        timeout = self._first_audio_timeout_s
+                        timeout = first_audio_timeout_s
                         self._invalidate_after_failure(reason="first_audio_timeout")
                         raise TimeoutError(
                             f"{self._name} produced no audio within {timeout:.1f}s"
                         )
                     if (
-                        self._request_timeout_s > 0
-                        and now - started_at >= self._request_timeout_s
+                        request_timeout_s > 0
+                        and now - started_at >= request_timeout_s
                     ):
-                        timeout = self._request_timeout_s
+                        timeout = request_timeout_s
                         self._invalidate_after_failure(reason="request_timeout")
                         raise TimeoutError(
                             f"{self._name} did not complete within {timeout:.1f}s"
@@ -238,6 +262,7 @@ class StreamingProcessWorker:
         child.close()
         self._process = process
         self._connection = parent
+        self._worker_warmed = False
 
         deadline = time.monotonic() + self._startup_timeout_s
         while time.monotonic() < deadline:
@@ -272,6 +297,7 @@ class StreamingProcessWorker:
         self._connection = None
         self._process = None
         self.ready_payload = {}
+        self._worker_warmed = False
         if connection is not None:
             with suppress(OSError):
                 connection.close()

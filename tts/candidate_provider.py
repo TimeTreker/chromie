@@ -43,6 +43,7 @@ class WorkerBackedCandidateProvider(TTSProvider):
         return {
             "ready": self._worker.is_alive,
             "worker_process_alive": self._worker.is_alive,
+            "worker_warmed": self._worker.worker_warmed,
             "worker_restart_count": self._worker.restart_count,
             "worker_cancel_drain_count": self._worker.cancel_drain_count,
             "worker_cancel_restart_count": self._worker.cancel_restart_count,

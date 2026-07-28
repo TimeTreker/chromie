@@ -40,7 +40,7 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Fast
 Planning, Task Continuity, and Social Attention, while Goal Association, Deep
 Planning, Tool Result Interpretation, Response Composition, and response review
-use `gemma4:26b`. It explicitly opts out of CosyVoice compact cognition and keeps
+use `gemma4:12b`. It explicitly opts out of CosyVoice compact cognition and keeps
 two Ollama models resident. Other profiles may retain the one-model compact
 topology when their committed profile leaves that setting enabled. Qualification
 therefore records launcher-effective component identities; a static

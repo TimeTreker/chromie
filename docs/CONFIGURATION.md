@@ -142,8 +142,10 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition
 enabled limit Ollama to one resident model; the RTX 5090 profile opts out and
-keeps `qwen3:4b` plus `gemma4:26b` resident with one 8192-token context topology
-per model. Select a fallback explicitly with
+keeps `qwen3:4b` plus `gemma4:12b` resident with one 32768-token context topology
+per model. The RTX 4090 Laptop source plan also names `gemma4:12b`, but its
+maintained CosyVoice path remains compact and runs only `qwen3:4b` on the 16GB
+GPU. Select a fallback explicitly with
 `--tts-backend oute` or `--tts-backend qwen3`; the selection is scoped to that
 launch and does not rewrite `.env.local`.
 
@@ -258,7 +260,7 @@ not selected by phrase rules.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; the RTX 5090 profile uses `gemma4:26b` for stronger continuity-before-creation and independent-goal segmentation. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; the RTX 5090 profile uses `gemma4:12b` for multimodal-capable continuity-before-creation and independent-goal segmentation. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a non-authoritative clarification result. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |

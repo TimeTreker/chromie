@@ -119,7 +119,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(set(MODEL_KEYS) - values.keys(), set())
                 self.assertTrue(all(values[key] for key in MODEL_KEYS))
 
-    def test_rtx5090_is_detected_and_generates_26b_quality_stages(self) -> None:
+    def test_rtx5090_is_detected_and_generates_12b_multimodal_quality_stages(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             system_info = root / "system.env"
@@ -137,12 +137,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
-        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:26b")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:26b")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:26b")
-        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:26b")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
-        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         for key in (
@@ -163,6 +163,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
+        self.assertEqual(
+            manifest["active_ollama_models"],
+            ["qwen3:4b", "gemma4:12b"],
+        )
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
             manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
@@ -204,8 +208,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             values = parse_env(root / ".env.runtime")
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:e2b")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:12b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")

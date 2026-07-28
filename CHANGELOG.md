@@ -4,6 +4,23 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Gemma 4 12B multimodal-core migration
+
+- Replaced the maintained `gemma4:26b` quality model with `gemma4:12b` for RTX
+  5090 and Jetson Thor, and made Gemma 4 12B the future visual-quality source
+  plan for RTX 4090 Laptop. The smaller dense model preserves image-capable
+  reasoning while avoiding the retained live failure where Gemma 26B, Qwen 4B,
+  and CosyVoice exhausted a 32GB GPU during synthesis.
+- Restored the RTX 5090 CosyVoice topology to two resident 32K models:
+  `qwen3:4b` for narrow fast stages and `gemma4:12b` for Goal Association, deep
+  planning, tool-result interpretation, response composition, and review.
+- Kept RTX 4090 Laptop voice mode fail-safe: CosyVoice still collapses cognition
+  to one resident `qwen3:4b`; Gemma 4 12B is reserved for explicit no-TTS or
+  remote-TTS multimodal qualification until peak-VRAM evidence proves co-residency.
+- Updated the release model lock, experience evaluator default, profile docs, and
+  automatic-profile tests. This change prepares the model plan but does not yet
+  implement the camera observation envelope.
+
 ### Owner-editable robot identity and cognitive propagation
 
 - Moved the maintained robot name, age, self-description, pronouns, internal-component boundary, and identity-answer guidance from Python defaults into `config/mind/chromie_default.json`, selected by `ORCH_MIND_PROFILE_PATH`.
@@ -31,7 +48,7 @@ All notable user-visible changes should be recorded here.
 ### RTX 5090 cognitive topology and contract hardening
 
 - Restored the intended RTX 5090 two-model topology while CosyVoice is active:
-  `qwen3:4b` owns narrow fast stages and `gemma4:26b` owns Goal Association,
+  `qwen3:4b` owns narrow fast stages and `gemma4:12b` owns Goal Association,
   Deep Planning, Tool Result Interpretation, and Response Composition. The
   profile explicitly opts out of the low-memory one-model compact override.
 - Unified every active RTX 5090 cognitive stage on one runner context

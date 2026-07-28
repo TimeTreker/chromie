@@ -714,7 +714,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--use-llm", action="store_true", help="Ask the deepthinking Ollama model to score episodes.")
     parser.add_argument("--require-llm", action="store_true", help="Fail instead of falling back to contract precheck when LLM scoring fails.")
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
-    parser.add_argument("--model", default="gemma4:26b")
+    parser.add_argument("--model", default="gemma4:12b")
     parser.add_argument("--timeout-s", type=float, default=120.0)
     args = parser.parse_args(argv)
 

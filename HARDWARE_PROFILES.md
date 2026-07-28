@@ -123,21 +123,24 @@ the detected profile.
 | `nvidia_ada` | RTX 4080/4070 class | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `rtx4090` | Desktop RTX 4090 | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx4090_laptop` | RTX 4090 Laptop GPU | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx5090` | Desktop RTX 5090 | `gemma4:26b` | `qwen3:4b` | 8192 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `gemma4:12b`* | `qwen3:4b` | 4096 |
+| `rtx5090` | Desktop RTX 5090 | `gemma4:12b` | `qwen3:4b` | 8192 |
 | `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
-| `jetson_thor` | AGX Thor placeholder profile | `gemma4:26b` | `qwen3:4b` | 4096 |
+| `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
 The quality model is used by Deep Planner and Response Composer. The fast model
 is used by Goal Interpretation, Fast Planner, Task Continuity, and Social
-Attention unless the profile explicitly states otherwise. RTX 4090 Laptop's
-maintained CosyVoice path collapses those roles to one resident `qwen3:4b` model
-and explicitly gives the launcher, Ollama server, warmup request, and every
-cognitive stage the same profile-owned 32768-token context. RTX 5090 keeps
-`gemma4:26b` assignments in its source plan for non-CosyVoice evaluation, while
-the maintained CosyVoice launcher collapses every cognitive role to one
-`qwen3:4b` 32768-token runner and limits effective Ollama residency to one model.
+Attention unless the profile explicitly states otherwise. Gemma 4 12B is the
+maintained multimodal-capable quality core for RTX 5090 and the future visual
+qualification target for RTX 4090 Laptop. RTX 5090 keeps `qwen3:4b` and
+`gemma4:12b` resident on the same 32768-token topology while CosyVoice is active.
+RTX 4090 Laptop cannot safely assume that two-model-plus-TTS topology on a 16GB
+GPU, so its maintained CosyVoice launcher still collapses every cognitive role
+to one `qwen3:4b` 32768-token runner; `gemma4:12b` is used only by explicit
+non-CosyVoice or remote-TTS qualification until retained peak-VRAM evidence says
+otherwise. The asterisk in the table marks that source-plan versus voice-runtime
+distinction. Camera frames are not yet part of the runtime input contract.
 Input preflight
 reserves each stage's full `num_predict` allowance and safety margin;
 `done_reason=length`, exhausted output budgets, and prompt-context truncation are

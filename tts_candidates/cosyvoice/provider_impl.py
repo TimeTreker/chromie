@@ -303,6 +303,12 @@ def create_provider() -> WorkerBackedCandidateProvider:
         request_timeout_s=float(
             os.getenv("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "60")
         ),
+        cold_first_audio_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC", "180")
+        ),
+        cold_request_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC", "240")
+        ),
     )
     speakers = ["default", *sorted(voices.profiles)]
     return WorkerBackedCandidateProvider(
