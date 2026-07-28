@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import re
@@ -96,7 +97,7 @@ class ToolResultInterpreter:
                     "num_ctx": self.num_ctx,
                     "num_predict": self.num_predict,
                 },
-                response_format=ToolResultModelOutput.model_json_schema(),
+                response_format=self._response_schema(request),
             )
             output = ToolResultModelOutput.model_validate(raw)
             selected_values = self._validate_fact_references(
@@ -170,6 +171,9 @@ class ToolResultInterpreter:
                 "tool_id": item.tool_id,
                 "status": item.status,
                 "data": item.data,
+                "available_scalar_json_pointers": self._scalar_json_pointers(
+                    item.data
+                ),
             }
             for item in request.evidence
         ]
@@ -193,7 +197,10 @@ class ToolResultInterpreter:
             "boundary shape the response naturally. Do not introduce Chromie unless the user "
             "asked who she is. Keep internal execution and evidence language out of ordinary speech. "
             "Select only the exact evidence fields needed to support the answer and cite each with "
-            "evidence_id plus an RFC 6901 JSON Pointer. Preserve numbers and named facts exactly. "
+            "evidence_id plus one JSON Pointer copied exactly from that evidence item's "
+            "available_scalar_json_pointers. The pointer root is the evidence data object itself; "
+            "never add a /data prefix and never invent or modify a field name. Preserve numbers "
+            "and named facts exactly. "
             "Conclusions may be phrased naturally but must be supported by selected facts. Normally "
             "use one short sentence; use a second sentence only when it adds something genuinely "
             "useful. Return JSON only."
@@ -207,6 +214,67 @@ class ToolResultInterpreter:
             "personality, with the fewest relevant grounded facts. Never invent facts "
             "or expose internal workflow language."
         )
+
+    @classmethod
+    def _response_schema(
+        cls,
+        request: ToolResultInterpretationRequest,
+    ) -> dict[str, Any]:
+        schema = copy.deepcopy(ToolResultModelOutput.model_json_schema())
+        variants: list[dict[str, Any]] = []
+        for evidence in request.evidence:
+            pointers = cls._scalar_json_pointers(evidence.data)
+            if not pointers:
+                continue
+            variants.append(
+                {
+                    "type": "object",
+                    "properties": {
+                        "evidence_id": {"const": evidence.evidence_id},
+                        "json_pointer": {"type": "string", "enum": pointers},
+                    },
+                    "required": ["evidence_id", "json_pointer"],
+                    "additionalProperties": False,
+                }
+            )
+        selected = schema.get("properties", {}).get("selected_facts")
+        if isinstance(selected, dict):
+            selected["items"] = (
+                {"anyOf": variants}
+                if variants
+                else {
+                    "type": "object",
+                    "properties": {
+                        "evidence_id": {"type": "string", "enum": []},
+                        "json_pointer": {"type": "string", "enum": []},
+                    },
+                    "required": ["evidence_id", "json_pointer"],
+                    "additionalProperties": False,
+                }
+            )
+        return schema
+
+    @classmethod
+    def _scalar_json_pointers(cls, document: Any) -> list[str]:
+        pointers: list[str] = []
+
+        def escape(part: Any) -> str:
+            return str(part).replace("~", "~0").replace("/", "~1")
+
+        def walk(value: Any, path: str) -> None:
+            if isinstance(value, dict):
+                for key in sorted(value, key=lambda item: str(item)):
+                    child = f"{path}/{escape(key)}"
+                    walk(value[key], child)
+                return
+            if isinstance(value, list):
+                for index, item in enumerate(value):
+                    walk(item, f"{path}/{index}")
+                return
+            pointers.append(path)
+
+        walk(document, "")
+        return [item for item in pointers if item]
 
     @classmethod
     def _validate_fact_references(

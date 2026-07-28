@@ -30,10 +30,11 @@ class _ScriptedOllama:
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
         self.prompts: list[str] = []
+        self.calls: list[dict[str, Any]] = []
 
     async def generate(self, prompt: str, **kwargs) -> dict[str, Any]:
-        del kwargs
         self.prompts.append(prompt)
+        self.calls.append(dict(kwargs))
         return dict(self.payload)
 
 
@@ -101,6 +102,37 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("owner-approved personality JSON", ollama.prompts[0])
         self.assertIn("Answer the user's actual question first", ollama.prompts[0])
         self.assertNotIn("customer-service", result.spoken_response)
+
+    async def test_decoder_schema_enumerates_exact_evidence_pointers(self) -> None:
+        ollama = _ScriptedOllama(
+            {
+                "spoken_response": "很热，现在37℃。",
+                "answer_mode": "direct",
+                "selected_facts": [
+                    {
+                        "evidence_id": "weather-result",
+                        "json_pointer": "/temperature_c",
+                    }
+                ],
+                "confidence": 0.9,
+                "rationale": "",
+            }
+        )
+        result = await ToolResultInterpreter(ollama).interpret(self._request())
+        self.assertEqual(result.status, "resolved")
+        schema = ollama.calls[0]["response_format"]
+        item_schema = schema["properties"]["selected_facts"]["items"]
+        variant = item_schema["anyOf"][0]
+        self.assertEqual(
+            variant["properties"]["evidence_id"]["const"],
+            "weather-result",
+        )
+        pointers = variant["properties"]["json_pointer"]["enum"]
+        self.assertIn("/temperature_c", pointers)
+        self.assertIn("/apparent_temperature_c", pointers)
+        self.assertNotIn("/data/temperature_c", pointers)
+        self.assertIn("available_scalar_json_pointers", ollama.prompts[0])
+        self.assertIn("never add a /data prefix", ollama.prompts[0])
 
     async def test_rejects_unselected_numeric_claim_and_uses_bounded_fallback(self) -> None:
         ollama = _ScriptedOllama(

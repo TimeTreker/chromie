@@ -804,6 +804,12 @@ def _compact_active_task_snapshots(
                 for value in (item.get("pending_questions") or [])
                 if isinstance(value, str)
             ]
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        execution_binding = metadata.get("execution_binding")
+        if not isinstance(execution_binding, dict):
+            execution_binding = {}
         compact.append(
             {
                 "task_id": str(item.get("task_id") or ""),
@@ -831,6 +837,7 @@ def _compact_active_task_snapshots(
                     or item.get("last_meaningful_user_turn")
                     or ""
                 )[:220],
+                "execution_binding": execution_binding,
             }
         )
     return compact
@@ -1049,7 +1056,7 @@ class OllamaGoalInterpreter:
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
+            "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. A status follow-up such as whether a lookup finished should associate with the relevant scheduled, running, or recoverable task and preserve its exact bound tool arguments. If that safe read has no completed evidence, route it for resume or retry rather than answering from another task's result. A follow-up that supplies or replaces a material lookup parameter, such as another city, inherits the lookup responsibility and must remain a tool route. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
             "Capability Affordance Proposal:\n"
             "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Use an available trusted lookup tool when the user needs current external facts; select it from capability meaning and context rather than a topic keyword. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"

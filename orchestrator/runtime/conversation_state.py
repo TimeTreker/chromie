@@ -527,6 +527,50 @@ class ConversationStateManager:
         metadata = context.get("metadata")
         if not isinstance(metadata, dict):
             metadata = {}
+        planned_skills: list[dict[str, Any]] = []
+        raw_planned_skills = metadata.get("planned_skills")
+        if isinstance(raw_planned_skills, list):
+            for item in raw_planned_skills[:8]:
+                if not isinstance(item, dict):
+                    continue
+                planned_skills.append(
+                    {
+                        "skill_id": str(item.get("skill_id") or "").strip(),
+                        "request_id": str(item.get("request_id") or "").strip(),
+                        "args": self._json_safe(
+                            item.get("args") if isinstance(item.get("args"), dict) else {}
+                        ),
+                        "safety_class": str(
+                            item.get("safety_class") or ""
+                        ).strip(),
+                        "retryable_safe_read": (
+                            item.get("retryable_safe_read") is True
+                        ),
+                    }
+                )
+        request_statuses = metadata.get("request_statuses")
+        if not isinstance(request_statuses, dict):
+            request_statuses = {}
+        remaining_request_ids = metadata.get("remaining_request_ids")
+        if not isinstance(remaining_request_ids, list):
+            remaining_request_ids = []
+        execution_binding = {
+            "planning_result": str(metadata.get("planning_result") or "").strip(),
+            "planned_skills": planned_skills,
+            "request_statuses": {
+                str(key): str(value)
+                for key, value in list(request_statuses.items())[:12]
+            },
+            "remaining_request_ids": [
+                str(item) for item in remaining_request_ids[:12] if str(item).strip()
+            ],
+            "retryable_safe_read": any(
+                item.get("retryable_safe_read") is True for item in planned_skills
+            ),
+            "execution_outcome_status": str(
+                metadata.get("execution_outcome_status") or ""
+            ).strip(),
+        }
         return TaskContextSnapshot(
             task_id=str(context.get("task_id") or "unknown-task"),
             status=status,  # type: ignore[arg-type]
@@ -552,6 +596,7 @@ class ConversationStateManager:
                     )
                     if metadata.get(key) is not None
                 },
+                "execution_binding": execution_binding,
             },
         ).model_dump(mode="json", exclude_none=True)
 
@@ -2736,11 +2781,21 @@ class ConversationStateManager:
             evidence_id = str(raw.get("evidence_id") or "").strip()
             if not evidence_id or evidence_id in known_ids:
                 continue
+            evidence_metadata = raw.get("metadata")
+            if not isinstance(evidence_metadata, dict):
+                evidence_metadata = {}
+            request_args = evidence_metadata.get("request_args")
+            if not isinstance(request_args, dict):
+                request_args = {}
             entry = {
                 "evidence_id": evidence_id,
                 "tool_id": str(raw.get("skill_id") or "").strip(),
                 "status": str(raw.get("status") or "").strip(),
                 "data": self._json_safe(data),
+                "request_args": self._json_safe(request_args),
+                "safety_class": str(
+                    evidence_metadata.get("safety_class") or ""
+                ).strip(),
                 "recorded_ms": _now_ms(),
                 "user_request": user_request,
                 "goal_ids": goal_ids,
@@ -3593,11 +3648,29 @@ class ConversationStateManager:
             "cancelled": "cancelled",
             "not_run": "failed",
         }
+        evidence_by_id = {
+            item.evidence_id: item for item in validated.evidence
+        }
         results: list[dict[str, Any]] = []
         try:
             for outcome in validated.goal_outcomes:
                 context, matching_tasks = bound_records[outcome.goal_id]
-                lifecycle_status = status_projection[outcome.status]
+                referenced_evidence = [
+                    evidence_by_id[evidence_id]
+                    for evidence_id in outcome.evidence_ids
+                    if evidence_id in evidence_by_id
+                ]
+                retryable_safe_read = bool(referenced_evidence) and all(
+                    item.metadata.get("retryable_safe_read") is True
+                    for item in referenced_evidence
+                )
+                lifecycle_status = (
+                    "recoverable"
+                    if retryable_safe_read
+                    and outcome.status
+                    in {"failed", "timed_out", "cancelled", "not_run"}
+                    else status_projection[outcome.status]
+                )
                 evidence_summary = context.get("evidence_summary")
                 if not isinstance(evidence_summary, dict):
                     evidence_summary = {}
@@ -3634,6 +3707,7 @@ class ConversationStateManager:
                     "execution_outcome_fingerprint": fingerprint,
                     "execution_outcome_status": outcome.status,
                     "execution_evidence_ids": list(outcome.evidence_ids),
+                    "retryable_safe_read": retryable_safe_read,
                 }
 
                 matched_pending = 0
@@ -3648,6 +3722,7 @@ class ConversationStateManager:
                         "execution_outcome_fingerprint": fingerprint,
                         "execution_outcome_status": outcome.status,
                         "execution_evidence_ids": list(outcome.evidence_ids),
+                        "retryable_safe_read": retryable_safe_read,
                     }
                     matched_pending += 1
 
@@ -3954,8 +4029,18 @@ class ConversationStateManager:
                     {
                         "skill_id": item.get("skill_id"),
                         "request_id": item.get("request_id"),
+                        "args": self._json_safe(
+                            item.get("args") if isinstance(item.get("args"), dict) else {}
+                        ),
                         "source_goal_ids": self._string_list(
                             (item.get("metadata") or {}).get("source_goal_ids")
+                        ),
+                        "safety_class": str(
+                            (item.get("metadata") or {}).get("safety_class") or ""
+                        ),
+                        "retryable_safe_read": (
+                            (item.get("metadata") or {}).get("retryable_safe_read")
+                            is True
                         ),
                     }
                     for item in goal_actions

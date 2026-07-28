@@ -123,6 +123,8 @@ cancellable deployment.
 |---|---|
 | `CHROMIE_COMPOSE_OVERRIDE_FILES` | Comma-separated Compose override files. |
 | `CHROMIE_CONDA_ENV` / `CONDA_ENV_NAME` | Select the host Orchestrator Conda environment. |
+| `CHROMIE_HOST_TIMEZONE` | Host-detected IANA timezone written into generated runtime configuration and propagated to services so logs and time-aware speech use the same local clock. |
+| `TZ` | Process/container timezone derived from `CHROMIE_HOST_TIMEZONE`; host startup also calls `tzset()` where available. |
 | `BUILD=1` | Build service images before startup. |
 | `REBUILD_NO_CACHE=1` | Rebuild service images without cache. |
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
@@ -595,11 +597,11 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; after ASR, TTS, Agent, Ollama, Soridormi, and optional cache warm-up are ready, request one structured short wake-up greeting and speak it before opening the live microphone. Stdin/discard acceptance modes skip it automatically. |
-| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. Set only when the owner deliberately wants fixed wording; otherwise the fast LLM writes the sentence from the owner-approved identity, mind profile, spoken language, and local time. Configured text must still satisfy the same one-sentence, language, and length boundary. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. Set only when the owner deliberately wants fixed wording; otherwise the fast LLM writes the sentence from the owner-approved identity, mind profile, spoken language, and local time. Configured text must still satisfy the same one-sentence, language, and 12-character boundary. |
 | `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | `嗨，我醒啦！`; used only when the fast model cannot produce valid speech. Keep it conversational rather than status-oriented. |
 | `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative spoken language for the startup greeting. |
 | `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; resolves to `AGENT_FAST_PLANNER_MODEL`, then `AGENT_GOAL_INTERPRETER_MODEL`, then the normal Ollama model. |
-| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `32`; the structured output budget is intentionally tiny because only one short wake-up sentence may be spoken. |
+| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `32`; the structured output budget is intentionally tiny because only one short wake-up sentence may be spoken. Generated speech is limited to 12 characters and cannot invent a nearby person's name or relationship. |
 | `ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS` | `15000`; bounded fast-model generation. Failure falls back without blocking startup. |
 | `ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS` | `45000`; bounded synthesis plus playback wait. Expiry is non-fatal and the microphone still opens. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |

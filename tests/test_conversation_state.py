@@ -1085,6 +1085,110 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "completed",
         )
 
+    def test_interrupted_safe_read_stays_recoverable_with_bound_arguments(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="recoverable-weather")
+        self._create_goals(manager, "goal-weather")
+        response = InteractionResponse(
+            interaction_id="interaction-weather",
+            skills=[
+                {
+                    "request_id": "request-weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "上海", "date": "today"},
+                    "timing": "parallel",
+                    "metadata": {
+                        "source_goal_ids": ["goal-weather"],
+                        "canonical_plan_id": "plan-weather",
+                        "canonical_plan_fingerprint": "a" * 64,
+                        "safety_class": "safe_read",
+                        "retryable_safe_read": True,
+                    },
+                }
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "turn_id": "turn-weather",
+                "canonical_plan_id": "plan-weather",
+                "canonical_plan_fingerprint": "a" * 64,
+                "canonical_plan": {
+                    "plan_id": "plan-weather",
+                    "planner_tier": "deep",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "confidence": 0.95,
+                    "goal_ids": ["goal-weather"],
+                    "steps": [
+                        {
+                            "step_id": "step-weather",
+                            "skill_id": "chromie.weather.lookup",
+                            "args": {"location": "上海", "date": "today"},
+                            "source_goal_ids": ["goal-weather"],
+                        }
+                    ],
+                    "goal_outcomes": [
+                        {
+                            "goal_id": "goal-weather",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["step-weather"],
+                        }
+                    ],
+                },
+            },
+        )
+        manager.record_agent_result("sid-weather", response)
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-weather-interrupted",
+            turn_id="turn-weather",
+            interaction_id="interaction-weather",
+            canonical_plan_id="plan-weather",
+            canonical_plan_fingerprint="a" * 64,
+            canonical_goal_ids=["goal-weather"],
+            aggregate_status="not_run",
+            evidence=[
+                {
+                    "evidence_id": "evidence-weather",
+                    "request_id": "request-weather",
+                    "step_id": "step-weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "source_goal_ids": ["goal-weather"],
+                    "status": "not_run",
+                    "missing_result": True,
+                    "metadata": {
+                        "request_args": {"location": "上海", "date": "today"},
+                        "safety_class": "safe_read",
+                        "retryable_safe_read": True,
+                    },
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "status": "not_run",
+                    "step_ids": ["step-weather"],
+                    "evidence_ids": ["evidence-weather"],
+                    "unresolved_step_ids": ["step-weather"],
+                    "reason_codes": ["missing_skill_result"],
+                }
+            ],
+        )
+
+        applied = manager.record_execution_outcome_bundle(
+            bundle,
+            sid="sid-weather",
+        )
+
+        self.assertEqual(applied[0]["lifecycle_status"], "recoverable")
+        snapshots = manager.active_task_snapshots()
+        self.assertEqual(len(snapshots), 1)
+        self.assertEqual(snapshots[0]["status"], "recoverable")
+        binding = snapshots[0]["metadata"]["execution_binding"]
+        self.assertTrue(binding["retryable_safe_read"])
+        self.assertEqual(
+            binding["planned_skills"][0]["args"],
+            {"location": "上海", "date": "today"},
+        )
+
     def test_stale_outcome_cannot_overwrite_a_newer_goal_plan_binding(self) -> None:
         manager = ConversationStateManager(base_conversation_id="stale-outcome")
         self._create_goals(manager, "goal-walk")

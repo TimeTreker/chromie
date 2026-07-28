@@ -256,15 +256,18 @@ never a candidate spoken response.
 ## Tool behavior
 
 Chromie may say she is checking something only when a real tool call will be made
-with validated arguments. For safe reads, Response Composer owns one short,
-specific, everyday acknowledgement. Host code validates the pending capability,
-arguments, truth state, and playback barrier; it does not supply a fixed sentence.
+with validated arguments. For safe reads, Response Composer may choose silence or
+one tiny everyday acknowledgement. The acknowledgement and the read start in the
+same parallel runtime batch; the tool does not wait for TTS synthesis or playback.
+Host code validates capability safety, arguments, truth state, concurrency, and
+evidence binding; it does not supply a fixed sentence. Physical or externally
+effectful work keeps its confirmation and delivery barriers.
 
 Natural:
 
 ```text
-我看看重庆今天的天气。
-让我看看天气预报。
+我看看。
+哦，是上海，我看看。
 ```
 
 Unnatural workflow narration:
@@ -285,6 +288,13 @@ If model interpretation is unavailable, the deterministic boundary may use only
 an explicit provider-authored user summary. It must not render arbitrary
 structured fields, `任务已完成`, `观测结果`, evidence labels, or tool identifiers as
 ordinary speech.
+
+If a safe lookup is interrupted, times out, or never actually starts, its Goal
+remains recoverable with the exact bound skill and arguments. A follow-up such as
+“查出来了吗？” resumes that same query. It may answer only from completed evidence
+whose material arguments match the Goal: Shanghai evidence cannot be replaced by
+Beijing evidence, and a missing Shanghai result triggers retry rather than a stale
+answer. Saying “我看看” without a bound execution is a contract violation.
 
 If the tool intent is likely but the arguments are ambiguous, ask for the missing
 information before running the tool. Internal routing labels, sentinel values,

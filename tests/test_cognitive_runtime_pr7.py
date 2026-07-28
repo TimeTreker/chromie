@@ -718,7 +718,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             canonical_plan=plan,
             response_plan=ResponsePlan(
                 pre_action=ResponseStage(
-                    text="我看看重庆今天的天气。",
+                    text="我看看。",
                     speech_act="inform",
                     commitment_state="evaluating",
                     must_not_claim_completion=True,
@@ -752,7 +752,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(len(response.speech), 1)
-        self.assertEqual(response.speech[0].text, "我看看重庆今天的天气。")
+        self.assertEqual(response.speech[0].text, "我看看。")
         self.assertNotIn("相关信息", response.speech[0].text)
         self.assertEqual(
             response.speech[0].metadata["operational_text_source"],
@@ -760,8 +760,16 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             response.metadata["operational_speech_authority"],
-            "llm_wording_runtime_validated",
+            "llm_optional_micro_ack",
         )
+        self.assertTrue(response.metadata["safe_read_parallel_execution"])
+        self.assertEqual(response.speech[0].timing, "parallel")
+        self.assertFalse(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertFalse(
+            response.speech[0].metadata["playback_start_required_for_effects"]
+        )
+        self.assertEqual(response.skills[0].timing, "parallel")
+        self.assertTrue(response.skills[0].metadata["retryable_safe_read"])
         self.assertEqual(
             response.metadata["user_turn_envelope"],
             user_turn_envelope,
@@ -770,9 +778,59 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "smart",
             response.metadata["personality_expression"]["core_traits"],
         )
-        self.assertTrue(
-            response.speech[0].metadata["playback_start_required_for_effects"]
+
+    def test_safe_read_may_start_silently_without_delivery_barrier(self):
+        plan = CanonicalPlan(
+            plan_id="plan-weather-silent",
+            planner_tier="deep",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.96,
+            goal_ids=["goal-weather"],
+            goal_summary="Check Shanghai weather.",
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "上海", "date": "today"},
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["weather"],
+                }
+            ],
         )
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-weather-silent",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(),
+            confidence=0.95,
+            metadata={"safe_read_speech_optional": True},
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([weather_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-weather-silent",
+                language="zh-CN",
+                context={},
+            )
+        )
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(response.skills[0].timing, "parallel")
+        self.assertTrue(response.skills[0].metadata["retryable_safe_read"])
+        self.assertTrue(response.metadata["safe_read_parallel_execution"])
 
     def test_effectful_pre_execution_keeps_one_grounded_speech_with_barrier(self):
         plan = execute_plan()

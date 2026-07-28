@@ -127,7 +127,7 @@ class ResponseComposerResolver:
                 metadata={"authority": "advisory", "resolver": "response_composer"},
             )
         composition_id = self._composition_id(request, plan)
-        response_schema = self._response_schema(plan)
+        response_schema = self._response_schema(plan, request.context)
         previous_raw: Any = None
         initial_validation_errors = ""
         contract_repair_attempted = False
@@ -157,6 +157,16 @@ class ResponseComposerResolver:
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
                 model_output = ResponseComposerModelOutput.model_validate(raw)
+                self._validate_safe_read_acknowledgement(
+                    model_output.response_plan,
+                    plan=plan,
+                    context=request.context,
+                    language=request.language,
+                )
+                self._validate_bare_greeting(
+                    model_output.response_plan,
+                    request=request,
+                )
                 premature_claims = self._pending_action_claim_errors(
                     model_output.response_plan,
                     plan=plan,
@@ -189,6 +199,9 @@ class ResponseComposerResolver:
                             "embodiment_independent": True,
                         },
                         "contract_schema": "ResponseComposerModelOutput",
+                        "safe_read_speech_optional": self._is_safe_read_plan(
+                            plan, request.context
+                        ),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
                     },
@@ -270,7 +283,103 @@ class ResponseComposerResolver:
         )
 
     @staticmethod
-    def _response_schema(plan: CanonicalPlan) -> dict[str, Any]:
+    def _is_safe_read_plan(
+        plan: CanonicalPlan,
+        context: dict[str, Any] | None,
+    ) -> bool:
+        if (
+            plan.disposition != "execute"
+            or not plan.steps
+            or not isinstance(context, dict)
+        ):
+            return False
+        raw = context.get("execution_capabilities")
+        if not isinstance(raw, list):
+            return False
+        safety_by_skill = {
+            str(item.get("skill_id") or "").strip(): str(
+                item.get("safety_class") or ""
+            ).strip()
+            for item in raw
+            if isinstance(item, dict)
+        }
+        return all(
+            safety_by_skill.get(step.skill_id) == "safe_read"
+            for step in plan.steps
+        )
+
+    @classmethod
+    def _validate_safe_read_acknowledgement(
+        cls,
+        response_plan: ResponsePlan,
+        *,
+        plan: CanonicalPlan,
+        context: dict[str, Any] | None,
+        language: str | None,
+    ) -> None:
+        if not cls._is_safe_read_plan(plan, context):
+            return
+        stages = [
+            stage
+            for stage in (response_plan.immediate, response_plan.pre_action)
+            if stage is not None
+        ]
+        if len(stages) > 1:
+            raise ValueError(
+                "safe-read pre-execution speech may contain at most one micro acknowledgement"
+            )
+        if not stages:
+            return
+        text = " ".join(stages[0].text.strip().split())
+        sentence_endings = sum(text.count(token) for token in ".!?。！？")
+        if sentence_endings > 1:
+            raise ValueError(
+                "safe-read micro acknowledgement must be one short sentence"
+            )
+        if str(language or "").lower().startswith("zh"):
+            if len(text) > 12:
+                raise ValueError(
+                    "safe-read Chinese micro acknowledgement exceeds 12 characters"
+                )
+        elif len(text.split()) > 6 or len(text) > 48:
+            raise ValueError(
+                "safe-read micro acknowledgement exceeds six words"
+            )
+
+    @staticmethod
+    def _validate_bare_greeting(
+        response_plan: ResponsePlan,
+        *,
+        request: AgentRunRequest,
+    ) -> None:
+        if str(request.route_decision.intent or "").strip() != "greeting":
+            return
+        stages = [
+            stage
+            for stage in (
+                response_plan.immediate,
+                response_plan.pre_action,
+                *response_plan.progress,
+                response_plan.final,
+            )
+            if stage is not None
+        ]
+        if len(stages) != 1:
+            raise ValueError("bare greeting must contain exactly one spoken stage")
+        text = " ".join(stages[0].text.strip().split())
+        if sum(text.count(token) for token in ".!?。！？") > 1:
+            raise ValueError("bare greeting must be one short sentence")
+        if str(request.language or "").lower().startswith("zh"):
+            if len(text) > 12:
+                raise ValueError("Chinese bare greeting exceeds 12 characters")
+        elif len(text.split()) > 6 or len(text) > 48:
+            raise ValueError("bare greeting exceeds six words")
+
+    @staticmethod
+    def _response_schema(
+        plan: CanonicalPlan,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "ResponseComposerModelOutput"
         goal_ids = list(dict.fromkeys(plan.goal_ids))
@@ -357,29 +466,34 @@ class ResponseComposerResolver:
                 if "final" not in response_required:
                     response_required.append("final")
             elif plan.disposition == "execute":
-                # The runtime has a delivery/effect barrier: an executable plan
-                # cannot start until immediate and/or pre_action speech covering
-                # every goal begins playback. Make that topology visible at the
-                # decoder boundary instead of asking the host to reinterpret a
-                # final or progress stage after generation.
                 response_properties["final"] = {"type": "null"}
                 progress = response_properties.get("progress")
                 if isinstance(progress, dict):
                     progress["maxItems"] = 0
-                response_plan_schema["anyOf"] = [
-                    {
-                        "required": ["immediate"],
-                        "properties": {
-                            "immediate": {"$ref": "#/$defs/ResponseStage"}
+                if ResponseComposerResolver._is_safe_read_plan(plan, context):
+                    # A safe read may start silently. When the model chooses to
+                    # acknowledge the wait, runtime validation constrains it to
+                    # one tiny natural utterance and executes it in parallel with
+                    # the lookup.
+                    response_plan_schema.pop("anyOf", None)
+                else:
+                    # Effectful work retains the delivery/effect barrier: it
+                    # cannot start until immediate and/or pre_action speech
+                    # covering every goal begins playback.
+                    response_plan_schema["anyOf"] = [
+                        {
+                            "required": ["immediate"],
+                            "properties": {
+                                "immediate": {"$ref": "#/$defs/ResponseStage"}
+                            },
                         },
-                    },
-                    {
-                        "required": ["pre_action"],
-                        "properties": {
-                            "pre_action": {"$ref": "#/$defs/ResponseStage"}
+                        {
+                            "required": ["pre_action"],
+                            "properties": {
+                                "pre_action": {"$ref": "#/$defs/ResponseStage"}
+                            },
                         },
-                    },
-                ]
+                    ]
         return schema
 
     @staticmethod
@@ -686,9 +800,9 @@ class ResponseComposerResolver:
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "The explicit Language hint is authoritative for spoken output unless the user explicitly asks for translation or a different language. When it is zh-CN, speak Chinese only; do not mirror a bilingual greeting, switch to English, or follow the language of identity/internal context. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
-            "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. "
-            "For execute plans this is pre-execution composition: emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech as a short natural acknowledgement of what will be checked or done. "
-            "For a pending safe_read or external_read capability, use one short everyday acknowledgement that names what Chromie is looking at, such as the weather forecast for the requested place. Do not say generic phrases such as checking related information, and do not mention tools, APIs, workflow, or execution. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
+            "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. For a bare greeting, return only one brief greeting; do not introduce Chromie, state her age, list her traits, or add an offer of help unless the user asked for that information. "
+            "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. "
+            "For a pending safe_read or external_read capability, acknowledgement is optional. If silence would feel awkward, emit only one tiny everyday micro acknowledgement, normally no more than a few words, such as ‘我看看。’ or ‘哦，是上海，我看看。’. Do not restate the full request, narrate the workflow, promise a result, or mention tools, APIs, data, execution, or waiting. The lookup and this optional speech will start in parallel. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires no SocialAttentionPlan and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style semantically; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
@@ -707,5 +821,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. For execute, use immediate and/or pre_action covering every canonical goal, omit progress and final, and keep must_not_claim_completion=true. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal, while safe-read work may omit pre-execution speech or use one tiny acknowledgement; always omit progress and final and keep must_not_claim_completion=true. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
         )

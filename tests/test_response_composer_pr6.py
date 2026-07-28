@@ -457,6 +457,39 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("When it is zh-CN, speak Chinese only", prompt)
         self.assertIn("exactly one final stage", prompt)
 
+    def test_bare_greeting_is_repaired_to_one_short_sentence(self):
+        canonical = plan(goals=["goal-greeting"], response_text="你好呀！")
+        long_output = {
+            "response_plan": {
+                "final": {
+                    "text": "你好呀！我是 Chromie，今年六岁了。我喜欢和朋友一起玩！",
+                    "covers_goal_ids": ["goal-greeting"],
+                }
+            }
+        }
+        repaired = {
+            "response_plan": {
+                "final": {
+                    "text": "你好呀！",
+                    "covers_goal_ids": ["goal-greeting"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([long_output, repaired])
+        req = request(canonical)
+        req = req.model_copy(
+            deep=True,
+            update={
+                "route_decision": req.route_decision.model_copy(
+                    update={"intent": "greeting"}
+                )
+            },
+        )
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(req))
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.composition.response_plan.final.text, "你好呀！")
+        self.assertEqual(len(ollama.prompts), 2)
+
     def test_execute_prompt_requires_immediate_or_pre_action(self):
         canonical = plan(
             disposition="execute",
@@ -488,6 +521,91 @@ class ResponseComposerResolverTests(unittest.TestCase):
         prompt = ollama.prompts[0][0]
         self.assertIn("immediate and/or pre_action stage covering every canonical goal", prompt)
         self.assertIn("omit progress and final", prompt)
+
+    def test_safe_read_acknowledgement_is_optional_at_decoder_boundary(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "上海", "date": "today"},
+                }
+            ],
+        )
+        ollama = FakeOllama({"response_plan": {}})
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "skill_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+        self.assertEqual(result.status, "resolved")
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotIn("anyOf", schema["properties"]["response_plan"])
+        self.assertIn("acknowledgement is optional", ollama.prompts[0][0])
+        self.assertIn("start in parallel", ollama.prompts[0][0])
+
+    def test_safe_read_long_acknowledgement_is_repaired_to_micro_speech(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "上海", "date": "today"},
+                }
+            ],
+        )
+        long_output = {
+            "response_plan": {
+                "immediate": {
+                    "text": "我现在就去帮你仔细看看上海今天的天气怎么样。",
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            }
+        }
+        repaired = {
+            "response_plan": {
+                "immediate": {
+                    "text": "我看看。",
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([long_output, repaired])
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "skill_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.composition.response_plan.immediate.text,
+            "我看看。",
+        )
+        self.assertEqual(len(ollama.prompts), 2)
 
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])

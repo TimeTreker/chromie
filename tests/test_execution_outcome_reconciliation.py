@@ -383,7 +383,17 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
 
     def test_missing_result_is_explicit_not_run(self) -> None:
         plan = single_plan()
-        request = request_for_step(plan, "lookup")
+        request = request_for_step(plan, "lookup").model_copy(
+            deep=True,
+            update={
+                "metadata": {
+                    **request_for_step(plan, "lookup").metadata,
+                    "safety_class": "safe_read",
+                    "effects": [],
+                    "retryable_safe_read": True,
+                }
+            },
+        )
 
         bundle = build_execution_outcome_bundle(
             turn_id="turn-missing",
@@ -401,6 +411,11 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             bundle.evidence[0].reason_code,
             "missing_skill_result",
         )
+        self.assertEqual(
+            bundle.evidence[0].metadata["request_args"],
+            {"city": "Beijing"},
+        )
+        self.assertTrue(bundle.evidence[0].metadata["retryable_safe_read"])
 
     def test_shared_step_evidence_can_support_multiple_owned_goals(self) -> None:
         plan = shared_step_plan()

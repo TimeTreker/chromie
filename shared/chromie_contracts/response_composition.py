@@ -84,7 +84,11 @@ class CoordinatedResponsePlan(BaseModel):
 
         phased_stages = self._stages(self.response_plan)
         stages = [stage for _, stage in phased_stages]
-        if not stages:
+        safe_read_speech_optional = (
+            plan.disposition == "execute"
+            and self.metadata.get("safe_read_speech_optional") is True
+        )
+        if not stages and not safe_read_speech_optional:
             raise ValueError("terminal canonical plans require at least one spoken response stage")
 
         known_goals = set(plan.goal_ids)
@@ -97,7 +101,9 @@ class CoordinatedResponsePlan(BaseModel):
                 )
             covered_goals.update(stage.covers_goal_ids)
 
-        if known_goals and covered_goals != known_goals:
+        if known_goals and covered_goals != known_goals and not (
+            safe_read_speech_optional and not stages
+        ):
             missing = sorted(known_goals - covered_goals)
             raise ValueError("response composition does not cover all plan goals: " + ",".join(missing))
 

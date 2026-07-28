@@ -4,11 +4,30 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Parallel safe reads and recoverable query continuity
+
+- Started validated `safe_read` capabilities in parallel with optional micro
+  acknowledgement speech. Read-only tools no longer wait for TTS synthesis or
+  playback start; effectful and confirmation-bound capabilities retain their
+  existing delivery barriers.
+- Made safe-read acknowledgement optional and bounded to one tiny utterance,
+  while bare greetings are limited to one short sentence without unsolicited
+  identity, age, traits, hobbies, or help offers.
+- Bound execution evidence and active task snapshots to exact tool arguments.
+  Interrupted or missing-result safe reads remain `recoverable`, so status
+  follow-ups resume or retry the same location/date instead of reusing another
+  task's result.
+- Constrained Tool Result Interpreter fact references to decoder-enumerated
+  scalar JSON Pointers, eliminating invented `/data/...` paths and preserving
+  natural evidence-grounded answers.
+- Tightened wake-up speech to 12 characters and rejected invented relationship
+  terms when nobody nearby has been identified.
+
 ### Spoken-output boundary hardening
 
 - Changed the runtime wake-up greeting to a strict structured `{"text": ...}`
   contract with thinking disabled, a 32-token generation ceiling, one-sentence and
-  language validation, and a 24-character spoken limit. Raw prose, incomplete
+  language validation, and a 12-character spoken limit. Raw prose, incomplete
   generations, analysis, and malformed output are logged as rejected evidence and
   never enter TTS.
 - Applied the same explicit spoken-text envelope to the rare Host direct-LLM

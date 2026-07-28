@@ -1059,9 +1059,31 @@ class CanonicalPlanRuntimeAdapter:
         effectful_pre_execution = (
             plan.disposition in {"execute", "mixed"} and bool(plan.steps)
         )
+        executable_definitions = (
+            [
+                self.interaction_runtime.skill_definition(step.skill_id)
+                for step in plan.steps
+            ]
+            if effectful_pre_execution
+            else []
+        )
+        read_only_plan = bool(executable_definitions) and all(
+            str((definition.metadata or {}).get("safety_class") or "")
+            == "safe_read"
+            for definition in executable_definitions
+        )
+        safe_read_parallel = (
+            effectful_pre_execution
+            and read_only_plan
+            and not confirmation_goal_ids
+        )
+        safe_read_speech_optional = (
+            safe_read_parallel
+            and plan.disposition == "execute"
+            and executable_goal_ids == set(plan.goal_ids)
+        )
         omitted_pre_execution_speech_phases: list[str] = []
         projected_speech_stages: list[dict[str, Any]] = []
-        read_only_plan = False
         if effectful_pre_execution:
             required_goal_ids = set(plan.goal_ids)
             immediate_item = (
@@ -1084,30 +1106,68 @@ class CanonicalPlanRuntimeAdapter:
                 for _, stage in available_pre_execution
                 for goal_id in stage.covers_goal_ids
             }
-            if not available_pre_execution or not required_goal_ids.issubset(
-                covered_pre_execution
-            ):
-                raise ValueError(
-                    "effectful pre-execution response requires immediate and/or "
-                    "pre_action stages covering all canonical goals"
-                )
 
-            if (
-                pre_action_item is not None
-                and required_goal_ids.issubset(
-                    set(pre_action_item[1].covers_goal_ids)
-                )
-            ):
-                stage_items = [pre_action_item]
-            elif (
-                immediate_item is not None
-                and required_goal_ids.issubset(
-                    set(immediate_item[1].covers_goal_ids)
-                )
-            ):
-                stage_items = [immediate_item]
+            # A safe, read-only lookup may start immediately without any spoken
+            # acknowledgement. If the response model supplied a tiny natural
+            # acknowledgement, it is optional and runs in parallel with the lookup.
+            # Effectful or confirmation-gated work retains the delivery barrier.
+            if safe_read_parallel:
+                if (
+                    not safe_read_speech_optional
+                    and not available_pre_execution
+                ):
+                    raise ValueError(
+                        "mixed safe-read execution requires response speech for "
+                        "its non-executing goals"
+                    )
+                if available_pre_execution and not required_goal_ids.issubset(
+                    covered_pre_execution
+                ):
+                    raise ValueError(
+                        "safe-read pre-execution speech, when present, must cover "
+                        "all canonical goals"
+                    )
+                if (
+                    pre_action_item is not None
+                    and required_goal_ids.issubset(
+                        set(pre_action_item[1].covers_goal_ids)
+                    )
+                ):
+                    stage_items = [pre_action_item]
+                elif (
+                    immediate_item is not None
+                    and required_goal_ids.issubset(
+                        set(immediate_item[1].covers_goal_ids)
+                    )
+                ):
+                    stage_items = [immediate_item]
+                else:
+                    stage_items = []
             else:
-                stage_items = list(available_pre_execution)
+                if not available_pre_execution or not required_goal_ids.issubset(
+                    covered_pre_execution
+                ):
+                    raise ValueError(
+                        "effectful pre-execution response requires immediate and/or "
+                        "pre_action stages covering all canonical goals"
+                    )
+
+                if (
+                    pre_action_item is not None
+                    and required_goal_ids.issubset(
+                        set(pre_action_item[1].covers_goal_ids)
+                    )
+                ):
+                    stage_items = [pre_action_item]
+                elif (
+                    immediate_item is not None
+                    and required_goal_ids.issubset(
+                        set(immediate_item[1].covers_goal_ids)
+                    )
+                ):
+                    stage_items = [immediate_item]
+                else:
+                    stage_items = list(available_pre_execution)
 
             selected_keys = {(phase, id(stage)) for phase, stage in stage_items}
             omitted_pre_execution_speech_phases = [
@@ -1121,15 +1181,6 @@ class CanonicalPlanRuntimeAdapter:
                 if stage is not None and (phase, id(stage)) not in selected_keys
             ]
 
-            executable_definitions = [
-                self.interaction_runtime.skill_definition(step.skill_id)
-                for step in plan.steps
-            ]
-            read_only_plan = bool(executable_definitions) and all(
-                str((definition.metadata or {}).get("safety_class") or "")
-                == "safe_read"
-                for definition in executable_definitions
-            )
             model_pre_execution = next(
                 (
                     (phase, stage)
@@ -1140,26 +1191,26 @@ class CanonicalPlanRuntimeAdapter:
                 None,
             )
 
-            if (
-                read_only_plan
-                and not confirmation_goal_ids
-                and model_pre_execution is not None
-            ):
-                phase, stage = model_pre_execution
-                projected_speech_stages = [
-                    {
-                        "phase": phase,
-                        "text": stage.text,
-                        "speech_act": stage.speech_act,
-                        "commitment_state": stage.commitment_state,
-                        "must_not_claim_completion": True,
-                        "covers_goal_ids": list(stage.covers_goal_ids),
-                        "claims": stage.claims,
-                        "source": "goal_driven_response_composer",
-                        "operational_text_source": "llm_wording_runtime_validated",
-                        "runtime_confirmation_required": False,
-                    }
-                ]
+            if safe_read_parallel:
+                if model_pre_execution is not None:
+                    phase, stage = model_pre_execution
+                    projected_speech_stages = [
+                        {
+                            "phase": phase,
+                            "text": stage.text,
+                            "speech_act": stage.speech_act,
+                            "commitment_state": stage.commitment_state,
+                            "must_not_claim_completion": True,
+                            "covers_goal_ids": list(stage.covers_goal_ids),
+                            "claims": stage.claims,
+                            "source": "goal_driven_response_composer",
+                            "operational_text_source": "llm_wording_runtime_validated",
+                            "runtime_confirmation_required": False,
+                            "safe_read_micro_ack": safe_read_speech_optional,
+                        }
+                    ]
+                else:
+                    projected_speech_stages = []
             else:
                 nonexecuting_goal_ids = required_goal_ids - executable_goal_ids
                 projected_nonexecuting_goal_ids: set[str] = set()
@@ -1274,10 +1325,18 @@ class CanonicalPlanRuntimeAdapter:
                 "canonical_plan_id": plan.plan_id,
                 "canonical_plan_fingerprint": fingerprint,
                 "claims": projected["claims"],
-                "wait_for_playback_start": True,
-                "playback_start_required_for_delivery": True,
+                "wait_for_playback_start": not safe_read_parallel,
+                "playback_start_required_for_delivery": not safe_read_parallel,
             }
-            if effectful_pre_execution:
+            if safe_read_parallel:
+                speech_metadata.update(
+                    {
+                        "safe_read_micro_ack": safe_read_speech_optional,
+                        "parallel_with_safe_read": True,
+                        "playback_start_required_for_effects": False,
+                    }
+                )
+            elif effectful_pre_execution:
                 speech_metadata["playback_start_required_for_effects"] = True
             for key in (
                 "operational_text_source",
@@ -1288,7 +1347,13 @@ class CanonicalPlanRuntimeAdapter:
             speech.append(
                 InteractionSpeech(
                     text=str(projected["text"]),
-                    timing="immediate" if phase == "immediate" else "sequential",
+                    timing=(
+                        "parallel"
+                        if safe_read_parallel
+                        else "immediate"
+                        if phase == "immediate"
+                        else "sequential"
+                    ),
                     style="brief",
                     metadata=speech_metadata,
                 )
@@ -1306,7 +1371,7 @@ class CanonicalPlanRuntimeAdapter:
                     skill_id=step.skill_id,
                     skill_version=definition.version,
                     args=step.args,
-                    timing=step.timing,
+                    timing="parallel" if safe_read_parallel else step.timing,
                     timeout_ms=definition.timeout_ms,
                     cancellable=definition.interruptible,
                     requires_confirmation=(
@@ -1332,6 +1397,8 @@ class CanonicalPlanRuntimeAdapter:
                         "effectful": str(
                             definition.metadata.get("safety_class") or ""
                         ) not in {"safe_read", "planning_only"},
+                        "retryable_safe_read": safe_read_parallel,
+                        "parallel_with_speech": safe_read_parallel,
                         **step.metadata,
                     },
                 )
@@ -1505,12 +1572,16 @@ class CanonicalPlanRuntimeAdapter:
                 omitted_pre_execution_speech_phases
             ),
             "operational_speech_authority": (
-                "llm_wording_runtime_validated"
-                if effectful_pre_execution and read_only_plan
+                "llm_optional_micro_ack"
+                if safe_read_speech_optional
+                else "llm_parallel_speech"
+                if safe_read_parallel
                 else "runtime_authoritative_state"
                 if effectful_pre_execution
                 else "not_applicable"
             ),
+            "safe_read_parallel_execution": safe_read_parallel,
+            "safe_read_speech_optional": safe_read_speech_optional,
             "deepthinking_proposed_effect_task_count": primary_effectful_count,
             "deepthinking_valid_effect_task_count": primary_effectful_count,
             "deepthinking_proposed_action_count": primary_effectful_count,

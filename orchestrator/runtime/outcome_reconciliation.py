@@ -227,6 +227,14 @@ class ExecutionOutcomeReconciler:
                         missing_result=True,
                         metadata={
                             "correlation": "plan_step_and_committed_request",
+                            "request_args": dict(request.args),
+                            "safety_class": str(
+                                request.metadata.get("safety_class") or ""
+                            ),
+                            "effects": list(request.metadata.get("effects") or []),
+                            "retryable_safe_read": (
+                                request.metadata.get("retryable_safe_read") is True
+                            ),
                         },
                     )
                 )
@@ -312,6 +320,14 @@ class ExecutionOutcomeReconciler:
                     missing_result=False,
                     metadata={
                         "correlation": "plan_step_request_and_skill_result",
+                        "request_args": dict(request.args),
+                        "safety_class": str(
+                            request.metadata.get("safety_class") or ""
+                        ),
+                        "effects": list(request.metadata.get("effects") or []),
+                        "retryable_safe_read": (
+                            request.metadata.get("retryable_safe_read") is True
+                        ),
                     },
                 )
             )

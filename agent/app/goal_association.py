@@ -611,7 +611,7 @@ class GoalAssociationResolver:
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2200)}\n\n"
             "Recent trusted tool evidence JSON:\n"
             f"{self._bounded_json(context.get('recent_tool_evidence') or [], 5000)}\n\n"
-            "Use recent trusted tool evidence only when it is semantically relevant and fresh enough for the current request. It may resolve references, ellipsis, or a request to interpret a result already obtained; do not create a duplicate lookup merely because the latest sentence omits previously established entities. The model owns that semantic judgment. "
+            "Use recent trusted tool evidence only when it is semantically relevant, fresh enough, and bound to the same material tool arguments required by the current goal. A weather result for Beijing cannot satisfy a Shanghai goal, and a different date or scope is also different evidence. It may resolve references, ellipsis, or a request to interpret a result already obtained only when the bound arguments match. For a scheduled, running, or recoverable safe-read goal with no completed matching evidence, associate the follow-up with that goal so downstream planning can resume or retry it; do not create a status-only goal and do not answer from another task's result. The model owns that semantic judgment. "
             "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
@@ -712,7 +712,7 @@ class GoalAssociationResolver:
             )
         return (
             "You are Chromie's Goal Association and Segmentation model. Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
-            "Apply continuity before creation. Understand references from meaning, bounded active goals, unresolved gaps, and dialogue context. "
+            "Apply continuity before creation. Understand references from meaning, bounded active goals, unresolved gaps, execution bindings, and dialogue context. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
             "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
             "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "
             "You are advisory only and never execute or commit. Return JSON only."

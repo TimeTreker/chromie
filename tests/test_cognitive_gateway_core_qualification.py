@@ -512,6 +512,10 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "age_appropriate_natural_voice": "pass",
                             "direct_answer_before_detail": "pass",
                             "no_internal_workflow_narration": "pass",
+                            "bare_greeting_brevity": "pass",
+                            "safe_read_speech_tool_parallelism": "pass",
+                            "recoverable_lookup_argument_binding": "pass",
+                            "tool_result_pointer_grounding": "pass",
                         },
                         "findings": [],
                     }

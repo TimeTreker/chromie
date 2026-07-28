@@ -1023,6 +1023,17 @@ it records a dirty declared paired Soridormi checkout and no endpoint executing
 revision. Operational rollout remains governed by
 [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
 
+The natural safe-read execution path is now parallel and task-bound. A validated
+read-only lookup may start silently or alongside one tiny model-authored
+acknowledgement; it no longer waits for TTS synthesis or playback start. Exact
+request arguments are retained in execution evidence and active task snapshots,
+and interrupted or missing-result safe reads remain recoverable so later status
+questions resume or retry the same query. Tool-result fact references are limited
+to decoder-enumerated scalar JSON Pointers. Effectful actions keep their existing
+speech and confirmation barriers. Bare greetings and wake-up speech are separately
+bounded to prevent unsolicited biography, invented relationships, and long
+workflow narration.
+
 The user-outcome acceptance layer is now implemented. Live general-ability
 probes default to architecture-independent observable behavior assertions while
 retaining route and planner details as diagnostics. Timeout, prompt/input

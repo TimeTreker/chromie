@@ -8293,7 +8293,9 @@ class VoiceAssistant:
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
             "services, models, being an assistant, or operational status. Do not "
-            "introduce yourself or ask what help is required. Return only a JSON "
+            "introduce yourself or ask what help is required. Nobody nearby has "
+            "been identified at startup, so do not address anyone as mother, father, "
+            "owner, friend, or by any other invented name or relationship. Return only a JSON "
             "object with one field named text. The text value is the complete spoken "
             "sentence and must be short enough to say naturally in about two seconds.\n\n"
             f"Local time: {local_time}\n"
@@ -8307,7 +8309,7 @@ class VoiceAssistant:
             configured = self._validate_spoken_text_contract(
                 self.runtime_ready_greeting_text,
                 purpose="configured runtime ready greeting",
-                max_chars=24,
+                max_chars=12,
                 one_sentence=True,
                 language=self.runtime_ready_greeting_language,
             )
@@ -8327,7 +8329,7 @@ class VoiceAssistant:
             "prompt": self._runtime_ready_greeting_prompt(),
             "stream": False,
             "think": False,
-            "format": self._spoken_text_response_schema(max_chars=24),
+            "format": self._spoken_text_response_schema(max_chars=12),
             "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
             "options": {
                 "num_ctx": int(
@@ -8359,10 +8361,17 @@ class VoiceAssistant:
             generated = self._decode_spoken_text_envelope(
                 data,
                 purpose="runtime ready greeting",
-                max_chars=24,
+                max_chars=12,
                 one_sentence=True,
                 language=self.runtime_ready_greeting_language,
             )
+            if re.search(
+                r"(?:妈妈|爸爸|妈咪|爹地|主人|哥哥|姐姐|爷爷|奶奶)",
+                generated,
+            ):
+                raise RuntimeError(
+                    "runtime ready greeting invented an unidentified relationship"
+                )
             return generated, f"llm:{model}"
         except Exception as exc:
             logger.warning("Runtime ready greeting generation failed: %s", exc)
@@ -8370,7 +8379,7 @@ class VoiceAssistant:
                 fallback = self._validate_spoken_text_contract(
                     self.runtime_ready_greeting_fallback_text,
                     purpose="runtime ready greeting fallback",
-                    max_chars=24,
+                    max_chars=12,
                     one_sentence=True,
                     language=self.runtime_ready_greeting_language,
                 )

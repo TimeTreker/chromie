@@ -184,7 +184,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(session.payload["think"], False)
         self.assertEqual(
             session.payload["format"],
-            assistant._spoken_text_response_schema(max_chars=24),
+            assistant._spoken_text_response_schema(max_chars=12),
         )
         self.assertEqual(session.payload["options"]["num_predict"], 32)
 
