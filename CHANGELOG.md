@@ -4,6 +4,19 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Spoken-output boundary hardening
+
+- Changed the runtime wake-up greeting to a strict structured `{"text": ...}`
+  contract with thinking disabled, a 32-token generation ceiling, one-sentence and
+  language validation, and a 24-character spoken limit. Raw prose, incomplete
+  generations, analysis, and malformed output are logged as rejected evidence and
+  never enter TTS.
+- Applied the same explicit spoken-text envelope to the rare Host direct-LLM
+  fallback. Any separate model `thinking` field is counted for observability but
+  discarded; only the validated `text` field can be chunked and spoken.
+- Kept the natural `嗨，我醒啦！` fallback so startup remains usable when the model
+  violates the spoken-output contract.
+
 ### Internal truth, external humanity
 
 - Added an owner-approved `personality_expression` contract to the Mind Profile.

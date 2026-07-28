@@ -594,12 +594,12 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
-| `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; after ASR, TTS, Agent, Ollama, Soridormi, and optional cache warm-up are ready, generate and speak one short wake-up greeting before opening the live microphone. Stdin/discard acceptance modes skip it automatically. |
-| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. Set only when the owner deliberately wants fixed wording; otherwise the fast LLM writes the sentence from the owner-approved identity, mind profile, spoken language, and local time. |
+| `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; after ASR, TTS, Agent, Ollama, Soridormi, and optional cache warm-up are ready, request one structured short wake-up greeting and speak it before opening the live microphone. Stdin/discard acceptance modes skip it automatically. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. Set only when the owner deliberately wants fixed wording; otherwise the fast LLM writes the sentence from the owner-approved identity, mind profile, spoken language, and local time. Configured text must still satisfy the same one-sentence, language, and length boundary. |
 | `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | `嗨，我醒啦！`; used only when the fast model cannot produce valid speech. Keep it conversational rather than status-oriented. |
 | `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative spoken language for the startup greeting. |
 | `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; resolves to `AGENT_FAST_PLANNER_MODEL`, then `AGENT_GOAL_INTERPRETER_MODEL`, then the normal Ollama model. |
-| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `64`; small generation budget because the output is exactly one short spoken sentence. |
+| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `32`; the structured output budget is intentionally tiny because only one short wake-up sentence may be spoken. |
 | `ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS` | `15000`; bounded fast-model generation. Failure falls back without blocking startup. |
 | `ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS` | `45000`; bounded synthesis plus playback wait. Expiry is non-fatal and the microphone still opens. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
@@ -843,7 +843,7 @@ Key controls:
 | `AGENT_*_NUM_PREDICT` | Per-stage maximum generated tokens. |
 | `AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE` | Conservative mixed-language preflight estimate; RTX 5090 uses `2.0`. |
 | `AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS` | Tokens held back beyond prompt plus maximum output; RTX 5090 uses `2048`. |
-| `ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT` | Buffer and verify the direct fallback response before any TTS; maintained default `1`. |
+| `ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT` | Retained compatibility switch; direct fallback speech is now always buffered and decoded from a structured `{"text": ...}` envelope before TTS. Setting `0` no longer permits unverified streaming speech. |
 
 ## Ollama
 
@@ -863,12 +863,18 @@ native `llama-server` runner crashes, warmup restarts `chromie-llm` once when
 model. A second native crash fails fast with commands to restart the LLM service
 and check GPU visibility.
 
-Spoken generation paths set `think: false`. Conversation and deep-thinking
-prompts ask the model to speak as Chromie, the robot, rather than as a backend
-model. If the first draft uses a stock model disclaimer such as "as an AI" or
-"I do not have personal opinions", the Agent retries once and asks the model to
-choose the right natural answer mode: factual answer, robot-persona preference,
-or brief honest uncertainty.
+Spoken generation paths set `think: false` and separate model reasoning from the
+user-visible speech contract. Normal cognition already uses typed response plans.
+The runtime wake-up greeting and rare Host direct-LLM fallback additionally require
+a structured `{"text": ...}` envelope. Only that validated field can reach TTS;
+raw prose, malformed JSON, truncated output, and any separate `thinking` field are
+retained only as bounded observability metadata and never spoken.
+
+Prompts ask the model to speak as Chromie, the owner-approved six-year-old person,
+rather than as a backend model. If the first draft uses a stock model disclaimer
+such as "as an AI" or "I do not have personal opinions", the Agent retries once
+and asks the model to choose the right natural answer mode: factual answer,
+Chromie's own preference, or brief honest uncertainty.
 
 ## Legacy hardware daemon
 

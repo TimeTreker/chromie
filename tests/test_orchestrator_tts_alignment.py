@@ -47,8 +47,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("naturally says after waking up", prompt)
         self.assertIn("Local time:", prompt)
         self.assertIn("Speak only in zh-CN", prompt)
-        self.assertIn("rather than like a device reporting status", prompt)
-        self.assertIn("Avoid service-desk wording", prompt)
+        self.assertIn("not a device or an adult professional", prompt)
+        self.assertIn("Return only a JSON object", prompt)
+        self.assertIn("Do not explain the task", prompt)
 
     async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -120,7 +121,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_num_predict = 32
         assistant.runtime_ready_greeting_generation_timeout_ms = 1000
         assistant.ollama_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
@@ -151,7 +152,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 del args
 
             async def text(self) -> str:
-                return json.dumps({"response": "早上好，我醒啦！"})
+                return json.dumps({"response": json.dumps({"text": "早上好，我醒啦！"}), "done_reason": "stop"})
 
         class FakeSession:
             def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
@@ -180,6 +181,125 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(source, "llm:qwen3:4b")
         self.assertEqual(session.url, assistant.llm_url)
         self.assertEqual(session.payload["model"], "qwen3:4b")
+        self.assertIs(session.payload["think"], False)
+        self.assertEqual(
+            session.payload["format"],
+            assistant._spoken_text_response_schema(max_chars=24),
+        )
+        self.assertEqual(session.payload["options"]["num_predict"], 32)
+
+
+    async def test_runtime_ready_greeting_rejects_reasoning_prose_and_falls_back(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_model = "qwen3:4b"
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant.runtime_ready_greeting_num_predict = 32
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.ollama_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm and curious",
+            assistant,
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": (
+                            "First, the user wants me to write a greeting. "
+                            "I need to make sure it sounds natural."
+                        ),
+                        "done_reason": "length",
+                    }
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                del url, json
+                return FakeResponse()
+
+        async def get_http_session(self: VoiceAssistant) -> FakeSession:
+            del self
+            return FakeSession()
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(source, "fallback")
+
+    async def test_runtime_ready_greeting_suppresses_separate_thinking_field(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_model = "qwen3:4b"
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant.runtime_ready_greeting_num_predict = 32
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.ollama_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm and curious",
+            assistant,
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "thinking": "I should produce a short childlike greeting.",
+                        "response": json.dumps({"text": "早呀，我醒啦！"}),
+                        "done_reason": "stop",
+                    }
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                del url, json
+                return FakeResponse()
+
+        async def get_http_session(self: VoiceAssistant) -> FakeSession:
+            del self
+            return FakeSession()
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+
+        with self.assertLogs(level="WARNING") as warning_logs:
+            text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual(text, "早呀，我醒啦！")
+        self.assertEqual(source, "llm:qwen3:4b")
+        self.assertTrue(
+            any("suppressed non-spoken model thinking" in line for line in warning_logs.output)
+        )
 
     async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -187,7 +307,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_num_predict = 32
         assistant.runtime_ready_greeting_generation_timeout_ms = 1
         assistant.ollama_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
@@ -219,7 +339,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
             async def text(self) -> str:
                 await asyncio.sleep(1)
-                return json.dumps({"response": "不应该返回"})
+                return json.dumps({"response": json.dumps({"text": "不应该返回"}), "done_reason": "stop"})
 
         class SlowSession:
             def post(self, url: str, json: dict[str, Any]) -> SlowResponse:
@@ -243,7 +363,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_num_predict = 32
         assistant.runtime_ready_greeting_generation_timeout_ms = 1000
         assistant.ollama_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"

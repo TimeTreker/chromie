@@ -587,8 +587,8 @@ class VoiceAssistant:
         ).strip()
         self.runtime_ready_greeting_num_predict = env_int(
             "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
-            64,
-            minimum=16,
+            32,
+            minimum=8,
         )
         self.runtime_ready_greeting_generation_timeout_ms = env_int(
             "ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS",
@@ -2101,11 +2101,15 @@ class VoiceAssistant:
             fallback_reason=fallback_reason,
             route=route,
         )
+        direct_spoken_max_chars = 800
         payload = {
             "model": self.ollama_model,
             "prompt": prompt,
             "stream": True,
             "think": False,
+            "format": self._spoken_text_response_schema(
+                max_chars=direct_spoken_max_chars
+            ),
             "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
             "options": {
                 "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
@@ -2117,9 +2121,23 @@ class VoiceAssistant:
         logger.info("[%s] LLM processing: %s", session_id, user_text)
         if reset_playback:
             await self.reset_playback_ordering()
-        sentence = ""
+        response_buffer = ""
+        suppressed_thinking_chars = 0
         llm_start_ms = now_ms()
-        self.session_log(session_id, "llm_request_start: prompt_chars=%s input_chars=%s text=%r fallback_reason=%s route=%s think=%s num_ctx=%s num_predict=%s", len(prompt), len(user_text), user_text, fallback_reason or "", route or "", payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
+        self.session_log(
+            session_id,
+            "llm_request_start: prompt_chars=%s input_chars=%s text=%r "
+            "fallback_reason=%s route=%s think=%s response_format=spoken_json "
+            "num_ctx=%s num_predict=%s",
+            len(prompt),
+            len(user_text),
+            user_text,
+            fallback_reason or "",
+            route or "",
+            payload.get("think"),
+            payload["options"]["num_ctx"],
+            payload["options"]["num_predict"],
+        )
         preflight = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(prompt),
             options=payload.get("options"),
@@ -2158,10 +2176,12 @@ class VoiceAssistant:
             self.maybe_session_done(session_id)
             return
 
-        require_complete_output = env_bool(
-            "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT",
-            True,
-        )
+        if not env_bool("ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT", True):
+            self.session_log(
+                session_id,
+                "llm_unbuffered_speech_disabled: reason=spoken_json_contract",
+            )
+
         try:
             session = await self.get_http_session()
             async with session.post(self.llm_url, json=payload) as resp:
@@ -2170,12 +2190,21 @@ class VoiceAssistant:
                     state = self.sessions.state.get(session_id or "")
                     if state is not None:
                         state["llm_done"] = True
-                    self.session_log(session_id, "llm_http_error: status=%s body=%s", resp.status, body)
+                    self.session_log(
+                        session_id,
+                        "llm_http_error: status=%s body=%s",
+                        resp.status,
+                        body,
+                    )
                     self.maybe_session_done(session_id)
                     return
                 async for line in resp.content:
                     if session_id != self.session_id:
-                        self.session_log(session_id, "llm_drop_stale_stream: current_sid=%s", self.session_id)
+                        self.session_log(
+                            session_id,
+                            "llm_drop_stale_stream: current_sid=%s",
+                            self.session_id,
+                        )
                         return
                     if not line:
                         continue
@@ -2183,23 +2212,27 @@ class VoiceAssistant:
                         data = json.loads(line.decode())
                     except json.JSONDecodeError:
                         continue
+
+                    thinking_token = data.get("thinking", "")
+                    if isinstance(thinking_token, str) and thinking_token:
+                        suppressed_thinking_chars += len(thinking_token)
+
                     token = data.get("response", "")
                     if token:
                         state = self.sessions.state.get(session_id or "")
                         if state is not None:
                             if not state.get("first_token_logged"):
                                 state["first_token_logged"] = True
-                                self.session_log(session_id, "llm_first_token: first_token_ms=%.1f", now_ms() - llm_start_ms)
-                            state["response_chars"] = int(state.get("response_chars", 0)) + len(token)
-                        sentence += token
-                        if not require_complete_output:
-                            while True:
-                                chunk, sentence = self.pop_tts_chunk(sentence)
-                                if not chunk:
-                                    break
-                                if self.is_valid_tts_text(chunk):
-                                    self.session_log(session_id, "llm_flush_to_tts: chars=%s text=%r", len(chunk), chunk)
-                                    await self.schedule_tts_sentence(chunk, session_id)
+                                self.session_log(
+                                    session_id,
+                                    "llm_first_token: first_token_ms=%.1f",
+                                    now_ms() - llm_start_ms,
+                                )
+                            state["response_chars"] = int(
+                                state.get("response_chars", 0)
+                            ) + len(token)
+                        response_buffer += token
+
                     if data.get("done"):
                         completion = ollama_completion_diagnostics(
                             options=payload.get("options"),
@@ -2212,7 +2245,8 @@ class VoiceAssistant:
                             (
                                 item
                                 for item in completion
-                                if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
+                                if item.event
+                                in {"llm_output_truncated", "llm_prompt_truncated"}
                                 and item.level >= logging.ERROR
                             ),
                             None,
@@ -2233,25 +2267,82 @@ class VoiceAssistant:
                             self.maybe_session_done(session_id)
                             return
 
-                        if require_complete_output:
-                            complete_text = sentence
-                            sentence = ""
-                            while True:
-                                chunk, complete_text = self.pop_tts_chunk(complete_text)
-                                if not chunk:
-                                    break
-                                if self.is_valid_tts_text(chunk):
-                                    self.session_log(session_id, "llm_verified_flush_to_tts: chars=%s text=%r", len(chunk), chunk)
-                                    await self.schedule_tts_sentence(chunk, session_id)
-                            sentence = complete_text
-                        final_text = self.normalize_tts_candidate(sentence)
+                        if suppressed_thinking_chars:
+                            self.session_log(
+                                session_id,
+                                "llm_thinking_suppressed: chars=%s",
+                                suppressed_thinking_chars,
+                            )
+                        envelope_data = dict(data)
+                        envelope_data["response"] = response_buffer
+                        envelope_data["thinking"] = ""
+                        try:
+                            spoken_text = self._decode_spoken_text_envelope(
+                                envelope_data,
+                                purpose="direct LLM fallback",
+                                max_chars=direct_spoken_max_chars,
+                                suppressed_thinking_chars=suppressed_thinking_chars,
+                            )
+                        except RuntimeError as exc:
+                            if state is not None:
+                                state["llm_done"] = True
+                            self.session_log(
+                                session_id,
+                                "llm_spoken_output_rejected: result_trusted=false "
+                                "response_chars=%s thinking_chars=%s error=%s",
+                                len(response_buffer),
+                                suppressed_thinking_chars,
+                                exc,
+                            )
+                            self.maybe_session_done(session_id)
+                            return
+
+                        remaining = spoken_text
+                        while True:
+                            chunk, remaining = self.pop_tts_chunk(remaining)
+                            if not chunk:
+                                break
+                            if self.is_valid_tts_text(chunk):
+                                self.session_log(
+                                    session_id,
+                                    "llm_verified_flush_to_tts: chars=%s text=%r",
+                                    len(chunk),
+                                    chunk,
+                                )
+                                await self.schedule_tts_sentence(chunk, session_id)
+                        final_text = self.normalize_tts_candidate(remaining)
                         if self.is_valid_tts_text(final_text):
-                            self.session_log(session_id, "llm_final_flush_to_tts: chars=%s text=%r", len(final_text), final_text)
+                            self.session_log(
+                                session_id,
+                                "llm_final_flush_to_tts: chars=%s text=%r",
+                                len(final_text),
+                                final_text,
+                            )
                             await self.schedule_tts_sentence(final_text, session_id)
                         if state is not None:
                             state["llm_done"] = True
-                        self.session_log(session_id, "llm_done: llm_ms=%.1f response_chars=%s scheduled_tts=%s", now_ms() - llm_start_ms, state.get("response_chars", 0) if state else "unknown", state.get("scheduled_tts", 0) if state else "unknown")
-                        self.session_log(session_id, "llm_done_raw: done_reason=%s total_duration=%s load_duration=%s prompt_eval_count=%s prompt_eval_duration=%s eval_count=%s eval_duration=%s", data.get("done_reason"), data.get("total_duration"), data.get("load_duration"), data.get("prompt_eval_count"), data.get("prompt_eval_duration"), data.get("eval_count"), data.get("eval_duration"))
+                        self.session_log(
+                            session_id,
+                            "llm_done: llm_ms=%.1f response_chars=%s "
+                            "spoken_chars=%s scheduled_tts=%s",
+                            now_ms() - llm_start_ms,
+                            state.get("response_chars", 0) if state else "unknown",
+                            len(spoken_text),
+                            state.get("scheduled_tts", 0) if state else "unknown",
+                        )
+                        self.session_log(
+                            session_id,
+                            "llm_done_raw: done_reason=%s total_duration=%s "
+                            "load_duration=%s prompt_eval_count=%s "
+                            "prompt_eval_duration=%s eval_count=%s eval_duration=%s",
+                            data.get("done_reason"),
+                            data.get("total_duration"),
+                            data.get("load_duration"),
+                            data.get("prompt_eval_count"),
+                            data.get("prompt_eval_duration"),
+                            data.get("eval_count"),
+                            data.get("eval_duration"),
+                        )
                         self.maybe_session_done(session_id)
                         return
         except asyncio.CancelledError:
@@ -2298,7 +2389,7 @@ class VoiceAssistant:
             "- When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age or body category in unrelated conversation.\n"
             "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners. Internal execution status, evidence labels, observation labels, and workflow narration belong in logs, not ordinary speech.\n"
             "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
-            "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
+            "- Return one JSON object with exactly one field named text. Put only the final words Chromie should say aloud in text; do not expose reasoning, analysis, markdown, or internal tool names.\n"
             "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
             "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that no valid motion result was produced; ask for a clearer command only when the request is actually ambiguous.\n\n"
             f"{fallback_line}\n"
@@ -8088,6 +8179,100 @@ class VoiceAssistant:
         )
         return stats
 
+    @staticmethod
+    def _spoken_text_response_schema(*, max_chars: int) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": max_chars,
+                }
+            },
+            "required": ["text"],
+            "additionalProperties": False,
+        }
+
+    def _validate_spoken_text_contract(
+        self,
+        text: str,
+        *,
+        purpose: str,
+        max_chars: int,
+        one_sentence: bool = False,
+        language: str | None = None,
+    ) -> str:
+        raw = str(text or "")
+        if "\n" in raw or "\r" in raw:
+            raise RuntimeError(f"{purpose} returned multiline speech")
+        normalized = self.normalize_tts_candidate(raw)
+        if not self.is_valid_tts_text(normalized):
+            raise RuntimeError(f"{purpose} returned no valid spoken text")
+        if len(normalized) > max_chars:
+            raise RuntimeError(
+                f"{purpose} exceeded spoken text limit: "
+                f"chars={len(normalized)} max_chars={max_chars}"
+            )
+        if one_sentence:
+            sentence_endings = re.findall(r"[.!?。！？]+", normalized)
+            if len(sentence_endings) > 1:
+                raise RuntimeError(f"{purpose} returned more than one sentence")
+        language_code = str(language or "").strip().lower()
+        if language_code.startswith("zh") and not re.search(
+            r"[\u3400-\u4dbf\u4e00-\u9fff]",
+            normalized,
+        ):
+            raise RuntimeError(f"{purpose} did not use the required Chinese language")
+        return normalized
+
+    def _decode_spoken_text_envelope(
+        self,
+        data: dict[str, Any],
+        *,
+        purpose: str,
+        max_chars: int,
+        one_sentence: bool = False,
+        language: str | None = None,
+        suppressed_thinking_chars: int = 0,
+    ) -> str:
+        thinking = data.get("thinking")
+        if isinstance(thinking, str):
+            suppressed_thinking_chars += len(thinking)
+        if suppressed_thinking_chars:
+            logger.warning(
+                "%s suppressed non-spoken model thinking: chars=%s",
+                purpose,
+                suppressed_thinking_chars,
+            )
+
+        done_reason = str(data.get("done_reason") or "").strip().lower()
+        if done_reason and done_reason != "stop":
+            raise RuntimeError(
+                f"{purpose} did not complete normally: done_reason={done_reason}"
+            )
+
+        raw_response = data.get("response")
+        if not isinstance(raw_response, str):
+            raise RuntimeError(f"{purpose} returned no response string")
+        try:
+            envelope = json.loads(raw_response)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"{purpose} returned non-JSON output; refusing to speak it"
+            ) from exc
+        if not isinstance(envelope, dict) or set(envelope) != {"text"}:
+            raise RuntimeError(
+                f"{purpose} returned an invalid spoken-output envelope"
+            )
+        return self._validate_spoken_text_contract(
+            envelope.get("text", ""),
+            purpose=purpose,
+            max_chars=max_chars,
+            one_sentence=one_sentence,
+            language=language,
+        )
+
     def _runtime_ready_greeting_prompt(self) -> str:
         language = self.runtime_ready_greeting_language
         identity_json = self._direct_llm_identity_json()
@@ -8100,19 +8285,17 @@ class VoiceAssistant:
         )
         return (
             "Chromie has just woken up and can now hear and talk with the people "
-            "nearby. Write the single short sentence she naturally says after waking "
-            "up. The wording belongs to you, not to the host runtime. Sound warm, "
-            "spontaneous, and human-like according to Chromie's owner-approved "
-            "identity and mind profile, rather than like a device reporting status. "
-            "Use the supplied local time only when a time-of-day greeting feels "
-            "natural; do not mechanically announce the clock. "
+            "nearby. Write exactly one very short sentence she naturally says after "
+            "waking up. Sound like a smart, warm, slightly sleepy six-year-old girl, "
+            "not a device or an adult professional. Use the supplied local time only "
+            "when a time-of-day greeting feels natural. "
             f"Speak only in {language}. "
-            "Do not mention readiness, startup, initialization, systems, services, "
-            "models, being an assistant, or operational status. Do not introduce "
-            "yourself or recite identity facts. Avoid service-desk wording such as "
-            "asking what help is required. Do not use emoji, markdown, labels, "
-            "quotation marks, or more than one sentence. Keep it brief enough to say "
-            "naturally in about two seconds. Output only the spoken sentence.\n\n"
+            "Do not explain the task, analyze the request, expose reasoning, or mention "
+            "the prompt. Do not mention readiness, startup, initialization, systems, "
+            "services, models, being an assistant, or operational status. Do not "
+            "introduce yourself or ask what help is required. Return only a JSON "
+            "object with one field named text. The text value is the complete spoken "
+            "sentence and must be short enough to say naturally in about two seconds.\n\n"
             f"Local time: {local_time}\n"
             f"Timezone: {timezone_name}\n"
             f"Owner-approved identity JSON: {identity_json}\n"
@@ -8120,8 +8303,17 @@ class VoiceAssistant:
         )
 
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
-        configured = self.normalize_tts_candidate(self.runtime_ready_greeting_text)
-        if self.is_valid_tts_text(configured):
+        try:
+            configured = self._validate_spoken_text_contract(
+                self.runtime_ready_greeting_text,
+                purpose="configured runtime ready greeting",
+                max_chars=24,
+                one_sentence=True,
+                language=self.runtime_ready_greeting_language,
+            )
+        except RuntimeError:
+            configured = ""
+        if configured:
             return configured, "configured"
 
         model = (
@@ -8135,6 +8327,7 @@ class VoiceAssistant:
             "prompt": self._runtime_ready_greeting_prompt(),
             "stream": False,
             "think": False,
+            "format": self._spoken_text_response_schema(max_chars=24),
             "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
             "options": {
                 "num_ctx": int(
@@ -8144,7 +8337,7 @@ class VoiceAssistant:
                     )
                 ),
                 "num_predict": self.runtime_ready_greeting_num_predict,
-                "temperature": 0.75,
+                "temperature": 0.65,
                 "top_p": 0.9,
             },
         }
@@ -8163,18 +8356,28 @@ class VoiceAssistant:
 
         try:
             data = await asyncio.wait_for(request_greeting(), timeout=timeout_s)
-            generated = self.normalize_tts_candidate(data.get("response", ""))
-            if not self.is_valid_tts_text(generated):
-                raise RuntimeError("runtime greeting model returned no valid spoken text")
+            generated = self._decode_spoken_text_envelope(
+                data,
+                purpose="runtime ready greeting",
+                max_chars=24,
+                one_sentence=True,
+                language=self.runtime_ready_greeting_language,
+            )
             return generated, f"llm:{model}"
         except Exception as exc:
             logger.warning("Runtime ready greeting generation failed: %s", exc)
-            fallback = self.normalize_tts_candidate(
-                self.runtime_ready_greeting_fallback_text
-            )
-            if self.is_valid_tts_text(fallback):
-                return fallback, "fallback"
-            return "", "unavailable"
+            try:
+                fallback = self._validate_spoken_text_contract(
+                    self.runtime_ready_greeting_fallback_text,
+                    purpose="runtime ready greeting fallback",
+                    max_chars=24,
+                    one_sentence=True,
+                    language=self.runtime_ready_greeting_language,
+                )
+            except RuntimeError as fallback_exc:
+                logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)
+                return "", "unavailable"
+            return fallback, "fallback"
 
     async def _announce_runtime_ready(self) -> None:
         """Speak one natural wake-up greeting before live microphone turns.

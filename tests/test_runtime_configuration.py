@@ -224,7 +224,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "64")
+        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "32")
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS"],
             "15000",

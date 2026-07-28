@@ -112,9 +112,9 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
     def test_truncated_stream_is_rejected_before_any_tts(self) -> None:
         assistant, http, spoken, logs = self._assistant(
             [
-                {"response": "This is only a partial answer. ", "done": False},
+                {"response": '{"text":"This is only a partial answer. ', "done": False},
                 {
-                    "response": "It was cut off",
+                    "response": 'It was cut off"}',
                     "done": True,
                     "done_reason": "length",
                     "prompt_eval_count": 20,
@@ -145,7 +145,7 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
     def test_verified_complete_stream_is_spoken_only_after_done(self) -> None:
         assistant, _http, spoken, logs = self._assistant(
             [
-                {"response": "Complete answer.", "done": False},
+                {"response": '{"text":"Complete answer."}', "done": False},
                 {
                     "response": "",
                     "done": True,
@@ -171,6 +171,68 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
         self.assertEqual(spoken, ["Complete answer."])
         self.assertTrue(any("llm_verified_flush_to_tts" in line for line in logs))
         self.assertFalse(any("llm_flush_to_tts" in line for line in logs))
+
+    def test_direct_fallback_suppresses_thinking_and_speaks_only_envelope_text(self) -> None:
+        assistant, http, spoken, logs = self._assistant(
+            [
+                {
+                    "thinking": "I should explain the answer before responding.",
+                    "response": '{"text":"Hi there."}',
+                    "done": True,
+                    "done_reason": "stop",
+                    "prompt_eval_count": 20,
+                    "eval_count": 8,
+                }
+            ]
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "OLLAMA_NUM_CTX": "32768",
+                "OLLAMA_NUM_PREDICT": "64",
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
+                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
+            },
+            clear=False,
+        ):
+            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+
+        self.assertEqual(spoken, ["Hi there."])
+        self.assertTrue(any("llm_thinking_suppressed" in line for line in logs))
+        self.assertEqual(
+            http.requests[0]["format"],
+            assistant._spoken_text_response_schema(max_chars=800),
+        )
+        self.assertIs(http.requests[0]["think"], False)
+
+    def test_direct_fallback_rejects_unstructured_reasoning_prose(self) -> None:
+        assistant, _http, spoken, logs = self._assistant(
+            [
+                {
+                    "response": "First, I need to analyze what the user wants.",
+                    "done": True,
+                    "done_reason": "stop",
+                    "prompt_eval_count": 20,
+                    "eval_count": 8,
+                }
+            ]
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "OLLAMA_NUM_CTX": "32768",
+                "OLLAMA_NUM_PREDICT": "64",
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
+                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
+            },
+            clear=False,
+        ):
+            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+
+        self.assertEqual(spoken, [])
+        self.assertTrue(any("llm_spoken_output_rejected" in line for line in logs))
 
 
 if __name__ == "__main__":
