@@ -7,6 +7,7 @@ from ..clients.weather_client import (
     WeatherLookupError,
     WeatherQuery,
     WeatherReport,
+    format_weather_brief,
     weather_code_text,
 )
 from ..schema import AgentResult, AgentRunRequest
@@ -268,6 +269,11 @@ class ToolAgent(BaseAgent):
             )
             return fallback, evidence, interpretation
 
+        mind = self.mind_context(request)
+        identity = mind.get("identity") if isinstance(mind, dict) else None
+        personality = (
+            mind.get("personality_expression") if isinstance(mind, dict) else None
+        )
         interpretation_request = ToolResultInterpretationRequest(
             sid=request.sid or "",
             user_request=request.text,
@@ -281,6 +287,10 @@ class ToolAgent(BaseAgent):
             context={
                 "route": request.route_decision.route,
                 "intent": request.route_decision.intent,
+                "identity": identity if isinstance(identity, dict) else {},
+                "personality_expression": (
+                    personality if isinstance(personality, dict) else {}
+                ),
             },
         )
         interpretation = await interpreter.interpret(interpretation_request)
@@ -315,54 +325,12 @@ class ToolAgent(BaseAgent):
         language: str,
         units: str,
     ) -> str:
-        """Bounded grounded fallback when semantic composition is unavailable."""
+        """Use the shared bounded provider fallback when semantic composition fails."""
 
-        zh = language.lower().startswith("zh")
-        imperial = units == "imperial"
-
-        def temperature(value: float | None) -> float | None:
-            if value is None:
-                return None
-            return value * 9.0 / 5.0 + 32.0 if imperial else value
-
-        current = temperature(report.current_temperature_c)
-        apparent = temperature(report.apparent_temperature_c)
-        high = temperature(report.daily_high_c)
-        unit = "℉" if imperial else "℃"
-        unit_en = "°F" if imperial else "°C"
-        condition = weather_code_text(report.weather_code, zh=zh)
-
-        if zh:
-            facts: list[str] = []
-            if current is not None:
-                facts.append(f"现在{current:.0f}{unit}")
-            if apparent is not None and (
-                current is None or abs(apparent - current) >= 2.0
-            ):
-                facts.append(f"体感{apparent:.0f}{unit}")
-            if high is not None:
-                facts.append(f"最高{high:.0f}{unit}")
-            suffix = "，".join(facts[:3])
-            return (
-                f"{report.location_name}今天{condition}，{suffix}。"
-                if suffix
-                else f"{report.location_name}今天{condition}。"
-            )
-
-        facts = []
-        if current is not None:
-            facts.append(f"{current:.0f}{unit_en} now")
-        if apparent is not None and (
-            current is None or abs(apparent - current) >= 3.0
-        ):
-            facts.append(f"feels like {apparent:.0f}{unit_en}")
-        if high is not None:
-            facts.append(f"high {high:.0f}{unit_en}")
-        suffix = ", ".join(facts[:3])
-        return (
-            f"Today in {report.location_name}: {condition}, {suffix}."
-            if suffix
-            else f"Today in {report.location_name}: {condition}."
+        return format_weather_brief(
+            report,
+            language=language,
+            units=units,
         )
 
     async def _extract_weather_query(self, request: AgentRunRequest) -> WeatherQuery:

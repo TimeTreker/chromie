@@ -65,7 +65,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 2048)
         self.assertEqual(ollama.calls[0]["options"]["num_predict"], 64)
 
-    async def test_identity_age_question_uses_owner_configured_robot_age(self) -> None:
+    async def test_identity_age_question_uses_owner_configured_age(self) -> None:
         ollama = _CapturingOllama("I'm Chromie, and I'm 6 years old.")
         agent = ConversationAgent(
             AgentServices(
@@ -98,7 +98,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(ollama.calls), 1)
         self.assertIn("social_presentation", ollama.calls[0]["prompt"])
-        self.assertIn("robot identity age: 6 years old", ollama.calls[0]["prompt"])
+        self.assertIn("owner-approved age: 6 years old", ollama.calls[0]["prompt"])
+        self.assertIn("Personality expression, owner-approved", ollama.calls[0]["prompt"])
         self.assertNotIn("not a human biological age", ollama.calls[0]["prompt"])
 
     async def test_identity_gender_question_uses_she_her_pronouns(self) -> None:

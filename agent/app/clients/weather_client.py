@@ -118,6 +118,66 @@ def _fmt_number(value: float | None, *, digits: int = 0) -> str | None:
     return f"{value:.{digits}f}" if digits > 0 else f"{value:.0f}"
 
 
+def format_weather_brief(
+    report: WeatherReport,
+    *,
+    language: str,
+    units: WeatherUnits = "metric",
+) -> str:
+    """Return a short provider-authored fallback, not a semantic user answer.
+
+    Normal spoken answers are composed by the evidence-bound LLM from the
+    original question.  This bounded text exists only for the exceptional case
+    where interpretation is unavailable, so it deliberately reports at most
+    the condition, current temperature, and materially different apparent
+    temperature.  It never tries to decide whether the weather is hot, cold,
+    pleasant, or otherwise answer a qualitative question on the model's behalf.
+    """
+
+    zh = language.lower().startswith("zh")
+    imperial = units == "imperial"
+
+    def temp(value: float | None) -> float | None:
+        if value is None:
+            return None
+        return value * 9.0 / 5.0 + 32.0 if imperial else value
+
+    current = temp(report.current_temperature_c)
+    apparent = temp(report.apparent_temperature_c)
+    condition = weather_code_text(report.weather_code, zh=zh)
+    unit_zh = "℉" if imperial else "℃"
+    unit_en = "°F" if imperial else "°C"
+
+    if zh:
+        details: list[str] = []
+        if current is not None:
+            details.append(f"现在约{current:.0f}{unit_zh}")
+        if apparent is not None and (
+            current is None or abs(apparent - current) >= 2.0
+        ):
+            details.append(f"体感约{apparent:.0f}{unit_zh}")
+        suffix = "，".join(details[:2])
+        return (
+            f"{report.location_name}今天{condition}，{suffix}。"
+            if suffix
+            else f"{report.location_name}今天{condition}。"
+        )
+
+    details = []
+    if current is not None:
+        details.append(f"about {current:.0f}{unit_en} now")
+    if apparent is not None and (
+        current is None or abs(apparent - current) >= 3.0
+    ):
+        details.append(f"feels like {apparent:.0f}{unit_en}")
+    suffix = ", ".join(details[:2])
+    return (
+        f"Today in {report.location_name}: {condition}, {suffix}."
+        if suffix
+        else f"Today in {report.location_name}: {condition}."
+    )
+
+
 def format_weather_report(report: WeatherReport, *, language: str, units: WeatherUnits = "metric") -> str:
     zh = language.lower().startswith("zh")
     condition = weather_code_text(report.weather_code, zh=zh)

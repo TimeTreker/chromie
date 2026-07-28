@@ -232,8 +232,10 @@ def chromie_manifests() -> list[AgentManifest]:
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
                     "fast_speech_guidance": (
-                        "Acknowledge only that Chromie will check the requested "
-                        "location/date. Do not state weather results before the tool returns."
+                        "Use one short, ordinary acknowledgement that says what Chromie is "
+                        "looking at, such as the weather forecast for the requested place/date. "
+                        "Do not use generic workflow language and do not state weather results "
+                        "before the tool returns."
                     ),
                     "semantic_scope": {
                         "domain": "weather_forecast",
@@ -245,10 +247,10 @@ def chromie_manifests() -> list[AgentManifest]:
                         ],
                         "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
                     },
-                    "pre_execution_acknowledgement": {
-                        "zh": "我查一下相关信息。",
-                        "en": "I'll check the requested information.",
-                    },
+                    "pre_execution_speech_guidance": (
+                        "Generate natural model-owned wording for the specific lookup. "
+                        "The Host validates truth and timing but does not provide a fixed sentence."
+                    ),
                 },
             )
         ],

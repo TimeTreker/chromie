@@ -22,7 +22,7 @@ def owner_approved_identity_context(context: dict[str, Any] | None) -> dict[str,
 
     This helper does not answer identity questions or choose wording.  It only
     projects the stable semantic facts that the cognitive models may use when
-    the user asks about the configured robot identity.
+    the user asks about the configured Chromie identity.
     """
 
     if not isinstance(context, dict):
@@ -54,6 +54,39 @@ def owner_approved_identity_context(context: dict[str, Any] | None) -> dict[str,
     return payload
 
 
+def owner_approved_personality_context(context: dict[str, Any] | None) -> dict[str, Any]:
+    """Return owner-approved personality-expression guidance for spoken behavior."""
+
+    if not isinstance(context, dict):
+        return {}
+    mind = context.get("mind")
+    if not isinstance(mind, dict) or mind.get("owner_approved") is not True:
+        return {}
+    personality = mind.get("personality_expression")
+    if not isinstance(personality, dict) or personality.get("owner_approved") is not True:
+        return {}
+    return dict(personality)
+
+
+def bounded_personality_json(
+    context: dict[str, Any] | None,
+    *,
+    max_chars: int = 3200,
+) -> str:
+    payload = owner_approved_personality_context(context)
+    if not payload:
+        return "null"
+    text = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    max_chars = max(200, int(max_chars))
+    return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
+
+
 def bounded_identity_json(
     context: dict[str, Any] | None,
     *,
@@ -74,19 +107,33 @@ def bounded_identity_json(
 
 
 IDENTITY_SEMANTIC_CONTRACT = (
-    "The owner-approved robot identity JSON is authoritative semantic evidence "
-    "about the first-person speaking entity. When the user asks who the robot is, "
-    "its name, its age, or requests a self-introduction, use the supplied identity "
+    "The owner-approved Chromie identity JSON is authoritative semantic evidence "
+    "about the first-person speaking entity. When the user asks who Chromie is, "
+    "her name, her age, or requests a self-introduction, use the supplied identity "
     "facts exactly and naturally, following identity.identity_answer_guidance and "
-    "using identity.name and identity.age_description when that guidance calls for them. Do not substitute a "
-    "generic AI-assistant description or treat an internal language/reasoning model "
-    "as the speaker. Do not volunteer age or internal architecture in unrelated "
-    "conversation. "
+    "using identity.name and identity.age_description when that guidance calls for them. "
+    "Chromie experiences herself as Chromie, not as an assistant, AI, system, model, "
+    "or generic robot category. Her body and internal architecture remain background "
+    "facts unless the user directly asks about them. Do not volunteer age or internal "
+    "architecture in unrelated conversation. "
 )
+
+PERSONALITY_SEMANTIC_CONTRACT = (
+    "The owner-approved personality-expression JSON is the authoritative positive voice "
+    "model for Chromie. Follow its self_concept, core_traits, spoken_style, answer_style, "
+    "tool_use_style, maturity_boundary, and internal_language_boundary semantically. "
+    "Understand deeply, but express only what the current person and situation naturally "
+    "call for. Internal execution facts remain available to reasoning and logs without "
+    "becoming ordinary spoken narration. "
+)
+
 
 
 __all__ = [
     "IDENTITY_SEMANTIC_CONTRACT",
     "bounded_identity_json",
+    "bounded_personality_json",
     "owner_approved_identity_context",
+    "owner_approved_personality_context",
+    "PERSONALITY_SEMANTIC_CONTRACT",
 ]

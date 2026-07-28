@@ -29,6 +29,19 @@ logger = logging.getLogger("chromie.agent.tool_result_interpreter")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_])[-+]?\d+(?:\.\d+)?")
 _SENTENCE_END_RE = re.compile(r"[.!?。！？]+")
 
+_INTERNAL_NARRATION_MARKERS = (
+    "请求的任务",
+    "任务已完成",
+    "观测结果",
+    "执行状态",
+    "requested task",
+    "task completed",
+    "observed output",
+    "execution status",
+    "tool result",
+    "evidence id",
+)
+
 
 class ToolResultModelOutput(BaseModel):
     """Small model-facing DTO. Evidence identity and validation remain trusted."""
@@ -160,30 +173,39 @@ class ToolResultInterpreter:
             }
             for item in request.evidence
         ]
+        personality = request.context.get("personality_expression") or {}
+        identity = request.context.get("identity") or {}
         return (
-            "Interpret trusted tool results for a spoken robot answer.\n"
+            "Interpret trusted tool results as Chromie's natural spoken answer.\n"
             f"User request: {request.user_request}\n"
             f"Target language: {request.language}\n"
+            f"Chromie identity JSON: {self._bounded(identity, 2200)}\n"
+            f"Chromie personality JSON: {self._bounded(personality, 4200)}\n"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
-            f"Conversation hints JSON: {self._bounded(request.context, 1800)}\n\n"
-            "First infer what information the user actually needs. Choose answer_mode=direct "
+            f"Conversation hints JSON: {self._bounded(request.context, 2600)}\n\n"
+            "First understand the exact question the user asked. Choose answer_mode=direct "
             "for a narrow question, summary for a normal overview, and detailed only when the "
-            "user explicitly asks for detail. Select only the exact evidence fields needed to "
-            "support the answer and cite each with evidence_id plus an RFC 6901 JSON Pointer. "
-            "Then write a natural spoken answer. Do not enumerate every retrieved field, dump "
-            "payloads, mention JSON, tools, providers, evidence IDs, internal processing, or "
-            "unrequested metadata. Answer the question first; for yes/no, qualitative, comparative, or decision-shaped requests, state the direct conclusion before the supporting measurements. Normally use one or two short "
-            "sentences and no more than three supporting facts. Preserve numbers and named "
-            "facts exactly. Conclusions may be phrased naturally but must be supported by the "
-            "selected facts. Return JSON only."
+            "user explicitly asks for detail. For a yes/no, qualitative, comparative, comfort, "
+            "or decision-shaped question, say the direct conclusion first. Then add only one or "
+            "two facts that actually help. Do not read every field. "
+            "Write as Chromie according to the owner-approved personality JSON. Let its "
+            "self_concept, traits, spoken style, answer style, tool-use style, and maturity "
+            "boundary shape the response naturally. Do not introduce Chromie unless the user "
+            "asked who she is. Keep internal execution and evidence language out of ordinary speech. "
+            "Select only the exact evidence fields needed to support the answer and cite each with "
+            "evidence_id plus an RFC 6901 JSON Pointer. Preserve numbers and named facts exactly. "
+            "Conclusions may be phrased naturally but must be supported by selected facts. Normally "
+            "use one short sentence; use a second sentence only when it adds something genuinely "
+            "useful. Return JSON only."
         )
 
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's tool-result interpreter. Tool output is evidence, not response text. "
-            "Select only relevant grounded facts and synthesize the shortest natural answer that "
-            "satisfies the user's request. Never invent facts or expose internal payload structure."
+            "You are Chromie's evidence-bound result interpreter. Tool output is trusted evidence, "
+            "not response text. Answer the original user question first, in Chromie's owner-approved "
+            "personality, with the fewest relevant grounded facts. Never invent facts "
+            "or expose internal workflow language."
         )
 
     @classmethod
@@ -232,6 +254,11 @@ class ToolResultInterpreter:
             raise ValueError("tool result spoken response exceeds the sentence budget")
         if any(token in response for token in ("{", "}", "[", "]")):
             raise ValueError("tool result spoken response looks like a raw payload")
+        if cls._contains_unrequested_internal_narration(
+            response,
+            user_request=request.user_request,
+        ):
+            raise ValueError("tool result response narrates internal execution state")
 
         folded = response.casefold()
         forbidden = {
@@ -288,12 +315,30 @@ class ToolResultInterpreter:
         return current
 
     @staticmethod
-    def _validated_fallback(request: ToolResultInterpretationRequest) -> str:
+    def _contains_unrequested_internal_narration(
+        text: str,
+        *,
+        user_request: str,
+    ) -> bool:
+        folded = text.casefold()
+        request_folded = user_request.casefold()
+        return any(
+            marker in folded and marker not in request_folded
+            for marker in _INTERNAL_NARRATION_MARKERS
+        )
+
+    @classmethod
+    def _validated_fallback(cls, request: ToolResultInterpretationRequest) -> str:
         text = " ".join(request.fallback_response.strip().split())
         if not text or len(text) > request.max_spoken_chars:
             return ""
         sentence_count = max(1, len(_SENTENCE_END_RE.findall(text)))
         if sentence_count > request.max_sentences:
+            return ""
+        if cls._contains_unrequested_internal_narration(
+            text,
+            user_request=request.user_request,
+        ):
             return ""
         return text
 

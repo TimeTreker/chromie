@@ -117,7 +117,7 @@ class BaseAgent(ABC):
                 "presence": "natural, warm, person-like conversational presence",
                 "foreground": [
                     "name",
-                    "robot identity age for direct self-introduction or age questions",
+                    "identity age for direct self-introduction or age questions",
                     "personality",
                     "current relationship and context",
                 ],

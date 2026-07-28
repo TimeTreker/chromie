@@ -171,9 +171,9 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(
             [item.text for item in response.speech],
             [
-                "The first requested task completed.",
-                "The second requested task failed.",
-                "The third requested task was cancelled.",
+                "The first one is done.",
+                "The second one did not work.",
+                "I stopped the third one.",
             ],
         )
 
@@ -195,13 +195,13 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(
             [item.text for item in response.speech],
             [
-                "第1个请求的任务已完成。",
-                "第2个请求的任务仅部分完成。",
-                "第3个请求的任务未能完成。",
-                "第4个请求的任务被拒绝执行。",
-                "第5个请求的任务执行超时。",
-                "第6个请求的任务已取消。",
-                "第7个请求的任务未执行。",
+                "第1件弄好啦。",
+                "第2件只弄好了一部分。",
+                "第3件没弄成。",
+                "第4件我不能做。",
+                "第5件等太久了。",
+                "第6件停下来啦。",
+                "第7件没有做。",
             ],
         )
         self.assertEqual(
@@ -219,6 +219,9 @@ class OutcomeResponseTests(unittest.TestCase):
                 "not_run",
             ],
         )
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertNotIn("请求的任务", spoken)
+        self.assertNotIn("观测结果", spoken)
 
     def test_all_uncompleted_mixture_never_claims_partial_completion(self) -> None:
         statuses = [
@@ -239,8 +242,8 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(
             [item.text for item in response.speech],
             [
-                "The first requested task failed.",
-                "The second requested task timed out.",
+                "The first one did not work.",
+                "The second one took too long.",
             ],
         )
         self.assertNotIn(
@@ -261,7 +264,7 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(bundle.aggregate_status, "failed")
         self.assertEqual(
             response.speech[0].text,
-            "The requested task failed.",
+            "That did not work just now.",
         )
 
     def test_partial_wording_requires_real_completed_work(self) -> None:
@@ -274,7 +277,7 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(bundle.goal_outcomes[0].status, "partial")
         self.assertEqual(
             response.speech[0].text,
-            "The requested task was partially completed.",
+            "I only finished part of it.",
         )
 
     def test_uses_only_available_model_observation_for_provider_output(self) -> None:
@@ -296,7 +299,7 @@ class OutcomeResponseTests(unittest.TestCase):
 
         self.assertEqual(
             conservative.speech[0].text,
-            "The requested task completed.",
+            "Done.",
         )
         self.assertNotIn("28", conservative.speech[0].text)
 
@@ -314,14 +317,37 @@ class OutcomeResponseTests(unittest.TestCase):
         self.assertEqual(
             observed.speech[0].text,
             (
-                "The requested task completed. "
-                "Observed output: It is raining in Beijing."
+                "It is raining in Beijing."
             ),
         )
         self.assertEqual(
             observed.speech[0].metadata["observed_evidence_ids"],
             ["evidence-1-1"],
         )
+
+    def test_structured_observation_is_not_rendered_as_a_host_report(self) -> None:
+        statuses = [("goal-weather", ["completed"])]
+        plan = _plan(statuses)
+        bundle = _bundle(
+            plan,
+            statuses,
+            observations={
+                "evidence-1-1": _observation(
+                    {
+                        "temperature_c": 36,
+                        "apparent_temperature_c": 41,
+                        "condition": "雷雨",
+                    }
+                )
+            },
+        )
+
+        response = compose_outcome_response(bundle, plan, "zh-CN")
+
+        self.assertEqual(response.speech[0].text, "我刚才没看明白。")
+        self.assertNotIn("36", response.speech[0].text)
+        self.assertNotIn("观测结果", response.speech[0].text)
+        self.assertEqual(response.metadata["source"], "deterministic_outcome_fallback")
 
     def test_does_not_speak_internal_identifiers_from_observation(self) -> None:
         statuses = [("goal-weather", ["completed"])]
@@ -345,7 +371,7 @@ class OutcomeResponseTests(unittest.TestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "The requested task completed.",
+            "I could not make sense of that just now.",
         )
         self.assertNotIn("goal-weather", response.speech[0].text)
         self.assertNotIn("plan-post-execution", response.speech[0].text)

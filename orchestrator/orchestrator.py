@@ -2276,6 +2276,7 @@ class VoiceAssistant:
         identity_json = self._direct_llm_identity_json()
         speaker_name = self._direct_llm_speaker_name()
         self_model_json = self._direct_llm_self_model_json()
+        personality_json = self._direct_llm_personality_json()
         context_json = self._direct_llm_context_json(session_id)
         fallback_line = (
             f"Direct fallback reason: {fallback_reason}."
@@ -2288,12 +2289,14 @@ class VoiceAssistant:
             "Use the supplied owner-approved identity and self model as the ontology for the speaking entity.\n"
             f"Owner-approved identity JSON: {identity_json}\n"
             f"Self model JSON: {self_model_json}\n"
+            f"Personality expression JSON: {personality_json}\n"
             "Owner-approved mind summary:\n"
             f"{mind_summary}\n\n"
             "Response contract:\n"
             "- Generate first-person speech for self_model.speaker_entity.\n"
-            "- Follow self_model.social_presentation. When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age in unrelated conversation.\n"
-            "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners.\n"
+            "- Follow self_model.social_presentation and every field in personality_expression as the owner-approved positive voice model. Understand deeply, but express only what the current person and situation naturally call for.\n"
+            "- When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age or body category in unrelated conversation.\n"
+            "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners. Internal execution status, evidence labels, observation labels, and workflow narration belong in logs, not ordinary speech.\n"
             "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
             "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
             "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
@@ -2336,6 +2339,26 @@ class VoiceAssistant:
         if not isinstance(self_model, dict):
             self_model = {}
         return json.dumps(self_model, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+    def _direct_llm_personality_json(self) -> str:
+        try:
+            context = self.mind.context()
+            personality = (
+                context.get("personality_expression", {})
+                if isinstance(context, dict)
+                else {}
+            )
+        except Exception as exc:
+            logger.warning("direct_llm_personality_failed: %s", exc)
+            personality = {}
+        if not isinstance(personality, dict):
+            personality = {}
+        return json.dumps(
+            personality,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
 
     def _direct_llm_mind_summary(self) -> str:
         try:
@@ -6208,6 +6231,13 @@ class VoiceAssistant:
                 session_id=session_id,
             )
             if final_response is None:
+                self.session_log(
+                    session_id,
+                    "tool_result_spoken_interpretation_unavailable: "
+                    "aggregate=%s evidence=%s fallback=natural_exception_boundary",
+                    bundle.aggregate_status,
+                    len(bundle.evidence),
+                )
                 final_response = compose_outcome_response(
                     bundle,
                     plan,
@@ -6245,6 +6275,32 @@ class VoiceAssistant:
             goal_state_results=goal_state_results,
         )
         return delivery_status
+
+    @staticmethod
+    def _trusted_tool_result_fallback(
+        evidence: list[ToolResultEvidence],
+        *,
+        max_chars: int,
+    ) -> str:
+        """Return one provider-authored user summary for exceptional fallback only."""
+
+        explicit_fields = (
+            "user_summary",
+            "summary",
+            "answer",
+            "text",
+            "result_text",
+        )
+        for item in evidence:
+            for field in explicit_fields:
+                value = item.data.get(field)
+                if not isinstance(value, str):
+                    continue
+                text = " ".join(value.strip().split())
+                if not text:
+                    continue
+                return text[:max_chars].rstrip()
+        return ""
 
     async def _compose_evidence_bound_tool_result_response(
         self,
@@ -6303,13 +6359,24 @@ class VoiceAssistant:
             or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
             or "en-US"
         )
+        mind_manager = getattr(self, "mind", None)
+        mind_context = (
+            mind_manager.context()
+            if mind_manager is not None and hasattr(mind_manager, "context")
+            else {}
+        )
+        normal_char_budget = 72 if language.lower().startswith("zh") else 200
         interpretation_request = ToolResultInterpretationRequest(
             sid=str(session_id or ""),
             user_request=user_request,
             language=language,
             evidence=evidence,
-            max_spoken_chars=96 if language.lower().startswith("zh") else 240,
-            detailed_max_spoken_chars=320 if language.lower().startswith("zh") else 700,
+            fallback_response=self._trusted_tool_result_fallback(
+                evidence,
+                max_chars=normal_char_budget,
+            ),
+            max_spoken_chars=normal_char_budget,
+            detailed_max_spoken_chars=260 if language.lower().startswith("zh") else 620,
             max_sentences=2,
             detailed_max_sentences=5,
             context={
@@ -6318,6 +6385,16 @@ class VoiceAssistant:
                     {"goal_id": item.goal_id, "status": item.status}
                     for item in bundle.goal_outcomes
                 ],
+                "identity": mind_context.get("identity") or {},
+                "self_model": mind_context.get("self_model") or {},
+                "personality_expression": mind_context.get(
+                    "personality_expression"
+                )
+                or {},
+                "social_interaction_style": mind_context.get(
+                    "social_interaction_style"
+                )
+                or {},
             },
         )
         try:
@@ -8072,17 +8149,20 @@ class VoiceAssistant:
             },
         }
         timeout_s = self.runtime_ready_greeting_generation_timeout_ms / 1000.0
-        try:
+
+        async def request_greeting() -> dict[str, Any]:
             session = await self.get_http_session()
-            async with asyncio.timeout(timeout_s):
-                async with session.post(self.llm_url, json=payload) as response:
-                    body = await response.text()
-                    if response.status != 200:
-                        raise RuntimeError(
-                            f"runtime greeting model returned HTTP {response.status}: "
-                            f"{body[:300]}"
-                        )
-                    data = json.loads(body)
+            async with session.post(self.llm_url, json=payload) as response:
+                body = await response.text()
+                if response.status != 200:
+                    raise RuntimeError(
+                        f"runtime greeting model returned HTTP {response.status}: "
+                        f"{body[:300]}"
+                    )
+                return json.loads(body)
+
+        try:
+            data = await asyncio.wait_for(request_greeting(), timeout=timeout_s)
             generated = self.normalize_tts_candidate(data.get("response", ""))
             if not self.is_valid_tts_text(generated):
                 raise RuntimeError("runtime greeting model returned no valid spoken text")

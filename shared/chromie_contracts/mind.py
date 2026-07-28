@@ -82,11 +82,11 @@ class InternalComponent(BaseModel):
 
 
 class RobotIdentity(BaseModel):
-    """Owner-configured identity facts for the speaking robot entity.
+    """Owner-configured identity facts for Chromie as the speaking person.
 
-    Concrete values intentionally have no Python defaults.  They belong to the
-    active MindProfile JSON so an owner can change the robot identity without a
-    code change.
+    Concrete values intentionally have no Python defaults. They belong to the
+    active MindProfile JSON so an owner can change Chromie's identity without a
+    code change. The class name is retained for wire compatibility only.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -123,7 +123,7 @@ class RobotIdentity(BaseModel):
     def normalize_pronouns(cls, value: list[str]) -> list[str]:
         normalized = [_compact_text(item, limit=40) for item in value if item.strip()]
         if not normalized:
-            raise ValueError("robot identity pronouns must not be empty")
+            raise ValueError("identity pronouns must not be empty")
         return normalized
 
     @field_validator("internal_components")
@@ -139,6 +139,49 @@ class RobotIdentity(BaseModel):
             seen.add(component.component_id)
             normalized.append(component)
         return normalized
+
+
+class PersonalityExpression(BaseModel):
+    """Owner-approved positive guidance for Chromie's lived personality."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    owner_approved: bool = True
+    change_policy: Literal["owner_approval_required"] = "owner_approval_required"
+    self_concept: str = Field(min_length=1)
+    core_traits: list[str] = Field(min_length=1)
+    spoken_style: str = Field(min_length=1)
+    answer_style: str = Field(min_length=1)
+    tool_use_style: str = Field(min_length=1)
+    maturity_boundary: str = Field(min_length=1)
+    internal_language_boundary: str = Field(min_length=1)
+
+    @field_validator(
+        "self_concept",
+        "spoken_style",
+        "answer_style",
+        "tool_use_style",
+        "maturity_boundary",
+        "internal_language_boundary",
+    )
+    @classmethod
+    def normalize_guidance(cls, value: str) -> str:
+        return _compact_text(value, limit=900)
+
+    @field_validator("core_traits")
+    @classmethod
+    def normalize_traits(cls, value: list[str]) -> list[str]:
+        normalized = [_compact_text(item, limit=100) for item in value if str(item or "").strip()]
+        if not normalized:
+            raise ValueError("personality expression requires at least one trait")
+        return normalized
+
+    @field_validator("owner_approved")
+    @classmethod
+    def require_owner_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("personality expression must be owner-approved")
+        return value
 
 
 class SocialInteractionStyle(BaseModel):
@@ -275,13 +318,14 @@ class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.4.0"
+    version: str = "0.5.0"
     owner_approved: bool = True
     owner_approval_note: str = (
-        "Core principles and Social Interaction Style change only through human "
-        "owner review and commit."
+        "Identity, personality expression, core principles, and Social Interaction "
+        "Style change only through human owner review and commit."
     )
     identity: RobotIdentity
+    personality_expression: PersonalityExpression
     social_interaction_style: SocialInteractionStyle = Field(
         default_factory=SocialInteractionStyle
     )
@@ -328,7 +372,7 @@ class MindProfile(BaseModel):
                 "presence": "natural, warm, person-like conversational presence",
                 "foreground": [
                     "name",
-                    "robot identity age for direct self-introduction or age questions",
+                    "age for direct self-introduction or age questions",
                     "personality",
                     "current relationship and context",
                 ],
@@ -375,6 +419,7 @@ class MindProfile(BaseModel):
                 exclude={"model_identity_boundary", "internal_components"},
             ),
             "self_model": self.self_model(),
+            "personality_expression": self.personality_expression.model_dump(mode="json"),
             "social_interaction_style": self.social_interaction_style.model_dump(
                 mode="json"
             ),
@@ -395,9 +440,9 @@ class MindProfile(BaseModel):
             f"- gender: {self.identity.gender}",
             f"- pronouns: {', '.join(self.identity.pronouns)}",
             f"- natural social self-reference: {self.identity.name}",
-            f"- owner-approved robot identity age: {self.identity.age_description}",
+            f"- owner-approved age: {self.identity.age_description}",
             f"- identity-answer guidance: {self.identity.identity_answer_guidance}",
-            "- direct identity, name, age, or self-introduction requests foreground the owner-approved name and robot identity age; unrelated conversation does not volunteer age",
+            "- direct identity, name, age, or self-introduction requests foreground the owner-approved name and age; unrelated conversation does not volunteer age",
             "- system category, embodiment category, and internal architecture remain background context",
             "- internal components: "
             + "; ".join(
@@ -405,6 +450,12 @@ class MindProfile(BaseModel):
                 f"speaker_entity={item.speaker_entity}; body_owner={item.body_owner})"
                 for item in self.identity.internal_components
             ),
+            "Personality expression, owner-approved: "
+            + self.personality_expression.self_concept
+            + " Traits: "
+            + ", ".join(self.personality_expression.core_traits)
+            + ". Spoken style: "
+            + self.personality_expression.spoken_style,
             (
                 f"Social interaction style, owner-approved preset={self.social_interaction_style.preset}: "
                 "bounded courtesy; proportional expressiveness; limited initiative; "

@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.app.tool_result_interpreter import ToolResultInterpreter
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.mind import MindManager
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     ExecutionOutcomeBundle,
@@ -13,6 +14,7 @@ from shared.chromie_contracts.execution_outcome import (
     ModelObservation,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
 from shared.chromie_contracts.tool_result import (
@@ -60,6 +62,12 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
             ],
             fallback_response=fallback,
             max_spoken_chars=48,
+            context={
+                "identity": default_mind_profile().prompt_context()["identity"],
+                "personality_expression": default_mind_profile().prompt_context()[
+                    "personality_expression"
+                ],
+            },
         )
 
     async def test_selects_only_relevant_facts_and_keeps_complete_evidence(self) -> None:
@@ -90,6 +98,9 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.metadata["full_tool_result_retained"])
         self.assertNotIn("wind_speed", result.spoken_response)
         self.assertIn("Interpret trusted tool results", ollama.prompts[0])
+        self.assertIn("owner-approved personality JSON", ollama.prompts[0])
+        self.assertIn("Answer the user's actual question first", ollama.prompts[0])
+        self.assertNotIn("customer-service", result.spoken_response)
 
     async def test_rejects_unselected_numeric_claim_and_uses_bounded_fallback(self) -> None:
         ollama = _ScriptedOllama(
@@ -113,6 +124,27 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "fallback")
         self.assertEqual(result.spoken_response, "重庆很热，现在37℃，体感42℃。")
+
+    async def test_rejects_internal_workflow_narration(self) -> None:
+        ollama = _ScriptedOllama(
+            {
+                "spoken_response": "请求的任务已完成。观测结果是37℃。",
+                "answer_mode": "direct",
+                "selected_facts": [
+                    {
+                        "evidence_id": "weather-result",
+                        "json_pointer": "/temperature_c",
+                    }
+                ],
+                "confidence": 0.9,
+                "rationale": "",
+            }
+        )
+
+        result = await ToolResultInterpreter(ollama).interpret(self._request())
+
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(result.spoken_response, "")
 
     async def test_rejects_unknown_fact_pointer(self) -> None:
         ollama = _ScriptedOllama(
@@ -241,6 +273,7 @@ class ToolResultHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
         )
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.agent_client = _FakeToolResultAgentClient()
+        assistant.mind = MindManager(default_mind_profile())
         assistant.tool_result_interpreter_timeout_ms = 5500
         assistant.session_log = lambda *args, **kwargs: None
 
@@ -269,6 +302,14 @@ class ToolResultHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
             3,
         )
         self.assertTrue(response.metadata["full_tool_result_retained"])
+        self.assertIn(
+            "smart",
+            assistant.agent_client.request.context["personality_expression"][
+                "core_traits"
+            ],
+        )
+        self.assertEqual(assistant.agent_client.request.max_spoken_chars, 72)
+        self.assertEqual(assistant.agent_client.request.max_sentences, 2)
 
 
 if __name__ == "__main__":

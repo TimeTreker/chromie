@@ -10,7 +10,12 @@ from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationErr
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
-from .cognitive_identity import IDENTITY_SEMANTIC_CONTRACT, bounded_identity_json
+from .cognitive_identity import (
+    IDENTITY_SEMANTIC_CONTRACT,
+    PERSONALITY_SEMANTIC_CONTRACT,
+    bounded_identity_json,
+    bounded_personality_json,
+)
 from .schema import AgentRunRequest
 
 try:
@@ -657,12 +662,14 @@ class ResponseComposerResolver:
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
+        personality_json = bounded_personality_json(context)
         return (
             f"User turn:\n{request.text}\n\n"
             f"Language hint: {request.language or 'auto'}\n\n"
             f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
-            f"Owner-approved robot identity JSON:\n{identity_json}\n\n"
+            f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
+            f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 6000)}\n\n"
             f"Pending execution capability semantics JSON:\n{self._bounded(context.get('execution_capabilities') or [], 3000)}\n\n"
             f"Recent conversation JSON:\n{self._bounded((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
@@ -676,11 +683,12 @@ class ResponseComposerResolver:
             "Compose one ResponsePlan and, only when socially useful, an optional SocialAttentionPlan that coordinates language expression and body expression under one scene-specific purpose. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. Recent trusted tool evidence and conversation context may ground a respond outcome or conversational repair, but never claim facts absent from that evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
+            f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "The explicit Language hint is authoritative for spoken output unless the user explicitly asks for translation or a different language. When it is zh-CN, speak Chinese only; do not mirror a bilingual greeting, switch to English, or follow the language of identity/internal context. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. "
             "For execute plans this is pre-execution composition: emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech as a short natural acknowledgement of what will be checked or done. "
-            "For a pending safe_read or external_read capability, acknowledge only that information will be checked. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
+            "For a pending safe_read or external_read capability, use one short everyday acknowledgement that names what Chromie is looking at, such as the weather forecast for the requested place. Do not say generic phrases such as checking related information, and do not mention tools, APIs, workflow, or execution. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires no SocialAttentionPlan and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style semantically; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "

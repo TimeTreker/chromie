@@ -114,6 +114,129 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(assistant.next_playback_order, 1)
 
+    async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_model = "qwen3:4b"
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.ollama_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
+            assistant,
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm and curious",
+            assistant,
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps({"response": "早上好，我醒啦！"})
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                self.url = url
+                self.payload = json
+                return FakeResponse()
+
+        session = FakeSession()
+
+        async def get_http_session(self: VoiceAssistant) -> FakeSession:
+            del self
+            return session
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+
+        original_timeout = getattr(asyncio, "timeout", None)
+        if hasattr(asyncio, "timeout"):
+            delattr(asyncio, "timeout")
+        try:
+            text, source = await assistant._generate_runtime_ready_greeting()
+        finally:
+            if original_timeout is not None:
+                setattr(asyncio, "timeout", original_timeout)
+
+        self.assertEqual(text, "早上好，我醒啦！")
+        self.assertEqual(source, "llm:qwen3:4b")
+        self.assertEqual(session.url, assistant.llm_url)
+        self.assertEqual(session.payload["model"], "qwen3:4b")
+
+    async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_model = "qwen3:4b"
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant.runtime_ready_greeting_num_predict = 64
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1
+        assistant.ollama_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
+            assistant,
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm and curious",
+            assistant,
+        )
+
+        class SlowResponse:
+            status = 200
+
+            async def __aenter__(self) -> "SlowResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                await asyncio.sleep(1)
+                return json.dumps({"response": "不应该返回"})
+
+        class SlowSession:
+            def post(self, url: str, json: dict[str, Any]) -> SlowResponse:
+                del url, json
+                return SlowResponse()
+
+        async def get_http_session(self: VoiceAssistant) -> SlowSession:
+            del self
+            return SlowSession()
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(source, "fallback")
+
     async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_text = ""
@@ -1094,7 +1217,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"entity_id":"chromie"', prompt)
         self.assertIn('"social_presentation"', prompt)
         self.assertIn('"self_reference":"Chromie"', prompt)
-        self.assertIn('"kind":"embodied robot"', prompt)
+        self.assertIn('"kind":"person"', prompt)
+        self.assertIn("Personality expression JSON", prompt)
+        self.assertIn('"answer_style"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn('"component_id":"language_reasoner"', prompt)
         self.assertIn('"speaker_entity":false', prompt)

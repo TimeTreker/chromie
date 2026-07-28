@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-import re
 from typing import Any
 
 from shared.chromie_contracts.execution_outcome import (
@@ -20,25 +18,26 @@ from shared.chromie_contracts.response_composition import (
 )
 
 
-_ENGLISH_STATUS_SUFFIX = {
-    "completed": "completed.",
-    "partial": "was partially completed.",
-    "failed": "failed.",
-    "refused": "was refused.",
-    "timed_out": "timed out.",
-    "cancelled": "was cancelled.",
-    "not_run": "did not run.",
+_ENGLISH_STATUS_TEXT = {
+    "completed": "Done.",
+    "partial": "I only finished part of it.",
+    "failed": "That did not work just now.",
+    "refused": "I cannot do that.",
+    "timed_out": "That took too long just now.",
+    "cancelled": "I stopped.",
+    "not_run": "I did not do that.",
 }
 
-_CHINESE_STATUS_SUFFIX = {
-    "completed": "已完成。",
-    "partial": "仅部分完成。",
-    "failed": "未能完成。",
-    "refused": "被拒绝执行。",
-    "timed_out": "执行超时。",
-    "cancelled": "已取消。",
-    "not_run": "未执行。",
+_CHINESE_STATUS_TEXT = {
+    "completed": "好啦。",
+    "partial": "刚才只弄好了一部分。",
+    "failed": "刚才没成功。",
+    "refused": "这个我不能做。",
+    "timed_out": "刚才等太久了。",
+    "cancelled": "已经停下来啦。",
+    "not_run": "刚才没有做。",
 }
+
 
 _ENGLISH_ORDINALS = (
     "first",
@@ -59,30 +58,15 @@ _EXPLICIT_OBSERVATION_FIELDS = (
     "answer",
     "text",
     "result_text",
-    "result",
 )
 
-_INTERNAL_KEY_PARTS = frozenset(
-    {
-        "credential",
-        "evidence",
-        "goal",
-        "interaction",
-        "password",
-        "plan",
-        "provider",
-        "request",
-        "secret",
-        "skill",
-        "step",
-        "token",
-        "trace",
-        "turn",
-    }
-)
+_INTERPRETATION_UNAVAILABLE_TEXT = {
+    "zh": "我刚才没看明白。",
+    "en": "I could not make sense of that just now.",
+}
 
 _MAX_OBSERVATION_TEXT = 240
-_MAX_OBSERVATION_FIELDS = 3
+
 
 
 def compose_outcome_response(
@@ -90,12 +74,12 @@ def compose_outcome_response(
     plan: CanonicalPlan,
     language: str,
 ) -> InteractionResponse:
-    """Compose one deterministic, speech-only response from trusted outcomes.
+    """Compose an exceptional natural-language fallback from trusted outcomes.
 
-    This is a conservative fallback boundary, not a semantic planner. It
-    validates the bundle against the immutable canonical plan, emits exactly
-    one speech item for each executable goal in canonical order, and never
-    treats provider messages or missing observations as user-facing output.
+    Normal post-execution speech belongs to the evidence-bound LLM interpreter.
+    This boundary exists only when that interpreter is unavailable. It validates
+    immutable correlations and may expose one trusted provider-authored summary,
+    but never narrates internal task status, evidence, or observation labels.
     """
 
     bundle, plan = _validated_inputs(bundle, plan)
@@ -115,7 +99,11 @@ def compose_outcome_response(
     goal_count = len(executable_goal_ids)
     for index, goal_id in enumerate(executable_goal_ids, start=1):
         outcome = outcomes_by_goal[goal_id]
-        observation_text, observed_evidence_ids = _goal_observation_text(
+        (
+            observation_text,
+            observed_evidence_ids,
+            had_available_observation,
+        ) = _goal_observation_text(
             outcome=outcome,
             evidence_by_id=evidence_by_id,
             internal_ids=internal_ids,
@@ -131,8 +119,11 @@ def compose_outcome_response(
             text = _append_observation(
                 text,
                 observation_text,
+                status=outcome.status,
                 chinese=chinese,
             )
+        elif outcome.status == "completed" and had_available_observation:
+            text = _INTERPRETATION_UNAVAILABLE_TEXT["zh" if chinese else "en"]
 
         speech_id = f"speech_outcome_{bundle_fingerprint[:12]}_{index}"
         speech.append(
@@ -144,7 +135,7 @@ def compose_outcome_response(
                 priority="normal",
                 interruptible=True,
                 metadata={
-                    "source": "deterministic_outcome_response",
+                    "source": "deterministic_outcome_fallback",
                     "phase": "post_execution",
                     "wait_for_playback_start": True,
                     "playback_start_required_for_delivery": True,
@@ -186,7 +177,7 @@ def compose_outcome_response(
             else f"post_execution_{bundle.aggregate_status}"
         ),
         metadata={
-            "source": "deterministic_outcome_response",
+            "source": "deterministic_outcome_fallback",
             "phase": "post_execution",
             "language": language,
             "canonical_plan_id": plan.plan_id,
@@ -303,9 +294,15 @@ def _goal_observation_text(
     evidence_by_id: dict[str, ExecutionEvidence],
     internal_ids: set[str],
     chinese: bool,
-) -> tuple[str, list[str]]:
-    snippets: list[str] = []
-    observed_evidence_ids: list[str] = []
+) -> tuple[str, list[str], bool]:
+    """Return only an explicitly provider-authored user summary.
+
+    Structured observations remain complete in the outcome bundle and logs. The
+    exceptional deterministic fallback must not convert arbitrary fields into a
+    spoken report; relevance and phrasing belong to the LLM interpreter.
+    """
+
+    had_available_observation = False
     for evidence_id in outcome.evidence_ids:
         evidence = evidence_by_id[evidence_id]
         observation = evidence.observation
@@ -316,21 +313,18 @@ def _goal_observation_text(
             or not observation.data
         ):
             continue
-        snippet = _render_observation_data(
+        had_available_observation = True
+        text = _explicit_user_summary(
             observation.data,
             internal_ids=internal_ids,
             chinese=chinese,
         )
-        if not snippet or snippet in snippets:
-            continue
-        snippets.append(snippet)
-        observed_evidence_ids.append(evidence_id)
-        if len(snippets) >= _MAX_OBSERVATION_FIELDS:
-            break
-    return "; ".join(snippets), observed_evidence_ids
+        if text:
+            return text, [evidence_id], True
+    return "", [], had_available_observation
 
 
-def _render_observation_data(
+def _explicit_user_summary(
     data: dict[str, Any],
     *,
     internal_ids: set[str],
@@ -346,28 +340,7 @@ def _render_observation_data(
         )
         if text:
             return text
-
-    rendered: list[str] = []
-    for raw_key in sorted(data, key=lambda item: str(item).casefold()):
-        key = _normalize_text(str(raw_key))
-        key_parts = set(re.split(r"[^a-z0-9]+", key.casefold()))
-        if not key or key_parts.intersection(_INTERNAL_KEY_PARTS):
-            continue
-        value = _safe_scalar_text(
-            data[raw_key],
-            internal_ids=internal_ids,
-            chinese=chinese,
-        )
-        if not value:
-            continue
-        label = _normalize_text(re.sub(r"[_-]+", " ", key))
-        if key.casefold() in {"output", "result", "value"}:
-            rendered.append(value)
-        else:
-            rendered.append(f"{label}: {value}")
-        if len(rendered) >= _MAX_OBSERVATION_FIELDS:
-            break
-    return "; ".join(rendered)
+    return ""
 
 
 def _safe_scalar_text(
@@ -376,19 +349,10 @@ def _safe_scalar_text(
     internal_ids: set[str],
     chinese: bool,
 ) -> str:
-    if isinstance(value, bool):
-        text = "是" if chinese and value else "否" if chinese else "yes" if value else "no"
-    elif isinstance(value, int):
-        text = str(value)
-    elif isinstance(value, float):
-        if not math.isfinite(value):
-            return ""
-        text = str(value)
-    elif isinstance(value, str):
-        text = _normalize_text(value)
-    else:
+    del chinese
+    if not isinstance(value, str):
         return ""
-
+    text = _normalize_text(value)
     if not text:
         return ""
     folded = text.casefold()
@@ -442,35 +406,57 @@ def _status_text(
     count: int,
     chinese: bool,
 ) -> str:
-    if chinese:
-        subject = "请求的任务" if count == 1 else f"第{index}个请求的任务"
-        return subject + _CHINESE_STATUS_SUFFIX[status]
-
+    base = (
+        _CHINESE_STATUS_TEXT[status]
+        if chinese
+        else _ENGLISH_STATUS_TEXT[status]
+    )
     if count == 1:
-        subject = "The requested task"
-    elif index <= len(_ENGLISH_ORDINALS):
-        subject = f"The {_ENGLISH_ORDINALS[index - 1]} requested task"
-    else:
-        subject = f"Requested task {index}"
-    return f"{subject} {_ENGLISH_STATUS_SUFFIX[status]}"
+        return base
+
+    if chinese:
+        templates = {
+            "completed": f"第{index}件弄好啦。",
+            "partial": f"第{index}件只弄好了一部分。",
+            "failed": f"第{index}件没弄成。",
+            "refused": f"第{index}件我不能做。",
+            "timed_out": f"第{index}件等太久了。",
+            "cancelled": f"第{index}件停下来啦。",
+            "not_run": f"第{index}件没有做。",
+        }
+        return templates[status]
+
+    label = (
+        _ENGLISH_ORDINALS[index - 1]
+        if index <= len(_ENGLISH_ORDINALS)
+        else f"number {index}"
+    )
+    templates = {
+        "completed": f"The {label} one is done.",
+        "partial": f"I only finished part of the {label} one.",
+        "failed": f"The {label} one did not work.",
+        "refused": f"I cannot do the {label} one.",
+        "timed_out": f"The {label} one took too long.",
+        "cancelled": f"I stopped the {label} one.",
+        "not_run": f"I did not do the {label} one.",
+    }
+    return templates[status]
 
 
 def _append_observation(
     status_text: str,
     observation_text: str,
     *,
+    status: str,
     chinese: bool,
 ) -> str:
-    if chinese:
-        suffix = observation_text
-        if suffix[-1:] not in {"。", "！", "？"}:
-            suffix += "。"
-        return f"{status_text}观测结果：{suffix}"
-
     suffix = observation_text
-    if suffix[-1:] not in {".", "!", "?"}:
-        suffix += "."
-    return f"{status_text} Observed output: {suffix}"
+    endings = {"。", "！", "？"} if chinese else {".", "!", "?"}
+    if suffix[-1:] not in endings:
+        suffix += "。" if chinese else "."
+    if status == "completed":
+        return suffix
+    return f"{status_text}{suffix}"
 
 
 def _is_chinese(language: str) -> bool:

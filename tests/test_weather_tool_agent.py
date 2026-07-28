@@ -5,7 +5,12 @@ from typing import Any
 
 from agent.app.agents import AgentServices
 from agent.app.agents.tool import ToolAgent
-from agent.app.clients.weather_client import WeatherQuery, WeatherReport, format_weather_report
+from agent.app.clients.weather_client import (
+    WeatherQuery,
+    WeatherReport,
+    format_weather_brief,
+    format_weather_report,
+)
 from agent.app.schema import AgentResult, AgentRunRequest, RouteDecision
 from agent.app.tool_result_interpreter import ToolResultInterpreter
 
@@ -80,7 +85,8 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.queries[0].date, "today")
         self.assertEqual(len(result.speak_immediate), 1)
         self.assertIn("Chongqing", result.speak_immediate[0].text)
-        self.assertIn("35°C", result.speak_immediate[0].text)
+        self.assertIn("32°C", result.speak_immediate[0].text)
+        self.assertIn("feels like 36°C", result.speak_immediate[0].text)
         self.assertIn("tool_agent", result.handled_by)
 
     async def test_weather_tool_asks_for_location_when_missing(self) -> None:
@@ -132,7 +138,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(weather.queries[0].location, "重庆")
         self.assertIn("重庆今天", result.speak_immediate[0].text)
-        self.assertIn("35℃", result.speak_immediate[0].text)
+        self.assertIn("现在约32℃", result.speak_immediate[0].text)
 
     async def test_weather_tool_composes_a_direct_concise_answer_to_comfort_question(self) -> None:
         weather = _FakeWeatherClient()
@@ -141,12 +147,11 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         interpreter_ollama = _FakeOllama(
             {
-                "spoken_response": "很热，重庆现在约32℃，体感36℃，最高35℃。",
+                "spoken_response": "很热呀，现在约32℃，体感36℃。",
                 "answer_mode": "direct",
                 "selected_facts": [
                     {"evidence_id": "weather_turn", "json_pointer": "/current_temperature_c"},
                     {"evidence_id": "weather_turn", "json_pointer": "/apparent_temperature_c"},
-                    {"evidence_id": "weather_turn", "json_pointer": "/daily_high_c"},
                 ],
                 "confidence": 0.96,
                 "rationale": "The user asked whether it is hot.",
@@ -162,6 +167,21 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         request = AgentRunRequest(
             text="今天重庆天热不热？",
             language="zh-CN",
+            context={
+                "mind": {
+                    "owner_approved": True,
+                    "identity": {
+                        "entity_id": "chromie",
+                        "name": "Chromie",
+                        "kind": "person",
+                    },
+                    "personality_expression": {
+                        "owner_approved": True,
+                        "core_traits": ["smart", "curious", "playful"],
+                        "answer_style": "Answer directly, then add one or two useful details.",
+                    },
+                }
+            },
             route_decision=RouteDecision(
                 route="tool",
                 intent="weather_query",
@@ -183,12 +203,14 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "很热，重庆现在约32℃，体感36℃，最高35℃。",
+            "很热呀，现在约32℃，体感36℃。",
         )
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(len(interpreter_ollama.prompts), 1)
-        self.assertIn("infer what information the user actually needs", interpreter_ollama.prompts[0])
+        self.assertIn("First understand the exact question the user asked", interpreter_ollama.prompts[0])
         self.assertIsInstance(interpreter_ollama.response_formats[0], dict)
+        self.assertIn("Chromie personality JSON", interpreter_ollama.prompts[0])
+        self.assertIn("playful", interpreter_ollama.prompts[0])
         self.assertEqual(result.metadata["tool_result_interpretation"]["answer_mode"], "direct")
         self.assertEqual(len(result.metadata["tool_results"]), 1)
 
@@ -229,7 +251,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await agent.run(request, AgentResult())
         speech = result.speak_immediate[0].text
 
-        self.assertEqual(speech, "重庆今天小雨，现在32℃，体感36℃，最高35℃。")
+        self.assertEqual(speech, "重庆今天小雨，现在约32℃，体感约36℃。")
         self.assertLessEqual(len(speech), 36)
         self.assertNotIn("降水概率", speech)
         self.assertNotIn("风速", speech)
@@ -281,12 +303,35 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "重庆今天小雨，现在32℃，体感36℃，最高35℃。",
+            "重庆今天小雨，现在约32℃，体感约36℃。",
         )
 
 
 
 class WeatherFormattingTests(unittest.TestCase):
+    def test_format_weather_brief_keeps_exception_fallback_short(self) -> None:
+        report = WeatherReport(
+            location_name="重庆",
+            country="中国",
+            timezone="Asia/Shanghai",
+            date="2026-07-08",
+            current_temperature_c=31.9,
+            apparent_temperature_c=35.2,
+            daily_high_c=34.8,
+            daily_low_c=27.6,
+            precipitation_probability_max=55,
+            precipitation_sum_mm=3.4,
+            weather_code=63,
+            wind_speed_kmh=8.2,
+        )
+
+        text = format_weather_brief(report, language="zh-CN")
+
+        self.assertEqual(text, "重庆今天中雨，现在约32℃，体感约35℃。")
+        self.assertNotIn("最高", text)
+        self.assertNotIn("降水概率", text)
+        self.assertNotIn("风速", text)
+
     def test_format_weather_report_zh(self) -> None:
         report = WeatherReport(
             location_name="重庆",

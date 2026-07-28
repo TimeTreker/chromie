@@ -27,11 +27,11 @@ class MindProfileTests(unittest.TestCase):
 
         self.assertTrue(profile.owner_approved)
         self.assertEqual(profile.identity.name, "Chromie")
-        self.assertEqual(profile.identity.kind, "embodied robot")
+        self.assertEqual(profile.identity.kind, "person")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.4.0")
-        self.assertIn("keep people company", profile.identity.short_self_description)
+        self.assertEqual(profile.version, "0.5.0")
+        self.assertIn("smart, curious, warm", profile.identity.short_self_description)
         self.assertIn("internal components", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)
         self.assertIn(
@@ -60,6 +60,11 @@ class MindProfileTests(unittest.TestCase):
         self.assertTrue(
             context["social_interaction_style"]["owner_approved"]
         )
+        self.assertTrue(context["personality_expression"]["owner_approved"])
+        self.assertIn("smart", context["personality_expression"]["core_traits"])
+        self.assertIn("six-year-old girl", context["personality_expression"]["self_concept"])
+        self.assertIn("question first", context["personality_expression"]["answer_style"])
+        self.assertIn("logs and memory", context["personality_expression"]["internal_language_boundary"])
         self.assertIn(
             "explicit user action",
             context["social_interaction_style"]["restraint"],
@@ -105,9 +110,9 @@ class MindProfileTests(unittest.TestCase):
             payload["profile_id"] = "owner_custom_identity"
             payload["identity"]["name"] = "Nova"
             payload["identity"]["age_description"] = "3 years old"
-            payload["identity"]["short_self_description"] = "I'm Nova, a 3-year-old companion robot."
+            payload["identity"]["short_self_description"] = "I'm Nova. I'm three years old and I like learning with people."
             payload["identity"]["identity_answer_guidance"] = (
-                "Use the configured name Nova and robot identity age 3 years old for direct identity questions."
+                "Use the configured name Nova and age 3 years old for direct identity questions."
             )
             path.write_text(json.dumps(payload), encoding="utf-8")
             with patch.dict(os.environ, {"ORCH_MIND_PROFILE_PATH": str(path)}, clear=False):
@@ -150,6 +155,7 @@ class MindProfileTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot be mutable by experience"):
             MindProfile(
                 identity=default_mind_profile().identity,
+                personality_expression=default_mind_profile().personality_expression,
                 core_principles=[
                     CorePrinciple(
                         principle_id="bad",

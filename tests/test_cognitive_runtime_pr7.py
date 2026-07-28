@@ -24,6 +24,7 @@ from orchestrator.runtime.skill_runtime import (
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import output_schema_sha256
+from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
@@ -268,6 +269,39 @@ def blink_definition(*, confirmation: bool = False) -> SkillDefinition:
         can_run_parallel=True,
         exclusive_group="eye_expression",
         metadata={"resource_claims": ["eye_expression"]},
+    )
+
+
+def weather_definition() -> SkillDefinition:
+    return SkillDefinition(
+        skill_id="chromie.weather.lookup",
+        provider_id="chromie.local",
+        description="Read the current weather forecast for a requested place.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"},
+                "date": {"type": "string"},
+            },
+            "required": ["location", "date"],
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "temperature_c": {"type": "number"},
+                "apparent_temperature_c": {"type": "number"},
+            },
+            "additionalProperties": False,
+        },
+        available=True,
+        requires_confirmation=False,
+        interruptible=True,
+        can_run_parallel=False,
+        metadata={
+            "safety_class": "safe_read",
+            "effects": ["read_only", "external_read", "weather_lookup"],
+        },
     )
 
 
@@ -650,6 +684,95 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ValueError, "execute goal outcomes must not carry response_text"
         ):
             CanonicalPlan.model_validate(goal_outcome_payload)
+
+    def test_safe_read_preserves_model_owned_specific_pre_action_speech(self):
+        plan = CanonicalPlan(
+            plan_id="plan-weather",
+            planner_tier="deep",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.96,
+            goal_ids=["goal-weather"],
+            goal_summary="Check whether Chongqing is hot today.",
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["weather"],
+                }
+            ],
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-weather",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                pre_action=ResponseStage(
+                    text="我看看重庆今天的天气。",
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.95,
+        )
+        mind = default_mind_profile().prompt_context(max_chars=5000)
+        user_turn_envelope = {
+            "turn_id": "turn-weather",
+            "normalized_input": {
+                "text": "今天重庆热不热呀？",
+                "language": "zh-CN",
+            },
+        }
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([weather_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-weather",
+                language="zh-CN",
+                context={
+                    "mind": mind,
+                    "user_turn_envelope": user_turn_envelope,
+                },
+            )
+        )
+
+        self.assertEqual(len(response.speech), 1)
+        self.assertEqual(response.speech[0].text, "我看看重庆今天的天气。")
+        self.assertNotIn("相关信息", response.speech[0].text)
+        self.assertEqual(
+            response.speech[0].metadata["operational_text_source"],
+            "llm_wording_runtime_validated",
+        )
+        self.assertEqual(
+            response.metadata["operational_speech_authority"],
+            "llm_wording_runtime_validated",
+        )
+        self.assertEqual(
+            response.metadata["user_turn_envelope"],
+            user_turn_envelope,
+        )
+        self.assertIn(
+            "smart",
+            response.metadata["personality_expression"]["core_traits"],
+        )
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_effects"]
+        )
 
     def test_effectful_pre_execution_keeps_one_grounded_speech_with_barrier(self):
         plan = execute_plan()

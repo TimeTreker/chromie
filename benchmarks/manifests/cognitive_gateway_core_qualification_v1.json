@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "qualification_id": "cognitive_gateway_core_entry_v1",
-  "description": "Source-bound live-text, active-cancellation, and simulator qualification for pre-Core admission, single Core authority, and conversational continuity.",
+  "description": "Source-bound live-text, active-cancellation, and simulator qualification for pre-Core admission, single Core authority, conversational continuity, and Chromie's owner-approved person identity and natural six-year-old voice.",
   "runtime_policy_authority": false,
   "release_qualified": false,
   "human_review_required": true,
@@ -43,6 +43,23 @@
         {
           "turn_key": "direct_question",
           "text": "Chromie, what can you do?",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "runtime_lane": "chat"
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "natural_self_identity",
+      "conversation_scope": "isolated",
+      "turns": [
+        {
+          "turn_key": "self_identity",
+          "text": "你好，你是谁呀？",
           "expect": {
             "gateway_admission": "admit",
             "core_entered": true,
@@ -122,7 +139,11 @@
       "direct_answer_quality",
       "tool_continuity_quality",
       "cancellation_feedback_quality",
-      "no_internal_contract_leakage"
+      "no_internal_contract_leakage",
+      "person_identity_consistency",
+      "age_appropriate_natural_voice",
+      "direct_answer_before_detail",
+      "no_internal_workflow_narration"
     ]
   }
 }

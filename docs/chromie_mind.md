@@ -6,7 +6,8 @@ Implemented as a structured context layer in the Orchestrator and shared
 contracts. The first version provides:
 
 - an owner-approved default mind profile loaded from `config/mind/chromie_default.json`;
-- an owner-approved structured self model for the speaking, perceiving, acting, and body-owning entity;
+- an owner-approved structured self model for Chromie as the speaking, perceiving, acting person;
+- an owner-approved Personality Expression for self-concept, age-appropriate speech, answer brevity, tool-use wording, and the boundary between internal logs and ordinary conversation;
 - an owner-approved Social Interaction Style for bounded courtesy,
   expressiveness, initiative, restraint, cooldown, and repetition guidance;
 - core principles that cannot be changed by experience;
@@ -41,13 +42,13 @@ Chromie's brain context has these layers:
 
 ## Owner-editable identity configuration
 
-Concrete robot identity values live in [`config/mind/chromie_default.json`](../config/mind/chromie_default.json). `RobotIdentity` in Python defines only required fields and validation; it does not supply a name, age, or self-description. The maintained runtime selects the JSON through:
+Concrete Chromie identity and personality values live in [`config/mind/chromie_default.json`](../config/mind/chromie_default.json). `RobotIdentity` in Python defines only required fields and validation; it does not supply a name, age, or self-description. The maintained runtime selects the JSON through:
 
 ```bash
 ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json
 ```
 
-An owner may change the configured name, robot identity age, pronouns, self-description, or identity-answer guidance without changing code. Increment the profile version and review the complete profile before retaining `owner_approved=true`.
+An owner may change the configured name, age, pronouns, self-description, identity-answer guidance, or personality expression without changing code. Increment the profile version and review the complete profile before retaining `owner_approved=true`.
 
 The Orchestrator turns the loaded profile into one bounded owner-approved identity snapshot. Goal Interpretation, Goal Association, Fast Planner, Deep Planner, Response Composer, conversation, and direct fallback prompts all receive that same snapshot. Models still infer whether a user is asking about identity and choose natural wording; the Host does not detect name or age questions with keywords or return a fixed answer.
 
@@ -86,7 +87,7 @@ calibration, limits, stop, and recovery.
 
 Prompt-facing robot planning is organized into context groups. This is the
 preferred shape for Goal Interpreter, capability-planning, conversation, and deepthinking
-prompts when they need robot identity, principles, session state, abilities, and
+prompts when they need Chromie identity, personality, principles, session state, abilities, and
 a strict output contract in one prompt.
 
 The group order is intentional:

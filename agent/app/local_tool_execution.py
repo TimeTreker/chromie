@@ -11,7 +11,7 @@ from .clients.weather_client import (
     WeatherLookupError,
     WeatherQuery,
     WeatherReport,
-    format_weather_report,
+    format_weather_brief,
     weather_code_text,
 )
 
@@ -171,7 +171,10 @@ def _weather_output(
         "precipitation_probability_max": report.precipitation_probability_max,
         "precipitation_sum_mm": report.precipitation_sum_mm,
         "wind_speed_kmh": report.wind_speed_kmh,
-        "summary": format_weather_report(report, language=language, units=units),
+        # This is an exceptional user-safe fallback.  The normal answer is
+        # composed later by the evidence-bound interpreter from the original
+        # question and the complete structured observation below.
+        "summary": format_weather_brief(report, language=language, units=units),
         "source": report.source,
     }
 

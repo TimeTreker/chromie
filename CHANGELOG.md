@@ -4,6 +4,32 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Internal truth, external humanity
+
+- Added an owner-approved `personality_expression` contract to the Mind Profile.
+  Chromie experiences herself as Chromie, a person and six-year-old girl; her
+  body and internal components remain truthful background facts rather than her
+  ordinary social identity. The active personality is smart, curious, warm,
+  simple, playful, innocent, and occasionally naive, with direct answers before
+  one or two useful details.
+- Propagated the same identity and personality projection through Goal
+  Association, Fast/Deep Planning, Response Composition, Tool Result
+  Interpretation, conversation, and direct fallback. Concrete personality values
+  remain owner-editable configuration rather than Python defaults.
+- Removed fixed safe-read acknowledgement sentences. Response Composer now owns
+  specific everyday pre-execution wording, while the Host validates that a real
+  read step exists and preserves the playback-before-effect barrier.
+- Changed post-execution delivery so the evidence-bound Tool Result Interpreter
+  answers the original user question from trusted observations. Complete outcome
+  bundles, status, evidence, and traces remain in logs and experience records, but
+  normal speech no longer announces task completion or observation labels.
+- Reduced the deterministic outcome formatter to an exceptional boundary. It may
+  use only an explicit provider-authored user summary; arbitrary structured fields
+  are never converted into a spoken report.
+- Extended Cognitive Gateway/Core qualification with a direct self-identity turn
+  and human-review gates for person-identity consistency, age-appropriate natural
+  voice, direct-answer-first behavior, and absence of internal workflow narration.
+
 ### Gemma 4 12B multimodal-core migration
 
 - Replaced the maintained `gemma4:26b` quality model with `gemma4:12b` for RTX
@@ -21,9 +47,9 @@ All notable user-visible changes should be recorded here.
   automatic-profile tests. This change prepares the model plan but does not yet
   implement the camera observation envelope.
 
-### Owner-editable robot identity and cognitive propagation
+### Owner-editable Chromie identity and cognitive propagation
 
-- Moved the maintained robot name, age, self-description, pronouns, internal-component boundary, and identity-answer guidance from Python defaults into `config/mind/chromie_default.json`, selected by `ORCH_MIND_PROFILE_PATH`.
+- Moved the maintained Chromie name, age, self-description, pronouns, internal-component boundary, and identity-answer guidance from Python defaults into `config/mind/chromie_default.json`, selected by `ORCH_MIND_PROFILE_PATH`.
 - Made `MindProfile.identity` required schema data and kept code responsible only for loading, validation, owner-approval boundaries, and prompt-safe projection.
 - Added one owner-approved identity context shared by Goal Interpretation, Goal Association, Fast Planner, Deep Planner, Response Composer, conversation fallback, and direct LLM fallback. Identity questions remain model-understood conversation rather than Host phrase rules.
 - Changed direct fallback speaker labeling to use the configured identity name instead of a hard-coded prompt suffix.

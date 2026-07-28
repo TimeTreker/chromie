@@ -852,7 +852,9 @@ class CanonicalPlanRuntimeAdapter:
         if safety_class == "safe_read" or (
             effects and effects.issubset(read_only_effects)
         ):
-            return "查询相关信息" if zh else "check the requested information"
+            raise ValueError(
+                "read-only pre-execution wording must come from Response Composer"
+            )
         count = args.get("count", 1)
         duration = args.get("duration_s")
 
@@ -942,6 +944,15 @@ class CanonicalPlanRuntimeAdapter:
             self.interaction_runtime.skill_definition(step.skill_id)
             for step in plan.steps
         ]
+        read_only = bool(definitions) and all(
+            str((definition.metadata or {}).get("safety_class") or "")
+            == "safe_read"
+            for definition in definitions
+        )
+        if read_only and not confirmation_required:
+            raise ValueError(
+                "read-only pre-execution wording must come from Response Composer"
+            )
         actions = [
             self._authoritative_step_text(
                 step,
@@ -950,17 +961,6 @@ class CanonicalPlanRuntimeAdapter:
             )
             for step, definition in zip(plan.steps, definitions)
         ]
-        read_only = bool(definitions) and all(
-            str((definition.metadata or {}).get("safety_class") or "")
-            == "safe_read"
-            for definition in definitions
-        )
-        if read_only and not confirmation_required:
-            return (
-                "我查一下相关信息。"
-                if zh
-                else "I'll check the requested information."
-            )
         if zh:
             if len(actions) == 1:
                 action_text = actions[0]
@@ -1061,6 +1061,7 @@ class CanonicalPlanRuntimeAdapter:
         )
         omitted_pre_execution_speech_phases: list[str] = []
         projected_speech_stages: list[dict[str, Any]] = []
+        read_only_plan = False
         if effectful_pre_execution:
             required_goal_ids = set(plan.goal_ids)
             immediate_item = (
@@ -1120,87 +1121,127 @@ class CanonicalPlanRuntimeAdapter:
                 if stage is not None and (phase, id(stage)) not in selected_keys
             ]
 
-            nonexecuting_goal_ids = required_goal_ids - executable_goal_ids
-            projected_nonexecuting_goal_ids: set[str] = set()
-            immediate_nonexecuting: list[dict[str, Any]] = []
-            pre_action_nonexecuting: list[dict[str, Any]] = []
-            for phase, stage in stage_items:
-                covered_nonexecuting = [
+            executable_definitions = [
+                self.interaction_runtime.skill_definition(step.skill_id)
+                for step in plan.steps
+            ]
+            read_only_plan = bool(executable_definitions) and all(
+                str((definition.metadata or {}).get("safety_class") or "")
+                == "safe_read"
+                for definition in executable_definitions
+            )
+            model_pre_execution = next(
+                (
+                    (phase, stage)
+                    for phase, stage in stage_items
+                    if stage is not None
+                    and required_goal_ids.issubset(set(stage.covers_goal_ids))
+                ),
+                None,
+            )
+
+            if (
+                read_only_plan
+                and not confirmation_goal_ids
+                and model_pre_execution is not None
+            ):
+                phase, stage = model_pre_execution
+                projected_speech_stages = [
+                    {
+                        "phase": phase,
+                        "text": stage.text,
+                        "speech_act": stage.speech_act,
+                        "commitment_state": stage.commitment_state,
+                        "must_not_claim_completion": True,
+                        "covers_goal_ids": list(stage.covers_goal_ids),
+                        "claims": stage.claims,
+                        "source": "goal_driven_response_composer",
+                        "operational_text_source": "llm_wording_runtime_validated",
+                        "runtime_confirmation_required": False,
+                    }
+                ]
+            else:
+                nonexecuting_goal_ids = required_goal_ids - executable_goal_ids
+                projected_nonexecuting_goal_ids: set[str] = set()
+                immediate_nonexecuting: list[dict[str, Any]] = []
+                pre_action_nonexecuting: list[dict[str, Any]] = []
+                for phase, stage in stage_items:
+                    covered_nonexecuting = [
+                        goal_id
+                        for goal_id in plan.goal_ids
+                        if goal_id in stage.covers_goal_ids
+                        and goal_id in nonexecuting_goal_ids
+                    ]
+                    if not covered_nonexecuting:
+                        continue
+                    text = self._authoritative_nonexecuting_text(
+                        plan,
+                        covered_nonexecuting,
+                        language=language,
+                    )
+                    if not text:
+                        raise ValueError(
+                            "effectful response cannot safely render non-executable "
+                            "goal outcomes from canonical state"
+                        )
+                    projected_nonexecuting_goal_ids.update(covered_nonexecuting)
+                    projected = {
+                        "phase": phase,
+                        "text": text,
+                        "speech_act": stage.speech_act,
+                        "commitment_state": stage.commitment_state,
+                        "must_not_claim_completion": True,
+                        "covers_goal_ids": covered_nonexecuting,
+                        "claims": [],
+                        "source": "goal_driven_canonical_outcome",
+                    }
+                    (
+                        immediate_nonexecuting
+                        if phase == "immediate"
+                        else pre_action_nonexecuting
+                    ).append(projected)
+
+                missing_nonexecuting = (
+                    nonexecuting_goal_ids - projected_nonexecuting_goal_ids
+                )
+                if missing_nonexecuting:
+                    raise ValueError(
+                        "effectful response projection lost non-executable goals: "
+                        + ",".join(sorted(missing_nonexecuting))
+                    )
+
+                ordered_executable_goal_ids = [
                     goal_id
                     for goal_id in plan.goal_ids
-                    if goal_id in stage.covers_goal_ids
-                    and goal_id in nonexecuting_goal_ids
+                    if goal_id in executable_goal_ids
                 ]
-                if not covered_nonexecuting:
-                    continue
-                text = self._authoritative_nonexecuting_text(
-                    plan,
-                    covered_nonexecuting,
-                    language=language,
-                )
-                if not text:
-                    raise ValueError(
-                        "effectful response cannot safely render non-executable "
-                        "goal outcomes from canonical state"
-                    )
-                projected_nonexecuting_goal_ids.update(covered_nonexecuting)
-                projected = {
-                    "phase": phase,
-                    "text": text,
-                    "speech_act": stage.speech_act,
-                    "commitment_state": stage.commitment_state,
+                projected_operational = {
+                    "phase": "pre_action",
+                    "text": self._authoritative_operational_text(
+                        plan,
+                        language=language,
+                        confirmation_required=bool(confirmation_goal_ids),
+                    ),
+                    "speech_act": (
+                        "request_confirmation"
+                        if confirmation_goal_ids
+                        else "acknowledge"
+                    ),
+                    "commitment_state": (
+                        "waiting_for_user" if confirmation_goal_ids else "accepted"
+                    ),
                     "must_not_claim_completion": True,
-                    "covers_goal_ids": covered_nonexecuting,
+                    "covers_goal_ids": ordered_executable_goal_ids,
                     "claims": [],
-                    "source": "goal_driven_canonical_outcome",
+                    "source": "goal_driven_runtime_authority",
+                    "operational_text_source": "runtime_authoritative_state",
+                    "runtime_confirmation_required": bool(confirmation_goal_ids),
                 }
-                (
-                    immediate_nonexecuting
-                    if phase == "immediate"
-                    else pre_action_nonexecuting
-                ).append(projected)
-
-            missing_nonexecuting = (
-                nonexecuting_goal_ids - projected_nonexecuting_goal_ids
-            )
-            if missing_nonexecuting:
-                raise ValueError(
-                    "effectful response projection lost non-executable goals: "
-                    + ",".join(sorted(missing_nonexecuting))
-                )
-
-            ordered_executable_goal_ids = [
-                goal_id
-                for goal_id in plan.goal_ids
-                if goal_id in executable_goal_ids
-            ]
-            projected_operational = {
-                "phase": "pre_action",
-                "text": self._authoritative_operational_text(
-                    plan,
-                    language=language,
-                    confirmation_required=bool(confirmation_goal_ids),
-                ),
-                "speech_act": (
-                    "request_confirmation"
-                    if confirmation_goal_ids
-                    else "acknowledge"
-                ),
-                "commitment_state": (
-                    "waiting_for_user" if confirmation_goal_ids else "accepted"
-                ),
-                "must_not_claim_completion": True,
-                "covers_goal_ids": ordered_executable_goal_ids,
-                "claims": [],
-                "source": "goal_driven_runtime_authority",
-                "operational_text_source": "runtime_authoritative_state",
-                "runtime_confirmation_required": bool(confirmation_goal_ids),
-            }
-            projected_speech_stages = [
-                *immediate_nonexecuting,
-                projected_operational,
-                *pre_action_nonexecuting,
-            ]
+                projected_speech_stages = [
+                    *immediate_nonexecuting,
+                    projected_operational,
+                    *pre_action_nonexecuting,
+                ]
         else:
             projected_speech_stages = [
                 {
@@ -1464,7 +1505,9 @@ class CanonicalPlanRuntimeAdapter:
                 omitted_pre_execution_speech_phases
             ),
             "operational_speech_authority": (
-                "runtime_authoritative_state"
+                "llm_wording_runtime_validated"
+                if effectful_pre_execution and read_only_plan
+                else "runtime_authoritative_state"
                 if effectful_pre_execution
                 else "not_applicable"
             ),
@@ -1473,6 +1516,17 @@ class CanonicalPlanRuntimeAdapter:
             "deepthinking_proposed_action_count": primary_effectful_count,
             "deepthinking_valid_action_count": primary_effectful_count,
         }
+        runtime_context = context if isinstance(context, dict) else {}
+        if isinstance(runtime_context.get("user_turn_envelope"), dict):
+            metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
+        mind_context = runtime_context.get("mind")
+        if (
+            isinstance(mind_context, dict)
+            and isinstance(mind_context.get("personality_expression"), dict)
+        ):
+            metadata["personality_expression"] = mind_context[
+                "personality_expression"
+            ]
         if alternative:
             metadata["material_plan_change_requires_confirmation"] = True
         return InteractionResponse(

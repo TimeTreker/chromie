@@ -4,8 +4,11 @@ import unittest
 
 from agent.app.cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
+    PERSONALITY_SEMANTIC_CONTRACT,
     bounded_identity_json,
+    bounded_personality_json,
     owner_approved_identity_context,
+    owner_approved_personality_context,
 )
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
@@ -69,6 +72,15 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertIn("identity_answer_guidance", projected["identity"])
         self.assertIn('"name":"Chromie"', bounded_identity_json(self.context))
 
+    def test_owner_approved_personality_projection_uses_active_profile(self) -> None:
+        projected = owner_approved_personality_context(self.context)
+        self.assertTrue(projected["owner_approved"])
+        self.assertIn("smart", projected["core_traits"])
+        self.assertIn("six-year-old girl", projected["self_concept"])
+        encoded = bounded_personality_json(self.context)
+        self.assertIn('"answer_style"', encoded)
+        self.assertIn('"internal_language_boundary"', encoded)
+
     def test_unapproved_or_missing_identity_is_not_prompt_evidence(self) -> None:
         self.assertEqual(owner_approved_identity_context({}), {})
         unapproved = {"mind": {**self.mind, "owner_approved": False}}
@@ -82,10 +94,11 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             [],
             output_type=GoalSegmentationModelOutput,
         )
-        self.assertIn("Owner-approved robot identity JSON", prompt)
+        self.assertIn("Owner-approved Chromie identity JSON", prompt)
         self.assertIn('"name":"Chromie"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn(IDENTITY_SEMANTIC_CONTRACT, prompt)
+        self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 
     def test_fast_and_deep_planner_prompts_share_same_identity(self) -> None:
         fast = FastPlannerResolver(_Dummy(), _Dummy())
@@ -103,10 +116,12 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             expected_goal_ids=["goal-identity"],
         )
         for prompt in (fast_prompt, deep_prompt):
-            self.assertIn("Owner-approved robot identity JSON", prompt)
+            self.assertIn("Owner-approved Chromie identity JSON", prompt)
             self.assertIn('"name":"Chromie"', prompt)
             self.assertIn('"age_description":"6 years old"', prompt)
-            self.assertIn("generic AI-assistant", prompt)
+            self.assertIn("generic robot category", prompt)
+            self.assertIn("Owner-approved Personality Expression JSON", prompt)
+            self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 
     def test_response_composer_receives_identity_as_final_wording_evidence(self) -> None:
         plan = CanonicalPlan(
@@ -129,10 +144,12 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             }
         )
         prompt = ResponseComposerResolver(_Dummy())._prompt(request, plan)
-        self.assertIn("Owner-approved robot identity JSON", prompt)
+        self.assertIn("Owner-approved Chromie identity JSON", prompt)
         self.assertIn('"name":"Chromie"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn("identity.identity_answer_guidance", prompt)
+        self.assertIn("Owner-approved Personality Expression JSON", prompt)
+        self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 
 
 if __name__ == "__main__":

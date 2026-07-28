@@ -170,6 +170,10 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             runtime_event(
                 "sid-direct", "conv-direct", digest, lane="chat", goal_ids=["goal-direct"]
             ),
+            gateway_event("sid-self", "conv-self", "admit", digest),
+            runtime_event(
+                "sid-self", "conv-self", digest, lane="chat", goal_ids=["goal-self"]
+            ),
             gateway_event("sid-weather-1", "conv-weather", "admit", digest),
             runtime_event(
                 "sid-weather-1",
@@ -243,6 +247,16 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "direct_question",
                             "sid-direct",
                             "Chromie, what can you do?",
+                        )
+                    ],
+                },
+                {
+                    "scenario_id": "natural_self_identity",
+                    "turns": [
+                        retained(
+                            "self_identity",
+                            "sid-self",
+                            "你好，你是谁呀？",
                         )
                     ],
                 },
@@ -494,6 +508,10 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "tool_continuity_quality": "pass",
                             "cancellation_feedback_quality": "pass",
                             "no_internal_contract_leakage": "pass",
+                            "person_identity_consistency": "pass",
+                            "age_appropriate_natural_voice": "pass",
+                            "direct_answer_before_detail": "pass",
+                            "no_internal_workflow_narration": "pass",
                         },
                         "findings": [],
                     }

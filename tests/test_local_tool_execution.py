@@ -54,6 +54,12 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.output["location"], "Beijing")
         self.assertEqual(result.output["apparent_temperature_c"], 35.0)
         self.assertEqual(result.output["source"], "open-meteo")
+        self.assertEqual(
+            result.output["summary"],
+            "Beijing今天小毛毛雨，现在约29℃，体感约35℃。",
+        )
+        self.assertNotIn("最高", result.output["summary"])
+        self.assertNotIn("降水概率", result.output["summary"])
         self.assertEqual(client.queries[0].location, "北京")
         self.assertEqual(client.queries[0].language, "zh-CN")
 

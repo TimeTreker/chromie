@@ -438,7 +438,7 @@ conversation.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_MIND_PROFILE_PATH` | `config/mind/chromie_default.json`; owner-editable JSON containing the concrete robot identity, principles, long-term goals, and social style. Relative paths resolve from the project root. Python defines only the schema and validation. |
+| `ORCH_MIND_PROFILE_PATH` | `config/mind/chromie_default.json`; owner-editable JSON containing Chromie’s concrete identity, personality expression, principles, long-term goals, and social style. Relative paths resolve from the project root. Python defines only the schema and validation. |
 | `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | Optional owner/operator-selected preset: `courteous`, `neutral`, or `reserved`. It overrides only `MindProfile.social_interaction_style`; use `ORCH_MIND_PROFILE_PATH` with `preset=custom` for reviewed custom guidance. |
 | `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Goal Interpretation and downstream Agent context. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
@@ -448,7 +448,7 @@ conversation.
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, robot identity age, pronouns, self-description, and identity-answer guidance are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+The maintained profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Response Composition, conversation, and direct fallback prompts. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
@@ -469,6 +469,9 @@ python scripts/evaluate_experience_episodes.py \
 `offline_review_proposals.jsonl` contains owner-review-only proposals derived
 from those reviews; it does not auto-apply prompt, memory, safety, or policy
 changes.
+
+
+**Internal truth, external humanity:** `personality_expression` is the positive first-person voice contract. The maintained profile lets Chromie experience herself as Chromie, a person and six-year-old girl, while robotic embodiment and internal model/runtime facts remain truthful background context. The LLM owns natural wording and relevance. Host code owns schema, grounding, timing, safety, and logging; it must not turn execution status, evidence labels, observation labels, or arbitrary tool fields into normal spoken prose.
 
 ## Runtime observability
 
