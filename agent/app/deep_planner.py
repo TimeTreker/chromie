@@ -105,9 +105,18 @@ class DeepPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
-        response_only = str(request.route_decision.route or "").strip() == "chat"
+        source_route = str(request.route_decision.route or "").strip()
+        response_only = source_route == "chat"
+        requires_execution = source_route == "tool"
         if response_only:
             executable = []
+        elif requires_execution:
+            # Cognitive Core already established the effect envelope. A tool
+            # lane may choose among tool capabilities, but it must never drift
+            # into a body gesture merely because that capability is common.
+            executable = [
+                item for item in executable if str(item.route) == "tool"
+            ]
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
         expected_goal_ids_for_turn = expected_goal_ids(
             request.context if isinstance(request.context, dict) else {}
@@ -116,6 +125,7 @@ class DeepPlannerResolver:
             expected_goal_ids_for_turn,
             allowed_skill_ids=[item["capability_id"] for item in payload],
             response_only=response_only,
+            requires_execution=requires_execution,
         )
         generation_options = {
             "temperature": 0,
@@ -228,7 +238,10 @@ class DeepPlannerResolver:
                     },
                 )
             errors = self._validation_errors(
-                plan, payload, expected_goal_ids=expected_goal_ids_for_turn
+                plan,
+                payload,
+                expected_goal_ids=expected_goal_ids_for_turn,
+                request=request,
             )
             if not errors:
                 metadata = dict(plan.metadata)
@@ -353,12 +366,14 @@ class DeepPlannerResolver:
         *,
         allowed_skill_ids: list[str] | None = None,
         response_only: bool = False,
+        requires_execution: bool = False,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=expected_goal_ids,
             allowed_skill_ids=list(allowed_skill_ids or []),
             response_only=response_only,
+            requires_execution=requires_execution,
         )
 
     @staticmethod
@@ -387,12 +402,22 @@ class DeepPlannerResolver:
         combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
+        source_route = str(request.route_decision.route or "").strip()
         route_effect_contract = (
             "The authoritative source route is chat. This turn is response-only: "
             "do not select or invent executable skills, physical effects, or plan "
             "steps. Use respond, clarify, unavailable, or refused outcomes only. "
-            if str(request.route_decision.route or "").strip() == "chat"
-            else ""
+            if source_route == "chat"
+            else (
+                "The authoritative source route is tool. This fresh external-information "
+                "turn must contain at least one executable supplied tool step, or return "
+                "clarify/unavailable/refused when no valid tool plan is possible. Do not "
+                "terminate the whole turn as respond from model memory or loosely related "
+                "evidence. A completed-evidence follow-up that needs no execution belongs "
+                "on a chat route upstream. "
+                if source_route == "tool"
+                else ""
+            )
         )
         return (
             f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 1800)}\n\n"
@@ -420,7 +445,7 @@ class DeepPlannerResolver:
             "Do not copy catalog field names such as capability_id, input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
             "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
-            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every complete multi-goal execute, respond, or mixed result must include it. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. In a mixed plan, every execute or respond outcome also requires its own prospective satisfaction assessment. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
+            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
             "Top-level disposition is the aggregate of per-goal dispositions: use mixed only when at least two different per-goal disposition values are present. Multiple goals that are all execute use top-level execute; multiple goals that are all respond use top-level respond. "
             "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
             "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
@@ -503,6 +528,7 @@ class DeepPlannerResolver:
         capabilities: list[dict[str, Any]],
         *,
         expected_goal_ids: list[str],
+        request: AgentRunRequest,
     ) -> list[dict[str, Any]]:
         allowed = {item["capability_id"]: item for item in capabilities}
         errors: list[dict[str, Any]] = []
@@ -512,6 +538,17 @@ class DeepPlannerResolver:
                     "type": "goal_ids_do_not_match_goal_association",
                     "expected_goal_ids": expected_goal_ids,
                     "actual_goal_ids": list(plan.goal_ids),
+                }
+            )
+        if (
+            str(request.route_decision.route or "").strip() == "tool"
+            and plan.disposition not in {"clarify", "unavailable", "refused"}
+            and not plan.steps
+        ):
+            errors.append(
+                {
+                    "type": "tool_route_requires_executable_step",
+                    "disposition": plan.disposition,
                 }
             )
         if plan.coverage == "complete" and plan.confidence < self.min_confidence:

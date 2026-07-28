@@ -85,6 +85,31 @@ class SessionRuntimeTraceTests(unittest.TestCase):
                 "abandoned",
             )
 
+    def test_idle_timeout_finalizes_once_when_runtime_tracing_is_off(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {"CHROMIE_RUNTIME_TRACE_MODE": "off"},
+            clear=False,
+        ):
+            tracker = SessionTracker(enabled=False)
+            sid = tracker.create()
+            state = tracker.state[sid]
+            state["last_activity_ms"] = 1000.0
+
+            first = tracker.finalize_idle_sessions(
+                idle_timeout_ms=500.0,
+                now_ms_value=1600.0,
+            )
+            second = tracker.finalize_idle_sessions(
+                idle_timeout_ms=500.0,
+                now_ms_value=2200.0,
+            )
+
+            self.assertEqual(first, [sid])
+            self.assertEqual(second, [])
+            self.assertTrue(state["runtime_trace_finalized"])
+            self.assertIsNone(state["runtime_trace_snapshot"])
+
     def test_session_trace_event_is_packaged_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
             "os.environ",

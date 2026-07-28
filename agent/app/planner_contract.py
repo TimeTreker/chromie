@@ -512,6 +512,7 @@ def canonical_plan_response_schema(
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
     response_only: bool = False,
+    requires_execution: bool = False,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -529,6 +530,7 @@ def canonical_plan_response_schema(
             expected_goal_ids=expected_goal_ids,
             allowed_skill_ids=allowed_skill_ids,
             response_only=response_only,
+            requires_execution=requires_execution,
         )
         schema["title"] = "FastPlannerModelOutput"
         return schema
@@ -561,26 +563,30 @@ def canonical_plan_response_schema(
 
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
-        disposition["enum"] = (
-            (
-                ["respond", "escalate"]
-                if planner_tier == "fast"
-                else ["respond", "clarify", "unavailable", "refused"]
-            )
-            if response_only
-            else (
-                ["respond", "execute", "mixed", "escalate"]
-                if planner_tier == "fast"
-                else [
-                    "respond",
-                    "execute",
-                    "mixed",
-                    "clarify",
-                    "unavailable",
-                    "refused",
-                ]
-            )
-        )
+        if response_only:
+            disposition["enum"] = [
+                "respond",
+                "clarify",
+                "unavailable",
+                "refused",
+            ]
+        elif requires_execution:
+            disposition["enum"] = [
+                "execute",
+                "mixed",
+                "clarify",
+                "unavailable",
+                "refused",
+            ]
+        else:
+            disposition["enum"] = [
+                "respond",
+                "execute",
+                "mixed",
+                "clarify",
+                "unavailable",
+                "refused",
+            ]
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
@@ -742,6 +748,101 @@ def canonical_plan_response_schema(
                 constrain(value)
 
     constrain(schema)
+
+    # Ollama's structured decoder does not reliably apply nested ``required``
+    # constraints through a dynamic object property that contains only a $ref.
+    # Inline each Deep Planner goal outcome and its satisfaction object so the
+    # decoder sees every required semantic field at the exact goal key.
+    if planner_tier == "deep":
+        satisfaction_schema = schema.get("$defs", {}).get(
+            "PlannerGoalSatisfaction"
+        )
+        if isinstance(satisfaction_schema, dict):
+            satisfaction_required = satisfaction_schema.setdefault(
+                "required", []
+            )
+            for field_name in (
+                "score",
+                "status",
+                "satisfied_goal_ids",
+                "unmet_goal_ids",
+                "unmet_requirements",
+                "rationale",
+            ):
+                if field_name not in satisfaction_required:
+                    satisfaction_required.append(field_name)
+            top_satisfaction = properties.get("goal_satisfaction")
+            if isinstance(top_satisfaction, dict):
+                top_satisfaction.clear()
+                top_satisfaction.update(copy.deepcopy(satisfaction_schema))
+                top_satisfaction["description"] = (
+                    "Required prospective adequacy judgment for the complete "
+                    "Deep Planner result, including clarify/unavailable/refused."
+                )
+
+        if (
+            isinstance(goal_outcomes, dict)
+            and isinstance(outcome_schema, dict)
+        ):
+            outcome_properties = goal_outcomes.get("properties", {})
+            for goal_id in allowed_goals:
+                goal_property = outcome_properties.get(goal_id)
+                if not isinstance(goal_property, dict):
+                    continue
+                specialized = copy.deepcopy(outcome_schema)
+                specialized_properties = specialized.get("properties", {})
+                if isinstance(satisfaction_schema, dict):
+                    specialized_satisfaction = copy.deepcopy(
+                        satisfaction_schema
+                    )
+                    satisfaction_properties = specialized_satisfaction.get(
+                        "properties", {}
+                    )
+                    for field_name in (
+                        "satisfied_goal_ids",
+                        "unmet_goal_ids",
+                    ):
+                        field = satisfaction_properties.get(field_name)
+                        if isinstance(field, dict):
+                            field["items"] = {
+                                "type": "string",
+                                "enum": [goal_id],
+                            }
+                            field["uniqueItems"] = True
+                            field["maxItems"] = 1
+                    specialized_properties["satisfaction"] = (
+                        specialized_satisfaction
+                    )
+                if requires_execution and len(allowed_goals) == 1:
+                    disposition_field = specialized_properties.get(
+                        "disposition"
+                    )
+                    if isinstance(disposition_field, dict):
+                        disposition_field["enum"] = [
+                            "execute",
+                            "clarify",
+                            "unavailable",
+                            "refused",
+                        ]
+                    branches = specialized.get("oneOf")
+                    if isinstance(branches, list):
+                        specialized["oneOf"] = [
+                            branch
+                            for branch in branches
+                            if (
+                                branch.get("properties", {})
+                                .get("disposition", {})
+                                .get("enum")
+                                != ["respond"]
+                            )
+                        ]
+                goal_property.clear()
+                goal_property.update(specialized)
+                goal_property["description"] = (
+                    "Complete model-authored Deep Planner outcome for "
+                    f"authoritative goal {goal_id!r}."
+                )
+
     if response_only:
         steps_schema = properties.get("steps")
         if isinstance(steps_schema, dict):
@@ -765,6 +866,7 @@ def fast_multi_goal_response_schema(
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
     response_only: bool = False,
+    requires_execution: bool = False,
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
@@ -807,6 +909,8 @@ def fast_multi_goal_response_schema(
         disposition["enum"] = (
             ["respond", "escalate"]
             if response_only
+            else ["execute", "mixed", "escalate"]
+            if requires_execution
             else ["respond", "execute", "mixed", "escalate"]
         )
 
@@ -918,6 +1022,8 @@ def fast_multi_goal_response_schema(
             outcome_disposition["enum"] = (
                 ["respond", "escalate"]
                 if response_only
+                else ["execute", "escalate"]
+                if requires_execution and len(allowed_goals) == 1
                 else ["respond", "execute", "escalate"]
             )
         if response_only:
@@ -1162,6 +1268,8 @@ def fast_multi_goal_response_schema(
         assignments.append(tuple("escalate" for _ in allowed_goals))
         for assignment in assignments:
             assignment_set = set(assignment)
+            if requires_execution and assignment_set == {"respond"}:
+                continue
             if assignment_set == {"execute"}:
                 aggregate = "execute"
             elif assignment_set == {"respond"}:

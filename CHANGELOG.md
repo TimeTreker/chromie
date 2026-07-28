@@ -4,6 +4,31 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Voice feedback-loop and grounded execution closure
+
+- Bound each VAD utterance to the playback state and playback generation at its
+  start, so low-energy speaker echo cannot become a new user turn merely because
+  playback ended before the segment closed. Continuous overlong audio now waits
+  for a real silence gap before VAD rearms instead of producing endless discarded
+  20-second segments.
+- Resolved the authoritative spoken language at Gateway capture and rejected
+  Response Composer speech that switches a Chinese turn into an English answer
+  or vice versa. Bare-greeting brevity now applies only to structurally bare
+  greetings, not every richer turn classified with a greeting intent.
+- Required fresh tool-routed turns to execute an eligible tool or return an
+  explicit escalation/clarification/unavailable outcome. Fast and Deep Planner
+  decoder contracts no longer permit a pure model-memory response for a tool
+  lane, and Deep per-goal fields are inlined so structured decoding cannot omit
+  disposition or satisfaction silently.
+- Bridged the generic Soridormi execution-plan confirmation gate only for a
+  reviewed auxiliary Social Attention request whose live named-skill contract and
+  Soridormi-created plan both require no user confirmation. This trusted
+  preflight is not recorded as user approval, and Soridormi retains planning,
+  monitoring, refusal, execution, and recovery authority.
+- Reduced clarification output to one waiting-for-user question and finalized
+  no-trace voice sessions exactly once, preventing contradictory follow-up speech
+  and repeated idle-timeout evidence for the same completed session.
+
 ### Runtime authority and embodied-response root fixes
 
 - Reconciled adapter-authorized safe-read parallel timing against immutable

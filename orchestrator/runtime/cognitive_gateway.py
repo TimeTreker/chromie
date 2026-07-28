@@ -65,6 +65,7 @@ class CognitiveGateway:
         session_id: str,
         conversation_id: str | None,
         channel: str = "voice",
+        language: str | None = None,
         quality: InputQualityEvidence | None = None,
     ) -> GatewayTurnCapture:
         normalized = self.input_normalization.capture(
@@ -72,6 +73,7 @@ class CognitiveGateway:
             session_id=session_id,
             conversation_id=conversation_id,
             channel=channel,
+            language=language,
             quality=quality,
         )
         return self.protective_reflex.evaluate(normalized)

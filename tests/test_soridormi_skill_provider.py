@@ -175,6 +175,200 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(invoker.calls[2][2].confirmed)
         self.assertTrue(invoker.calls[2][2].safety_monitor_active)
 
+    async def test_reviewed_low_risk_social_attention_uses_trusted_preflight(self) -> None:
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.create_plan": ToolCallOutcome.success(
+                    {
+                        "plan_id": "social-plan",
+                        "skill_id": "blink_eyes",
+                        "requires_confirmation": False,
+                    }
+                ),
+                "soridormi.skill.execute_plan": ToolCallOutcome.success(
+                    {
+                        "completed": True,
+                        "skill_id": "blink_eyes",
+                        "summary": "completed blink_eyes",
+                    }
+                ),
+            }
+        )
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "blink_eyes",
+                    "description": "Blink as subtle social expression.",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {
+                            "count": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 3,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                    "requires_confirmation": False,
+                    "safety_class": "low_risk_action",
+                    "effects": ["social_expression"],
+                    "interruptible": True,
+                }
+            ]
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+
+        execution = await runtime.execute(
+            InteractionResponse(
+                interaction_id="social-interaction",
+                skills=[
+                    {
+                        "request_id": "social-blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "parallel",
+                        "requires_confirmation": False,
+                        "metadata": {
+                            "source": "social_attention_plan",
+                            "auxiliary_social_attention": True,
+                        },
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(),
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "completed")
+        execute_context = next(
+            context
+            for tool, _, context in invoker.calls
+            if tool == "soridormi.skill.execute_plan"
+        )
+        self.assertIsNotNone(execute_context)
+        self.assertFalse(execute_context.confirmed)
+        self.assertTrue(execute_context.trusted_preflight_authorized)
+        self.assertTrue(execute_context.safety_monitor_active)
+
+    async def test_social_preflight_does_not_override_provider_confirmation(self) -> None:
+        invoker = _RecordingInvoker()
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "blink_eyes",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                    "requires_confirmation": False,
+                    "safety_class": "low_risk_action",
+                    "effects": ["social_expression"],
+                }
+            ]
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+
+        await runtime.execute(
+            InteractionResponse(
+                interaction_id="provider-confirmation",
+                skills=[
+                    {
+                        "request_id": "provider-confirmed-blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {},
+                        "requires_confirmation": False,
+                        "metadata": {
+                            "source": "social_attention_plan",
+                            "auxiliary_social_attention": True,
+                        },
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(),
+                safety_monitor_active=True,
+            ),
+        )
+
+        execute_context = next(
+            context
+            for tool, _, context in invoker.calls
+            if tool == "soridormi.skill.execute_plan"
+        )
+        self.assertIsNotNone(execute_context)
+        self.assertFalse(execute_context.confirmed)
+        self.assertFalse(execute_context.trusted_preflight_authorized)
+
+    async def test_non_social_low_risk_action_cannot_claim_trusted_preflight(self) -> None:
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.create_plan": ToolCallOutcome.success(
+                    {
+                        "plan_id": "ordinary-plan",
+                        "skill_id": "blink_eyes",
+                        "requires_confirmation": False,
+                    }
+                )
+            }
+        )
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "blink_eyes",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                    "requires_confirmation": False,
+                    "safety_class": "low_risk_action",
+                    "effects": ["social_expression"],
+                }
+            ]
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+
+        await runtime.execute(
+            InteractionResponse(
+                interaction_id="ordinary-interaction",
+                skills=[
+                    {
+                        "request_id": "ordinary-blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {},
+                        "requires_confirmation": False,
+                        "metadata": {"source": "canonical_plan"},
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(),
+                safety_monitor_active=True,
+            ),
+        )
+
+        execute_context = next(
+            context
+            for tool, _, context in invoker.calls
+            if tool == "soridormi.skill.execute_plan"
+        )
+        self.assertIsNotNone(execute_context)
+        self.assertFalse(execute_context.confirmed)
+        self.assertFalse(execute_context.trusted_preflight_authorized)
+
     async def test_named_skill_propagates_route_trace_metadata_to_plan(self) -> None:
         invoker = _RecordingInvoker()
         execution = await self._runtime(invoker).execute(

@@ -45,6 +45,33 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         self.assertEqual(capture.normalized_text, "Hello Chromie")
         self.assertEqual(capture.received_at, self.clock())
 
+    def test_normalization_resolves_spoken_language_from_script(self) -> None:
+        normalizer = InputNormalization(clock=self.clock)
+
+        chinese = normalizer.capture(
+            "今天重庆热不热？",
+            session_id="turn-zh",
+            conversation_id="conversation-1",
+            channel="voice",
+        )
+        english = normalizer.capture(
+            "How warm is Chongqing?",
+            session_id="turn-en",
+            conversation_id="conversation-1",
+            channel="voice",
+        )
+        explicit = normalizer.capture(
+            "Chromie",
+            session_id="turn-explicit",
+            conversation_id="conversation-1",
+            channel="voice",
+            language="zh-CN",
+        )
+
+        self.assertEqual(chinese.language, "zh-CN")
+        self.assertEqual(english.language, "en-US")
+        self.assertEqual(explicit.language, "zh-CN")
+
     def test_protective_reflex_precedes_attention_or_core(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)
         capture = gateway.capture(

@@ -223,10 +223,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "covers_goal_ids": ["goal-look", "goal-blink"],
             "decision": "execute",
             "must_not_claim_completion": True,
-            "response_text": "I'll look at you for two seconds and then blink twice.",
+            "response_text": "我会先看着你两秒，再眨两次眼。",
         }
         repaired_stage = {
-            "text": "I'll look at you for two seconds and then blink twice.",
+            "text": "我会先看着你两秒，再眨两次眼。",
             "speech_act": "inform",
             "commitment_state": "evaluating",
             "must_not_claim_completion": True,
@@ -321,7 +321,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         invalid = {
             "response_plan": {
                 "final": {
-                    "text": "Done.",
+                    "text": "已经完成。",
                     "commitment_state": "completed",
                     "must_not_claim_completion": False,
                     "covers_goal_ids": ["goal-look"],
@@ -331,7 +331,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         repaired = {
             "response_plan": {
                 "pre_action": {
-                    "text": "I'll look at you for two seconds, then blink twice.",
+                    "text": "我会先看着你两秒，再眨两次眼。",
                     "commitment_state": "evaluating",
                     "must_not_claim_completion": True,
                     "covers_goal_ids": ["goal-look", "goal-blink"],
@@ -610,7 +610,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])
         response_plan = {
-            "final": {"text": "Hello.", "covers_goal_ids": ["goal-chat"]}
+            "final": {"text": "你好。", "covers_goal_ids": ["goal-chat"]}
         }
         invalid = {
             "composition_id": "model-owned",
@@ -672,7 +672,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         repaired = {
             "response_plan": {
                 "pre_action": {
-                    "text": "I'll blink twice. Why do robots avoid water?",
+                    "text": "我会眨两次眼。为什么机器人怕水？",
                     "commitment_state": "evaluating",
                     "must_not_claim_completion": True,
                     "covers_goal_ids": ["goal-blink", "goal-joke"],
@@ -691,7 +691,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
-            "I'll blink twice. Why do robots avoid water?",
+            "我会眨两次眼。为什么机器人怕水？",
         )
 
     def test_mixed_execute_and_clarify_composes_one_truthful_response(self):

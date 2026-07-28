@@ -31,6 +31,39 @@ class VadLimitTests(unittest.TestCase):
         self.assertEqual(vad.last_end_reason, "max_duration")
         self.assertFalse(vad.in_speech)
 
+    def test_max_duration_requires_a_real_silence_gap_before_rearm(self) -> None:
+        vad = VAD(
+            mode=0,
+            sample_rate=16000,
+            frame_duration_ms=30,
+            silence_timeout_ms=60,
+            pre_roll_ms=0,
+            max_utterance_ms=90,
+        )
+        vad.vad = None
+        speech = (b"\x01\x00") * 480
+        silence = b"\x00\x00" * 480
+
+        vad.process_chunk(speech)
+        vad.process_chunk(speech)
+        _, ended, _ = vad.process_chunk(speech)
+        self.assertTrue(ended)
+        self.assertTrue(vad.awaiting_rearm_silence)
+
+        started, ended, audio = vad.process_chunk(speech)
+        self.assertFalse(started)
+        self.assertFalse(ended)
+        self.assertIsNone(audio)
+
+        vad.process_chunk(silence)
+        vad.process_chunk(silence)
+        self.assertFalse(vad.awaiting_rearm_silence)
+
+        started, ended, audio = vad.process_chunk(speech)
+        self.assertTrue(started)
+        self.assertFalse(ended)
+        self.assertIsNone(audio)
+
     def test_normal_silence_end_reports_silence_reason(self) -> None:
         vad = VAD(
             mode=0,

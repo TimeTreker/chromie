@@ -34,15 +34,24 @@ class VAD:
         self.silence_ms = 0
         self.current = bytearray()
         self.last_end_reason: str | None = None
+        # After a continuous segment reaches the hard duration limit, do not
+        # immediately open another segment on the very next voiced frame. A TV,
+        # speaker echo, or stuck input otherwise produces an endless sequence of
+        # discarded 20-second utterances. Rearm only after a real silence gap.
+        self.awaiting_rearm_silence = False
+        self.rearm_silence_ms = 0
         self.pre_roll_frames = collections.deque(
             maxlen=max(1, int(self.pre_roll_ms / max(1, self.frame_duration_ms)))
         )
 
-    def reset(self) -> None:
+    def reset(self, *, preserve_rearm: bool = False) -> None:
         self.in_speech = False
         self.silence_ms = 0
         self.current.clear()
         self.pre_roll_frames.clear()
+        if not preserve_rearm:
+            self.awaiting_rearm_silence = False
+            self.rearm_silence_ms = 0
 
     def _is_speech(self, frame: bytes) -> bool:
         if not frame:
@@ -63,6 +72,17 @@ class VAD:
         ended = False
         audio: bytes | None = None
 
+        if self.awaiting_rearm_silence:
+            if speech:
+                self.rearm_silence_ms = 0
+            else:
+                self.rearm_silence_ms += self.frame_duration_ms
+                if self.rearm_silence_ms >= self.silence_timeout_ms:
+                    self.awaiting_rearm_silence = False
+                    self.rearm_silence_ms = 0
+                    self.pre_roll_frames.append(frame)
+            return started, ended, audio
+
         if not self.in_speech:
             self.pre_roll_frames.append(frame)
             if speech:
@@ -82,7 +102,9 @@ class VAD:
             if current_ms >= self.max_utterance_ms:
                 ended = True
                 audio = bytes(self.current)
-                self.reset()
+                self.awaiting_rearm_silence = True
+                self.rearm_silence_ms = 0
+                self.reset(preserve_rearm=True)
                 self.last_end_reason = "max_duration"
                 return started, ended, audio
 

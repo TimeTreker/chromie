@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import MethodType
 from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
@@ -13,6 +14,7 @@ from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconcil
 from shared.chromie_contracts.interaction import SkillRequest
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import canonical_plan_fingerprint
+from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 
 
 class _SequenceOllama:
@@ -198,6 +200,117 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Timezone:", prompt)
         self.assertIn("Do not mention clock time", prompt)
         self.assertIn("Do not ask a question or end mid-clause", prompt)
+
+    async def test_vad_segment_started_during_playback_keeps_barge_in_threshold(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.target_asr_rate = 16000
+        assistant.max_vad_utterance_ms = 20000
+        assistant.min_audio_ms = 100
+        assistant.min_rms = 120.0
+        assistant.barge_in_min_rms = 350.0
+        assistant.is_playing_audio = False
+        assistant.playback_generation = 2
+        created: list[str] = []
+
+        def create_session(self: VoiceAssistant) -> str:
+            created.append("created")
+            return "unexpected"
+
+        assistant.create_session = MethodType(create_session, assistant)
+        audio = int(200).to_bytes(2, "little", signed=True) * 16000
+
+        await assistant.handle_vad_audio(
+            audio,
+            started_during_playback=True,
+            playback_generation_at_start=1,
+        )
+
+        self.assertEqual(created, [])
+
+    def test_response_language_validation_rejects_full_english_for_chinese(self) -> None:
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "language-boundary",
+                "text": "今天重庆热不热？",
+                "language": "zh-CN",
+                "route_decision": {
+                    "route": "chat",
+                    "intent": "question",
+                    "confidence": 0.9,
+                    "source": "llm",
+                },
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "authoritative Chinese"):
+            ResponseComposerResolver._validate_spoken_language(
+                ResponsePlan(
+                    final=ResponseStage(
+                        text="It is about 32 degrees Celsius.",
+                    )
+                ),
+                request=request,
+            )
+
+        ResponseComposerResolver._validate_spoken_language(
+            ResponsePlan(
+                final=ResponseStage(
+                    text="重庆现在大约32摄氏度。",
+                )
+            ),
+            request=request,
+        )
+
+    def test_nontrivial_return_statement_is_not_a_bare_greeting(self) -> None:
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "return-statement",
+                "text": "I'm back and pet you.",
+                "language": "en-US",
+                "route_decision": {
+                    "route": "chat",
+                    "intent": "greeting",
+                    "confidence": 0.9,
+                    "source": "llm",
+                },
+            }
+        )
+        self.assertFalse(
+            ResponseComposerResolver._is_bare_greeting_turn(request)
+        )
+
+    def test_deep_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
+        schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-weather"],
+            allowed_skill_ids=["chromie.weather.lookup"],
+            requires_execution=True,
+        )
+        outcome = schema["properties"]["goal_outcomes"]["properties"][
+            "goal-weather"
+        ]
+
+        self.assertNotIn("$ref", outcome)
+        self.assertEqual(
+            set(outcome["required"]),
+            {
+                "disposition",
+                "coverage",
+                "response_text",
+                "unresolved",
+                "step_ids",
+                "satisfaction",
+                "rationale",
+            },
+        )
+        self.assertNotIn(
+            "respond",
+            outcome["properties"]["disposition"]["enum"],
+        )
+        self.assertNotIn(
+            "respond",
+            schema["properties"]["disposition"]["enum"],
+        )
+        self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
     def test_courteous_social_attention_needs_concrete_restraint_for_none(self) -> None:
         source = inspect.getsource(ResponseComposerResolver._prompt)

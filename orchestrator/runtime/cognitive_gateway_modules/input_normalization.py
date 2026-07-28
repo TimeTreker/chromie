@@ -38,6 +38,7 @@ class InputNormalization:
         session_id: str,
         conversation_id: str | None,
         channel: str = "voice",
+        language: str | None = None,
         quality: InputQualityEvidence | None = None,
     ) -> NormalizedTurnCapture:
         resolved_session_id = normalize_turn_text(session_id)
@@ -54,7 +55,7 @@ class InputNormalization:
             received_at=self._aware_now(),
             original_text=text or "",
             normalized_text=normalize_turn_text(text or ""),
-            language="auto",
+            language=self._resolve_language(text or "", language),
             quality=quality
             or InputQualityEvidence(
                 source="asr_final" if channel == "voice" else channel,
@@ -62,6 +63,27 @@ class InputNormalization:
                 reason="accepted by the existing transport boundary",
             ),
         )
+
+    @staticmethod
+    def _resolve_language(text: str, language: str | None) -> str:
+        explicit = normalize_turn_text(language or "")
+        if explicit and explicit.casefold() != "auto":
+            return explicit
+
+        cjk_count = sum(
+            1
+            for char in text
+            if (
+                "\u3400" <= char <= "\u4dbf"
+                or "\u4e00" <= char <= "\u9fff"
+                or "\uf900" <= char <= "\ufaff"
+            )
+        )
+        if cjk_count:
+            return "zh-CN"
+        if any(("A" <= char <= "Z") or ("a" <= char <= "z") for char in text):
+            return "en-US"
+        return "auto"
 
     @staticmethod
     def with_conversation_id(

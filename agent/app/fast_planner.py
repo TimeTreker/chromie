@@ -116,9 +116,18 @@ class FastPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
-        response_only = str(request.route_decision.route or "").strip() == "chat"
+        source_route = str(request.route_decision.route or "").strip()
+        response_only = source_route == "chat"
+        requires_execution = source_route == "tool"
         if response_only:
             executable = []
+        elif requires_execution:
+            # Cognitive Core already established the effect envelope. A tool
+            # lane may choose among tool capabilities, but it must never drift
+            # into a body gesture merely because that capability is common.
+            executable = [
+                item for item in executable if str(item.route) == "tool"
+            ]
         capability_payload = [
             {
                 "capability_id": item.capability_id,
@@ -148,6 +157,7 @@ class FastPlannerResolver:
                     item["capability_id"] for item in capability_payload
                 ],
                 response_only=response_only,
+                requires_execution=requires_execution,
             )
             if multi_goal_contract
             else canonical_plan_response_schema(
@@ -157,6 +167,7 @@ class FastPlannerResolver:
                     item["capability_id"] for item in capability_payload
                 ],
                 response_only=response_only,
+                requires_execution=requires_execution,
             )
         )
         options = {
@@ -459,13 +470,23 @@ class FastPlannerResolver:
             "source_ref must be an exact goal-text span containing that same "
             "number. "
         )
+        source_route = str(request.route_decision.route or "").strip()
         route_effect_contract = (
             "The authoritative source route is chat. This turn is response-only: "
             "do not select or invent executable skills, physical effects, or plan "
             "steps. Answer conversational goals with respond outcomes; escalate "
             "only when semantic reasoning is genuinely insufficient. "
-            if str(request.route_decision.route or "").strip() == "chat"
-            else ""
+            if source_route == "chat"
+            else (
+                "The authoritative source route is tool. This fresh external-information "
+                "turn must contain at least one executable supplied tool step, or use a "
+                "model-authored semantic escalation when no valid tool plan is possible. "
+                "Do not terminate the whole turn as respond from model memory or loosely "
+                "related evidence. A completed-evidence follow-up that needs no execution "
+                "belongs on a chat route upstream. "
+                if source_route == "tool"
+                else ""
+            )
         )
         semantic_scope_contract = (
             "Capability semantic_scope metadata is authoritative applicability evidence. Preserve every canonical-goal qualifier, including temporal scope, comparison period, and answer shape. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
@@ -684,6 +705,20 @@ class FastPlannerResolver:
                 metadata={
                     "expected_goal_ids": expected_goal_ids_for_turn,
                     "actual_goal_ids": list(plan.goal_ids),
+                    **counts,
+                },
+            )
+        if (
+            str(request.route_decision.route or "").strip() == "tool"
+            and plan.disposition != "escalate"
+            and not plan.steps
+        ):
+            return self._escalation(
+                plan.plan_id,
+                request,
+                "tool_route_requires_executable_step",
+                metadata={
+                    "proposed_disposition": plan.disposition,
                     **counts,
                 },
             )

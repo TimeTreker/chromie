@@ -692,6 +692,12 @@ class VoiceAssistant:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.mic_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
         self._vad_leftover = b""
+        # Preserve playback state from the instant a VAD segment starts. The
+        # segment can end after TTS playback has stopped; evaluating only the
+        # end-time state lets speaker echo pass the normal microphone threshold
+        # and re-enter Chromie as a fake user turn.
+        self._vad_segment_started_during_playback = False
+        self._vad_segment_playback_generation: int | None = None
         self.playback_queue: asyncio.Queue = asyncio.Queue()
         self.playback_task: asyncio.Task | None = None
         self.active_synthesis_tasks: set[asyncio.Task] = set()
@@ -704,7 +710,9 @@ class VoiceAssistant:
         self.concurrent_protective_reflex_tasks: set[asyncio.Task] = set()
         self._protective_reflex_failure = False
         self._pending_turn_after_reflex: tuple[str, str] | None = None
-        self._pending_vad_audio: bytes | None = None
+        self._pending_vad_audio: (
+            bytes | tuple[bytes, bool, int | None] | None
+        ) = None
         self.synthesis_semaphore = asyncio.Semaphore(int(os.getenv("ORCH_TTS_CONCURRENCY", "1")))
         self.next_playback_order = 0
         self.pending_audio: dict[int, tuple[int, bytes, int, str | None, str | None]] = {}
@@ -7744,7 +7752,13 @@ class VoiceAssistant:
 
         self.loop.call_soon_threadsafe(enqueue_audio)
 
-    async def handle_vad_audio(self, audio: bytes):
+    async def handle_vad_audio(
+        self,
+        audio: bytes,
+        *,
+        started_during_playback: bool = False,
+        playback_generation_at_start: int | None = None,
+    ):
         duration_ms = (len(audio) / (self.target_asr_rate * 2)) * 1000.0
         duration = duration_ms / 1000.0
         rms = float(np.sqrt(np.mean(np.square(np.frombuffer(audio, dtype=np.int16).astype(np.float32))))) if audio else 0.0
@@ -7758,9 +7772,25 @@ class VoiceAssistant:
         if duration_ms < self.min_audio_ms:
             logger.warning("VAD speech ended but skipped: duration=%.2fs min_audio_ms=%s", duration, self.min_audio_ms)
             return
-        effective_min_rms = self.barge_in_min_rms if self.is_playing_audio else self.min_rms
+        playback_contaminated = bool(
+            started_during_playback or self.is_playing_audio
+        )
+        effective_min_rms = (
+            self.barge_in_min_rms if playback_contaminated else self.min_rms
+        )
         if rms < effective_min_rms:
-            logger.warning("VAD speech ended but skipped: duration=%.2fs RMS=%.1f min_rms=%.1f playing=%s", duration, rms, effective_min_rms, self.is_playing_audio)
+            logger.warning(
+                "VAD speech ended but skipped: duration=%.2fs RMS=%.1f "
+                "min_rms=%.1f playing=%s started_during_playback=%s "
+                "playback_generation_at_start=%s current_generation=%s",
+                duration,
+                rms,
+                effective_min_rms,
+                self.is_playing_audio,
+                started_during_playback,
+                playback_generation_at_start,
+                self.playback_generation,
+            )
             return
 
         session_id = self.create_session()
@@ -7774,6 +7804,8 @@ class VoiceAssistant:
                     "audio_bytes": len(audio),
                     "rms": round(rms, 3),
                     "playing_audio": bool(self.is_playing_audio),
+                    "started_during_playback": bool(started_during_playback),
+                    "playback_generation_at_start": playback_generation_at_start,
                 },
             )
             self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
@@ -8007,17 +8039,38 @@ class VoiceAssistant:
             state["llm_done"] = True
         self.maybe_session_done(pending_session_id)
 
-    def _queue_vad_utterance(self, audio: bytes) -> None:
+    def _queue_vad_utterance(
+        self,
+        audio: bytes,
+        *,
+        started_during_playback: bool = False,
+        playback_generation_at_start: int | None = None,
+    ) -> None:
+        queued: bytes | tuple[bytes, bool, int | None]
+        if started_during_playback or playback_generation_at_start is not None:
+            queued = (
+                audio,
+                bool(started_during_playback),
+                playback_generation_at_start,
+            )
+        else:
+            queued = audio
         active = getattr(self, "active_asr_task", None)
         if active is not None and not active.done():
             replaced = getattr(self, "_pending_vad_audio", None) is not None
-            self._pending_vad_audio = audio
+            self._pending_vad_audio = queued
             logger.info(
                 "ASR is processing; queued latest utterance%s",
                 " and replaced older pending audio" if replaced else "",
             )
             return
-        task = asyncio.create_task(self.handle_vad_audio(audio))
+        task = asyncio.create_task(
+            self.handle_vad_audio(
+                audio,
+                started_during_playback=started_during_playback,
+                playback_generation_at_start=playback_generation_at_start,
+            )
+        )
         self.active_asr_task = task
         task.add_done_callback(self._on_asr_task_done)
 
@@ -8032,7 +8085,26 @@ class VoiceAssistant:
         pending = getattr(self, "_pending_vad_audio", None)
         self._pending_vad_audio = None
         if pending:
-            self._queue_vad_utterance(pending)
+            if isinstance(pending, tuple) and len(pending) == 3:
+                (
+                    pending_audio,
+                    pending_started_playing,
+                    pending_generation,
+                ) = pending
+            else:
+                # Compatibility for tests and old in-process embeddings that
+                # populated the pre-provenance bytes-only queue directly.
+                pending_audio = pending
+                pending_started_playing = False
+                pending_generation = None
+            if pending_started_playing or pending_generation is not None:
+                self._queue_vad_utterance(
+                    pending_audio,
+                    started_during_playback=pending_started_playing,
+                    playback_generation_at_start=pending_generation,
+                )
+            else:
+                self._queue_vad_utterance(pending_audio)
 
     async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
         frame_bytes_target = int(
@@ -8045,8 +8117,24 @@ class VoiceAssistant:
             offset += frame_bytes_target
             started, ended, vad_audio = self.vad.process_chunk(frame)
             if started:
-                logger.info("VAD detected voice")
+                self._vad_segment_started_during_playback = bool(
+                    self.is_playing_audio
+                )
+                self._vad_segment_playback_generation = self.playback_generation
+                logger.info(
+                    "VAD detected voice: playing=%s playback_generation=%s",
+                    self._vad_segment_started_during_playback,
+                    self._vad_segment_playback_generation,
+                )
             if ended and vad_audio:
+                started_during_playback = bool(
+                    self._vad_segment_started_during_playback
+                )
+                playback_generation_at_start = (
+                    self._vad_segment_playback_generation
+                )
+                self._vad_segment_started_during_playback = False
+                self._vad_segment_playback_generation = None
                 if getattr(self.vad, "last_end_reason", None) == "max_duration":
                     logger.warning(
                         "VAD force-closed and discarded an overlong utterance: duration_limit_ms=%s bytes=%s",
@@ -8054,7 +8142,13 @@ class VoiceAssistant:
                         len(vad_audio),
                     )
                 else:
-                    self._queue_vad_utterance(vad_audio)
+                    self._queue_vad_utterance(
+                        vad_audio,
+                        started_during_playback=started_during_playback,
+                        playback_generation_at_start=(
+                            playback_generation_at_start
+                        ),
+                    )
         self._vad_leftover = buffered[offset:]
         await asyncio.sleep(0)
 

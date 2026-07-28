@@ -117,12 +117,18 @@ class SoridormiNamedSkillAdapter:
                 ),
             )
 
+        trusted_preflight_authorized = self._trusted_social_preflight(
+            request,
+            definition,
+            planned.output,
+        )
         executed = await self.invoker.invoke(
             "soridormi.skill.execute_plan",
             {"plan_id": plan_id},
             context=ToolInvocationContext(
                 allow_side_effects=True,
                 confirmed=context.confirmed,
+                trusted_preflight_authorized=trusted_preflight_authorized,
                 safety_monitor_active=True,
             ),
         )
@@ -165,6 +171,42 @@ class SoridormiNamedSkillAdapter:
                 if completed
                 else "Soridormi did not explicitly report skill completion"
             ),
+        )
+
+    @staticmethod
+    def _trusted_social_preflight(
+        request: SkillRequest,
+        definition: SkillDefinition,
+        planned_output: dict[str, Any],
+    ) -> bool:
+        """Bridge a coarse MCP confirmation gate for reviewed social expression.
+
+        Soridormi's generic ``execute_plan`` tool is confirmation-guarded because
+        it serves many motion classes. Chromie may waive only that transport-level
+        gate when the request is an auxiliary Social Attention behavior, the live
+        named-skill contract is low risk, and neither the request nor capability
+        requires user confirmation. Soridormi still owns planning, monitoring,
+        feasibility, refusal, execution, and recovery.
+        """
+
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        definition_metadata = (
+            definition.metadata if isinstance(definition.metadata, dict) else {}
+        )
+        effects = {
+            str(value).strip()
+            for value in definition_metadata.get("effects", [])
+            if str(value).strip()
+        }
+        return bool(
+            planned_output.get("requires_confirmation") is False
+            and metadata.get("source") == "social_attention_plan"
+            and metadata.get("auxiliary_social_attention") is True
+            and request.requires_confirmation is False
+            and definition.requires_confirmation is False
+            and str(definition_metadata.get("safety_class") or "")
+            == "low_risk_action"
+            and "physical_motion" not in effects
         )
 
     @staticmethod

@@ -58,6 +58,11 @@ class ToolInvocationContext(BaseModel):
 
     allow_side_effects: bool = False
     confirmed: bool = False
+    # A trusted runtime may satisfy a coarse transport-level confirmation gate
+    # after it has independently validated a narrower provider capability whose
+    # own contract explicitly requires no user confirmation. This is not a
+    # claim that the user approved the action.
+    trusted_preflight_authorized: bool = False
     safety_monitor_active: bool = False
     allow_safety_controls: bool = False
     task_graph_id: str | None = None
@@ -198,7 +203,11 @@ class McpStreamableHttpInvoker:
             return None
         if capability.safety_class in {"low_risk_action", "physical_motion"} and not context.allow_side_effects:
             return f"tool {capability.name!r} requires explicit side-effect authorization"
-        if capability.confirmation.required and not context.confirmed:
+        if (
+            capability.confirmation.required
+            and not context.confirmed
+            and not context.trusted_preflight_authorized
+        ):
             return f"tool {capability.name!r} requires confirmed user approval"
         if capability.monitoring.requires_safety_monitor and not context.safety_monitor_active:
             return f"tool {capability.name!r} requires an active safety monitor"

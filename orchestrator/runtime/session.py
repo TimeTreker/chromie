@@ -416,8 +416,13 @@ class SessionTracker:
         session = self.state.get(sid)
         if not session or session.get("runtime_trace_finalized"):
             return
+        # Lifecycle finalization is required even when runtime tracing is off.
+        # Previously a session without a RuntimeTrace stayed perpetually
+        # unfinished and the idle sweeper logged the same timeout every cycle.
+        session["runtime_trace_finalized"] = True
         trace = session.get("runtime_trace")
         if not isinstance(trace, RuntimeTrace):
+            session["runtime_trace_snapshot"] = None
             return
         self.sample_resources(
             sid,
@@ -427,7 +432,6 @@ class SessionTracker:
             sid,
             reason="session_abandoned" if state == "abandoned" else "session_finish",
         )
-        session["runtime_trace_finalized"] = True
         snapshot = trace.finish(state=state)
         session["runtime_trace_snapshot"] = snapshot
         retention = trace.policy.retention_decision(snapshot)
