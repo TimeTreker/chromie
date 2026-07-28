@@ -8,10 +8,14 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from typing import Any
 
 import websockets
+
+if hasattr(time, "tzset"):
+    time.tzset()
 
 from provider import TTSAudioChunk, TTSSynthesisCompleted, TTSSynthesisRequest
 from provider_impl import create_provider
@@ -152,6 +156,11 @@ async def handler(ws: Any) -> None:
 
 async def main() -> None:
     await provider.start()
+    logger.info(
+        "Candidate TTS runtime timezone tz=%s local=%s",
+        os.getenv("TZ", "unset"),
+        time.strftime("%Y-%m-%d %H:%M:%S %Z"),
+    )
     logger.info(
         "Candidate TTS ready provider=%s address=ws://%s:%s",
         provider.capabilities.provider_id,

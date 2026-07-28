@@ -142,7 +142,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:26b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
-        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
+        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         for key in (
             "OLLAMA_NUM_CTX",

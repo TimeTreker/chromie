@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
+import threading
 import time
 from multiprocessing.connection import Connection
 from pathlib import Path
@@ -137,8 +139,25 @@ def tensor_pcm16(tensor: Any) -> bytes:
 
 def worker_target(connection: Connection) -> None:
     try:
+        import torch
         from cosyvoice.cli.cosyvoice import AutoModel
         from huggingface_hub import snapshot_download
+
+        original_thread_excepthook = threading.excepthook
+
+        def fail_worker_on_cuda_oom(args: threading.ExceptHookArgs) -> None:
+            original_thread_excepthook(args)
+            exception = args.exc_value
+            if isinstance(exception, torch.OutOfMemoryError) or (
+                "CUDA out of memory" in str(exception)
+            ):
+                # CosyVoice performs token generation in an internal thread.
+                # If that thread dies, the outer generator can otherwise wait
+                # forever and never send a terminal pipe event to the server.
+                sys.stderr.flush()
+                os._exit(70)
+
+        threading.excepthook = fail_worker_on_cuda_oom
 
         model_id = required_env("COSYVOICE3_MODEL_ID", DEFAULT_MODEL_ID)
         model_revision = required_env(
@@ -277,6 +296,12 @@ def create_provider() -> WorkerBackedCandidateProvider:
         startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "1200")),
         cancel_drain_timeout_s=float(
             os.getenv("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", "3")
+        ),
+        first_audio_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC", "20")
+        ),
+        request_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "60")
         ),
     )
     speakers = ["default", *sorted(voices.profiles)]

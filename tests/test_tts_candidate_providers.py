@@ -38,7 +38,16 @@ def stream_fixture_target(connection: Connection) -> None:
         if payload.get("type") == "shutdown":
             connection.send({"type": "stopped"})
             return
-        if payload.get("text") == "block":
+        if payload.get("text") in {"block", "silent"}:
+            while True:
+                time.sleep(1)
+        if payload.get("text") == "worker-error":
+            connection.send({"type": "error", "message": "fixture failure"})
+            continue
+        if payload.get("text") == "audio-then-stall":
+            connection.send(
+                {"type": "audio", "pcm": b"\x01\x00" * 80, "sample_rate": 8000}
+            )
             while True:
                 time.sleep(1)
         if payload.get("text") == "slow-complete":
@@ -61,6 +70,7 @@ class FakeStreamingWorker:
     restart_count = 0
     cancel_drain_count = 0
     cancel_restart_count = 0
+    failure_restart_count = 0
     cancellation_mode = "bounded_drain_then_restart_worker"
     ready_payload = {"fixture": True}
 
@@ -136,6 +146,73 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(health["worker_cancel_drain_count"], 0)
         self.assertEqual(health["worker_cancel_restart_count"], 0)
+        self.assertEqual(health["worker_failure_restart_count"], 0)
+
+    async def test_streaming_worker_invalidates_after_worker_error(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-error-worker",
+            startup_timeout_s=5.0,
+        )
+        await worker.start()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "fixture failure"):
+                async for _event in worker.stream(
+                    {"type": "synthesize", "text": "worker-error"}
+                ):
+                    pass
+            self.assertFalse(worker.is_alive)
+            self.assertEqual(worker.failure_restart_count, 1)
+
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "recover"}
+                )
+            ]
+            self.assertEqual([event["type"] for event in events], ["audio", "complete"])
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_first_audio_timeout_invalidates_worker(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-first-audio-timeout-worker",
+            startup_timeout_s=5.0,
+            first_audio_timeout_s=0.05,
+            request_timeout_s=1.0,
+        )
+        await worker.start()
+        try:
+            with self.assertRaisesRegex(TimeoutError, "produced no audio"):
+                async for _event in worker.stream(
+                    {"type": "synthesize", "text": "silent"}
+                ):
+                    pass
+            self.assertFalse(worker.is_alive)
+            self.assertEqual(worker.failure_restart_count, 1)
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_total_timeout_catches_post_audio_stall(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-request-timeout-worker",
+            startup_timeout_s=5.0,
+            first_audio_timeout_s=1.0,
+            request_timeout_s=0.05,
+        )
+        await worker.start()
+        try:
+            with self.assertRaisesRegex(TimeoutError, "did not complete"):
+                async for _event in worker.stream(
+                    {"type": "synthesize", "text": "audio-then-stall"}
+                ):
+                    pass
+            self.assertFalse(worker.is_alive)
+            self.assertEqual(worker.failure_restart_count, 1)
+        finally:
+            await worker.stop()
 
     async def test_streaming_worker_restarts_after_native_cancellation(self) -> None:
         worker = StreamingProcessWorker(

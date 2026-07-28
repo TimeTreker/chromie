@@ -34,12 +34,16 @@ class StreamingProcessWorker:
         name: str,
         startup_timeout_s: float = 900.0,
         cancel_drain_timeout_s: float = 0.0,
+        first_audio_timeout_s: float = 0.0,
+        request_timeout_s: float = 0.0,
         context_name: str = "spawn",
     ) -> None:
         self._target = target
         self._name = name
         self._startup_timeout_s = startup_timeout_s
         self._cancel_drain_timeout_s = max(0.0, cancel_drain_timeout_s)
+        self._first_audio_timeout_s = max(0.0, first_audio_timeout_s)
+        self._request_timeout_s = max(0.0, request_timeout_s)
         self._context = multiprocessing.get_context(context_name)
         self._process: multiprocessing.Process | None = None
         self._connection: Connection | None = None
@@ -47,6 +51,7 @@ class StreamingProcessWorker:
         self.restart_count = 0
         self.cancel_drain_count = 0
         self.cancel_restart_count = 0
+        self.failure_restart_count = 0
         self.ready_payload: dict[str, Any] = {}
 
     @property
@@ -77,6 +82,8 @@ class StreamingProcessWorker:
             if connection is None:
                 raise RuntimeError(f"{self._name} is not started")
             terminal_received = False
+            first_audio_received = False
+            started_at = time.monotonic()
             try:
                 connection.send(payload)
                 while True:
@@ -87,16 +94,45 @@ class StreamingProcessWorker:
                                 f"{self._name} returned a non-object stream event"
                             )
                         event_type = str(event.get("type") or "")
+                        if event_type == "error":
+                            message = str(event.get("message") or "worker synthesis failed")
+                            self._invalidate_after_failure(reason="worker_error")
+                            raise RuntimeError(f"{self._name} failed: {message}")
+                        if event_type == "audio":
+                            first_audio_received = True
                         terminal_received = event_type in TERMINAL_TYPES
                         yield event
                         if terminal_received:
                             return
-                    elif self._connection is not connection or not self.is_alive:
-                        raise EOFError(
-                            f"{self._name} closed before a terminal stream event"
+                        continue
+
+                    now = time.monotonic()
+                    if (
+                        not first_audio_received
+                        and self._first_audio_timeout_s > 0
+                        and now - started_at >= self._first_audio_timeout_s
+                    ):
+                        timeout = self._first_audio_timeout_s
+                        self._invalidate_after_failure(reason="first_audio_timeout")
+                        raise TimeoutError(
+                            f"{self._name} produced no audio within {timeout:.1f}s"
                         )
-                    else:
-                        await asyncio.sleep(0.01)
+                    if (
+                        self._request_timeout_s > 0
+                        and now - started_at >= self._request_timeout_s
+                    ):
+                        timeout = self._request_timeout_s
+                        self._invalidate_after_failure(reason="request_timeout")
+                        raise TimeoutError(
+                            f"{self._name} did not complete within {timeout:.1f}s"
+                        )
+                    if self._connection is not connection or not self.is_alive:
+                        exitcode = self._process.exitcode if self._process is not None else None
+                        raise EOFError(
+                            f"{self._name} closed before a terminal stream event "
+                            f"(exitcode={exitcode})"
+                        )
+                    await asyncio.sleep(0.01)
             except asyncio.CancelledError:
                 if not terminal_received:
                     await self._recover_after_cancellation(connection)
@@ -109,8 +145,12 @@ class StreamingProcessWorker:
                 if not terminal_received:
                     await self._recover_after_cancellation(connection)
                 raise
+            except TimeoutError:
+                # TimeoutError subclasses OSError; the timeout paths already
+                # invalidated the worker with the more specific reason.
+                raise
             except (BrokenPipeError, EOFError, OSError):
-                await self._restart_after_failure(cancelled=False)
+                self._invalidate_after_failure(reason="worker_transport_failure")
                 raise
 
     async def _recover_after_cancellation(self, connection: Connection) -> None:
@@ -151,6 +191,24 @@ class StreamingProcessWorker:
         except (BrokenPipeError, EOFError, OSError):
             return False
         return False
+
+    def _invalidate_after_failure(self, *, reason: str) -> None:
+        """Discard a poisoned worker and let the next request start a fresh one.
+
+        Failure propagation must not wait for a heavyweight model reload. The
+        next request enters ``stream`` under the singleton lock and calls
+        ``_start`` before sending any payload, so no stale CUDA or pipe state is
+        reused after OOM, process death, or a bounded synthesis timeout.
+        """
+
+        self._terminate_sync()
+        self.restart_count += 1
+        self.failure_restart_count += 1
+        logger.error(
+            "Invalidated streaming worker after %s; next request will start a fresh process: %s",
+            reason,
+            self._name,
+        )
 
     async def _restart_after_failure(self, *, cancelled: bool) -> None:
         self._terminate_sync()

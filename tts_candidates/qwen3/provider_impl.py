@@ -197,6 +197,12 @@ def create_provider() -> WorkerBackedCandidateProvider:
         cancel_drain_timeout_s=float(
             os.getenv("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", "3")
         ),
+        first_audio_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC", "20")
+        ),
+        request_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "60")
+        ),
     )
     return WorkerBackedCandidateProvider(
         capabilities=capabilities,

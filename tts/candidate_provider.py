@@ -46,6 +46,7 @@ class WorkerBackedCandidateProvider(TTSProvider):
             "worker_restart_count": self._worker.restart_count,
             "worker_cancel_drain_count": self._worker.cancel_drain_count,
             "worker_cancel_restart_count": self._worker.cancel_restart_count,
+            "worker_failure_restart_count": self._worker.failure_restart_count,
             "cancellation_mode": self._worker.cancellation_mode,
             "worker": dict(self._worker.ready_payload),
         }
