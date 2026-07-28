@@ -45,7 +45,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("has just woken up", prompt)
         self.assertIn("naturally says after waking up", prompt)
-        self.assertIn("Local time:", prompt)
+        self.assertNotIn("Local time:", prompt)
+        self.assertIn("Do not mention clock time", prompt)
         self.assertIn("Speak only in zh-CN", prompt)
         self.assertIn("not a device or an adult professional", prompt)
         self.assertIn("Return only a JSON object", prompt)
@@ -184,7 +185,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(session.payload["think"], False)
         self.assertEqual(
             session.payload["format"],
-            assistant._spoken_text_response_schema(max_chars=12),
+            assistant._spoken_text_response_schema(max_chars=24),
         )
         self.assertEqual(session.payload["options"]["num_predict"], 32)
 

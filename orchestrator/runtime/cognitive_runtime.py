@@ -1382,6 +1382,7 @@ class CanonicalPlanRuntimeAdapter:
                         definition.output_schema
                     ),
                     metadata={
+                        **step.metadata,
                         "source": "goal_driven_canonical_plan",
                         "canonical_plan_id": plan.plan_id,
                         "canonical_plan_fingerprint": fingerprint,
@@ -1399,7 +1400,15 @@ class CanonicalPlanRuntimeAdapter:
                         ) not in {"safe_read", "planning_only"},
                         "retryable_safe_read": safe_read_parallel,
                         "parallel_with_speech": safe_read_parallel,
-                        **step.metadata,
+                        "canonical_timing": step.timing,
+                        "effective_timing": (
+                            "parallel" if safe_read_parallel else step.timing
+                        ),
+                        "runtime_timing_adjustment": (
+                            "safe_read_parallel"
+                            if safe_read_parallel and step.timing != "parallel"
+                            else "none"
+                        ),
                     },
                 )
             )

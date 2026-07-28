@@ -516,6 +516,27 @@ class ExecutionOutcomeReconciler:
         )
 
     @staticmethod
+    def _request_timing_matches_step(
+        step: Any,
+        request: SkillRequest,
+    ) -> bool:
+        if request.timing == step.timing:
+            return True
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        return bool(
+            request.timing == "parallel"
+            and step.timing != "parallel"
+            and request.requires_confirmation is False
+            and metadata.get("runtime_timing_adjustment")
+            == "safe_read_parallel"
+            and metadata.get("canonical_timing") == step.timing
+            and metadata.get("effective_timing") == request.timing
+            and metadata.get("retryable_safe_read") is True
+            and metadata.get("parallel_with_speech") is True
+            and str(metadata.get("safety_class") or "") == "safe_read"
+        )
+
+    @staticmethod
     def _planned_requests(
         plan: CanonicalPlan,
         *,
@@ -591,7 +612,9 @@ class ExecutionOutcomeReconciler:
                 raise ValueError(
                     "canonical step request args do not match plan"
                 )
-            if request.timing != step.timing:
+            if not ExecutionOutcomeReconciler._request_timing_matches_step(
+                step, request
+            ):
                 raise ValueError(
                     "canonical step request timing does not match plan"
                 )

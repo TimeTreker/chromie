@@ -8277,39 +8277,43 @@ class VoiceAssistant:
         language = self.runtime_ready_greeting_language
         identity_json = self._direct_llm_identity_json()
         mind_summary = self._direct_llm_mind_summary()
-        local_time = time.strftime("%Y-%m-%d %H:%M:%S %Z")
-        timezone_name = (
-            os.getenv("CHROMIE_HOST_TIMEZONE", "").strip()
-            or os.getenv("TZ", "").strip()
-            or time.tzname[0]
-        )
         return (
             "Chromie has just woken up and can now hear and talk with the people "
-            "nearby. Write exactly one very short sentence she naturally says after "
-            "waking up. Sound like a smart, warm, slightly sleepy six-year-old girl, "
-            "not a device or an adult professional. Use the supplied local time only "
-            "when a time-of-day greeting feels natural. "
+            "nearby. Write exactly one complete, very short greeting she naturally "
+            "says after waking up. Sound like a smart, warm six-year-old girl, not a "
+            "device or an adult professional. "
             f"Speak only in {language}. "
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
             "services, models, being an assistant, or operational status. Do not "
-            "introduce yourself or ask what help is required. Nobody nearby has "
+            "introduce yourself or ask what help is required. Do not mention clock "
+            "time, time of day, meals, hunger, sleepiness, weather, or another "
+            "ungrounded personal state. Do not ask a question or end mid-clause. "
+            "Nobody nearby has "
             "been identified at startup, so do not address anyone as mother, father, "
             "owner, friend, or by any other invented name or relationship. Return only a JSON "
             "object with one field named text. The text value is the complete spoken "
-            "sentence and must be short enough to say naturally in about two seconds.\n\n"
-            f"Local time: {local_time}\n"
-            f"Timezone: {timezone_name}\n"
+            "sentence, normally four to twelve Chinese characters and never more "
+            "than twenty-four characters. Prefer a complete greeting over filling "
+            "the available length.\n\n"
             f"Owner-approved identity JSON: {identity_json}\n"
             f"Owner-approved mind summary: {mind_summary}\n"
         )
+
+    @staticmethod
+    def _validate_runtime_ready_greeting_completion(text: str) -> str:
+        if not re.search(r"[。！？!?]$", str(text or "").strip()):
+            raise RuntimeError(
+                "runtime ready greeting is not a complete punctuated sentence"
+            )
+        return text
 
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
         try:
             configured = self._validate_spoken_text_contract(
                 self.runtime_ready_greeting_text,
                 purpose="configured runtime ready greeting",
-                max_chars=12,
+                max_chars=24,
                 one_sentence=True,
                 language=self.runtime_ready_greeting_language,
             )
@@ -8329,7 +8333,7 @@ class VoiceAssistant:
             "prompt": self._runtime_ready_greeting_prompt(),
             "stream": False,
             "think": False,
-            "format": self._spoken_text_response_schema(max_chars=12),
+            "format": self._spoken_text_response_schema(max_chars=24),
             "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
             "options": {
                 "num_ctx": int(
@@ -8339,7 +8343,7 @@ class VoiceAssistant:
                     )
                 ),
                 "num_predict": self.runtime_ready_greeting_num_predict,
-                "temperature": 0.65,
+                "temperature": 0.35,
                 "top_p": 0.9,
             },
         }
@@ -8361,7 +8365,7 @@ class VoiceAssistant:
             generated = self._decode_spoken_text_envelope(
                 data,
                 purpose="runtime ready greeting",
-                max_chars=12,
+                max_chars=24,
                 one_sentence=True,
                 language=self.runtime_ready_greeting_language,
             )
@@ -8372,6 +8376,7 @@ class VoiceAssistant:
                 raise RuntimeError(
                     "runtime ready greeting invented an unidentified relationship"
                 )
+            self._validate_runtime_ready_greeting_completion(generated)
             return generated, f"llm:{model}"
         except Exception as exc:
             logger.warning("Runtime ready greeting generation failed: %s", exc)
@@ -8379,7 +8384,7 @@ class VoiceAssistant:
                 fallback = self._validate_spoken_text_contract(
                     self.runtime_ready_greeting_fallback_text,
                     purpose="runtime ready greeting fallback",
-                    max_chars=12,
+                    max_chars=24,
                     one_sentence=True,
                     language=self.runtime_ready_greeting_language,
                 )
@@ -8392,7 +8397,7 @@ class VoiceAssistant:
         """Speak one natural wake-up greeting before live microphone turns.
 
         The fast language model owns the normal wording using the owner-approved
-        identity, mind profile, language, and local time. The host only schedules
+        identity, mind profile, and language. The host only schedules
         the resulting speech before the microphone opens, so startup creates no
         fake user turn and cannot feed its own greeting back through ASR.
         """

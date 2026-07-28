@@ -519,8 +519,19 @@ def canonical_plan_response_schema(
     The host supplies its plan identity, tier, schema version, and exact Goal
     Association IDs after validating this semantic DTO. Cross-field invariants
     remain enforced by ``PlannerModelOutput`` and ``CanonicalPlan`` with one
-    bounded same-tier model repair.
+    bounded same-tier model repair. Fast Planner uses the same decoder-tight
+    per-goal shape for one or many goals so the schema never instructs the model
+    to omit fields that deterministic validation requires.
     """
+
+    if planner_tier == "fast":
+        schema = fast_multi_goal_response_schema(
+            expected_goal_ids=expected_goal_ids,
+            allowed_skill_ids=allowed_skill_ids,
+            response_only=response_only,
+        )
+        schema["title"] = "FastPlannerModelOutput"
+        return schema
 
     schema = copy.deepcopy(PlannerModelOutput.model_json_schema())
     schema["title"] = (

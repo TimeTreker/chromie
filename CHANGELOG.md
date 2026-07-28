@@ -4,6 +4,24 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Runtime authority and embodied-response root fixes
+
+- Reconciled adapter-authorized safe-read parallel timing against immutable
+  canonical timing without weakening timing checks for physical or forged
+  requests. Runtime timing provenance is now explicit and evidence-bound.
+- Preserved an admitted Cognitive Core `clarify` disposition through Goal
+  Association, so low-information ASR fragments cannot become invented goals or
+  unsolicited self-introductions.
+- Unified the single-goal Fast Planner decoder with the strict per-goal contract;
+  it now authors the required outcome and prospective satisfaction instead of
+  being instructed to emit values the validator must reject.
+- Restored a practical wake-up greeting bound, removed ungrounded clock/state
+  prompting, and rejected model greetings that end without sentence-final
+  punctuation rather than speaking truncated clauses.
+- Calibrated courteous Social Attention so meaningful direct engagement is
+  positive evidence for one subtle model-selected behavior; stillness remains
+  valid when the supplied scene or recent evidence provides a concrete restraint.
+
 ### Explicit Social Attention decisions and bounded compatibility join
 
 - Required Response Composer to return an explicit `decision=none` or

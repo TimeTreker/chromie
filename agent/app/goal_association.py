@@ -297,7 +297,11 @@ class GoalAssociationResolver:
             if active_goals
             else GoalSegmentationModelOutput
         )
-        response_schema = self._response_schema(output_type, active_goals)
+        response_schema = self._response_schema(
+            output_type,
+            active_goals,
+            clarification_only=self._clarification_only(request),
+        )
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -326,7 +330,7 @@ class GoalAssociationResolver:
                     turn_id=turn_id,
                     output_type=output_type,
                 )
-            except ValidationError as exc:
+            except (ValidationError, ValueError) as exc:
                 repair_attempted = True
                 initial_validation_error = self._validation_error_json(exc)
                 logger.warning(
@@ -440,6 +444,11 @@ class GoalAssociationResolver:
         ),
     ) -> GoalAssociationResolution:
         model_output = output_type.model_validate(raw)
+        if self._clarification_only(request) and model_output.decision != "clarify":
+            raise ValueError(
+                "an admitted clarify route requires a clarification-only Goal "
+                "Association result"
+            )
         return self._expand_model_output(
             model_output,
             request=request,
@@ -447,9 +456,13 @@ class GoalAssociationResolver:
         )
 
     @staticmethod
-    def _validation_error_json(exc: ValidationError) -> str:
+    def _validation_error_json(exc: Exception) -> str:
+        if isinstance(exc, ValidationError):
+            payload: Any = exc.errors(include_url=False)
+        else:
+            payload = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
         return json.dumps(
-            exc.errors(include_url=False),
+            payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -463,6 +476,8 @@ class GoalAssociationResolver:
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
         active_goals: list[dict[str, Any]],
+        *,
+        clarification_only: bool = False,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(output_type.model_json_schema())
         active_ids = [
@@ -520,6 +535,17 @@ class GoalAssociationResolver:
                 "reason_summary",
             ]
         schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
+        if clarification_only:
+            properties["decision"] = {"type": "string", "enum": ["clarify"]}
+            clarification = properties.get("clarification")
+            if isinstance(clarification, dict):
+                clarification["minLength"] = 1
+            new_goals = properties.get("new_goals")
+            if isinstance(new_goals, dict):
+                new_goals["maxItems"] = 0
+            associations = properties.get("associations")
+            if isinstance(associations, dict):
+                associations["maxItems"] = 0
         schema.pop("oneOf", None)
         schema.pop("anyOf", None)
         return schema
@@ -538,6 +564,10 @@ class GoalAssociationResolver:
             except Exception:
                 continue
         return out
+
+    @staticmethod
+    def _clarification_only(request: AgentRunRequest) -> bool:
+        return str(request.route_decision.route or "").strip() == "clarify"
 
     @staticmethod
     def _turn_id(request: AgentRunRequest) -> str:
@@ -561,6 +591,14 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        clarification_authority = (
+            "The admitted Cognitive Core disposition is clarify. Preserve that "
+            "semantic authority: return decision=clarify with one concise "
+            "user-facing question, associations=[], and new_goals=[]. Do not "
+            "reinterpret the low-information turn as a social goal.\n\n"
+            if self._clarification_only(request)
+            else ""
+        )
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
@@ -585,6 +623,7 @@ class GoalAssociationResolver:
             )
         return (
             state_instructions
+            + clarification_authority
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans.\n\n"
@@ -633,6 +672,13 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        clarification_authority = (
+            "The admitted Cognitive Core disposition is clarify. Return only "
+            "decision=clarify with a concise user-facing question; do not create "
+            "or associate goals.\n\n"
+            if self._clarification_only(request)
+            else ""
+        )
         if output_type is GoalSegmentationModelOutput:
             contract_name = "Goal Segmentation"
             revision_action = "Re-evaluate the independent goal segmentation"
@@ -660,6 +706,7 @@ class GoalAssociationResolver:
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             + state_instructions
+            + clarification_authority
             + "\n\n"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
