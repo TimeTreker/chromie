@@ -563,10 +563,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
             response_plan_schema["properties"]["pre_action"],
             {"type": "null"},
         )
-        self.assertIn("emit exactly one tiny everyday immediate acknowledgement", ollama.prompts[0][0])
+        self.assertIn("emit exactly one natural everyday immediate acknowledgement", ollama.prompts[0][0])
         self.assertIn("starts this speech and the lookup in parallel", ollama.prompts[0][0])
 
-    def test_safe_read_long_acknowledgement_is_repaired_to_micro_speech(self):
+    def test_safe_read_acknowledgement_length_remains_model_owned(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -586,15 +586,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             }
         }
-        repaired = {
-            "response_plan": {
-                "immediate": {
-                    "text": "我看看。",
-                    "covers_goal_ids": ["goal-weather"],
-                }
-            }
-        }
-        ollama = ScriptedOllama([long_output, repaired])
+        ollama = ScriptedOllama([long_output])
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
                 request(
@@ -613,9 +605,9 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         self.assertEqual(
             result.composition.response_plan.immediate.text,
-            "我看看。",
+            "我现在就去帮你仔细看看上海今天的天气怎么样。",
         )
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
 
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])

@@ -26,6 +26,7 @@ from .planner_contract import (
     materialize_planner_metadata,
     planner_contract_diagnostics,
     validate_explicit_numeric_parameter_grounding,
+    validate_goal_binding_argument_grounding,
     validate_planner_model_output,
 )
 from .schema import AgentRunRequest
@@ -227,13 +228,19 @@ class FastPlannerResolver:
                     )
                 )
                 plan = CanonicalPlan.model_validate(normalized)
+                validated_model_output = validate_planner_model_output(
+                    raw,
+                    planner_tier="fast",
+                    expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                )
+                authoritative_goals = canonical_goal_grounding(request.context)
                 validate_explicit_numeric_parameter_grounding(
-                    validate_planner_model_output(
-                        raw,
-                        planner_tier="fast",
-                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                    ),
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
+                )
+                validate_goal_binding_argument_grounding(
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
                 )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
@@ -489,7 +496,7 @@ class FastPlannerResolver:
             )
         )
         semantic_scope_contract = (
-            "Capability semantic_scope metadata is authoritative applicability evidence. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+            "Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "
@@ -504,11 +511,11 @@ class FastPlannerResolver:
                 f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
-                f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 5000)}\n\n"
+                f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
-                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. Recent trusted tool evidence may satisfy a conversational goal without another execution only when it is semantically relevant, fresh, and its bound request_args match every material goal parameter such as location and date; use a respond outcome in that case. Never infer relevance through fixed phrase rules. For a scheduled, running, or recoverable safe-read goal without matching completed evidence, reuse the bound skill and exact arguments and execute or retry it; never answer from another task's evidence. A tool-routed current/external-information goal without matching trusted evidence must execute a supplied read capability or escalate; never fabricate the result from model memory. On a tool route, every top-level and per-goal response_text must be empty: do not greet, acknowledge, self-introduce, narrate a lookup, or predict the result. Response Composer owns optional pre-execution speech, and post-execution speech is produced only from trusted tool evidence. "
+                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound skill and exact arguments and execute or retry it; never answer from another task's result. On a tool route, every top-level and per-goal response_text must be empty: do not greet, acknowledge, self-introduce, narrate a lookup, or predict the result. Response Composer owns optional pre-execution speech, and post-execution speech is produced only from evidence returned by an executed retrieval or external read. "
                 f"{argument_grounding_contract}"
                 f"{semantic_scope_contract}"
                 f"{IDENTITY_SEMANTIC_CONTRACT}"
@@ -537,11 +544,11 @@ class FastPlannerResolver:
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
-            f"Recent trusted tool evidence JSON:\n{self._bounded(context.get('recent_tool_evidence') or [], 5000)}\n\n"
+            f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
             f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
-            "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. Recent trusted tool evidence may already satisfy a conversational goal only when it is relevant, fresh, and bound to the same material request_args, including location and date. Never use lexical mappings or host-authored recency rules for that judgment. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed evidence exists. A tool-routed request for current or external information has no answer evidence unless matching recent trusted tool evidence is explicitly present. Otherwise plan the supplied read capability with grounded arguments, or escalate if the required arguments are unresolved; never invent weather, temperature, status, price, schedule, or another external result from model memory. "
+            "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent weather, temperature, status, price, schedule, or another external result from model memory or from index metadata. "
             "There are exactly two legal output shapes for one or many goals. A terminal plan uses coverage=complete, a goal_outcomes entry keyed exactly once by every canonical Goal ID, and non-null prospective satisfaction. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], one escalate outcome for every canonical Goal ID, non-exact prospective satisfaction, and a specific non-empty escalation_reason. "
             "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the complete model-authored semantic-escalation shape; never return an empty outcome map or null satisfaction. "
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "

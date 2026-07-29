@@ -24,6 +24,12 @@ class ConversationToolEvidenceTests(unittest.TestCase):
                                 "evidence_id": "evidence-weather",
                                 "skill_id": "chromie.weather.lookup",
                                 "status": "completed",
+                                "metadata": {
+                                    "request_args": {
+                                        "location": "Beijing",
+                                        "date": "today",
+                                    }
+                                },
                                 "observation": {
                                     "status": "available",
                                     "schema_validated": True,
@@ -49,6 +55,46 @@ class ConversationToolEvidenceTests(unittest.TestCase):
             snapshot["session_memory"]["recent_tool_evidence"][0]["evidence_id"],
             "evidence-weather",
         )
+        memory_index = snapshot["verified_tool_memory_index"]
+        self.assertEqual(memory_index[0]["request_args"]["location"], "Beijing")
+        self.assertNotIn("data", memory_index[0])
+
+        mismatch = manager.retrieve_verified_tool_memory(
+            {
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "material_args": {"location": "内乡", "date": "today"},
+                "max_age_s": 900,
+            }
+        )
+        self.assertFalse(mismatch["found"])
+        self.assertEqual(mismatch["reason"], "no_exact_verified_match")
+
+        exact = manager.retrieve_verified_tool_memory(
+            {
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "material_args": {"location": "beijing", "date": "today"},
+                "max_age_s": 900,
+            }
+        )
+        self.assertTrue(exact["found"])
+        self.assertEqual(exact["data"]["apparent_temperature_c"], 35.0)
+
+    def test_result_without_original_arguments_is_not_advertised_for_memory_reuse(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="tool-no-args")
+        manager._recent_tool_evidence.append(
+            {
+                "evidence_id": "evidence-no-args",
+                "tool_id": "chromie.weather.lookup",
+                "status": "completed",
+                "request_args": {},
+                "recorded_ms": 1.0,
+                "data": {"location": "重庆"},
+            }
+        )
+
+        self.assertEqual(manager.verified_tool_memory_index(), [])
 
     def test_unvalidated_tool_payload_is_not_retained(self) -> None:
         manager = ConversationStateManager(base_conversation_id="tool-reject")

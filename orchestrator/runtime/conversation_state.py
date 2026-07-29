@@ -12,6 +12,11 @@ from typing import Any, Callable, Deque
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
 try:
+    from chromie_contracts.discourse import (
+        DiscourseReferent,
+        DiscourseReferentUpdate,
+        ResolvedDiscourseReference,
+    )
     from chromie_contracts.goal import (
         ActiveGoalSnapshot,
         GoalAssociationResolution,
@@ -29,6 +34,11 @@ try:
         TaskContextSnapshot,
     )
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.discourse import (
+        DiscourseReferent,
+        DiscourseReferentUpdate,
+        ResolvedDiscourseReference,
+    )
     from shared.chromie_contracts.goal import (
         ActiveGoalSnapshot,
         GoalAssociationResolution,
@@ -185,6 +195,8 @@ class ConversationStateManager:
         max_pending_tasks: int = 8,
         max_tool_evidence: int = 8,
         max_memory_entries: int = 24,
+        max_discourse_referents: int = 24,
+        max_discourse_focus: int = 8,
         completed_task_retention_sec: int = 180,
         task_store_enabled: bool = False,
         task_store_path: str | os.PathLike[str] | None = None,
@@ -202,6 +214,8 @@ class ConversationStateManager:
         self.max_pending_tasks = max(0, int(max_pending_tasks))
         self.max_tool_evidence = max(1, int(max_tool_evidence))
         self.max_memory_entries = max(1, int(max_memory_entries))
+        self.max_discourse_referents = max(1, int(max_discourse_referents))
+        self.max_discourse_focus = max(1, int(max_discourse_focus))
         self.completed_task_retention_sec = max(0, int(completed_task_retention_sec))
         self.task_store_enabled = bool(task_store_enabled)
         self.task_store_path = self._resolve_task_store_path(task_store_path)
@@ -219,6 +233,12 @@ class ConversationStateManager:
         self._task_contexts: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
         self._recent_tool_evidence: Deque[dict[str, Any]] = deque(
             maxlen=self.max_tool_evidence
+        )
+        self._discourse_referents: Deque[dict[str, Any]] = deque(
+            maxlen=self.max_discourse_referents
+        )
+        self._discourse_focus: Deque[str] = deque(
+            maxlen=self.max_discourse_focus
         )
         self._memory_store = MemoryStore(max_entries=self.max_memory_entries)
         self._memory_extractor = MemoryExtractor()
@@ -250,6 +270,12 @@ class ConversationStateManager:
                 os.getenv("ORCH_CONVERSATION_MAX_TOOL_EVIDENCE", "8")
             ),
             max_memory_entries=int(os.getenv("ORCH_CONVERSATION_MAX_MEMORY_ENTRIES", "24")),
+            max_discourse_referents=int(
+                os.getenv("ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS", "24")
+            ),
+            max_discourse_focus=int(
+                os.getenv("ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS", "8")
+            ),
             completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
             task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
             task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
@@ -304,10 +330,12 @@ class ConversationStateManager:
         if not self.enabled or not self.task_store_enabled:
             return False
         payload = {
-            "version": 1,
+            "version": 2,
             "conversation_id": self.conversation_id,
             "saved_ms": _now_ms(),
             "task_contexts": self._durable_task_contexts(),
+            "discourse_referents": self.discourse_referents(),
+            "discourse_focus": self.discourse_focus(),
         }
         try:
             self.task_store_path.parent.mkdir(parents=True, exist_ok=True)
@@ -335,7 +363,49 @@ class ConversationStateManager:
             return
         raw_contexts = payload.get("task_contexts") if isinstance(payload, dict) else payload
         if not isinstance(raw_contexts, list):
-            return
+            raw_contexts = []
+        raw_referents = (
+            payload.get("discourse_referents", [])
+            if isinstance(payload, dict)
+            else []
+        )
+        restored_referents: list[dict[str, Any]] = []
+        if isinstance(raw_referents, list):
+            for item in raw_referents[-self.max_discourse_referents :]:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    restored_referents.append(
+                        DiscourseReferent.model_validate(item).model_dump(
+                            mode="json",
+                            exclude_none=True,
+                        )
+                    )
+                except Exception:
+                    continue
+        if restored_referents:
+            self._discourse_referents = deque(
+                restored_referents,
+                maxlen=self.max_discourse_referents,
+            )
+            known = {
+                str(item.get("referent_id") or "")
+                for item in restored_referents
+            }
+            raw_focus = (
+                payload.get("discourse_focus", [])
+                if isinstance(payload, dict)
+                else []
+            )
+            focus = [
+                str(item)
+                for item in raw_focus
+                if str(item) in known
+            ] if isinstance(raw_focus, list) else []
+            self._discourse_focus = deque(
+                focus[-self.max_discourse_focus :],
+                maxlen=self.max_discourse_focus,
+            )
         now = _now_ms()
         restored: list[dict[str, Any]] = []
         for item in raw_contexts[-self.max_pending_tasks :]:
@@ -363,7 +433,8 @@ class ConversationStateManager:
             restored.append(context)
         if restored:
             self._task_contexts = deque(restored, maxlen=max(1, self.max_pending_tasks))
-            self.last_split_reason = "restored_task_contexts"
+        if restored or restored_referents:
+            self.last_split_reason = "restored_semantic_context"
             self.last_task_store_error = None
 
     @staticmethod
@@ -376,6 +447,7 @@ class ConversationStateManager:
             self._turns
             or self._pending_tasks
             or self._task_contexts
+            or self._discourse_referents
             or self._memory_store.prompt_entries(limit=1)
         )
 
@@ -1019,6 +1091,8 @@ class ConversationStateManager:
 
         task_context_snapshot = copy.deepcopy(list(self._task_contexts))
         pending_task_snapshot = copy.deepcopy(list(self._pending_tasks))
+        discourse_referent_snapshot = copy.deepcopy(list(self._discourse_referents))
+        discourse_focus_snapshot = list(self._discourse_focus)
         activity_snapshot = self.last_activity_ms
         store_error_snapshot = self.last_task_store_error
 
@@ -1028,6 +1102,14 @@ class ConversationStateManager:
             )
             self._pending_tasks = deque(
                 pending_task_snapshot, maxlen=max(1, self.max_pending_tasks)
+            )
+            self._discourse_referents = deque(
+                discourse_referent_snapshot,
+                maxlen=self.max_discourse_referents,
+            )
+            self._discourse_focus = deque(
+                discourse_focus_snapshot,
+                maxlen=self.max_discourse_focus,
             )
             self.last_activity_ms = activity_snapshot
             self.last_task_store_error = store_error
@@ -2071,6 +2153,7 @@ class ConversationStateManager:
         }
         operations: list[SemanticTaskOperation] = []
         results: list[dict[str, Any]] = []
+        results.extend(self._apply_discourse_resolution_in_memory(resolved))
 
         for ordinal, goal in enumerate(resolved.new_goals):
             operation_id = stable_goal_operation_id(
@@ -2646,6 +2729,8 @@ class ConversationStateManager:
         self._pending_tasks.clear()
         self._task_contexts.clear()
         self._recent_tool_evidence.clear()
+        self._discourse_referents.clear()
+        self._discourse_focus.clear()
         self._memory_store.clear()
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
@@ -2735,6 +2820,291 @@ class ConversationStateManager:
         if not self.enabled:
             return []
         return [copy.deepcopy(item) for item in self._recent_tool_evidence]
+
+    def discourse_referents(self) -> list[dict[str, Any]]:
+        """Return all bounded scoped referents retained for this conversation."""
+
+        if not self.enabled:
+            return []
+        return [copy.deepcopy(item) for item in self._discourse_referents]
+
+    def discourse_focus(self) -> list[str]:
+        """Return the model-authored focus stack, with foreground last."""
+
+        if not self.enabled:
+            return []
+        known = {
+            str(item.get("referent_id") or "")
+            for item in self._discourse_referents
+        }
+        return [item for item in self._discourse_focus if item in known]
+
+    def discourse_snapshot(self) -> dict[str, Any]:
+        return {
+            "referents": self.discourse_referents(),
+            "focus": self.discourse_focus(),
+            "authority": "goal_association_llm",
+            "host_role": "typed_storage_and_provenance_only",
+        }
+
+    def _referent_index(self) -> dict[str, dict[str, Any]]:
+        return {
+            str(item.get("referent_id") or ""): item
+            for item in self._discourse_referents
+            if str(item.get("referent_id") or "")
+        }
+
+    def _focus_referent(self, referent_id: str) -> None:
+        normalized = " ".join(str(referent_id or "").strip().split())
+        if not normalized:
+            return
+        focus = [item for item in self._discourse_focus if item != normalized]
+        focus.append(normalized)
+        self._discourse_focus = deque(
+            focus[-self.max_discourse_focus :],
+            maxlen=self.max_discourse_focus,
+        )
+
+    def _remove_focus(self, referent_id: str) -> None:
+        self._discourse_focus = deque(
+            [item for item in self._discourse_focus if item != referent_id],
+            maxlen=self.max_discourse_focus,
+        )
+
+    def _apply_discourse_resolution_in_memory(
+        self,
+        resolution: GoalAssociationResolution,
+    ) -> list[dict[str, Any]]:
+        """Apply only model-authored scoped referent and focus mutations."""
+
+        results: list[dict[str, Any]] = []
+        index = self._referent_index()
+
+        def replace_referent(referent: DiscourseReferent) -> None:
+            payload = referent.model_dump(mode="json", exclude_none=True)
+            retained = [
+                item
+                for item in self._discourse_referents
+                if str(item.get("referent_id") or "") != referent.referent_id
+            ]
+            retained.append(payload)
+            self._discourse_referents = deque(
+                retained[-self.max_discourse_referents :],
+                maxlen=self.max_discourse_referents,
+            )
+            index[referent.referent_id] = payload
+
+        for update in resolution.referent_updates:
+            if update.operation in {"introduce", "correct"}:
+                if update.referent is None:
+                    results.append(
+                        {
+                            "operation": update.operation,
+                            "applied": False,
+                            "reason": "missing_referent",
+                        }
+                    )
+                    continue
+                if update.operation == "correct":
+                    for target_id in update.target_referent_ids:
+                        current = index.get(target_id)
+                        if current is None:
+                            results.append(
+                                {
+                                    "operation": update.operation,
+                                    "referent_id": target_id,
+                                    "applied": False,
+                                    "reason": "unknown_target_referent",
+                                }
+                            )
+                            continue
+                        background = DiscourseReferent.model_validate(current).model_copy(
+                            update={"status": "background"}
+                        )
+                        replace_referent(background)
+                        self._remove_focus(target_id)
+                replace_referent(update.referent)
+                self._focus_referent(update.referent.referent_id)
+                results.append(
+                    {
+                        "operation": update.operation,
+                        "referent_id": update.referent.referent_id,
+                        "applied": True,
+                        "state_change": "referent_upserted_and_focused",
+                    }
+                )
+                continue
+
+            status = {
+                "focus": "foreground",
+                "background": "background",
+                "retire": "retired",
+            }[update.operation]
+            for target_id in update.target_referent_ids:
+                current = index.get(target_id)
+                if current is None:
+                    results.append(
+                        {
+                            "operation": update.operation,
+                            "referent_id": target_id,
+                            "applied": False,
+                            "reason": "unknown_target_referent",
+                        }
+                    )
+                    continue
+                revised = DiscourseReferent.model_validate(current).model_copy(
+                    update={"status": status}
+                )
+                replace_referent(revised)
+                if status == "foreground":
+                    self._focus_referent(target_id)
+                else:
+                    self._remove_focus(target_id)
+                results.append(
+                    {
+                        "operation": update.operation,
+                        "referent_id": target_id,
+                        "applied": True,
+                        "state_change": f"referent_{status}",
+                    }
+                )
+
+        # A successfully resolved reference is itself a model-authored focus event.
+        for reference in resolution.resolved_references:
+            referent_id = str(reference.referent_id or "").strip()
+            if not referent_id:
+                continue
+            current = index.get(referent_id)
+            if current is None:
+                results.append(
+                    {
+                        "operation": "resolve_reference",
+                        "referent_id": referent_id,
+                        "applied": False,
+                        "reason": "unknown_resolved_referent",
+                    }
+                )
+                continue
+            focused = DiscourseReferent.model_validate(current).model_copy(
+                update={"status": "foreground"}
+            )
+            replace_referent(focused)
+            self._focus_referent(referent_id)
+            results.append(
+                {
+                    "operation": "resolve_reference",
+                    "referent_id": referent_id,
+                    "surface_form": reference.surface_form,
+                    "resolved_value": reference.resolved_value,
+                    "applied": True,
+                    "state_change": "referent_focused_from_resolution",
+                }
+            )
+        return results
+
+    def verified_tool_memory_index(self) -> list[dict[str, Any]]:
+        """Expose provenance and exact bindings, never result contents, to planners."""
+
+        if not self.enabled:
+            return []
+        now = _now_ms()
+        index: list[dict[str, Any]] = []
+        for item in self._recent_tool_evidence:
+            evidence_id = str(item.get("evidence_id") or "").strip()
+            tool_id = str(item.get("tool_id") or "").strip()
+            request_args = item.get("request_args")
+            if not evidence_id or not tool_id or not isinstance(request_args, dict):
+                continue
+            if not request_args:
+                # A provenance-only record with no original arguments cannot
+                # support exact material-binding retrieval. Keep it out of the
+                # planner-visible index rather than inviting loose reuse.
+                continue
+            index.append(
+                {
+                    "evidence_id": evidence_id,
+                    "tool_id": tool_id,
+                    "status": str(item.get("status") or ""),
+                    "request_args": copy.deepcopy(request_args),
+                    "recorded_ms": item.get("recorded_ms"),
+                    "age_ms": max(
+                        0.0,
+                        now - float(item.get("recorded_ms") or now),
+                    ),
+                    "goal_ids": list(item.get("goal_ids") or []),
+                    "canonical_plan_id": str(item.get("canonical_plan_id") or ""),
+                    "source": "verified_tool_memory_index",
+                }
+            )
+        return index
+
+    @staticmethod
+    def _material_arg_equal(left: Any, right: Any) -> bool:
+        if isinstance(left, str) and isinstance(right, str):
+            return " ".join(left.strip().casefold().split()) == " ".join(
+                right.strip().casefold().split()
+            )
+        return left == right
+
+    def retrieve_verified_tool_memory(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Return one exact verified result after Goal bindings are already resolved."""
+
+        evidence_id = " ".join(str(args.get("evidence_id") or "").strip().split())
+        tool_id = " ".join(str(args.get("tool_id") or "").strip().split())
+        material_args = args.get("material_args")
+        if not isinstance(material_args, dict) or not material_args:
+            return {
+                "found": False,
+                "reason": "material_args_required",
+                "evidence_id": evidence_id,
+                "tool_id": tool_id,
+            }
+        max_age_s = float(args.get("max_age_s") or 900.0)
+        now = _now_ms()
+        for item in reversed(self._recent_tool_evidence):
+            if evidence_id and str(item.get("evidence_id") or "") != evidence_id:
+                continue
+            if tool_id and str(item.get("tool_id") or "") != tool_id:
+                continue
+            request_args = item.get("request_args")
+            if not isinstance(request_args, dict):
+                continue
+            if not all(
+                key in request_args
+                and self._material_arg_equal(request_args[key], expected)
+                for key, expected in material_args.items()
+            ):
+                continue
+            recorded_ms = float(item.get("recorded_ms") or 0.0)
+            age_ms = max(0.0, now - recorded_ms)
+            if age_ms > max_age_s * 1000.0:
+                return {
+                    "found": False,
+                    "reason": "matching_memory_stale",
+                    "evidence_id": str(item.get("evidence_id") or ""),
+                    "tool_id": str(item.get("tool_id") or ""),
+                    "request_args": copy.deepcopy(request_args),
+                    "age_ms": age_ms,
+                    "max_age_s": max_age_s,
+                }
+            return {
+                "found": True,
+                "reason": "exact_verified_match",
+                "evidence_id": str(item.get("evidence_id") or ""),
+                "tool_id": str(item.get("tool_id") or ""),
+                "request_args": copy.deepcopy(request_args),
+                "recorded_ms": recorded_ms,
+                "age_ms": age_ms,
+                "data": copy.deepcopy(item.get("data") or {}),
+                "source": "conversation_verified_tool_memory",
+            }
+        return {
+            "found": False,
+            "reason": "no_exact_verified_match",
+            "evidence_id": evidence_id,
+            "tool_id": tool_id,
+            "material_args": copy.deepcopy(material_args),
+        }
 
     def _record_tool_evidence(self, metadata: dict[str, Any]) -> None:
         bundle = metadata.get("execution_outcome_bundle")
@@ -2840,6 +3210,9 @@ class ConversationStateManager:
             "active_task_snapshots": self.active_task_snapshots(limit=4),
             "active_pending_tasks": active_tasks[-4:],
             "recent_tool_evidence": self.recent_tool_evidence(),
+            "verified_tool_memory_index": self.verified_tool_memory_index(),
+            "discourse_referents": self.discourse_referents(),
+            "discourse_focus": self.discourse_focus(),
             "extracted_memory": extracted_memory["entries"],
             "memory_summary": extracted_memory["summary"],
             "forgetting_policy": {
@@ -2866,7 +3239,11 @@ class ConversationStateManager:
             "active_task_contexts": self._active_task_contexts(),
             "active_task_snapshots": self.active_task_snapshots(),
             "current_task_context": self._current_task_context(),
+            "discourse_referents": self.discourse_referents(),
+            "discourse_focus": self.discourse_focus(),
+            "discourse": self.discourse_snapshot(),
             "recent_tool_evidence": self.recent_tool_evidence(),
+            "verified_tool_memory_index": self.verified_tool_memory_index(),
             "extracted_memory": self._memory_store.snapshot(),
             "session_memory": self.session_memory(),
             "task_store": {
@@ -2881,6 +3258,8 @@ class ConversationStateManager:
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "max_memory_entries": self.max_memory_entries,
                 "max_tool_evidence": self.max_tool_evidence,
+                "max_discourse_referents": self.max_discourse_referents,
+                "max_discourse_focus": self.max_discourse_focus,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
             },
         }

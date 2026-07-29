@@ -39,13 +39,28 @@ class ScriptedOllama:
         return payload
 
 
-def request(text: str, *, active_goals=None, history=None, language="zh-CN"):
+def request(
+    text: str,
+    *,
+    active_goals=None,
+    history=None,
+    language="zh-CN",
+    discourse_referents=None,
+    discourse_focus=None,
+    recent_tool_evidence=None,
+):
     return AgentRunRequest(
         sid="sid-pr2",
         text=text,
         language=language,
         route_decision=RouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm"),
-        context={"active_goal_snapshots": active_goals or [], "history": history or []},
+        context={
+            "active_goal_snapshots": active_goals or [],
+            "history": history or [],
+            "discourse_referents": discourse_referents or [],
+            "discourse_focus": discourse_focus or [],
+            "recent_tool_evidence": recent_tool_evidence or [],
+        },
     )
 
 
@@ -165,7 +180,225 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
-        self.assertIn("Each new_goals item contains only description", ollama.prompts[1][0])
+        self.assertIn(
+            "Each new_goals item contains description and bindings only",
+            ollama.prompts[1][0],
+        )
+
+    def test_location_correction_creates_scoped_referent_and_goal_binding(self):
+        chongqing = {
+            "referent_id": "ref-chongqing",
+            "entity_type": "location",
+            "canonical_value": "重庆",
+            "scope_kind": "goal",
+            "scope_ids": ["goal-chongqing-weather"],
+            "status": "foreground",
+            "confidence": 1.0,
+            "source_turn_id": "turn-chongqing",
+            "source_goal_ids": ["goal-chongqing-weather"],
+        }
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": "确认用户纠正的地点是内乡。",
+                        "bindings": [
+                            {
+                                "name": "location",
+                                "entity_type": "location",
+                                "value": "内乡",
+                                "confidence": 1.0,
+                            }
+                        ],
+                    }
+                ],
+                "referent_updates": [
+                    {
+                        "operation": "correct",
+                        "entity_type": "location",
+                        "canonical_value": "内乡",
+                        "target_referent_ids": ["ref-chongqing"],
+                        "scope_kind": "conversation",
+                        "confidence": 1.0,
+                        "reason_summary": "用户明确纠正地点为内乡。",
+                    }
+                ],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": "The current discourse location was corrected.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "不是重庆，是一个地名叫内乡。",
+                    discourse_referents=[chongqing],
+                    discourse_focus=["ref-chongqing"],
+                )
+            )
+        )
+
+        self.assertEqual(len(result.referent_updates), 1)
+        update = result.referent_updates[0]
+        self.assertEqual(update.operation, "correct")
+        self.assertEqual(update.target_referent_ids, ["ref-chongqing"])
+        self.assertEqual(update.referent.canonical_value, "内乡")
+        binding = result.new_goals[0].object["bindings"]["location"]
+        self.assertEqual(binding["value"], "内乡")
+        self.assertEqual(binding["referent_id"], update.referent.referent_id)
+
+    def test_pronoun_resolves_from_foreground_referent_not_stale_tool_evidence(self):
+        chongqing = {
+            "referent_id": "ref-chongqing",
+            "entity_type": "location",
+            "canonical_value": "重庆",
+            "scope_kind": "goal",
+            "scope_ids": ["goal-chongqing-weather"],
+            "status": "background",
+            "confidence": 1.0,
+            "source_turn_id": "turn-chongqing",
+            "source_goal_ids": ["goal-chongqing-weather"],
+        }
+        neixiang = {
+            "referent_id": "ref-neixiang",
+            "entity_type": "location",
+            "canonical_value": "内乡",
+            "scope_kind": "conversation",
+            "scope_ids": [],
+            "status": "foreground",
+            "confidence": 1.0,
+            "source_turn_id": "turn-neixiang",
+            "source_goal_ids": [],
+            "supersedes_referent_ids": ["ref-chongqing"],
+        }
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": "查询今天内乡是否下雨。",
+                        "bindings": [
+                            {
+                                "name": "location",
+                                "entity_type": "location",
+                                "value": "内乡",
+                                "referent_id": "ref-neixiang",
+                                "confidence": 1.0,
+                            },
+                            {
+                                "name": "date",
+                                "entity_type": "date",
+                                "value": "today",
+                                "confidence": 1.0,
+                            },
+                        ],
+                    }
+                ],
+                "referent_updates": [],
+                "resolved_references": [
+                    {
+                        "surface_form": "那边",
+                        "entity_type": "location",
+                        "resolved_value": "内乡",
+                        "source": "discourse_referent",
+                        "referent_id": "ref-neixiang",
+                        "confidence": 1.0,
+                        "reason_summary": "内乡是当前前景地点。",
+                    }
+                ],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": "The foreground location resolves the reference.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "今天那边下雨了没有？",
+                    discourse_referents=[chongqing, neixiang],
+                    discourse_focus=["ref-chongqing", "ref-neixiang"],
+                    recent_tool_evidence=[
+                        {
+                            "evidence_id": "old-chongqing",
+                            "tool_id": "chromie.weather.lookup",
+                            "request_args": {"location": "重庆", "date": "today"},
+                            "data": {"condition": "雷雨", "precipitation_probability": 65},
+                        }
+                    ],
+                    history=[
+                        {"role": "user", "text": "不是重庆，是一个地名叫内乡。"},
+                        {"role": "assistant", "text": "我明白了，内乡是河南省的一个县。"},
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(result.resolved_references[0].resolved_value, "内乡")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["value"],
+            "内乡",
+        )
+        prompt = ollama.prompts[0][0]
+        self.assertIn('"canonical_value":"内乡"', prompt)
+        self.assertNotIn("old-chongqing", prompt)
+        self.assertNotIn('"condition":"雷雨"', prompt)
+
+    def test_last_task_reference_is_associated_by_llm_semantics(self):
+        ollama = FakeOllama(
+            {
+                "decision": "associate",
+                "associations": [
+                    {
+                        "relationship": "reference",
+                        "target_goal_ids": ["goal-weather"],
+                        "confidence": 0.98,
+                        "reason_summary": (
+                            "The user's phrase refers to the previously described "
+                            "weather task in the supplied active Goal context."
+                        ),
+                    }
+                ],
+                "new_goals": [],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 0.98,
+                "reason_summary": "The model semantically selected the referenced Goal.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Please continue the last task I told you.",
+                    language="en-US",
+                    active_goals=[
+                        active_goal("goal-coffee", "Order an iced coffee"),
+                        active_goal("goal-weather", "Check the weather in Neixiang"),
+                    ],
+                    history=[
+                        {"role": "user", "text": "Check the weather in Neixiang."},
+                        {"role": "assistant", "text": "I will check it."},
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(len(result.associations), 1)
+        self.assertEqual(result.associations[0].relationship, "reference")
+        self.assertEqual(
+            result.associations[0].target_goal_ids,
+            ["goal-weather"],
+        )
+        prompt = ollama.prompts[0][0]
+        self.assertIn("the last task I told you", prompt)
+        self.assertIn("not from a Host phrase table", prompt)
+        self.assertIn('"goal_id":"goal-weather"', prompt)
+        self.assertIn('"goal_id":"goal-coffee"', prompt)
 
     def test_ambiguous_reference_returns_natural_clarification_only(self):
         ollama = FakeOllama({"associations": [], "new_goals": [], "clarification": "你是说咖啡不用了，还是天气也不用查了？", "confidence": 0.58})
@@ -198,7 +431,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIsInstance(schema, dict)
         self.assertEqual(
             set(schema["properties"]),
-            {"decision", "associations", "new_goals", "clarification", "confidence", "reason_summary"},
+            {"decision", "associations", "new_goals", "referent_updates", "resolved_references", "clarification", "confidence", "reason_summary"},
         )
         self.assertEqual(
             schema["properties"]["decision"]["enum"],
@@ -208,7 +441,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description"},
+            {"description", "bindings"},
         )
         self.assertEqual(
             schema["$defs"]["GoalAssociationModelAssociation"]["properties"]["relationship"]["enum"],

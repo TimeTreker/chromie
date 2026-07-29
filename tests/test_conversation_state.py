@@ -6,7 +6,13 @@ import unittest
 from unittest.mock import patch
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from shared.chromie_contracts.discourse import (
+    DiscourseReferent,
+    DiscourseReferentUpdate,
+    ResolvedDiscourseReference,
+)
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -21,6 +27,154 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(boundary["started_new"])
         self.assertNotEqual(manager.conversation_id, original_id)
         self.assertEqual(manager.get_history(), [])
+
+    def test_scoped_referents_coexist_and_correction_only_backgrounds_target(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="discourse")
+
+        room = DiscourseReferent(
+            referent_id="ref-room",
+            entity_type="physical_location",
+            canonical_value="客厅",
+            scope_kind="goal",
+            scope_ids=["goal-navigation"],
+            status="foreground",
+            confidence=1.0,
+            source_turn_id="turn-room",
+            source_goal_ids=["goal-navigation"],
+        )
+        chongqing = DiscourseReferent(
+            referent_id="ref-chongqing",
+            entity_type="location",
+            canonical_value="重庆",
+            scope_kind="goal",
+            scope_ids=["goal-weather-chongqing"],
+            status="foreground",
+            confidence=1.0,
+            source_turn_id="turn-chongqing",
+            source_goal_ids=["goal-weather-chongqing"],
+        )
+        for turn_id, referent in (
+            ("turn-room", room),
+            ("turn-chongqing", chongqing),
+        ):
+            results = manager.apply_goal_association_resolution(
+                GoalAssociationResolution(
+                    turn_id=turn_id,
+                    referent_updates=[
+                        DiscourseReferentUpdate(
+                            operation="introduce",
+                            referent=referent,
+                            confidence=1.0,
+                        )
+                    ],
+                    confidence=1.0,
+                ),
+                sid=turn_id,
+                user_text=referent.canonical_value,
+                atomic=True,
+            )
+            self.assertTrue(all(item["applied"] for item in results))
+
+        neixiang = DiscourseReferent(
+            referent_id="ref-neixiang",
+            entity_type="location",
+            canonical_value="内乡",
+            scope_kind="conversation",
+            status="foreground",
+            confidence=1.0,
+            source_turn_id="turn-neixiang",
+            supersedes_referent_ids=["ref-chongqing"],
+        )
+        results = manager.apply_goal_association_resolution(
+            GoalAssociationResolution(
+                turn_id="turn-neixiang",
+                referent_updates=[
+                    DiscourseReferentUpdate(
+                        operation="correct",
+                        referent=neixiang,
+                        target_referent_ids=["ref-chongqing"],
+                        confidence=1.0,
+                    )
+                ],
+                confidence=1.0,
+            ),
+            sid="sid-neixiang",
+            user_text="不是重庆，是内乡。",
+            atomic=True,
+        )
+        self.assertTrue(all(item["applied"] for item in results))
+
+        referents = {
+            item["referent_id"]: item for item in manager.discourse_referents()
+        }
+        self.assertEqual(referents["ref-room"]["canonical_value"], "客厅")
+        self.assertEqual(referents["ref-room"]["status"], "foreground")
+        self.assertEqual(referents["ref-chongqing"]["status"], "background")
+        self.assertEqual(referents["ref-neixiang"]["status"], "foreground")
+        self.assertEqual(
+            manager.discourse_focus(),
+            ["ref-room", "ref-neixiang"],
+        )
+
+        focus_result = manager.apply_goal_association_resolution(
+            GoalAssociationResolution(
+                turn_id="turn-rain",
+                resolved_references=[
+                    ResolvedDiscourseReference(
+                        surface_form="那边",
+                        entity_type="location",
+                        resolved_value="内乡",
+                        source="discourse_referent",
+                        referent_id="ref-neixiang",
+                        confidence=1.0,
+                    )
+                ],
+                referent_updates=[
+                    DiscourseReferentUpdate(
+                        operation="focus",
+                        target_referent_ids=["ref-neixiang"],
+                        confidence=1.0,
+                    )
+                ],
+                confidence=1.0,
+            ),
+            sid="sid-rain",
+            user_text="今天那边下雨了吗？",
+            atomic=True,
+        )
+        self.assertTrue(all(item["applied"] for item in focus_result))
+        self.assertEqual(manager.discourse_focus()[-1], "ref-neixiang")
+
+    def test_atomic_unknown_referent_update_rolls_back_all_discourse_changes(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="discourse-atomic")
+        neixiang = DiscourseReferent(
+            referent_id="ref-neixiang",
+            entity_type="location",
+            canonical_value="内乡",
+            status="foreground",
+            confidence=1.0,
+            source_turn_id="turn-neixiang",
+        )
+        results = manager.apply_goal_association_resolution(
+            GoalAssociationResolution(
+                turn_id="turn-neixiang",
+                referent_updates=[
+                    DiscourseReferentUpdate(
+                        operation="correct",
+                        referent=neixiang,
+                        target_referent_ids=["missing-ref"],
+                        confidence=1.0,
+                    )
+                ],
+                confidence=1.0,
+            ),
+            sid="sid-neixiang",
+            user_text="不是那里，是内乡。",
+            atomic=True,
+        )
+        self.assertTrue(any(item.get("rolled_back") for item in results))
+        self.assertEqual(manager.discourse_referents(), [])
+        self.assertEqual(manager.discourse_focus(), [])
 
     def test_ambiguous_cancellation_does_not_clear_all_goal_context(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
@@ -68,6 +222,17 @@ class ConversationStateTests(unittest.TestCase):
 
         self.assertFalse(boundary["started_new"])
         self.assertEqual(boundary["reason"], "followup_reference")
+
+    def test_last_task_phrase_does_not_create_host_task_association(self) -> None:
+        manager = ConversationStateManager()
+
+        relation = manager._infer_task_relation(
+            "Please continue the last task I told you.",
+            route="chat",
+            metadata={},
+        )
+
+        self.assertIsNone(relation)
 
     def test_pending_task_keeps_context_for_new_topic_like_text(self) -> None:
         manager = ConversationStateManager(soft_idle_timeout_sec=10, hard_idle_timeout_sec=100)

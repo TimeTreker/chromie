@@ -131,6 +131,116 @@ def chromie_manifests() -> list[AgentManifest]:
         ],
     )
 
+    memory = AgentManifest(
+        agent_id="chromie.memory",
+        display_name="Chromie Verified Tool Memory",
+        description=(
+            "Host-owned read-only retrieval of one previously verified tool result. "
+            "It never resolves pronouns or chooses a location; Goal Association must "
+            "already provide exact semantic bindings."
+        ),
+        transport=TransportSpec(
+            kind="host_runtime",
+            module="orchestrator.runtime.conversation_memory_provider",
+        ),
+        tags=["chromie", "memory", "safe_read", "verified_result"],
+        tools=[
+            ToolCapability(
+                name="chromie.memory.retrieve_verified_tool_result",
+                agent_id="chromie.memory",
+                display_name="Retrieve verified tool result",
+                description=(
+                    "Retrieve one recent verified tool result by exact evidence ID, "
+                    "original tool ID, and already-resolved material arguments. Use "
+                    "only when the verified memory index advertises an exact fresh "
+                    "match. This capability does not search loosely, resolve references, "
+                    "or return another task's result."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "evidence_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Exact evidence_id copied from the verified memory index.",
+                        },
+                        "tool_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Original capability ID that produced the verified result.",
+                        },
+                        "material_args": {
+                            "type": "object",
+                            "minProperties": 1,
+                            "description": (
+                                "Exact already-resolved material Goal bindings, such as "
+                                "location and date. Values must match the memory index."
+                            ),
+                            "additionalProperties": True,
+                        },
+                        "max_age_s": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 86400,
+                            "default": 900,
+                        },
+                    },
+                    "required": ["evidence_id", "tool_id", "material_args"],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "found": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                        "evidence_id": {"type": "string"},
+                        "tool_id": {"type": "string"},
+                        "request_args": {"type": "object"},
+                        "recorded_ms": {"type": ["number", "null"]},
+                        "age_ms": {"type": ["number", "null"]},
+                        "max_age_s": {"type": ["number", "null"]},
+                        "data": {"type": "object"},
+                        "source": {"type": "string"},
+                    },
+                    "required": [
+                        "found",
+                        "reason",
+                        "evidence_id",
+                        "tool_id",
+                    ],
+                    "additionalProperties": True,
+                },
+                effects=["read_only", "memory_read", "verified_tool_result"],
+                safety_class="safe_read",
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=2.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "interaction_executable": True,
+                    "prompt_tier": "common",
+                    "prompt_tier_reason": (
+                        "Recent verified lookup reuse is common in multi-turn spoken interaction."
+                    ),
+                    "when_to_use": (
+                        "Use only after Goal Association resolved all references and the "
+                        "verified tool-memory index contains one exact fresh match for "
+                        "the same tool_id and material arguments."
+                    ),
+                    "semantic_type": "verified_tool_memory_retrieval",
+                    "reference_resolution_authority": False,
+                    "pre_execution_speech_guidance": (
+                        "Say naturally that Chromie recently checked the exact subject "
+                        "and is retrieving that result. Do not state the result before retrieval."
+                    ),
+                },
+            )
+        ],
+    )
+
     weather = AgentManifest(
         agent_id="chromie.weather",
         display_name="Chromie Weather Tool Agent",
@@ -255,7 +365,7 @@ def chromie_manifests() -> list[AgentManifest]:
             )
         ],
     )
-    return [speech, task, weather]
+    return [speech, task, memory, weather]
 
 
 def chromie_capability_bundle() -> CapabilityBundle:

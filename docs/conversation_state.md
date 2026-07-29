@@ -38,6 +38,8 @@ The host store can retain bounded representations of:
 - active interaction metadata;
 - pending task hints;
 - task contexts for open or recently completed user goals;
+- bounded scoped discourse referents and an LLM-authored focus stack;
+- a provenance-only index of verified prior tool results;
 - session working memory for the current task or topic;
 - follow-up context;
 - the current conversation identifier and timestamps.
@@ -55,6 +57,26 @@ prompts. It summarizes the current task, active pending tasks, extracted memory
 entries, a compact `memory_summary`, and the current forgetting policy. This is
 the prompt-facing working memory for the current session, not a permanent
 memory store.
+
+Conversation state does not expose one global `current_location`. Multiple
+task-, Goal-, and conversation-scoped referents can coexist, so a navigation
+destination, a Chongqing weather task, and a Neixiang place discussion do not
+overwrite one another. Goal Association resolves expressions such as `那边`
+from current user meaning, scoped referents/focus, active Goal bindings, and
+recent dialogue. The Host only validates and stores the typed model result.
+Verified tool evidence is not allowed to decide reference meaning.
+
+Operational reset/follow-up phrase settings affect only whether bounded context is
+retained across an idle boundary. They never resolve a pronoun, choose a task, or
+associate a Goal. Expressions such as “the last task I told you” are resolved by
+Goal Association from active/recoverable Goals and dialogue semantics.
+
+Prior tool results are reused only through the explicit read-only
+`chromie.memory.retrieve_verified_tool_result` capability. Planners receive a
+result-free index of exact original arguments and provenance; the capability
+returns data only when the already-resolved Goal bindings match exactly and the
+record is fresh enough. See
+[`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 Goal Interpretation can hand complex requests to `deepthinking_agent`, which uses this
 same bounded memory to split tasks, plan, debug, and produce unified robot
 skill tasks without treating memory as authorization.
@@ -145,6 +167,9 @@ ORCH_CONVERSATION_MAX_TURNS=12
 ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS=1200
 ORCH_CONVERSATION_MAX_CONTEXT_CHARS=6000
 ORCH_CONVERSATION_MAX_PENDING_TASKS=8
+ORCH_CONVERSATION_MAX_TOOL_EVIDENCE=8
+ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS=24
+ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS=8
 ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=300
 ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
 ORCH_CONVERSATION_RESET_PHRASES=

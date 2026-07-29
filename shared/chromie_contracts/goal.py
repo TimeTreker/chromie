@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_task import InformationGap, SemanticGoal, TaskContextSnapshot
+from .discourse import DiscourseReferentUpdate, ResolvedDiscourseReference
 
 
 GoalRelationship = Literal[
@@ -244,6 +245,8 @@ class GoalAssociationResolution(BaseModel):
     turn_id: str = Field(min_length=1)
     associations: list[GoalAssociation] = Field(default_factory=list)
     new_goals: list[SemanticGoal] = Field(default_factory=list)
+    referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
+    resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
     clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
@@ -274,8 +277,22 @@ class GoalAssociationResolution(BaseModel):
             raise ValueError("new_goals goal_id values must be unique")
         if existing_targets.intersection(new_ids):
             raise ValueError("new_goals must not reuse target existing goal IDs")
-        if self.clarification and (self.new_goals or self.associations):
-            raise ValueError("clarification result must not also propose goal changes")
-        if not self.clarification and not self.new_goals and not self.associations:
-            raise ValueError("resolution must contain associations, new_goals, or clarification")
+        if self.clarification and (
+            self.new_goals
+            or self.associations
+            or self.referent_updates
+            or self.resolved_references
+        ):
+            raise ValueError(
+                "clarification result must not also propose goal or discourse changes"
+            )
+        if (
+            not self.clarification
+            and not self.new_goals
+            and not self.associations
+            and not self.referent_updates
+        ):
+            raise ValueError(
+                "resolution must contain associations, new_goals, referent_updates, or clarification"
+            )
         return self

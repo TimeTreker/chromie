@@ -764,6 +764,9 @@ class VoiceAssistant:
             task_graph_handler=self._execute_planning_task_graph,
             task_graph_cancel_handler=self._cancel_planning_task_graph,
             agent_tool_handler=self._execute_agent_tool,
+            conversation_memory_handler=(
+                self.conversation_state.retrieve_verified_tool_memory
+            ),
             capability_manifest_paths=os.getenv("AGENT_CAPABILITY_MANIFESTS", ""),
         )
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
@@ -2561,6 +2564,8 @@ class VoiceAssistant:
             "active_pending_tasks": conversation.get("active_pending_tasks") or [],
             "active_task_snapshots": conversation.get("active_task_snapshots") or [],
             "current_task_context": conversation.get("current_task_context"),
+            "discourse_referents": conversation.get("discourse_referents") or [],
+            "discourse_focus": conversation.get("discourse_focus") or [],
         }
         return self._compact_json_for_prompt(payload, max_chars=1600)
 
@@ -2602,6 +2607,11 @@ class VoiceAssistant:
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
             "current_task_context": conversation.get("current_task_context"),
+            "discourse_referents": conversation.get("discourse_referents", []),
+            "discourse_focus": conversation.get("discourse_focus", []),
+            "verified_tool_memory_index": conversation.get(
+                "verified_tool_memory_index", []
+            ),
             "recent_tool_evidence": conversation.get("recent_tool_evidence", []),
             "robot_state": {
                 "available": not self.action_dry_run,

@@ -68,6 +68,7 @@ When documents disagree, correct the lower-authority document.
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
+| How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
 | How are development artifacts packaged? | `docs/RELEASE.md` |
@@ -191,6 +192,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [SenseVoice ASR](SENSEVOICE_ASR.md)
 - [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)
 - [Conversation State](conversation_state.md)
+- [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md)
 
 ## Operations and release
 

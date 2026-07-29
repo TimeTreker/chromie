@@ -47,6 +47,11 @@ from .agent_tool_provider import (
     AgentToolSkillProvider,
     local_agent_tool_definitions,
 )
+from .conversation_memory_provider import (
+    ConversationMemoryHandler,
+    ConversationMemorySkillProvider,
+    host_runtime_memory_definitions,
+)
 from .body_recovery import (
     build_body_recovery_confirmation,
     conservative_body_failure_message,
@@ -96,6 +101,7 @@ class InteractionRuntimeCoordinator:
         task_graph_handler: TaskGraphHandler | None = None,
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
         agent_tool_handler: AgentToolHandler | None = None,
+        conversation_memory_handler: ConversationMemoryHandler | None = None,
         capability_manifest_paths: str | None = None,
     ) -> None:
         self.registry = SkillRegistry()
@@ -122,6 +128,16 @@ class InteractionRuntimeCoordinator:
                 self.registry.register(definition)
             if definitions:
                 self.runtime.register_provider(AgentToolSkillProvider(agent_tool_handler))
+        if conversation_memory_handler is not None:
+            memory_definitions = host_runtime_memory_definitions(
+                capability_manifest_paths
+            )
+            for definition in memory_definitions:
+                self.registry.register(definition)
+            if memory_definitions:
+                self.runtime.register_provider(
+                    ConversationMemorySkillProvider(conversation_memory_handler)
+                )
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:
             self.runtime.register_provider(

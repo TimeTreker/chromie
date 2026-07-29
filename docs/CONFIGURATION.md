@@ -657,8 +657,10 @@ and Goal Interpretation validation.
 | `ORCH_CONVERSATION_MAX_PENDING_TASKS` | `8`. |
 | `ORCH_CONVERSATION_MAX_TOOL_EVIDENCE` | `8`; maximum recent schema-validated trusted tool observations retained in bounded session context for semantic follow-up reasoning. The Host records evidence but does not decide its meaning, relevance, or freshness. |
 | `ORCH_CONVERSATION_MAX_MEMORY_ENTRIES` | `24`; maximum process-local extracted memory entries retained in the current conversation. |
+| `ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS` | `24`; maximum scoped model-authored entity referents retained across conversation/task/Goal scopes. This is not a global location slot and does not represent robot physical state. |
+| `ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS` | `8`; maximum ordered referent IDs in the LLM-authored discourse focus stack. |
 | `ORCH_CONVERSATION_RESET_PHRASES` | Optional `|`-separated override. |
-| `ORCH_CONVERSATION_FOLLOWUP_PHRASES` | Optional `|`-separated override. |
+| `ORCH_CONVERSATION_FOLLOWUP_PHRASES` | Optional `|`-separated override used only to preserve a conversation boundary across idle time. It never selects or associates a Goal; Goal Association remains LLM-authored. |
 | `ORCH_CONVERSATION_NEW_TOPIC_STARTERS` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
 | `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
@@ -671,6 +673,13 @@ should use the `ORCH_CONVERSATION_*` names.
 The task-context store never resumes physical work by itself; restored
 robot-action tasks are prompt-facing recoverable context and require fresh
 confirmation before any new action can run.
+
+Goal Association resolves references before planning and emits typed Goal
+bindings plus scoped referent/focus updates. Tool-result contents are excluded
+from that boundary. Planners may reuse a prior verified result only by executing
+`chromie.memory.retrieve_verified_tool_result` with an exact evidence ID,
+original tool ID, and material arguments that match the resolved Goal bindings.
+See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
 ## Skill Runtime and Soridormi
 

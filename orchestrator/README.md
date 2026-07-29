@@ -69,7 +69,9 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Goal Association -> Fast Planner -> terminal Deep Planner when required
+  -> Goal Association resolves scoped references and typed Goal bindings
+  -> Fast Planner -> terminal Deep Planner when required
+      -> exact verified-memory retrieval or fresh external read
   -> prospective Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Skill Runtime
       -> Soridormi provider -> MCP -> simulator/robot
@@ -240,14 +242,16 @@ repository-relative files assume the repository root.
 ## Conversation state
 
 The current store retains bounded turns, pending task hints, active interaction
-metadata, compact task contexts, and one conversation identifier across
+metadata, compact task contexts, scoped discourse referents/focus, a
+provenance-only verified-tool-memory index, and one conversation identifier across
 utterances until reset or expiry. Each utterance still receives its own SID.
 
 State is process-local by default. When `ORCH_ENABLE_TASK_CONTEXT_STORE=1`,
 unfinished compact task contexts are saved locally and restored as recoverable
 after restart; physical work still requires fresh confirmation and never resumes
 blindly. This is not a long-term personal memory system. See
-[`../docs/conversation_state.md`](../docs/conversation_state.md).
+[`../docs/conversation_state.md`](../docs/conversation_state.md) and
+[`../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
 ## Scheduling, interruption, and cancellation
 

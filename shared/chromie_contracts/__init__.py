@@ -103,6 +103,17 @@ from .social_attention import (
     SocialAttentionTarget,
     normalize_social_attention_mode,
 )
+from .discourse import (
+    DiscourseReferenceSource,
+    DiscourseReferent,
+    DiscourseReferentOperation,
+    DiscourseReferentStatus,
+    DiscourseReferentUpdate,
+    DiscourseScopeKind,
+    GoalEntityBinding,
+    ResolvedDiscourseReference,
+    stable_referent_id,
+)
 from .goal import (
     ActiveGoalSnapshot,
     GoalAssociation,
@@ -226,6 +237,15 @@ __all__ = [
     "SocialAttentionSpeechExpression",
     "SocialAttentionTarget",
     "normalize_social_attention_mode",
+    "DiscourseReferenceSource",
+    "DiscourseReferent",
+    "DiscourseReferentOperation",
+    "DiscourseReferentStatus",
+    "DiscourseReferentUpdate",
+    "DiscourseScopeKind",
+    "GoalEntityBinding",
+    "ResolvedDiscourseReference",
+    "stable_referent_id",
     "ActiveGoalSnapshot",
     "GoalAssociation",
     "GoalAssociationResolution",

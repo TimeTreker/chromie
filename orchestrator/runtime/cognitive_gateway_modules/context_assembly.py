@@ -25,6 +25,9 @@ class ContextAssembly:
         "mind": "orchestrator.mind",
         "robot_state": "orchestrator.runtime_state",
         "recent_tool_evidence": "orchestrator.conversation_state",
+        "verified_tool_memory_index": "orchestrator.conversation_state",
+        "discourse_referents": "orchestrator.conversation_state",
+        "discourse_focus": "orchestrator.conversation_state",
     }
 
     def __init__(self, *, clock: Callable[[], datetime] | None = None) -> None:

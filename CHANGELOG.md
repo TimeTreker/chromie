@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Scoped discourse referents and verified result retrieval
+
+- Added model-authored, Host-validated discourse referents with conversation,
+  task, and Goal scopes plus a bounded focus stack. Multiple locations and other
+  entities can coexist; there is no global `current_location`, and robot physical
+  position remains outside conversational reference state.
+- Extended Goal Association to resolve references and task mentions explicitly,
+  emit correction/focus updates, and bind material entities such as location into
+  canonical Goals before planning. The same LLM association path handles phrases
+  such as “the last task I told you”; Host code contains no phrase-to-Goal map.
+- Removed tool-result contents from Goal Association, Fast/Deep Planner, and
+  pre-execution Response Composer boundaries. Old results are advertised only as
+  a provenance/binding index and become available through an executed exact-match
+  `chromie.memory.retrieve_verified_tool_result` capability.
+- Added generic binding-provenance validation so Planner arguments cannot
+  contradict Goal Association’s immutable typed bindings. The validator compares
+  names and values only; it never decides what a user reference means.
+- Removed fixed character, word, and sentence-count limits from safe-read
+  acknowledgements. Response Composer owns natural wording while the Host keeps
+  the immediate-stage, no-completion-claim, and evidence-before-result contracts.
+
 ## Unreleased — Safe-read speech, grounded result delivery, and explicit concurrency
 
 - Removed the Host-owned greeting-length classifier and brevity veto. Ordinary
@@ -115,8 +136,8 @@ All notable user-visible changes should be recorded here.
   acknowledgement speech. Read-only tools no longer wait for TTS synthesis or
   playback start; effectful and confirmation-bound capabilities retain their
   existing delivery barriers.
-- Made safe-read acknowledgement optional and bounded to one tiny utterance.
-  Ordinary greeting wording and length remain model-owned.
+- Kept safe-read acknowledgement structurally bounded to one pre-result stage
+  while leaving its natural wording and length model-owned.
 - Bound execution evidence and active task snapshots to exact tool arguments.
   Interrupted or missing-result safe reads remain `recoverable`, so status
   follow-ups resume or retry the same location/date instead of reusing another

@@ -325,6 +325,7 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                 "source_text": goal.get("source_text") or item.get("last_user_update") or "",
                 "constraints": goal.get("constraints") or {},
                 "success_criteria": goal.get("success_criteria") or [],
+                "object": goal.get("object") or {},
             }
 
     result: list[dict[str, Any]] = []
@@ -352,9 +353,140 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                     "source_text": item.get("source_text") or "",
                     "constraints": item.get("constraints") or {},
                     "success_criteria": item.get("success_criteria") or [],
+                    "object": item.get("object") or {},
                 }
             )
     return result
+
+
+def _normalized_material_value(value: Any) -> Any:
+    """Normalize only representation details for exact semantic comparisons."""
+
+    if isinstance(value, str):
+        normalized = " ".join(value.strip().casefold().split())
+        if _NUMERIC_LITERAL_RE.fullmatch(normalized):
+            try:
+                return Decimal(normalized)
+            except InvalidOperation:
+                pass
+        return normalized
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        try:
+            return Decimal(str(value))
+        except InvalidOperation:
+            return value
+    if isinstance(value, dict):
+        return {
+            str(key): _normalized_material_value(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    if isinstance(value, list):
+        return [_normalized_material_value(item) for item in value]
+    return value
+
+
+def _goal_binding_map(goal: dict[str, Any]) -> dict[str, Any]:
+    goal_object = goal.get("object")
+    if not isinstance(goal_object, dict):
+        return {}
+    raw_bindings = goal_object.get("bindings")
+    if not isinstance(raw_bindings, dict):
+        return {}
+    bindings: dict[str, Any] = {}
+    for raw_name, raw_binding in raw_bindings.items():
+        name = " ".join(str(raw_name or "").strip().split())
+        if not name or not isinstance(raw_binding, dict) or "value" not in raw_binding:
+            continue
+        bindings[name] = raw_binding.get("value")
+    return bindings
+
+
+def validate_goal_binding_argument_grounding(
+    output: PlannerModelOutput,
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> None:
+    """Keep executable arguments aligned with Goal Association bindings.
+
+    Goal Association remains the LLM semantic authority that resolves references
+    and binds entities.  This validator does not infer what ``那边`` means and it
+    contains no location, weather, or phrase rules.  It only rejects a Planner
+    step when an argument with the same semantic binding name contradicts the
+    immutable Goal value that the step claims to satisfy.
+
+    Verified-memory retrieval is additionally required to carry every material
+    binding in ``material_args``.  This prevents a generic "latest result" lookup
+    from crossing task or discourse scopes after the Goal has been resolved.
+    """
+
+    if output.disposition not in {"execute", "mixed"}:
+        return
+
+    bindings_by_goal: dict[str, dict[str, Any]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        if goal_id:
+            bindings_by_goal[goal_id] = _goal_binding_map(goal)
+
+    for step in output.steps:
+        claimed_goal_ids = [
+            goal_id
+            for goal_id in step.source_goal_ids
+            if goal_id in bindings_by_goal
+        ]
+        if not claimed_goal_ids:
+            continue
+
+        required: dict[str, Any] = {}
+        for goal_id in claimed_goal_ids:
+            for name, value in bindings_by_goal[goal_id].items():
+                if (
+                    name in required
+                    and _normalized_material_value(required[name])
+                    != _normalized_material_value(value)
+                ):
+                    raise ValueError(
+                        "one executable step cannot satisfy conflicting authoritative "
+                        f"Goal bindings for {name!r}"
+                    )
+                required[name] = value
+
+        for name, expected in required.items():
+            if name not in step.args:
+                continue
+            actual = step.args[name]
+            if _normalized_material_value(actual) != _normalized_material_value(
+                expected
+            ):
+                raise ValueError(
+                    "planner step argument contradicts authoritative Goal binding: "
+                    f"{step.step_id}.{name}={actual!r}, expected={expected!r}"
+                )
+
+        if step.skill_id == "chromie.memory.retrieve_verified_tool_result":
+            material_args = step.args.get("material_args")
+            if not isinstance(material_args, dict):
+                raise ValueError(
+                    "verified-memory retrieval requires material_args containing "
+                    "the authoritative Goal bindings"
+                )
+            for name, expected in required.items():
+                if name not in material_args:
+                    raise ValueError(
+                        "verified-memory retrieval omitted authoritative Goal binding: "
+                        f"{name!r}"
+                    )
+                actual = material_args[name]
+                if _normalized_material_value(
+                    actual
+                ) != _normalized_material_value(expected):
+                    raise ValueError(
+                        "verified-memory retrieval contradicts authoritative Goal "
+                        f"binding: material_args.{name}={actual!r}, "
+                        f"expected={expected!r}"
+                    )
 
 
 def validate_explicit_numeric_parameter_grounding(

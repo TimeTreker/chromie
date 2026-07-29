@@ -17,6 +17,11 @@ def test_chromie_registry_lists_local_speech_tools() -> None:
     assert "chromie.speak" in names
     assert "chromie.ask_confirmation" in names
     assert "chromie.listen" in names
+    assert "chromie.memory.retrieve_verified_tool_result" in names
+    memory = registry.get_tool("chromie.memory.retrieve_verified_tool_result")
+    assert memory.safety_class == "safe_read"
+    assert memory.execution.side_effect_free is True
+    assert memory.llm_hints["reference_resolution_authority"] is False
 
 
 def test_registry_merges_external_soridormi_manifest() -> None:
