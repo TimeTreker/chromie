@@ -97,6 +97,15 @@ exact matching material bindings. Planner validation rejects a step whose
 arguments contradict those authoritative bindings. See
 [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
+Weather provider resolution now preserves that same authority boundary. A place
+such as `河南省内乡县` remains the immutable Goal/tool `location`; the adapter
+tries the exact string first and may then use structurally equivalent locality
+queries to satisfy Open-Meteo's geocoder. It ranks candidates using the already
+resolved administrative context and rejects a same-named place from another
+province. This is retrieval normalization, not pronoun resolution or Goal
+association. Exhausted geocoding returns typed `location_not_found`, which is
+carried into grounded failure-response facts.
+
 The same profile now requires an owner-approved `personality_expression`. The maintained self-concept is Chromie as a person and six-year-old girl: smart, curious, warm, simple, playful, innocent, and occasionally naive. This is not a claim that her body is biologically human; body type, runtime components, and safety ownership remain truthful background state. Normal user-facing speech is LLM-authored from that positive personality. Orchestrator statuses, evidence, observations, tool identifiers, and workflow narration remain internal logs and experience evidence. Safe-read waiting speech is specific model wording validated against a real pending capability, and post-execution tool speech is generated from the original user question plus trusted result evidence.
 
 A July 27 live weather regression exposed a general Goal/capability truthfulness
@@ -111,7 +120,7 @@ operational speech. Maintained RTX profiles use one shared context size per
 resident model to avoid context-only runner reloads. This is a
 general contract correction, not a Chongqing- or phrase-specific rule.
 
-The Gateway/Core migration automated gate now passes 1,499 primary tests plus 20
+The Gateway/Core migration automated gate now passes 1,507 primary tests plus 20
 legacy Agent tests. Focused coverage verifies the five physical modules,
 digest-bound context, fail-open attention review, admitted-envelope-only Core
 entry, Core interpretation projection integrity, and preservation of the

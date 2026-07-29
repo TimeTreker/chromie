@@ -293,6 +293,92 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("没有硬来", " ".join(item.text for item in response.speech))
 
+    async def test_location_not_found_reason_reaches_grounded_failure_composer(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.failure_response_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(), assistant
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()), assistant
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {
+                                "text": "天气网站没认出内乡县，我再试一次。"
+                            },
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                self.url = url
+                self.payload = json
+                return FakeResponse()
+
+        session = FakeSession()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="tool",
+            metadata={},
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="execution_outcome_failure",
+            confidence=1.0,
+            metadata={},
+        )
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            decision,
+            user_text="河南省内乡县现在下雨了没有？",
+            session_id="location-not-found-style",
+            trusted_failure_facts={
+                "route": "tool",
+                "failure_stage": "skill_execution",
+                "failure_class": "provider_execution_failed",
+                "execution_started": True,
+                "verified_result_available": False,
+                "retryable": True,
+                "reason_codes": ["location_not_found"],
+            },
+            response_source="llm_execution_failure_response",
+        )
+
+        assert response is not None
+        self.assertIn("location_not_found", session.payload["prompt"])
+        self.assertIn("could not identify the requested place", session.payload["prompt"])
+        self.assertIn("没认出内乡县", " ".join(item.text for item in response.speech))
+
     async def test_failure_response_composer_rejects_language_drift(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.failure_response_model = "gemma4:e2b"

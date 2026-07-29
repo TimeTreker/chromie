@@ -4,7 +4,7 @@ import unittest
 
 from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.capabilities.models import CapabilityRegistry
-from agent.app.clients.weather_client import WeatherReport
+from agent.app.clients.weather_client import WeatherLookupError, WeatherReport
 from agent.app.local_tool_execution import LocalToolExecutor
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
@@ -30,6 +30,15 @@ class _WeatherClient:
             precipitation_sum_mm=1.2,
             weather_code=51,
             wind_speed_kmh=8.0,
+        )
+
+
+class _MissingLocationWeatherClient:
+    async def lookup(self, query):
+        raise WeatherLookupError(
+            f"weather location was not found: {query.location}",
+            reason_code="location_not_found",
+            attempted_queries=(query.location,),
         )
 
 
@@ -62,6 +71,35 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("降水概率", result.output["summary"])
         self.assertEqual(client.queries[0].location, "北京")
         self.assertEqual(client.queries[0].language, "zh-CN")
+
+    async def test_executor_preserves_typed_location_not_found_failure(self) -> None:
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            weather_client=_MissingLocationWeatherClient(),
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="weather-neixiang-missing",
+                tool_id="chromie.weather.lookup",
+                args={
+                    "location": "河南省内乡县",
+                    "location_context": {
+                        "locality": "内乡县",
+                        "admin1": "河南省",
+                        "country": "中国",
+                        "aliases": ["内乡"],
+                    },
+                    "date": "today",
+                },
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.reason_code, "location_not_found")
+        self.assertIn("河南省内乡县", result.message)
+        self.assertEqual(result.output, {})
 
     async def test_executor_fails_closed_on_schema_invalid_arguments(self) -> None:
         executor = LocalToolExecutor(

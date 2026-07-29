@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from ..clients.weather_client import (
+    WeatherLocationContext,
     WeatherLookupError,
     WeatherQuery,
     WeatherReport,
@@ -161,10 +162,21 @@ class ToolAgent(BaseAgent):
                 exc,
             )
             result.add_speak_immediate(
-                f"我没查到这个地点的天气：{query.location}。" if zh else f"I could not find weather for {query.location}.",
+                (
+                    f"天气服务没有识别出这个地点：{query.location}。"
+                    if zh and exc.reason_code == "location_not_found"
+                    else f"我没查到这个地点的天气：{query.location}。"
+                    if zh
+                    else f"The weather provider did not recognize {query.location}."
+                    if exc.reason_code == "location_not_found"
+                    else f"I could not find weather for {query.location}."
+                ),
                 style="warning",
             )
-            self.trace(result, f"weather lookup failed: {exc}")
+            self.trace(
+                result,
+                f"weather lookup failed: reason={exc.reason_code} error={exc}",
+            )
             return result
         except Exception as exc:
             logger.warning(
@@ -389,6 +401,9 @@ class ToolAgent(BaseAgent):
             date=date,
             units=units,
             language=language,
+            location_context=WeatherLocationContext.from_mapping(
+                metadata_query.get("location_context")
+            ),
         )
 
     def _metadata_weather_query(self, request: AgentRunRequest) -> dict[str, Any]:

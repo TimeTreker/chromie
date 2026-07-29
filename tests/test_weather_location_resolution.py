@@ -1,0 +1,225 @@
+from __future__ import annotations
+
+import unittest
+from urllib.parse import parse_qs
+
+import httpx
+
+from agent.app.clients.weather_client import (
+    OpenMeteoWeatherClient,
+    WeatherLocationContext,
+    WeatherLookupError,
+    WeatherQuery,
+)
+
+
+class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_hierarchical_chinese_location_retries_locality_and_qualifies_admin1(self) -> None:
+        geocode_queries: list[str] = []
+        forecast_requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                query = parse_qs(request.url.query.decode())["name"][0]
+                geocode_queries.append(query)
+                if query == "河南省内乡县":
+                    return httpx.Response(200, json={"results": []})
+                if query == "内乡县":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "results": [
+                                {
+                                    "name": "内乡县",
+                                    "admin1": "河北省",
+                                    "country": "中国",
+                                    "latitude": 37.0,
+                                    "longitude": 114.0,
+                                },
+                                {
+                                    "name": "内乡县",
+                                    "admin1": "河南省",
+                                    "country": "中国",
+                                    "latitude": 33.046,
+                                    "longitude": 111.849,
+                                },
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"results": []})
+            if request.url.path.endswith("/forecast"):
+                forecast_requests.append(request)
+                return httpx.Response(
+                    200,
+                    json={
+                        "timezone": "Asia/Shanghai",
+                        "current": {
+                            "temperature_2m": 30.1,
+                            "apparent_temperature": 34.2,
+                            "precipitation": 0.0,
+                            "weather_code": 3,
+                            "wind_speed_10m": 7.0,
+                        },
+                        "daily": {
+                            "time": ["2026-07-29", "2026-07-30"],
+                            "weather_code": [3, 61],
+                            "temperature_2m_max": [31.0, 29.0],
+                            "temperature_2m_min": [24.0, 23.0],
+                            "precipitation_sum": [0.0, 2.4],
+                            "precipitation_probability_max": [20.0, 70.0],
+                        },
+                    },
+                )
+            raise AssertionError(f"unexpected request: {request.url}")
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+
+        report = await client.lookup(
+            WeatherQuery(
+                location="河南省内乡县",
+                date="today",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(geocode_queries[:2], ["河南省内乡县", "内乡县"])
+        self.assertEqual(len(forecast_requests), 1)
+        forecast_params = parse_qs(forecast_requests[0].url.query.decode())
+        self.assertEqual(forecast_params["latitude"], ["33.046"])
+        self.assertEqual(forecast_params["longitude"], ["111.849"])
+        self.assertEqual(report.location_name, "内乡县")
+        self.assertEqual(report.country, "中国")
+        self.assertEqual(report.current_temperature_c, 30.1)
+
+    async def test_explicit_location_context_is_used_without_changing_canonical_location(self) -> None:
+        geocode_queries: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                query = parse_qs(request.url.query.decode())["name"][0]
+                geocode_queries.append(query)
+                if query == "Neixiang County, Henan Province":
+                    return httpx.Response(200, json={"results": []})
+                if query == "Neixiang":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "results": [
+                                {
+                                    "name": "Neixiang",
+                                    "admin1": "Henan",
+                                    "country": "China",
+                                    "latitude": 33.046,
+                                    "longitude": 111.849,
+                                }
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"results": []})
+            return httpx.Response(
+                200,
+                json={
+                    "timezone": "Asia/Shanghai",
+                    "current": {},
+                    "daily": {
+                        "time": ["2026-07-29", "2026-07-30"],
+                        "weather_code": [3, 3],
+                        "temperature_2m_max": [31.0, 31.0],
+                        "temperature_2m_min": [24.0, 24.0],
+                        "precipitation_sum": [0.0, 0.0],
+                        "precipitation_probability_max": [20.0, 20.0],
+                    },
+                },
+            )
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+        query = WeatherQuery(
+            location="Neixiang County, Henan Province",
+            language="en-US",
+            location_context=WeatherLocationContext(
+                locality="Neixiang",
+                admin1="Henan",
+                country="China",
+            ),
+        )
+
+        report = await client.lookup(query)
+
+        self.assertEqual(
+            geocode_queries[:2],
+            ["Neixiang County, Henan Province", "Neixiang"],
+        )
+        self.assertEqual(query.location, "Neixiang County, Henan Province")
+        self.assertEqual(report.location_name, "Neixiang")
+
+    async def test_fallback_rejects_same_named_locality_from_wrong_admin1(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                query = parse_qs(request.url.query.decode())["name"][0]
+                if query == "河南省内乡县":
+                    return httpx.Response(200, json={"results": []})
+                return httpx.Response(
+                    200,
+                    json={
+                        "results": [
+                            {
+                                "name": "内乡县",
+                                "admin1": "河北省",
+                                "country": "中国",
+                                "latitude": 37.0,
+                                "longitude": 114.0,
+                            }
+                        ]
+                    },
+                )
+            raise AssertionError("forecast must not run for a mismatched province")
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+
+        with self.assertRaises(WeatherLookupError) as captured:
+            await client.lookup(
+                WeatherQuery(location="河南省内乡县", language="zh-CN")
+            )
+
+        self.assertEqual(captured.exception.reason_code, "location_not_found")
+
+    async def test_location_not_found_is_typed_after_all_equivalent_queries_fail(self) -> None:
+        queries: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            queries.append(parse_qs(request.url.query.decode())["name"][0])
+            return httpx.Response(200, json={"results": []})
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+
+        with self.assertRaises(WeatherLookupError) as captured:
+            await client.lookup(
+                WeatherQuery(location="河南省内乡县", language="zh-CN")
+            )
+
+        self.assertEqual(captured.exception.reason_code, "location_not_found")
+        self.assertEqual(
+            captured.exception.attempted_queries,
+            ("河南省内乡县", "内乡县", "内乡"),
+        )
+        self.assertEqual(queries, ["河南省内乡县", "内乡县", "内乡"])
+
+
+if __name__ == "__main__":
+    unittest.main()

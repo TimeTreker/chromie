@@ -270,9 +270,31 @@ def chromie_manifests() -> list[AgentManifest]:
                             "type": "string",
                             "minLength": 1,
                             "description": (
-                                "City or place name supplied by the user, such as "
-                                "重庆, 北京, Chongqing, or Beijing."
+                                "Canonical city or place binding resolved from the "
+                                "user turn, such as 重庆, 河南省内乡县, Chongqing, "
+                                "or Neixiang County. Preserve this value exactly; "
+                                "provider retries must not replace the Goal target."
                             ),
+                        },
+                        "location_context": {
+                            "type": "object",
+                            "description": (
+                                "Optional model-authored structure for the same "
+                                "resolved place. Include only components stated or "
+                                "unambiguously resolved from discourse; this helps "
+                                "the provider geocoder recognize hierarchical names."
+                            ),
+                            "properties": {
+                                "locality": {"type": "string", "minLength": 1},
+                                "admin1": {"type": "string", "minLength": 1},
+                                "country": {"type": "string", "minLength": 1},
+                                "aliases": {
+                                    "type": "array",
+                                    "items": {"type": "string", "minLength": 1},
+                                    "maxItems": 6,
+                                },
+                            },
+                            "additionalProperties": False,
                         },
                         "date": {
                             "type": "string",

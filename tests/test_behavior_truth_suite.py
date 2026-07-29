@@ -18,7 +18,7 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
         expected_counts = {
             "adapter": 4,
             "goal_interpretation": 24,
-            "cognitive_core_dialogue": 2,
+            "cognitive_core_dialogue": 3,
             "interaction": 29,
             "dialogue": 319,
         }

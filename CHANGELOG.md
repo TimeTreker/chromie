@@ -25,6 +25,17 @@
   named entities remain Goal bindings/referent updates and are no longer misclassified
   as resolved references, preventing valid explicit weather requests from failing
   before planning.
+- Added exact-first weather geocoding with bounded provider-only retry forms for
+  hierarchical places. The canonical Goal binding remains unchanged while the
+  adapter may query equivalent locality forms and qualify same-named results by
+  administrative context; a mismatched province is rejected rather than guessed.
+- Added typed `location_not_found` propagation from the weather provider through
+  Skill Runtime outcome facts so the model-authored failure response can say that
+  the provider did not recognize the place instead of claiming weather data or the
+  network was unavailable.
+- Added the Chongqing-to-Henan-Neixiang multi-turn scenario plus provider integration
+  coverage for full administrative names, locality fallback, candidate qualification,
+  and total geocoding failure.
 
 ## Unreleased — Safe-read speech, grounded result delivery, and explicit concurrency
 

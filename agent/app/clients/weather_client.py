@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import httpx
@@ -14,11 +15,45 @@ WeatherUnits = Literal["metric", "imperial", "auto"]
 
 
 @dataclass(slots=True)
+class WeatherLocationContext:
+    """Optional model-authored structure for one already-resolved place.
+
+    These fields do not select the user's referent or change the canonical
+    location binding. They only give a provider adapter equivalent lookup
+    forms and administrative qualifiers for the same bound place.
+    """
+
+    locality: str | None = None
+    admin1: str | None = None
+    country: str | None = None
+    aliases: tuple[str, ...] = field(default_factory=tuple)
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "WeatherLocationContext | None":
+        if not isinstance(value, dict):
+            return None
+        aliases_raw = value.get("aliases")
+        aliases: list[str] = []
+        if isinstance(aliases_raw, list):
+            for item in aliases_raw:
+                text = _normalize_location_text(item)
+                if text and text not in aliases:
+                    aliases.append(text)
+        return cls(
+            locality=_normalize_location_text(value.get("locality")) or None,
+            admin1=_normalize_location_text(value.get("admin1")) or None,
+            country=_normalize_location_text(value.get("country")) or None,
+            aliases=tuple(aliases[:6]),
+        )
+
+
+@dataclass(slots=True)
 class WeatherQuery:
     location: str
     date: WeatherDate = "today"
     units: WeatherUnits = "metric"
     language: str = "en-US"
+    location_context: WeatherLocationContext | None = None
 
 
 @dataclass(slots=True)
@@ -40,6 +75,136 @@ class WeatherReport:
 
 class WeatherLookupError(RuntimeError):
     """Raised when a weather lookup cannot produce a user-safe report."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_code: str = "weather_lookup_failed",
+        attempted_queries: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = " ".join(str(reason_code or "weather_lookup_failed").split())
+        self.attempted_queries = attempted_queries
+
+
+_CHINESE_ADMIN_PREFIX_SUFFIXES = (
+    "特别行政区",
+    "自治区",
+    "自治州",
+    "地区",
+    "省",
+    "市",
+    "盟",
+)
+_CHINESE_LOCALITY_SUFFIXES = (
+    "自治县",
+    "市辖区",
+    "自治旗",
+    "县",
+    "市",
+    "旗",
+)
+
+
+def _normalize_location_text(value: Any) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def _compact_place_key(value: Any) -> str:
+    return re.sub(r"[\s,，.。·'\"-]+", "", str(value or "")).casefold()
+
+
+def _strip_admin_suffix(value: Any) -> str:
+    text = _normalize_location_text(value)
+    for suffix in (*_CHINESE_ADMIN_PREFIX_SUFFIXES, *_CHINESE_LOCALITY_SUFFIXES):
+        if text.endswith(suffix) and len(text) > len(suffix):
+            return text[: -len(suffix)]
+    return text
+
+
+def _lexical_location_context(location: str) -> WeatherLocationContext:
+    """Derive provider search structure without changing semantic authority.
+
+    This is bounded transport normalization for Chinese administrative strings,
+    analogous to splitting an address into search fields. It never chooses a
+    conversational referent, Goal, or replacement location.
+    """
+
+    compact = _normalize_location_text(location).replace(" ", "")
+    country: str | None = None
+    for prefix in ("中华人民共和国", "中国"):
+        if compact.startswith(prefix) and len(compact) > len(prefix):
+            country = prefix
+            compact = compact[len(prefix) :]
+            break
+
+    boundaries: list[tuple[int, int]] = []
+    for suffix in _CHINESE_ADMIN_PREFIX_SUFFIXES:
+        start = 0
+        while True:
+            index = compact.find(suffix, start)
+            if index < 0:
+                break
+            end = index + len(suffix)
+            if end < len(compact):
+                boundaries.append((index, end))
+            start = index + 1
+
+    admin1: str | None = None
+    if boundaries:
+        first_end = min(end for _, end in boundaries)
+        admin1 = compact[:first_end] or None
+        last_end = max(end for _, end in boundaries)
+        locality = compact[last_end:] or None
+    else:
+        locality = compact or None
+
+    aliases: list[str] = []
+    if locality:
+        stripped = _strip_admin_suffix(locality)
+        if stripped and stripped != locality:
+            aliases.append(stripped)
+    return WeatherLocationContext(
+        locality=locality,
+        admin1=admin1,
+        country=country,
+        aliases=tuple(aliases),
+    )
+
+
+def _merge_location_context(
+    location: str,
+    explicit: WeatherLocationContext | None,
+) -> WeatherLocationContext:
+    lexical = _lexical_location_context(location)
+    explicit = explicit or WeatherLocationContext()
+    aliases: list[str] = []
+    for item in (*explicit.aliases, *lexical.aliases):
+        text = _normalize_location_text(item)
+        if text and text not in aliases:
+            aliases.append(text)
+    return WeatherLocationContext(
+        locality=explicit.locality or lexical.locality,
+        admin1=explicit.admin1 or lexical.admin1,
+        country=explicit.country or lexical.country,
+        aliases=tuple(aliases[:6]),
+    )
+
+
+def _provider_query_candidates(
+    location: str,
+    context: WeatherLocationContext,
+) -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for item in (location, context.locality, *context.aliases):
+        text = _normalize_location_text(item)
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            candidates.append(text)
+    return candidates[:8]
 
 
 _WEATHER_CODE_EN = {
@@ -260,6 +425,7 @@ class OpenMeteoWeatherClient:
         geocoding_url: str | None = None,
         forecast_url: str | None = None,
         timeout_s: float | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.geocoding_url = (
             geocoding_url
@@ -276,39 +442,41 @@ class OpenMeteoWeatherClient:
             if timeout_s is not None
             else os.getenv("AGENT_WEATHER_TIMEOUT_S", "8")
         )
+        self.transport = transport
 
     async def lookup(self, query: WeatherQuery) -> WeatherReport:
         location = " ".join((query.location or "").strip().split())
         if not location:
             raise WeatherLookupError("weather lookup requires a location")
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_s), trust_env=False) as client:
-            logger.info(
-                "weather_geocode_start location=%r language=%s url=%s",
-                location,
-                query.language,
-                self.geocoding_url,
+        context = _merge_location_context(location, query.location_context)
+        candidates = _provider_query_candidates(location, context)
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout_s),
+            trust_env=False,
+            transport=self.transport,
+        ) as client:
+            result, matched_query = await self._resolve_location(
+                client,
+                requested_location=location,
+                candidates=candidates,
+                context=context,
+                language=query.language,
             )
-            geo_resp = await client.get(
-                self.geocoding_url,
-                params={
-                    "name": location,
-                    "count": 1,
-                    "language": "zh" if query.language.lower().startswith("zh") else "en",
-                    "format": "json",
-                },
-            )
-            geo_resp.raise_for_status()
-            geo_data = geo_resp.json()
-            result = self._first_geocoding_result(geo_data)
             latitude = result.get("latitude")
             longitude = result.get("longitude")
             if not isinstance(latitude, (int, float)) or not isinstance(longitude, (int, float)):
-                raise WeatherLookupError(f"could not resolve weather location {location!r}")
+                raise WeatherLookupError(
+                    f"could not resolve weather location {location!r}",
+                    reason_code="location_resolution_invalid",
+                    attempted_queries=tuple(candidates),
+                )
             logger.info(
-                "weather_geocode_done requested=%r matched=%r country=%r lat=%s lon=%s",
+                "weather_geocode_done requested=%r query=%r matched=%r admin1=%r country=%r lat=%s lon=%s",
                 location,
+                matched_query,
                 result.get("name"),
+                result.get("admin1"),
                 result.get("country"),
                 latitude,
                 longitude,
@@ -380,14 +548,148 @@ class OpenMeteoWeatherClient:
         )
         return report
 
-    def _first_geocoding_result(self, data: Any) -> dict[str, Any]:
+    async def _resolve_location(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        requested_location: str,
+        candidates: list[str],
+        context: WeatherLocationContext,
+        language: str,
+    ) -> tuple[dict[str, Any], str]:
+        attempted: list[str] = []
+        for ordinal, candidate in enumerate(candidates):
+            attempted.append(candidate)
+            logger.info(
+                "weather_geocode_start requested=%r query=%r attempt=%s/%s language=%s url=%s",
+                requested_location,
+                candidate,
+                ordinal + 1,
+                len(candidates),
+                language,
+                self.geocoding_url,
+            )
+            geo_resp = await client.get(
+                self.geocoding_url,
+                params={
+                    "name": candidate,
+                    "count": 10,
+                    "language": "zh" if language.lower().startswith("zh") else "en",
+                    "format": "json",
+                },
+            )
+            geo_resp.raise_for_status()
+            result = self._select_geocoding_result(
+                geo_resp.json(),
+                requested_location=requested_location,
+                query_candidate=candidate,
+                context=context,
+            )
+            if result is not None:
+                return result, candidate
+            logger.info(
+                "weather_geocode_no_match requested=%r query=%r",
+                requested_location,
+                candidate,
+            )
+
+        raise WeatherLookupError(
+            "weather location was not found",
+            reason_code="location_not_found",
+            attempted_queries=tuple(attempted),
+        )
+
+    def _select_geocoding_result(
+        self,
+        data: Any,
+        *,
+        requested_location: str,
+        query_candidate: str,
+        context: WeatherLocationContext,
+    ) -> dict[str, Any] | None:
         results = data.get("results") if isinstance(data, dict) else None
         if not isinstance(results, list) or not results:
-            raise WeatherLookupError("weather location was not found")
-        first = results[0]
-        if not isinstance(first, dict):
-            raise WeatherLookupError("weather location response was malformed")
-        return first
+            return None
+
+        scored: list[tuple[int, int, dict[str, Any]]] = []
+        for index, item in enumerate(results):
+            if not isinstance(item, dict):
+                continue
+            latitude = item.get("latitude")
+            longitude = item.get("longitude")
+            if not isinstance(latitude, (int, float)) or not isinstance(longitude, (int, float)):
+                continue
+            score = self._geocoding_score(
+                item,
+                requested_location=requested_location,
+                query_candidate=query_candidate,
+                context=context,
+            )
+            if score is not None:
+                scored.append((score, -index, item))
+        if not scored:
+            return None
+        scored.sort(key=lambda entry: (entry[0], entry[1]), reverse=True)
+        return scored[0][2]
+
+    def _geocoding_score(
+        self,
+        result: dict[str, Any],
+        *,
+        requested_location: str,
+        query_candidate: str,
+        context: WeatherLocationContext,
+    ) -> int | None:
+        name = _normalize_location_text(result.get("name"))
+        if not name:
+            return None
+        requested_key = _compact_place_key(requested_location)
+        query_key = _compact_place_key(query_candidate)
+        name_key = _compact_place_key(name)
+        locality_key = _compact_place_key(context.locality)
+        locality_base_key = _compact_place_key(_strip_admin_suffix(context.locality))
+        name_base_key = _compact_place_key(_strip_admin_suffix(name))
+
+        score = 0
+        if name_key == requested_key:
+            score += 180
+        if name_key == query_key:
+            score += 140
+        if locality_key and name_key == locality_key:
+            score += 160
+        if locality_base_key and name_base_key == locality_base_key:
+            score += 120
+        if query_key and query_key in name_key:
+            score += 30
+
+        if context.admin1:
+            expected_admin1 = _compact_place_key(_strip_admin_suffix(context.admin1))
+            actual_admin1 = _compact_place_key(
+                _strip_admin_suffix(result.get("admin1"))
+            )
+            if actual_admin1:
+                if actual_admin1 == expected_admin1:
+                    score += 100
+                else:
+                    return None
+            elif _compact_place_key(query_candidate) != requested_key:
+                return None
+
+        if context.country:
+            expected_country = _compact_place_key(context.country)
+            actual_country = _compact_place_key(result.get("country"))
+            if actual_country:
+                if actual_country == expected_country:
+                    score += 40
+                elif expected_country not in actual_country and actual_country not in expected_country:
+                    score -= 60
+
+        # A fallback query must still identify the same lexical locality. This
+        # guards against accepting an unrelated first provider result merely
+        # because a broad query returned something.
+        if locality_base_key and name_base_key != locality_base_key:
+            return None
+        return score
 
     def _report_from_payload(
         self,

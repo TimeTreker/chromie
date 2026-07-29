@@ -6,8 +6,8 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 527,
-  "expected_normalized_total": 526,
+  "expected_inventory_total": 528,
+  "expected_normalized_total": 527,
   "allowed_datasets": [
     "adapter",
     "asr_noise",
@@ -126,7 +126,7 @@
       ],
       "target_reference": "integration/cognitive_core_dialogue",
       "migration_state": "referenced_in_place",
-      "expected_inventory_count": 2
+      "expected_inventory_count": 3
     },
     {
       "name": "adapter",

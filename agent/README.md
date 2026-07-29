@@ -45,7 +45,7 @@ separate and default-off; enable it only with
 | `robot_pose_controller_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `motion_planner_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `safety_agent` | Rejects or clamps unsafe action proposals. |
-| `tool_agent` | Handles read-only weather lookup directly; produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
+| `tool_agent` | Handles read-only weather lookup directly; preserves the canonical resolved place while the provider adapter may use bounded equivalent geocoding forms and typed `location_not_found`; produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
 | `memory_agent` | Produces refined `extracted_memory` updates plus compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
 | `chromie.memory.retrieve_verified_tool_result` | Read-only Host-runtime capability that retrieves one exact fresh prior tool result after Goal Association has already resolved references and bound material arguments. It never resolves pronouns or performs loose semantic search. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |

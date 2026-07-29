@@ -240,3 +240,26 @@ Only the post-execution interpreter may state weather facts.
 - Old evidence remains usable only through an explicit executed retrieval.
 - Physical robot location remains Soridormi/runtime state, not a discourse
   location referent.
+
+## Provider location recognition does not change discourse authority
+
+After Goal Association has resolved a weather location, the canonical binding is
+immutable. For example, `河南省内乡县` stays the tool argument even when a provider
+geocoder cannot match that full administrative string. The weather adapter may
+query bounded equivalent forms such as the locality name and may use supplied
+province/country fields to qualify candidates. These are retrieval mechanics for
+the same place, not a new semantic decision.
+
+The adapter must:
+
+- query the canonical location first;
+- retain the canonical location as the request target;
+- reject a same-named candidate whose administrative context contradicts the
+  resolved place;
+- return typed `location_not_found` when no qualified candidate exists; and
+- never use geocoder results to resolve `那边`, select an active Goal, or replace
+  a discourse referent.
+
+The maintained `chongqing_then_neixiang_weather_stays_grounded` scenario protects
+the multi-turn semantic boundary, while provider tests protect the full-name to
+locality fallback and wrong-province rejection.

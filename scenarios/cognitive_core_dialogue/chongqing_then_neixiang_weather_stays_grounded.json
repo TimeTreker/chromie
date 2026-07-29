@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "id": "chongqing_then_neixiang_weather_stays_grounded",
+  "suite": "cognitive_core_dialogue",
+  "level": "integration",
+  "description": "After a successful Chongqing weather turn, an explicit Henan Neixiang County weather request must remain bound to Neixiang in Cognitive Core; the prior Chongqing location is history only and cannot replace the new weather query.",
+  "tags": [
+    "voice-log",
+    "multi-turn",
+    "weather",
+    "location-context",
+    "context-pollution",
+    "neixiang",
+    "zh-CN"
+  ],
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 77,
+      "capabilities": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "agent_id": "chromie.weather",
+          "description": "Read current weather or forecast for an already-resolved named place.",
+          "route": "tool",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "read_only",
+            "external_read",
+            "weather_lookup"
+          ],
+          "safety_class": "safe_read",
+          "requires_confirmation": false,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "units": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "location"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "turns": [
+    {
+      "id": "chongqing_weather",
+      "ask": "你好，今天重庆天气咋样？热不热，下雨了没？",
+      "language": "zh-CN",
+      "stub": {
+        "llm_script": [
+          {
+            "stage": "quick_intent",
+            "decision": {
+              "route": "tool",
+              "intent": "weather_query",
+              "confidence": 0.96,
+              "language": "zh-CN",
+              "metadata": {
+                "tool_name": "weather",
+                "weather_query": {
+                  "location": "重庆",
+                  "date": "today",
+                  "units": "metric"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "route": "tool",
+        "intent": "weather_query",
+        "source": "llm",
+        "llm_calls": 1,
+        "llm_stages": [
+          "quick_intent"
+        ],
+        "task_types_include": [
+          "task.use_tool"
+        ]
+      }
+    },
+    {
+      "id": "neixiang_weather",
+      "ask": "那个河南省内乡县现在下雨了没有？",
+      "language": "zh-CN",
+      "stub": {
+        "llm_script": [
+          {
+            "stage": "quick_intent",
+            "decision": {
+              "route": "tool",
+              "intent": "weather_query",
+              "confidence": 0.97,
+              "language": "zh-CN",
+              "metadata": {
+                "tool_name": "weather",
+                "weather_query": {
+                  "location": "河南省内乡县",
+                  "date": "today",
+                  "units": "metric"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "route": "tool",
+        "intent": "weather_query",
+        "source": "llm",
+        "llm_calls": 1,
+        "llm_stages": [
+          "quick_intent"
+        ],
+        "history_contains": [
+          "你好，今天重庆天气咋样？热不热，下雨了没？"
+        ],
+        "metadata_json_contains": [
+          "河南省内乡县",
+          "weather_query"
+        ]
+      }
+    }
+  ]
+}

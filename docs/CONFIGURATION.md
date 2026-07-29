@@ -558,6 +558,15 @@ retained. See
 | `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
 | `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
 | `AGENT_WEATHER_FORECAST_URL` | Weather forecast endpoint; default `https://api.open-meteo.com/v1/forecast`. |
+
+`chromie.weather.lookup` keeps its required `location` argument equal to the
+canonical Goal binding. It also accepts optional `location_context` fields
+(`locality`, `admin1`, `country`, and `aliases`) when those fields were supplied
+or unambiguously resolved by the LLM. The Open-Meteo adapter queries the exact
+canonical string first, then bounded equivalent locality forms only for provider
+recognition; it never changes the conversational referent or Goal. Candidates
+are qualified against available administrative context. If none match, the tool
+returns typed `location_not_found`.
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |

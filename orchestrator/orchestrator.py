@@ -5905,8 +5905,11 @@ class VoiceAssistant:
             "Do not mention models, planners, schemas, validation, services, APIs, "
             "internal tools, evidence labels, or system components. Do not claim any "
             "successful lookup, movement, or verified result that the facts do not prove. "
-            "Do not invent the requested result. Say simply what failed in natural childlike "
-            "language, preserve the honest no-guess/no-forced-motion boundary, and invite one "
+            "Do not invent the requested result. Treat typed provider reason codes as exact "
+            "failure facts: location_not_found means the provider could not identify the "
+            "requested place, not that weather itself was unavailable or the network failed. "
+            "Say simply what failed in natural childlike language, preserve the honest "
+            "no-guess/no-forced-motion boundary, and invite one "
             "retry when retryable. Return only a JSON object with one field named text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
@@ -6589,11 +6592,20 @@ class VoiceAssistant:
                     goal_statuses = [
                         str(item.status) for item in bundle.goal_outcomes
                     ]
+                    reason_codes = sorted(
+                        {
+                            str(code)
+                            for outcome in bundle.goal_outcomes
+                            for code in outcome.reason_codes
+                            if str(code or "").strip()
+                        }
+                    )
                     failure_facts = {
                         "route": route,
                         "failure_stage": "skill_execution",
                         "failure_class": "provider_execution_failed",
                         "execution_started": True,
+                        "reason_codes": reason_codes,
                         "verified_result_available": any(
                             item.observation is not None
                             and item.observation.status == "available"

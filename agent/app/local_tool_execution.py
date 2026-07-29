@@ -8,6 +8,7 @@ from typing import Any
 from .capabilities.models import CapabilityRegistry, ToolCapability
 from .clients.weather_client import (
     OpenMeteoWeatherClient,
+    WeatherLocationContext,
     WeatherLookupError,
     WeatherQuery,
     WeatherReport,
@@ -79,7 +80,12 @@ class LocalToolExecutor:
         except (ValueError, TypeError) as exc:
             return self._result(request, "refused", "contract_invalid", str(exc))
         except WeatherLookupError as exc:
-            return self._result(request, "failed", "weather_lookup_failed", str(exc))
+            return self._result(
+                request,
+                "failed",
+                exc.reason_code or "weather_lookup_failed",
+                str(exc),
+            )
         except Exception as exc:  # pragma: no cover - final provider boundary
             logger.exception(
                 "local_tool_execution_failed request_id=%s tool_id=%s",
@@ -128,6 +134,9 @@ class LocalToolExecutor:
                 date=str(args.get("date") or "today"),
                 units=units,
                 language=language,
+                location_context=WeatherLocationContext.from_mapping(
+                    args.get("location_context")
+                ),
             )
         )
         return _weather_output(report, units=units, language=language)
