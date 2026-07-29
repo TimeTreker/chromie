@@ -20,7 +20,7 @@
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-27
+**Status refresh date:** 2026-07-29
 **Current focus:** Qualify the implemented Cognitive Gateway/Core migration. The
 five Gateway modules, pre-Core admission, admitted-envelope-only Core API,
 Core-owned interpretation result, and digest-bound compatibility projection are
@@ -36,6 +36,18 @@ identity matching both the checkout and capability manifest. The remaining work
 is to execute that workflow from a clean committed deployment, review and
 approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
+
+The next and only active code implementation Issue is now **Introduce Agent
+Skills on canonical Capability terminology without a second execution
+authority**. Its architecture and semantic slices are documented in
+[docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md)
+and
+[docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
+The Gateway/Core item remains an open evidence track. Resume implementation by
+making `capability_id` canonical while preserving bounded legacy `skill_id`
+readers. Then add Agent Skill contracts and a secure read-only owner-approved
+loader. Do not begin with phrase-to-Skill rules, weather-specific Host selection,
+script execution, or provider registration.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -67,7 +79,7 @@ path.
 ## Benchmark Suite foundation closure
 
 The Benchmark infrastructure issue is formally closed. The authoritative migration
-manifest reconciles 527 inventory entries with 526 common-contract scenarios,
+manifest reconciles 528 inventory entries with 527 common-contract scenarios,
 retains current commands under explicit removal gates, and exposes a
 Benchmark-native deterministic runner. Episode candidates remain immutable until
 a separate fingerprint-bound review approves promotion. Future work should run

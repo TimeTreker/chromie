@@ -334,7 +334,7 @@ semantic IDs, source paths, Git provenance, or evidence claims.
 `benchmarks/manifests/scenario_migration_v1.json` now owns this classification.
 The suites manifest is only a compatibility redirect. Physical moves are not
 required for closure because the Benchmark-native runner, inventory, common
-normalizer, and retained commands reconcile 527 inventory entries with 526
+normalizer, and retained commands reconcile 528 inventory entries with 527
 semantic scenarios. Compatibility entrypoints have explicit criteria-based
 removal schedules. No scenario is copied into multiple directories solely to
 represent multiple tags.

@@ -1,4 +1,4 @@
-# Interaction Agent and Skill Runtime
+# Interaction Agent and Capability Runtime
 
 ## Current status
 
@@ -28,19 +28,31 @@ Open release-support gates:
   support;
 - physical pilot commissioning evidence before any real robot motion claim.
 
+## Terminology boundary
+
+The implementation historically uses **named skill**, `skill_id`, and
+**Skill Runtime** for executable capabilities. Canonical architecture terms are
+**named capability**, `capability_id`, and **Trusted Capability Runtime**. The new
+[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) defines a
+separate passive concept: an Agent Skill is reusable LLM task methodology
+with no provider registration or execution authority. Agent Skill selection
+may inform a Plan; only the executable named capability requests described here
+reach the Trusted Capability Runtime. Current code and retained traces may still
+use the legacy Trusted Skill Runtime name during compatibility migration.
+
 ## Design goal
 
-The language model may propose speech and validated named skills. It must not
-emit or authorize raw robot controls.
+The language model may propose speech and validated named capabilities. It must
+not emit or authorize raw robot controls.
 
 ```text
 user speech
   -> deterministic operational controls
   -> structured interaction reasoning
   -> strict InteractionResponse
-  -> trusted host Skill Runtime
+  -> trusted host Capability Runtime
       -> speech provider
-      -> Soridormi named-skill provider
+      -> Soridormi named-capability provider
       -> planning TaskGraph provider
 ```
 

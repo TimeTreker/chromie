@@ -29,6 +29,8 @@ Chromie 负责：
 - 麦克风、VAD、ASR 协调、TTS 播放和打断；
 - stop、cancel、emergency、silence 等确定性路径；
 - 对话状态、原生结构化 Agent 输出和严格契约；
+- Agent Skills：由 Agent 按需选择的无执行权任务方法，帮助生成 Plan；
+- Capability / Tool：通过可信 Runtime 和 Provider 执行的原子能力；
 - 可信 Skill Runtime 的确认、调度、超时、取消和证据；
 - 配置、验收与可复现开发制品工具。
 
@@ -73,17 +75,36 @@ acoustic 模式使用 TTS 生成语音，通过主机扬声器播放并由配置
 可以降低人工语音测试成本。真实人声、真实麦克风/扬声器支持声明和人工审核
 需要单独完成 supervised 验收。现阶段不能宣称实体机器人支持。
 
+## Agent Skills 新架构 Issue
+
+Chromie 已接受 Agent Skills 架构：Agent 在自己的职责范围内，根据当前
+Goal 和上下文选择零个、一个或多个 Agent Skills，并生成本次 Plan；Skill
+只提供可复用方法和领域经验，没有独立 Goal、Provider 注册、权限或执行权；
+Plan 最终仍只能通过 `capability_id` 调用已注册 Capability，并经过 Trusted
+Capability Runtime（当前代码兼容名仍为 Trusted Skill Runtime）与
+Provider/Soridormi 校验。
+
+当前仅完成文档和实施计划，运行时代码尚未实现。下一项代码工作是先把
+`capability_id` 设为可执行 Plan、请求、结果和 Trace 的规范字段，同时保留有界的
+`skill_id` 兼容读取；之后再实现通用的 Agent Skill 合同与 owner-approved 只读
+Loader。不能从天气关键词映射或固定 Workflow 开始。详见 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) 和
+[Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)。
+
 ## 开发主线
 
-1. **当前**：优化 Fast Planner 多目标时延，并保留统一 Goal-driven Runtime 的
-   干净、来源绑定的语音和文本到 MuJoCo 证据。
-2. **取消证据**：named-goal 精确取消、Goal 状态原子协调和剩余确认令牌重建
-   已实现；下一步补充受监督的 E-stop/safe-idle 及宽范围 reflex 协调证据。
-3. **实体准备**：选择一台实体参考机器人，先完成身份、安全、网络和无动作检查。
-4. **实体试点**：从无动作检查、单技能低速运行逐步进入受监督多技能任务。
-5. **语音设备证据**：需要真实麦克风/扬声器支持时，再单独完成 supervised
-   语音验收与人工审核。
-6. **后续**：在基础闭环稳定后，再考虑视觉、长期记忆、复杂恢复和更高自治。
+- **当前代码 Issue**：先完成 `skill_id` → `capability_id` 的兼容迁移，再建立
+  Agent Skill 通用合同和 owner-approved 只读 Loader，随后依次完成模型选择、
+  Agent 投影、Plan provenance、grounded external information 与 weather vertical
+  slice。
+- **开放证据 Issue**：保留统一 Goal-driven Runtime 的干净、来源绑定 live-text、
+  active cancellation 和 MuJoCo safe-idle 证据。
+- **取消证据**：named-goal 精确取消、Goal 状态原子协调和剩余确认令牌重建已
+  实现；仍需补充受监督的 E-stop/safe-idle 及宽范围 reflex 协调证据。
+- **实体准备**：选择一台实体参考机器人，先完成身份、安全、网络和无动作检查。
+- **实体试点**：从无动作检查、单技能低速运行逐步进入受监督多技能任务。
+- **语音设备证据**：需要真实麦克风/扬声器支持时，再单独完成 supervised
+  语音验收与人工审核。
+- **后续**：在基础闭环稳定后，再考虑视觉、长期记忆、复杂恢复和更高自治。
 
 早期开发增量现在统一归入“实时交互基础”和“结构化具身基础”两项已完成能力，
 不再使用顺序编号作为独立规划单位。语音验收使用功能化脚本名和

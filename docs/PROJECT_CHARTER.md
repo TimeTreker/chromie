@@ -51,8 +51,11 @@ A successful Chromie release lets an operator:
 - the Goal-Driven Cognitive Core: goal meaning and continuity, semantic
   decomposition and planning, outcome reconciliation, and response composition;
 - native structured Agent output and strict model-facing contracts;
-- trusted Skill Runtime validation, authorization, scheduling, timeout, and
-  cancellation;
+- owner-approved Agent Skill discovery, bounded Agent projections, and
+  selection provenance without granting Skill content execution authority;
+- Trusted Capability Runtime validation, authorization, scheduling, timeout,
+  and cancellation; current code may retain legacy Skill Runtime aliases during
+  migration;
 - evidence capture, acceptance tooling, deployment configuration, and release
   packaging.
 
@@ -68,7 +71,9 @@ A successful Chromie release lets an operator:
 
 - interpret user intent;
 - produce concise speech;
-- select registered named skills;
+- select zero or more owner-approved Agent Skills as reusable reasoning
+  methods;
+- select registered named capabilities for a typed Plan;
 - propose validated TaskGraphs.
 
 ### The language model must never
@@ -79,6 +84,8 @@ A successful Chromie release lets an operator:
   decisions;
 - send raw motor, joint, actuator, torque, controller-array, or bus commands;
 - decide deterministic operational controls;
+- treat an Agent Skill, `SKILL.md`, bundled resource, or script as execution
+  authorization;
 - claim execution succeeded without provider evidence.
 
 The legacy host hardware daemon is mock compatibility infrastructure, not a
@@ -154,6 +161,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or other Host rules that imitate intelligence merely to pass visible cases.
    LLMs may generate candidate scenarios and qualitative critique, but reviewed
    contracts and retained evidence remain authoritative for acceptance.
+12. **Agent Skills teach; capabilities execute.** An Agent may select and
+   combine owner-approved Agent Skills to inform a Plan, but a Skill has no
+   independent Goal, provider registration, permission, confirmation exemption,
+   or execution authority. All effects still use exact registered capabilities,
+   Trusted Capability Runtime validation, and provider evidence. Skill retrieval may narrow
+   candidates; it must not become phrase-based semantic selection.
 
 ## Non-goals
 

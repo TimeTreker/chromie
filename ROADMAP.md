@@ -21,10 +21,10 @@ do so.
 
 The final closure audit also removed stale 8091 developer-tool/configuration contracts, integrated-container tests, Router-named metadata/provenance fields, and unused Host-authored weather acknowledgement composition. The maintained full test entrypoint and Benchmark checks must pass before the Social Attention benchmark expansion begins.
 
-## Active issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
+## Open evidence issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
 
 The Goal-Driven Cognitive Turn Loop and the Gateway/Core code migration are now
-implemented. The active Issue remains open for source-bound qualification and the
+implemented. This evidence Issue remains open for source-bound qualification and the
 final post-evidence audit:
 
 - [x] expose explicit contracts and implementations for Input Normalization,
@@ -66,7 +66,85 @@ final post-evidence audit:
 resumes only after the Gateway/Core path above is the deployed single semantic
 authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
- The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
+The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
+
+## Active architecture issue — Introduce Agent Skills on canonical Capability terminology
+
+The accepted design is defined in
+[docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
+and the semantic delivery slices and closure criteria are defined in
+[docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
+
+Objective:
+
+> Let LLM-driven Agents discover and use owner-approved reusable task methods to
+> generate better Plans, while making `capability_id` and Trusted Capability
+> Runtime the canonical executable vocabulary and preserving the existing
+> registry, provider authority, evidence boundaries, and the rule that thinking
+> belongs to the LLM.
+
+Locked boundaries:
+
+- an Agent owns semantic decisions within its assigned responsibility;
+- an Agent Skill is passive task knowledge with no Goal, state loop,
+  provider registration, permission, confirmation exemption, or execution
+  authority;
+- a Plan is the current situation-specific model proposal;
+- a Capability is the atomic executable contract;
+- Skill candidate retrieval may narrow context, but final selection is
+  model-authored and typed;
+- Skill packages cannot execute scripts or create a second capability registry;
+- executable steps use canonical `capability_id`; legacy `skill_id` is accepted
+  only at explicit compatibility boundaries and conflicting dual fields fail
+  closed;
+- Agent Skill identity uses `agent_skill_id`;
+- weather is the first vertical slice, built on a reusable grounded-external-
+  information Skill;
+- Benchmarks evaluate Skill selection, Plan quality, grounding, and failure
+  behavior without choosing Skills for the runtime.
+
+Semantic delivery order:
+
+- migrate executable contracts from canonical `skill_id` usage to
+  `capability_id` with bounded legacy readers;
+- establish Agent Skill contracts and `agent_skill_id`;
+- add a secure read-only owner-approved Agent Skill registry and loader;
+- add model-authored discovery and selection;
+- add Agent-specific progressive disclosure;
+- bind selected Skill provenance to Canonical Plans without changing execution
+  authority;
+- implement grounded external information and weather Skills;
+- add trace, experience, module, integration, and E2E evidence;
+- remove legacy aliases only after retained artifacts and external callers have
+  migrated.
+
+Immediate implementation slice:
+
+> Make `capability_id` canonical while preserving a bounded `skill_id`
+> compatibility reader.
+
+The following slice establishes Agent Skill contracts and a read-only
+owner-approved loader. Do not begin with a weather keyword selector, fixed
+weather Workflow, arbitrary script loader, or provider-registration mechanism.
+
+Exit criteria:
+
+- Agent, Agent Skill, Plan, and Capability are distinct in contracts and
+  traces;
+- new executable Plans and traces use `capability_id`, while retained
+  `skill_id` artifacts remain readable;
+- Skill selection is model-authored and observable;
+- malformed, unapproved, duplicate, or path-escaping packages fail closed;
+- Agents receive bounded projections rather than the complete Skill library;
+- Plans record exact Skill ID, version, projection, and digest;
+- execution still references only registered Capabilities and crosses Trusted
+  Runtime/provider validation;
+- grounded external information and weather Skills pass the maintained
+  Chongqing/Neixiang, verified-memory, stale-memory, failure, and generic Goal-
+  reference scenarios;
+- automated, live-text, and live-tool evidence are reported separately;
+- architecture, contributor, status, roadmap, and operational documentation
+  agree.
 
 ## Chromie Benchmark Suite
 
@@ -171,7 +249,7 @@ Chromie plans and reports work by the problem being solved, the capability being
 qualified, and the evidence required for the product claim. Sequential milestone
 codes are not part of the current project model.
 
-- Only one delivery milestone is active at a time.
+- Only one code implementation Issue is active at a time; independent retained-evidence tracks may remain open.
 - A milestone closes only when its implementation and required evidence exist.
 - Default-off experimental work is not release support.
 - Documents, tools, tests, and evidence classes use semantic problem, capability,
@@ -600,13 +678,16 @@ The detailed plan is maintained in
 ### Selective ecosystem alignment
 
 Chromie will absorb external Agent-framework ideas only when they solve a concrete
-project problem. The current plan does not add capability-package scanning,
-`SKILL.md` execution, arbitrary script plugins, automatic provider registration, or
-a package-install command. Optional descriptive conventions may be documented next
-to existing manifests, but the manifest/provider contract and trusted execution
-path remain authoritative. Revisit packaging or installation only after a real
-interoperability use case demonstrates value that cannot be achieved with the
-current registry and MCP/provider model.
+project problem. The accepted Agent Skills architecture adopts a separate,
+read-only, owner-approved `SKILL.md`-style cognitive-content library with model-
+authored selection and progressive disclosure. It does **not** add arbitrary
+script execution, automatic provider registration, a second execution registry,
+or a package-install command. Typed capability manifests, live provider schemas,
+Trusted Capability Runtime, and Soridormi remain execution-authoritative.
+Current code may retain the legacy Skill Runtime name during compatibility
+migration. Third-party
+installation and broader interoperability remain deferred until a concrete use
+case and explicit review justify them.
 
 ## Completed phase - Robust simulation and provider readiness
 

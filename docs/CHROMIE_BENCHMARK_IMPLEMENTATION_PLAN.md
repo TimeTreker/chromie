@@ -269,7 +269,7 @@ Implemented evidence:
 - one authoritative migration manifest references maintained sources in place;
 - the former suites manifest is a compatibility redirect rather than duplicate
   classification authority;
-- inventory and common-contract totals reconcile at 527 entries and 526 semantic
+- inventory and common-contract totals reconcile at 528 entries and 527 semantic
   scenarios;
 - stable IDs, source paths, evidence levels, Git provenance, and existing
   general-ability entrypoints remain intact;

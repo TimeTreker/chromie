@@ -82,9 +82,11 @@ needs a stable semantic object above routes and skills: the user goal.
 The primary cognitive object is the user’s desired outcome, not a route,
 intent, capability, or skill.
 
-A skill is one possible means of satisfying a goal. The same goal may be
-satisfied through different skills, composed plans, observation, clarification,
-or an alternative plan depending on context.
+An executable capability is one possible means of satisfying a goal. A
+Agent Skill is a reusable method that may help an Agent decide how to use
+one or more capabilities. The same goal may be satisfied through different
+capabilities, Agent Skills, composed plans, observation, clarification, or
+an alternative plan depending on context.
 
 ### 3.2 Continuity before creation
 
@@ -114,6 +116,25 @@ priorities before choosing implementation capabilities.
 
 Normal semantic understanding must not be implemented through phrase tables,
 regex intent rules, hidden skill maps, or action-name keyword branches.
+
+### 3.4.1 Agent, Agent Skill, Plan, and Capability
+
+Chromie distinguishes four objects that external Agent frameworks often call
+"skills" interchangeably:
+
+- an **Agent** is an LLM-driven decision role with bounded responsibility and
+  typed output;
+- a **Agent Skill** is passive, reusable task knowledge with no Goal or
+  execution authority;
+- a **Plan** is the Agent's situation-specific proposal for current Goals;
+- a **Capability** is an atomic executable contract invoked only through the
+  trusted runtime/provider path.
+
+Agents may select zero, one, or several Agent Skills before generating a
+Plan. Candidate retrieval may narrow the Skill catalog, but ordinary Skill
+selection remains model-authored and typed. Agent Skill content cannot
+register capabilities, grant permissions, bypass confirmation, or execute
+scripts. See [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
 ### 3.5 Single-direction cognition
 
@@ -365,6 +386,10 @@ Goal Association
 Goal Segmentation
   ├─ update existing goals
   └─ create independent new goals
+  ↓
+Model-authored Agent Skill selection and bounded projection loading
+  ├─ zero, one, or several owner-approved methods
+  └─ no Skill content receives execution authority
   ↓
 Fast Planner per goal
   ├─ complete coverage → Canonical Plan
@@ -633,6 +658,7 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 The Fast Planner is a low-latency semantic planner over:
 
 - the complete current goal;
+- bounded summaries or projections of model-selected Agent Skills;
 - a compact self model;
 - bounded active-goal context;
 - common capabilities;
@@ -677,6 +703,7 @@ escalation. The implemented contract and qualification matrix are defined in
 The Deep Planner receives:
 
 - the original user turn;
+- bounded projections of model-selected Agent Skills and their provenance;
 - complete associated goal state;
 - any advisory fast-planner draft;
 - the full capability registry;
@@ -699,8 +726,8 @@ It may produce:
 Deep Planner and single-goal Fast Planner use the shared flat
 `PlannerModelOutput` boundary. Multi-goal Fast Planner uses the decoder-tight
 `FastPlannerMultiGoalPlanOutput` boundary. In every case, the planner model owns
-all semantic plan fields: disposition, coverage, steps, step identifiers,
-skill selection, arguments, ordering, goal ownership, per-goal outcomes,
+all semantic plan fields: disposition, coverage, Agent Skill selection,
+capability steps, step identifiers, arguments, ordering, goal ownership, per-goal outcomes,
 response content, and satisfaction judgments.
 
 For complete multi-goal planning, per-goal outcomes form an exact object keyed
@@ -719,8 +746,11 @@ host-owned canonical envelope.
 
 The Deep Planner does not send simple steps back to the Fast Planner.
 
-Simple skills are leaf nodes in either planner’s canonical plan. Skills do not
-belong to a planner tier.
+Executable capabilities are leaf nodes in either planner's canonical plan and
+use canonical `capability_id`. Agent Skills are reusable planning methods and do
+not belong to a planner tier. Legacy `skill_id` remains a bounded compatibility
+input until retained artifacts and callers migrate; conflicting dual fields fail
+closed.
 
 ### 8.4 Shared planner primitives
 
@@ -1195,6 +1225,9 @@ The following patterns violate this architecture:
 
 - regex or phrase-table planning for normal language;
 - hidden keyword-to-skill mapping;
+- Host-selected Agent Skills for ordinary language;
+- automatic execution or registration from an Agent Skill package;
+- an Agent Skill that owns hidden Goal, memory, or provider state;
 - one new task per utterance;
 - using recency alone to associate a turn with a goal;
 - Goal Interpreter-selected first skill treated as the complete goal;

@@ -80,17 +80,20 @@ before Goal Interpretation and downstream planning can reliably ground natural l
 
 ## Selective ecosystem alignment
 
-Chromie may borrow useful descriptive conventions from external Agent ecosystems,
-including prose-oriented formats such as `SKILL.md`, when they make a capability
-easier for contributors to understand. Such material is documentation only unless
-a separate architecture decision explicitly promotes it into a machine contract.
+Chromie now has an accepted architecture direction for a separate
+owner-approved **Agent Skill** library; see
+[`docs/AGENT_SKILLS_ARCHITECTURE.md`](../docs/AGENT_SKILLS_ARCHITECTURE.md).
+Agent Skills may use prose-oriented formats such as `SKILL.md`, but they are
+passive LLM task methods stored outside this executable capability directory.
+They cannot register a capability, provider, permission, or confirmation
+exemption.
 
 The existing typed manifest, live provider schema, capability registry, Trusted
-Skill Runtime, and Soridormi validation remain the only execution-authoritative
-path. Do not add a second registry, directory scanner, script entrypoint, automatic
-registration hook, or install mechanism merely to resemble another framework.
-Adopt an external convention only for a demonstrated integration need and only
-when it preserves the current authority and safety boundaries.
+Capability Runtime, and Soridormi validation remain the only execution-
+authoritative path. Current code may still expose the legacy Skill Runtime name
+until the compatibility migration lands. Do not add a second execution registry, script entrypoint, automatic
+provider-registration hook, or install mechanism. The planned Agent Skill
+registry is a read-only cognitive-content index with no execution authority.
 
 ## Prompt-tier preset
 

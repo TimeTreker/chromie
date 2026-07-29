@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Agent Skills architecture and canonical Capability terminology
+
+- Defined Agent, Agent Skill, Plan, and Capability as separate architectural
+  objects. Agents make semantic decisions, Agent Skills provide passive
+  reusable methods, Plans record current proposals, and Capabilities remain the
+  only executable contracts.
+- Accepted model-authored zero/one/multi-Skill selection, bounded Agent-specific
+  progressive disclosure, owner approval, version/digest provenance, and Plan-
+  level Skill traceability.
+- Preserved the existing typed capability registry, provider validation,
+  confirmation, evidence, and Soridormi physical-safety boundaries as the only
+  execution-authoritative path; adopted Trusted Capability Runtime as the
+  canonical architecture term while retaining legacy runtime aliases during
+  migration.
+- Opened the implementation Issue with semantic delivery slices for generic
+  contracts, a secure read-only loader, model selection, Agent projections,
+  Plan provenance, grounded external information, the weather vertical slice,
+  and maintained module/integration/E2E qualification.
+- Explicitly deferred third-party installation, arbitrary Skill scripts,
+  automatic provider registration, a second execution registry, and made the `skill_id` to `capability_id` compatibility migration the first
+  implementation slice before Agent Skill selection.
+
 ## Unreleased — Scoped discourse referents and verified result retrieval
 
 - Added model-authored, Host-validated discourse referents with conversation,

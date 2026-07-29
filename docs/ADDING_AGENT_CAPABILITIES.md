@@ -24,6 +24,12 @@ User request
 
 The Goal Interpreter may generate a short process acknowledgement such as “好的，我查一下重庆今天的天气。” It must not invent the final answer. The Agent/tool owns the grounded result.
 
+An **Agent Skill** is a different object. It is passive reusable task
+knowledge selected by an Agent to help generate a Plan. Adding an Agent
+Skill does not add an executable capability, provider, permission, or route. See
+[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) and
+[Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
+
 ## One authoritative capability contract
 
 Keep contributor guidance separate from execution authority. A capability may have
@@ -100,6 +106,14 @@ feature.
    - Do not treat a provider's extra advertised tools as registered Chromie
      abilities. The manifest and live provider must be intentionally aligned
      before those tools can enter planning or execution.
+
+## Agent Skill boundary
+
+Do not use this capability-registration process to create a second executable
+path from `SKILL.md`. A weather Agent Skill may teach Agents how to decide
+between verified memory, a fresh lookup, clarification, and grounded failure
+speech. The executable weather call still must be registered here as
+`chromie.weather.lookup` and pass the same trusted runtime boundary.
 
 ## Weather lookup example
 

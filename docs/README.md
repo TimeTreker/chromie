@@ -15,18 +15,20 @@ authoritative home and other documents should link to it rather than repeat it.
    and final response.
 4. [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) -
    cognitive constitution for goal continuity, multi-goal planning, validation, and interaction.
-5. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
+5. [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) -
+   Agent, Agent Skill, Plan, Capability, discovery, and authority boundaries.
+6. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
    root-cause rules for natural, grounded robot behavior and valid interaction
    evidence.
-6. [Current Status](STATUS.md) - implementation, automated verification, target
+7. [Current Status](STATUS.md) - implementation, automated verification, target
    validation, and release readiness.
-7. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
-8. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-9. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-10. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
+8. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
+9. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
+10. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
+11. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
    [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-11. Component documents - local implementation boundaries.
-12. Decision documents - rationale for an established design.
+12. Component documents - local implementation boundaries.
+13. Decision documents - rationale for an established design.
 
 When documents disagree, correct the lower-authority document.
 
@@ -51,6 +53,8 @@ When documents disagree, correct the lower-authority document.
 | What contract and evidence govern TTS backend selection? | `docs/TTS_PROVIDER_EVALUATION.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
+| How do Agents, Agent Skills, Plans, and Capabilities differ? | `docs/AGENT_SKILLS_ARCHITECTURE.md` |
+| What is the Agent Skills implementation issue and delivery order? | `docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
 | How is the active Gateway/Core migration qualified against live services and MuJoCo? | `docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md` |
 | What is the implementation contract for terminal Fast Planner multi-goal planning? | `docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md` |
@@ -98,6 +102,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
 - [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
+- [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
@@ -156,6 +162,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Benchmark Suite](../benchmarks/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
+- [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
