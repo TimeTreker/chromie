@@ -489,7 +489,7 @@ class FastPlannerResolver:
             )
         )
         semantic_scope_contract = (
-            "Capability semantic_scope metadata is authoritative applicability evidence. Preserve every canonical-goal qualifier, including temporal scope, comparison period, and answer shape. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+            "Capability semantic_scope metadata is authoritative applicability evidence. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "

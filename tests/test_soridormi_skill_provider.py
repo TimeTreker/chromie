@@ -309,7 +309,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(execute_context.confirmed)
         self.assertFalse(execute_context.trusted_preflight_authorized)
 
-    async def test_non_social_low_risk_action_cannot_claim_trusted_preflight(self) -> None:
+    async def test_untrusted_noncanonical_action_cannot_claim_trusted_preflight(self) -> None:
         invoker = _RecordingInvoker(
             overrides={
                 "soridormi.skill.create_plan": ToolCallOutcome.success(
@@ -351,6 +351,145 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {"source": "canonical_plan"},
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(),
+                safety_monitor_active=True,
+            ),
+        )
+
+        execute_context = next(
+            context
+            for tool, _, context in invoker.calls
+            if tool == "soridormi.skill.execute_plan"
+        )
+        self.assertIsNotNone(execute_context)
+        self.assertFalse(execute_context.confirmed)
+        self.assertFalse(execute_context.trusted_preflight_authorized)
+
+
+    async def test_goal_grounded_named_motion_uses_trusted_preflight(self) -> None:
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.create_plan": ToolCallOutcome.success(
+                    {
+                        "plan_id": "walk-plan",
+                        "skill_id": "walk_forward",
+                        "requires_confirmation": False,
+                    }
+                ),
+                "soridormi.skill.execute_plan": ToolCallOutcome.success(
+                    {
+                        "completed": True,
+                        "skill_id": "walk_forward",
+                        "summary": "completed walk_forward",
+                    }
+                ),
+            }
+        )
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "walk_forward",
+                    "description": "Walk forward for a bounded duration.",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {
+                            "duration_s": {
+                                "type": "number",
+                                "minimum": 0.1,
+                                "maximum": 20.0,
+                            }
+                        },
+                        "required": ["duration_s"],
+                        "additionalProperties": False,
+                    },
+                    "requires_confirmation": False,
+                    "safety_class": "physical_motion",
+                    "effects": ["physical_motion"],
+                    "interruptible": True,
+                }
+            ]
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+
+        execution = await runtime.execute(
+            InteractionResponse(
+                interaction_id="goal-grounded-motion",
+                skills=[
+                    {
+                        "request_id": "walk-request",
+                        "skill_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15.0},
+                        "requires_confirmation": False,
+                        "metadata": {
+                            "source": "goal_driven_canonical_plan",
+                            "canonical_plan_id": "plan-walk",
+                            "step_id": "step-walk",
+                            "source_goal_ids": ["goal-walk"],
+                        },
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=set(),
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "completed")
+        execute_context = next(
+            context
+            for tool, _, context in invoker.calls
+            if tool == "soridormi.skill.execute_plan"
+        )
+        self.assertIsNotNone(execute_context)
+        self.assertFalse(execute_context.confirmed)
+        self.assertTrue(execute_context.trusted_preflight_authorized)
+        self.assertTrue(execute_context.safety_monitor_active)
+
+    async def test_goal_grounded_preflight_does_not_override_provider_confirmation(self) -> None:
+        invoker = _RecordingInvoker()
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "walk_forward",
+                    "available": True,
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                    "requires_confirmation": False,
+                    "safety_class": "physical_motion",
+                    "effects": ["physical_motion"],
+                }
+            ]
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+
+        await runtime.execute(
+            InteractionResponse(
+                interaction_id="provider-confirmed-motion",
+                skills=[
+                    {
+                        "request_id": "walk-request",
+                        "skill_id": "soridormi.walk_forward",
+                        "args": {},
+                        "requires_confirmation": False,
+                        "metadata": {
+                            "source": "goal_driven_canonical_plan",
+                            "canonical_plan_id": "plan-walk",
+                            "step_id": "step-walk",
+                            "source_goal_ids": ["goal-walk"],
+                        },
                     }
                 ],
             ),

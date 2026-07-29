@@ -283,6 +283,51 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(created, [])
 
+
+    def test_tts_echo_match_rejects_concatenated_robot_speech(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant._tts_text_by_generation = {
+            4: [
+                "我会先眨两下眼睛，再往前走15秒。",
+                "刚才没成功。",
+            ]
+        }
+
+        likely, ratio, coverage = assistant._likely_tts_echo(
+            "我会先眨两下眼睛，再往前走15秒，刚才没成功。",
+            playback_generation_at_start=4,
+        )
+
+        self.assertTrue(likely)
+        self.assertGreaterEqual(ratio, 0.78)
+        self.assertGreaterEqual(coverage, 0.88)
+
+    def test_tts_echo_match_keeps_real_barge_in(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant._tts_text_by_generation = {
+            5: ["我会先眨两下眼睛，再往前走15秒。"]
+        }
+
+        likely, _, _ = assistant._likely_tts_echo(
+            "停一下，我不是让你先眨眼。",
+            playback_generation_at_start=5,
+        )
+
+        self.assertFalse(likely)
+
+    def test_planner_prompts_preserve_requested_concurrency(self) -> None:
+        from agent.app.deep_planner import DeepPlannerResolver
+        from agent.app.fast_planner import FastPlannerResolver
+
+        fast_source = inspect.getsource(FastPlannerResolver._prompt)
+        deep_source = inspect.getsource(DeepPlannerResolver._prompt)
+        for source in (fast_source, deep_source):
+            self.assertIn(
+                "Never silently rewrite simultaneous independent actions as before/after actions",
+                source,
+            )
+            self.assertIn("timing=parallel", source)
+
     def test_response_language_validation_rejects_full_english_for_chinese(self) -> None:
         request = AgentRunRequest.model_validate(
             {

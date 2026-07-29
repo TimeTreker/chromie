@@ -117,7 +117,7 @@ class SoridormiNamedSkillAdapter:
                 ),
             )
 
-        trusted_preflight_authorized = self._trusted_social_preflight(
+        trusted_preflight_authorized = self._trusted_named_skill_preflight(
             request,
             definition,
             planned.output,
@@ -174,39 +174,64 @@ class SoridormiNamedSkillAdapter:
         )
 
     @staticmethod
-    def _trusted_social_preflight(
+    def _trusted_named_skill_preflight(
         request: SkillRequest,
         definition: SkillDefinition,
         planned_output: dict[str, Any],
     ) -> bool:
-        """Bridge a coarse MCP confirmation gate for reviewed social expression.
+        """Bridge Soridormi's coarse execute-plan confirmation gate safely.
 
-        Soridormi's generic ``execute_plan`` tool is confirmation-guarded because
-        it serves many motion classes. Chromie may waive only that transport-level
-        gate when the request is an auxiliary Social Attention behavior, the live
-        named-skill contract is low risk, and neither the request nor capability
-        requires user confirmation. Soridormi still owns planning, monitoring,
-        feasibility, refusal, execution, and recovery.
+        ``soridormi.skill.execute_plan`` is confirmation-guarded because one MCP
+        transport serves many motion classes.  The body-owned plan, however, may
+        explicitly state that no additional confirmation is required.  Chromie may
+        waive only that transport-level gate when all of the following are true:
+
+        * Soridormi's freshly created plan says ``requires_confirmation=false``;
+        * the live named-skill definition and committed request agree;
+        * the request came from either a goal-grounded canonical plan or reviewed
+          auxiliary Social Attention; and
+        * Soridormi's safety monitor has already accepted the motion.
+
+        This is not a fabricated ``confirmed=true`` claim.  The execution context
+        keeps ``confirmed=false`` and records a trusted preflight authorization.
+        Soridormi still owns planning, feasibility, monitoring, refusal, execution,
+        and recovery.
         """
 
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
         definition_metadata = (
             definition.metadata if isinstance(definition.metadata, dict) else {}
         )
+        source = str(metadata.get("source") or "").strip()
+        safety_class = str(definition_metadata.get("safety_class") or "").strip()
         effects = {
             str(value).strip()
             for value in definition_metadata.get("effects", [])
             if str(value).strip()
         }
+
+        reviewed_social = bool(
+            source == "social_attention_plan"
+            and metadata.get("auxiliary_social_attention") is True
+            and safety_class == "low_risk_action"
+            and "physical_motion" not in effects
+        )
+        canonical_goal_action = bool(
+            source == "goal_driven_canonical_plan"
+            and str(metadata.get("canonical_plan_id") or "").strip()
+            and str(metadata.get("step_id") or "").strip()
+            and any(
+                str(value).strip()
+                for value in metadata.get("source_goal_ids", [])
+                if str(value).strip()
+            )
+            and safety_class in {"low_risk_action", "physical_motion"}
+        )
         return bool(
             planned_output.get("requires_confirmation") is False
-            and metadata.get("source") == "social_attention_plan"
-            and metadata.get("auxiliary_social_attention") is True
             and request.requires_confirmation is False
             and definition.requires_confirmation is False
-            and str(definition_metadata.get("safety_class") or "")
-            == "low_risk_action"
-            and "physical_motion" not in effects
+            and (reviewed_social or canonical_goal_action)
         )
 
     @staticmethod

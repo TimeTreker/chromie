@@ -194,6 +194,105 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(session.payload["think"])
         self.assertIn("verified_result_available", session.payload["prompt"])
 
+
+    async def test_quality_model_phrases_post_execution_failure_facts(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.failure_response_model = "gemma4:12b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(), assistant
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()), assistant
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {
+                                "text": (
+                                    "刚才两个动作都没成功，我没有硬来。你再说一次吧。"
+                                )
+                            },
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                self.url = url
+                self.payload = json
+                return FakeResponse()
+
+        session = FakeSession()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="robot_action",
+            metadata={},
+        )
+        decision = RouteDecision(
+            route="robot_action",
+            intent="execution_outcome_failure",
+            confidence=1.0,
+            metadata={},
+        )
+        facts = {
+            "route": "robot_action",
+            "failure_stage": "skill_execution",
+            "failure_class": "provider_execution_failed",
+            "execution_started": True,
+            "verified_result_available": False,
+            "retryable": True,
+            "goal_statuses": ["failed", "failed"],
+        }
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            decision,
+            user_text="边走边眨眼睛。",
+            session_id="execution-failure-style",
+            trusted_failure_facts=facts,
+            response_source="llm_execution_failure_response",
+        )
+
+        assert response is not None
+        self.assertEqual(
+            response.metadata["source"],
+            "llm_execution_failure_response",
+        )
+        self.assertTrue(
+            response.metadata["failure_facts"]["execution_started"]
+        )
+        self.assertIn(
+            "were attempted but did not complete",
+            session.payload["prompt"],
+        )
+        self.assertIn("没有硬来", " ".join(item.text for item in response.speech))
+
     async def test_failure_response_composer_rejects_language_drift(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.failure_response_model = "gemma4:e2b"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from difflib import SequenceMatcher
 import json
 import logging
 import math
@@ -8,6 +9,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Optional
 
@@ -722,6 +724,11 @@ class VoiceAssistant:
         self.pending_audio: dict[int, tuple[int, bytes, int, str | None, str | None]] = {}
         self.synthesis_order = 0
         self.playback_generation = 0
+        # Keep a bounded transcript of text scheduled in each playback
+        # generation.  ASR segments that started while that generation was
+        # playing can then be rejected as speaker echo before they re-enter the
+        # Cognitive Gateway as fake user turns.
+        self._tts_text_by_generation: dict[int, list[str]] = {}
         self.playback_start_waiters: dict[
             tuple[int, int, str | None],
             asyncio.Future[bool],
@@ -984,6 +991,7 @@ class VoiceAssistant:
             generation = self.playback_generation
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
+        self._remember_tts_text(generation, audio.text)
         key = self.playback_start_key(generation, order, session_id)
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
         state = self.sessions.state.get(session_id or "")
@@ -1909,6 +1917,61 @@ class VoiceAssistant:
             await self.enqueue_playback_skip(generation, order, session_id, "tts_exception")
             self.maybe_session_done(session_id)
 
+    @staticmethod
+    def _normalize_echo_text(text: str) -> str:
+        normalized = unicodedata.normalize("NFKC", str(text or "")).casefold()
+        return "".join(char for char in normalized if char.isalnum())
+
+    def _remember_tts_text(self, generation: int, text: str) -> None:
+        normalized = self.normalize_tts_candidate(text)
+        if not normalized:
+            return
+        store = getattr(self, "_tts_text_by_generation", None)
+        if not isinstance(store, dict):
+            store = {}
+            self._tts_text_by_generation = store
+        history = store.setdefault(int(generation), [])
+        history.append(normalized)
+        # Retain only the current and a few recent generations.  A delayed ASR
+        # response may arrive after playback advances, but old dialogue must not
+        # accumulate for the lifetime of the process.
+        minimum_generation = int(generation) - 3
+        for old_generation in list(store):
+            if old_generation < minimum_generation:
+                store.pop(old_generation, None)
+
+    def _likely_tts_echo(
+        self,
+        transcript: str,
+        *,
+        playback_generation_at_start: int | None,
+    ) -> tuple[bool, float, float]:
+        if playback_generation_at_start is None:
+            return False, 0.0, 0.0
+        store = getattr(self, "_tts_text_by_generation", {})
+        if not isinstance(store, dict):
+            store = {}
+        spoken_parts = store.get(
+            int(playback_generation_at_start),
+            [],
+        )
+        transcript_key = self._normalize_echo_text(transcript)
+        spoken_key = self._normalize_echo_text(" ".join(spoken_parts))
+        if len(transcript_key) < 2 or not spoken_key:
+            return False, 0.0, 0.0
+        if transcript_key in spoken_key:
+            return True, 1.0, 1.0
+
+        matcher = SequenceMatcher(None, transcript_key, spoken_key, autojunk=False)
+        ratio = float(matcher.ratio())
+        longest = max((block.size for block in matcher.get_matching_blocks()), default=0)
+        transcript_coverage = float(longest / max(1, len(transcript_key)))
+        likely = bool(
+            ratio >= 0.78
+            or (transcript_coverage >= 0.88 and len(transcript_key) >= 6)
+        )
+        return likely, ratio, transcript_coverage
+
     async def schedule_tts_sentence(
         self,
         sentence: str,
@@ -1924,6 +1987,7 @@ class VoiceAssistant:
             generation = self.playback_generation
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
+        self._remember_tts_text(generation, sentence)
         key = self.playback_start_key(generation, order, session_id)
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
         state = self.sessions.state.get(session_id or "")
@@ -5791,6 +5855,8 @@ class VoiceAssistant:
         *,
         user_text: str,
         session_id: str,
+        trusted_failure_facts: dict[str, Any] | None = None,
+        response_source: str = "llm_cognitive_failure_response",
     ) -> InteractionResponse | None:
         """Let the quality model verbalize Host-owned failure facts."""
 
@@ -5804,25 +5870,34 @@ class VoiceAssistant:
         if not failure_response_model or not llm_url:
             return None
         metadata = resolution.metadata if isinstance(resolution.metadata, dict) else {}
-        failure_facts = {
-            "route": decision.route,
-            "failure_stage": str(metadata.get("failure_stage") or "runtime"),
-            "failure_class": str(metadata.get("failure_class") or "runtime_failure"),
-            "execution_started": False,
-            "verified_result_available": False,
-            "retryable": bool(metadata.get("retryable")),
-        }
+        failure_facts = dict(trusted_failure_facts or {})
+        if not failure_facts:
+            failure_facts = {
+                "route": decision.route,
+                "failure_stage": str(metadata.get("failure_stage") or "runtime"),
+                "failure_class": str(metadata.get("failure_class") or "runtime_failure"),
+                "execution_started": False,
+                "verified_result_available": False,
+                "retryable": bool(metadata.get("retryable")),
+            }
+        execution_started = failure_facts.get("execution_started") is True
+        phase = (
+            "after one or more requested actions were attempted but did not complete"
+            if execution_started
+            else "before any tool or body action started"
+        )
         prompt = (
-            "Write the exact words Chromie should say after a request failed before "
-            "any tool or body action started. The facts below are authoritative. "
+            "Write the exact words Chromie should say after a request failed "
+            f"{phase}. The facts below are authoritative. "
             "Do not diagnose beyond them and do not change them. Sound like a smart, "
             "warm six-year-old girl, not a service status page or an adult engineer. "
             f"Speak only in {language}. Use one or two short natural sentences. "
             "Do not mention models, planners, schemas, validation, services, APIs, "
-            "internal tools, evidence labels, or system components. Do not claim a "
-            "lookup or action happened. Do not invent the requested result. Say simply "
-            "that it did not work, preserve the honest no-guess/no-action boundary, "
-            "and invite one retry. Return only a JSON object with one field named text.\n\n"
+            "internal tools, evidence labels, or system components. Do not claim any "
+            "successful lookup, movement, or verified result that the facts do not prove. "
+            "Do not invent the requested result. Say simply what failed in natural childlike "
+            "language, preserve the honest no-guess/no-forced-motion boundary, and invite one "
+            "retry when retryable. Return only a JSON object with one field named text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
             f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"
@@ -5904,7 +5979,7 @@ class VoiceAssistant:
             response = self._host_speech_response(
                 text,
                 style="warning",
-                source="llm_cognitive_failure_response",
+                source=response_source,
             )
             return response.model_copy(
                 update={
@@ -6494,15 +6569,76 @@ class VoiceAssistant:
                 self.session_log(
                     session_id,
                     "tool_result_spoken_interpretation_unavailable: "
-                    "aggregate=%s evidence=%s fallback=natural_exception_boundary",
+                    "aggregate=%s evidence=%s fallback=grounded_failure_response",
                     bundle.aggregate_status,
                     len(bundle.evidence),
                 )
-                final_response = compose_outcome_response(
-                    bundle,
-                    plan,
-                    str(response.metadata.get("language") or "en-US"),
-                )
+                language = str(response.metadata.get("language") or "en-US")
+                route = self._execution_outcome_route(response, plan)
+                if bundle.aggregate_status != "completed":
+                    goal_statuses = [
+                        str(item.status) for item in bundle.goal_outcomes
+                    ]
+                    failure_facts = {
+                        "route": route,
+                        "failure_stage": "skill_execution",
+                        "failure_class": "provider_execution_failed",
+                        "execution_started": True,
+                        "verified_result_available": any(
+                            item.observation is not None
+                            and item.observation.status == "available"
+                            and item.observation.schema_validated
+                            for item in bundle.evidence
+                        ),
+                        "retryable": any(
+                            status in {"failed", "timed_out", "not_run"}
+                            for status in goal_statuses
+                        ),
+                        "aggregate_status": str(bundle.aggregate_status),
+                        "goal_statuses": goal_statuses,
+                        "requested_step_count": len(plan.steps),
+                        "completed_step_count": sum(
+                            item.status == "completed" for item in bundle.evidence
+                        ),
+                    }
+                    failure_resolution = CognitiveRuntimeResolution(
+                        mode="apply",
+                        status="error",
+                        lane=(
+                            "robot_action" if route == "robot_action" else "tool"
+                        ),
+                        metadata={
+                            "failure_stage": "skill_execution",
+                            "failure_class": "provider_execution_failed",
+                            "retryable": failure_facts["retryable"],
+                        },
+                    )
+                    failure_decision = RouteDecision(
+                        route=route,
+                        intent="execution_outcome_failure",
+                        confidence=1.0,
+                        metadata={},
+                    )
+                    final_response = await self._compose_cognitive_failure_response(
+                        failure_resolution,
+                        failure_decision,
+                        user_text=self._execution_outcome_user_text(response, plan),
+                        session_id=str(session_id or ""),
+                        trusted_failure_facts=failure_facts,
+                        response_source="llm_execution_failure_response",
+                    )
+                    if final_response is None:
+                        final_response = compose_outcome_response(
+                            bundle,
+                            plan,
+                            language,
+                        )
+                else:
+                    final_response = compose_outcome_response(
+                        bundle,
+                        plan,
+                        language,
+                    )
         except Exception as exc:
             self.session_log(
                 session_id,
@@ -6535,6 +6671,47 @@ class VoiceAssistant:
             goal_state_results=goal_state_results,
         )
         return delivery_status
+
+    @staticmethod
+    def _execution_outcome_route(
+        source_response: InteractionResponse,
+        plan: Any,
+    ) -> str:
+        metadata = (
+            source_response.metadata
+            if isinstance(source_response.metadata, dict)
+            else {}
+        )
+        for key in ("source_route", "route"):
+            value = str(metadata.get(key) or "").strip()
+            if value in {"tool", "robot_action", "memory"}:
+                return value
+        skill_ids = [str(step.skill_id or "") for step in getattr(plan, "steps", [])]
+        if any(skill_id.startswith("soridormi.") for skill_id in skill_ids):
+            return "robot_action"
+        return "tool"
+
+    @staticmethod
+    def _execution_outcome_user_text(
+        source_response: InteractionResponse,
+        plan: Any,
+    ) -> str:
+        metadata = (
+            source_response.metadata
+            if isinstance(source_response.metadata, dict)
+            else {}
+        )
+        envelope = metadata.get("user_turn_envelope")
+        normalized_input = (
+            envelope.get("normalized_input")
+            if isinstance(envelope, dict)
+            else None
+        )
+        if isinstance(normalized_input, dict):
+            text = str(normalized_input.get("text") or "").strip()
+            if text:
+                return text
+        return str(getattr(plan, "goal_summary", "") or "").strip()
 
     @staticmethod
     def _trusted_tool_result_fallback(
@@ -8026,6 +8203,29 @@ class VoiceAssistant:
                             attributes={"text_chars": len(user_text)},
                         )
                         self.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
+                        likely_echo, echo_ratio, echo_coverage = self._likely_tts_echo(
+                            user_text,
+                            playback_generation_at_start=(
+                                playback_generation_at_start
+                                if started_during_playback
+                                else None
+                            ),
+                        )
+                        if likely_echo:
+                            self.session_log(
+                                session_id,
+                                "asr_tts_echo_suppressed: generation=%s ratio=%.3f "
+                                "coverage=%.3f text=%r",
+                                playback_generation_at_start,
+                                echo_ratio,
+                                echo_coverage,
+                                user_text,
+                            )
+                            state = self.sessions.state.get(session_id)
+                            if state is not None:
+                                state["llm_done"] = True
+                            self.maybe_session_done(session_id)
+                            return
                         if user_text:
                             self._launch_routed_turn(user_text, session_id)
                         else:

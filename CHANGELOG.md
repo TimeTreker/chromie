@@ -4,6 +4,27 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Goal-grounded body execution and speaker-echo suppression
+
+- Generalized Soridormi's trusted preflight bridge from reviewed auxiliary Social
+  Attention to any Goal-grounded named body skill whose committed request, live
+  capability contract, and freshly created Soridormi plan all agree that no extra
+  confirmation is required. The execution context still records `confirmed=false`;
+  provider-required confirmation, safety monitoring, refusal, and recovery remain
+  body-owned.
+- Preserved user-requested concurrency in Fast and Deep Planner guidance: compatible
+  simultaneous actions must use `timing=parallel`, while unsafe or unsupported
+  concurrency must be clarified or presented as an explicit adjustment rather than
+  silently serialized.
+- Added playback-generation transcript evidence so an ASR utterance that began during
+  playback and substantially matches Chromie's own scheduled speech is suppressed
+  before Cognitive Gateway admission. Genuine semantically different barge-in speech
+  continues through the normal reflex and routing path.
+- Routed post-execution failures through the quality-model failure composer using only
+  Host-owned aggregate status facts. This removes normal live phrases such as
+  `第1件没弄成` while preserving the existing per-goal deterministic evidence response
+  as the final fail-closed fallback.
+
 ### Grounded failure speech and maintained GPU model topology
 
 - Restored a fast/quality cognitive split on both maintained development GPUs:
