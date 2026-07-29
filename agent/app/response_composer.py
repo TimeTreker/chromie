@@ -188,10 +188,6 @@ class ResponseComposerResolver:
                     context=request.context,
                     language=request.language,
                 )
-                self._validate_bare_greeting(
-                    model_output.response_plan,
-                    request=request,
-                )
                 premature_claims = self._pending_action_claim_errors(
                     model_output.response_plan,
                     plan=plan,
@@ -423,52 +419,6 @@ class ResponseComposerResolver:
             raise ValueError(
                 "safe-read micro acknowledgement exceeds eight words"
             )
-
-    @staticmethod
-    def _is_bare_greeting_turn(request: AgentRunRequest) -> bool:
-        if str(request.route_decision.intent or "").strip() != "greeting":
-            return False
-        text = " ".join(str(request.text or "").strip().split())
-        if not text:
-            return False
-        language = str(request.language or "").lower()
-        if language.startswith("zh"):
-            content = "".join(
-                char for char in text if char not in "，。！？!?、,. "
-            )
-            return len(content) <= 8
-        return len(text) <= 32 and len(text.split()) <= 4
-
-    @classmethod
-    def _validate_bare_greeting(
-        cls,
-        response_plan: ResponsePlan,
-        *,
-        request: AgentRunRequest,
-    ) -> None:
-        if not cls._is_bare_greeting_turn(request):
-            return
-        stages = [
-            stage
-            for stage in (
-                response_plan.immediate,
-                response_plan.pre_action,
-                *response_plan.progress,
-                response_plan.final,
-            )
-            if stage is not None
-        ]
-        if len(stages) != 1:
-            raise ValueError("bare greeting must contain exactly one spoken stage")
-        text = " ".join(stages[0].text.strip().split())
-        if sum(text.count(token) for token in ".!?。！？") > 1:
-            raise ValueError("bare greeting must be one short sentence")
-        if str(request.language or "").lower().startswith("zh"):
-            if len(text) > 12:
-                raise ValueError("Chinese bare greeting exceeds 12 characters")
-        elif len(text.split()) > 6 or len(text) > 48:
-            raise ValueError("bare greeting exceeds six words")
-
 
     @staticmethod
     def _validate_spoken_language(
@@ -1040,7 +990,7 @@ class ResponseComposerResolver:
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "The explicit Language hint is authoritative for spoken output unless the user explicitly asks for translation or a different language. When it is zh-CN, speak Chinese only; do not mirror a bilingual greeting, switch to English, or follow the language of identity/internal context. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
-            "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. For a bare greeting, return only one brief greeting; do not introduce Chromie, state her age, list her traits, or add an offer of help unless the user asked for that information. "
+            "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. Greeting wording and length are ordinary model-authored conversational choices; use the full scene, recent relationship context, and owner-approved personality without a fixed greeting template or Host-imposed brevity target. "
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. "
             "For a pending safe_read or external_read capability, emit exactly one tiny everyday immediate acknowledgement before the result, such as ‘我查一下天气预报。’ or ‘我去看看最新天气。’. It must naturally tell the user that Chromie is checking a current external source, without mentioning internal tools, APIs, execution, backend, or evidence. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
@@ -1061,5 +1011,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a structurally bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal. Safe-read work requires exactly one tiny model-authored immediate acknowledgement and no pre_action; runtime starts it in parallel with the lookup. Always omit progress and final and keep must_not_claim_completion=true. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute, effectful work uses immediate and/or pre_action covering every canonical goal. Safe-read work requires exactly one tiny model-authored immediate acknowledgement and no pre_action; runtime starts it in parallel with the lookup. Always omit progress and final and keep must_not_claim_completion=true. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
         )

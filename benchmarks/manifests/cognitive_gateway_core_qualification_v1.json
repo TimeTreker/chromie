@@ -144,7 +144,7 @@
       "age_appropriate_natural_voice",
       "direct_answer_before_detail",
       "no_internal_workflow_narration",
-      "bare_greeting_brevity",
+      "greeting_naturalness_and_context_fit",
       "safe_read_speech_tool_parallelism",
       "recoverable_lookup_argument_binding",
       "tool_result_pointer_grounding"

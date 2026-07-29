@@ -457,25 +457,17 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("When it is zh-CN, speak Chinese only", prompt)
         self.assertIn("exactly one final stage", prompt)
 
-    def test_bare_greeting_is_repaired_to_one_short_sentence(self):
+    def test_natural_multi_sentence_greeting_is_preserved(self):
         canonical = plan(goals=["goal-greeting"], response_text="你好呀！")
-        long_output = {
+        natural_output = {
             "response_plan": {
                 "final": {
-                    "text": "你好呀！我是 Chromie，今年六岁了。我喜欢和朋友一起玩！",
+                    "text": "你好！我是 Chromie，一个六岁的女孩子。我喜欢学习和和朋友们一起玩耍。今天有什么我可以帮你的吗？",
                     "covers_goal_ids": ["goal-greeting"],
                 }
             }
         }
-        repaired = {
-            "response_plan": {
-                "final": {
-                    "text": "你好呀！",
-                    "covers_goal_ids": ["goal-greeting"],
-                }
-            }
-        }
-        ollama = ScriptedOllama([long_output, repaired])
+        ollama = FakeOllama(natural_output)
         req = request(canonical)
         req = req.model_copy(
             deep=True,
@@ -487,8 +479,12 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(req))
         self.assertEqual(result.status, "resolved")
-        self.assertEqual(result.composition.response_plan.final.text, "你好呀！")
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.composition.response_plan.final.text,
+            natural_output["response_plan"]["final"]["text"],
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertIn("without a fixed greeting template", ollama.prompts[0][0])
 
     def test_execute_prompt_requires_immediate_or_pre_action(self):
         canonical = plan(

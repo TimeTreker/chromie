@@ -1030,9 +1030,10 @@ request arguments are retained in execution evidence and active task snapshots,
 and interrupted or missing-result safe reads remain recoverable so later status
 questions resume or retry the same query. Tool-result fact references are limited
 to decoder-enumerated scalar JSON Pointers. Effectful actions keep their existing
-speech and confirmation barriers. Bare greetings and wake-up speech are separately
-bounded to prevent unsolicited biography, invented relationships, and long
-workflow narration.
+speech and confirmation barriers. Ordinary greeting wording and length remain
+model-authored under language, identity-truth, typed-response, and bounded-output
+contracts. Wake-up speech remains a separate startup event with its own completion
+and truncation safeguards.
 
 The user-outcome acceptance layer is now implemented. Live general-ability
 probes default to architecture-independent observable behavior assertions while

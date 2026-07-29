@@ -479,24 +479,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             request=request,
         )
 
-    def test_nontrivial_return_statement_is_not_a_bare_greeting(self) -> None:
-        request = AgentRunRequest.model_validate(
-            {
-                "sid": "return-statement",
-                "text": "I'm back and pet you.",
-                "language": "en-US",
-                "route_decision": {
-                    "route": "chat",
-                    "intent": "greeting",
-                    "confidence": 0.9,
-                    "source": "llm",
-                },
-            }
-        )
-        self.assertFalse(
-            ResponseComposerResolver._is_bare_greeting_turn(request)
-        )
-
     def test_deep_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
         schema = canonical_plan_response_schema(
             planner_tier="deep",

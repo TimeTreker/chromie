@@ -2,6 +2,9 @@
 
 ## Unreleased — Safe-read speech, grounded result delivery, and explicit concurrency
 
+- Removed the Host-owned greeting-length classifier and brevity veto. Ordinary
+  greeting wording and length are now authored by the LLM under the same truth,
+  language, typed-response, and bounded-output contracts as other conversation.
 - Require one model-authored micro acknowledgement for safe-read/external-read work while starting speech and lookup in parallel, so Chromie naturally tells the user she is checking a current source without delaying retrieval.
 - Fix tool-result sentence counting so decimal points such as `40.3` do not consume the sentence budget and cause a valid evidence-bound answer to be discarded.
 - Require every planner-model step to author `timing` explicitly, preserving the model's ordering or concurrency decision instead of silently defaulting missing timing to sequential.
@@ -57,8 +60,8 @@ All notable user-visible changes should be recorded here.
   20-second segments.
 - Resolved the authoritative spoken language at Gateway capture and rejected
   Response Composer speech that switches a Chinese turn into an English answer
-  or vice versa. Bare-greeting brevity now applies only to structurally bare
-  greetings, not every richer turn classified with a greeting intent.
+  or vice versa. Greeting style remains model-authored rather than inferred from
+  a Host-side greeting-length category.
 - Required fresh tool-routed turns to execute an eligible tool or return an
   explicit escalation/clarification/unavailable outcome. Fast and Deep Planner
   decoder contracts no longer permit a pure model-memory response for a tool
@@ -112,9 +115,8 @@ All notable user-visible changes should be recorded here.
   acknowledgement speech. Read-only tools no longer wait for TTS synthesis or
   playback start; effectful and confirmation-bound capabilities retain their
   existing delivery barriers.
-- Made safe-read acknowledgement optional and bounded to one tiny utterance,
-  while bare greetings are limited to one short sentence without unsolicited
-  identity, age, traits, hobbies, or help offers.
+- Made safe-read acknowledgement optional and bounded to one tiny utterance.
+  Ordinary greeting wording and length remain model-owned.
 - Bound execution evidence and active task snapshots to exact tool arguments.
   Interrupted or missing-result safe reads remain `recoverable`, so status
   follow-ups resume or retry the same location/date instead of reusing another
