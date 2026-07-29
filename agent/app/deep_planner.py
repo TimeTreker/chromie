@@ -413,8 +413,11 @@ class DeepPlannerResolver:
                 "turn must contain at least one executable supplied tool step, or return "
                 "clarify/unavailable/refused when no valid tool plan is possible. Do not "
                 "terminate the whole turn as respond from model memory or loosely related "
-                "evidence. A completed-evidence follow-up that needs no execution belongs "
-                "on a chat route upstream. "
+                "evidence. Every top-level and per-goal response_text must be empty on this "
+                "tool route: do not greet, self-introduce, narrate the lookup, or predict "
+                "its result. Response Composer owns optional pre-execution speech and "
+                "trusted post-execution interpretation owns the answer. A completed-evidence "
+                "follow-up that needs no execution belongs on a chat route upstream. "
                 if source_route == "tool"
                 else ""
             )

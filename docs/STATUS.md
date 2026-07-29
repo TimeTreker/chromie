@@ -72,9 +72,9 @@ that `gemma4:26b`, `qwen3:4b`, and CosyVoice could exhaust the 32GB GPU and cras
 TTS. The maintained RTX 5090 profile now assigns Goal Association and quality
 stages to `gemma4:12b`, keeps narrow stages on `qwen3:4b`, opts out of compact
 cognition, and uses one 32768-token correctness-first topology for both resident
-models. RTX 4090 Laptop names `gemma4:12b` as its future visual-quality source
-plan but keeps the maintained CosyVoice runtime compact and Qwen-only on its
-16GB GPU. Every request reserves its declared output budget plus a safety margin
+models. RTX 4090 Laptop preserves the same fast/quality role split with
+`gemma4:e2b` as the smaller quality core while CosyVoice shares its 16GB GPU.
+Every request reserves its declared output budget plus a safety margin
 before inference; prompt truncation and `done_reason=length` are fail-closed
 LLM-budget evidence. The rare host direct-LLM fallback buffers and verifies the
 full stream before scheduling TTS. Goal Association uses an explicit decision
@@ -95,8 +95,8 @@ execution claim. The implementation now preserves temporal/comparison scope in
 Goal Association prompts, supplies semantic-scope metadata to both planners,
 propagates the admitted turn language through `ToolExecutionRequest`, derives
 effect semantics from capability metadata, and uses truthful read-only
-operational speech. CosyVoice compact cognition also uses one shared context
-size across maintained Qwen stages to avoid repeated runner reloads. This is a
+operational speech. Maintained RTX profiles use one shared context size per
+resident model to avoid context-only runner reloads. This is a
 general contract correction, not a Chongqing- or phrase-specific rule.
 
 The Gateway/Core migration automated gate now passes 1,419 primary tests plus 20

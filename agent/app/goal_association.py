@@ -629,6 +629,8 @@ class GoalAssociationResolver:
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing only description for each responsibility. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, or casual check-in is itself one satisfiable conversational Goal: respond naturally to that social act. Do not treat it as an empty turn. "
+            "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
+            "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
@@ -685,7 +687,7 @@ class GoalAssociationResolver:
             state_instructions = (
                 "There are no active Goals. Existing-goal associations are structurally invalid and must not appear. "
                 "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the meaning is materially ambiguous. "
-                "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. "
+                "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. A greeting attached to substantive work is framing, not a second Goal. Identity and personality shape wording only and never create a Goal. A lookup plus an interpretation derived from the same result is one Goal. "
             )
             output_instructions = (
                 "The exact GoalSegmentationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "

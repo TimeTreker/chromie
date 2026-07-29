@@ -253,6 +253,13 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("TTS_CONTEXT_SIZE=4096", profile)
         self.assertIn("TTS_MAX_LENGTH=4096", profile)
+        self.assertIn("AGENT_MODEL=gemma4:e2b", profile)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:e2b", profile)
+        self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:e2b", profile)
+        self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:e2b", profile)
+        self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", profile)
+        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=8192", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
             encoding="utf-8"

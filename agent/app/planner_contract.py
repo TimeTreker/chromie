@@ -573,7 +573,6 @@ def canonical_plan_response_schema(
         elif requires_execution:
             disposition["enum"] = [
                 "execute",
-                "mixed",
                 "clarify",
                 "unavailable",
                 "refused",
@@ -590,6 +589,16 @@ def canonical_plan_response_schema(
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
+
+    if requires_execution:
+        planner_response_text = properties.get("response_text")
+        if isinstance(planner_response_text, dict):
+            planner_response_text["maxLength"] = 0
+            planner_response_text["description"] = (
+                "Tool-route planning never speaks or predicts a tool result. "
+                "Response Composer owns any tiny pre-execution acknowledgement, "
+                "and verified post-execution speech is grounded in tool evidence."
+            )
 
     # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
     # emits a complete map.  Fast Planner uses one flat decoder-compatible shape:
@@ -813,7 +822,7 @@ def canonical_plan_response_schema(
                     specialized_properties["satisfaction"] = (
                         specialized_satisfaction
                     )
-                if requires_execution and len(allowed_goals) == 1:
+                if requires_execution:
                     disposition_field = specialized_properties.get(
                         "disposition"
                     )
@@ -824,6 +833,15 @@ def canonical_plan_response_schema(
                             "unavailable",
                             "refused",
                         ]
+                    response_text_field = specialized_properties.get(
+                        "response_text"
+                    )
+                    if isinstance(response_text_field, dict):
+                        response_text_field["maxLength"] = 0
+                        response_text_field["description"] = (
+                            "Planner outcomes on a tool route contain no speech "
+                            "and never predict the tool result."
+                        )
                     branches = specialized.get("oneOf")
                     if isinstance(branches, list):
                         specialized["oneOf"] = [
@@ -909,7 +927,7 @@ def fast_multi_goal_response_schema(
         disposition["enum"] = (
             ["respond", "escalate"]
             if response_only
-            else ["execute", "mixed", "escalate"]
+            else ["execute", "escalate"]
             if requires_execution
             else ["respond", "execute", "mixed", "escalate"]
         )
@@ -930,7 +948,14 @@ def fast_multi_goal_response_schema(
     # otherwise simple plans consume most of the decoder budget.  Keep the
     # semantic judgments model-authored while bounding their representation.
     bound_text(properties, "goal_summary", 240)
-    bound_text(properties, "response_text", 800)
+    bound_text(properties, "response_text", 0 if requires_execution else 800)
+    if requires_execution:
+        response_text_field = properties.get("response_text")
+        if isinstance(response_text_field, dict):
+            response_text_field["description"] = (
+                "Tool-route planning contains no user-facing speech and never "
+                "predicts a tool result."
+            )
     bound_text(properties, "escalation_reason", 240)
     top_unresolved = properties.get("unresolved")
     if isinstance(top_unresolved, dict):
@@ -1023,7 +1048,7 @@ def fast_multi_goal_response_schema(
                 ["respond", "escalate"]
                 if response_only
                 else ["execute", "escalate"]
-                if requires_execution and len(allowed_goals) == 1
+                if requires_execution
                 else ["respond", "execute", "escalate"]
             )
         if response_only:
@@ -1228,6 +1253,33 @@ def fast_multi_goal_response_schema(
             specialized_outcome_properties = specialized_outcome.get(
                 "properties", {}
             )
+            if requires_execution:
+                disposition_field = specialized_outcome_properties.get(
+                    "disposition"
+                )
+                if isinstance(disposition_field, dict):
+                    disposition_field["enum"] = ["execute", "escalate"]
+                response_text_field = specialized_outcome_properties.get(
+                    "response_text"
+                )
+                if isinstance(response_text_field, dict):
+                    response_text_field["maxLength"] = 0
+                    response_text_field["description"] = (
+                        "Tool-route planner outcomes contain no speech and never "
+                        "predict tool evidence."
+                    )
+                branches = specialized_outcome.get("oneOf")
+                if isinstance(branches, list):
+                    specialized_outcome["oneOf"] = [
+                        branch
+                        for branch in branches
+                        if (
+                            branch.get("properties", {})
+                            .get("disposition", {})
+                            .get("enum")
+                            != ["respond"]
+                        )
+                    ]
             specialized_outcome_properties["satisfaction"] = strict_satisfaction_schema(
                 specialized_satisfaction,
                 exact_satisfied_count=1,
@@ -1264,7 +1316,11 @@ def fast_multi_goal_response_schema(
     # validator/Deep Planner path rather than exploding the response schema.
     if 1 < len(allowed_goals) <= 6:
         assignment_branches: list[dict[str, Any]] = []
-        assignments = list(product(("execute", "respond"), repeat=len(allowed_goals)))
+        assignments = (
+            [tuple("execute" for _ in allowed_goals)]
+            if requires_execution
+            else list(product(("execute", "respond"), repeat=len(allowed_goals)))
+        )
         assignments.append(tuple("escalate" for _ in allowed_goals))
         for assignment in assignments:
             assignment_set = set(assignment)

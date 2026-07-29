@@ -208,6 +208,10 @@ class VoiceAssistant:
         self.tts_url = os.getenv("TTS_URL", "ws://localhost:5000")
         self.llm_url = os.getenv("LLM_URL", "http://localhost:11434/api/generate")
         self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
+        self.failure_response_model = os.getenv(
+            "AGENT_RESPONSE_COMPOSER_MODEL",
+            self.ollama_model,
+        ).strip() or self.ollama_model
 
         self.enable_agent = env_bool("ORCH_ENABLE_AGENT", False)
         self.enable_interaction_response = env_bool(
@@ -3784,9 +3788,16 @@ class VoiceAssistant:
                 decision=decision,
                 session_id=session_id,
             )
-            safe_response = self._agent_exception_safe_response(
-                decision, user_text=user_text
+            safe_response = await self._compose_cognitive_failure_response(
+                resolution,
+                decision,
+                user_text=user_text,
+                session_id=session_id,
             )
+            if safe_response is None:
+                safe_response = self._agent_exception_safe_response(
+                    decision, user_text=user_text
+                )
             if safe_response is None:
                 text = (
                     "这次处理流程没有正确完成，所以我先停下了。请再试一次。"
@@ -5773,6 +5784,154 @@ class VoiceAssistant:
             }
         )
 
+    async def _compose_cognitive_failure_response(
+        self,
+        resolution: CognitiveRuntimeResolution,
+        decision: RouteDecision,
+        *,
+        user_text: str,
+        session_id: str,
+    ) -> InteractionResponse | None:
+        """Let the quality model verbalize Host-owned failure facts."""
+
+        language = "zh-CN" if self._looks_zh(user_text) else "en-US"
+        failure_response_model = (
+            str(getattr(self, "failure_response_model", "") or "").strip()
+            or os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "").strip()
+            or str(getattr(self, "ollama_model", "") or "").strip()
+        )
+        llm_url = str(getattr(self, "llm_url", "") or "").strip()
+        if not failure_response_model or not llm_url:
+            return None
+        metadata = resolution.metadata if isinstance(resolution.metadata, dict) else {}
+        failure_facts = {
+            "route": decision.route,
+            "failure_stage": str(metadata.get("failure_stage") or "runtime"),
+            "failure_class": str(metadata.get("failure_class") or "runtime_failure"),
+            "execution_started": False,
+            "verified_result_available": False,
+            "retryable": bool(metadata.get("retryable")),
+        }
+        prompt = (
+            "Write the exact words Chromie should say after a request failed before "
+            "any tool or body action started. The facts below are authoritative. "
+            "Do not diagnose beyond them and do not change them. Sound like a smart, "
+            "warm six-year-old girl, not a service status page or an adult engineer. "
+            f"Speak only in {language}. Use one or two short natural sentences. "
+            "Do not mention models, planners, schemas, validation, services, APIs, "
+            "internal tools, evidence labels, or system components. Do not claim a "
+            "lookup or action happened. Do not invent the requested result. Say simply "
+            "that it did not work, preserve the honest no-guess/no-action boundary, "
+            "and invite one retry. Return only a JSON object with one field named text.\n\n"
+            f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
+            f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
+            f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"
+            f"User turn: {user_text}\n"
+        )
+        payload = {
+            "model": failure_response_model,
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "format": self._spoken_text_response_schema(max_chars=72),
+            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+            "options": {
+                "num_ctx": env_int(
+                    "AGENT_RESPONSE_COMPOSER_NUM_CTX", 8192, minimum=2048
+                ),
+                "num_predict": env_int(
+                    "AGENT_RESPONSE_COMPOSER_NUM_PREDICT", 256, minimum=64
+                ),
+                "temperature": 0.35,
+                "top_p": 0.9,
+            },
+        }
+        try:
+            session = await self.get_http_session()
+            timeout_ms = env_int(
+                "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
+                4500,
+                minimum=500,
+            )
+
+            async def request_text() -> dict[str, Any]:
+                async with session.post(llm_url, json=payload) as response:
+                    body = await response.text()
+                    if response.status != 200:
+                        raise RuntimeError(
+                            "failure response composer returned HTTP "
+                            f"{response.status}: {body[:300]}"
+                        )
+                    data = json.loads(body)
+                    if not isinstance(data, dict):
+                        raise RuntimeError(
+                            "failure response composer returned a non-object body"
+                        )
+                    return data
+
+            data = await asyncio.wait_for(
+                request_text(),
+                timeout=timeout_ms / 1000.0,
+            )
+            text = self._decode_spoken_text_envelope(
+                data,
+                purpose="cognitive failure response",
+                max_chars=72,
+                language=language,
+            )
+            cjk_count = sum(
+                1
+                for char in text
+                if (
+                    "\u3400" <= char <= "\u4dbf"
+                    or "\u4e00" <= char <= "\u9fff"
+                    or "\uf900" <= char <= "\ufaff"
+                )
+            )
+            latin_count = sum(
+                1
+                for char in text
+                if ("A" <= char <= "Z") or ("a" <= char <= "z")
+            )
+            if language.startswith("zh") and latin_count > max(12, cjk_count * 2):
+                raise RuntimeError(
+                    "cognitive failure response contains too much English for zh-CN"
+                )
+            if language.startswith("en") and cjk_count > max(2, latin_count // 4):
+                raise RuntimeError(
+                    "cognitive failure response contains too much Chinese for en-US"
+                )
+            response = self._host_speech_response(
+                text,
+                style="warning",
+                source="llm_cognitive_failure_response",
+            )
+            return response.model_copy(
+                update={
+                    "metadata": {
+                        **response.metadata,
+                        "failure_facts": failure_facts,
+                        "failure_response_model": failure_response_model,
+                        "semantic_fallback": False,
+                    }
+                }
+            )
+        except Exception as exc:
+            try:
+                self.session_log(
+                    session_id,
+                    "cognitive_failure_response_composer_failed: error_type=%s error=%s",
+                    type(exc).__name__,
+                    exc,
+                )
+            except Exception:
+                logger.warning(
+                    "cognitive_failure_response_composer_failed: error_type=%s error=%s",
+                    type(exc).__name__,
+                    exc,
+                )
+            return None
+
     def _agent_exception_safe_response(
         self,
         decision: RouteDecision,
@@ -5801,23 +5960,25 @@ class VoiceAssistant:
             return None
 
         zh = self._looks_zh(user_text)
-        if decision.route == "robot_action" or has_effectful_task:
+        if decision.route == "robot_action" or (
+            has_effectful_task and decision.route not in {"tool", "memory"}
+        ):
             text = (
-                "动作规划服务暂时不可用，所以我没有执行这个动作。"
+                "我刚才没弄好，所以没有动。你再说一次吧。"
                 if zh
-                else "The action planner is temporarily unavailable, so I did not perform that action."
+                else "I couldn\'t get that movement ready, so I stayed still. Please try again."
             )
         elif decision.route == "tool":
             text = (
-                "查询服务暂时不可用，所以我没有返回未经验证的结果。"
+                "我刚才没查成功，不能乱说。你再问我一次吧。"
                 if zh
-                else "The lookup service is temporarily unavailable, so I will not invent a result."
+                else "I couldn\'t complete that lookup, so I won\'t guess. Please ask me again."
             )
         else:
             text = (
-                "记忆服务暂时不可用，所以这次没有保存更改。"
+                "我刚才没记好，所以这次没有保存。你再说一次吧。"
                 if zh
-                else "The memory service is temporarily unavailable, so that change was not saved."
+                else "I couldn\'t save that properly, so nothing changed. Please try again."
             )
         return self._host_speech_response(
             text,

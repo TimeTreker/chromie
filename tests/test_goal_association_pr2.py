@@ -4,7 +4,10 @@ import asyncio
 import unittest
 
 from agent.app.clients.ollama_client import OllamaGenerationError
-from agent.app.goal_association import GoalAssociationResolver
+from agent.app.goal_association import (
+    GoalAssociationResolver,
+    GoalSegmentationModelOutput,
+)
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
 
@@ -587,6 +590,31 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
         decision = OrchestratorRouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm")
         reviewed = assistant._schedule_goal_association_report(object(), user_text="hello", session_id="sid", context={"active_goal_snapshots": []}, decision=decision)
         self.assertIs(reviewed, decision)
+
+
+    def test_substantive_request_framing_does_not_create_style_goals(self) -> None:
+        resolver = GoalAssociationResolver(FakeOllama({}))  # type: ignore[arg-type]
+        tool_request = AgentRunRequest(
+            sid="style-goal-guard",
+            text="你好，帮我查重庆天气热不热。",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="tool",
+                intent="weather.lookup",
+                confidence=0.95,
+                source="llm",
+            ),
+            context={"active_goal_snapshots": [], "history": []},
+        )
+        prompt = resolver._build_prompt(
+            tool_request,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+
+        self.assertIn("politeness preamble", prompt)
+        self.assertIn("identity and personality shape expression only", prompt)
+        self.assertIn("one Goal when one capability result can satisfy both", prompt)
 
 
 if __name__ == "__main__":

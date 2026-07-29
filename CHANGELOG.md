@@ -4,6 +4,22 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Grounded failure speech and maintained GPU model topology
+
+- Restored a fast/quality cognitive split on both maintained development GPUs:
+  RTX 4090 Laptop now uses `qwen3:4b` for fast stages and `gemma4:e2b` for Goal
+  Association, Deep Planner, Response Composer, tool-result interpretation,
+  and review; RTX 5090 retains `qwen3:4b` plus `gemma4:12b`.
+- Tightened tool-route decoder schemas so Fast and Deep Planner cannot place
+  greetings, acknowledgements, or guessed tool results in planner
+  `response_text`; verified post-execution speech remains evidence-grounded.
+- Prevented identity/personality guidance and polite framing from becoming
+  artificial Goals, and kept one lookup plus an interpretation of its result as
+  one semantic responsibility.
+- Replaced misleading service-status fallbacks with structured failure facts
+  phrased by the configured Response Composer model, retaining a short natural
+  deterministic fallback when that final wording call is unavailable.
+
 ### Voice feedback-loop and grounded execution closure
 
 - Bound each VAD utterance to the playback state and playback generation at its

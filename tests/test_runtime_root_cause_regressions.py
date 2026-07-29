@@ -6,7 +6,10 @@ from types import MethodType
 from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
-from agent.app.planner_contract import canonical_plan_response_schema
+from agent.app.planner_contract import (
+    canonical_plan_response_schema,
+    fast_multi_goal_response_schema,
+)
 from agent.app.response_composer import ResponseComposerResolver
 from agent.app.schema import AgentRunRequest
 from orchestrator.orchestrator import VoiceAssistant
@@ -104,6 +107,59 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcomes["minProperties"], 1)
         self.assertEqual(outcomes["maxProperties"], 1)
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
+
+
+    def test_tool_route_planner_schemas_forbid_model_authored_speech(self) -> None:
+        fast = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-weather"],
+            allowed_skill_ids=["chromie.weather.lookup"],
+            requires_execution=True,
+        )
+        deep = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-weather"],
+            allowed_skill_ids=["chromie.weather.lookup"],
+            requires_execution=True,
+        )
+
+        self.assertEqual(
+            fast["properties"]["disposition"]["enum"],
+            ["execute", "escalate"],
+        )
+        self.assertEqual(
+            fast["properties"]["response_text"]["maxLength"],
+            0,
+        )
+        fast_outcome = fast["properties"]["goal_outcomes"]["properties"]["goal-weather"]
+        self.assertEqual(
+            fast_outcome["properties"]["disposition"]["enum"],
+            ["execute", "escalate"],
+        )
+        self.assertEqual(
+            fast_outcome["properties"]["response_text"]["maxLength"],
+            0,
+        )
+
+        self.assertEqual(
+            deep["properties"]["disposition"]["enum"],
+            ["execute", "clarify", "unavailable", "refused"],
+        )
+        self.assertEqual(
+            deep["properties"]["response_text"]["maxLength"],
+            0,
+        )
+        deep_outcome = deep["properties"]["goal_outcomes"]["properties"]["goal-weather"]
+        self.assertEqual(
+            deep_outcome["properties"]["response_text"]["maxLength"],
+            0,
+        )
+        self.assertNotIn(
+            ["respond"],
+            [
+                branch.get("properties", {}).get("disposition", {}).get("enum")
+                for branch in deep_outcome.get("oneOf", [])
+            ],
+        )
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(

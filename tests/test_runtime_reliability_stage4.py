@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import unittest
+from types import MethodType
+from typing import Any
 from pathlib import Path
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.schemas.route import RouteDecision
 
 
@@ -32,7 +37,7 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         assert response is not None
         self.assertEqual(response.skills, [])
         spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("没有执行", spoken)
+        self.assertIn("没有动", spoken)
         self.assertNotIn("我会点头", spoken)
         self.assertNotIn("正在执行", spoken)
 
@@ -53,8 +58,38 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         self.assertIsNotNone(response)
         assert response is not None
         spoken = " ".join(item.text for item in response.speech)
-        self.assertIn("没有返回未经验证的结果", spoken)
+        self.assertIn("没查成功", spoken)
+        self.assertIn("不能乱说", spoken)
+        self.assertNotIn("查询服务", spoken)
+        self.assertNotIn("未经验证", spoken)
         self.assertEqual(response.skills, [])
+
+
+    def test_tool_route_with_capability_task_does_not_use_action_fallback(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        decision = RouteDecision(
+            route="tool",
+            intent="weather.lookup",
+            confidence=0.95,
+            metadata={
+                "task_list": [
+                    {
+                        "task_type": "task.execute.capability",
+                        "capability_id": "chromie.weather.lookup",
+                    }
+                ]
+            },
+        )
+
+        response = assistant._agent_exception_safe_response(
+            decision,
+            user_text="查一下重庆天气。",
+        )
+
+        assert response is not None
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertIn("没查成功", spoken)
+        self.assertNotIn("没有动", spoken)
 
     def test_generic_runtime_failure_does_not_claim_user_was_misunderstood(self) -> None:
         source = Path("orchestrator/orchestrator.py").read_text(encoding="utf-8")
@@ -68,6 +103,169 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
 
         self.assertIn('NUM_PREDICT="${OLLAMA_WARM_NUM_PREDICT:-1}"', source)
         self.assertIn('"think": False', source)
+
+
+class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_quality_model_phrases_host_owned_failure_facts(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.failure_response_model = "gemma4:e2b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(), assistant
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()), assistant
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {"text": "我刚才没查成功，不能乱说。你再问我一次吧。"},
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                self.url = url
+                self.payload = json
+                return FakeResponse()
+
+        session = FakeSession()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="unsupported",
+            fallback_reason="deep planner contract failed",
+            metadata={
+                "failure_stage": "deep_planner",
+                "failure_class": "structured_output_validation",
+                "retryable": True,
+            },
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="weather.lookup",
+            confidence=0.95,
+            metadata={},
+        )
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            decision,
+            user_text="重庆今天热不热？",
+            session_id="failure-style",
+        )
+
+        assert response is not None
+        self.assertEqual(response.metadata["source"], "llm_cognitive_failure_response")
+        self.assertEqual(response.metadata["failure_response_model"], "gemma4:e2b")
+        self.assertEqual(
+            response.metadata["failure_facts"]["failure_stage"],
+            "deep_planner",
+        )
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertIn("不能乱说", spoken)
+        self.assertNotIn("查询服务", spoken)
+        self.assertEqual(session.payload["model"], "gemma4:e2b")
+        self.assertFalse(session.payload["think"])
+        self.assertIn("verified_result_available", session.payload["prompt"])
+
+    async def test_failure_response_composer_rejects_language_drift(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.failure_response_model = "gemma4:e2b"
+        assistant.ollama_model = "qwen3:4b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {
+                                "text": (
+                                    "抱歉，I could not complete the lookup correctly, "
+                                    "so please try the request again."
+                                )
+                            },
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        session = type(
+            "FakeSession",
+            (),
+            {"post": lambda self, url, json: FakeResponse()},
+        )()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="unsupported",
+            metadata={
+                "failure_stage": "deep_planner",
+                "failure_class": "structured_output_validation",
+                "retryable": True,
+            },
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="weather.lookup",
+            confidence=0.95,
+            metadata={},
+        )
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            decision,
+            user_text="重庆今天热不热？",
+            session_id="failure-language",
+        )
+
+        self.assertIsNone(response)
 
 
 if __name__ == "__main__":
