@@ -155,12 +155,11 @@ class GoalAssociationModelResolvedReference(BaseModel):
     entity_type: str = Field(min_length=1)
     resolved_value: str = Field(min_length=1)
     source: Literal[
-        "explicit_user_turn",
         "discourse_referent",
         "active_goal_binding",
     ]
-    referent_id: str = ""
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    referent_id: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = ""
 
     @field_validator(
@@ -177,13 +176,6 @@ class GoalAssociationModelResolvedReference(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @model_validator(mode="after")
-    def validate_source(self) -> "GoalAssociationModelResolvedReference":
-        if self.source in {"discourse_referent", "active_goal_binding"} and not self.referent_id:
-            raise ValueError(f"source={self.source} requires referent_id")
-        return self
-
-
 class GoalAssociationModelReferentUpdate(BaseModel):
     """Model-facing scoped discourse mutation; identifiers remain Host-owned."""
 
@@ -196,7 +188,7 @@ class GoalAssociationModelReferentUpdate(BaseModel):
     target_referent_ids: list[str] = Field(default_factory=list)
     target_goal_ids: list[str] = Field(default_factory=list)
     scope_kind: Literal["conversation", "task", "goal"] = "conversation"
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = ""
 
     @field_validator(
@@ -846,7 +838,7 @@ class GoalAssociationResolver:
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; active Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active or recoverable Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
-            "For every materially resolved reference in the current turn, emit resolved_references with the exact surface form, semantic entity type, resolved value, source, and copied referent_id when one exists. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
+            "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -855,7 +847,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description and bindings only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists.\n\n"
+            + "Each new_goals object contains description and bindings only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -929,7 +921,7 @@ class GoalAssociationResolver:
             + "\n\n"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            + "\n\nOwner-approved Chromie identity JSON:\n"
+            + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"
             + identity_json
             + "\n\nOwner-approved Personality Expression JSON:\n"
             + personality_json

@@ -185,6 +185,153 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ollama.prompts[1][0],
         )
 
+
+    def test_direct_explicit_location_uses_binding_and_referent_update(self):
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": "查询今晚重庆天气并判断是否炎热。",
+                        "bindings": [
+                            {
+                                "name": "location",
+                                "entity_type": "location",
+                                "value": "重庆",
+                                "confidence": 1.0,
+                            },
+                            {
+                                "name": "time_scope",
+                                "entity_type": "time",
+                                "value": "tonight",
+                                "confidence": 1.0,
+                            },
+                        ],
+                    }
+                ],
+                "referent_updates": [
+                    {
+                        "operation": "introduce",
+                        "entity_type": "location",
+                        "canonical_value": "重庆",
+                        "scope_kind": "goal",
+                        "confidence": 1.0,
+                        "reason_summary": "重庆是用户当前明确指定并且后续可能引用的地点。",
+                    }
+                ],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": "The user explicitly named the weather location.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("今天晚上重庆热不热？")
+            )
+        )
+
+        self.assertEqual(result.new_goals[0].object["bindings"]["location"]["value"], "重庆")
+        self.assertEqual(result.resolved_references, [])
+        self.assertEqual(result.referent_updates[0].referent.canonical_value, "重庆")
+        prompt = ollama.prompts[0][0]
+        self.assertIn("Do not emit resolved_references for an ordinary explicit entity mention", prompt)
+
+    def test_missing_resolved_reference_confidence_uses_contract_repair(self):
+        neixiang = {
+            "referent_id": "ref-neixiang",
+            "entity_type": "location",
+            "canonical_value": "内乡",
+            "scope_kind": "conversation",
+            "scope_ids": [],
+            "status": "foreground",
+            "confidence": 1.0,
+            "source_turn_id": "turn-neixiang",
+            "source_goal_ids": [],
+        }
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "查询今天内乡是否下雨。",
+                            "bindings": [
+                                {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "内乡",
+                                    "referent_id": "ref-neixiang",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        }
+                    ],
+                    "referent_updates": [],
+                    "resolved_references": [
+                        {
+                            "surface_form": "那边",
+                            "entity_type": "location",
+                            "resolved_value": "内乡",
+                            "source": "discourse_referent",
+                            "referent_id": "ref-neixiang",
+                        }
+                    ],
+                    "clarification": "",
+                    "confidence": 1.0,
+                    "reason_summary": "Resolve the foreground place.",
+                },
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "查询今天内乡是否下雨。",
+                            "bindings": [
+                                {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "内乡",
+                                    "referent_id": "ref-neixiang",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        }
+                    ],
+                    "referent_updates": [],
+                    "resolved_references": [
+                        {
+                            "surface_form": "那边",
+                            "entity_type": "location",
+                            "resolved_value": "内乡",
+                            "source": "discourse_referent",
+                            "referent_id": "ref-neixiang",
+                            "confidence": 1.0,
+                            "reason_summary": "内乡是当前前景地点。",
+                        }
+                    ],
+                    "clarification": "",
+                    "confidence": 1.0,
+                    "reason_summary": "Resolve the foreground place.",
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "今天那边下雨了没有？",
+                    discourse_referents=[neixiang],
+                    discourse_focus=["ref-neixiang"],
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.resolved_references[0].confidence, 1.0)
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn("Every resolved reference and referent update must include explicit confidence", ollama.prompts[1][0])
+
     def test_location_correction_creates_scoped_referent_and_goal_binding(self):
         chongqing = {
             "referent_id": "ref-chongqing",
@@ -443,6 +590,16 @@ class GoalAssociationResolverTests(unittest.TestCase):
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
             {"description", "bindings"},
         )
+        resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
+        self.assertEqual(
+            resolved_reference_schema["properties"]["source"]["enum"],
+            ["discourse_referent", "active_goal_binding"],
+        )
+        self.assertIn("referent_id", resolved_reference_schema["required"])
+        self.assertIn("confidence", resolved_reference_schema["required"])
+        referent_update_schema = schema["$defs"]["GoalAssociationModelReferentUpdate"]
+        self.assertIn("confidence", referent_update_schema["required"])
+
         self.assertEqual(
             schema["$defs"]["GoalAssociationModelAssociation"]["properties"]["relationship"]["enum"],
             [

@@ -20,6 +20,11 @@
 - Removed fixed character, word, and sentence-count limits from safe-read
   acknowledgements. Response Composer owns natural wording while the Host keeps
   the immediate-stage, no-completion-claim, and evidence-before-result contracts.
+- Fixed the nested Goal Association reference contract so indirect reference
+  confidence is decoder-required instead of silently defaulting to zero. Directly
+  named entities remain Goal bindings/referent updates and are no longer misclassified
+  as resolved references, preventing valid explicit weather requests from failing
+  before planning.
 
 ## Unreleased — Safe-read speech, grounded result delivery, and explicit concurrency
 

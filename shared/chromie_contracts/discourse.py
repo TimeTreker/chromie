@@ -18,7 +18,6 @@ DiscourseReferentOperation = Literal[
     "retire",
 ]
 DiscourseReferenceSource = Literal[
-    "explicit_user_turn",
     "discourse_referent",
     "active_goal_binding",
 ]
@@ -80,8 +79,8 @@ class ResolvedDiscourseReference(BaseModel):
     entity_type: str = Field(min_length=1)
     resolved_value: str = Field(min_length=1)
     source: DiscourseReferenceSource
-    referent_id: str | None = None
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    referent_id: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = ""
 
     @field_validator(
@@ -99,13 +98,6 @@ class ResolvedDiscourseReference(BaseModel):
         if isinstance(value, str):
             return _normalized_text(value)
         return value
-
-    @model_validator(mode="after")
-    def validate_source(self) -> "ResolvedDiscourseReference":
-        if self.source in {"discourse_referent", "active_goal_binding"} and not self.referent_id:
-            raise ValueError(f"source={self.source} requires referent_id")
-        return self
-
 
 class DiscourseReferent(BaseModel):
     """One scoped entity retained in short-term conversational focus state."""

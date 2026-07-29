@@ -32,6 +32,15 @@ Chromie's cognitive stages have distinct responsibilities:
 
 Tool-result memory is never reference-resolution authority.
 
+An ordinary explicit entity mention is not a resolved reference. For example,
+`今天晚上重庆热不热？` places `重庆` directly in the Goal binding and may introduce
+a salient scoped referent for later dialogue. `resolved_references` is reserved for
+indirect expressions such as `那边`, pronouns, ellipsis, aliases, corrections, or
+task mentions that the LLM binds to an already supplied discourse referent or active
+Goal binding. Every such indirect resolution carries the copied referent ID and an
+explicit confidence; omitted confidence is a contract error rather than an implicit
+low- or high-confidence decision.
+
 Goal references are generic, not location-specific. A phrase such as “the last
 task I told you” is associated by the same Goal Association LLM against bounded
 active/recoverable Goals and dialogue context. The Host does not contain a phrase
