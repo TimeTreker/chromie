@@ -270,7 +270,7 @@ class ResponseComposerResolver:
                             validated_social_behavior_count
                         ),
                         "contract_schema": "ResponseComposerModelOutput",
-                        "safe_read_speech_optional": self._is_safe_read_plan(
+                        "safe_read_speech_required": self._is_safe_read_plan(
                             plan, request.context
                         ),
                         "contract_repair_attempted": contract_repair_attempted,
@@ -400,31 +400,28 @@ class ResponseComposerResolver:
     ) -> None:
         if not cls._is_safe_read_plan(plan, context):
             return
-        stages = [
-            stage
-            for stage in (response_plan.immediate, response_plan.pre_action)
-            if stage is not None
-        ]
-        if len(stages) > 1:
+        if response_plan.immediate is None:
             raise ValueError(
-                "safe-read pre-execution speech may contain at most one micro acknowledgement"
+                "safe-read execution requires one model-authored immediate acknowledgement"
             )
-        if not stages:
-            return
-        text = " ".join(stages[0].text.strip().split())
+        if response_plan.pre_action is not None:
+            raise ValueError(
+                "safe-read acknowledgement must use immediate, not pre_action"
+            )
+        text = " ".join(response_plan.immediate.text.strip().split())
         sentence_endings = sum(text.count(token) for token in ".!?。！？")
         if sentence_endings > 1:
             raise ValueError(
                 "safe-read micro acknowledgement must be one short sentence"
             )
         if str(language or "").lower().startswith("zh"):
-            if len(text) > 12:
+            if len(text) > 18:
                 raise ValueError(
-                    "safe-read Chinese micro acknowledgement exceeds 12 characters"
+                    "safe-read Chinese micro acknowledgement exceeds 18 characters"
                 )
-        elif len(text.split()) > 6 or len(text) > 48:
+        elif len(text.split()) > 8 or len(text) > 64:
             raise ValueError(
-                "safe-read micro acknowledgement exceeds six words"
+                "safe-read micro acknowledgement exceeds eight words"
             )
 
     @staticmethod
@@ -705,10 +702,15 @@ class ResponseComposerResolver:
                 if isinstance(progress, dict):
                     progress["maxItems"] = 0
                 if ResponseComposerResolver._is_safe_read_plan(plan, context):
-                    # A safe read may start silently. When the model chooses to
-                    # acknowledge the wait, runtime validation constrains it to
-                    # one tiny natural utterance and executes it in parallel with
-                    # the lookup.
+                    # A safe read always receives one model-authored micro
+                    # acknowledgement. Runtime starts the acknowledgement and
+                    # lookup together; speech is not an execution barrier.
+                    response_properties["immediate"] = {
+                        "$ref": "#/$defs/ResponseStage"
+                    }
+                    response_properties["pre_action"] = {"type": "null"}
+                    if "immediate" not in response_required:
+                        response_required.append("immediate")
                     response_plan_schema.pop("anyOf", None)
                 else:
                     # Effectful work retains the delivery/effect barrier: it
@@ -1040,7 +1042,7 @@ class ResponseComposerResolver:
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For a terminal respond plan, emit exactly one final stage, omit immediate/pre_action/progress, set commitment_state=completed, and set must_not_claim_completion=false. This marks the conversational response itself as complete; it does not claim that an unexecuted action occurred. For a bare greeting, return only one brief greeting; do not introduce Chromie, state her age, list her traits, or add an offer of help unless the user asked for that information. "
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. "
-            "For a pending safe_read or external_read capability, acknowledgement is optional. If silence would feel awkward, emit only one tiny everyday micro acknowledgement, normally no more than a few words, such as ‘我看看。’ or ‘哦，是上海，我看看。’. Do not restate the full request, narrate the workflow, promise a result, or mention tools, APIs, data, execution, or waiting. The lookup and this optional speech will start in parallel. Before matching trusted evidence exists, do not state any result, measurement, condition, recommendation, or conclusion. "
+            "For a pending safe_read or external_read capability, emit exactly one tiny everyday immediate acknowledgement before the result, such as ‘我查一下天气预报。’ or ‘我去看看最新天气。’. It must naturally tell the user that Chromie is checking a current external source, without mentioning internal tools, APIs, execution, backend, or evidence. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
@@ -1059,5 +1061,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a structurally bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal, while safe-read work may omit pre-execution speech or use one tiny acknowledgement; always omit progress and final and keep must_not_claim_completion=true. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, and goal coverage, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false; a structurally bare greeting remains one brief greeting without self-introduction. For execute, effectful work uses immediate and/or pre_action covering every canonical goal. Safe-read work requires exactly one tiny model-authored immediate acknowledgement and no pre_action; runtime starts it in parallel with the lookup. Always omit progress and final and keep must_not_claim_completion=true. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
         )

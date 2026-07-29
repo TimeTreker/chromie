@@ -522,7 +522,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("immediate and/or pre_action stage covering every canonical goal", prompt)
         self.assertIn("omit progress and final", prompt)
 
-    def test_safe_read_acknowledgement_is_optional_at_decoder_boundary(self):
+    def test_safe_read_acknowledgement_is_required_at_decoder_boundary(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -534,7 +534,16 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             ],
         )
-        ollama = FakeOllama({"response_plan": {}})
+        ollama = FakeOllama(
+            {
+                "response_plan": {
+                    "immediate": {
+                        "text": "我查一下天气预报。",
+                        "covers_goal_ids": ["goal-weather"],
+                    }
+                }
+            }
+        )
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
                 request(
@@ -552,9 +561,14 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "resolved")
         schema = ollama.prompts[0][1]["response_format"]
-        self.assertNotIn("anyOf", schema["properties"]["response_plan"])
-        self.assertIn("acknowledgement is optional", ollama.prompts[0][0])
-        self.assertIn("start in parallel", ollama.prompts[0][0])
+        response_plan_schema = schema["$defs"]["ResponsePlan"]
+        self.assertIn("immediate", response_plan_schema["required"])
+        self.assertEqual(
+            response_plan_schema["properties"]["pre_action"],
+            {"type": "null"},
+        )
+        self.assertIn("emit exactly one tiny everyday immediate acknowledgement", ollama.prompts[0][0])
+        self.assertIn("starts this speech and the lookup in parallel", ollama.prompts[0][0])
 
     def test_safe_read_long_acknowledgement_is_repaired_to_micro_speech(self):
         canonical = plan(

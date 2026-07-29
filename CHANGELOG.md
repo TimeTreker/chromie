@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Safe-read speech, grounded result delivery, and explicit concurrency
+
+- Require one model-authored micro acknowledgement for safe-read/external-read work while starting speech and lookup in parallel, so Chromie naturally tells the user she is checking a current source without delaying retrieval.
+- Fix tool-result sentence counting so decimal points such as `40.3` do not consume the sentence budget and cause a valid evidence-bound answer to be discarded.
+- Require every planner-model step to author `timing` explicitly, preserving the model's ordering or concurrency decision instead of silently defaulting missing timing to sequential.
+- Clarify planner semantics that a prohibition or hold-state constraint cannot be satisfied by executing the positive action it forbids.
+
 All notable user-visible changes should be recorded here.
 
 ## Unreleased

@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.tool_result_interpreter")
 
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_])[-+]?\d+(?:\.\d+)?")
-_SENTENCE_END_RE = re.compile(r"[.!?。！？]+")
+_SENTENCE_END_RE = re.compile(r"(?:[!?。！？]+|(?<!\d)\.(?!\d))")
 
 _INTERNAL_NARRATION_MARKERS = (
     "请求的任务",

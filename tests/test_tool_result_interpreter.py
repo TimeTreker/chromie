@@ -47,6 +47,7 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
             "apparent_temperature_c": 42.0,
             "wind_speed_kmh": 9.0,
             "precipitation_probability": 18.0,
+            "condition": "雷雨",
         }
         return ToolResultInterpretationRequest(
             sid="tool-turn",
@@ -69,6 +70,54 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
                     "personality_expression"
                 ],
             },
+        )
+
+    async def test_decimal_temperature_does_not_consume_sentence_budget(self) -> None:
+        ollama = _ScriptedOllama(
+            {
+                "spoken_response": "重庆现在非常热，体感温度达到了40.3℃。而且现在还在下雷雨呢。",
+                "answer_mode": "direct",
+                "selected_facts": [
+                    {
+                        "evidence_id": "weather-result",
+                        "json_pointer": "/apparent_temperature_c",
+                    },
+                    {
+                        "evidence_id": "weather-result",
+                        "json_pointer": "/condition",
+                    },
+                ],
+                "confidence": 0.98,
+                "rationale": "The apparent temperature and condition directly answer the question.",
+            }
+        )
+        request = self._request().model_copy(
+            update={
+                "evidence": [
+                    self._request().evidence[0].model_copy(
+                        update={
+                            "data": {
+                                **self._request().evidence[0].data,
+                                "apparent_temperature_c": 40.3,
+                            },
+                            "output_sha256": canonical_value_sha256(
+                                {
+                                    **self._request().evidence[0].data,
+                                    "apparent_temperature_c": 40.3,
+                                }
+                            ),
+                        }
+                    )
+                ]
+            }
+        )
+
+        result = await ToolResultInterpreter(ollama).interpret(request)
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.spoken_response,
+            "重庆现在非常热，体感温度达到了40.3℃。而且现在还在下雷雨呢。",
         )
 
     async def test_selects_only_relevant_facts_and_keeps_complete_evidence(self) -> None:

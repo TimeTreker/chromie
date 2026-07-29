@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+
 from types import MethodType
 from typing import Any
 
@@ -159,6 +160,121 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 branch.get("properties", {}).get("disposition", {}).get("enum")
                 for branch in deep_outcome.get("oneOf", [])
             ],
+        )
+
+    def test_safe_read_response_schema_requires_model_authored_acknowledgement(self) -> None:
+        plan = CanonicalPlan(
+            plan_id="plan-weather-ack",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-weather"],
+            goal_summary="Check current weather.",
+            steps=[
+                {
+                    "step_id": "lookup",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "today"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["lookup"],
+                }
+            ],
+        )
+        context = {
+            "execution_capabilities": [
+                {
+                    "skill_id": "chromie.weather.lookup",
+                    "safety_class": "safe_read",
+                }
+            ]
+        }
+        schema = ResponseComposerResolver._response_schema(plan, context)
+        response_plan = schema["$defs"]["ResponsePlan"]
+
+        self.assertIn("immediate", response_plan["required"])
+        self.assertEqual(
+            response_plan["properties"]["immediate"],
+            {"$ref": "#/$defs/ResponseStage"},
+        )
+        self.assertEqual(
+            response_plan["properties"]["pre_action"],
+            {"type": "null"},
+        )
+        with self.assertRaisesRegex(ValueError, "requires one model-authored"):
+            ResponseComposerResolver._validate_safe_read_acknowledgement(
+                ResponsePlan(),
+                plan=plan,
+                context=context,
+                language="zh-CN",
+            )
+        ResponseComposerResolver._validate_safe_read_acknowledgement(
+            ResponsePlan(
+                immediate=ResponseStage(
+                    text="我查一下天气预报。",
+                    speech_act="acknowledge",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=["goal-weather"],
+                )
+            ),
+            plan=plan,
+            context=context,
+            language="zh-CN",
+        )
+
+    def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
+        from agent.app.deep_planner import DeepPlannerResolver
+
+        context = {
+            "fast_plan_resolution": {
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "skill_id": "soridormi.walk_forward",
+                        "timing": "parallel",
+                    },
+                    {
+                        "step_id": "blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "timing": "parallel",
+                    },
+                ]
+            }
+        }
+        raw = {
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                },
+            ]
+        }
+        with self.assertRaisesRegex(ValueError, "omitted timing"):
+            DeepPlannerResolver._validate_parallel_timing_preservation(
+                raw,
+                context=context,
+            )
+
+        for step in raw["steps"]:
+            step["timing"] = "parallel"
+        DeepPlannerResolver._validate_parallel_timing_preservation(
+            raw,
+            context=context,
         )
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
@@ -327,6 +443,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 source,
             )
             self.assertIn("timing=parallel", source)
+            self.assertIn("Every executable step must explicitly include timing", source)
+            self.assertIn("Never satisfy a prohibition", source)
 
     def test_response_language_validation_rejects_full_english_for_chinese(self) -> None:
         request = AgentRunRequest.model_validate(

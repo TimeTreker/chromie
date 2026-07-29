@@ -160,6 +160,10 @@ class DeepPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
+                self._validate_parallel_timing_preservation(
+                    raw,
+                    context=request.context,
+                )
                 plan = CanonicalPlan.model_validate(
                     self._normalize(
                         raw,
@@ -377,6 +381,64 @@ class DeepPlannerResolver:
         )
 
     @staticmethod
+    def _validate_parallel_timing_preservation(
+        raw: dict[str, Any],
+        *,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """Reject a silent loss of Fast Planner concurrency.
+
+        The Host does not infer concurrency from user phrases. It only preserves
+        the preceding model-authored Fast plan as semantic evidence. Deep Planner
+        may keep parallel timing or explicitly revise it using validator feedback,
+        but omitting timing must never fall through to the DTO's sequential
+        compatibility default.
+        """
+
+        if not isinstance(context, dict):
+            return
+        advisory = context.get("fast_plan_resolution") or context.get(
+            "fast_planner_resolution"
+        )
+        if not isinstance(advisory, dict):
+            return
+        fast_steps = advisory.get("steps")
+        raw_steps = raw.get("steps")
+        if not isinstance(fast_steps, list) or not isinstance(raw_steps, list):
+            return
+        parallel_fast = [
+            item
+            for item in fast_steps
+            if isinstance(item, dict)
+            and str(item.get("timing") or "").strip() == "parallel"
+        ]
+        if len(parallel_fast) < 2:
+            return
+        expected_skills = sorted(
+            str(item.get("skill_id") or "").strip()
+            for item in parallel_fast
+            if str(item.get("skill_id") or "").strip()
+        )
+        actual_skills = sorted(
+            str(item.get("skill_id") or "").strip()
+            for item in raw_steps
+            if isinstance(item, dict)
+            and str(item.get("skill_id") or "").strip()
+        )
+        if expected_skills != actual_skills:
+            return
+        missing = [
+            index
+            for index, item in enumerate(raw_steps)
+            if isinstance(item, dict) and "timing" not in item
+        ]
+        if missing:
+            raise ValueError(
+                "deep planner omitted timing while revising a parallel Fast plan; "
+                "explicitly preserve parallel timing or author an explicit reviewed alternative"
+            )
+
+    @staticmethod
     def _bounded(value: Any, limit: int) -> str:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return text if len(text) <= limit else text[:limit].rstrip() + "..."
@@ -438,7 +500,7 @@ class DeepPlannerResolver:
             f"{route_effect_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
+            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
