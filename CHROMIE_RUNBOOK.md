@@ -420,24 +420,19 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 This intentionally leaves Soridormi emergency-stopped. Follow the Soridormi
 recovery procedure and verify ready/safe-idle state before further motion.
 
-## 12. Legacy target evidence
+## 12. Target-evidence closure
+
+Use the current source-bound coordinator instead of the retired broad supervised
+runner:
 
 ```bash
-SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-  ./scripts/run_supervised_target_acceptance.sh
+python scripts/run_target_evidence_closure.py --help
 ```
 
-Evidence appears under `.chromie/acceptance/<id>/`. The runner combines runtime
-preflight, GPU smoke, and cancellation/emergency fallback. After it passes,
-record the recovery result; the script itself leaves e-stop active.
-
-Command rehearsal:
-
-```bash
-SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
-  SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-  ./scripts/run_supervised_target_acceptance.sh
-```
+The complete ordered procedure, review files, second-machine LAN probe, and
+physical profile are owned by
+[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). Do not combine
+unrelated smoke logs into a stronger target claim.
 
 ## 13. Alpha voice acceptance
 

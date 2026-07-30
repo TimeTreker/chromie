@@ -292,7 +292,7 @@ def check_project_direction(errors: list[str]) -> None:
         "## Completed phase - Text-to-MuJoCo interaction closure",
         "## Open evidence track - Physical audio validation",
         "## Completed phase - Robust simulation and provider readiness",
-        "## Evidence checkpoint for the active Gateway/Core issue",
+        "## Target-evidence closure track",
         "## Future phase - Physical pilot preparation",
         "## Later work",
     ):
@@ -464,6 +464,7 @@ def check_documentation_authority(errors: list[str]) -> None:
         "mission_architecture",
         "delivery_order",
         "implementation_and_evidence_status",
+        "target_evidence_closure",
         "resume_point",
         "operations",
         "configuration",

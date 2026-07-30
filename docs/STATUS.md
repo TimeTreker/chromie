@@ -19,7 +19,7 @@ model-authored `MemoryUpdateProposal`. Current model, Plan, task-proposal, API,
 trace, scenario, and qualification identities emit canonical
 `capability_id`/`capability_ids`; retained legacy artifacts remain readable at
 bounded compatibility boundaries. The repository policy gate mechanically
-protects these corrections. The final audited tree passes 1,631 primary tests
+protects these corrections. The final audited tree passes 1,644 primary tests
 and 20 legacy Agent tests; pinned Ruff/Mypy execution remains a required local
 static gate rather than evidence claimed from the restricted artifact sandbox.
 See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md).
@@ -39,13 +39,15 @@ See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md).
 | VoiceAssistant composition root | Runtime-ready greeting scheduling and playback barriers are extracted; remaining lifecycle responsibilities are intentionally composed. | Collaborator, greeting, TTS alignment, startup, cancellation, and full-suite tests. | Normal live startup greeting remains covered only when retained from a source-bound deployment. | `VoiceAssistant` remains lifecycle owner. Owner: [Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md). |
 | Documentation governance | Current authority map, concise status/checkpoint/changelog, indexed historical archives, and mechanical ownership checks are implemented. | Documentation authority, links, indexing, current focus, API/configuration, and reproducibility checks. | Not a runtime target-evidence claim. | Owners are declared in [Documentation Authority](DOCUMENTATION_AUTHORITY.md). |
 
-## Open evidence priorities
+## Target-evidence closure
 
-- [Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
-- [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
-- [Physical Audio Validation](ACCEPTANCE.md)
-- [User-Outcome Acceptance](USER_OUTCOME_ACCEPTANCE.md)
-- [Release and evidence rules](RELEASE.md)
+The remaining evidence tracks are coordinated by
+[Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md). The default
+`source_bound_development` profile requires source-bound Gateway/Core, positive
+Agent Skill/weather, Social Attention, and second-machine LAN evidence. Physical
+voice and robot evidence remain optional and supervised; they are required only
+for the stricter physical-pilot profile. No current retained bundle closes these
+tracks yet, and no automatic workflow grants release qualification.
 
 ## Deployment truth
 

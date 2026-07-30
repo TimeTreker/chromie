@@ -22,8 +22,9 @@ def test_suites_manifest_is_a_single_authority_redirect() -> None:
 def test_migration_manifest_reconciles_inventory_and_normalized_counts() -> None:
     report = build_migration_report(ROOT, MIGRATION)
     assert report["status"] == "pass"
-    assert report["inventory_total"] == 527
-    assert report["normalized_total"] == 526
+    manifest = load_migration_manifest(MIGRATION)
+    assert report["inventory_total"] == manifest["expected_inventory_total"]
+    assert report["normalized_total"] == manifest["expected_normalized_total"]
     assert report["runtime_policy_authority"] is False
     assert report["release_claims_changed"] is False
     assert report["source_counts"]["social_attention_v1"] == 128

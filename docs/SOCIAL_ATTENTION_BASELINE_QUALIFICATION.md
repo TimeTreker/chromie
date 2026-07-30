@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This issue uses the completed Benchmark Suite to qualify the current Chromie
+This specialized track is coordinated by [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md).
+
+This target-evidence track uses the completed Benchmark Suite to qualify the current Chromie
 Social Attention behavior. It does not add behavior policy to Benchmark or move
 semantic decisions into the Host Runtime.
 

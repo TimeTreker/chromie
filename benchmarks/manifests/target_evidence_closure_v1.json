@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "closure_id": "chromie.target-evidence-closure.v1",
+  "runtime_policy_authority": false,
+  "release_qualification_automatic": false,
+  "profiles": {
+    "source_bound_development": {
+      "description": "Close current source-bound development validation without claiming physical-device support.",
+      "required_tracks": [
+        "gateway_core",
+        "agent_skill_weather",
+        "social_attention",
+        "lan_exposure"
+      ],
+      "optional_tracks": [
+        "physical_voice",
+        "physical_robot"
+      ]
+    },
+    "supervised_physical_pilot": {
+      "description": "Add supervised physical audio and robot evidence to the source-bound development closure.",
+      "required_tracks": [
+        "gateway_core",
+        "agent_skill_weather",
+        "social_attention",
+        "lan_exposure",
+        "physical_voice",
+        "physical_robot"
+      ],
+      "optional_tracks": []
+    }
+  },
+  "tracks": {
+    "gateway_core": {
+      "report": "gateway-core/qualification.json",
+      "eligibility_path": "qualification.issue_closure_eligible"
+    },
+    "agent_skill_weather": {
+      "report": "agent-skill-weather/qualification.json",
+      "eligibility_path": "qualification.track_closure_eligible"
+    },
+    "social_attention": {
+      "report": "social-attention/qualification.json",
+      "eligibility_path": "qualification.state",
+      "eligibility_value": "human_review_required",
+      "review": "social-attention/human-review.json"
+    },
+    "lan_exposure": {
+      "report": "lan-exposure/qualification.json",
+      "eligibility_path": "passed"
+    },
+    "physical_voice": {
+      "report": "physical-voice/verification.json",
+      "eligibility_path": "human_voice_device_claim_eligible"
+    },
+    "physical_robot": {
+      "report": "physical-robot/qualification.json",
+      "eligibility_path": "physical_robot_claim_eligible",
+      "review": "physical-robot/human-review.json"
+    }
+  },
+  "social_attention_review_checks": [
+    "qualitative_samples_reviewed",
+    "none_behavior_remains_acceptable",
+    "primary_work_is_not_delayed",
+    "backend_identity_and_calibration_are_not_leaked",
+    "model_choice_remains_a_human_decision"
+  ],
+  "physical_robot_review_checks": [
+    "safety_operator_present",
+    "verified_stop_path",
+    "bounded_workspace",
+    "provider_source_identity_matches",
+    "post_execution_safe_state_confirmed"
+  ]
+}

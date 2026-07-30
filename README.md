@@ -244,6 +244,7 @@ documented in
 - [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md): trace, event, episode, and scenario relationships
 - [Runtime Trace Contract](docs/RUNTIME_TRACE.md): architecture-independent trace-item schema and lifecycle
 - [Status](docs/STATUS.md): what exists and what is evidenced
+- [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md): current source-bound evidence workflow
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
 - [SenseVoice ASR](docs/SENSEVOICE_ASR.md): runtime contract, model provenance,
   evaluation, and release evidence

@@ -39,16 +39,16 @@ feasibility, collision safety, stop, and recovery.
 Implementation and evidence claims are owned by [Current Status](docs/STATUS.md).
 Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 
-## Open evidence work
+## Target-evidence resume point
 
-1. Execute the source-bound Gateway/Core qualification workflow on a clean paired
-   Chromie/Soridormi deployment and approve the exact artifacts.
-2. Retain positive live Agent Skill selection and provider-backed weather evidence.
-3. Resume Social Attention baseline qualification after the Gateway/Core evidence
-   checkpoint closes.
-4. Retain supervised physical audio and physical-robot evidence only under their
-   dedicated safety procedures.
-5. Confirm local loopback exposure from the deployed host and a second LAN machine.
+Use the single resumable workflow in
+[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). Initialize one clean
+source-bound evidence root, collect/finalize Gateway/Core and Agent Skill/weather,
+collect or attach the homogeneous Social Attention qualification, attach local and
+second-machine LAN exposure reports, then finalize the default development
+profile. Select `supervised_physical_pilot` only when supervised physical voice
+and robot evidence will also be attached. Human review remains explicit and
+fingerprint-bound.
 
 ## Required local gates
 

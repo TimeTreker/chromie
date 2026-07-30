@@ -24,6 +24,7 @@ class DocumentationAuthorityTests(unittest.TestCase):
         self.assertEqual(len(roles), len(set(roles)))
         self.assertEqual(len(paths), len(set(paths)))
         self.assertIn("implementation_and_evidence_status", roles)
+        self.assertIn("target_evidence_closure", roles)
         self.assertIn("resume_point", roles)
         self.assertIn("delivery_order", roles)
         for raw_path in paths:
@@ -54,6 +55,12 @@ class DocumentationAuthorityTests(unittest.TestCase):
                 text,
                 raw_path,
             )
+
+
+    def test_retired_target_runner_is_not_current_authority(self) -> None:
+        self.assertFalse((ROOT / "scripts" / "run_supervised_target_acceptance.sh").exists())
+        for path in (ROOT / "docs" / "ACCEPTANCE.md", ROOT / "CHROMIE_RUNBOOK.md"):
+            self.assertNotIn("run_supervised_target_acceptance.sh", path.read_text(encoding="utf-8"))
 
     def test_canonical_documentation_gate_passes(self) -> None:
         completed = subprocess.run(

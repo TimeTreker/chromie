@@ -47,9 +47,13 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 - Consolidated documentation authority, archived detailed superseded narratives,
   and added a machine-checked authority registry.
 
-### Evidence status
+### Target-evidence closure
 
-- Automated repository gates remain distinct from live target evidence.
-- Current source-bound Gateway/Core, Social Attention, provider-backed weather,
-  physical audio, and supervised physical-robot validation remain governed by
-  their owning evidence documents.
+- Added one resumable source-bound closure workflow for Gateway/Core, positive
+  Agent Skill/weather, Social Attention, and second-machine LAN evidence.
+- Added fingerprint-bound Agent Skill/weather verification and loopback/LAN
+  exposure reports without granting Runtime policy or release authority.
+- Retired the overlapping broad supervised shell runner; physical voice and robot
+  evidence now enter only through their dedicated supervised contracts.
+- Automated repository gates remain distinct from live target evidence, and every
+  closure report remains `release_qualified=false`.

@@ -9,6 +9,7 @@ Status: current normative documentation-governance contract
 | stable mission, brain/body boundary, engineering principles, non-goals | [Project Charter](PROJECT_CHARTER.md) |
 | delivery order and Issue/evidence exit criteria | [Roadmap](../ROADMAP.md) |
 | implementation, automatic verification, target validation, deployment state | [Current Status](STATUS.md) |
+| coordinated source-bound target-evidence workflow and profiles | [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md) |
 | current resume point and immediate commands | [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) |
 | operation, startup, inspection, and recovery | [Runbook](../CHROMIE_RUNBOOK.md) |
 | environment and generated-runtime configuration | [Configuration](CONFIGURATION.md) |

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "qualification_id": "chromie.agent-skill-weather.source-bound.v1",
+  "runtime_policy_authority": false,
+  "release_qualification_automatic": false,
+  "required_agent_skill_ids": [
+    "chromie.grounded-external-information",
+    "chromie.weather-information"
+  ],
+  "required_weather_capability_id": "chromie.weather.lookup",
+  "scenarios": [
+    {
+      "scenario_id": "neixiang_weather_and_exact_followup",
+      "conversation_scope": "new",
+      "turns": [
+        {
+          "turn_key": "weather_initial",
+          "text": "河南省内乡县现在下雨了吗？",
+          "expect": {
+            "admission": "admit",
+            "runtime_lane": "tool",
+            "required_agent_skill_ids": [
+              "chromie.grounded-external-information",
+              "chromie.weather-information"
+            ],
+            "required_capability_ids": [
+              "chromie.weather.lookup"
+            ],
+            "weather_observation": {
+              "location_contains_any": ["内乡", "Neixiang"],
+              "require_source": true
+            }
+          }
+        },
+        {
+          "turn_key": "weather_followup",
+          "text": "刚才那个天气结果，简单告诉我现在有没有下雨。",
+          "expect": {
+            "admission": "admit",
+            "forbidden_capability_ids": [
+              "chromie.weather.lookup"
+            ],
+            "must_target_prior_goal_from_turn": "weather_initial"
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "chongqing_correction_to_neixiang_reference",
+      "conversation_scope": "new",
+      "turns": [
+        {
+          "turn_key": "chongqing_initial",
+          "text": "今天重庆热不热？",
+          "expect": {
+            "admission": "admit"
+          }
+        },
+        {
+          "turn_key": "location_correction",
+          "text": "不是重庆，我说的是内乡。",
+          "expect": {
+            "admission": "admit"
+          }
+        },
+        {
+          "turn_key": "resolved_reference_weather",
+          "text": "今天那边下雨了吗？",
+          "expect": {
+            "admission": "admit",
+            "runtime_lane": "tool",
+            "required_agent_skill_ids": [
+              "chromie.grounded-external-information",
+              "chromie.weather-information"
+            ],
+            "required_capability_ids": [
+              "chromie.weather.lookup"
+            ],
+            "weather_observation": {
+              "location_contains_any": ["内乡", "Neixiang"],
+              "forbid_location_contains": ["重庆", "Chongqing"],
+              "require_source": true
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "human_review_checks": [
+    "selected_methods_match_the_user_goal",
+    "weather_answer_is_grounded_and_user_focused",
+    "no_internal_identifiers_or_workflow_narration_are_spoken",
+    "correction_and_reference_resolution_remain_on_neixiang"
+  ]
+}

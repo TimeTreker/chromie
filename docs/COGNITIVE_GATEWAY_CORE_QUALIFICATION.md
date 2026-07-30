@@ -1,6 +1,6 @@
 # Cognitive Gateway/Core Source-Bound Qualification
 
-Status: maintained qualification procedure for the active Gateway/Core migration Issue.
+Status: maintained specialized target-evidence track; coordinated by [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md).
 
 This procedure validates the implemented interaction authority boundary against
 running services and Soridormi/MuJoCo. It does not add cognition, infer expected
@@ -41,7 +41,7 @@ unmodified hardware-profile plan.
 
 Missing, dirty, stale, mismatched, or digest-invalid identity fails closed. An
 identity generated with `--allow-dirty` or `--allow-missing-images` is diagnostic
-only and cannot qualify the Issue.
+only and cannot qualify this target-evidence track.
 
 ## Retained live-service text cases
 

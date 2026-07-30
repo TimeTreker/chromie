@@ -109,6 +109,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Owner-Editable Mind Profile](../config/mind/README.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
+- [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md)
 - [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
 - [Benchmark Suite](../benchmarks/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)

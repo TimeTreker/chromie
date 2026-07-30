@@ -532,31 +532,21 @@ This dispatches a long zero-velocity plan, cancels it, requires the emergency
 fallback, and verifies retained e-stop state. Complete Soridormi’s recovery
 procedure before further motion.
 
-## Level D - legacy target runner
+## Source-bound target-evidence closure
+
+New target evidence is coordinated by
+[Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md). The retired broad supervised runner combined unrelated smoke, cancellation, and
+recovery artifacts without one source-bound profile or fingerprinted review. Use
+the unified workflow for Gateway/Core, Agent Skill/weather, Social Attention, LAN,
+and optional supervised physical evidence.
 
 ```bash
-SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-  ./scripts/run_supervised_target_acceptance.sh
+python scripts/run_target_evidence_closure.py --help
 ```
 
-Evidence is written under:
-
-```text
-.chromie/acceptance/<UTC acceptance id>/
-```
-
-The runner records runtime preflight, GPU smoke output, cancellation/recovery
-output, and `summary.env`. It intentionally ends with Soridormi emergency
-stopped. A passing command is not complete until the operator records recovery
-and safe-idle confirmation.
-
-A command-only rehearsal is available:
-
-```bash
-SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
-  SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-  ./scripts/run_supervised_target_acceptance.sh
-```
+The default profile does not require or claim physical support. The physical
+pilot profile requires dedicated voice and robot evidence under their safety
+procedures.
 
 ## Voice audio acceptance modes
 

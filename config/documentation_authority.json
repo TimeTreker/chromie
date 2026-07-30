@@ -4,6 +4,7 @@
     {"role": "mission_architecture", "path": "docs/PROJECT_CHARTER.md"},
     {"role": "delivery_order", "path": "ROADMAP.md"},
     {"role": "implementation_and_evidence_status", "path": "docs/STATUS.md"},
+    {"role": "target_evidence_closure", "path": "docs/TARGET_EVIDENCE_CLOSURE.md"},
     {"role": "resume_point", "path": "DEVELOPMENT_CHECKPOINT.md"},
     {"role": "operations", "path": "CHROMIE_RUNBOOK.md"},
     {"role": "configuration", "path": "docs/CONFIGURATION.md"},

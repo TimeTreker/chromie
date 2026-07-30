@@ -503,7 +503,7 @@ are deleted. Backend identity and calibrated body arguments are absent from the
 model-facing Social Attention boundary. Remaining work is retained live Soridormi
 interaction evidence and the full release-quality regression gate.
 
-## Open architecture track - Orchestrator task proposal merge
+## Implemented architecture track - Orchestrator task proposal merge
 
 Goal Interpretation, quick intent, and deepthinking stages may all propose tasks, but
 effectful work must become an Orchestrator commitment before execution. The
@@ -529,7 +529,7 @@ Exit criteria before treating this as a complete smart merge layer:
   and correction causes without injecting raw history into prompts;
 - `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
 
-## Open architecture track - Semantic task continuity and situational planning
+## Implemented architecture track - Semantic task continuity and situational planning
 
 Chromie should preserve open semantic user goals across turns, associate later
 utterances with active tasks through model-based meaning understanding, and
@@ -660,47 +660,34 @@ Exit criteria before treating the implemented loop as target-qualified:
 - provider-backed live-text, simulator, microphone, E-stop, safe-idle, and
   physical-robot behavior remain separate evidence claims.
 
-## Evidence checkpoint for the active Gateway/Core issue
+## Target-evidence closure track
 
-The active milestone is to validate the implemented Goal-driven Runtime as the
-single semantic authority on the intended live-text and MuJoCo target, and to
-make retained evidence provenance strong enough that an older run cannot be
-mistaken for validation of newer source.
+The named implementation backlog is complete. Current development evidence is
+closed through the source-bound profiles and resumable workflow defined in
+[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
 
-The common safe base enables structured interaction and authoritative `apply`
-for `chat,tool` while leaving Soridormi off. The maintained Soridormi launcher
-enables that trusted provider and widens authority to `chat,robot_action,tool`. Both
-fail closed after the Goal-driven Runtime acquires a turn. Exact Goal Interpretation actions
-are adapter-only; the old CapabilityAgent semantic planner is emergency-only
-behind both service gates and a non-empty matching-turn authority claim. That
-internal claim is exact turn binding, not caller authentication or a consumed
-replay nonce.
+The default `source_bound_development` profile requires:
 
-This checkpoint does not claim physical microphone/speaker quality, Jetson
-packaging, real hardware support, navigation autonomy, manipulation,
-unattended operation, target validation of the new cognitive path, or release
-readiness.
+- clean Gateway/Core live-text, cancellation, paired MuJoCo, and approved review;
+- positive live Agent Skill selection with provider-backed weather evidence;
+- all reviewed Social Attention mode/style slices and qualitative approval;
+- loopback-local and second-machine LAN exposure proof.
+
+The stricter `supervised_physical_pilot` profile additionally requires supervised
+physical voice and robot evidence. Simulation and automatic tests cannot satisfy
+those physical claims. Every closure report remains `release_qualified=false`;
+release approval is separate from evidence collection.
 
 Exit criteria:
 
-- status, architecture, rollout, configuration, acceptance, and component docs
-  describe the same authoritative lanes and fallback boundary as source;
-- empty or cross-turn legacy-planner authority claims fail closed before model
-  planning;
-- cognitive simulator evidence contains an applied cognitive result, completed
-  Soridormi `sim` execution, explicit safe idle, an exact matching Chromie
-  source, manifest, clean declared paired Soridormi checkout, and a matching
-  endpoint-reported Soridormi revision;
-- artifact verification rejects evidence, capability-manifest, compatibility,
-  source-revision, or development-identity drift;
-- running Chromie images and loaded models are bound to the evaluated revision,
-  and source image references are immutable;
-- `python scripts/check_docs.py`, `./scripts/run_tests.sh`, cognitive scenarios,
-  and General Ability Level A pass from the evaluated revision;
-- retained live-text and MuJoCo runs pass through the authoritative path before
-  target behavior or deployment readiness is claimed.
+- all required reports match the initialized clean revision;
+- human reviews match exact artifact digests and approve every declared check;
+- required track eligibility fields pass without promotion from weaker evidence;
+- finalization runs from the same clean revision;
+- current Status, Checkpoint, Runbook, Acceptance, and qualification documents
+  point to the same workflow and do not retain duplicate active procedures.
 
-## Open architecture track - General ability acceptance reconstruction
+## Implemented evaluation track - General ability acceptance reconstruction
 
 The behavior test framework is being reconstructed so Chromie is evaluated by
 general robot abilities, not by one pasted user sentence at a time.
