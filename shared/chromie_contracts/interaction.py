@@ -408,15 +408,16 @@ class CapabilityResult(CapabilityIdentityModel):
     status: CapabilityResultStatus
     provider_id: str | None = None
     output: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     reason_code: str | None = None
     message: str = ""
     trace_id: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
-    @field_validator("output")
+    @field_validator("output", "metadata")
     @classmethod
-    def reject_low_level_output(cls, value: dict[str, Any]) -> dict[str, Any]:
+    def reject_low_level_result_payloads(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
 

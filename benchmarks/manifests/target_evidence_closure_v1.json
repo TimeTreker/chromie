@@ -33,30 +33,37 @@
   "tracks": {
     "gateway_core": {
       "report": "gateway-core/qualification.json",
-      "eligibility_path": "qualification.issue_closure_eligible"
+      "eligibility_path": "qualification.issue_closure_eligible",
+      "source_revision_path": "expected_provenance.chromie_revision"
     },
     "agent_skill_weather": {
       "report": "agent-skill-weather/qualification.json",
-      "eligibility_path": "qualification.track_closure_eligible"
+      "eligibility_path": "qualification.track_closure_eligible",
+      "source_revision_path": "expected_provenance.chromie_revision"
     },
     "social_attention": {
       "report": "social-attention/qualification.json",
       "eligibility_path": "qualification.state",
       "eligibility_value": "human_review_required",
-      "review": "social-attention/human-review.json"
+      "review": "social-attention/human-review.json",
+      "source_revision_list_path": "runs",
+      "source_revision_item_path": "code_revision"
     },
     "lan_exposure": {
       "report": "lan-exposure/qualification.json",
-      "eligibility_path": "passed"
+      "eligibility_path": "passed",
+      "source_revision_path": "source_revision"
     },
     "physical_voice": {
       "report": "physical-voice/verification.json",
-      "eligibility_path": "human_voice_device_claim_eligible"
+      "eligibility_path": "human_voice_device_claim_eligible",
+      "source_revision_path": "chromie_revision"
     },
     "physical_robot": {
       "report": "physical-robot/qualification.json",
       "eligibility_path": "physical_robot_claim_eligible",
-      "review": "physical-robot/human-review.json"
+      "review": "physical-robot/human-review.json",
+      "source_revision_path": "chromie_revision"
     }
   },
   "social_attention_review_checks": [

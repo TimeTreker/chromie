@@ -54,6 +54,7 @@ class ToolExecutionResponse(BaseModel):
     tool_id: str = Field(min_length=1, max_length=160)
     status: ToolExecutionStatus
     output: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     reason_code: str = Field(default="", max_length=160)
     message: str = Field(default="", max_length=600)
 
@@ -62,9 +63,9 @@ class ToolExecutionResponse(BaseModel):
     def normalize_execution_result_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
 
-    @field_validator("output")
+    @field_validator("output", "metadata")
     @classmethod
-    def reject_low_level_output(cls, value: dict[str, Any]) -> dict[str, Any]:
+    def reject_low_level_payloads(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
     @model_validator(mode="after")

@@ -168,6 +168,24 @@ def _target_goal_ids(runtime_event: dict[str, Any]) -> set[str]:
     return values
 
 
+def _contains_any(value: Any, terms: Any) -> bool:
+    if not isinstance(terms, list) or not terms:
+        return True
+    folded = str(value or "").casefold()
+    return any(str(term or "").casefold() in folded for term in terms if str(term or ""))
+
+
+def _contains_forbidden(value: Any, terms: Any) -> str | None:
+    if not isinstance(terms, list):
+        return None
+    folded = str(value or "").casefold()
+    for term in terms:
+        text = str(term or "")
+        if text and text.casefold() in folded:
+            return text
+    return None
+
+
 def _validate_weather_observation(
     outcome: dict[str, Any] | None,
     expectation: dict[str, Any],
@@ -206,6 +224,62 @@ def _validate_weather_observation(
     item = completed[-1]
     if not str(item.get("provider_id") or "").strip():
         errors.append(f"{label}: completed weather evidence has no provider_id")
+
+    metadata = item.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    request_args = metadata.get("request_args")
+    request_args = request_args if isinstance(request_args, dict) else {}
+    request_location = str(request_args.get("location") or "").strip()
+    expected_request = str(expectation.get("request_location_equals") or "").strip()
+    if expected_request and request_location != expected_request:
+        errors.append(
+            f"{label}: canonical weather request location {request_location!r} != {expected_request!r}"
+        )
+    required_request_terms = expectation.get("request_location_contains_any")
+    if isinstance(required_request_terms, list) and not _contains_any(
+        request_location, required_request_terms
+    ):
+        errors.append(
+            f"{label}: canonical weather request location {request_location!r} does not contain any required locality"
+        )
+    forbidden_request = _contains_forbidden(
+        request_location, expectation.get("forbid_request_location_contains")
+    )
+    if forbidden_request:
+        errors.append(
+            f"{label}: canonical weather request location {request_location!r} contains forbidden locality {forbidden_request!r}"
+        )
+
+    provider_execution = metadata.get("provider_execution")
+    provider_execution = (
+        provider_execution if isinstance(provider_execution, dict) else {}
+    )
+    resolution = provider_execution.get("provider_resolution")
+    resolution = resolution if isinstance(resolution, dict) else {}
+    expected_provider_query = str(
+        expectation.get("provider_query_equals") or ""
+    ).strip()
+    if expected_provider_query:
+        actual_provider_query = str(resolution.get("provider_query") or "").strip()
+        if actual_provider_query != expected_provider_query:
+            errors.append(
+                f"{label}: provider weather query {actual_provider_query!r} != {expected_provider_query!r}"
+            )
+        provider_requested = str(
+            resolution.get("requested_location") or ""
+        ).strip()
+        if provider_requested != request_location:
+            errors.append(
+                f"{label}: provider requested location {provider_requested!r} does not preserve canonical request {request_location!r}"
+            )
+    required_admin1 = expectation.get("provider_admin1_contains_any")
+    if isinstance(required_admin1, list) and not _contains_any(
+        resolution.get("matched_admin1"), required_admin1
+    ):
+        errors.append(
+            f"{label}: provider-matched admin1 {resolution.get('matched_admin1')!r} does not match the required administrative area"
+        )
+
     observation = item.get("observation")
     if not isinstance(observation, dict):
         errors.append(f"{label}: completed weather evidence has no observation")
@@ -219,18 +293,17 @@ def _validate_weather_observation(
         return
     location = str(data.get("location") or "")
     required_terms = expectation.get("location_contains_any")
-    if isinstance(required_terms, list) and required_terms:
-        if not any(str(term) in location for term in required_terms):
-            errors.append(
-                f"{label}: weather location {location!r} does not contain any required locality"
-            )
-    forbidden_terms = expectation.get("forbid_location_contains")
-    if isinstance(forbidden_terms, list):
-        for term in forbidden_terms:
-            if str(term) and str(term) in location:
-                errors.append(
-                    f"{label}: weather location {location!r} contains forbidden locality {term!r}"
-                )
+    if isinstance(required_terms, list) and not _contains_any(location, required_terms):
+        errors.append(
+            f"{label}: weather location {location!r} does not contain any required locality"
+        )
+    forbidden_term = _contains_forbidden(
+        location, expectation.get("forbid_location_contains")
+    )
+    if forbidden_term:
+        errors.append(
+            f"{label}: weather location {location!r} contains forbidden locality {forbidden_term!r}"
+        )
     if expectation.get("require_source") is True and not str(data.get("source") or "").strip():
         errors.append(f"{label}: weather observation has no source identity")
 
@@ -498,6 +571,9 @@ def verify(
         "errors": errors,
         "warnings": warnings,
         "runtime_identity_sha256": identity_digest,
+        "expected_provenance": {
+            "chromie_revision": expected_revision,
+        },
         "artifacts": {
             "runtime_identity": str(runtime_identity_path),
             "live_summary": str(live_summary_path),

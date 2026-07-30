@@ -47,6 +47,7 @@ class AgentToolSkillProvider:
             status=status,
             provider_id=self.provider_id,
             output=response.output,
+            metadata=response.metadata,
             reason_code=response.reason_code or None,
             message=response.message,
         )

@@ -71,6 +71,9 @@ class WeatherReport:
     precipitation_sum_mm: float | None
     weather_code: int | None
     wind_speed_kmh: float | None
+    requested_location: str | None = None
+    provider_query: str | None = None
+    provider_admin1: str | None = None
     source: str = "open-meteo"
 
 
@@ -596,6 +599,9 @@ class OpenMeteoWeatherClient:
         report = self._report_from_payload(
             location_name=str(result.get("name") or location),
             country=result.get("country"),
+            requested_location=location,
+            provider_query=matched_query,
+            provider_admin1=result.get("admin1"),
             forecast=forecast_data,
             day_index=day_index,
         )
@@ -756,6 +762,9 @@ class OpenMeteoWeatherClient:
         *,
         location_name: str,
         country: Any,
+        requested_location: str,
+        provider_query: str,
+        provider_admin1: Any,
         forecast: dict[str, Any],
         day_index: int,
     ) -> WeatherReport:
@@ -790,6 +799,9 @@ class OpenMeteoWeatherClient:
             precipitation_sum_mm=self._number(daily_value("precipitation_sum")),
             weather_code=weather_code,
             wind_speed_kmh=self._number(current.get("wind_speed_10m")),
+            requested_location=requested_location,
+            provider_query=provider_query,
+            provider_admin1=(str(provider_admin1) if provider_admin1 else None),
         )
 
     @staticmethod

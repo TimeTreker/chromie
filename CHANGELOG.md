@@ -61,6 +61,12 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ### Target-evidence closure
 
+- Bound every required track to the exact revision captured when the closure is
+  initialized and reject collection, attachment, or finalization from a dirty or
+  moved checkout.
+- Retained non-semantic provider-resolution metadata so weather qualification
+  proves canonical Goal arguments and the provider-native `neixiang` lookup key
+  independently.
 - Added one resumable source-bound closure workflow for Gateway/Core, positive
   Agent Skill/weather, Social Attention, and second-machine LAN evidence.
 - Added fingerprint-bound Agent Skill/weather verification and loopback/LAN

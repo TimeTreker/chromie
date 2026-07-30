@@ -19,8 +19,11 @@ scripts/run_target_evidence_closure.py
 ```
 
 Every report remains source-bound, fingerprinted, and explicit about its claim.
-A completed closure report always contains `release_qualified=false`; product or
-physical release approval remains a separate owner decision.
+The coordinator independently verifies that every retained track belongs to the
+exact clean Chromie revision recorded by `init`; an eligible report from another
+revision cannot be mixed into the closure. A completed closure report always
+contains `release_qualified=false`; product or physical release approval remains
+a separate owner decision.
 
 ## Profiles
 
@@ -74,6 +77,18 @@ python scripts/run_target_evidence_closure.py init \
   --evidence-root "$EVIDENCE_ROOT"
 ```
 
+## Revision lifecycle
+
+Initialize a closure only after the code and configuration under qualification
+have been committed. Collection, attachment, and track finalization fail closed
+when the checkout is dirty or no longer matches the revision captured by
+`init`. If a defect is fixed after evidence collection begins, commit the fix
+and create a new evidence root; do not carry reports or approvals forward from
+the earlier revision.
+
+The `status` command may still inspect an existing bundle from another checkout,
+but that does not make its reports eligible for the current revision.
+
 ## Gateway/Core source-bound evidence
 
 ```bash
@@ -105,7 +120,10 @@ The specialized procedure remains documented in
 This track reuses the exact Gateway/Core runtime identity. It proves live
 selection of both approved methods, content-free Plan provenance, correct
 Neixiang discourse grounding, provider-backed `chromie.weather.lookup`
-evidence, and exact verified-memory reuse on the follow-up.
+evidence, and exact verified-memory reuse on the follow-up. The retained
+execution evidence separately proves that the canonical request remains
+`河南省内乡县` while the Open-Meteo adapter uses its provider-native lookup key
+`neixiang`; provider syntax never replaces the Goal binding.
 
 ```bash
 python scripts/run_target_evidence_closure.py collect-skill-weather \
@@ -127,8 +145,9 @@ python scripts/run_target_evidence_closure.py finalize-skill-weather \
 ```
 
 The verifier rejects missing Skill provenance, digest drift, stale/mismatched
-Goal bindings, repeated lookup on the exact-memory follow-up, or a Chongqing
-observation used to answer the corrected Neixiang request.
+Goal bindings, canonical-location rewriting, an unexpected provider lookup key,
+a wrong administrative match, repeated lookup on the exact-memory follow-up,
+or a Chongqing observation used to answer the corrected Neixiang request.
 
 ## Social Attention baseline
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from .capabilities.models import CapabilityRegistry, ToolCapability
@@ -23,7 +24,14 @@ except ImportError:  # pragma: no cover - repository development path
 
 logger = logging.getLogger("chromie.agent.local_tool_execution")
 
-ToolHandler = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+
+@dataclass(frozen=True, slots=True)
+class LocalToolResult:
+    output: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+ToolHandler = Callable[[dict[str, Any]], Awaitable[LocalToolResult]]
 
 
 class LocalToolExecutor:
@@ -70,11 +78,13 @@ class LocalToolExecutor:
             _validate_json_schema(request.args, tool.input_schema, path="args")
             handler_args = dict(request.args)
             handler_args["__request_language"] = request.language
-            output = await asyncio.wait_for(
+            handler_result = await asyncio.wait_for(
                 handler(handler_args),
                 timeout=max(0.001, float(tool.execution.timeout_s or 30.0)),
             )
-            _validate_json_schema(output, tool.output_schema, path="output")
+            _validate_json_schema(
+                handler_result.output, tool.output_schema, path="output"
+            )
         except asyncio.TimeoutError:
             return self._result(request, "timed_out", "provider_timeout", "Local tool timed out")
         except (ValueError, TypeError) as exc:
@@ -103,7 +113,8 @@ class LocalToolExecutor:
             request_id=request.request_id,
             tool_id=request.tool_id,
             status="completed",
-            output=output,
+            output=handler_result.output,
+            metadata=handler_result.metadata,
         )
 
     def _execution_denial(self, tool: ToolCapability) -> tuple[str, str] | None:
@@ -123,7 +134,7 @@ class LocalToolExecutor:
             return "tool_unavailable", reason
         return None
 
-    async def _execute_weather(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_weather(self, args: dict[str, Any]) -> LocalToolResult:
         if self.weather_client is None:
             raise WeatherLookupError("weather provider is disabled")
         units = str(args.get("units") or "metric")
@@ -139,7 +150,18 @@ class LocalToolExecutor:
                 ),
             )
         )
-        return _weather_output(report, units=units, language=language)
+        return LocalToolResult(
+            output=_weather_output(report, units=units, language=language),
+            metadata={
+                "provider_resolution": {
+                    "requested_location": report.requested_location,
+                    "provider_query": report.provider_query,
+                    "matched_location": report.location_name,
+                    "matched_admin1": report.provider_admin1,
+                    "matched_country": report.country,
+                }
+            },
+        )
 
     @staticmethod
     def _result(

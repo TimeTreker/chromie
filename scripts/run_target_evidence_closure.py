@@ -148,6 +148,61 @@ def _nested(payload: dict[str, Any], dotted_path: str) -> Any:
     return value
 
 
+def _assert_initialized_source(state: dict[str, Any]) -> dict[str, Any]:
+    current = _git_state()
+    expected = state.get("source")
+    expected = expected if isinstance(expected, dict) else {}
+    expected_revision = str(expected.get("revision") or "")
+    if current.get("dirty") is True:
+        raise ValueError("evidence collection requires a clean checkout")
+    if not expected_revision or current.get("revision") != expected_revision:
+        raise ValueError(
+            "current source revision differs from the initialized target-evidence closure"
+        )
+    return current
+
+
+def _source_binding_errors(
+    payload: dict[str, Any],
+    spec: dict[str, Any],
+    *,
+    expected_revision: str,
+) -> list[str]:
+    errors: list[str] = []
+    direct_path = spec.get("source_revision_path")
+    if isinstance(direct_path, str) and direct_path:
+        actual = _nested(payload, direct_path)
+        if actual != expected_revision:
+            errors.append(
+                "source_revision_mismatch:"
+                f"path={direct_path}:expected={expected_revision!r}:actual={actual!r}"
+            )
+
+    list_path = spec.get("source_revision_list_path")
+    item_path = spec.get("source_revision_item_path")
+    if isinstance(list_path, str) and list_path:
+        values = _nested(payload, list_path)
+        if not isinstance(values, list) or not values:
+            errors.append(f"source_revision_list_missing:path={list_path}")
+        elif not isinstance(item_path, str) or not item_path:
+            errors.append("source_revision_item_path_missing")
+        else:
+            mismatches: list[str] = []
+            for index, item in enumerate(values):
+                if not isinstance(item, dict):
+                    mismatches.append(f"{index}:not_an_object")
+                    continue
+                actual = _nested(item, item_path)
+                if actual != expected_revision:
+                    mismatches.append(f"{index}:{actual!r}")
+            if mismatches:
+                errors.append(
+                    "source_revision_list_mismatch:"
+                    f"expected={expected_revision!r}:items={','.join(mismatches)}"
+                )
+    return errors
+
+
 def _review_checks(manifest: dict[str, Any], track_id: str) -> list[str]:
     key = f"{track_id}_review_checks"
     values = manifest.get(key)
@@ -190,6 +245,8 @@ def _track_status(
     root: Path,
     manifest: dict[str, Any],
     track_id: str,
+    *,
+    expected_revision: str,
 ) -> dict[str, Any]:
     spec = _track_spec(manifest, track_id)
     report = root / str(spec.get("report") or "")
@@ -214,6 +271,14 @@ def _track_status(
         status["errors"].append(
             f"eligibility_mismatch:expected={expected!r}:actual={actual!r}"
         )
+    status["errors"].extend(
+        _source_binding_errors(
+            payload,
+            spec,
+            expected_revision=expected_revision,
+        )
+    )
+    status["source_revision"] = expected_revision
     review_relative = spec.get("review")
     if review_relative:
         review_path = root / str(review_relative)
@@ -241,8 +306,14 @@ def _refresh(root: Path, manifest: dict[str, Any], state: dict[str, Any]) -> dic
     profile = _profile(manifest, str(state["profile"]))
     required = list(profile.get("required_tracks") or [])
     optional = list(profile.get("optional_tracks") or [])
+    expected_revision = str(state.get("source", {}).get("revision") or "")
     statuses = {
-        track_id: _track_status(root, manifest, track_id)
+        track_id: _track_status(
+            root,
+            manifest,
+            track_id,
+            expected_revision=expected_revision,
+        )
         for track_id in dict.fromkeys([*required, *optional])
     }
     state["tracks"] = statuses
@@ -319,6 +390,7 @@ def collect_core(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     command = [
         args.python,
         "scripts/run_cognitive_gateway_core_qualification.py",
@@ -348,6 +420,7 @@ def finalize_core(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     result = _run_command(
         [
             args.python,
@@ -367,6 +440,7 @@ def collect_skill_weather(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     identity = root / "gateway-core" / "runtime-identity.json"
     command = [
         args.python,
@@ -395,6 +469,7 @@ def finalize_skill_weather(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     identity = root / "gateway-core" / "runtime-identity.json"
     result = _run_command(
         [
@@ -466,6 +541,7 @@ def collect_social(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     directory = root / "social-attention"
     inventory = directory / "inventory.json"
     coverage = directory / "coverage.json"
@@ -581,6 +657,7 @@ def attach_social(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     destination = root / "social-attention" / "qualification.json"
     _copy(args.qualification, destination)
     report = _read_json(destination)
@@ -620,6 +697,7 @@ def attach_lan(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     directory = root / "lan-exposure"
     local = _copy(args.local_report, directory / "local.json")
     remote = _copy(args.remote_report, directory / "remote.json")
@@ -648,6 +726,7 @@ def attach_voice(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     directory = root / "physical-voice"
     directory.mkdir(parents=True, exist_ok=True)
     report = directory / "verification.json"
@@ -672,6 +751,7 @@ def attach_physical_robot(args: argparse.Namespace) -> int:
     manifest = _manifest(args)
     root = _root(args.evidence_root, existing=True)
     state = _load_state(root, manifest)
+    _assert_initialized_source(state)
     directory = root / "physical-robot"
     report_path = _copy(args.qualification, directory / "qualification.json")
     report = _read_json(report_path)

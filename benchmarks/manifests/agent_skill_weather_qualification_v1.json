@@ -27,8 +27,17 @@
               "chromie.weather.lookup"
             ],
             "weather_observation": {
-              "location_contains_any": ["内乡", "Neixiang"],
-              "require_source": true
+              "location_contains_any": [
+                "内乡",
+                "Neixiang"
+              ],
+              "require_source": true,
+              "request_location_equals": "河南省内乡县",
+              "provider_query_equals": "neixiang",
+              "provider_admin1_contains_any": [
+                "河南",
+                "Henan"
+              ]
             }
           }
         },
@@ -77,9 +86,28 @@
               "chromie.weather.lookup"
             ],
             "weather_observation": {
-              "location_contains_any": ["内乡", "Neixiang"],
-              "forbid_location_contains": ["重庆", "Chongqing"],
-              "require_source": true
+              "location_contains_any": [
+                "内乡",
+                "Neixiang"
+              ],
+              "forbid_location_contains": [
+                "重庆",
+                "Chongqing"
+              ],
+              "require_source": true,
+              "request_location_contains_any": [
+                "内乡",
+                "Neixiang"
+              ],
+              "forbid_request_location_contains": [
+                "重庆",
+                "Chongqing"
+              ],
+              "provider_query_equals": "neixiang",
+              "provider_admin1_contains_any": [
+                "河南",
+                "Henan"
+              ]
             }
           }
         }

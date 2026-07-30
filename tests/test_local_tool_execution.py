@@ -30,6 +30,9 @@ class _WeatherClient:
             precipitation_sum_mm=1.2,
             weather_code=51,
             wind_speed_kmh=8.0,
+            requested_location="北京",
+            provider_query="beijing",
+            provider_admin1="Beijing",
         )
 
 
@@ -63,6 +66,16 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.output["location"], "Beijing")
         self.assertEqual(result.output["apparent_temperature_c"], 35.0)
         self.assertEqual(result.output["source"], "open-meteo")
+        self.assertEqual(
+            result.metadata["provider_resolution"],
+            {
+                "requested_location": "北京",
+                "provider_query": "beijing",
+                "matched_location": "Beijing",
+                "matched_admin1": "Beijing",
+                "matched_country": "China",
+            },
+        )
         self.assertEqual(
             result.output["summary"],
             "Beijing今天小毛毛雨，现在约29℃，体感约35℃。",
@@ -146,6 +159,12 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "summary": "Today in Beijing, it is about 29°C now.",
                     "source": "open-meteo",
                 },
+                metadata={
+                    "provider_resolution": {
+                        "requested_location": "北京",
+                        "provider_query": "beijing",
+                    }
+                },
             )
 
         coordinator = InteractionRuntimeCoordinator(
@@ -175,6 +194,10 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.results[0].status, "completed")
         self.assertEqual(result.results[0].output["apparent_temperature_c"], 35.0)
+        self.assertEqual(
+            result.results[0].metadata["provider_resolution"]["provider_query"],
+            "beijing",
+        )
         self.assertEqual(requests[0].tool_id, "chromie.weather.lookup")
         self.assertEqual(requests[0].language, "zh-CN")
 

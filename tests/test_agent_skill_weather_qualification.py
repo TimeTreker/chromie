@@ -88,7 +88,15 @@ def _runtime(
     }
 
 
-def _outcome(sid: str, identity: str, location: str) -> dict:
+def _outcome(
+    sid: str,
+    identity: str,
+    location: str,
+    *,
+    request_location: str,
+    provider_query: str = "neixiang",
+    provider_admin1: str = "Henan",
+) -> dict:
     return {
         "schema_version": 2,
         "event": "cognitive_execution_outcome",
@@ -102,6 +110,18 @@ def _outcome(sid: str, identity: str, location: str) -> dict:
                     "capability_id": "chromie.weather.lookup",
                     "status": "completed",
                     "provider_id": "chromie.local.weather",
+                    "metadata": {
+                        "request_args": {"location": request_location},
+                        "provider_execution": {
+                            "provider_resolution": {
+                                "requested_location": request_location,
+                                "provider_query": provider_query,
+                                "matched_location": location,
+                                "matched_admin1": provider_admin1,
+                                "matched_country": "China",
+                            }
+                        },
+                    },
                     "observation": {
                         "status": "available",
                         "schema_validated": True,
@@ -126,7 +146,15 @@ def _retained(turn_key: str, sid: str, text: str) -> dict:
 
 
 class AgentSkillWeatherQualificationTests(unittest.TestCase):
-    def _fixture(self, root: Path, *, bad_location: bool = False, omit_base: bool = False):
+    def _fixture(
+        self,
+        root: Path,
+        *,
+        bad_location: bool = False,
+        omit_base: bool = False,
+        bad_provider_query: bool = False,
+        bad_canonical_location: bool = False,
+    ):
         identity_path = root / "runtime-identity.json"
         identity = {
             "schema_version": 1,
@@ -187,7 +215,15 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
                 goal_ids=["goal-weather"],
                 skills=skills,
             ),
-            _outcome("sid-weather-1", "identity-digest", "内乡县"),
+            _outcome(
+                "sid-weather-1",
+                "identity-digest",
+                "内乡县",
+                request_location=(
+                    "河南省南阳市" if bad_canonical_location else "河南省内乡县"
+                ),
+                provider_query=("henan neixiang" if bad_provider_query else "neixiang"),
+            ),
             _gateway("sid-weather-2", "identity-digest"),
             _runtime(
                 "sid-weather-2",
@@ -227,6 +263,8 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
                 "sid-correction-3",
                 "identity-digest",
                 "重庆" if bad_location else "河南省内乡县",
+                request_location="内乡",
+                provider_query=("henan neixiang" if bad_provider_query else "neixiang"),
             ),
         ]
         events_path = root / "cognitive-events.jsonl"
@@ -327,6 +365,42 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             report["qualification"]["provider_backed_weather_validated"]
         )
         self.assertIn("forbidden locality", "\n".join(report["errors"]))
+
+    def test_provider_query_must_be_the_provider_native_neixiang_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(root, bad_provider_query=True)
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+        self.assertFalse(
+            report["qualification"]["provider_backed_weather_validated"]
+        )
+        self.assertIn("provider weather query", "\n".join(report["errors"]))
+
+    def test_canonical_location_is_not_rewritten_to_provider_syntax(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(
+                root, bad_canonical_location=True
+            )
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+        self.assertFalse(
+            report["qualification"]["provider_backed_weather_validated"]
+        )
+        self.assertIn(
+            "canonical weather request location", "\n".join(report["errors"])
+        )
 
 
 if __name__ == "__main__":

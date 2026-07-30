@@ -58,21 +58,36 @@ class TargetEvidenceClosureTests(unittest.TestCase):
     def write_required_reports(self, root: Path) -> None:
         self.write_json(
             root / "gateway-core" / "qualification.json",
-            {"qualification": {"issue_closure_eligible": True}},
+            {
+                "expected_provenance": {"chromie_revision": "revision-1"},
+                "qualification": {"issue_closure_eligible": True},
+            },
         )
         self.write_json(
             root / "agent-skill-weather" / "qualification.json",
-            {"qualification": {"track_closure_eligible": True}},
+            {
+                "expected_provenance": {"chromie_revision": "revision-1"},
+                "qualification": {"track_closure_eligible": True},
+            },
         )
         social = root / "social-attention" / "qualification.json"
         self.write_json(
             social,
-            {"qualification": {"state": "human_review_required"}},
+            {
+                "qualification": {"state": "human_review_required"},
+                "runs": [
+                    {"run_id": "social-1", "code_revision": "revision-1"}
+                ],
+            },
         )
         self.approve_review(root, "social_attention", social)
         self.write_json(
             root / "lan-exposure" / "qualification.json",
-            {"passed": True, "release_qualified": False},
+            {
+                "passed": True,
+                "source_revision": "revision-1",
+                "release_qualified": False,
+            },
         )
 
     def args(self, root: Path) -> argparse.Namespace:
@@ -142,7 +157,10 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             self.write_required_reports(root)
             self.write_json(
                 root / "agent-skill-weather" / "qualification.json",
-                {"qualification": {"track_closure_eligible": False}},
+                {
+                    "expected_provenance": {"chromie_revision": "revision-1"},
+                    "qualification": {"track_closure_eligible": False},
+                },
             )
             refreshed = closure._refresh(root, self.manifest, state)
             status = refreshed["tracks"]["agent_skill_weather"]
@@ -167,6 +185,49 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             self.assertTrue(any("clean" in item for item in report["errors"]))
             self.assertTrue(any("revision" in item for item in report["errors"]))
 
+    def test_track_report_from_another_revision_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = self.initialize(root)
+            self.write_required_reports(root)
+            self.write_json(
+                root / "agent-skill-weather" / "qualification.json",
+                {
+                    "expected_provenance": {"chromie_revision": "revision-2"},
+                    "qualification": {"track_closure_eligible": True},
+                },
+            )
+            refreshed = closure._refresh(root, self.manifest, state)
+            status = refreshed["tracks"]["agent_skill_weather"]
+            self.assertFalse(status["eligible"])
+            self.assertTrue(
+                any("source_revision_mismatch" in item for item in status["errors"])
+            )
+
+    def test_collection_rejects_dirty_or_moved_initialized_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize(root)
+            args = argparse.Namespace(
+                manifest=MANIFEST_PATH,
+                evidence_root=root,
+                python="python",
+                reviewer="reviewer-1",
+                agent_url="http://127.0.0.1:8092",
+                soridormi_repo=ROOT.parent / "soridormi",
+                soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+                speaker=False,
+                resume=False,
+                dry_run=True,
+            )
+            with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-2", "dirty": False},
+            ):
+                with self.assertRaisesRegex(ValueError, "initialized"):
+                    closure.collect_core(args)
+
     def test_collect_social_covers_every_reviewed_mode_style_slice(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -190,6 +251,10 @@ class TargetEvidenceClosureTests(unittest.TestCase):
                 dry_run=True,
             )
             with patch.object(
+                closure,
+                "_git_state",
+                return_value={"revision": "revision-1", "dirty": False},
+            ), patch.object(
                 closure,
                 "_run_command",
                 side_effect=lambda command, dry_run: commands.append(command) or 0,

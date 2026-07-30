@@ -250,6 +250,9 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(("Neixiang", "en"), geocode_queries)
         self.assertEqual(report.location_name, "Neixiang")
         self.assertEqual(report.current_temperature_c, 28.0)
+        self.assertEqual(report.requested_location, "河南省内乡县")
+        self.assertEqual(report.provider_query, "neixiang")
+        self.assertEqual(report.provider_admin1, "Henan")
 
     async def test_location_not_found_is_typed_after_all_equivalent_queries_fail(self) -> None:
         queries: list[str] = []

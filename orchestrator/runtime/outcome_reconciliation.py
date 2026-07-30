@@ -321,6 +321,7 @@ class ExecutionOutcomeReconciler:
                     metadata={
                         "correlation": "plan_step_request_and_skill_result",
                         "request_args": dict(request.args),
+                        "provider_execution": dict(result.metadata),
                         "safety_class": str(
                             request.metadata.get("safety_class") or ""
                         ),
