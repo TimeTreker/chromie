@@ -154,9 +154,9 @@ Implementation status:
 - `authority=agent_method_only` and `execution_authority=none` are explicit
   required metadata fields, and unknown executable/provider declarations fail
   closed through strict schemas;
-- typed model-selection and Plan-provenance contracts remain intentionally
-  deferred to their owning slices rather than being prematurely attached to
-  model or execution behavior.
+- typed model-selection contracts are now implemented in the following slice;
+  Plan-provenance contracts remain deferred to their owning slice rather than
+  being prematurely attached to execution behavior.
 
 ### Add a read-only Skill registry and loader
 
@@ -190,8 +190,9 @@ Implementation status:
 - the maintained Compose profile mounts the root read-only;
 - the registry has no registration or execution API, imports no package code,
   and leaves the Capability Registry unchanged;
-- `GET /agent-skills` and `/health` provide metadata-only operational
-  visibility, with model selection explicitly reported disabled;
+- `GET /agent-skills` provides metadata-only registry visibility; `/health`
+  reports the separate selection boundary and its limits without claiming any
+  projection or Plan integration;
 - no domain Agent Skill package is present yet.
 
 ### Add model-authored Skill discovery and selection
@@ -216,6 +217,26 @@ Acceptance:
   Host Skill rule;
 - unknown or unapproved selections fail closed and can trigger model repair or
   continue without the optional Skill where safe.
+
+Implementation status:
+
+- complete as an independent `/agent-skills/select` boundary for the declared
+  Goal Association, Fast Planner, Deep Planner, Response Composer, or Tool
+  Result Interpreter role;
+- candidate discovery exposes only approved summaries that declare the requested
+  projection, optionally validates an explicit candidate set, and deterministically
+  caps volume without phrase, route, or domain matching;
+- the model authors explicit `no_skill` or ordered one/multi-Skill output with
+  exact ID, version, projection, relevant Goal IDs, rationale, and confidence;
+- Host validation binds accepted selections to registry content digests, rejects
+  undisclosed IDs, version/projection/Goal conflicts, and low-confidence positive
+  selections, and permits one bounded same-contract repair;
+- unavailable or invalid model output fails to optional no-Skill without changing
+  the Capability Registry, Canonical Plans, prompts of other Agents, or execution;
+- the repository-owned root still contains no domain Skill package, so default
+  runtime calls currently return `no_candidates` without invoking the model;
+- progressive projection loading and Cognitive Turn Loop integration remain the
+  next owning slice.
 
 ### Add Agent-specific progressive disclosure
 

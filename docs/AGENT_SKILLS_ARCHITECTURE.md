@@ -291,6 +291,11 @@ load references/examples only when requested within budget
 This keeps prompts small, makes selection observable, and avoids turning the
 entire Skill library into permanent system-prompt text.
 
+Current implementation stops after the second line: `/agent-skills/select` shows
+only bounded approved summaries and returns a digest-bound typed selection. It
+does not yet load the selected projection or place it into any Agent prompt; that
+is owned by the progressive-disclosure Issue.
+
 ### Evidence and provenance
 
 Every loaded Skill projection should have stable provenance:
@@ -401,7 +406,8 @@ The following invariants are enforced:
 - startup retains bounded metadata summaries, not full `SKILL.md` or projection text;
 - explicit body/projection reads recheck the package digest before returning text;
 - package Python or scripts are inert and are never imported or executed;
-- Skill selection is model-authored and typed, but is not implemented by this loader Issue.
+- Skill selection is model-authored and typed through an independent bounded
+  selection boundary; projection loading and Plan integration remain separate.
 
 ## Weather vertical slice
 

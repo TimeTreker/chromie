@@ -1,5 +1,6 @@
 """Read-only Agent Skill metadata and content loader."""
 
+from .selection import AgentSkillSelectionService
 from .loader import (
     AgentSkillLoadError,
     AgentSkillRegistry,
@@ -11,6 +12,7 @@ from .loader import (
 )
 
 __all__ = [
+    "AgentSkillSelectionService",
     "AgentSkillLoadError",
     "AgentSkillRegistry",
     "ConfiguredAgentSkillRegistry",

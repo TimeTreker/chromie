@@ -34,17 +34,19 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Add Model-Authored Agent Skill Discovery
-and Selection.** Executable contracts now use canonical `capability_id`, and the
-passive Agent Skill foundation is implemented: strict immutable metadata and
-summary/projection/document contracts, explicit owner approval and no-execution
-authority, deterministic package digests, a safe read-only loader, duplicate and
-path/inheritance rejection, metadata-only `/agent-skills` inspection, and a
-read-only Compose mount. The repository-owned root currently contains no domain
-Skill package. No Agent sees Skill summaries or projections yet; no selection,
-Plan Skill provenance, Capability registration, or execution behavior is added.
-Gateway/Core qualification remains an independent open evidence issue rather
-than a second code implementation mainline.
+**Active implementation issue:** **Add Agent-Specific Progressive
+Disclosure.** Executable contracts use canonical `capability_id`; strict passive
+Agent Skill metadata and a read-only digest-bound Loader are implemented; and an
+independent `/agent-skills/select` boundary now lets the declared responsible
+Agent role author explicit no/one/multi-Skill decisions from bounded approved
+summaries. Host validation checks exact disclosed ID, version, projection, Goal
+IDs, confidence, and package digest, permits one repair, and degrades model or
+contract failure to optional no-Skill. The repository-owned root still contains
+no domain Skill package, and the selection boundary is not yet called by the
+Cognitive Turn Loop. No projection content enters an Agent prompt, no Plan
+records Skill provenance, and no Capability registration, authorization, or
+execution behavior is changed. Gateway/Core qualification remains an independent
+open evidence issue rather than a second code implementation mainline.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automatic evidence, target evidence, and deployment
@@ -56,7 +58,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,545 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,558 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,
@@ -669,7 +671,7 @@ Target validation or Release readiness.
 | High-level Chromie self and ability model | Implemented as an owner-approved structured self model plus a static Host ability ontology above concrete skills. Prompts bind first-person speech, perception, action, and body ownership to the self-model speaker entity, expose language/reasoning models only as internal components, and use a natural social presentation that foregrounds the name Chromie rather than volunteering system category, embodiment category, age labels, or internal architecture; capability inquiries use supplied catalog/provider evidence semantically and do not execute actions. The ontology uses only backend-neutral lifecycle states; provider-backed body skills remain non-executable there and are resolved only from the live provider catalog | Mind/self-model, conversation prompt, Goal Interpreter inquiry-versus-execution, DeepThinking, direct-fallback, ability-registry vocabulary, provider-confirmation parity, capability-evidence, dialogue-scenario, task-ledger, and Orchestrator TTS-alignment tests | Automated prompt/scenario evidence only; no claim that every live model response will be correct, and only existing text/provider paths exercise executable abilities | Registry enabled in host Orchestrator; no identity-question branch, hardcoded identity reply, normal-language identity/capability regex, simulator-only state, or hardware-only state is present; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Historical clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence is retained for its recorded revisions; a clean current goal-driven rerun remains open. Physical supervised mode is separate support evidence for human voice-device claims | Acceptance-only |
 | Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
-| Passive Agent Skill contract and read-only registry | Strict immutable `skill.yaml` metadata, bounded summaries, digest-bound lazy `SKILL.md`/projection reads, explicit owner approval, `authority=agent_method_only`, `execution_authority=none`, safe YAML/unique keys, semantic versions, path/symlink/package-size controls, duplicate/parent/cycle rejection, metadata-only `/agent-skills`, and a read-only Compose mount are implemented. The repository root currently contains no domain Skill package. | 18 focused contract, loader-security, digest, inert-code, Capability-isolation, Compose/Docker, empty-root, and runtime-surface tests plus the maintained full gate | No live model-selection or domain-Skill evidence; no Agent receives Skill content yet | Registry loads at Agent startup; model selection is explicitly disabled and the registry has no registration or execution API |
+| Passive Agent Skill foundation and model-authored selection | Strict immutable `skill.yaml` metadata, bounded summaries, digest-bound lazy `SKILL.md`/projection reads, explicit owner approval, `authority=agent_method_only`, `execution_authority=none`, safe YAML/unique keys, semantic versions, path/symlink/package-size controls, duplicate/parent/cycle rejection, metadata-only `/agent-skills`, read-only Compose mount, and independent typed `/agent-skills/select` are implemented. Selection discloses only projection-compatible approved summaries and validates exact ID/version/projection/Goal/confidence/digest with one repair. The repository root currently contains no domain Skill package. | 31 focused Loader, runtime-surface, selection-contract, no/one/multi-Skill, context variation, repair/failure, candidate-bound, provenance, and Capability-isolation tests plus the maintained full gate | No domain-Skill or Cognitive Turn Loop projection evidence; default empty-root selection returns `no_candidates` without a model call | Selection endpoint enabled by default; no projection is loaded into another Agent, no Plan is changed, and the registry has no registration or execution API |
 | Capability registry and deployment probe | Implemented; materialization preserves provider compatibility tools but forces raw planar `commands[]` controller arrays out of model-facing catalogs, and the static audit rejects visible regressions | Registry, manifest, pagination, schema, materialization-visibility, and CLI safety tests | Checked-in Soridormi manifest is pinned to an upstream commit | Root Compose loads the static manifest by default; live Soridormi provider use remains off in the common safe base; normal model-authored motion uses named skills or structured task goals rather than controller recipes |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |

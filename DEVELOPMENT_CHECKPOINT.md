@@ -37,24 +37,23 @@ is to execute that workflow from a clean committed deployment, review and
 approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
-The next and only active code implementation Issue is now **Add Model-Authored
-Agent Skill Discovery and Selection**. Canonical executable terminology and the
-passive read-only Agent Skill foundation are implemented and automatically
-verified. The new registry loads only explicit owner-approved roots, exposes
-bounded summaries and requested digest-bound Markdown lazily, rejects unsafe or
-ambiguous packages, imports no package code, and cannot register or execute
-Capabilities. The repository-owned root is currently empty of domain Skills and
-`/health` reports model selection disabled.
+The next and only active code implementation Issue is now **Add Agent-Specific
+Progressive Disclosure**. Canonical executable terminology, the passive
+read-only Agent Skill foundation, and the independent model-authored selection
+boundary are implemented and automatically verified. `/agent-skills/select`
+shows only bounded approved summaries for a declared Agent role and accepts a
+typed no/one/multi-Skill decision validated against exact IDs, versions,
+projection, relevant Goal IDs, confidence, and registry digest. One invalid
+result may receive one repair; model failure degrades to optional no-Skill.
 
-The Agent Skills architecture and semantic slices are documented in
-[docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md)
-and
-[docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
-The Gateway/Core item remains an independent open evidence track. The next slice
-may expose bounded summaries to an Agent and accept typed model-authored
-zero/one/multi-Skill selection. Do not add phrase-to-Skill rules,
-weather-specific Host selection, script execution, provider registration,
-Capability authority, or broad projection injection.
+The repository-owned root remains empty of domain Skills, and selection is not
+yet called by the Cognitive Turn Loop. No selected projection enters Goal
+Association, Fast Planner, Deep Planner, Response Composer, or Tool Result
+Interpreter prompts yet. The next slice must load only an already-selected
+role-specific projection under bounded prompt budgets and retain digest
+provenance. Do not add phrase-to-Skill rules, weather-specific Host selection,
+broad full-package injection, script execution, provider registration, or
+Capability authority.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for

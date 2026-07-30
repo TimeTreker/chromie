@@ -13,14 +13,21 @@ from pydantic import BaseModel, Field
 from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
-from .agent_skills import build_configured_agent_skill_registry
+from .agent_skills import (
+    AgentSkillSelectionService,
+    build_configured_agent_skill_registry,
+)
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
 
 try:
-    from chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
+    from chromie_contracts.agent_skill import (
+        AgentSkillRegistrySnapshot,
+        AgentSkillSelectionRequest,
+        AgentSkillSelectionResolution,
+    )
     from chromie_contracts.core_interpretation import CoreInterpretationResult
     from chromie_contracts.route import RouteDecision as SharedRouteDecision
     from chromie_contracts.tool_result import (
@@ -38,7 +45,11 @@ try:
         normalize_social_attention_mode,
     )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
+    from shared.chromie_contracts.agent_skill import (
+        AgentSkillRegistrySnapshot,
+        AgentSkillSelectionRequest,
+        AgentSkillSelectionResolution,
+    )
     from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
     from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
     from shared.chromie_contracts.tool_result import (
@@ -272,6 +283,59 @@ class Settings(BaseModel):
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
     agent_skill_roots: str = Field(
         default_factory=lambda: os.getenv("AGENT_SKILL_ROOTS", "agent-skills")
+    )
+    agent_skill_selection_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SKILL_SELECTION_ENABLED",
+            "1",
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    agent_skill_selection_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SKILL_SELECTION_MODEL",
+            os.getenv("AGENT_GOAL_ASSOCIATION_MODEL", "qwen3:4b"),
+        )
+    )
+    agent_skill_selection_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_SELECTION_TIMEOUT_MS", "3000")
+        ),
+        ge=100,
+        le=120000,
+    )
+    agent_skill_selection_max_candidates: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_SELECTION_MAX_CANDIDATES", "12")
+        ),
+        ge=1,
+        le=64,
+    )
+    agent_skill_selection_max_selected: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_SELECTION_MAX_SELECTED", "4")
+        ),
+        ge=1,
+        le=8,
+    )
+    agent_skill_selection_min_confidence: float = Field(
+        default_factory=lambda: float(
+            os.getenv("AGENT_SKILL_SELECTION_MIN_CONFIDENCE", "0.55")
+        ),
+        ge=0.0,
+        le=1.0,
+    )
+    agent_skill_selection_num_ctx: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_SELECTION_NUM_CTX", "4096")
+        ),
+        ge=512,
+    )
+    agent_skill_selection_num_predict: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_SELECTION_NUM_PREDICT", "384")
+        ),
+        ge=32,
+        le=4096,
     )
     capability_catalog_refresh_sec: float = Field(
         default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_CATALOG_REFRESH_SEC", "30")),
@@ -566,6 +630,29 @@ configured_agent_skill_registry = build_configured_agent_skill_registry(
     settings.agent_skill_roots
 )
 agent_skill_registry = configured_agent_skill_registry.registry
+agent_skill_selection_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.agent_skill_selection_model,
+        timeout_ms=settings.agent_skill_selection_timeout_ms,
+        purpose="agent_skill_selection",
+    )
+    if settings.use_llm and settings.agent_skill_selection_enabled
+    else None
+)
+agent_skill_selection_service = (
+    AgentSkillSelectionService(
+        agent_skill_selection_client,
+        agent_skill_registry,
+        max_candidates=settings.agent_skill_selection_max_candidates,
+        max_selected=settings.agent_skill_selection_max_selected,
+        min_confidence=settings.agent_skill_selection_min_confidence,
+        num_ctx=settings.agent_skill_selection_num_ctx,
+        num_predict=settings.agent_skill_selection_num_predict,
+    )
+    if agent_skill_selection_client is not None
+    else None
+)
 local_tool_executor = LocalToolExecutor(
     capability_registry,
     weather_client=weather_client,
@@ -690,6 +777,15 @@ logger.info(
     ",".join(configured_agent_skill_registry.roots) or "<none>",
     ",".join(configured_agent_skill_registry.package_files) or "<none>",
     len(agent_skill_registry),
+)
+logger.info(
+    "Agent Skill model selection enabled=%s model=%s max_candidates=%s "
+    "max_selected=%s min_confidence=%s",
+    agent_skill_selection_service is not None,
+    settings.agent_skill_selection_model,
+    settings.agent_skill_selection_max_candidates,
+    settings.agent_skill_selection_max_selected,
+    settings.agent_skill_selection_min_confidence,
 )
 goal_association_client = (
     OllamaClient(
@@ -828,7 +924,14 @@ async def health() -> HealthResponse:
         agent_skill_roots=list(configured_agent_skill_registry.roots),
         agent_skill_package_files=list(configured_agent_skill_registry.package_files),
         agent_skill_count=len(agent_skill_registry),
-        agent_skill_model_selection_enabled=False,
+        agent_skill_model_selection_enabled=(agent_skill_selection_service is not None),
+        agent_skill_selection_model=(
+            settings.agent_skill_selection_model
+            if agent_skill_selection_service is not None
+            else None
+        ),
+        agent_skill_selection_max_candidates=settings.agent_skill_selection_max_candidates,
+        agent_skill_selection_max_selected=settings.agent_skill_selection_max_selected,
         task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
         planning_task_graph_execution_enabled=planning_invoker is not None,
@@ -1012,6 +1115,25 @@ async def resolve_task_continuity(request: AgentRunRequest) -> SemanticTaskOpera
                 "sid": request.sid,
             },
         )
+
+
+@app.post(
+    "/agent-skills/select",
+    response_model=AgentSkillSelectionResolution,
+)
+async def select_agent_skills(
+    request: AgentSkillSelectionRequest,
+) -> AgentSkillSelectionResolution:
+    """Let the declared Agent role author a typed optional Skill selection."""
+    if agent_skill_selection_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent Skill model selection is disabled",
+        )
+    try:
+        return await agent_skill_selection_service.select(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)

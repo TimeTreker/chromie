@@ -68,14 +68,15 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Add Model-Authored Agent Skill Discovery and Selection
+## Active architecture issue — Add Agent-Specific Progressive Disclosure
 
-The executable Capability terminology and passive read-only Agent Skill
-contract/loader slices are implemented and automatically verified. The active
-code slice now adds model-authored discovery and selection from bounded approved
-summaries. Local target validation of loopback exposure remains a separate
-deployment-evidence item and does not block this repository implementation
-slice.
+The executable Capability terminology, passive read-only Agent Skill
+contract/loader, and independent model-authored discovery/selection slices are
+implemented and automatically verified. The active code slice now loads only
+the already-selected projection for the responsible Agent under explicit prompt
+budgets and immutable digest provenance. Local target validation of loopback
+exposure remains a separate deployment-evidence item and does not block this
+repository implementation slice.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -128,19 +129,21 @@ Semantic delivery order:
 Completed implementation slices:
 
 - canonical executable `capability_id` terminology with bounded legacy readers;
-- strict passive Agent Skill contracts and a repository-owned read-only loader.
+- strict passive Agent Skill contracts and a repository-owned read-only loader;
+- bounded model-authored no/one/multi-Skill discovery and selection with exact
+  registry/Goal validation, one repair, and optional no-Skill degradation.
 
 Current implementation slice:
 
-> Add Model-Authored Agent Skill Discovery and Selection.
+> Add Agent-Specific Progressive Disclosure.
 
-The responsible Agent may receive bounded approved summaries and author a typed
-zero/one/multi-Skill or explicit no-Skill decision. Retrieval may narrow
-candidates but cannot decide semantics. The Host may validate identity, version,
-approval, digest, projection availability, Goal bindings, and output schema; it
-must not select Skills from phrases or routes. This slice does not yet attach
-projections to every Agent, bind Skill provenance to Canonical Plans, or add
-weather packages.
+Only an already-selected projection may enter the matching Goal Association,
+Fast Planner, Deep Planner, Response Composer, or Tool Result Interpreter model
+boundary. The Host may resolve the declared projection path, recheck package and
+projection digests, enforce prompt budgets, and record provenance; it must not
+select a Skill, inject the complete package, reinterpret the Goal, or grant
+Capability authority. This slice does not yet bind Skill provenance to
+Canonical Plans or add grounded-information/weather domain packages.
 
 Exit criteria:
 

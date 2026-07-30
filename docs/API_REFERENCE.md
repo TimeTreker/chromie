@@ -52,6 +52,7 @@ running.
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
 | `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body/projection text and no model selection. |
+| `POST` | `/agent-skills/select` | Let the declared responsible Agent role make a typed model-authored no/one/multi-Skill decision from bounded approved summaries; this endpoint does not load projections, mutate Plans, or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
@@ -69,10 +70,21 @@ domain Skill package. Startup validates safe YAML, explicit
 `authority=agent_method_only`, explicit `execution_authority=none`, owner
 approval, semantic version, deterministic package digest, projection paths,
 duplicate IDs, parent references, and inheritance cycles. The endpoint exposes
-only immutable bounded summaries. It does not expose `SKILL.md`, load
-projections into prompts, select Skills, register Capabilities, or execute
-package content. `/health` separately reports configured roots, package files,
-Skill count, and `agent_skill_model_selection_enabled=false` for this slice.
+only immutable bounded summaries.
+
+`POST /agent-skills/select` accepts the responsible Agent projection name, the
+current user text, bounded Goal context, optional bounded context summaries, and
+an optional explicit candidate-ID set. The Host performs only structural
+discovery: it filters by declared projection, validates explicit IDs, sorts and
+caps the candidate summaries, then lets the configured model author an explicit
+`no_skill` or ordered one/multi-Skill decision. The closed output is validated
+against the exact disclosed IDs, versions, projection, Goal IDs, confidence,
+and registry digest. One invalid result may receive one same-boundary repair;
+model or contract failure returns an optional no-Skill resolution rather than
+fabricating method provenance. No `SKILL.md` or projection text is loaded, no
+Canonical Plan is changed, and no Capability is registered, authorized, or
+executed. `/health` reports whether this independent selection boundary is
+enabled plus its model and candidate limits.
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -95,6 +107,7 @@ inspection endpoints, not Goal Interpretation execution authorization.
 | `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; exact Goal Interpretation actions are adapter input. |
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Goal Interpretation actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
+| `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read skill requests already selected by the Goal-driven planner. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |

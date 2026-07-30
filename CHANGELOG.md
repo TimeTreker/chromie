@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Model-authored Agent Skill discovery and selection
+
+- Added strict shared request, Goal-context, closed model-output, selected-Skill,
+  and observable resolution contracts for explicit no/one/multi-Skill decisions.
+- Added an independent selection service and `POST /agent-skills/select` that
+  discloses only bounded owner-approved summaries for the declared Agent role and
+  lets the model author the semantic decision.
+- Added exact Host validation for disclosed IDs, versions, requested projection,
+  relevant Goal IDs, confidence, and registry content digest, with one bounded
+  same-contract repair and optional no-Skill degradation on model failure.
+- Kept projection text, complete `SKILL.md`, Canonical Plans, Capability
+  registration, authorization, and execution outside this slice. Deterministic
+  candidate caps and projection availability are structural retrieval only; no
+  phrase, route, or weather selector was added.
+- Added runtime configuration and health reporting plus focused tests for empty
+  candidates, explicit no-Skill, one/multi-Skill order, context-sensitive model
+  decisions, repair/failure, candidate bounding, provenance, and Capability
+  Registry isolation.
+
 ## Unreleased — Read-only Agent Skill contracts and loader
 
 - Added strict shared Agent Skill metadata, summary, projection, document,

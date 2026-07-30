@@ -19,19 +19,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
-    def test_empty_repository_owned_root_is_valid_and_model_selection_is_off(self) -> None:
+    def test_empty_repository_owned_root_is_valid_and_selection_can_be_enabled(self) -> None:
         configured = load_agent_skill_registry([ROOT / "agent-skills"])
         snapshot = configured.snapshot()
         health = HealthResponse(
             agent_skill_roots=list(configured.roots),
             agent_skill_package_files=list(configured.package_files),
             agent_skill_count=len(configured.registry),
-            agent_skill_model_selection_enabled=False,
+            agent_skill_model_selection_enabled=True,
+            agent_skill_selection_model="qwen3:test",
+            agent_skill_selection_max_candidates=12,
+            agent_skill_selection_max_selected=4,
         )
 
         self.assertEqual(snapshot.summaries, ())
         self.assertEqual(health.agent_skill_count, 0)
-        self.assertFalse(health.agent_skill_model_selection_enabled)
+        self.assertTrue(health.agent_skill_model_selection_enabled)
+        self.assertEqual(health.agent_skill_selection_model, "qwen3:test")
+        self.assertEqual(health.agent_skill_selection_max_candidates, 12)
+        self.assertEqual(health.agent_skill_selection_max_selected, 4)
 
     def test_compose_mounts_agent_skill_root_read_only(self) -> None:
         compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
@@ -42,6 +48,9 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
             "${AGENT_SKILL_ROOTS:-/app/agent-skills}",
         )
         self.assertIn("./agent-skills:/app/agent-skills:ro", service["volumes"])
+        self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_ENABLED"], "${AGENT_SKILL_SELECTION_ENABLED:-1}")
+        self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_MODEL"], "${AGENT_SKILL_SELECTION_MODEL:-qwen3:4b}")
+        self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_MAX_CANDIDATES"], "${AGENT_SKILL_SELECTION_MAX_CANDIDATES:-12}")
 
     def test_agent_image_contains_repository_owned_empty_root(self) -> None:
         dockerfile = (ROOT / "agent" / "Dockerfile").read_text(encoding="utf-8")
