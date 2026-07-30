@@ -520,7 +520,7 @@ class _Ollama:
             "speech": "Walking ahead for 10 minutes.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
                 }
             ],
@@ -536,7 +536,7 @@ class _InvalidWalkOllama:
             "speech": "Walking forward for five seconds.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 5.0},
                 }
             ],
@@ -552,9 +552,9 @@ class _OverLimitBlinkClarifyOllama:
             "decision": "execute",
             "speech": "Okay, I'll blink my eyes 15 times in three batches.",
             "skills": [
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
             ],
             "plan_relation": "exact",
             "original_goal_summary": "blink fifteen times",
@@ -570,9 +570,9 @@ class _OverLimitBlinkClampedExecuteOllama:
             "decision": "execute",
             "speech": "Okay, I'll blink my eyes 15 times in three batches.",
             "skills": [
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
-                {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
             ],
             "plan_relation": "exact",
             "original_goal_summary": "blink fifteen times",
@@ -603,17 +603,17 @@ class _SemanticCapabilityPlanOllama:
 class _SelectedWalkOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
-        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact capability_id: soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
         assert "When decision is execute, skills is required" in prompt
         assert "Never return execute with skills omitted" in prompt
-        assert "Goal-Interpreter-selected exact skill_id is best" in prompt
+        assert "Goal-Interpreter-selected exact capability_id is best" in prompt
         return {
             "decision": "execute",
             "speech": "Walking forward for 3 seconds.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 3.0, "speed": "quick"},
                 }
             ],
@@ -637,7 +637,7 @@ class _ExtractedMemoryCapabilityOllama:
             "speech": "Walking forward.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quick"},
                 }
             ],
@@ -646,7 +646,7 @@ class _ExtractedMemoryCapabilityOllama:
 
 class _SelectedVelocityBetterForwardOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_velocity" in prompt
+        assert "Goal-Interpreter-selected exact capability_id: soridormi.walk_velocity" in prompt
         assert "soridormi.walk_velocity" in prompt
         assert "soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
@@ -655,7 +655,7 @@ class _SelectedVelocityBetterForwardOllama:
             "speech": "Walking forward quickly for 15 seconds.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
                 }
             ],
@@ -669,12 +669,12 @@ class _RecoveredDeepThoughtWalkOllama:
         return {
             "tasks": [
                 {
-                    "skill_id": "chromie.speak",
+                    "capability_id": "chromie.speak",
                     "args": {"text": "Walking forward quickly for 15 seconds."},
                     "timing": "immediate",
                 },
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
                     "timing": "sequential",
                 }
@@ -698,11 +698,11 @@ class _LookForwardOllama:
             "speech": "Looking forward and blinking.",
             "skills": [
                 {
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 5.0},
                 },
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 },
             ],
@@ -723,7 +723,7 @@ class _PoliteHeadQuestionOllama:
             "speech": "我会摇头。",
             "skills": [
                 {
-                    "skill_id": "soridormi.shake_no",
+                    "capability_id": "soridormi.shake_no",
                     "args": {"count": 2},
                 }
             ],
@@ -739,7 +739,7 @@ class _EmptySpeechHeadQuestionOllama:
             "speech": "",
             "skills": [
                 {
-                    "skill_id": "soridormi.shake_no",
+                    "capability_id": "soridormi.shake_no",
                     "args": {"count": 2},
                 }
             ],
@@ -758,7 +758,7 @@ class _AdverbSpeedOllama:
             "speech": "Walking ahead quickly.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quickly"},
                 }
             ],
@@ -772,14 +772,14 @@ class _ProposalAdjustedWalkOllama:
         assert "semantic_intent" in prompt
         assert "parameter_grounding" in prompt
         assert "unmapped_intent" in prompt
-        assert "semantic skill proposals" in kwargs["system"]
+        assert "semantic capability proposals" in kwargs["system"]
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
             "speech": "I will walk forward quickly with a safe bounded plan.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "semantic_intent": {
                         "motion_type": "locomotion",
                         "direction": "forward",
@@ -818,13 +818,13 @@ class _WalkBlinkAlternativeOllama:
             "speech": "我目前不能在行走时同时眨眼，但可以先走十五秒，再眨两下眼睛，可以吗？",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.25, "duration_s": 15.0},
                     "timing": "sequential",
                     "reason": "provider resources do not support overlap",
                 },
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "timing": "sequential",
                     "reason": "run after locomotion",
@@ -852,12 +852,12 @@ class _WalkBlinkParallelOllama:
             "speech": "I can walk forward while blinking twice.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
                     "timing": "parallel",
                 },
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "timing": "parallel",
                 },
@@ -877,11 +877,11 @@ class _WalkBlinkInvalidSecondSkillOllama:
             "speech": "I will walk and blink.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.25, "duration_s": 3.0},
                 },
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {},
                 },
             ],
@@ -906,7 +906,7 @@ class _BlinkSafeDefaultRepairOllama:
                 "speech": "我眨四下眼睛。",
                 "skills": [
                     {
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "proposed_args": {"count": 4},
                         "parameter_grounding": {
                             "count": {
@@ -926,7 +926,7 @@ class _BlinkSafeDefaultRepairOllama:
             "speech": "我眨眼睛。",
             "skills": [
                 {
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "proposed_args": {},
                 }
             ],
@@ -959,7 +959,7 @@ class _ImportantWalkParameterRepairOllama:
                         "candidate_values": [],
                         "metadata": {
                             "schema_field": "duration_s",
-                            "skill_id": "soridormi.walk_velocity",
+                            "capability_id": "soridormi.walk_velocity",
                             "reason": "duration materially changes the physical action scope",
                         },
                     }
@@ -974,7 +974,7 @@ class _ImportantWalkParameterRepairOllama:
             "speech": "我往前走。",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_velocity",
+                    "capability_id": "soridormi.walk_velocity",
                     "proposed_args": {"vx_mps": 0.15},
                     "parameter_grounding": {
                         "vx_mps": {"resolution": "use_safe_default"}
@@ -995,11 +995,11 @@ class _DuplicateWalkOllama:
             "speech": "Walking forward.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0, "speed": "quick"},
                 },
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"speed": "quick", "duration_s": 1.0},
                 },
             ],
@@ -1018,7 +1018,7 @@ class _FullApiOllama:
             "speech": "Waving.",
             "skills": [
                 {
-                    "skill_id": "soridormi.wave_hand",
+                    "capability_id": "soridormi.wave_hand",
                     "args": {"count": 2},
                 }
             ],
@@ -1049,7 +1049,7 @@ class _PromptBudgetOllama:
             "speech": "Walking forward for one second.",
             "skills": [
                 {
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
                 }
             ],
@@ -1071,7 +1071,7 @@ class _BadSocialFallbackOllama:
             "speech": "I will nod my head to acknowledge you.",
             "skills": [
                 {
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                 }
             ],
@@ -1081,7 +1081,7 @@ class _BadSocialFallbackOllama:
 class _ExactBadSocialFallbackOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Walk forward for 15 seconds, quickly." in prompt
-        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact capability_id: soridormi.walk_forward" in prompt
         assert "soridormi.walk_forward" in prompt
         assert "soridormi.nod_yes" in prompt
         assert "Preserve the user's intended action class" in prompt
@@ -1091,7 +1091,7 @@ class _ExactBadSocialFallbackOllama:
             "speech": "I will nod my head to acknowledge you.",
             "skills": [
                 {
-                    "skill_id": "soridormi.nod_yes",
+                    "capability_id": "soridormi.nod_yes",
                     "args": {"count": 2},
                 }
             ],
@@ -1139,7 +1139,7 @@ class _TimeoutCapabilityReviewer:
 
 class _AcceptBadSubstitutionReviewer:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact capability_id: soridormi.walk_forward" in prompt
         assert "do not use decision=accept" in prompt
         assert "soridormi.walk_forward" in prompt
         assert "soridormi.nod_yes" in prompt
@@ -1454,7 +1454,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.metadata["atomic_plan_rejected"])
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(response.metadata["planning_result"], "needs_clarification")
-        self.assertEqual(response.metadata["invalid_capability_args"]["skill_id"], "soridormi.blink_eyes")
+        self.assertEqual(response.metadata["invalid_capability_args"]["capability_id"], "soridormi.blink_eyes")
 
     async def test_low_consequence_missing_blink_count_is_repaired_with_llm_safe_default(self) -> None:
         planner = _BlinkSafeDefaultRepairOllama()
@@ -1672,7 +1672,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 5 times.",
-                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "blink five times",
                     },
@@ -1734,7 +1734,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "好的，我会眨眼2次。",
-                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 2}}],
+                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 2}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "眨眼两次",
                     },
@@ -1790,7 +1790,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 5 times.",
-                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "skills": [{"capability_id": "soridormi.blink_eyes", "args": {"count": 5}}],
                         "plan_relation": "exact",
                         "original_goal_summary": "blink five times",
                     },
@@ -1850,9 +1850,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                         "decision": "execute",
                         "speech": "Okay, I'll blink my eyes 15 times in three sequential batches.",
                         "skills": [
-                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
-                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
-                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
+                            {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                            {"capability_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                            {"capability_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
                         ],
                         "plan_relation": "exact",
                         "original_goal_summary": "blink fifteen times",
@@ -1921,7 +1921,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                         "speech": "Walking forward quickly for three seconds.",
                         "skills": [
                             {
-                                "skill_id": "soridormi.walk_forward",
+                                "capability_id": "soridormi.walk_forward",
                                 "args": {"duration_s": 3.0, "speed": "quick"},
                             }
                         ],

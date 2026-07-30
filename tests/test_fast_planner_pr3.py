@@ -101,14 +101,14 @@ def unsatisfied_satisfaction(goal_ids: list[str], rationale: str) -> dict:
 
 def execute_step(
     step_id: str,
-    skill_id: str,
+    capability_id: str,
     args: dict,
     goal_ids: list[str],
     reason: str,
 ) -> dict:
     return {
         "step_id": step_id,
-        "skill_id": skill_id,
+        "capability_id": capability_id,
         "args": args,
         "timing": "sequential",
         "source_goal_ids": list(goal_ids),
@@ -186,7 +186,7 @@ def multi_goal_plan(
 class CanonicalPlanContractTests(unittest.TestCase):
     def test_partial_plan_cannot_carry_steps(self):
         with self.assertRaises(ValueError):
-            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","skill_id":"soridormi.walk_forward","args":{"duration_s":15}}])
+            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","capability_id":"soridormi.walk_forward","args":{"duration_s":15}}])
 
     def test_complete_execute_requires_steps(self):
         with self.assertRaises(ValueError):
@@ -204,7 +204,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                 response_text="A joke.",
                 steps=[{
                     "step_id": "wrong",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
                     "source_goal_ids": ["goal-joke"],
                 }],
@@ -224,7 +224,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             goal_ids=["goal-blink", "goal-joke"],
             steps=[{
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             }],
@@ -278,11 +278,11 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 class FastPlannerResolverTests(unittest.TestCase):
     def test_simple_blink_produces_complete_direct_plan(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.coverage, "complete")
-        self.assertEqual(plan.steps[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
         self.assertEqual(plan.metadata["authority"], "advisory")
 
     def test_simple_chat_produces_complete_response(self):
@@ -340,13 +340,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
@@ -537,7 +537,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             set(schema["$defs"]["PlannerModelStep"]["required"]),
             {
                 "step_id",
-                "skill_id",
+                "capability_id",
                 "args",
                 "timing",
                 "source_goal_ids",
@@ -824,13 +824,13 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"capability_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.steps, [])
 
     def test_non_common_or_non_executable_skill_escalates(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","skill_id":"invented.skill","args":{},"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
@@ -892,7 +892,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Catalog defaults are only for parameters", prompt)
         self.assertIn("A material adjustment must use a non-exact plan_relation", prompt)
 
-    def test_uses_dynamic_schema_for_goal_and_skill_ids(self):
+    def test_uses_dynamic_schema_for_goal_and_capability_ids(self):
         ollama = FakeOllama({
             "disposition": "execute",
             "coverage": "complete",
@@ -900,7 +900,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "goal_ids": ["goal-blink"],
             "steps": [{
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             }],
@@ -928,7 +928,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         step_schema = schema["$defs"]["PlannerModelStep"]
         self.assertIn("source_goal_ids", step_schema["required"])
         self.assertEqual(
-            step_schema["properties"]["skill_id"]["enum"],
+            step_schema["properties"]["capability_id"]["enum"],
             ["soridormi.blink_eyes", "soridormi.walk_forward"],
         )
         prompt = ollama.prompts[0][0]
@@ -936,7 +936,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("FINAL CANONICAL GOALS JSON", prompt)
         self.assertNotIn(
             "chromie.speak",
-            step_schema["properties"]["skill_id"]["enum"],
+            step_schema["properties"]["capability_id"]["enum"],
         )
 
     def test_response_transport_step_is_repaired_to_conversational_response(self):
@@ -946,7 +946,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "confidence": 0.95,
             "steps": [{
                 "step_id": "say",
-                "skill_id": "chromie.speak",
+                "capability_id": "chromie.speak",
                 "args": {"text": "A short joke."},
                 "source_goal_ids": ["goal-joke"],
             }],
@@ -1101,11 +1101,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [step.skill_id for step in plan_one.steps],
+            [step.capability_id for step in plan_one.steps],
             ["soridormi.walk_forward", "soridormi.blink_eyes"],
         )
         self.assertEqual(
-            [step.skill_id for step in plan_two.steps],
+            [step.capability_id for step in plan_two.steps],
             ["soridormi.blink_eyes", "soridormi.walk_forward"],
         )
         self.assertNotEqual(
@@ -1121,7 +1121,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
                     "timing": "sequential",
                     "source_goal_ids": ["goal-a"],
@@ -1173,7 +1173,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "goal_ids": ["goal-blink"],
             "steps": [{
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             }],
@@ -1192,7 +1192,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(plan.steps[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
         self.assertIn("capability_id", ollama.prompts[1][0])
         self.assertIn("extra_forbidden", ollama.prompts[1][0])

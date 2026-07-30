@@ -1,7 +1,7 @@
 # Agent Skills Implementation Plan
 
-Status: Open architecture issue; documentation and delivery plan accepted,
-runtime implementation not started
+Status: Open architecture issue; canonical Capability terminology is implemented
+and automatically verified; Agent Skill contracts and loader are not yet implemented
 Related architecture: [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 
 ## Issue
@@ -113,6 +113,19 @@ Acceptance:
 - maintained tests, scenarios, traces, and legacy replay fixtures remain green;
 - no Agent Skill contract exists yet, so the rename cannot accidentally add a
   second execution authority.
+
+Implementation status:
+
+- complete in the current repository snapshot;
+- new Plan, request, result, trace, evidence, Planner, and DeepThinking model
+  boundaries emit `capability_id`;
+- legacy `skill_id` input is normalized only at bounded compatibility boundaries;
+- contradictory dual identity fails closed;
+- canonical runtime/type names are aliases over the existing single registry and
+  Trusted Runtime rather than a second authority;
+- the maintained full gate passes 1,527 primary tests plus 20 legacy Agent tests;
+- no Agent Skill package, loader, selection, or execution authority is introduced
+  by this slice.
 
 ### Establish Agent Skill contracts and terminology
 
@@ -370,14 +383,17 @@ The issue may close only when:
 
 ## Immediate next implementation slice
 
-After this documentation-only patch is reviewed and committed, begin with:
+Begin with:
 
-> **Make `capability_id` canonical while preserving a bounded `skill_id` compatibility reader.**
+> **Establish Agent Skill Contracts and Read-Only Loader.**
 
-This migration must complete at the typed contract and model-facing boundaries
-before Agent Skill selection is introduced. The following implementation slice
-then establishes Agent Skill contracts and the read-only owner-approved loader.
+Define the passive `agent_skill_id` metadata, owner approval, semantic version,
+content digest, bounded summaries, projection declarations, and deterministic
+read-only loading boundary. The loader may inspect approved repository content;
+it cannot import package code, register Capabilities, grant permissions, or
+execute anything.
 
 Do not begin by writing a weather keyword selector, a fixed weather Workflow,
-or an automatic Skill script loader. The rename is semantic cleanup only; it
-must not change execution authority or behavior.
+model-authored Skill selection, or an automatic Skill script loader. Selection
+and progressive disclosure remain later slices after the passive foundation is
+secure and automatically verified.

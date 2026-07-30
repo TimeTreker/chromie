@@ -3,6 +3,13 @@ from .core_interpretation import CoreInterpretationResult
 from .agent import AgentRequest, AgentResult, SpeechItem
 from .action import ActionCommand, ActionResult
 from .interaction import (
+    CapabilityIdentityModel,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityResultStatus,
+    CapabilityTiming,
+    CapabilityTrace,
+    CapabilityTraceEvent,
     InteractionResponse,
     InteractionSpeech,
     SkillRequest,
@@ -156,6 +163,13 @@ __all__ = [
     "ActionResult",
     "InteractionResponse",
     "InteractionSpeech",
+    "CapabilityIdentityModel",
+    "CapabilityRequest",
+    "CapabilityResult",
+    "CapabilityResultStatus",
+    "CapabilityTiming",
+    "CapabilityTrace",
+    "CapabilityTraceEvent",
     "SkillRequest",
     "SkillResult",
     "SkillTrace",

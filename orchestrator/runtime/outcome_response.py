@@ -261,7 +261,7 @@ def _validate_correlations(
             )
         if evidence.skill_id != step.skill_id:
             raise ValueError(
-                "post-execution evidence skill does not match canonical step"
+                "post-execution evidence capability does not match canonical step"
             )
         if set(evidence.source_goal_ids) != set(step.source_goal_ids):
             raise ValueError(

@@ -68,7 +68,13 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Introduce Agent Skills on canonical Capability terminology
+## Active architecture issue — Establish Agent Skill Contracts and Read-Only Loader
+
+The executable Capability terminology slice is implemented and automatically
+verified. The active code slice now establishes passive Agent Skill contracts and
+a secure read-only owner-approved loader. Local target validation of loopback
+exposure remains a separate deployment-evidence item and does not block this
+repository implementation slice.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -118,14 +124,15 @@ Semantic delivery order:
 - remove legacy aliases only after retained artifacts and external callers have
   migrated.
 
-Immediate implementation slice:
+Current implementation slice:
 
-> Make `capability_id` canonical while preserving a bounded `skill_id`
-> compatibility reader.
+> Establish Agent Skill Contracts and Read-Only Loader.
 
-The following slice establishes Agent Skill contracts and a read-only
-owner-approved loader. Do not begin with a weather keyword selector, fixed
-weather Workflow, arbitrary script loader, or provider-registration mechanism.
+The loader is a passive cognitive-content boundary. It must validate
+`agent_skill_id`, version, owner approval, digest, and projection paths; it must
+not execute scripts, register Capabilities, grant permissions, or select Skills
+for the model. Do not begin with a weather keyword selector, fixed weather
+Workflow, model-authored selection, or provider-registration mechanism.
 
 Exit criteria:
 
@@ -221,8 +228,7 @@ Paused issue — Social Attention Baseline Qualification:
 - [ ] retain the current 128-case default-model baseline and reviewed qualitative samples;
 - [ ] retain selected MuJoCo evidence, classify earliest error boundaries, and promote reviewed regressions.
 
-
-## Queued engineering sustainability program
+## Implemented engineering sustainability issue — Secure Local Runtime Exposure
 
 A repository-wide external review identified useful engineering improvements in
 local network exposure, failure-path clarity, executable policy enforcement,
@@ -232,11 +238,18 @@ constraints, explicit non-goals, dependency order, and Issue closure criteria ar
 maintained in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
-This is a queued Issue registry, not a broad active refactor and not a replacement
-for the active Goal-driven Gateway/Core qualification. When engineering work is
-selected from this registry, only one named Issue may be active. The first
-implementation candidate is `Issue: Secure Local Runtime Exposure`; later Issues
-must be re-audited against the then-current tree before activation.
+The first named Issue is implemented and automatically verified: all maintained
+Compose host publications are loopback-bound, a dependency-light checker guards
+maintained source, the supported launcher audits the fully resolved Compose
+configuration before startup, and the maintained full gate passes 1,527 primary
+tests plus 20 legacy Agent tests. Local target acceptance proving localhost
+access, failed LAN access, and unchanged container networking remains open and
+must not be inferred from automated evidence.
+
+No later sustainability Issue is active. The independent Gateway/Core evidence
+track remains open, while the active code implementation returns to the Agent
+Skill contracts/read-only-loader slice. Later sustainability Issues must be
+re-audited against the then-current tree before activation.
 
 The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
 strict typing, blanket removal of source-level tests, Git LFS for the current

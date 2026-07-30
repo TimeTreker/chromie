@@ -9,6 +9,11 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
+    from chromie_contracts.interaction import CapabilityIdentityModel
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.interaction import CapabilityIdentityModel
+
+try:
     from chromie_contracts.plan import (
         CanonicalPlan,
         GoalOutcomeDisposition,
@@ -42,14 +47,24 @@ _NUMERIC_LITERAL_RE = re.compile(
 # runtime transport skills are valid in legacy/native InteractionResponse task
 # lists, but they are not task-plan leaves: conversational goals use a
 # ``respond`` outcome and model-authored ``response_text`` instead.
-RESPONSE_COMPOSER_OWNED_SKILL_IDS = frozenset({"chromie.speak"})
+RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS = frozenset({"chromie.speak"})
+RESPONSE_COMPOSER_OWNED_SKILL_IDS = RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
+
+
+def is_planner_step_capability(capability_id: str) -> bool:
+    return (
+        str(capability_id or "").strip()
+        not in RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
+    )
 
 
 def is_planner_step_skill(skill_id: str) -> bool:
-    return str(skill_id or "").strip() not in RESPONSE_COMPOSER_OWNED_SKILL_IDS
+    """Bounded compatibility alias for pre-migration callers."""
+
+    return is_planner_step_capability(skill_id)
 
 
-class PlannerModelStep(BaseModel):
+class PlannerModelStep(CapabilityIdentityModel):
     """Semantic plan leaf returned by a planner model.
 
     Step ownership and arguments are model judgments.  They intentionally have
@@ -57,10 +72,7 @@ class PlannerModelStep(BaseModel):
     decision can silently authorize one step for every active goal.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     step_id: str = ""
-    skill_id: str = Field(min_length=1)
     args: dict[str, Any]
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
@@ -205,9 +217,9 @@ class PlannerModelOutput(BaseModel):
     @model_validator(mode="after")
     def validate_semantic_shape(self) -> "PlannerModelOutput":
         response_transport_steps = [
-            step.skill_id
+            step.capability_id
             for step in self.steps
-            if not is_planner_step_skill(step.skill_id)
+            if not is_planner_step_capability(step.capability_id)
         ]
         if response_transport_steps:
             raise ValueError(
@@ -465,7 +477,7 @@ def validate_goal_binding_argument_grounding(
                     f"{step.step_id}.{name}={actual!r}, expected={expected!r}"
                 )
 
-        if step.skill_id == "chromie.memory.retrieve_verified_tool_result":
+        if step.capability_id == "chromie.memory.retrieve_verified_tool_result":
             material_args = step.args.get("material_args")
             if not isinstance(material_args, dict):
                 raise ValueError(
@@ -872,9 +884,9 @@ def canonical_plan_response_schema(
                 goal_id = node_properties.get("goal_id")
                 if isinstance(goal_id, dict) and allowed_goals:
                     goal_id["enum"] = allowed_goals
-                skill_id = node_properties.get("skill_id")
-                if isinstance(skill_id, dict) and allowed_skills:
-                    skill_id["enum"] = allowed_skills
+                capability_id = node_properties.get("capability_id")
+                if isinstance(capability_id, dict) and allowed_skills:
+                    capability_id["enum"] = allowed_skills
                 for field_name in goal_list_fields:
                     field = node_properties.get(field_name)
                     if isinstance(field, dict) and allowed_goals:
@@ -1005,7 +1017,7 @@ def canonical_plan_response_schema(
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
     if isinstance(step_schema, dict):
         step_required = step_schema.setdefault("required", [])
-        for field_name in ("step_id", "skill_id", "args", "source_goal_ids"):
+        for field_name in ("step_id", "capability_id", "args", "source_goal_ids"):
             if field_name not in step_required:
                 step_required.append(field_name)
     return schema
@@ -1223,7 +1235,7 @@ def fast_multi_goal_response_schema(
         step_required = step_schema.setdefault("required", [])
         for field_name in (
             "step_id",
-            "skill_id",
+            "capability_id",
             "args",
             "timing",
             "source_goal_ids",
@@ -1267,9 +1279,9 @@ def fast_multi_goal_response_schema(
         if isinstance(node, dict):
             node_properties = node.get("properties")
             if isinstance(node_properties, dict):
-                skill_id = node_properties.get("skill_id")
-                if isinstance(skill_id, dict) and allowed_skills:
-                    skill_id["enum"] = allowed_skills
+                capability_id = node_properties.get("capability_id")
+                if isinstance(capability_id, dict) and allowed_skills:
+                    capability_id["enum"] = allowed_skills
                 for field_name in goal_list_fields:
                     field = node_properties.get(field_name)
                     if isinstance(field, dict) and allowed_goals:
@@ -1615,7 +1627,7 @@ def planner_contract_diagnostics(
                     goal_id = " ".join(str(source_goal_id or "").strip().split())
                     if goal_id:
                         step_sources.setdefault(step_id, set()).add(goal_id)
-        elif item.get("skill_id"):
+        elif item.get("capability_id") or item.get("skill_id"):
             add(
                 ["steps", index, "step_id"],
                 "executable planner step requires step_id",

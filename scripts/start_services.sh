@@ -178,6 +178,10 @@ BUILD_SERVICES=(
 
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
+echo "[start] Auditing resolved local runtime exposure..."
+docker compose "${COMPOSE_ARGS[@]}" config --format json |
+  python3 ./scripts/check_local_runtime_exposure.py --resolved-json -
+
 echo "[start] Validating resolved Docker Compose configuration..."
 docker compose "${COMPOSE_ARGS[@]}" config --quiet
 

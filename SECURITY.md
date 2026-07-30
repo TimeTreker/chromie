@@ -33,6 +33,34 @@ Include:
 - Docker/socket/device permissions;
 - any path that could convert model output into physical motion.
 
+## Local runtime network boundary
+
+The maintained Docker Compose profile is a single-host development and
+qualification profile. Its host-published services are reachable only through
+IPv4 loopback:
+
+- ASR WebSocket: `127.0.0.1:9001`;
+- maintained TTS WebSocket: `127.0.0.1:5000`;
+- optional local TTS evaluation endpoints: `127.0.0.1:5001` and
+  `127.0.0.1:5002`;
+- Ollama HTTP: `127.0.0.1:11434`;
+- Agent HTTP: `127.0.0.1:8092`.
+
+No maintained Chromie service is intentionally published to the LAN. A remote
+or multi-host deployment requires a separate reviewed profile with explicit
+authentication, transport protection, endpoint authorization, and deployment
+documentation; changing a local port to `0.0.0.0` is not such a design.
+
+Service processes still listen on `0.0.0.0` *inside their containers*. That is
+required for Docker bridge-network traffic and is distinct from the host-side
+publication address. Agent-to-LLM and Agent self-catalog traffic continues to
+use Docker service names, while the host Orchestrator uses `127.0.0.1`.
+
+`scripts/check_local_runtime_exposure.py` rejects wildcard publications and
+host networking. The supported service launcher audits Docker Compose's fully
+resolved configuration before starting containers, so local override files
+cannot silently broaden the host boundary.
+
 ## Safety boundary
 
 Chromie must not expose raw motor, joint, torque, or actuator commands to the

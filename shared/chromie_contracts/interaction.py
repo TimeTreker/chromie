@@ -10,9 +10,10 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 InteractionStatus = Literal["ok", "clarify", "refused", "ignored", "error"]
-SkillTiming = Literal["parallel", "sequential"]
+CapabilityTiming = Literal["parallel", "sequential"]
+SkillTiming = CapabilityTiming
 SpeechTiming = Literal["immediate", "parallel", "sequential", "after_skills"]
-SkillResultStatus = Literal[
+CapabilityResultStatus = Literal[
     "accepted",
     "running",
     "completed",
@@ -21,6 +22,7 @@ SkillResultStatus = Literal[
     "cancelled",
     "timed_out",
 ]
+SkillResultStatus = CapabilityResultStatus
 
 FORBIDDEN_LOW_LEVEL_FIELDS = frozenset(
     {
@@ -229,6 +231,65 @@ def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
     return schema
 
 
+def normalize_capability_identity_payload(value: Any) -> Any:
+    """Normalize one bounded legacy ``skill_id`` input to ``capability_id``.
+
+    New contracts serialize only ``capability_id``.  Historical payloads may
+    still provide ``skill_id`` at declared decode/persistence boundaries.  A
+    payload containing both names is accepted only when the normalized values
+    are identical; contradictory executable identity fails closed.
+    """
+
+    if not isinstance(value, dict):
+        return value
+    payload = dict(value)
+    has_capability = "capability_id" in payload
+    has_legacy = "skill_id" in payload
+    if not has_capability and not has_legacy:
+        return payload
+
+    capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
+    legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
+    if has_capability and has_legacy and capability_id != legacy_skill_id:
+        raise ValueError(
+            "conflicting capability_id and legacy skill_id executable identities"
+        )
+    normalized = capability_id or legacy_skill_id
+    if not normalized:
+        raise ValueError("capability_id must not be empty")
+    payload["capability_id"] = normalized
+    payload.pop("skill_id", None)
+    return payload
+
+
+class CapabilityIdentityModel(BaseModel):
+    """Canonical executable identity with a bounded legacy read alias."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_identity(cls, value: Any) -> Any:
+        return normalize_capability_identity_payload(value)
+
+    @field_validator("capability_id", mode="before")
+    @classmethod
+    def normalize_capability_id(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @property
+    def skill_id(self) -> str:
+        """Read-only compatibility projection for already-migrating callers."""
+
+        return self.capability_id
+
+    def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False):
+        normalized = normalize_capability_identity_payload(update) if update else update
+        return super().model_copy(update=normalized, deep=deep)
+
+
 class InteractionSpeech(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -263,14 +324,13 @@ class InteractionSpeech(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class SkillRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CapabilityRequest(CapabilityIdentityModel):
+    """One exact executable Capability request."""
 
     request_id: str = Field(default_factory=lambda: f"skillreq_{uuid4().hex[:12]}")
-    skill_id: str = Field(min_length=1)
     skill_version: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
-    timing: SkillTiming = "parallel"
+    timing: CapabilityTiming = "parallel"
     timeout_ms: int | None = Field(default=None, ge=1, le=120000)
     cancellable: bool = True
     requires_confirmation: bool = False
@@ -281,7 +341,7 @@ class SkillRequest(BaseModel):
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("request_id", "skill_id")
+    @field_validator("request_id")
     @classmethod
     def normalize_identifier(cls, value: str) -> str:
         normalized = (value or "").strip()
@@ -295,13 +355,12 @@ class SkillRequest(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class SkillResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CapabilityResult(CapabilityIdentityModel):
+    """Terminal or intermediate result for one exact Capability request."""
 
     request_id: str
-    skill_id: str
     skill_version: str | None = None
-    status: SkillResultStatus
+    status: CapabilityResultStatus
     provider_id: str | None = None
     output: dict[str, Any] = Field(default_factory=dict)
     reason_code: str | None = None
@@ -316,7 +375,7 @@ class SkillResult(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class SkillTraceEvent(BaseModel):
+class CapabilityTraceEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -330,18 +389,26 @@ class SkillTraceEvent(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class SkillTrace(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CapabilityTrace(CapabilityIdentityModel):
+    """Correlated execution trace for one exact Capability request."""
 
     trace_id: str = Field(default_factory=lambda: f"skilltrace_{uuid4().hex[:12]}")
     interaction_id: str
     request_id: str
-    skill_id: str
     provider_id: str
-    status: SkillResultStatus = "accepted"
-    events: list[SkillTraceEvent] = Field(default_factory=list)
+    status: CapabilityResultStatus = "accepted"
+    events: list[CapabilityTraceEvent] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = None
+
+
+# Bounded source compatibility.  These aliases accept legacy ``skill_id`` input
+# through the canonical models, while all new serialization emits
+# ``capability_id``.
+SkillRequest = CapabilityRequest
+SkillResult = CapabilityResult
+SkillTraceEvent = CapabilityTraceEvent
+SkillTrace = CapabilityTrace
 
 
 class InteractionResponse(BaseModel):
@@ -350,7 +417,7 @@ class InteractionResponse(BaseModel):
     interaction_id: str = Field(default_factory=lambda: f"interaction_{uuid4().hex[:12]}")
     status: InteractionStatus = "ok"
     speech: list[InteractionSpeech] = Field(default_factory=list)
-    skills: list[SkillRequest] = Field(default_factory=list)
+    skills: list[CapabilityRequest] = Field(default_factory=list)
     requires_confirmation: bool = False
     reason: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

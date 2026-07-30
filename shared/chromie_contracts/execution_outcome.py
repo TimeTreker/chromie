@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .interaction import reject_forbidden_low_level_fields
+from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
 
 ExecutionEvidenceStatus = Literal[
@@ -133,16 +133,13 @@ class ModelObservation(BaseModel):
         return self
 
 
-class ExecutionEvidence(BaseModel):
+class ExecutionEvidence(CapabilityIdentityModel):
     """One exact planned-step/request correlation and its terminal evidence."""
-
-    model_config = ConfigDict(extra="forbid")
 
     schema_version: int = Field(default=1, ge=1)
     evidence_id: str = Field(min_length=1)
     request_id: str = Field(min_length=1)
     step_id: str = Field(min_length=1)
-    skill_id: str = Field(min_length=1)
     source_goal_ids: list[str] = Field(min_length=1)
     status: ExecutionEvidenceStatus
     reported_status: str = ""
@@ -160,7 +157,6 @@ class ExecutionEvidence(BaseModel):
         "evidence_id",
         "request_id",
         "step_id",
-        "skill_id",
         "reported_status",
         "provider_id",
         "reason_code",

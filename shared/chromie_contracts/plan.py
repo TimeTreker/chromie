@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .interaction import reject_forbidden_low_level_fields
+from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
 PlanCoverage = Literal["complete", "partial", "uncertain"]
 PlannerTier = Literal["fast", "deep"]
@@ -121,18 +121,17 @@ class GoalSatisfactionAssessment(BaseModel):
         return self
 
 
-class CanonicalPlanStep(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CanonicalPlanStep(CapabilityIdentityModel):
+    """One canonical executable Capability step in a Plan."""
 
     step_id: str = Field(min_length=1)
-    skill_id: str = Field(min_length=1)
     args: dict[str, Any] = Field(default_factory=dict)
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("step_id", "skill_id", "reason_summary", mode="before")
+    @field_validator("step_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value

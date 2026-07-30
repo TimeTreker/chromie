@@ -429,7 +429,7 @@ class OutcomeResponseTests(unittest.TestCase):
                 "en",
             )
 
-    def test_fails_closed_on_goal_order_or_step_skill_mismatch(self) -> None:
+    def test_fails_closed_on_goal_order_or_step_capability_mismatch(self) -> None:
         statuses = [
             ("goal-a", ["completed"]),
             ("goal-b", ["completed"]),
@@ -448,11 +448,11 @@ class OutcomeResponseTests(unittest.TestCase):
                 "en",
             )
 
-        wrong_skill = bundle.model_dump(mode="python")
-        wrong_skill["evidence"][0]["skill_id"] = "test.skill.unrelated"
-        with self.assertRaisesRegex(ValueError, "skill does not match"):
+        wrong_capability = bundle.model_dump(mode="python")
+        wrong_capability["evidence"][0]["capability_id"] = "test.skill.unrelated"
+        with self.assertRaisesRegex(ValueError, "capability does not match"):
             compose_outcome_response(
-                ExecutionOutcomeBundle.model_validate(wrong_skill),
+                ExecutionOutcomeBundle.model_validate(wrong_capability),
                 plan,
                 "en",
             )

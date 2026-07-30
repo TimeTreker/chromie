@@ -20,7 +20,7 @@
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-29
+**Status refresh date:** 2026-07-30
 **Current focus:** Qualify the implemented Cognitive Gateway/Core migration. The
 five Gateway modules, pre-Core admission, admitted-envelope-only Core API,
 Core-owned interpretation result, and digest-bound compatibility projection are
@@ -37,31 +37,35 @@ is to execute that workflow from a clean committed deployment, review and
 approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
-The next and only active code implementation Issue is now **Introduce Agent
-Skills on canonical Capability terminology without a second execution
-authority**. Its architecture and semantic slices are documented in
+The next and only active code implementation Issue is now **Establish Agent
+Skill Contracts and Read-Only Loader**. The preceding executable-terminology
+slice is implemented and automatically verified: new Plans, requests, results,
+traces, evidence, and model-facing Planner/DeepThinking schemas emit
+`capability_id`; bounded legacy `skill_id` readers normalize immediately and
+conflicting dual fields fail closed. Canonical Runtime/type names still refer to
+the existing single registry and execution authority.
+
+The Agent Skills architecture and semantic slices are documented in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md)
 and
 [docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
-The Gateway/Core item remains an open evidence track. Resume implementation by
-making `capability_id` canonical while preserving bounded legacy `skill_id`
-readers. Then add Agent Skill contracts and a secure read-only owner-approved
-loader. Do not begin with phrase-to-Skill rules, weather-specific Host selection,
-script execution, or provider registration.
+The Gateway/Core item remains an independent open evidence track. Do not begin
+with phrase-to-Skill rules, weather-specific Host selection, model-authored
+selection, script execution, or provider registration.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
 milestone intent.
 
-## Queued engineering sustainability Issues
+## Engineering sustainability checkpoint
 
-The accepted repository-review recommendations are now retained in
+The accepted repository-review recommendations are retained in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
-That plan is a queued registry and does not supersede the active Goal-driven
-Gateway/Core qualification. When the owner chooses to begin the engineering
-program, resume with `Issue: Secure Local Runtime Exposure`, work only one named
-Issue at a time, and update the plan registry plus this checkpoint at activation
-and closure.
+`Issue: Secure Local Runtime Exposure` is implemented and automatically verified:
+maintained host publications bind to loopback, the launcher audits resolved
+Compose configuration, and the full gate passes. Local target acceptance from
+the deployed host/LAN remains open and must be reported separately. No later
+sustainability Issue is activated by this patch.
 
 A July 24 live voice trace exposed two user-visible response-quality defects.
 The then-current Goal Interpreter correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal

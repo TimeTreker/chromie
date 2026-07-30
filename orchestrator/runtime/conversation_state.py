@@ -607,7 +607,7 @@ class ConversationStateManager:
                     continue
                 planned_skills.append(
                     {
-                        "skill_id": str(item.get("skill_id") or "").strip(),
+                        "capability_id": str(item.get("capability_id") or item.get("skill_id") or "").strip(),
                         "request_id": str(item.get("request_id") or "").strip(),
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
@@ -1717,9 +1717,9 @@ class ConversationStateManager:
                 if not isinstance(item, dict):
                     continue
                 request_id = str(item.get("request_id") or "").strip()
-                skill_id = str(item.get("skill_id") or "").strip()
+                capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
                 if request_id:
-                    result[request_id] = skill_id
+                    result[request_id] = capability_id
             return result
 
         candidate_contexts: list[dict[str, Any]] = []
@@ -3159,7 +3159,7 @@ class ConversationStateManager:
                 request_args = {}
             entry = {
                 "evidence_id": evidence_id,
-                "tool_id": str(raw.get("skill_id") or "").strip(),
+                "tool_id": str(raw.get("capability_id") or raw.get("skill_id") or "").strip(),
                 "status": str(raw.get("status") or "").strip(),
                 "data": self._json_safe(data),
                 "request_args": self._json_safe(request_args),
@@ -3566,6 +3566,7 @@ class ConversationStateManager:
             else:
                 request = {
                     "request_id": getattr(raw_request, "request_id", None),
+                    "capability_id": getattr(raw_request, "capability_id", None),
                     "skill_id": getattr(raw_request, "skill_id", None),
                     "metadata": getattr(raw_request, "metadata", None),
                 }
@@ -3575,15 +3576,16 @@ class ConversationStateManager:
             metadata = request.get("metadata")
             if not isinstance(metadata, dict):
                 metadata = {}
-            skill_id = str(
-                request.get("skill_id")
+            capability_id = str(
+                request.get("capability_id")
+                or request.get("skill_id")
                 or request.get("type")
                 or request.get("target")
                 or "action"
             ).strip()
             for goal_id in self._string_list(metadata.get("source_goal_ids")):
                 by_goal.setdefault(goal_id, []).append(
-                    {"request_id": request_id, "skill_id": skill_id}
+                    {"request_id": request_id, "capability_id": capability_id}
                 )
                 scoped_request_ids.add(request_id)
 
@@ -3594,7 +3596,7 @@ class ConversationStateManager:
                 dict.fromkeys(item["request_id"] for item in requests)
             )
             summary = ", ".join(
-                dict.fromkeys(item["skill_id"] for item in requests)
+                dict.fromkeys(item["capability_id"] for item in requests)
             )
             metadata = {
                 "confirmation_id": confirmation_id,
@@ -4401,12 +4403,12 @@ class ConversationStateManager:
                     if item.get("request_id")
                 ]
                 summaries = [
-                    str(item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    str(item.get("capability_id") or item.get("skill_id") or item.get("type") or item.get("target") or "action")
                     for item in goal_actions[:3]
                 ]
                 planned_skills = [
                     {
-                        "skill_id": item.get("skill_id"),
+                        "capability_id": item.get("capability_id") or item.get("skill_id"),
                         "request_id": item.get("request_id"),
                         "args": self._json_safe(
                             item.get("args") if isinstance(item.get("args"), dict) else {}
@@ -4446,7 +4448,7 @@ class ConversationStateManager:
                     if item.get("request_id")
                 ]
                 action_summaries = [
-                    str(item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    str(item.get("capability_id") or item.get("skill_id") or item.get("type") or item.get("target") or "action")
                     for item in unscoped[:3]
                 ]
                 self.record_pending_task(

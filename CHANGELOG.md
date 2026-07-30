@@ -1,7 +1,32 @@
 # Changelog
 
+## Unreleased — Secure local runtime exposure
+
+- Bound all maintained ASR, maintained/evaluation TTS, Ollama, and Agent host
+  publications to `127.0.0.1` without changing in-container listeners or Docker
+  bridge-network service discovery.
+- Added a dependency-light source and resolved-Compose exposure checker that
+  rejects unspecified hosts, IPv4/IPv6 wildcards, and host networking.
+- Integrated the resolved configuration check into the supported service
+  launcher and added eight focused regression tests.
+- Documented the local-only trust boundary; remote or multi-host exposure
+  requires a separate authenticated deployment design.
+
 ## Unreleased — Agent Skills architecture and canonical Capability terminology
 
+- Implemented the executable terminology slice: Canonical Plan steps,
+  Capability requests/results/traces, execution evidence, and model-facing
+  planner schemas now serialize `capability_id`.
+- Added bounded `skill_id` readers that normalize immediately, accept equal
+  dual fields, and reject contradictory dual identity fail-closed. Compatibility
+  properties and class aliases keep existing callers readable without emitting
+  new legacy payloads.
+- Exposed `CapabilityRequest`, `CapabilityResult`, `CapabilityTrace`,
+  `CapabilityDefinition`, `CapabilityRegistry`, and `TrustedCapabilityRuntime`
+  as canonical names while retaining one underlying registry and execution
+  authority.
+- Kept Soridormi's native `skill_id` catalog as an explicit Provider-boundary
+  compatibility input; imported Chromie contracts remain Capability-identified.
 - Defined Agent, Agent Skill, Plan, and Capability as separate architectural
   objects. Agents make semantic decisions, Agent Skills provide passive
   reusable methods, Plans record current proposals, and Capabilities remain the

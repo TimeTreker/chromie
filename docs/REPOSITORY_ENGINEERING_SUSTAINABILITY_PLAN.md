@@ -1,6 +1,7 @@
 # Repository Engineering Sustainability Plan
 
-Status: approved planning backlog; implementation not started
+Status: Secure Local Runtime Exposure is implemented and automatically
+verified; local target validation is pending; later Issues remain queued
 
 This document records the engineering recommendations accepted after the
 repository-wide external review and decomposes them into independently closable
@@ -108,7 +109,7 @@ The following recommendations are not part of the current program:
 
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
-| Secure Local Runtime Exposure | queued; first implementation candidate | none | Remove unintended LAN exposure from the default local Compose profile. |
+| Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
 | Make Runtime Failure Paths Explicit | queued | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
 | Establish Repository Engineering Policy Checks | queued | Runtime Failure Paths audit is preferred | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | queued | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
@@ -156,6 +157,24 @@ machine even though the intended trust boundary is local-only.
 - automatic tests reject an accidental wildcard publication;
 - `SECURITY.md`, deployment/configuration ownership, and the runbook agree;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+The maintained Compose profile now binds ASR, maintained and evaluation TTS,
+Ollama, and Agent host publications to `127.0.0.1`. In-container listeners
+remain unchanged so Docker bridge-network service discovery and health checks
+continue to work.
+
+The dependency-light `scripts/check_local_runtime_exposure.py` checker audits
+both maintained Compose source files and Docker Compose's resolved JSON. The
+supported service launcher runs the resolved check before startup, and focused
+unit tests reject unspecified hosts, IPv4/IPv6 wildcards, and host networking.
+
+The maintained full gate passes 1,527 primary tests plus 20 legacy Agent tests,
+including eight focused exposure-policy tests. This establishes implementation
+and automatic verification. Local target acceptance still must confirm localhost
+reachability, failed LAN reachability, and unchanged container-to-container
+service health; those deployment facts are not inferred from automated tests.
 
 Suggested commit:
 

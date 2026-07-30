@@ -23,7 +23,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "9001:9001"
+      - "127.0.0.1:9001:9001"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
@@ -114,7 +114,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
@@ -213,7 +213,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "5001:5000"
+      - "127.0.0.1:5001:5000"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
@@ -315,7 +315,7 @@ services:
     restart: unless-stopped
     gpus: all
     ports:
-      - "5002:5000"
+      - "127.0.0.1:5002:5000"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
@@ -393,7 +393,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
@@ -449,7 +449,7 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "8092:8092"
+      - "127.0.0.1:8092:8092"
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}

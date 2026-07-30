@@ -12,14 +12,20 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.chromie_runtime import ResourceArbiter
 from shared.chromie_contracts.interaction import (
+    CapabilityIdentityModel,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityTrace,
+    CapabilityTraceEvent,
     InteractionResponse,
     InteractionSpeech,
-    SkillRequest,
-    SkillResult,
-    SkillTrace,
-    SkillTraceEvent,
     reject_forbidden_low_level_fields,
 )
+
+SkillRequest = CapabilityRequest
+SkillResult = CapabilityResult
+SkillTrace = CapabilityTrace
+SkillTraceEvent = CapabilityTraceEvent
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
@@ -55,10 +61,8 @@ SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
 }
 
 
-class SkillDefinition(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class SkillDefinition(CapabilityIdentityModel):
 
-    skill_id: str = Field(min_length=1)
     version: str = Field(default="0.1.0", min_length=1)
     provider_id: str = Field(min_length=1)
     description: str = ""
@@ -351,10 +355,9 @@ class SkillRuntimeSchedulerStatus(BaseModel):
     active_interaction_ids: list[str] = Field(default_factory=list)
 
 
-class SkillRuntimeRequestObservation(BaseModel):
+class SkillRuntimeRequestObservation(CapabilityIdentityModel):
     interaction_id: str
     request_id: str
-    skill_id: str
     provider_id: str
     source_goal_ids: list[str] = Field(default_factory=list)
     provider_started: bool
@@ -1116,8 +1119,19 @@ class SkillRuntime:
                     *rules_to_install,
                 }
             )
-            selected_binding_keys = set(selected_keys)
-            queued_keys = selected_binding_keys - active_keys
+            # Preserve the trusted plan/scheduling order in cancellation
+            # evidence. Request IDs are opaque digests and must never become a
+            # semantic ordering key; changing a DTO field name may change those
+            # digests without changing the Plan.
+            selected_binding_order = tuple(selected_by_key)
+            selected_binding_keys = set(selected_binding_order)
+            active_binding_order = tuple(
+                key for key in selected_binding_order if key in active_keys
+            )
+            queued_binding_order = tuple(
+                key for key in selected_binding_order if key not in active_keys
+            )
+            queued_keys = set(queued_binding_order)
 
         provider_results = await asyncio.gather(
             *(
@@ -1177,22 +1191,22 @@ class SkillRuntime:
             ),
             affected_goal_ids=tuple(sorted(affected_goal_ids)),
             selected_request_ids=tuple(
-                sorted({key[1] for key in selected_binding_keys})
+                key[1] for key in selected_binding_order
             ),
             selected_request_bindings=tuple(
-                binding(key) for key in sorted(selected_binding_keys)
+                binding(key) for key in selected_binding_order
             ),
             active_request_ids=tuple(
-                sorted({key[1] for key in active_keys})
+                key[1] for key in active_binding_order
             ),
             active_request_bindings=tuple(
-                binding(key) for key in sorted(active_keys)
+                binding(key) for key in active_binding_order
             ),
             queued_request_ids=tuple(
-                sorted({key[1] for key in queued_keys})
+                key[1] for key in queued_binding_order
             ),
             queued_request_bindings=tuple(
-                binding(key) for key in sorted(queued_keys)
+                binding(key) for key in queued_binding_order
             ),
             cancel_requested_request_ids=tuple(
                 sorted({key[1] for key in cancel_requested_keys})
@@ -1992,6 +2006,20 @@ def session_interrupt_definition() -> SkillDefinition:
         idempotent=True,
         metadata={"control": "session_interrupt"},
     )
+
+
+# Canonical executable-runtime vocabulary.  The legacy class names remain
+# import-compatible during the bounded migration window; they do not represent
+# a second registry or execution authority.
+CapabilityDefinition = SkillDefinition
+CapabilityRegistry = SkillRegistry
+CapabilityExecutionContext = SkillExecutionContext
+CapabilityProvider = SkillProvider
+CapabilityRuntimeResult = SkillRuntimeResult
+CapabilityRuntimeSchedulerStatus = SkillRuntimeSchedulerStatus
+CapabilityRuntimeRequestObservation = SkillRuntimeRequestObservation
+CapabilityRuntimeExecutionObservation = SkillRuntimeExecutionObservation
+TrustedCapabilityRuntime = SkillRuntime
 
 
 def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:

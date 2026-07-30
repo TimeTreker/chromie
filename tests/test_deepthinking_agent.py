@@ -94,7 +94,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Extracted conversation context", call["prompt"])
         self.assertIn("Output Contract:", call["prompt"])
         self.assertIn("Top-level keys: tasks, task_proposals, quick_review, reason only", call["prompt"])
-        self.assertIn("\"skill_id\":\"chromie.speak\"", call["prompt"])
+        self.assertIn("\"capability_id\":\"chromie.speak\"", call["prompt"])
         self.assertIn("\"status\":\"missing_ability\"", call["prompt"])
         self.assertIn("Do not output spoken_response, speech_tasks, action_tasks", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
@@ -287,7 +287,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
             {
                 "tasks": [
                     {
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "args": {
                             "text": "Moving now.",
                             "style": "brief",
@@ -297,7 +297,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                         "reason": "Acknowledge the direct body request.",
                     },
                     {
-                        "skill_id": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15, "speed": "quickly"},
                         "timing": "sequential",
                         "reason": "The user asked Chromie to walk forward.",
@@ -388,7 +388,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
             {
                 "tasks": [
                     {
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "args": {
                             "text": "I understand you want me to pick up the bottle, but I do not have a trusted grasping ability yet.",
                             "style": "brief",
@@ -403,7 +403,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                         "ability_id": "manipulation.pick_up_object",
                         "intent": "pick up the bottle",
                         "status": "missing_ability",
-                        "matched_skill_id": None,
+                        "matched_capability_id": None,
                         "confidence": 0.93,
                         "reason": "No executable manipulation skill was supplied.",
                     }
@@ -466,7 +466,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
             {
                 "tasks": [
                     {
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "args": {
                             "text": "Thanks for the warning. I will hold still.",
                             "style": "warning",
@@ -518,7 +518,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                                     "effectful": True,
                                     "priority": "normal",
                                     "sequence": 0,
-                                    "skill_id": "soridormi.look_at_window",
+                                    "capability_id": "soridormi.look_at_window",
                                 }
                             ],
                         }

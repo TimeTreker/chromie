@@ -110,8 +110,8 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 class DeepPlannerResolverTests(unittest.TestCase):
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
-            {"step_id":"walk","skill_id":"soridormi.walk_forward","args":{"duration_s":15},"source_goal_ids":["goal-action"]},
-            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
+            {"step_id":"walk","capability_id":"soridormi.walk_forward","args":{"duration_s":15},"source_goal_ids":["goal-action"]},
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         catalog = FullCatalog()
         plan = asyncio.run(DeepPlannerResolver(SequencedOllama([raw]), catalog).resolve(request()))
@@ -122,10 +122,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
-            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":99},"source_goal_ids":["goal-action"]}
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":99},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         revised = {"disposition":"execute","coverage":"complete","confidence":0.93,"goal_ids":["goal-action"],"steps":[
-            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         ollama = SequencedOllama([invalid, revised])
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(request("眨眼。")))
@@ -143,13 +143,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "walk",
-                    "skill_id": "soridormi.walk_forward",
+                    "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
@@ -213,7 +213,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 }
@@ -277,7 +277,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                     "reason_summary": "Execute the requested physical blink action.",
@@ -353,7 +353,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "steps": [
                         {
                             "step_id": "blink",
-                            "skill_id": "soridormi.blink_eyes",
+                            "capability_id": "soridormi.blink_eyes",
                             "args": {"count": 1},
                             "source_goal_ids": ["goal-greet"],
                         }
@@ -445,14 +445,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
         steps = [
             {
                 "step_id": "step_look_at_user",
-                "skill_id": "soridormi.look_at_person",
+                "capability_id": "soridormi.look_at_person",
                 "args": {"duration_s": 2.0, "target_ref": "person"},
                 "source_goal_ids": [goal_ids[0]],
                 "reason_summary": "Look at the user for two seconds.",
             },
             {
                 "step_id": "step_blink_twice",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": [goal_ids[1]],
                 "reason_summary": "Blink twice.",
@@ -517,7 +517,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                 }
             ],
@@ -563,13 +563,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "step_blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
                 {
                     "step_id": "step_joke",
-                    "skill_id": "chromie.speak",
+                    "capability_id": "chromie.speak",
                     "args": {"text": "Why don't robots panic? They keep their cache."},
                     "source_goal_ids": ["goal-joke"],
                 },
@@ -631,7 +631,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "mixed")
-        self.assertEqual([step.skill_id for step in plan.steps], ["soridormi.blink_eyes"])
+        self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
         self.assertEqual(
             [outcome.disposition for outcome in plan.goal_outcomes],
             ["execute", "respond"],
@@ -640,7 +640,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("owned by Response Composer", ollama.prompts[1][0])
         skill_enum = ollama.prompts[0][1]["response_format"]["$defs"][
             "PlannerModelStep"
-        ]["properties"]["skill_id"]["enum"]
+        ]["properties"]["capability_id"]["enum"]
         self.assertNotIn("chromie.speak", skill_enum)
 
     def test_live_blink_and_joke_nested_metadata_repairs_to_minimal_keyed_outcomes(self):
@@ -657,13 +657,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "step_blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 },
                 {
                     "step_id": "step_neutral",
-                    "skill_id": "soridormi.look_at_person",
+                    "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 2.0, "target_ref": "person"},
                     "source_goal_ids": ["goal-blink"],
                 },
@@ -739,7 +739,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "step_blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 }
@@ -792,7 +792,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "step_blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 }
@@ -843,13 +843,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
         steps = [
             {
                 "step_id": "look",
-                "skill_id": "soridormi.look_at_person",
+                "capability_id": "soridormi.look_at_person",
                 "args": {"duration_s": 2.0, "target_ref": "person"},
                 "source_goal_ids": ["goal-look"],
             },
             {
                 "step_id": "blink",
-                "skill_id": "soridormi.blink_eyes",
+                "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
                 "source_goal_ids": ["goal-blink"],
             },
@@ -909,7 +909,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-action"],
                 }
@@ -941,7 +941,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-action"],
                 }
@@ -966,7 +966,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-action"],
                 }
@@ -1001,7 +1001,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 }
@@ -1057,13 +1057,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "look",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
                     "source_goal_ids": ["goal-look"],
                 },
                 {
                     "step_id": "status",
-                    "skill_id": "rare.observe_doorway",
+                    "capability_id": "rare.observe_doorway",
                     "args": {},
                     "source_goal_ids": ["goal-check-status"],
                 },
@@ -1090,7 +1090,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "look",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
                     "source_goal_ids": ["goal-look"],
                 }
@@ -1180,7 +1180,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-action"],
                 }
@@ -1195,7 +1195,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.steps[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
         self.assertEqual(plan.steps[0].args, {"count": 2})
         self.assertTrue(plan.metadata["contract_repair_attempted"])
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
@@ -1238,7 +1238,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_repeated_invalid_plan_fails_closed_without_steps(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
-            {"skill_id":"invented.skill","args":{}}
+            {"capability_id":"invented.skill","args":{}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(DeepPlannerResolver(SequencedOllama([invalid, invalid]), FullCatalog(), max_replans=1).resolve(request()))
         self.assertEqual(plan.disposition, "clarify")
@@ -1270,7 +1270,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "steps": [
                 {
                     "step_id": "nod",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-nod"],
                 }
@@ -1328,7 +1328,7 @@ class OrchestratorDeepPlannerTests(unittest.TestCase):
                 return CanonicalPlan(plan_id="fast", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.8, escalation_reason="compound", steps=[])
             async def resolve_deep_plan(self, *args, **kwargs):
                 self.deep_context = kwargs["context"]
-                return CanonicalPlan(plan_id="deep", planner_tier="deep", disposition="execute", coverage="complete", confidence=0.9, goal_ids=["goal-action"], steps=[{"step_id":"s1","skill_id":"soridormi.blink_eyes","args":{"count":3},"source_goal_ids":["goal-action"]}], metadata={"attempt_count":1})
+                return CanonicalPlan(plan_id="deep", planner_tier="deep", disposition="execute", coverage="complete", confidence=0.9, goal_ids=["goal-action"], steps=[{"step_id":"s1","capability_id":"soridormi.blink_eyes","args":{"count":3},"source_goal_ids":["goal-action"]}], metadata={"attempt_count":1})
 
         async def run():
             assistant = VoiceAssistant.__new__(VoiceAssistant)
