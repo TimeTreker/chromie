@@ -266,7 +266,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:e2b", profile)
         self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:e2b", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
-        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", profile)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=8192", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
@@ -441,6 +441,16 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertNotIn('wait_for_tcp 127.0.0.1 9001 900 "ASR"', launcher)
         self.assertIn("warm_tts_candidate", launcher)
+        self.assertIn("reset_ollama_before_tts_warmup", launcher)
+        self.assertIn(
+            "Resetting Ollama runners before the shared-GPU TTS synthesis probe",
+            launcher,
+        )
+        self.assertIn("show_shared_gpu_startup_diagnostics", launcher)
+        self.assertLess(
+            launcher.index('  reset_ollama_before_tts_warmup\nfi'),
+            launcher.index('  COSYVOICE_WARMUP_TIMEOUT_SEC='),
+        )
         self.assertIn("TTS_COSYVOICE_ZH_WARMUP_TEXT", launcher)
         self.assertIn("TTS_COSYVOICE_EN_WARMUP_TEXT", launcher)
         self.assertIn("TTS_COSYVOICE_MIXED_WARMUP_TEXT", launcher)

@@ -44,6 +44,13 @@ artifact sandbox. See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md
 | VoiceAssistant composition root | Runtime-ready greeting scheduling and playback barriers are extracted. The remaining class is still a large maintenance and regression-risk surface. | Collaborator, greeting, TTS alignment, startup, cancellation, and full-suite tests. | Source-bound runtime evidence must close before further structural extraction begins. | `VoiceAssistant` remains lifecycle owner; evidence-driven decomposition is queued in [Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md). |
 | Documentation governance | Current authority map, concise status/checkpoint/changelog, indexed history, and mechanical ownership checks are implemented. The maintained documentation set remains larger and more repetitive than desired. | Documentation authority, links, indexing, current focus, API/configuration, and reproducibility checks. | Not a runtime target-evidence claim; semantic duplication still needs human consolidation. | Owners are declared in [Documentation Authority](DOCUMENTATION_AUTHORITY.md); consolidation is queued after runtime simplification. |
 
+A source-bound RTX 4090 Laptop launch exposed a concrete shared-GPU startup
+blocker: the unchanged Ollama container retained prior model runners while the
+new TTS worker attempted its first cuBLAS allocation. The launcher now resets
+Ollama before the CosyVoice synthesis probe and the laptop profile permits only
+one resident 32K runner. This is an implemented correction, not target evidence;
+the complete current-revision closure must be initialized again and rerun.
+
 ## Target-evidence closure
 
 The remaining evidence tracks are coordinated by

@@ -105,9 +105,12 @@ topology, reserves its complete declared output budget plus a 2048-token safety
 margin before inference, and rejects prompt or completion truncation as an
 LLM-budget failure. RTX 5090 retains the `qwen3:4b` fast model plus
 `gemma4:12b` quality model while CosyVoice is active. RTX 4090 Laptop preserves
-the same role split with `gemma4:e2b` as its smaller quality model. The prior
-launcher-wide compact override is reserved only for profiles that explicitly
-choose it; it no longer replaces maintained quality stages on either GPU.
+the same role split with `gemma4:e2b` as its smaller quality model, but only one
+32K Ollama runner may remain resident at a time while CosyVoice shares the 16 GB
+GPU. The supervised launcher clears stale Ollama runners before the first TTS
+synthesis probe. The prior launcher-wide compact override is reserved only for
+profiles that explicitly choose it; it no longer replaces maintained quality
+stages on either GPU.
 Agent model stages receive up to 120 seconds, host stage calls receive up to 150
 seconds, and the complete staged cognitive runtime receives up to 900 seconds.
 This is intentional: live acceptance should measure model capability and

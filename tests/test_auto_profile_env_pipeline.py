@@ -216,7 +216,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
-        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(
             manifest["active_ollama_models"],
             ["qwen3:4b", "gemma4:e2b"],

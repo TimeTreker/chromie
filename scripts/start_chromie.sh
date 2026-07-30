@@ -181,6 +181,26 @@ wait_for_ws_health() {
   echo "[chromie] $label application is healthy."
 }
 
+show_shared_gpu_startup_diagnostics() {
+  echo "[chromie][diagnostic] GPU memory snapshot:" >&2
+  nvidia-smi \
+    --query-compute-apps=pid,process_name,used_memory \
+    --format=csv,noheader 2>/dev/null >&2 || true
+  echo "[chromie][diagnostic] Ollama resident runners:" >&2
+  docker compose "${COMPOSE_ARGS[@]}" exec -T chromie-llm ollama ps >&2 2>/dev/null || true
+}
+
+reset_ollama_before_tts_warmup() {
+  # start_services.sh may intentionally preserve an already-running Ollama
+  # container. On a shared 16 GB GPU that can also preserve old model runners,
+  # leaving too little memory for CosyVoice's first cuBLAS allocation even
+  # though the TTS worker health endpoint is already alive. start_chromie.sh
+  # owns the complete supervised startup and has already rejected an active
+  # Orchestrator, so restart only the LLM service here to clear stale runners.
+  echo "[chromie] Resetting Ollama runners before the shared-GPU TTS synthesis probe..."
+  docker compose "${COMPOSE_ARGS[@]}" restart chromie-llm >/dev/null
+}
+
 warm_tts_candidate() {
   local host="$1" port="$2" expected_provider="$3" text="$4" timeout_s="$5" label="$6"
   local speaker_id="${7:-default}" language_hint="${8:-auto}"
@@ -269,6 +289,7 @@ asyncio.run(main())
 PYTTSWARM
 )" || {
     echo "[chromie][error] $label failed its synthesis readiness probe for speaker=$speaker_id." >&2
+    show_shared_gpu_startup_diagnostics
     return 1
   }
   echo "[chromie] $label is synthesis-ready ($output)."
@@ -694,6 +715,10 @@ run_soridormi_capability_probe() {
   fi
   return "$rc"
 }
+
+if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
+  reset_ollama_before_tts_warmup
+fi
 
 wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
 wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"

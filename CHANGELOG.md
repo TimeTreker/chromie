@@ -5,6 +5,16 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ## Unreleased
 
+### Shared-GPU startup reliability
+
+- Reset stale Ollama runners before the CosyVoice synthesis readiness probe so
+  an unchanged long-running LLM container cannot retain GPU allocations from a
+  previous launch.
+- Limit the RTX 4090 Laptop profile to one resident 32K Ollama runner while
+  preserving distinct Qwen fast and Gemma quality model roles.
+- Emit GPU-process and Ollama-runner diagnostics when the TTS readiness probe
+  still fails.
+
 ### Live Agent weather and planning reliability
 
 - Aligned Agent Skill selection schema, validation, repair prompts, context, and

@@ -144,8 +144,11 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The maintained RTX 5090 and RTX 4090 Laptop profiles both opt out: RTX 5090 keeps
-`qwen3:4b` plus `gemma4:12b`, while RTX 4090 Laptop keeps `qwen3:4b` plus the
-smaller `gemma4:e2b`, each on the committed 32768-token topology. Select a
+`qwen3:4b` plus `gemma4:12b` resident when memory permits, while RTX 4090 Laptop
+keeps the same fast/quality role split with `qwen3:4b` and the smaller
+`gemma4:e2b` but limits Ollama to one resident 32768-token runner at a time.
+Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
+only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
 `--tts-backend oute` or `--tts-backend qwen3`; the selection is scoped to that
 launch and does not rewrite `.env.local`.
@@ -893,7 +896,9 @@ Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
 `OLLAMA_NUM_PARALLEL=1`, which lets the fast Goal Interpreter model and larger Agent
 model stay resident together when memory allows without increasing per-model
-parallel KV-cache pressure.
+parallel KV-cache pressure. The RTX 4090 Laptop profile deliberately lowers the
+resident-runner limit to `1`: model roles remain distinct, but Qwen and Gemma are
+swapped rather than retained together while CosyVoice shares the 16 GB GPU.
 
 `scripts/warm_ollama.sh` performs a real `/api/generate` request for every model
 that must be ready before the microphone opens. If Ollama is reachable but the
