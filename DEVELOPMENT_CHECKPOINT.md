@@ -2,7 +2,8 @@
 
 **Development identity:** `development`
 **Status refresh date:** 2026-07-30
-**Current code Issue:** none; the accepted engineering-sustainability implementation backlog is complete.
+**Current code Issue:** none.
+**Current evidence Issue:** Close Current-Revision Target Evidence.
 
 ## Resume point
 
@@ -41,6 +42,11 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 
 ## Target-evidence resume point
 
+This is the only active delivery line. Freeze new architecture layers, ordinary
+behavior flags, standalone design documents, and project terminology unless a
+change is required to remove a reproduced evidence blocker. Prefer deletion,
+merging, or simplification over adding another compatibility surface.
+
 Use the single resumable workflow in
 [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). Initialize one clean
 source-bound evidence root, collect/finalize Gateway/Core and Agent Skill/weather,
@@ -49,6 +55,21 @@ second-machine LAN exposure reports, then finalize the default development
 profile. Select `supervised_physical_pilot` only when supervised physical voice
 and robot evidence will also be attached. Human review remains explicit and
 fingerprint-bound.
+
+## Work after evidence closure
+
+After the default source-bound profile is retained and reviewed, continue one
+semantic Issue at a time:
+
+- audit and narrow broad runtime exception boundaries;
+- decompose `VoiceAssistant` around seams observed in live traces;
+- collapse direct environment parsing into typed, profile-owned settings;
+- expand Mypy by complete contract/runtime boundaries;
+- merge duplicated documentation and remove stale vocabulary;
+- rerun the source-bound evidence profile after structural changes.
+
+Detailed scope and exit criteria are in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 ## Required local gates
 

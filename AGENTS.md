@@ -16,6 +16,21 @@ Guidance for coding agents working on Chromie.
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
 
+## Current delivery constraint
+
+Until the default current-revision target-evidence closure is retained and
+reviewed, treat evidence collection as the only active delivery line. Do not add
+a new architecture layer, ordinary behavior flag, standalone design document,
+compatibility path, or first-class project term unless it is required to remove a
+reproduced evidence blocker. When one must be added, remove or merge an
+equivalent item in the same change or record the exception in the active Issue.
+
+After evidence closure, follow the semantic Issue order in
+`docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md`. Do not use file length,
+method count, or document count as mechanical gates; extract or consolidate only
+when ownership, independent testing, configuration authority, or failure
+semantics become clearer.
+
 ## Working rules
 
 - Inspect implementation and tests before editing documentation or behavior.

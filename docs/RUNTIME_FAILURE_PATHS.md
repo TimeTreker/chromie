@@ -95,3 +95,13 @@ Focused tests verify:
 Automatic verification does not prove live provider, microphone, speaker,
 Soridormi, or physical-robot behavior. Those remain separate target-evidence
 tracks.
+
+## Post-evidence narrowing audit
+
+The classification above records the completed first audit, not proof that every
+remaining broad catch is permanently optimal. The current archive contains 142
+`except Exception` handlers across `orchestrator/`, `agent/`, and `shared/`. After
+the source-bound runtime baseline closes, each handler must retain an explicit
+reviewed classification and regression boundary. Model, provider, execution,
+cancellation, state, and evidence paths take priority; expected cleanup may stay
+contained when it cannot replace the primary failure.

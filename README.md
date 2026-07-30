@@ -79,53 +79,35 @@ There is no independent Router service or `/route` compatibility API.
 Chromie never gives raw motor, joint, actuator, or torque controls to the
 language model. The legacy `hardware/` daemon is mock compatibility only.
 
-## What works
+## What works in source and automated tests
 
-- realtime microphone, VAD, ASR, Cognitive Gateway admission, Goal Interpretation, TTS, playback, and barge-in;
-- a versioned stream-oriented TTSProvider contract with Fun-CosyVoice3 0.5B
-  as the maintained default, an authorized local cloned-voice reference,
-  application-level readiness, bounded cancellation drain/restart behavior, and
-  explicit OuteTTS/Qwen3-TTS alternatives; the common multilingual, interruption,
-  dialogue, concurrency, and listening workflow remains available for continued
-  quality and recovery evaluation;
-- sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
-  with immutable model provenance, CUDA/CPU providers, and startup warm-up;
-- a host-side Cognitive Gateway with a frozen immutable turn envelope,
-  deterministic stop/cancel/emergency recognition before Goal Interpretation model
-  inference, deterministic local suppression, and bounded model-assisted
-  addressedness that can only suppress an inactive ambient turn and fails open
-  to admitted cognition;
-- safety-first ingress followed by fast Goal Interpretation and a larger-model
-  deep-planning handoff when confidence is low or broader reasoning is needed;
-- structured Goal Interpretation output that can represent independent chat,
-  memory, deep-planning, tool, and skill responsibilities without making the
-  Host a semantic authority;
-- staged task/action proposals merged into shared task proposals before
-  deterministic Agent and Trusted Capability Runtime validation;
-- single-authority goal-driven cognition with exact turn-bound authority claims,
-  atomic Goal-state application, and fail-closed trusted adaptation;
-- native strict `POST /interaction` plus explicit compatibility rollback;
-- Trusted Capability Runtime with validation, confirmation, timeout, cancellation,
-  bounded scheduling, and traces;
-- evidence-bound named-Goal cancellation that resolves semantic targets to exact
-  runtime bindings, reconciles provider widening atomically, and preserves
-  separable pending siblings through a fresh child confirmation plan and token;
-- manager-owned effectful-turn closure that correlates exact immutable plans,
-  committed requests, schemas, results, and traces; retains exact per-goal
-  terminal outcomes; suppresses stale final speech; and emits a validated
-  speech-only result response;
-- request-bound spoken approval and denial;
-- Soridormi named-skill discovery and MuJoCo execution;
-- TaskGraph validation and gated read, planning, guarded, and physical-policy
-  paths;
-- text-to-MuJoCo, synthetic, virtual-microphone, acoustic, supervised, GPU,
-  simulator, and release acceptance tooling.
+These are implementation claims, not current-revision live qualification:
 
-Endpoint-reported Soridormi source identity, running Chromie image/model source
-binding, immutable source image references, current-revision goal-driven
-live/MuJoCo evidence, physical microphone/speaker evidence, a reviewed release
-bundle, a retained multi-provider TTS comparison, verified Jetson packaging,
-and physical robot support remain open.
+- accepts microphone audio, detects speech, transcribes final utterances, and plays ordered TTS;
+- admits normal turns through Cognitive Gateway before Goal-driven model reasoning;
+- handles stop, cancel, emergency, silence, and unusable audio deterministically;
+- lets the LLM interpret Goals, choose passive Agent Skills, and propose Plans;
+- validates, authorizes, schedules, cancels, and records named Capability execution;
+- keeps provider adaptation inside trusted Capability adapters rather than planner prompts;
+- reconciles external results against the exact request before allowing factual speech;
+- delegates embodied feasibility, collision safety, stop, and recovery to Soridormi;
+- supports named Soridormi skills through MCP and MuJoCo-backed execution;
+- retains runtime traces, execution receipts, evidence manifests, and acceptance reports;
+- evaluates behavior through module, integration, E2E, stress, and General Ability tooling.
+
+The current revision still needs retained source-bound evidence for:
+
+- live Gateway/Core text interaction and active cancellation;
+- positive Agent Skill selection with real provider-backed weather execution;
+- paired Chromie/Soridormi MuJoCo execution and safe idle;
+- the reviewed Social Attention live baseline;
+- physical microphone and speaker behavior;
+- second-machine LAN exposure validation;
+- physical robot and Jetson deployment.
+
+Until the default target-evidence profile closes, new architecture layers, ordinary
+behavior flags, standalone design documents, and project terminology are frozen
+unless they are required to remove a demonstrated evidence blocker.
 
 ## Quick start
 

@@ -55,3 +55,11 @@ be cited as the owner of current architecture, status, or delivery order.
 - concise owner documents remain within reviewed line limits;
 - every maintained Markdown file is indexed;
 - current-focus, link, API, configuration, and reproducibility checks still pass.
+
+## Addition and consolidation rule
+
+A new maintained document is justified only when an existing authority or
+component owner cannot hold the fact clearly. The same change must link it from
+an entry point and remove or merge duplicated current prose, or record why no
+subtraction is possible. Documentation checks prove paths and ownership; human
+review still owns semantic consistency and plain-language quality.

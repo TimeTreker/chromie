@@ -1,7 +1,8 @@
 # Repository Engineering Sustainability Plan
 
-Status: Secure Local Runtime Exposure is implemented and automatically
-verified; local target validation is pending; later Issues remain queued
+Status: the initial bounded implementation program is complete; the active
+Issue is current-revision target-evidence closure; post-evidence simplification
+Issues are accepted and queued
 
 This document records the engineering recommendations accepted after the
 repository-wide external review and decomposes them into independently closable
@@ -105,7 +106,7 @@ The following recommendations are not part of the current program:
 - Run the maintained full suite and documentation checks for every Issue. Add
   focused checks appropriate to the Issue.
 
-## Issue registry
+## Initial bounded issue registry
 
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
@@ -124,9 +125,205 @@ product milestone, and retained evidence determine whether the next queued Issue
 is still the correct priority.
 
 
-## Program status
+## Initial bounded program status
 
-All accepted implementation Issues are closed with automatic verification. This program is complete as a code-maintenance backlog. It does not imply release readiness or target validation; live Gateway/Core, Social Attention, provider, audio, simulator, LAN, and physical evidence remain owned by their qualification documents.
+All Issues in the initial bounded program are closed at their declared first-slice exit criteria. That means the repository now has policy gates, one typed service boundary, one composition-root extraction, and documentation authority; it does **not** mean the underlying maintainability concerns are fully retired. Release readiness and target validation remain separate.
+
+## Evidence-first continuation program
+
+### Current-tree observations
+
+The 2026-07-30 archive confirms that the external review identified real
+maintenance pressure:
+
+- 496 Python files and 183,142 Python lines;
+- `orchestrator/orchestrator.py` has 8,886 lines; `VoiceAssistant` has 167
+  directly declared methods, a 615-line initializer, and 155 initialized
+  attributes;
+- `orchestrator/runtime/conversation_state.py` has 4,424 lines and its manager
+  directly declares 80 methods;
+- maintained runtime sources directly read about 276 distinct environment keys;
+- `orchestrator/`, `agent/`, and `shared/` contain 142 `except Exception`
+  handlers;
+- the Mypy ratchet covers four files;
+- `docs/` contains 80 Markdown files.
+
+These counts are observations from one archive, not permanent pass/fail limits.
+The engineering problem is unclear ownership, unbounded configuration and failure
+surfaces, duplicated current truth, and insufficient current-revision live
+evidence—not the numbers by themselves.
+
+### Governing decisions
+
+- Evidence comes first. Do not start a broad refactor before one retained and
+  reviewed default source-bound evidence closure exists.
+- Freeze architecture growth during evidence collection. A blocker fix may
+  correct contracts, prompts, provider adaptation, provenance, or runtime bugs,
+  but must not create another semantic authority or compatibility architecture.
+- Make subtraction the default. Adding a maintained document, ordinary behavior
+  flag, compatibility path, or first-class term requires removing or merging an
+  equivalent item in the same change, unless the active Issue records why that is
+  impossible.
+- Decompose by ownership and independently testable lifecycle seams. File length
+  and method count are diagnostic signals, not mechanical gates.
+- Preserve the existing safety assets: deterministic protective controls,
+  model-authored semantic reasoning, trusted Host authorization, Soridormi
+  embodiment authority, and four-axis evidence honesty.
+
+### Continuation issue registry
+
+| Issue | State | Depends on | Purpose |
+|---|---|---|---|
+| Close Current-Revision Target Evidence | active evidence Issue | clean candidate source | Prove the narrow maintained loop and retain exact source-bound evidence before structural expansion. |
+| Audit Broad Runtime Failure Boundaries | queued | target-evidence closure | Narrow catches where programming defects or critical failures could be converted into ambiguous degradation. |
+| Decompose VoiceAssistant Around Proven Runtime Seams | queued | evidence closure; failure audit where touched | Extract independently testable lifecycle owners selected from real traces rather than static aesthetics. |
+| Consolidate Runtime Configuration Profiles | queued | evidence closure; typed seams where touched | Replace repeated direct environment parsing and unsupported Boolean combinations with typed service settings and a small orthogonal profile model. |
+| Expand Type Checking by Boundary | queued | stable extracted/configuration boundaries | Ratchet complete contract and runtime directories without broad `Any`, ignores, or scope retreat. |
+| Consolidate Documentation and Vocabulary | queued | structural/configuration changes settled | Merge duplicated current truth, reduce trace-document fragmentation, archive or delete stale narrative, and simplify public wording. |
+| Requalify the Simplified Runtime | queued | all accepted simplification Issues | Re-run the same source-bound profile and compare behavior, latency, cancellation, safety, and evidence completeness. |
+
+Only one continuation Issue may be active. Closing an Issue does not
+automatically activate the next; the current evidence and risk decide whether the
+queued scope remains correct.
+
+## Issue: Close Current-Revision Target Evidence
+
+### Scope
+
+- retain the default `source_bound_development` closure from one clean Chromie
+  revision and one exact Soridormi revision;
+- include live Gateway/Core text behavior, active cancellation, positive Agent
+  Skill/weather execution, reviewed Social Attention, paired MuJoCo safe-idle,
+  and second-machine LAN evidence;
+- retain physical voice or robot evidence only through the stricter supervised
+  profile;
+- fix only blockers reproduced by the maintained evidence workflow.
+
+### Exit criteria
+
+- every required report belongs to the initialized clean revisions;
+- exact request, provider, execution receipt, response, and human-review
+  fingerprints agree;
+- the default closure is eligible while still reporting
+  `release_qualified=false`;
+- Status, Roadmap, Checkpoint, and Handoff point to the retained bundle;
+- every blocker fix is regression-tested and the closure is restarted from the
+  fixed revision.
+
+## Issue: Audit Broad Runtime Failure Boundaries
+
+### Scope
+
+Inventory every maintained `except Exception` by boundary and classify it as
+expected cleanup, typed degradation, operational failure, evidence failure, or
+invariant failure. Prioritize model, provider, execution, cancellation, state,
+and evidence paths. Narrow exception types where possible; otherwise map the
+error to an explicit typed result, visible diagnostic, or fail-closed transition.
+
+### Non-goals
+
+- no blanket re-raise rule for best-effort cleanup;
+- no logging churn that hides the primary failure;
+- no semantic fallback added to recover from an operational error.
+
+### Exit criteria
+
+- each remaining broad catch has an explicit reviewed reason and regression
+  boundary;
+- critical paths cannot continue as success after an unknown exception;
+- cleanup containment cannot replace the primary error;
+- the maintained full gates pass.
+
+## Issue: Decompose VoiceAssistant Around Proven Runtime Seams
+
+### Scope
+
+Use retained traces and failure evidence to select one collaborator at a time.
+Candidate owners include audio-output/playback lifecycle, TTS chunk scheduling
+and echo handling, input-turn lifecycle, session registry, Cognitive turn
+execution, and observability/evidence coordination. `VoiceAssistant` remains the
+public composition and shutdown owner.
+
+Each extraction must remove the old implementation from the root, accept typed
+inputs, expose a narrow lifecycle, preserve ordering/cancellation, and have
+independent tests. Prefer constructor-injected collaborator bundles over another
+set of root-owned fields.
+
+### Exit criteria
+
+- the selected responsibilities have one clear owner and no duplicate root
+  implementation;
+- affected collaborators can be tested without constructing the whole voice
+  runtime;
+- deterministic controls, semantic authority, provider authorization, and
+  Soridormi ownership do not move;
+- source-bound behavior is rerun after each coherent extraction set.
+
+## Issue: Consolidate Runtime Configuration Profiles
+
+### Scope
+
+Inventory direct environment reads and classify each key as generated
+hardware/profile authority, service-owned setting, operator override, diagnostic
+control, experiment, or stale compatibility. Migrate one service boundary at a
+time to immutable typed settings. Remove obsolete keys and unsupported
+combinations instead of preserving them indefinitely.
+
+Supported runtime behavior should be composed from a small set of orthogonal
+profile axes—hardware/resources, execution authority, evidence level, and
+diagnostics—not from freely combined Boolean flags.
+
+### Exit criteria
+
+- each migrated service parses its environment once;
+- supported combinations are explicit and emitted in the runtime manifest;
+- ordinary behavior no longer depends on undocumented Boolean combinations;
+- removed keys have bounded compatibility or a deliberate clean break;
+- invalid combinations fail before service startup.
+
+## Issue: Expand Type Checking by Boundary
+
+### Scope
+
+Expand the monotonic ratchet through complete ownership boundaries, beginning
+with `shared/chromie_contracts/` and then stable slices of
+`orchestrator/runtime/`. Add a boundary only after its real optionality, async
+results, containers, and callables are represented accurately.
+
+### Exit criteria
+
+- checked scope grows by directory or coherent contract family rather than
+  isolated showcase files;
+- no blanket `Any`, global ignore, import skipping, or scope removal is used to
+  manufacture a pass;
+- runtime tests and the pinned Mypy gate pass together.
+
+## Issue: Consolidate Documentation and Vocabulary
+
+### Scope
+
+- keep the existing authority map and reduce repeated current claims to links;
+- merge the trace/event/observability documents into the smallest set that still
+  has clear contract and operational owners;
+- move superseded plans and archives out of the current reading path or delete
+  them when Git history is sufficient;
+- rewrite README and operator-facing claims in short, direct sentences;
+- keep only terms that identify a real authority, contract, state, or lifecycle.
+
+### Exit criteria
+
+- a new developer can find mission, status, delivery order, evidence workflow,
+  configuration, API, and runbook without reading historical migration prose;
+- every maintained document is linked by an entry point or mechanically required;
+- current documents do not contradict Status or Roadmap;
+- terminology has one definition and one canonical name.
+
+## Issue: Requalify the Simplified Runtime
+
+Run the same default source-bound closure after the accepted structural changes.
+The program closes only when behavior, cancellation, safety ownership, latency,
+and evidence completeness are no worse than the pre-change retained baseline,
+and every claim is bound to the final clean revisions.
 
 ## Issue: Secure Local Runtime Exposure
 

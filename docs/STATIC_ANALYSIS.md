@@ -47,8 +47,8 @@ The maintained Mypy version is pinned in `requirements-test.txt`. The gate runs:
 python scripts/run_mypy.py
 ```
 
-`config/mypy_scope.txt` is a smaller, monotonic ratchet over selected clean
-contracts and tooling boundaries. `mypy.ini` requires complete function
+`config/mypy_scope.txt` currently contains four files and is a monotonic
+ratchet over selected clean contracts and tooling boundaries. `mypy.ini` requires complete function
 annotations, checks untyped bodies, forbids implicit optional values, and reports
 unsafe `Any` returns and stale ignores. It does not skip imports or enable a
 whole-tree error suppression.
@@ -57,3 +57,11 @@ A checked path may leave the ratchet only through a separate reviewed
 architecture change. New modules should enter once their real optionality,
 containers, callables, and async return types are clean; broad `Any` conversion
 is not an accepted migration strategy.
+
+## Accepted expansion order
+
+After current-revision target evidence closes and the relevant boundaries are
+stable, expand Mypy through complete ownership scopes: first
+`shared/chromie_contracts/`, then coherent slices of `orchestrator/runtime/`. Do
+not add isolated showcase files merely to increase a count, and do not use broad
+`Any`, import skipping, global ignores, or scope removal to manufacture a pass.

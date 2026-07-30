@@ -34,20 +34,26 @@ and playback barrier semantics live in the collaborator. Existing timeout,
 fallback, injected-audio skip, cancellation, and playback ordering behavior is
 preserved.
 
-## Intentionally composed responsibilities
+## Remaining decomposition backlog
 
-A post-extraction audit leaves these responsibilities in the composition root
-until a later concrete maintenance need justifies another independently tested
-collaborator:
+The first extraction proves the collaborator pattern; it does not retire the
+composition-root risk. The current archive still contains an 8,886-line module,
+a `VoiceAssistant` class with 167 directly declared methods, and a 615-line
+initializer. These counts are diagnostic signals, not mechanical limits. Further
+extraction begins only after current-revision target evidence is retained, then
+uses live traces and failure evidence to select one independently tested owner at
+a time.
 
-| Responsibility | Why it remains composed |
+The main candidate responsibilities are:
+
+| Responsibility | Required extraction boundary |
 |---|---|
-| audio device creation and VAD/ASR handoff | shares lifecycle ownership with microphone queues and injected-audio acceptance |
-| playback worker and synthesis ordering | tightly coupled to interruption, generation cancellation, and session delivery evidence |
-| Cognitive Gateway/Core turn dispatch | already delegates semantic work to explicit runtime and Agent boundaries |
-| stop, interruption, approval revocation, and active-Goal cancellation | deterministic Host safety/commitment coordination must remain atomic |
-| evidence, episode, and runtime trace recording | cross-cuts the lifecycle and already delegates storage/trace mechanics to dedicated modules |
-| cleanup | is the final composition-root responsibility for every owned collaborator and resource |
+| audio device creation and VAD/ASR handoff | one input-turn lifecycle owner with explicit queue and injected-audio contracts |
+| playback worker and synthesis ordering | one output/playback owner preserving interruption, cancellation, ordering, and delivery evidence |
+| Cognitive Gateway/Core turn dispatch | one turn-execution owner that delegates semantic work without gaining semantic authority |
+| stop, interruption, approval revocation, and active-Goal cancellation | an atomic deterministic control owner with explicit state transitions |
+| evidence, episode, and runtime trace recording | one observability coordinator with typed events and no semantic decisions |
+| cleanup | the root retains only top-level reverse-order collaborator shutdown |
 
 This audit is not a prohibition on future extraction. Each future activity must
 name a concrete seam, preserve ordering and cancellation, add narrow tests, and

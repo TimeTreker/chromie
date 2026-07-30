@@ -4,7 +4,8 @@
 verification, target-validation, and deployment claims.
 **Development identity:** `development`; no release version or publication target is planned.
 **Status refresh date:** 2026-07-30
-**Active code Issue:** none; the accepted engineering-sustainability implementation program is complete.
+**Active code Issue:** none.
+**Active evidence Issue:** Close Current-Revision Target Evidence.
 
 Chromie’s current runtime is Goal-driven and has one semantic authority. The Host
 validates and executes; it does not replace LLM reasoning with phrase rules.
@@ -38,10 +39,10 @@ artifact sandbox. See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md
 | Social Attention | Embodiment-independent `off`, `report_only`, and `on` behavior domain with owner-approved style and provider-safe auxiliary expression is implemented. | Dataset, mode/style, priority, stillness, provider, backend-neutrality, and qualification-foundation tests. | Current 128-case live baseline, reviewed samples, and selected MuJoCo evidence remain open. | Maintained default `on`. Owner: [Social Attention Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md). |
 | Speech stack | SenseVoice final-utterance ASR, CosyVoice3 default TTS, cancellation/watchdogs, content gates, and ordered playback are implemented. | ASR/TTS provider, cancellation, alignment, startup, and voice acceptance tests. | Physical microphone accuracy, listening quality, shared-load recovery, and supervised device evidence remain open. | Local containers plus Host audio lifecycle. Owner: [TTS Evaluation](TTS_PROVIDER_EVALUATION.md) and [Acceptance](ACCEPTANCE.md). |
 | Benchmark suite | Module, integration, E2E profiles, stress workloads, migration inventory, and reviewed Social Attention data are implemented. | Inventory/migration parity, dataset validation, adapters, workload, and report tests. | Real model/service/MuJoCo/physical evidence must be collected per profile. | Evaluator only; it cannot implement intelligence. Owner: [Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md). |
-| Engineering safeguards | Loopback publication, explicit failure paths, repository policies, Ruff/Mypy ratchets, and test ownership are implemented. | Thirteen-family canonical policy, exposure, failure, static-runner, ownership, docs, and full gates. | LAN exposure acceptance is open; static tools must run from installed pinned dependencies. | Development/CI gates. Owners: [Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md) and [Static Analysis](STATIC_ANALYSIS.md). |
-| Typed service configuration | Complete ASR service environment is parsed once into immutable typed settings with safe diagnostics. | Parsing, precedence, invalid-input, backend projection, ASR, Compose, and full-suite tests. | Container startup acceptance on maintained hardware profiles remains operational evidence. | ASR migrated; remaining map in [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md). |
-| VoiceAssistant composition root | Runtime-ready greeting scheduling and playback barriers are extracted; remaining lifecycle responsibilities are intentionally composed. | Collaborator, greeting, TTS alignment, startup, cancellation, and full-suite tests. | Normal live startup greeting remains covered only when retained from a source-bound deployment. | `VoiceAssistant` remains lifecycle owner. Owner: [Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md). |
-| Documentation governance | Current authority map, concise status/checkpoint/changelog, indexed historical archives, and mechanical ownership checks are implemented. | Documentation authority, links, indexing, current focus, API/configuration, and reproducibility checks. | Not a runtime target-evidence claim. | Owners are declared in [Documentation Authority](DOCUMENTATION_AUTHORITY.md). |
+| Engineering safeguards | Loopback publication, classified failure paths, repository policies, Ruff/Mypy ratchets, and test ownership are implemented. | Canonical policy, exposure, failure, static-runner, ownership, docs, and full gates. | LAN exposure acceptance is open. Broad exception boundaries still require a post-evidence narrowing audit; static tools must run from installed pinned dependencies. | Development/CI gates. Owners: [Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md), [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md), and [Static Analysis](STATIC_ANALYSIS.md). |
+| Typed service configuration | ASR parses its maintained environment once into immutable typed settings with safe diagnostics. Other services still read substantial environment surfaces directly. | ASR parsing, precedence, invalid-input, backend projection, Compose, and full-suite tests. | Container startup acceptance on maintained hardware profiles remains operational evidence. | First boundary migrated; profile consolidation remains post-evidence work in [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md). |
+| VoiceAssistant composition root | Runtime-ready greeting scheduling and playback barriers are extracted. The remaining class is still a large maintenance and regression-risk surface. | Collaborator, greeting, TTS alignment, startup, cancellation, and full-suite tests. | Source-bound runtime evidence must close before further structural extraction begins. | `VoiceAssistant` remains lifecycle owner; evidence-driven decomposition is queued in [Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md). |
+| Documentation governance | Current authority map, concise status/checkpoint/changelog, indexed history, and mechanical ownership checks are implemented. The maintained documentation set remains larger and more repetitive than desired. | Documentation authority, links, indexing, current focus, API/configuration, and reproducibility checks. | Not a runtime target-evidence claim; semantic duplication still needs human consolidation. | Owners are declared in [Documentation Authority](DOCUMENTATION_AUTHORITY.md); consolidation is queued after runtime simplification. |
 
 ## Target-evidence closure
 
@@ -52,6 +53,14 @@ Agent Skill/weather, Social Attention, and second-machine LAN evidence. Physical
 voice and robot evidence remain optional and supervised; they are required only
 for the stricter physical-pilot profile. No current retained bundle closes these
 tracks yet, and no automatic workflow grants release qualification.
+
+
+During this evidence Issue, the architecture is frozen: changes may repair a
+reproduced evidence blocker, improve evidence provenance, or remove dead/stale
+material, but they must not add a new semantic authority, architecture layer,
+ordinary behavior flag, standalone design document, or first-class term. The
+post-evidence simplification order is owned by
+[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 ## Deployment truth
 

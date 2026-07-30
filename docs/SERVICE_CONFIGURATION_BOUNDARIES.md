@@ -41,6 +41,20 @@ environment surface. It provides:
 transcription executor, and backend factory all consume the same immutable
 settings instance.
 
+
+## Continuation objective
+
+The first ASR migration is a proven slice, not closure of the configuration
+problem. The current archive still contains about 276 distinct environment keys
+read directly by maintained runtime sources. Before changing names, inventory
+each key as profile authority, service setting, operator override, diagnostics,
+experiment, or stale compatibility. Ordinary behavior should be composed from a
+small set of orthogonal profile axes rather than freely combined Boolean flags.
+
+Further migrations remain queued until current-revision target evidence closes.
+Each migrated service must delete duplicate parsing and obsolete keys instead of
+adding another compatibility layer indefinitely.
+
 ## Remaining migration map
 
 The remaining services keep their current behavior and are future ratchet work:

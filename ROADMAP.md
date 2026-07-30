@@ -4,6 +4,30 @@ The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
 are tracked in [Status](docs/STATUS.md).
 
+## Current delivery order — evidence first, then simplification
+
+The active Issue is **Close Current-Revision Target Evidence**. The default
+`source_bound_development` profile must retain and review current-revision
+Gateway/Core, Agent Skill/weather, Social Attention, paired MuJoCo, and
+second-machine LAN evidence before another architecture or maintainability Issue
+becomes active.
+
+While that Issue is open:
+
+- fix only reproduced evidence blockers or provenance defects;
+- do not add architecture layers, ordinary behavior flags, standalone design
+  documents, or new project terminology;
+- prefer deleting stale compatibility, duplicated prose, or dead configuration;
+- keep every claim bound to the exact clean Chromie and Soridormi revisions.
+
+After closure, the accepted order is: narrow broad runtime exception boundaries,
+decompose `VoiceAssistant` around proven runtime seams, consolidate typed runtime
+configuration, expand Mypy by boundary, consolidate documentation and vocabulary,
+and rerun the source-bound evidence profile. File length, method count, Boolean
+count, and document count are diagnostic signals, not mechanical architecture
+gates. Detailed scopes are maintained in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+
 ## Completed architecture correction — Router removal
 
 The independent Router service and compatibility authority are removed. Input
@@ -127,7 +151,7 @@ projections, remain execution-authority-free, fit configured disclosure budgets,
 and preserve provider adaptation inside the Weather Capability adapter. Real
 model selection and live weather execution remain target-evidence work.
 
-The high-signal Ruff gate, incremental Mypy ratchet, test-ownership guard, typed ASR settings boundary, VoiceAssistant greeting collaborator, and documentation-authority consolidation are implemented. The accepted engineering-sustainability implementation program is complete. Open live and deployment evidence remains governed by the owning qualification documents; local target validation of loopback exposure remains separate deployment evidence.
+The high-signal Ruff gate, incremental Mypy ratchet, test-ownership guard, typed ASR settings boundary, VoiceAssistant greeting collaborator, and documentation-authority consolidation are implemented as the initial bounded sustainability slices. They do not retire the larger composition, configuration, failure-surface, type-coverage, or documentation-simplification backlog. Open live and deployment evidence remains governed by the owning qualification documents; local target validation of loopback exposure remains separate deployment evidence.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -202,9 +226,9 @@ Completed domain implementation slices:
 
 The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
 
-The first VoiceAssistant decomposition set is complete: runtime-ready greeting scheduling and playback barriers are delegated to an independently tested collaborator, while the remaining lifecycle responsibilities are intentionally composed as documented in [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
+The first VoiceAssistant extraction is complete: runtime-ready greeting scheduling and playback barriers are delegated to an independently tested collaborator. The remaining root is still a large maintenance surface; further extraction is queued after current-revision evidence and must follow the proven seams in [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
-The accepted engineering-sustainability implementation program is complete. There is no active named code Issue; the next work is source-bound qualification and retained target evidence.
+The initial bounded engineering-sustainability program is complete. There is no active code Issue; the active evidence Issue is **Close Current-Revision Target Evidence**. Post-evidence simplification is queued in [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 Exit criteria:
 
@@ -662,8 +686,9 @@ Exit criteria before treating the implemented loop as target-qualified:
 
 ## Target-evidence closure track
 
-The named implementation backlog is complete. Current development evidence is
-closed through the source-bound profiles and resumable workflow defined in
+The named implementation backlog is complete, but current development evidence
+remains open. It is coordinated through the source-bound profiles and resumable
+workflow defined in
 [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
 
 The default `source_bound_development` profile requires:

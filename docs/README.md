@@ -64,7 +64,7 @@ When documents disagree, correct the lower-authority document.
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
-| Which engineering-sustainability Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
+| Which evidence-first stabilization and post-evidence simplification Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
 | How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |
 | Which stable source, architecture, Agent Skill, contract, and local deployment rules are executable? | `docs/REPOSITORY_ENGINEERING_POLICIES.md` |
 | Which Python static-analysis ratchets are active? | `docs/STATIC_ANALYSIS.md` |
