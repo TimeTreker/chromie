@@ -93,3 +93,7 @@ A useful pull request description includes:
 
 Never include execution tokens, private model credentials, device serials, or
 unredacted acceptance logs.
+
+## Static analysis
+
+Run the pinned incremental static-analysis gates through `./scripts/run_tests.sh`. The reviewed scope, rules, and ratchet policy are documented in [Static Analysis Ratchets](docs/STATIC_ANALYSIS.md). Do not add blanket ignores or remove checked paths to make a gate pass.

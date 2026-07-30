@@ -112,8 +112,8 @@ The following recommendations are not part of the current program:
 | Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
 | Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
 | Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
-| Introduce High-Signal Ruff Gates | queued | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
-| Establish Incremental Type Checking | queued | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
+| Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
+| Establish Incremental Type Checking | active | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
 | Modernize Behavioral and Architecture Tests | queued | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | queued | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | queued | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
@@ -328,6 +328,18 @@ review.
 - suppressions are local and justified;
 - no user-visible or runtime behavior changes are introduced by cleanup;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+Ruff 0.16.0 is pinned in the test dependency boundary. `ruff.toml` explicitly
+selects `E4`, `E7`, `E9`, `F`, `B`, and `ASYNC`; preview and formatting gates
+remain disabled. `config/ruff_scope.txt` is a sorted, duplicate-free monotonic
+ratchet over selected clean contract and tooling modules. `scripts/run_ruff.py`
+validates the executable version and scope before invoking Ruff, and the
+maintained test entrypoint runs the same command used by CI. No blanket ignore
+baseline was introduced. Focused Ruff gate tests and the maintained behavioral
+suite pass; actual Ruff execution requires the pinned dependency in the clean
+development/CI environment.
 
 Suggested commit:
 

@@ -9,6 +9,7 @@ if [[ "${INSTALL_TEST_DEPS:-0}" == "1" ]]; then
 fi
 
 python scripts/check_repository_policies.py
+python scripts/run_ruff.py
 python scripts/check_docs.py
 
 python -m unittest discover -s tests -v

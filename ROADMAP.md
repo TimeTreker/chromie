@@ -98,8 +98,9 @@ projections, remain execution-authority-free, fit configured disclosure budgets,
 and preserve provider adaptation inside the Weather Capability adapter. Real
 model selection and live weather execution remain target-evidence work.
 
-The next active named code Issue is **Introduce High-Signal Ruff Gates** from the
-engineering sustainability plan. Local target validation of loopback exposure
+The high-signal Ruff gate is implemented as an explicit, pinned, monotonic
+defect-oriented ratchet. The next active named code Issue is **Establish
+Incremental Type Checking** from the engineering sustainability plan. Local target validation of loopback exposure
 remains a separate deployment-evidence item.
 
 The accepted design is defined in
@@ -173,7 +174,7 @@ Completed domain implementation slices:
   location/time/aspect scope, exact weather-memory matching, weather lookup, and
   result interpretation.
 
-The next active named code Issue is **Introduce High-Signal Ruff Gates**.
+The next active named code Issue is **Establish Incremental Type Checking**.
 
 Exit criteria:
 

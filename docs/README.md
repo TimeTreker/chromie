@@ -65,6 +65,7 @@ When documents disagree, correct the lower-authority document.
 | Which engineering-sustainability Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
 | How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |
 | Which stable source, architecture, Agent Skill, contract, and local deployment rules are executable? | `docs/REPOSITORY_ENGINEERING_POLICIES.md` |
+| Which Python static-analysis ratchets are active? | `docs/STATIC_ANALYSIS.md` |
 | How are maintained scenarios migrated and episode candidates reviewed? | `docs/BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md` |
 | How are stress workloads and behavior distributions executed and compared? | `docs/STRESS_BENCHMARK_EVALUATION.md` |
 | How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
@@ -91,6 +92,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
 - [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
 - [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md)
+- [Static Analysis Ratchets](STATIC_ANALYSIS.md)
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)

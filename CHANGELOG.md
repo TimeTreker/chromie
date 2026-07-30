@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — High-signal Ruff enforcement
+
+- Pinned Ruff 0.16.0 and added an explicit defect-oriented rule set covering
+  Pyflakes, syntax/import/statement errors, bugbear correctness findings, and
+  async misuse without enabling formatting or style-only churn.
+- Added a sorted, duplicate-free, repository-relative scope ratchet and a
+  version-enforcing runner used by the maintained test entrypoint and CI.
+- Added focused tests for version drift, unsafe scope changes, reviewed rule
+  selection, dependency pinning, and gate integration.
+
 ## Unreleased — Grounded external-information and weather Agent Skills
 
 - Added the first two repository-owned, owner-approved passive Agent Skill

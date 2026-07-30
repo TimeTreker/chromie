@@ -78,3 +78,7 @@ python scripts/check_docs.py
 For interface, configuration, status, or support changes, update the owned
 source-of-truth document in the same patch. Use the four-axis status vocabulary
 from `docs/STATUS.md`.
+
+## Static analysis
+
+Run the pinned incremental static-analysis gates through `./scripts/run_tests.sh`. The reviewed scope, rules, and ratchet policy are documented in [Static Analysis Ratchets](docs/STATIC_ANALYSIS.md). Do not add blanket ignores or remove checked paths to make a gate pass.
