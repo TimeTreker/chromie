@@ -37,22 +37,29 @@ is to execute that workflow from a clean committed deployment, review and
 approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
-The next and only active code implementation Issue is now **Bind Agent Skill
-Provenance to Canonical Plans**. Canonical executable terminology, the passive
-read-only Agent Skill foundation, independent model-authored selection, and
-Agent-specific progressive disclosure are implemented and automatically verified.
-The five maintained model boundaries strip caller-supplied disclosure context,
-select from bounded approved summaries, revalidate package/projection digests,
-and inject only their exact selected role projections under omission-not-
-truncation prompt budgets. Empty roots and no-Skill decisions remain behavior-
-neutral. Result/trace metadata retains identities, digests, counts, and typed
-failures without logging projection content or source paths.
+Canonical executable terminology, the passive read-only Agent Skill foundation,
+independent model-authored selection, and Agent-specific progressive disclosure
+are implemented and automatically verified. The five maintained model boundaries
+strip caller-supplied disclosure context, select from bounded approved summaries,
+revalidate package/projection digests, and inject only exact selected role
+projections under omission-not-truncation prompt budgets. Empty roots and no-Skill
+decisions remain behavior-neutral. Result/trace metadata retains identities,
+digests, counts, and typed failures without logging projection content or source
+paths.
 
-The repository-owned root remains empty of domain Skills. The next slice must
-record exact selection/disclosure provenance in immutable Canonical Plans while
-keeping execution dependent only on registered `capability_id` steps. Do not add
-phrase-to-Skill rules, weather-specific Host selection, script execution,
-provider registration, or Capability authority.
+`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
+verified. Production runtime invariants no longer depend on `assert`; malformed
+state-changing semantic operations fail before mutation; optional compatibility
+input is narrowly classified; expected cleanup is debug-visible; and Runtime
+Trace or episode evidence loss remains observable. See
+[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
+
+The next and only active code implementation Issue is now **Establish Repository
+Engineering Policy Checks**. After it closes, resume the Agent Skills sequence
+with **Bind Agent Skill Provenance to Canonical Plans**, followed by the grounded
+external-information and weather vertical slices. The repository-owned root
+remains empty of domain Skills, and execution continues to depend only on
+registered `capability_id` steps.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -65,8 +72,10 @@ The accepted repository-review recommendations are retained in
 `Issue: Secure Local Runtime Exposure` is implemented and automatically verified:
 maintained host publications bind to loopback, the launcher audits resolved
 Compose configuration, and the full gate passes. Local target acceptance from
-the deployed host/LAN remains open and must be reported separately. No later
-sustainability Issue is activated by this patch.
+the deployed host/LAN remains open and must be reported separately.
+`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
+verified. `Issue: Establish Repository Engineering Policy Checks` is now active
+before Agent Skill Plan provenance work resumes.
 
 A July 24 live voice trace exposed two user-visible response-quality defects.
 The then-current Goal Interpreter correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal

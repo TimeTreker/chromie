@@ -528,7 +528,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     ignored = manifest.get("ignored_local_overrides", [])
-    assert isinstance(ignored, list)
+    if not isinstance(ignored, list):
+        raise ConfigurationError(
+            "generated manifest ignored_local_overrides must be a list"
+        )
     if ignored:
         print(
             "[env][warning] Ignoring .env.local values for profile/validation-owned "
@@ -541,8 +544,9 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
-    models = manifest["models"]
-    assert isinstance(models, dict)
+    models = manifest.get("models")
+    if not isinstance(models, dict):
+        raise ConfigurationError("generated manifest models must be an object")
     print(f"[env] Auto-detected hardware profile: {manifest['active_profile']}")
     print(
         "[env] Model plan: "
@@ -553,8 +557,11 @@ def main(argv: list[str] | None = None) -> int:
         f"deep={models['AGENT_DEEP_PLANNER_MODEL']} "
         f"composer={models['AGENT_RESPONSE_COMPOSER_MODEL']}"
     )
-    budgets = manifest["cognitive_budgets"]
-    assert isinstance(budgets, dict)
+    budgets = manifest.get("cognitive_budgets")
+    if not isinstance(budgets, dict):
+        raise ConfigurationError(
+            "generated manifest cognitive_budgets must be an object"
+        )
     print(
         "[env] Cognitive budgets: "
         f"profile={budgets.get('CHROMIE_COGNITIVE_BUDGET_PROFILE') or 'default'} "

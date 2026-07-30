@@ -68,16 +68,25 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Bind Agent Skill Provenance to Canonical Plans
+## Active engineering issue — Establish Repository Engineering Policy Checks
 
 The executable Capability terminology, passive read-only Agent Skill
 contract/Loader, independent model-authored discovery/selection, and role-specific
-progressive disclosure slices are implemented and automatically verified. Each
-maintained Agent receives only selected role projections under exact digest and
-prompt-budget checks. The active code slice now binds that exact selection and
-disclosure provenance to immutable Canonical Plans without changing execution. Local target validation of loopback
-exposure remains a separate deployment-evidence item and does not block this
-repository implementation slice.
+progressive disclosure slices are implemented and automatically verified. The
+Agent Skills sequence is paused before Plan provenance while the required
+engineering safeguards close.
+
+`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
+verified. Maintained runtime invariants no longer depend on production `assert`;
+malformed state-changing input fails before mutation; and expected cleanup,
+defined degradation, operational failure, evidence failure, and impossible
+invariants are classified in [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
+
+The active Issue now converts stable architecture, failure, deployment, and Agent
+Skill boundaries into a dependency-light executable policy checker. After it
+closes, resume with **Bind Agent Skill Provenance to Canonical Plans**, followed
+by the grounded external-information and weather vertical slices. Local target
+validation of loopback exposure remains a separate deployment-evidence item.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -259,10 +268,17 @@ tests plus 20 legacy Agent tests. Local target acceptance proving localhost
 access, failed LAN access, and unchanged container networking remains open and
 must not be inferred from automated evidence.
 
-No later sustainability Issue is active. The independent Gateway/Core evidence
-track remains open, while the active code implementation returns to the Agent
-Skill contracts/read-only-loader slice. Later sustainability Issues must be
-re-audited against the then-current tree before activation.
+`Issue: Make Runtime Failure Paths Explicit` is also implemented and
+automatically verified. Maintained runtime and generated-environment invariants
+no longer depend on `assert`; silent cleanup and optional compatibility paths are
+classified; state-changing malformed semantic operations fail before mutation;
+and evidence loss remains observable. The audit is maintained in
+[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
+
+The active code implementation Issue is **Establish Repository Engineering
+Policy Checks**. It converts stable architecture and deployment boundaries into
+one dependency-light checker before Agent Skill Plan provenance resumes. The
+independent Gateway/Core evidence track remains open.
 
 The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
 strict typing, blanket removal of source-level tests, Git LFS for the current

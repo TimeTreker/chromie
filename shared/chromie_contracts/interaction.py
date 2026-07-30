@@ -220,7 +220,10 @@ def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
     error = output_schema_declaration_error(schema)
     if error is not None:
         raise ValueError(error)
-    assert isinstance(schema, dict)
+    if not isinstance(schema, dict):
+        raise ValueError(
+            "output schema validation completed without an object declaration"
+        )
     reject_forbidden_low_level_fields(schema)
     raw_controller_path = find_raw_controller_array_schema(schema)
     if raw_controller_path is not None:

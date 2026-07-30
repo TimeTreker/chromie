@@ -739,12 +739,22 @@ class GoalAssociationResolver:
         if not isinstance(raw, list):
             raw = []
         out: list[dict[str, Any]] = []
-        for item in raw[: self.max_active_goals]:
+        for index, item in enumerate(raw[: self.max_active_goals]):
             if not isinstance(item, dict):
                 continue
             try:
-                out.append(ActiveGoalSnapshot.model_validate(item).model_dump(mode="json", exclude_none=True))
-            except Exception:
+                out.append(
+                    ActiveGoalSnapshot.model_validate(item).model_dump(
+                        mode="json",
+                        exclude_none=True,
+                    )
+                )
+            except ValidationError as exc:
+                logger.debug(
+                    "Ignoring malformed active Goal snapshot index=%s error=%s",
+                    index,
+                    exc,
+                )
                 continue
         return out
 
@@ -754,7 +764,7 @@ class GoalAssociationResolver:
         if not isinstance(raw, list):
             raw = []
         out: list[dict[str, Any]] = []
-        for item in raw[:24]:
+        for index, item in enumerate(raw[:24]):
             if not isinstance(item, dict):
                 continue
             try:
@@ -764,7 +774,12 @@ class GoalAssociationResolver:
                         exclude_none=True,
                     )
                 )
-            except Exception:
+            except ValidationError as exc:
+                logger.debug(
+                    "Ignoring malformed discourse referent index=%s error=%s",
+                    index,
+                    exc,
+                )
                 continue
         return out
 

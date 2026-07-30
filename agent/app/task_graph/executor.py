@@ -171,8 +171,12 @@ class DagDryRunExecutor:
                     finished_at=time.monotonic(),
                 )
 
-        # Unreachable, but keeps type checkers happy.
-        assert last_outcome is not None
+        # The retry loop always executes at least once. Keep this invariant
+        # explicit because Python -O removes assert statements.
+        if last_outcome is None:
+            raise RuntimeError(
+                "task graph retry loop completed without an invocation outcome"
+            )
         return NodeResult(
             node_id=node.id,
             tool=node.tool,

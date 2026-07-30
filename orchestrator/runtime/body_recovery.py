@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
+
+from pydantic import ValidationError
 
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -14,6 +17,9 @@ from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
+
+logger = logging.getLogger("chromie.orchestrator.body_recovery")
+
 
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
 _RECOVERABLE_FAILURE_CLASSES = frozenset(
@@ -290,7 +296,12 @@ def _recovery_canonical_plan(
         return None
     try:
         parent = CanonicalPlan.model_validate(raw_plan)
-    except Exception:
+    except ValidationError as exc:
+        logger.warning(
+            "Body recovery ignored an invalid canonical plan interaction_id=%s error=%s",
+            response.interaction_id,
+            exc,
+        )
         return None
 
     selected_step_ids = {

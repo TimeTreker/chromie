@@ -449,17 +449,17 @@ The issue may close only when:
 
 ## Immediate next implementation slice
 
-Begin with:
+`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
+verified. Continue the safeguard sequence with:
 
-> **Bind Agent Skill Provenance to Canonical Plans.**
+> **Establish Repository Engineering Policy Checks.**
 
-Extend the immutable Plan contract with the exact selected Skill ID, version,
-Agent projection, package digest, projection digest, selection ID, disclosure
-ID, and relevant Goal IDs used by the Planner. Execution must continue to read
-only `capability_id` steps and ignore Agent Skill content. Plan validation may
-verify provenance but must not grant permissions, register Capabilities, or
-change Provider/safety authority.
+Convert stable boundaries such as passive Skills, no Host keyword selection,
+explicit runtime invariants, loopback-only local publication, and conflicting
+Capability aliases into one dependency-light checker with focused self-tests and
+minimal reviewed exceptions.
 
-Do not begin by adding domain-specific weather selection, a second execution
-registry, or a Host-authored Workflow. Grounded external-information and weather
-packages remain subsequent vertical slices.
+After that safeguard closes, resume this plan with **Bind Agent Skill Provenance
+to Canonical Plans**, then implement the grounded external-information and
+weather Agent Skills. Do not add domain-specific selection, a second execution
+registry, or a Host-authored Workflow during the safeguard Issue.

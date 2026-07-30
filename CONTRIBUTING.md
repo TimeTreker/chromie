@@ -46,6 +46,10 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   executable entrypoint, provider registration, permission, confirmation
   exemption, phrase selector, or hidden mutable state. Regenerate and review the
   package digest after any content change.
+- Do not use production `assert` statements for runtime, state, execution, or
+  evidence invariants. Classify failure handling according to
+  `docs/RUNTIME_FAILURE_PATHS.md`; expected cleanup may be debug-visible, while
+  operational and evidence failures must fail closed or remain observable.
 
 ## Tests
 

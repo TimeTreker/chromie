@@ -118,7 +118,8 @@ async def handle_client(ws):
         if isinstance(message, str):
             try:
                 data = json.loads(message)
-            except Exception:
+            except json.JSONDecodeError as exc:
+                logger.debug("Ignoring malformed ASR control message: %s", exc)
                 data = {}
 
             if data.get("type") in {"health", "ping"}:

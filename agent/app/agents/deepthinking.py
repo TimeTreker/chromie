@@ -181,7 +181,7 @@ class DeepThinkingAgent(BaseAgent):
         return result
 
     async def _llm_plan(self, request: AgentRunRequest) -> _DeepThinkingPlan:
-        assert self.services.ollama is not None
+        ollama = self.require_ollama()
         zh = self.is_zh(request)
         language = self.language(request)
         extracted_context_block = self._format_extracted_conversation_context(request, zh=False)
@@ -271,7 +271,7 @@ class DeepThinkingAgent(BaseAgent):
             "num_predict": int(os.getenv("AGENT_DEEPTHINKING_NUM_PREDICT", "384")),
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
-        raw = await self.services.ollama.generate(
+        raw = await ollama.generate(
             prompt,
             system=system,
             response_format="json",

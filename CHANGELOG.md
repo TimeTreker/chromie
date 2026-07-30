@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Explicit runtime failure paths
+
+- Replaced production `assert` invariants in maintained Agent, TaskGraph,
+  Orchestrator, shared-contract, and generated-environment paths with explicit
+  typed exceptions that remain active under Python `-O`.
+- Made malformed optional Goal/referent/task context visible through bounded
+  debug or warning diagnostics while preserving defined compatibility fallbacks.
+- Made state-changing semantic-operation batches fail closed before mutation,
+  and made corrupt Runtime Trace checkpoints archive with warning evidence.
+- Preserved best-effort audio/WebSocket cleanup and episode evidence emission,
+  but removed silent `pass` behavior so cleanup or evidence loss remains
+  observable without replacing the primary runtime failure.
+- Added the maintained failure-classification document and focused tests for
+  explicit model-client invariants, atomic state safety, evidence recovery, and
+  removal of production assert statements.
+
 ## Unreleased — Agent-specific progressive disclosure
 
 - Added strict disclosure request, projection, omission, and resolution contracts

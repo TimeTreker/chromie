@@ -50,6 +50,8 @@ archives, and old milestone prose are context only.
 - Preserve confirmation, monitor, cancellation, timeout, and fallback semantics.
 - Keep physical TaskGraph nodes sequential.
 - Log fallback causes; do not hide model or service failures.
+- Do not use production `assert` for runtime invariants; classify and handle
+  failures according to `docs/RUNTIME_FAILURE_PATHS.md`.
 - Use generated `.env.runtime`; do not edit it directly.
 - Use Docker service names inside containers and loopback ports from the host.
 - Run the Orchestrator from repository root with

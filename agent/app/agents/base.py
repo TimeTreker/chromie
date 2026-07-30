@@ -73,6 +73,16 @@ class BaseAgent(ABC):
         result.handled_by.append(self.name)
         result.trace.append(f"{self.name}: {message}")
 
+    def require_ollama(self) -> OllamaClient:
+        """Return the configured model client or fail with an explicit invariant."""
+
+        client = self.services.ollama
+        if client is None:
+            raise RuntimeError(
+                f"{self.name} requires an Ollama client for this model path"
+            )
+        return client
+
     def get_context(self, request: AgentRunRequest, key: str, default: Any = None) -> Any:
         return request.context.get(key, default)
 

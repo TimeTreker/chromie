@@ -140,7 +140,7 @@ class ConversationAgent(BaseAgent):
         return result
 
     async def _llm_reply(self, request: AgentRunRequest) -> str:
-        assert self.services.ollama is not None
+        ollama = self.require_ollama()
         zh = self.is_zh(request)
         target_language = self.language(request)
         memory_block = self._format_memory_context(request, zh=False)
@@ -195,7 +195,7 @@ class ConversationAgent(BaseAgent):
             "num_predict": int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "64")),
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
-        raw = await self.services.ollama.generate(
+        raw = await ollama.generate(
             prompt,
             system=system,
             options=options,
@@ -282,7 +282,7 @@ class ConversationAgent(BaseAgent):
         target_language: str,
         reason: str,
     ) -> str:
-        assert self.services.ollama is not None
+        ollama = self.require_ollama()
         prompt = (
             f"Target spoken language: {target_language}\n"
             f"Self model: {self.format_self_model_context(request, zh=False)}\n"
@@ -297,7 +297,7 @@ class ConversationAgent(BaseAgent):
             "Return only the spoken reply text."
         )
         try:
-            raw = await self.services.ollama.generate(
+            raw = await ollama.generate(
                 prompt,
                 system=(
                     "You are a compact spoken-response repairer. "

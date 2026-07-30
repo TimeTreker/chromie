@@ -34,20 +34,25 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Bind Agent Skill Provenance to Canonical
-Plans.** Executable contracts use canonical `capability_id`; strict passive Agent
-Skill metadata and a read-only digest-bound Loader are implemented; model-authored
-selection supports explicit no/one/multi-Skill decisions; and Agent-specific
-progressive disclosure is now integrated into Goal Association, Fast Planner,
-Deep Planner, Response Composer, and Tool Result Interpreter. Each boundary
-receives only its selected role projection after package/projection digest and
-prompt-budget validation. Caller-supplied disclosure context is stripped, empty
-roots remain behavior-neutral, and traces retain identity/digests without content.
-The repository-owned root still contains no domain Skill package. Canonical Plans
-do not yet retain exact Skill selection/disclosure provenance, and Capability
-registration, authorization, Provider validation, and execution remain unchanged.
-Gateway/Core qualification remains an independent open evidence issue rather than
-a second code implementation mainline.
+**Active implementation issue:** **Establish Repository Engineering Policy
+Checks.** `Issue: Make Runtime Failure Paths Explicit` is implemented and
+automatically verified: production invariants no longer depend on `assert`,
+state-changing semantic-operation batches reject malformed input before mutation,
+expected cleanup and optional compatibility degradation are explicitly
+classified, and Runtime Trace or episode evidence loss remains observable. See
+[Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md).
+
+Agent-specific progressive disclosure remains implemented and automatically
+verified across Goal Association, Fast Planner, Deep Planner, Response Composer,
+and Tool Result Interpreter. Each boundary receives only its selected role
+projection after package/projection digest and prompt-budget validation. Caller-
+supplied disclosure context is stripped, empty roots remain behavior-neutral,
+and traces retain identity/digests without content. The repository-owned root
+still contains no domain Skill package. Canonical Plans do not yet retain exact
+Skill provenance, and Capability registration, authorization, Provider validation,
+and execution remain unchanged. Plan provenance resumes after the active policy-
+check safeguard closes. Gateway/Core qualification remains an independent open
+evidence issue rather than a second code implementation mainline.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automatic evidence, target evidence, and deployment
@@ -59,7 +64,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,573 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,578 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,

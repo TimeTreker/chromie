@@ -1597,12 +1597,18 @@ class VoiceAssistant:
                     return
                 try:
                     self.output_stream.stop()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(
+                        "Best-effort output stream stop failed during close: %s",
+                        exc,
+                    )
                 try:
                     self.output_stream.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(
+                        "Best-effort output stream close failed: %s",
+                        exc,
+                    )
                 self.output_stream = None
 
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
@@ -5528,7 +5534,10 @@ class VoiceAssistant:
                 )
 
         if resolution.decision == "approved":
-            assert resolution.response is not None
+            if resolution.response is None:
+                raise RuntimeError(
+                    "approved confirmation resolution is missing its bound response"
+                )
             self.session_log(
                 session_id,
                 "confirmation_authorized: confirmation_id=%s interaction_id=%s "
@@ -8258,8 +8267,12 @@ class VoiceAssistant:
                 try:
                     if self.asr_ws:
                         await self.asr_ws.close()
-                except Exception:
-                    pass
+                except Exception as close_exc:
+                    logger.debug(
+                        "%s Best-effort ASR websocket close failed: %s",
+                        session_id,
+                        close_exc,
+                    )
                 self.asr_ws = None
 
     def _has_active_protective_reflex(

@@ -110,8 +110,8 @@ The following recommendations are not part of the current program:
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
 | Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
-| Make Runtime Failure Paths Explicit | queued | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
-| Establish Repository Engineering Policy Checks | queued | Runtime Failure Paths audit is preferred | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
+| Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
+| Establish Repository Engineering Policy Checks | active; next implementation issue | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | queued | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
 | Establish Incremental Type Checking | queued | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
 | Modernize Behavioral and Architecture Tests | queued | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
@@ -215,6 +215,17 @@ and may disappear under optimized Python execution.
 - optimized Python execution cannot remove required safety checks;
 - failure-path tests cover changed behavior;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+The audit and classification are maintained in
+[Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md). Production assertions were
+replaced with explicit contract, state, service, and execution exceptions.
+State-changing semantic operations validate before mutation; malformed optional
+compatibility records are narrowly omitted with diagnostics; expected cleanup is
+debug-visible; and corrupt trace or episode evidence remains observable. Focused
+tests verify invariant behavior and scan maintained runtime ASTs for remaining
+`assert` statements.
 
 Suggested commit:
 

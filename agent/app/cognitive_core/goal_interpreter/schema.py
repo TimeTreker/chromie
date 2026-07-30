@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 try:
     from chromie_contracts.task_proposal import TaskProposal
@@ -23,6 +24,9 @@ RouteName = Literal[
 
 Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
+
+
+logger = logging.getLogger("chromie.agent.goal_interpreter.schema")
 
 
 DEFAULT_AGENTS: dict[str, list[str]] = {
@@ -371,12 +375,17 @@ def _route_items_from_metadata(decision: RouteDecision) -> list[RouteItem]:
     if not isinstance(raw, list):
         return []
     items: list[RouteItem] = []
-    for item in raw:
+    for index, item in enumerate(raw):
         if not isinstance(item, dict):
             continue
         try:
             items.append(RouteItem.model_validate(item))
-        except Exception:
+        except ValidationError as exc:
+            logger.debug(
+                "Ignoring malformed compatibility route item index=%s error=%s",
+                index,
+                exc,
+            )
             continue
     return items
 

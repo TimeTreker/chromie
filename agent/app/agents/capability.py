@@ -1411,7 +1411,7 @@ class CapabilityAgent(BaseAgent):
         )
 
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:
-        assert self.services.ollama is not None
+        ollama = self.require_ollama()
         zh = self.is_zh(request)
         global_context_block = self._format_global_context(request, zh=zh)
         session_context_block = self._format_session_context(request)
@@ -1514,7 +1514,7 @@ class CapabilityAgent(BaseAgent):
             "- For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the runtime limitation."
         )
         try:
-            raw = await self.services.ollama.generate(
+            raw = await ollama.generate(
                 prompt,
                 system=system,
                 response_format="json",

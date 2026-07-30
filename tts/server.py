@@ -639,8 +639,8 @@ def _token_count(value) -> int:
             shape = size()
             if hasattr(shape, "__len__") and len(shape):
                 return max(0, int(shape[-1]))
-        except Exception:
-            pass
+        except (TypeError, ValueError, RuntimeError) as exc:
+            logger.debug("Could not inspect token tensor shape: %s", exc)
     try:
         return max(0, len(value))
     except (TypeError, ValueError):

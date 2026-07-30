@@ -583,7 +583,10 @@ async def dispatch_named_goal_cancellation(
 
     if confirmation_transition is not None:
         try:
-            assert callable(confirmation_replace)
+            if not callable(confirmation_replace):
+                raise TypeError(
+                    "confirmation replacement callback is required for a pending transition"
+                )
             confirmation_replace(
                 expected_confirmation_id=str(
                     confirmation_transition["old_confirmation_id"]

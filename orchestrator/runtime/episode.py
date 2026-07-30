@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,9 @@ from shared.chromie_contracts.mind import MindProfile
 from shared.chromie_runtime.runtime_events import persist_runtime_event
 
 from .skill_runtime import SkillRuntimeResult
+
+
+logger = logging.getLogger("chromie.orchestrator.episode")
 
 
 def _now_iso() -> str:
@@ -350,8 +354,15 @@ class EpisodeRecorder:
                 },
                 payloads={"episode.json": episode.model_dump(mode="json")},
             )
-        except Exception:
-            # Evidence emission is best-effort and must never break the realtime path.
+        except Exception as exc:
+            # Evidence emission is best-effort and must never break the realtime path,
+            # but the evidence loss must remain observable to operators.
+            logger.warning(
+                "Episode runtime-event evidence emission failed episode_id=%s error_type=%s error=%s",
+                episode.episode_id,
+                type(exc).__name__,
+                exc,
+            )
             return
 
     @staticmethod

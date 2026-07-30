@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import os
 import re
 import time
 from collections import deque
 from pathlib import Path
 from typing import Any, Callable, Deque
+
+from pydantic import ValidationError
 
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
@@ -68,6 +71,9 @@ _TASK_RELATIONS = {
 }
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_TASK_STORE_PATH = ".chromie/conversation/task_contexts.json"
+
+
+logger = logging.getLogger("chromie.orchestrator.conversation_state")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -381,7 +387,12 @@ class ConversationStateManager:
                             exclude_none=True,
                         )
                     )
-                except Exception:
+                except ValidationError as exc:
+                    logger.debug(
+                        "Ignoring malformed persisted discourse referent index=%s error=%s",
+                        len(restored_referents),
+                        exc,
+                    )
                     continue
         if restored_referents:
             self._discourse_referents = deque(
@@ -516,8 +527,12 @@ class ConversationStateManager:
         if isinstance(raw, dict):
             try:
                 return SemanticGoal.model_validate(raw)
-            except Exception:
-                pass
+            except ValidationError as exc:
+                logger.warning(
+                    "Falling back from malformed persisted semantic_goal task_id=%s error=%s",
+                    context.get("task_id"),
+                    exc,
+                )
         description = " ".join(
             str(context.get("goal") or context.get("task_type") or "task").strip().split()
         ) or "task"
@@ -545,7 +560,12 @@ class ConversationStateManager:
                     continue
                 try:
                     gap = InformationGap.model_validate(item)
-                except Exception:
+                except ValidationError as exc:
+                    logger.debug(
+                        "Ignoring malformed task information gap task_id=%s error=%s",
+                        context.get("task_id"),
+                        exc,
+                    )
                     continue
                 if not gap.resolved:
                     gaps.append(gap)
@@ -716,7 +736,11 @@ class ConversationStateManager:
                 continue
             try:
                 operations.append(SemanticTaskOperation.model_validate(item))
-            except Exception:
+            except ValidationError as exc:
+                logger.warning(
+                    "Ignoring malformed semantic task operation from turn metadata error=%s",
+                    exc,
+                )
                 continue
         return operations
 
@@ -755,7 +779,10 @@ class ConversationStateManager:
         intent: str | None,
         source: str | None,
     ) -> dict[str, Any]:
-        assert operation.goal is not None
+        if operation.goal is None:
+            raise ValueError(
+                "create semantic operation requires a goal before state mutation"
+            )
         now = _now_ms()
         task_id = self._new_task_id()
         goal = operation.goal.model_copy(
@@ -2321,14 +2348,16 @@ class ConversationStateManager:
         if not self.enabled:
             return []
         validated: list[SemanticTaskOperation] = []
-        for item in operations:
+        for index, item in enumerate(operations):
             if isinstance(item, SemanticTaskOperation):
                 validated.append(item)
-            elif isinstance(item, dict):
-                try:
-                    validated.append(SemanticTaskOperation.model_validate(item))
-                except Exception:
-                    continue
+                continue
+            try:
+                validated.append(SemanticTaskOperation.model_validate(item))
+            except (ValidationError, TypeError) as exc:
+                raise ValueError(
+                    f"invalid semantic operation at index {index}: {exc}"
+                ) from exc
         results: list[dict[str, Any]] = []
         for operation in validated:
             if operation.operation == "create":
@@ -4094,7 +4123,10 @@ class ConversationStateManager:
                 matched_pending = 0
                 for task in matching_tasks:
                     task_metadata = task.get("metadata")
-                    assert isinstance(task_metadata, dict)
+                    if not isinstance(task_metadata, dict):
+                        raise RuntimeError(
+                            "pending task metadata must be an object during outcome reconciliation"
+                        )
                     task["status"] = lifecycle_status
                     task["updated_ms"] = timestamp_ms
                     task["metadata"] = {
@@ -4166,7 +4198,12 @@ class ConversationStateManager:
                     continue
                 try:
                     gap = InformationGap.model_validate(item)
-                except Exception:
+                except ValidationError as exc:
+                    logger.debug(
+                        "Ignoring malformed planning information gap task_id=%s error=%s",
+                        context.get("task_id"),
+                        exc,
+                    )
                     continue
                 if not gap.resolved:
                     gaps.append(gap.model_dump(mode="json", exclude_none=True))

@@ -1180,7 +1180,10 @@ class GuardedTaskGraphExecutor:
             if outcome.status != "failed_retryable" or attempts >= max_attempts:
                 break
             await asyncio.sleep(0.1)
-        assert outcome is not None
+        if outcome is None:
+            raise RuntimeError(
+                "fallback execution completed without an invocation outcome"
+            )
         self._record(
             trace,
             results,

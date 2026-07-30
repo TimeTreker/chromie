@@ -10,6 +10,7 @@ import asyncio
 import contextvars
 import hashlib
 import json
+import logging
 import os
 import tempfile
 import threading
@@ -28,6 +29,9 @@ TRACE_FRAGMENT_KEY = "_runtime_trace_fragment"
 TRACE_CHECKPOINT_SCHEMA_VERSION = 1
 _TRACE_MODES = {"off": 0, "basic": 1, "debug": 2}
 _TRACE_STATES = {"active", "finishing", "complete", "abandoned"}
+
+
+logger = logging.getLogger("chromie.runtime.trace")
 
 
 def _utc_now() -> datetime:
@@ -300,8 +304,15 @@ class TraceCheckpointStore:
                     raise ValueError("checkpoint trace is missing")
                 if not isinstance(payload.get("summary"), Mapping):
                     raise ValueError("checkpoint summary is missing")
-            except Exception:
-                self.archive(path, category="corrupt")
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                archived = self.archive(path, category="corrupt")
+                logger.warning(
+                    "Archived corrupt runtime trace checkpoint path=%s archived=%s error_type=%s error=%s",
+                    path,
+                    archived,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
             pending.append((path, payload))
         return pending

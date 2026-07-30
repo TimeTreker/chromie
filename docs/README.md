@@ -63,6 +63,7 @@ When documents disagree, correct the lower-authority document.
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
 | Which engineering-sustainability Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
+| How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |
 | How are maintained scenarios migrated and episode candidates reviewed? | `docs/BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md` |
 | How are stress workloads and behavior distributions executed and compared? | `docs/STRESS_BENCHMARK_EVALUATION.md` |
 | How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
@@ -87,6 +88,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
 - [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
+- [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
