@@ -77,10 +77,9 @@ The audit covered:
 - `scripts/generate_runtime_env.py`, which is part of every supported launch.
 
 Remaining broad handlers are intentional boundaries that already re-raise,
-return typed failure results, or log a defined degradation. The following Issue
-will turn stable rules into the dependency-light Repository Engineering Policy
-checker rather than leaving enforcement distributed across prose and focused
-tests.
+return typed failure results, or log a defined degradation. Stable enforcement is
+now centralized in the dependency-light checker documented by
+[Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).
 
 ## Automatic evidence
 

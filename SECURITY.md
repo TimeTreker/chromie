@@ -62,6 +62,20 @@ host networking. The supported service launcher audits Docker Compose's fully
 resolved configuration before starting containers, so local override files
 cannot silently broaden the host boundary.
 
+## Executable repository policy boundary
+
+`scripts/check_repository_policies.py` mechanically protects local-only host
+publication, removed architecture authority, passive Agent Skills, model-authored
+Skill selection, model-contract actuation boundaries, explicit runtime
+invariants, and safe Python execution. The maintained test and CI entrypoints run
+the same gate.
+
+Reviewed exceptions are exact entries in
+`config/repository_policy_exceptions.json`. Wildcards and stale exceptions fail
+closed. A policy exception is not a deployment, execution, confirmation, or
+physical-safety authorization. See
+[Repository Engineering Policies](docs/REPOSITORY_ENGINEERING_POLICIES.md).
+
 ## Agent Skill content boundary
 
 Agent Skills are prompt-method assets, not executable plugins. The maintained

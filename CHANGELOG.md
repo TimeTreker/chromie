@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Executable repository engineering policies
+
+- Added one dependency-light AST/configuration gate for production assertions,
+  trivially silent broad handlers, dynamic execution, unsafe shell invocation,
+  model-contract actuation fields, loopback-only Compose publication, removed
+  architecture authority, passive Agent Skills, and model-authored Skill
+  selection.
+- Integrated the canonical gate into local tests, GitHub Actions through the
+  maintained test entrypoint, and the Benchmark check. Existing specialized
+  Compose and Router guards remain component-owned inputs to the aggregate gate.
+- Added an exact central exception registry with reviewed reason and removal
+  conditions; wildcards, weak entries, duplicate keys, and stale exceptions fail
+  closed. The current registry is empty.
+- Narrowed one remaining Agent Skill Goal-context degradation from a silent broad
+  catch to Pydantic validation with debug evidence.
+
 ## Unreleased — Explicit runtime failure paths
 
 - Replaced production `assert` invariants in maintained Agent, TaskGraph,

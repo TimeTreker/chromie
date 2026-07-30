@@ -50,12 +50,16 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   evidence invariants. Classify failure handling according to
   `docs/RUNTIME_FAILURE_PATHS.md`; expected cleanup may be debug-visible, while
   operational and evidence failures must fail closed or remain observable.
+- Run `scripts/check_repository_policies.py` for stable architecture and
+  deployment boundaries. Policy exceptions must be exact, reviewed, and recorded
+  only in `config/repository_policy_exceptions.json`; stale exceptions fail.
 
 ## Tests
 
 Run the full dependency-light suite:
 
 ```bash
+python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 ```
 

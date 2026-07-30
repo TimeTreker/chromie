@@ -111,7 +111,7 @@ The following recommendations are not part of the current program:
 |---|---|---|---|
 | Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
 | Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
-| Establish Repository Engineering Policy Checks | active; next implementation issue | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
+| Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | queued | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
 | Establish Incremental Type Checking | queued | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
 | Modernize Behavioral and Architecture Tests | queued | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
@@ -272,6 +272,20 @@ Integrate the checker into the maintained local test entrypoint and CI.
 - exceptions are centralized, minimal, and explain why they remain;
 - `AGENTS.md` and contributing guidance point to the executable policy;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+The canonical `scripts/check_repository_policies.py` gate is implemented and runs
+from the maintained local test entrypoint, GitHub Actions, and the Benchmark gate.
+It combines AST checks for explicit runtime invariants, silent broad handlers,
+dynamic execution, unsafe shells, model-contract actuation fields, passive Agent
+Skill authority, and model-authored Skill selection with the maintained Compose
+exposure and removed-Router guards. Rule ownership and exception governance are
+defined in [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).
+
+The central exception registry is empty. Any future entry must match one exact
+rule/path/symbol, explain the reviewed reason and removal condition, and remain a
+live finding; wildcards and stale exceptions fail closed.
 
 Suggested commit:
 

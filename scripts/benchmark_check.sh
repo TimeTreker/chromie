@@ -9,4 +9,4 @@ python -m benchmarks.stress.validate --check
 python -m benchmarks.scenarios check
 python -m benchmarks.mining.validate --check
 python -m pytest -q benchmarks/tests
-python scripts/check_router_removed.py
+python scripts/check_repository_policies.py

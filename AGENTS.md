@@ -51,7 +51,9 @@ archives, and old milestone prose are context only.
 - Keep physical TaskGraph nodes sequential.
 - Log fallback causes; do not hide model or service failures.
 - Do not use production `assert` for runtime invariants; classify and handle
-  failures according to `docs/RUNTIME_FAILURE_PATHS.md`.
+  failures according to `docs/RUNTIME_FAILURE_PATHS.md`. Stable mechanical
+  boundaries are enforced by `scripts/check_repository_policies.py`; do not
+  bypass it with local source-string guards or unreviewed exceptions.
 - Use generated `.env.runtime`; do not edit it directly.
 - Use Docker service names inside containers and loopback ports from the host.
 - Run the Orchestrator from repository root with
@@ -68,6 +70,7 @@ archives, and old milestone prose are context only.
 ## Required checks
 
 ```bash
+python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
 ```

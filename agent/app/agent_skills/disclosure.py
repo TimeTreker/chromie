@@ -6,6 +6,8 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from .loader import AgentSkillLoadError, AgentSkillRegistry
 from .selection import AgentSkillSelectionService
 
@@ -328,7 +330,12 @@ def _goal_contexts(context: dict[str, Any]) -> tuple[AgentSkillSelectionGoalCont
                     success_criteria=_bounded_items(raw.get("success_criteria")),
                 )
             )
-        except Exception:
+        except ValidationError as exc:
+            logger.debug(
+                "agent_skill_goal_context_omitted goal_id=%s error=%s",
+                goal_id,
+                exc,
+            )
             continue
         seen.add(goal_id)
         if len(out) >= 16:

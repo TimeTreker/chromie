@@ -68,25 +68,29 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active engineering issue — Establish Repository Engineering Policy Checks
+## Active architecture issue — Bind Agent Skill Provenance to Canonical Plans
 
 The executable Capability terminology, passive read-only Agent Skill
 contract/Loader, independent model-authored discovery/selection, and role-specific
-progressive disclosure slices are implemented and automatically verified. The
-Agent Skills sequence is paused before Plan provenance while the required
-engineering safeguards close.
+progressive disclosure slices are implemented and automatically verified. Both
+required engineering safeguards are also complete.
 
-`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
-verified. Maintained runtime invariants no longer depend on production `assert`;
-malformed state-changing input fails before mutation; and expected cleanup,
-defined degradation, operational failure, evidence failure, and impossible
-invariants are classified in [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
+`Issue: Make Runtime Failure Paths Explicit` replaced production assertions and
+silent failure ambiguity with explicit classified behavior. `Issue: Establish
+Repository Engineering Policy Checks` now enforces those invariants together
+with local-only Compose publication, removed architecture authority, passive
+Agent Skills, model-authored Skill selection, safe Python execution, and
+model-contract actuation boundaries. See
+[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md) and
+[Repository Engineering Policies](docs/REPOSITORY_ENGINEERING_POLICIES.md).
 
-The active Issue now converts stable architecture, failure, deployment, and Agent
-Skill boundaries into a dependency-light executable policy checker. After it
-closes, resume with **Bind Agent Skill Provenance to Canonical Plans**, followed
-by the grounded external-information and weather vertical slices. Local target
-validation of loopback exposure remains a separate deployment-evidence item.
+The active Issue now binds exact selected Agent Skill ID, version, role
+projection, package/projection digest, selection identity, and relevant Goal IDs
+to the immutable `CanonicalPlan`. This provenance explains which reviewed method
+content informed planning; it must not grant Capability authority or alter
+execution validation. The grounded external-information and weather vertical
+slices follow. Local target validation of loopback exposure remains a separate
+deployment-evidence item.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),

@@ -54,9 +54,9 @@ input is narrowly classified; expected cleanup is debug-visible; and Runtime
 Trace or episode evidence loss remains observable. See
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
-The next and only active code implementation Issue is now **Establish Repository
-Engineering Policy Checks**. After it closes, resume the Agent Skills sequence
-with **Bind Agent Skill Provenance to Canonical Plans**, followed by the grounded
+`Issue: Establish Repository Engineering Policy Checks` is implemented and
+automatically verified. The next and only active code implementation Issue is now
+**Bind Agent Skill Provenance to Canonical Plans**, followed by the grounded
 external-information and weather vertical slices. The repository-owned root
 remains empty of domain Skills, and execution continues to depend only on
 registered `capability_id` steps.
@@ -73,9 +73,10 @@ The accepted repository-review recommendations are retained in
 maintained host publications bind to loopback, the launcher audits resolved
 Compose configuration, and the full gate passes. Local target acceptance from
 the deployed host/LAN remains open and must be reported separately.
-`Issue: Make Runtime Failure Paths Explicit` is implemented and automatically
-verified. `Issue: Establish Repository Engineering Policy Checks` is now active
-before Agent Skill Plan provenance work resumes.
+`Issue: Make Runtime Failure Paths Explicit` and `Issue: Establish Repository
+Engineering Policy Checks` are implemented and automatically verified. The
+canonical dependency-light gate is documented in
+[Repository Engineering Policies](docs/REPOSITORY_ENGINEERING_POLICIES.md).
 
 A July 24 live voice trace exposed two user-visible response-quality defects.
 The then-current Goal Interpreter correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal
