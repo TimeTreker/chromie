@@ -44,6 +44,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('ORCH_AGENT_TIMEOUT_MS", "9000"', orchestrator_source)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 
+    def test_asr_image_includes_every_standalone_server_module(self) -> None:
+        dockerfile = (ROOT / "asr" / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "COPY backends.py server.py settings.py transcription.py ./",
+            dockerfile,
+        )
+
     def test_goal_interpreter_host_budget_exceeds_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
