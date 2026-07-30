@@ -115,8 +115,8 @@ The following recommendations are not part of the current program:
 | Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
 | Establish Incremental Type Checking | implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
 | Modernize Behavioral and Architecture Tests | implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
-| Establish Typed Service Configuration Boundaries | active | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
-| Decompose the VoiceAssistant Composition Root | queued | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
+| Establish Typed Service Configuration Boundaries | implemented and automatically verified | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
+| Decompose the VoiceAssistant Composition Root | active | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
 | Consolidate Current Documentation Authority | queued | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
 
 Closing one Issue does not automatically activate the next. The current tree,
@@ -454,6 +454,9 @@ Modernize behavioral and architecture test ownership
 ```
 
 ## Issue: Establish Typed Service Configuration Boundaries
+
+Status: implemented and automatically verified through the ASR service boundary; remaining service migrations are recorded in `SERVICE_CONFIGURATION_BOUNDARIES.md`.
+
 
 ### Problem
 

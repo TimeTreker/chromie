@@ -176,7 +176,9 @@ Completed domain implementation slices:
   location/time/aspect scope, exact weather-memory matching, weather lookup, and
   result interpretation.
 
-The next active named code Issue is **Establish Typed Service Configuration Boundaries**.
+The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
+
+The next active named code Issue is **Decompose the VoiceAssistant Composition Root**.
 
 Exit criteria:
 

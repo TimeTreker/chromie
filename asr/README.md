@@ -131,3 +131,8 @@ the service's bounded inference concurrency.
 See [`../docs/SENSEVOICE_ASR.md`](../docs/SENSEVOICE_ASR.md) for architecture and
 evidence requirements, and [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md) for
 container, simulator, and physical voice acceptance levels.
+
+
+## Typed startup configuration
+
+`ASRServiceSettings` copies and validates the process environment once when the service starts. The backend, warm-up path, health response, executor limits, and WebSocket server consume that immutable snapshot. Invalid booleans, ports, sample rates, thread counts, and warm-up durations fail startup with the owning variable name.

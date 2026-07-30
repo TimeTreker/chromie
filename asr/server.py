@@ -1,101 +1,63 @@
 import asyncio
 import json
 import logging
-import os
 import time
 
 import numpy as np
 import websockets
 
 try:
-    from .backends import ASRBackendConfig, create_final_asr_backend
+    from .backends import create_final_asr_backend
     from .transcription import TranscriptionExecutor
+    from .settings import ASRServiceSettings
 except ImportError:
-    from backends import ASRBackendConfig, create_final_asr_backend
+    from backends import create_final_asr_backend
     from transcription import TranscriptionExecutor
+    from settings import ASRServiceSettings
+
+settings = ASRServiceSettings.from_env()
 
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=settings.log_level,
     format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("chromie-asr")
 
-HOST = os.getenv("ASR_HOST", "0.0.0.0")
-PORT = int(os.getenv("ASR_PORT", "9001"))
-DEFAULT_SENSEVOICE_MODEL_ID = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
-DEFAULT_SENSEVOICE_MODEL_REVISION = f"asr-models/{DEFAULT_SENSEVOICE_MODEL_ID}"
-DEFAULT_SENSEVOICE_MODEL_PATH = (
-    "/root/.cache/huggingface/sherpa-onnx/"
-    f"{DEFAULT_SENSEVOICE_MODEL_ID}"
-)
-
-SHERPA_ONNX_MODEL_TYPE = os.getenv("SHERPA_ONNX_MODEL_TYPE", "sense_voice")
-SHERPA_ONNX_PROVIDER = os.getenv("SHERPA_ONNX_PROVIDER") or None
-SHERPA_ONNX_MODEL_FILE = os.getenv("SHERPA_ONNX_MODEL_FILE") or None
-SHERPA_ONNX_TOKENS_FILE = os.getenv("SHERPA_ONNX_TOKENS_FILE") or None
-ASR_MODE = os.getenv("ASR_MODE", "final")
-MODEL_NAME = os.getenv("ASR_MODEL", DEFAULT_SENSEVOICE_MODEL_PATH)
-MODEL_REVISION = os.getenv("ASR_MODEL_REVISION") or DEFAULT_SENSEVOICE_MODEL_REVISION
-DEVICE = os.getenv("ASR_DEVICE", "cuda")
-SAMPLE_RATE = int(os.getenv("ASR_SAMPLE_RATE", "16000"))
-ASR_LANGUAGE = os.getenv("ASR_LANGUAGE") or None
-SHERPA_ONNX_NUM_THREADS = max(1, int(os.getenv("SHERPA_ONNX_NUM_THREADS", "2")))
-SHERPA_ONNX_LANGUAGE = os.getenv("SHERPA_ONNX_LANGUAGE") or ASR_LANGUAGE or "auto"
-SHERPA_ONNX_USE_ITN = os.getenv("SHERPA_ONNX_USE_ITN", "true").lower() in {"1", "true", "yes", "on"}
-ASR_MAX_CONCURRENT_TRANSCRIPTIONS = max(
-    1,
-    int(os.getenv("ASR_MAX_CONCURRENT_TRANSCRIPTIONS", "1")),
-)
-ASR_STARTUP_WARMUP_ENABLED = os.getenv("ASR_STARTUP_WARMUP_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
-ASR_STARTUP_WARMUP_AUDIO_SECONDS = max(0.01, float(os.getenv("ASR_STARTUP_WARMUP_AUDIO_SECONDS", "1.0")))
 
 logger.info(
     (
         "ASR config: backend=sherpa_onnx mode=%s model=%s revision=%s device=%s "
         "language=%s"
     ),
-    ASR_MODE,
-    MODEL_NAME,
-    MODEL_REVISION or "unpinned",
-    DEVICE,
-    ASR_LANGUAGE or "auto",
+    settings.mode,
+    settings.model_name,
+    settings.model_revision or "unpinned",
+    settings.device,
+    settings.language or "auto",
 )
-asr_backend = create_final_asr_backend(
-    ASRBackendConfig(
-        mode=ASR_MODE,
-        model_name=MODEL_NAME,
-        model_revision=MODEL_REVISION,
-        device=DEVICE,
-        sample_rate=SAMPLE_RATE,
-        sherpa_model_type=SHERPA_ONNX_MODEL_TYPE,
-        sherpa_provider=SHERPA_ONNX_PROVIDER,
-        sherpa_num_threads=SHERPA_ONNX_NUM_THREADS,
-        sherpa_language=SHERPA_ONNX_LANGUAGE,
-        sherpa_use_itn=SHERPA_ONNX_USE_ITN,
-        sherpa_debug=os.getenv("SHERPA_ONNX_DEBUG", "false").lower() in {"1", "true", "yes", "on"},
-        sherpa_model_file=SHERPA_ONNX_MODEL_FILE,
-        sherpa_tokens_file=SHERPA_ONNX_TOKENS_FILE,
-    )
-)
+asr_backend = create_final_asr_backend(settings.backend_config())
 logger.info(
     "ASR backend loaded successfully: backend=%s model=%s device=%s",
     asr_backend.name,
     asr_backend.model_name,
-    DEVICE,
+    settings.device,
 )
-transcription_executor = TranscriptionExecutor(ASR_MAX_CONCURRENT_TRANSCRIPTIONS)
+transcription_executor = TranscriptionExecutor(settings.max_concurrent_transcriptions)
 
 
 def warm_up_backend() -> None:
-    if not ASR_STARTUP_WARMUP_ENABLED:
+    if not settings.startup_warmup_enabled:
         logger.info("ASR startup warm-up disabled")
         return
 
-    sample_count = max(1, int(SAMPLE_RATE * ASR_STARTUP_WARMUP_AUDIO_SECONDS))
+    sample_count = max(
+        1,
+        int(settings.sample_rate * settings.startup_warmup_audio_seconds),
+    )
     audio = np.zeros(sample_count, dtype=np.float32)
     logger.info(
         "ASR startup warm-up starting: audio=%.2fs samples=%s",
-        sample_count / SAMPLE_RATE,
+        sample_count / settings.sample_rate,
         sample_count,
     )
     start = time.time()
@@ -128,18 +90,19 @@ async def handle_client(ws):
                         {
                             "type": "pong",
                             "service": "asr",
-                            "max_concurrent_transcriptions": ASR_MAX_CONCURRENT_TRANSCRIPTIONS,
+                            "max_concurrent_transcriptions": settings.max_concurrent_transcriptions,
                             "backend": asr_backend.name,
-                            "mode": ASR_MODE,
+                            "mode": settings.mode,
                             "model": asr_backend.model_name,
                             "model_revision": asr_backend.model_revision,
+                            "settings": settings.safe_diagnostics(),
                         }
                     )
                 )
             continue
 
         audio = pcm16_to_float32(message)
-        duration = len(audio) / SAMPLE_RATE
+        duration = len(audio) / settings.sample_rate
         rms = float(np.sqrt(np.mean((audio * 32768.0) ** 2))) if len(audio) else 0.0
 
         logger.info("ASR received audio: %.2fs rms=%.1f bytes=%s", duration, rms, len(message))
@@ -160,10 +123,17 @@ async def handle_client(ws):
 
 async def main():
     warm_up_backend()
-    logger.info("ASR server starting on ws://%s:%s", HOST, PORT)
+    logger.info("ASR server starting on ws://%s:%s", settings.host, settings.port)
     try:
-        async with websockets.serve(handle_client, HOST, PORT, max_size=10**7, ping_interval=20, ping_timeout=20):
-            logger.info("ASR server started on ws://%s:%s", HOST, PORT)
+        async with websockets.serve(
+            handle_client,
+            settings.host,
+            settings.port,
+            max_size=10**7,
+            ping_interval=20,
+            ping_timeout=20,
+        ):
+            logger.info("ASR server started on ws://%s:%s", settings.host, settings.port)
             await asyncio.Future()
     finally:
         transcription_executor.close()

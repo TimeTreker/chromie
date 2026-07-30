@@ -34,7 +34,9 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Establish Typed Service Configuration Boundaries.** The
+**Active implementation issue:** **Decompose the VoiceAssistant Composition Root.**
+
+The typed service-configuration Issue is implemented for the complete ASR service boundary. `ASRServiceSettings` parses a copied startup environment once, validates booleans/numerics/ranges/mode, supplies the backend configuration, and exposes safe health diagnostics. Generated `.env.runtime` and hardware-profile precedence remain unchanged; the remaining service migration map is documented in `SERVICE_CONFIGURATION_BOUNDARIES.md`. The
 Agent Skills implementation track is code-complete: the repository-owned root now
 contains the owner-approved `chromie.grounded-external-information` base method
 and `chromie.weather-information` specialization, each with bounded projections

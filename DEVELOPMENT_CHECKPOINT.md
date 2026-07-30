@@ -64,8 +64,7 @@ depends only on registered `capability_id` steps. Positive live selection and
 live weather execution remain target evidence. The high-signal Ruff ratchet is implemented and wired into the maintained gate.
 The incremental Mypy ratchet is implemented after Ruff in the maintained gate.
 Behavioral and architecture test ownership is now modernized and mechanically
-checked. The next active code Issue is **Establish Typed Service Configuration
-Boundaries**.
+checked. `Issue: Establish Typed Service Configuration Boundaries` is implemented through the complete ASR service boundary: environment input is copied and parsed once into immutable typed settings, invalid values fail clearly, and health diagnostics omit installation-local override paths. The follow-on service map is documented in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md). The next active code Issue is **Decompose the VoiceAssistant Composition Root**.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for

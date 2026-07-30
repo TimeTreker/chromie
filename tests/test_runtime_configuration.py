@@ -36,11 +36,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
     def test_standalone_service_fallbacks_match_documented_common_budgets(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(GoalInterpreterSettings().capability_catalog_timeout_ms, 400)
-        asr_source = (ROOT / "asr" / "server.py").read_text(encoding="utf-8")
+        asr_settings_source = (ROOT / "asr" / "settings.py").read_text(encoding="utf-8")
         orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('SHERPA_ONNX_NUM_THREADS", "2"', asr_source)
+        self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertIn('ORCH_AGENT_TIMEOUT_MS", "9000"', orchestrator_source)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 

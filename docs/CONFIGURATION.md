@@ -952,3 +952,8 @@ ORCH_SESSION_IDLE_SWEEP_S=5
 `abandoned` after the configured period without recorded session activity.
 `ORCH_SESSION_IDLE_SWEEP_S` controls how often the orchestrator checks for idle
 sessions. These settings do not change normal completed-session behavior.
+
+
+## Service-owned typed settings
+
+Generated `.env.runtime` remains the deployment authority. Services may copy that startup environment once into a validated, immutable service-owned settings snapshot. The first completed boundary is ASR; ownership and the follow-on migration map are documented in [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md).

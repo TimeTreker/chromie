@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — typed ASR service configuration boundary
+
+- Added one immutable `ASRServiceSettings` startup snapshot with strict typed parsing, backend projection, and safe diagnostics.
+- Removed repeated ASR environment reads from the running service while preserving generated `.env.runtime` and hardware-profile authority.
+- Documented the remaining Agent, TTS, Orchestrator, and shared-runtime configuration migration map.
+
 ## Unreleased — Behavioral and architecture test ownership
 
 - Replaced source-string assertions for gratitude routing, Cognitive Core endpoint
