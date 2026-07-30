@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -457,6 +458,10 @@ class DeepPlannerResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="deep_planner",
+        )
         fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
         goals = context.get("active_goal_snapshots") or []
         association = context.get("goal_association_resolution") or {}
@@ -491,6 +496,7 @@ class DeepPlannerResolver:
             f"Active goals JSON:\n{self._bounded(goals, 3200)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+            f"{skill_section}"
             f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"

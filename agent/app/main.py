@@ -14,7 +14,10 @@ from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .agent_skills import (
+    AgentSkillDisclosureService,
+    AgentSkillProgressiveDisclosureCoordinator,
     AgentSkillSelectionService,
+    attach_disclosure_metadata,
     build_configured_agent_skill_registry,
 )
 from .clients.ollama_client import OllamaClient
@@ -24,6 +27,8 @@ from .cognitive_gateway import AttentionReviewer
 
 try:
     from chromie_contracts.agent_skill import (
+        AgentSkillDisclosureRequest,
+        AgentSkillDisclosureResolution,
         AgentSkillRegistrySnapshot,
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
@@ -46,6 +51,8 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.agent_skill import (
+        AgentSkillDisclosureRequest,
+        AgentSkillDisclosureResolution,
         AgentSkillRegistrySnapshot,
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
@@ -336,6 +343,33 @@ class Settings(BaseModel):
         ),
         ge=32,
         le=4096,
+    )
+    agent_skill_progressive_disclosure_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED",
+            "1",
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    agent_skill_projection_max_chars: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_PROJECTION_MAX_CHARS", "3000")
+        ),
+        ge=128,
+        le=50000,
+    )
+    agent_skill_projection_total_max_chars: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS", "6000")
+        ),
+        ge=128,
+        le=100000,
+    )
+    agent_skill_projection_count_limit: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_SKILL_PROJECTION_COUNT_LIMIT", "4")
+        ),
+        ge=1,
+        le=8,
     )
     capability_catalog_refresh_sec: float = Field(
         default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_CATALOG_REFRESH_SEC", "30")),
@@ -653,6 +687,17 @@ agent_skill_selection_service = (
     if agent_skill_selection_client is not None
     else None
 )
+agent_skill_disclosure_service = AgentSkillDisclosureService(
+    agent_skill_registry,
+    max_projection_chars=settings.agent_skill_projection_max_chars,
+    max_total_chars=settings.agent_skill_projection_total_max_chars,
+    projection_count_limit=settings.agent_skill_projection_count_limit,
+)
+agent_skill_progressive_disclosure = AgentSkillProgressiveDisclosureCoordinator(
+    agent_skill_selection_service,
+    agent_skill_disclosure_service,
+    enabled=settings.agent_skill_progressive_disclosure_enabled,
+)
 local_tool_executor = LocalToolExecutor(
     capability_registry,
     weather_client=weather_client,
@@ -786,6 +831,15 @@ logger.info(
     settings.agent_skill_selection_max_candidates,
     settings.agent_skill_selection_max_selected,
     settings.agent_skill_selection_min_confidence,
+)
+logger.info(
+    "Agent Skill progressive disclosure enabled=%s max_projection_chars=%s "
+    "max_total_chars=%s projection_count_limit=%s",
+    settings.agent_skill_progressive_disclosure_enabled
+    and agent_skill_selection_service is not None,
+    settings.agent_skill_projection_max_chars,
+    settings.agent_skill_projection_total_max_chars,
+    settings.agent_skill_projection_count_limit,
 )
 goal_association_client = (
     OllamaClient(
@@ -932,6 +986,15 @@ async def health() -> HealthResponse:
         ),
         agent_skill_selection_max_candidates=settings.agent_skill_selection_max_candidates,
         agent_skill_selection_max_selected=settings.agent_skill_selection_max_selected,
+        agent_skill_progressive_disclosure_enabled=(
+            settings.agent_skill_progressive_disclosure_enabled
+            and agent_skill_selection_service is not None
+        ),
+        agent_skill_projection_max_chars=settings.agent_skill_projection_max_chars,
+        agent_skill_projection_total_max_chars=(
+            settings.agent_skill_projection_total_max_chars
+        ),
+        agent_skill_projection_count_limit=settings.agent_skill_projection_count_limit,
         task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
         planning_task_graph_execution_enabled=planning_invoker is not None,
@@ -1051,14 +1114,24 @@ async def interpret_cognitive_turn(
 async def resolve_fast_plan(request: AgentRunRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    return await fast_planner_resolver.resolve(request)
+    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
+        request,
+        "fast_planner",
+    )
+    result = await fast_planner_resolver.resolve(prepared)
+    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/deep-plan")
 async def resolve_deep_plan(request: AgentRunRequest):
     if deep_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Deep planner is disabled")
-    return await deep_planner_resolver.resolve(request)
+    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
+        request,
+        "deep_planner",
+    )
+    result = await deep_planner_resolver.resolve(prepared)
+    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/compose-response-plan")
@@ -1066,7 +1139,12 @@ async def compose_response_plan(request: AgentRunRequest):
     if response_composer_resolver is None:
         raise HTTPException(status_code=503, detail="Response composer is disabled")
     await interaction_runtime.prepare_response_composition_context(request)
-    return await response_composer_resolver.resolve(request)
+    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
+        request,
+        "response_composer",
+    )
+    result = await response_composer_resolver.resolve(prepared)
+    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/tools/execute", response_model=ToolExecutionResponse)
@@ -1079,14 +1157,23 @@ async def execute_local_tool(request: ToolExecutionRequest) -> ToolExecutionResp
 async def interpret_tool_result(request: ToolResultInterpretationRequest):
     if tool_result_interpreter is None:
         raise HTTPException(status_code=503, detail="Tool result interpreter is disabled")
-    return await tool_result_interpreter.interpret(request)
+    prepared, disclosure = (
+        await agent_skill_progressive_disclosure.prepare_tool_result_request(request)
+    )
+    result = await tool_result_interpreter.interpret(prepared)
+    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/goal-association")
 async def resolve_goal_association(request: AgentRunRequest):
     if goal_association_resolver is None:
         raise HTTPException(status_code=503, detail="Goal association resolver is disabled")
-    return await goal_association_resolver.resolve(request)
+    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
+        request,
+        "goal_association",
+    )
+    result = await goal_association_resolver.resolve(prepared)
+    return attach_disclosure_metadata(result, disclosure)
 
 
 @app.post("/task-continuity", response_model=SemanticTaskOperationSet)
@@ -1134,6 +1221,22 @@ async def select_agent_skills(
         return await agent_skill_selection_service.select(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post(
+    "/agent-skills/disclose",
+    response_model=AgentSkillDisclosureResolution,
+)
+async def disclose_agent_skills(
+    request: AgentSkillDisclosureRequest,
+) -> AgentSkillDisclosureResolution:
+    """Load only exact role projections from a validated model selection."""
+    if not settings.agent_skill_progressive_disclosure_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent Skill progressive disclosure is disabled",
+        )
+    return agent_skill_disclosure_service.disclose(request)
 
 
 @app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)

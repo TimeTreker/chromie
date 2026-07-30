@@ -34,19 +34,20 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Add Agent-Specific Progressive
-Disclosure.** Executable contracts use canonical `capability_id`; strict passive
-Agent Skill metadata and a read-only digest-bound Loader are implemented; and an
-independent `/agent-skills/select` boundary now lets the declared responsible
-Agent role author explicit no/one/multi-Skill decisions from bounded approved
-summaries. Host validation checks exact disclosed ID, version, projection, Goal
-IDs, confidence, and package digest, permits one repair, and degrades model or
-contract failure to optional no-Skill. The repository-owned root still contains
-no domain Skill package, and the selection boundary is not yet called by the
-Cognitive Turn Loop. No projection content enters an Agent prompt, no Plan
-records Skill provenance, and no Capability registration, authorization, or
-execution behavior is changed. Gateway/Core qualification remains an independent
-open evidence issue rather than a second code implementation mainline.
+**Active implementation issue:** **Bind Agent Skill Provenance to Canonical
+Plans.** Executable contracts use canonical `capability_id`; strict passive Agent
+Skill metadata and a read-only digest-bound Loader are implemented; model-authored
+selection supports explicit no/one/multi-Skill decisions; and Agent-specific
+progressive disclosure is now integrated into Goal Association, Fast Planner,
+Deep Planner, Response Composer, and Tool Result Interpreter. Each boundary
+receives only its selected role projection after package/projection digest and
+prompt-budget validation. Caller-supplied disclosure context is stripped, empty
+roots remain behavior-neutral, and traces retain identity/digests without content.
+The repository-owned root still contains no domain Skill package. Canonical Plans
+do not yet retain exact Skill selection/disclosure provenance, and Capability
+registration, authorization, Provider validation, and execution remain unchanged.
+Gateway/Core qualification remains an independent open evidence issue rather than
+a second code implementation mainline.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automatic evidence, target evidence, and deployment
@@ -58,7 +59,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,558 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,573 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,
@@ -996,13 +997,16 @@ Documentation status:
 
 Implementation status:
 
-- not implemented: shared Agent Skill DTOs;
-- not implemented: secure read-only Skill registry/loader;
-- not implemented: model-authored Skill discovery and selection;
-- not implemented: Agent projection loading;
+- implemented and automatically verified: shared passive Agent Skill DTOs;
+- implemented and automatically verified: secure read-only Skill registry/Loader;
+- implemented and automatically verified: model-authored Skill discovery/selection;
+- implemented and automatically verified: role-specific progressive projection
+  disclosure with digest checks, budgets, forged-context removal, and content-free
+  trace metadata;
 - not implemented: CanonicalPlan Skill provenance;
-- not implemented: grounded external information and weather Skill packages;
-- not implemented: runtime traces and live evidence for Skill selection.
+- not implemented: grounded external-information and weather Skill packages;
+- not retained: positive live model/domain-Skill evidence, because the repository
+  root intentionally contains no domain Skill package yet.
 
 Current runtime behavior is unchanged. The accepted target vocabulary uses
 `capability_id`, CapabilityRequest/CapabilityResult, named capability, and

@@ -1,6 +1,8 @@
 # Agent Skills Architecture
 
-Status: Accepted architecture direction; runtime implementation is not yet present
+Status: Accepted architecture with canonical Capability terminology, passive
+contracts/Loader, model-authored selection, and Agent-specific progressive
+disclosure implemented; Plan provenance and domain Skills remain open
 Scope: Goal-Driven Cognitive Core, Agent roles, reusable cognitive methods,
 planning, capability execution, and evidence
 
@@ -406,8 +408,12 @@ The following invariants are enforced:
 - startup retains bounded metadata summaries, not full `SKILL.md` or projection text;
 - explicit body/projection reads recheck the package digest before returning text;
 - package Python or scripts are inert and are never imported or executed;
-- Skill selection is model-authored and typed through an independent bounded
-  selection boundary; projection loading and Plan integration remain separate.
+- Skill selection is model-authored and typed through a bounded boundary;
+- the matching Agent receives only selected role-specific projections after exact
+  package/projection digest verification and prompt-budget checks;
+- untrusted caller-supplied projection context is stripped before disclosure;
+- selection/disclosure identity and digests are observable without logging content;
+- CanonicalPlan provenance remains the next separate slice.
 
 ## Weather vertical slice
 

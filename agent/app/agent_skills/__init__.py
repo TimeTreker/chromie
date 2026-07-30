@@ -1,5 +1,14 @@
-"""Read-only Agent Skill metadata and content loader."""
+"""Passive Agent Skill selection, progressive disclosure, and read-only loading."""
 
+from .disclosure import (
+    AgentSkillDisclosureService,
+    AgentSkillProgressiveDisclosureCoordinator,
+    agent_skill_prompt_section,
+    attach_disclosure_metadata,
+    build_agent_skill_selection_request,
+    prompt_agent_skill_context,
+    trace_disclosure_metadata,
+)
 from .selection import AgentSkillSelectionService
 from .loader import (
     AgentSkillLoadError,
@@ -12,6 +21,13 @@ from .loader import (
 )
 
 __all__ = [
+    "AgentSkillDisclosureService",
+    "AgentSkillProgressiveDisclosureCoordinator",
+    "agent_skill_prompt_section",
+    "attach_disclosure_metadata",
+    "build_agent_skill_selection_request",
+    "prompt_agent_skill_context",
+    "trace_disclosure_metadata",
     "AgentSkillSelectionService",
     "AgentSkillLoadError",
     "AgentSkillRegistry",

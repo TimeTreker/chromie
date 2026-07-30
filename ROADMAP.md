@@ -68,13 +68,14 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Add Agent-Specific Progressive Disclosure
+## Active architecture issue — Bind Agent Skill Provenance to Canonical Plans
 
 The executable Capability terminology, passive read-only Agent Skill
-contract/loader, and independent model-authored discovery/selection slices are
-implemented and automatically verified. The active code slice now loads only
-the already-selected projection for the responsible Agent under explicit prompt
-budgets and immutable digest provenance. Local target validation of loopback
+contract/Loader, independent model-authored discovery/selection, and role-specific
+progressive disclosure slices are implemented and automatically verified. Each
+maintained Agent receives only selected role projections under exact digest and
+prompt-budget checks. The active code slice now binds that exact selection and
+disclosure provenance to immutable Canonical Plans without changing execution. Local target validation of loopback
 exposure remains a separate deployment-evidence item and does not block this
 repository implementation slice.
 
@@ -129,21 +130,22 @@ Semantic delivery order:
 Completed implementation slices:
 
 - canonical executable `capability_id` terminology with bounded legacy readers;
-- strict passive Agent Skill contracts and a repository-owned read-only loader;
+- strict passive Agent Skill contracts and a repository-owned read-only Loader;
 - bounded model-authored no/one/multi-Skill discovery and selection with exact
-  registry/Goal validation, one repair, and optional no-Skill degradation.
+  registry/Goal validation, one repair, and optional no-Skill degradation;
+- Agent-specific progressive disclosure across the five maintained model roles,
+  with exact package/projection digest checks, omission-not-truncation budgets,
+  forged-context removal, and content-free trace metadata.
 
 Current implementation slice:
 
-> Add Agent-Specific Progressive Disclosure.
+> Bind Agent Skill Provenance to Canonical Plans.
 
-Only an already-selected projection may enter the matching Goal Association,
-Fast Planner, Deep Planner, Response Composer, or Tool Result Interpreter model
-boundary. The Host may resolve the declared projection path, recheck package and
-projection digests, enforce prompt budgets, and record provenance; it must not
-select a Skill, inject the complete package, reinterpret the Goal, or grant
-Capability authority. This slice does not yet bind Skill provenance to
-Canonical Plans or add grounded-information/weather domain packages.
+Planner-produced Canonical Plans must retain the exact selected Skill identity,
+version, role projection, package/projection digests, selection/disclosure IDs,
+and relevant Goal IDs. Plan validation may verify that provenance, but Trusted
+Capability Runtime continues to authorize and execute only `capability_id` steps.
+This slice does not add grounded-information/weather domain packages.
 
 Exit criteria:
 

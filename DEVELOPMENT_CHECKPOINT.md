@@ -37,23 +37,22 @@ is to execute that workflow from a clean committed deployment, review and
 approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
-The next and only active code implementation Issue is now **Add Agent-Specific
-Progressive Disclosure**. Canonical executable terminology, the passive
-read-only Agent Skill foundation, and the independent model-authored selection
-boundary are implemented and automatically verified. `/agent-skills/select`
-shows only bounded approved summaries for a declared Agent role and accepts a
-typed no/one/multi-Skill decision validated against exact IDs, versions,
-projection, relevant Goal IDs, confidence, and registry digest. One invalid
-result may receive one repair; model failure degrades to optional no-Skill.
+The next and only active code implementation Issue is now **Bind Agent Skill
+Provenance to Canonical Plans**. Canonical executable terminology, the passive
+read-only Agent Skill foundation, independent model-authored selection, and
+Agent-specific progressive disclosure are implemented and automatically verified.
+The five maintained model boundaries strip caller-supplied disclosure context,
+select from bounded approved summaries, revalidate package/projection digests,
+and inject only their exact selected role projections under omission-not-
+truncation prompt budgets. Empty roots and no-Skill decisions remain behavior-
+neutral. Result/trace metadata retains identities, digests, counts, and typed
+failures without logging projection content or source paths.
 
-The repository-owned root remains empty of domain Skills, and selection is not
-yet called by the Cognitive Turn Loop. No selected projection enters Goal
-Association, Fast Planner, Deep Planner, Response Composer, or Tool Result
-Interpreter prompts yet. The next slice must load only an already-selected
-role-specific projection under bounded prompt budgets and retain digest
-provenance. Do not add phrase-to-Skill rules, weather-specific Host selection,
-broad full-package injection, script execution, provider registration, or
-Capability authority.
+The repository-owned root remains empty of domain Skills. The next slice must
+record exact selection/disclosure provenance in immutable Canonical Plans while
+keeping execution dependent only on registered `capability_id` steps. Do not add
+phrase-to-Skill rules, weather-specific Host selection, script execution,
+provider registration, or Capability authority.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for

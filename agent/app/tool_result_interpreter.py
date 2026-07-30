@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .agent_skills import agent_skill_prompt_section
 
 try:
     from chromie_contracts.tool_result import (
@@ -179,14 +180,24 @@ class ToolResultInterpreter:
         ]
         personality = request.context.get("personality_expression") or {}
         identity = request.context.get("identity") or {}
+        skill_section = agent_skill_prompt_section(
+            request.context,
+            agent_role="tool_result_interpreter",
+        )
+        conversation_hints = {
+            key: value
+            for key, value in request.context.items()
+            if key != "agent_skill_disclosure"
+        }
         return (
             "Interpret trusted tool results as Chromie's natural spoken answer.\n"
             f"User request: {request.user_request}\n"
             f"Target language: {request.language}\n"
             f"Chromie identity JSON: {self._bounded(identity, 2200)}\n"
             f"Chromie personality JSON: {self._bounded(personality, 4200)}\n"
+            f"{skill_section}"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
-            f"Conversation hints JSON: {self._bounded(request.context, 2600)}\n\n"
+            f"Conversation hints JSON: {self._bounded(conversation_hints, 2600)}\n\n"
             "First understand the exact question the user asked. Choose answer_mode=direct "
             "for a narrow question, summary for a normal overview, and detailed only when the "
             "user explicitly asks for detail. For a yes/no, qualitative, comparative, comfort, "

@@ -1,7 +1,8 @@
 # Agent Skills Implementation Plan
 
-Status: Open architecture issue; canonical Capability terminology is implemented
-and automatically verified; Agent Skill contracts and loader are not yet implemented
+Status: Open architecture issue; canonical Capability terminology, passive
+contracts/Loader, model-authored selection, and Agent-specific progressive
+disclosure are implemented and automatically verified
 Related architecture: [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 
 ## Issue
@@ -235,8 +236,7 @@ Implementation status:
   the Capability Registry, Canonical Plans, prompts of other Agents, or execution;
 - the repository-owned root still contains no domain Skill package, so default
   runtime calls currently return `no_candidates` without invoking the model;
-- progressive projection loading and Cognitive Turn Loop integration remain the
-  next owning slice.
+- Agent-specific projection disclosure is now implemented by the following slice.
 
 ### Add Agent-specific progressive disclosure
 
@@ -257,6 +257,24 @@ Acceptance:
 - projection identity and digest appear in trace metadata;
 - optional Skill loading failure cannot fabricate execution or evidence;
 - prompt budgets and context truncation remain observable.
+
+Implementation status:
+
+- complete for Goal Association, Fast Planner, Deep Planner, Response Composer,
+  and Tool Result Interpreter, including their bounded repair prompts;
+- each boundary performs model-authored selection from approved summaries and
+  lazily loads only the exact matching projection after rechecking package and
+  projection provenance;
+- per-projection, aggregate-character, and projection-count budgets omit content
+  rather than truncate it; partial disclosure preserves model-authored order and
+  records typed failure reasons;
+- caller-supplied `agent_skill_disclosure` context is removed before selection,
+  so only the trusted Loader can inject projection text;
+- empty registries and no-Skill decisions remain behavior-neutral and make no
+  selection-model call;
+- traces and result metadata retain identity, digests, counts, and failures but
+  never projection content or filesystem source paths;
+- Skill provenance is not yet embedded in `CanonicalPlan`; that is the next slice.
 
 ### Bind Agent Skills to Canonical Plans
 
@@ -433,15 +451,15 @@ The issue may close only when:
 
 Begin with:
 
-> **Establish Agent Skill Contracts and Read-Only Loader.**
+> **Bind Agent Skill Provenance to Canonical Plans.**
 
-Define the passive `agent_skill_id` metadata, owner approval, semantic version,
-content digest, bounded summaries, projection declarations, and deterministic
-read-only loading boundary. The loader may inspect approved repository content;
-it cannot import package code, register Capabilities, grant permissions, or
-execute anything.
+Extend the immutable Plan contract with the exact selected Skill ID, version,
+Agent projection, package digest, projection digest, selection ID, disclosure
+ID, and relevant Goal IDs used by the Planner. Execution must continue to read
+only `capability_id` steps and ignore Agent Skill content. Plan validation may
+verify provenance but must not grant permissions, register Capabilities, or
+change Provider/safety authority.
 
-Do not begin by writing a weather keyword selector, a fixed weather Workflow,
-model-authored Skill selection, or an automatic Skill script loader. Selection
-and progressive disclosure remain later slices after the passive foundation is
-secure and automatically verified.
+Do not begin by adding domain-specific weather selection, a second execution
+registry, or a Host-authored Workflow. Grounded external-information and weather
+packages remain subsequent vertical slices.

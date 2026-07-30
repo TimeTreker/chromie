@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from pathlib import PurePosixPath
 from typing import Any, Literal
@@ -22,6 +24,21 @@ AgentSkillSelectionStatus = Literal[
     "no_candidates",
     "model_unavailable",
     "model_contract_failed",
+]
+AgentSkillDisclosureStatus = Literal[
+    "loaded",
+    "partial",
+    "no_skill",
+    "unavailable",
+]
+AgentSkillDisclosureFailureReason = Literal[
+    "selection_not_selected",
+    "selection_role_mismatch",
+    "selection_provenance_mismatch",
+    "projection_load_failed",
+    "projection_too_large",
+    "total_budget_exceeded",
+    "projection_count_limit_exceeded",
 ]
 AgentSkillLoadFailureReason = Literal[
     "root_not_found",
@@ -509,6 +526,206 @@ class AgentSkillSelectionResolution(BaseModel):
                 raise ValueError("selected Agent Skill digest does not match candidate")
             if item.projection not in candidate.available_projections:
                 raise ValueError("selected projection is not declared by the candidate")
+            if item.projection != self.agent_role:
+                raise ValueError("selected projection must match the responsible Agent role")
+        return self
+
+
+class AgentSkillDisclosureRequest(BaseModel):
+    """Request to load only projections already selected by one responsible Agent."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1.0"] = "1.0"
+    selection: AgentSkillSelectionResolution
+
+
+class DisclosedAgentSkillProjection(BaseModel):
+    """One bounded projection with exact selection and package provenance."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    selection_id: str = Field(min_length=1, max_length=200)
+    selected_by_agent_role: AgentSkillProjectionName
+    agent_skill_id: str
+    version: str
+    projection: AgentSkillProjectionName
+    content: str = Field(min_length=1)
+    content_digest: str
+    projection_digest: str
+    relevant_goal_ids: tuple[str, ...] = Field(default_factory=tuple)
+    selection_rationale: str = Field(min_length=1, max_length=500)
+    selection_confidence: float = Field(ge=0.0, le=1.0)
+    source: str = Field(min_length=1)
+    char_count: int = Field(ge=1)
+
+    @field_validator("agent_skill_id", mode="before")
+    @classmethod
+    def normalize_agent_skill_id(cls, value: Any) -> str:
+        return _normalize_identifier(value, field_name="agent_skill_id")
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def validate_semantic_version(cls, value: Any) -> str:
+        text = str(value or "").strip()
+        if not _SEMANTIC_VERSION.fullmatch(text):
+            raise ValueError("version must be a valid semantic version")
+        return text
+
+    @field_validator("content_digest", "projection_digest", mode="before")
+    @classmethod
+    def validate_digests(cls, value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if not _SHA256.fullmatch(text):
+            raise ValueError("projection provenance digests must use sha256:<64 lowercase hex>")
+        return text
+
+    @field_validator("relevant_goal_ids", mode="before")
+    @classmethod
+    def normalize_goal_ids(cls, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("relevant_goal_ids must be an array")
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+        return tuple(out)
+
+    @model_validator(mode="after")
+    def validate_projection_identity(self) -> "DisclosedAgentSkillProjection":
+        if self.projection != self.selected_by_agent_role:
+            raise ValueError("disclosed projection must match the selecting Agent role")
+        if self.char_count != len(self.content):
+            raise ValueError("char_count must equal the disclosed projection content length")
+        return self
+
+
+class AgentSkillDisclosureFailure(BaseModel):
+    """Observable optional projection omission; never execution evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    agent_skill_id: str | None = None
+    version: str | None = None
+    projection: AgentSkillProjectionName | None = None
+    reason: AgentSkillDisclosureFailureReason
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class AgentSkillDisclosureResolution(BaseModel):
+    """Bounded model context loaded from one validated Skill selection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1.0"] = "1.0"
+    disclosure_id: str = Field(min_length=1, max_length=200)
+    selection_id: str = Field(min_length=1, max_length=200)
+    sid: str = Field(min_length=1, max_length=200)
+    turn_id: str = Field(min_length=1, max_length=200)
+    agent_role: AgentSkillProjectionName
+    status: AgentSkillDisclosureStatus
+    projections: tuple[DisclosedAgentSkillProjection, ...] = Field(default_factory=tuple)
+    failures: tuple[AgentSkillDisclosureFailure, ...] = Field(default_factory=tuple)
+    total_chars: int = Field(default=0, ge=0)
+    max_projection_chars: int = Field(ge=1)
+    max_total_chars: int = Field(ge=1)
+    projection_count_limit: int = Field(ge=1)
+    disclosure_digest: str
+
+    @staticmethod
+    def compute_disclosure_digest(
+        *,
+        selection_id: str,
+        agent_role: AgentSkillProjectionName,
+        status: AgentSkillDisclosureStatus,
+        projections: tuple[DisclosedAgentSkillProjection, ...],
+        failures: tuple[AgentSkillDisclosureFailure, ...],
+        max_projection_chars: int,
+        max_total_chars: int,
+        projection_count_limit: int,
+    ) -> str:
+        payload = {
+            "selection_id": selection_id,
+            "agent_role": agent_role,
+            "status": status,
+            "projections": [
+                {
+                    "agent_skill_id": item.agent_skill_id,
+                    "version": item.version,
+                    "projection": item.projection,
+                    "content_digest": item.content_digest,
+                    "projection_digest": item.projection_digest,
+                    "relevant_goal_ids": list(item.relevant_goal_ids),
+                    "char_count": item.char_count,
+                }
+                for item in projections
+            ],
+            "failures": [item.model_dump(mode="json") for item in failures],
+            "max_projection_chars": max_projection_chars,
+            "max_total_chars": max_total_chars,
+            "projection_count_limit": projection_count_limit,
+        }
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+    @field_validator("disclosure_digest", mode="before")
+    @classmethod
+    def validate_disclosure_digest(cls, value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if not _SHA256.fullmatch(text):
+            raise ValueError("disclosure_digest must use sha256:<64 lowercase hex>")
+        return text
+
+    @model_validator(mode="after")
+    def validate_disclosure_shape(self) -> "AgentSkillDisclosureResolution":
+        if len(self.projections) > self.projection_count_limit:
+            raise ValueError("disclosed projections exceed projection_count_limit")
+        if self.total_chars != sum(item.char_count for item in self.projections):
+            raise ValueError("total_chars must equal disclosed projection content lengths")
+        if self.total_chars > self.max_total_chars:
+            raise ValueError("disclosed projection content exceeds max_total_chars")
+        if any(item.char_count > self.max_projection_chars for item in self.projections):
+            raise ValueError("a disclosed projection exceeds max_projection_chars")
+        ids = [item.agent_skill_id for item in self.projections]
+        if len(ids) != len(set(ids)):
+            raise ValueError("disclosed Agent Skill projections must have unique IDs")
+        for item in self.projections:
+            if item.selection_id != self.selection_id:
+                raise ValueError("disclosed projection selection_id mismatch")
+            if item.selected_by_agent_role != self.agent_role:
+                raise ValueError("disclosed projection Agent role mismatch")
+        if self.status == "loaded" and not self.projections:
+            raise ValueError("status=loaded requires at least one projection")
+        if self.status == "partial" and (not self.projections or not self.failures):
+            raise ValueError("status=partial requires projections and failures")
+        if self.status in {"no_skill", "unavailable"} and self.projections:
+            raise ValueError(f"status={self.status} must not contain projections")
+        if self.status == "no_skill" and self.failures:
+            raise ValueError("status=no_skill must not contain projection failures")
+        if self.status == "unavailable" and not self.failures:
+            raise ValueError("status=unavailable requires at least one projection failure")
+        expected_digest = self.compute_disclosure_digest(
+            selection_id=self.selection_id,
+            agent_role=self.agent_role,
+            status=self.status,
+            projections=self.projections,
+            failures=self.failures,
+            max_projection_chars=self.max_projection_chars,
+            max_total_chars=self.max_total_chars,
+            projection_count_limit=self.projection_count_limit,
+        )
+        if self.disclosure_digest != expected_digest:
+            raise ValueError("disclosure_digest does not match the disclosure contents")
         return self
 
 

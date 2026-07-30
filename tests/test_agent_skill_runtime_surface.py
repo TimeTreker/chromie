@@ -30,6 +30,10 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
             agent_skill_selection_model="qwen3:test",
             agent_skill_selection_max_candidates=12,
             agent_skill_selection_max_selected=4,
+            agent_skill_progressive_disclosure_enabled=True,
+            agent_skill_projection_max_chars=3000,
+            agent_skill_projection_total_max_chars=6000,
+            agent_skill_projection_count_limit=4,
         )
 
         self.assertEqual(snapshot.summaries, ())
@@ -38,6 +42,10 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
         self.assertEqual(health.agent_skill_selection_model, "qwen3:test")
         self.assertEqual(health.agent_skill_selection_max_candidates, 12)
         self.assertEqual(health.agent_skill_selection_max_selected, 4)
+        self.assertTrue(health.agent_skill_progressive_disclosure_enabled)
+        self.assertEqual(health.agent_skill_projection_max_chars, 3000)
+        self.assertEqual(health.agent_skill_projection_total_max_chars, 6000)
+        self.assertEqual(health.agent_skill_projection_count_limit, 4)
 
     def test_compose_mounts_agent_skill_root_read_only(self) -> None:
         compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
@@ -51,6 +59,22 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
         self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_ENABLED"], "${AGENT_SKILL_SELECTION_ENABLED:-1}")
         self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_MODEL"], "${AGENT_SKILL_SELECTION_MODEL:-qwen3:4b}")
         self.assertEqual(service["environment"]["AGENT_SKILL_SELECTION_MAX_CANDIDATES"], "${AGENT_SKILL_SELECTION_MAX_CANDIDATES:-12}")
+        self.assertEqual(
+            service["environment"]["AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED"],
+            "${AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED:-1}",
+        )
+        self.assertEqual(
+            service["environment"]["AGENT_SKILL_PROJECTION_MAX_CHARS"],
+            "${AGENT_SKILL_PROJECTION_MAX_CHARS:-3000}",
+        )
+        self.assertEqual(
+            service["environment"]["AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS"],
+            "${AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS:-6000}",
+        )
+        self.assertEqual(
+            service["environment"]["AGENT_SKILL_PROJECTION_COUNT_LIMIT"],
+            "${AGENT_SKILL_PROJECTION_COUNT_LIMIT:-4}",
+        )
 
     def test_agent_image_contains_repository_owned_empty_root(self) -> None:
         dockerfile = (ROOT / "agent" / "Dockerfile").read_text(encoding="utf-8")

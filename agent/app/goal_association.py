@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -793,6 +794,10 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
         clarification_authority = (
             "The admitted Cognitive Core disposition is clarify. Preserve that "
             "semantic authority: return decision=clarify with one concise "
@@ -852,7 +857,8 @@ class GoalAssociationResolver:
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
             f"{personality_json}\n\n"
-            "Bounded active goals JSON:\n"
+            + skill_section
+            + "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 6500)}\n\n"
             "Scoped discourse referents JSON:\n"
             f"{self._bounded_json(self._discourse_referents(request), 6500)}\n\n"
@@ -883,6 +889,10 @@ class GoalAssociationResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
         clarification_authority = (
             "The admitted Cognitive Core disposition is clarify. Return only "
             "decision=clarify with a concise user-facing question; do not create "
@@ -926,7 +936,8 @@ class GoalAssociationResolver:
             + "\n\nOwner-approved Personality Expression JSON:\n"
             + personality_json
             + "\n\n"
-            f"Latest user turn:\n{request.text}\n\n"
+            + skill_section
+            + f"Latest user turn:\n{request.text}\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"

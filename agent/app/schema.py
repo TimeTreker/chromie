@@ -350,6 +350,10 @@ class HealthResponse(BaseModel):
     agent_skill_selection_model: str | None = None
     agent_skill_selection_max_candidates: int = 0
     agent_skill_selection_max_selected: int = 0
+    agent_skill_progressive_disclosure_enabled: bool = False
+    agent_skill_projection_max_chars: int = 0
+    agent_skill_projection_total_max_chars: int = 0
+    agent_skill_projection_count_limit: int = 0
     task_graph_planning_enabled: bool = False
     read_only_task_graph_execution_enabled: bool = False
     planning_task_graph_execution_enabled: bool = False

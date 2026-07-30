@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased — Agent-specific progressive disclosure
+
+- Added strict disclosure request, projection, omission, and resolution contracts
+  that bind loaded text to the exact model selection, Agent role, Skill version,
+  package digest, projection digest, and relevant Goal IDs.
+- Integrated model-authored selection and lazy projection loading at the Goal
+  Association, Fast Planner, Deep Planner, Response Composer, and Tool Result
+  Interpreter boundaries. Each Agent receives only its own selected projection.
+- Added per-projection, aggregate-character, and projection-count budgets.
+  Oversized or unavailable projection content is omitted rather than truncated,
+  and optional loading failure cannot become execution or evidence.
+- Removed caller-supplied disclosure context before selection, revalidated package
+  provenance at load time, and added a passive-method prompt contract that cannot
+  override Goals, evidence, Capability schemas, confirmation, safety, or output
+  contracts.
+- Added digest-only result/trace metadata, configuration and health reporting,
+  `POST /agent-skills/disclose`, and focused tests for role isolation, forged
+  context/digest rejection, prompt budgets, empty-root neutrality, and unchanged
+  Capability Registry authority.
+
+## Unreleased — Agent-specific progressive disclosure
+
+- Added strict disclosure request/resolution contracts that preserve the exact
+  model-authored selection, Agent role, Goal bindings, package digest, projection
+  digest, character budgets, omission reasons, and disclosure digest.
+- Added a bounded disclosure service and `POST /agent-skills/disclose` that lazily
+  loads only already-selected role-specific projections, revalidates repository
+  content before every read, omits rather than truncates oversized content, and
+  never loads complete `SKILL.md` bodies into model context.
+- Integrated optional selection and projection disclosure into Goal Association,
+  Fast Planner, Deep Planner, Response Composer, and Tool Result Interpreter.
+  Each boundary receives only its own selected projection and retains existing
+  authoritative Goals, catalogs, schemas, evidence, and safety contracts.
+- Removed any caller-supplied disclosure payload before selection so only the
+  trusted Loader may inject projection content. Empty roots and explicit no-Skill
+  decisions remain behavior-neutral and do not invoke the selection model.
+- Added content-free trace/result metadata plus focused coverage for digest drift,
+  role isolation, prompt budgets, selection order, forged-context removal, and
+  unchanged Capability Registry authority.
+
 ## Unreleased — Model-authored Agent Skill discovery and selection
 
 - Added strict shared request, Goal-context, closed model-output, selected-Skill,

@@ -1,5 +1,10 @@
 from .agent_skill import (
     AgentSkillAuthority,
+    AgentSkillDisclosureFailure,
+    AgentSkillDisclosureFailureReason,
+    AgentSkillDisclosureRequest,
+    AgentSkillDisclosureResolution,
+    AgentSkillDisclosureStatus,
     AgentSkillDocument,
     AgentSkillExecutionAuthority,
     AgentSkillLoadFailure,
@@ -17,6 +22,7 @@ from .agent_skill import (
     AgentSkillSelectionResolution,
     AgentSkillSelectionStatus,
     AgentSkillSummary,
+    DisclosedAgentSkillProjection,
     SelectedAgentSkill,
 )
 from .route import RouteDecision, RouteItem, RouteRequest
@@ -175,6 +181,11 @@ from .tool_result import (
 
 __all__ = [
     "AgentSkillAuthority",
+    "AgentSkillDisclosureFailure",
+    "AgentSkillDisclosureFailureReason",
+    "AgentSkillDisclosureRequest",
+    "AgentSkillDisclosureResolution",
+    "AgentSkillDisclosureStatus",
     "AgentSkillDocument",
     "AgentSkillExecutionAuthority",
     "AgentSkillLoadFailure",
@@ -192,6 +203,7 @@ __all__ = [
     "AgentSkillSelectionResolution",
     "AgentSkillSelectionStatus",
     "AgentSkillSummary",
+    "DisclosedAgentSkillProjection",
     "SelectedAgentSkill",
     "RouteRequest",
     "RouteDecision",

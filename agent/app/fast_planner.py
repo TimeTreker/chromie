@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -451,6 +452,10 @@ class FastPlannerResolver:
         validation_errors: str = "",
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="fast_planner",
+        )
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
         association = context.get("goal_association_resolution") or {}
@@ -509,7 +514,8 @@ class FastPlannerResolver:
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
                 f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
                 f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
-            f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+                f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+                f"{skill_section}"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
@@ -543,6 +549,7 @@ class FastPlannerResolver:
             f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+            f"{skill_section}"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
@@ -556,7 +563,7 @@ class FastPlannerResolver:
             f"{argument_grounding_contract}"
             f"{semantic_scope_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
-                f"{PERSONALITY_SEMANTIC_CONTRACT}"
+            f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{route_effect_contract}"
             f"{concise_output_contract}"
             "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "

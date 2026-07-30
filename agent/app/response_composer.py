@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationErr
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -955,6 +956,10 @@ class ResponseComposerResolver:
         context = request.context if isinstance(request.context, dict) else {}
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
+        skill_section = agent_skill_prompt_section(
+            context,
+            agent_role="response_composer",
+        )
         return (
             f"User turn:\n{request.text}\n\n"
             f"Language hint: {request.language or 'auto'}\n\n"
@@ -962,6 +967,7 @@ class ResponseComposerResolver:
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+            f"{skill_section}"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Pending execution capability semantics JSON:\n{self._bounded(context.get('execution_capabilities') or [], 3000)}\n\n"
             f"Recent conversation JSON:\n{self._bounded((context.get('history') or request.history or [])[-6:], 2600)}\n\n"

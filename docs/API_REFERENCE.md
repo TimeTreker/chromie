@@ -51,8 +51,9 @@ running.
 | `GET` | `/agents` | List specialized agents and ownership notes. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
-| `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body/projection text and no model selection. |
+| `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body or projection text. |
 | `POST` | `/agent-skills/select` | Let the declared responsible Agent role make a typed model-authored no/one/multi-Skill decision from bounded approved summaries; this endpoint does not load projections, mutate Plans, or execute Capabilities. |
+| `POST` | `/agent-skills/disclose` | Load only exact projections from a validated selection under digest and prompt-budget checks; it does not mutate Plans or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
@@ -100,6 +101,13 @@ a goal-scoped `respond` outcome plus executable body steps; the Response
 Composer owns the speech plan. Search scores are relevance signals for catalog
 inspection endpoints, not Goal Interpretation execution authorization.
 
+`POST /agent-skills/disclose` accepts a previously validated selection and loads
+only its exact matching role projections. The Loader rechecks package content,
+applies per-projection/aggregate/count budgets, omits rather than truncates
+oversized content, and returns typed failures plus a disclosure digest. The five
+maintained model endpoints perform this selection/disclosure automatically;
+caller-supplied disclosure context is removed before trusted injection.
+
 ### Conversation and interaction
 
 | Method | Path | Purpose |
@@ -108,6 +116,7 @@ inspection endpoints, not Goal Interpretation execution authorization.
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Goal Interpretation actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
+| `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read skill requests already selected by the Goal-driven planner. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
