@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — VoiceAssistant composition-root decomposition
+
+- Extracted runtime-ready greeting scheduling and playback barriers into an independently tested `RuntimeReadyGreetingCoordinator`.
+- Kept wording generation behind the existing validated LLM boundary and retained `VoiceAssistant` as the public lifecycle owner.
+- Audited the remaining audio, cognition, cancellation, evidence, and cleanup responsibilities as intentional composition rather than hidden migration debt.
+
 ## Unreleased — typed ASR service configuration boundary
 
 - Added one immutable `ASRServiceSettings` startup snapshot with strict typed parsing, backend projection, and safe diagnostics.

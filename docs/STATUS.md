@@ -34,7 +34,9 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Decompose the VoiceAssistant Composition Root.**
+**Active implementation issue:** **Consolidate Current Documentation Authority.**
+
+The first VoiceAssistant decomposition set is implemented. Runtime-ready greeting scheduling and playback barriers now belong to `RuntimeReadyGreetingCoordinator`; the composition root supplies validated generation and playback dependencies and retains lifecycle ownership. Existing injected-audio skip, fallback, timeout, cancellation, ordering, and microphone-release behavior remains covered. The remaining responsibilities are intentionally composed in `VOICE_ASSISTANT_COMPOSITION_ROOT.md`.
 
 The typed service-configuration Issue is implemented for the complete ASR service boundary. `ASRServiceSettings` parses a copied startup environment once, validates booleans/numerics/ranges/mode, supplies the backend configuration, and exposes safe health diagnostics. Generated `.env.runtime` and hardware-profile precedence remain unchanged; the remaining service migration map is documented in `SERVICE_CONFIGURATION_BOUNDARIES.md`. The
 Agent Skills implementation track is code-complete: the repository-owned root now

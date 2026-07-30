@@ -93,6 +93,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
 - [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
 - [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md)
+- [VoiceAssistant Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md)
 - [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md)
 - [Static Analysis Ratchets](STATIC_ANALYSIS.md)
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)

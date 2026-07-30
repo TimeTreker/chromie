@@ -178,7 +178,9 @@ Completed domain implementation slices:
 
 The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
 
-The next active named code Issue is **Decompose the VoiceAssistant Composition Root**.
+The first VoiceAssistant decomposition set is complete: runtime-ready greeting scheduling and playback barriers are delegated to an independently tested collaborator, while the remaining lifecycle responsibilities are intentionally composed as documented in [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
+
+The next active named code Issue is **Consolidate Current Documentation Authority**.
 
 Exit criteria:
 

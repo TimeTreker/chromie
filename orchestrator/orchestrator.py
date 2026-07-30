@@ -79,6 +79,10 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.outcome_response import compose_outcome_response
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
+from orchestrator.runtime.runtime_ready_greeting import (
+    RuntimeReadyGreetingCoordinator,
+    RuntimeReadyGreetingPolicy,
+)
 from orchestrator.runtime.session import SessionTracker, now_ms
 from shared.chromie_runtime.accelerator_telemetry import (
     ACCELERATOR_SAMPLE_MODULE,
@@ -8883,90 +8887,31 @@ class VoiceAssistant:
                 return "", "unavailable"
             return fallback, "fallback"
 
-    async def _announce_runtime_ready(self) -> None:
-        """Speak one natural wake-up greeting before live microphone turns.
+    def _build_runtime_ready_greeting_coordinator(
+        self,
+    ) -> RuntimeReadyGreetingCoordinator:
+        async def schedule_text(text: str) -> dict[str, Any]:
+            return await self.schedule_tts_text(text, session_id=None)
 
-        The fast language model owns the normal wording using the owner-approved
-        identity, mind profile, and language. The host only schedules
-        the resulting speech before the microphone opens, so startup creates no
-        fake user turn and cannot feed its own greeting back through ASR.
-        """
-
-        if not self.runtime_ready_greeting_enabled:
-            logger.info("Runtime ready greeting disabled")
-            return
-        if self.audio_input_mode != "device" or self.audio_output_mode != "device":
-            logger.info(
-                "Runtime ready greeting skipped: input_mode=%s output_mode=%s",
-                self.audio_input_mode,
-                self.audio_output_mode,
-            )
-            return
-
-        text, source = await self._generate_runtime_ready_greeting()
-        if not self.is_valid_tts_text(text):
-            logger.warning(
-                "Runtime ready greeting skipped because no valid text was produced"
-            )
-            return
-
-        logger.info(
-            "Runtime ready greeting scheduled: source=%s text=%r",
-            source,
-            text,
+        return RuntimeReadyGreetingCoordinator(
+            policy=RuntimeReadyGreetingPolicy(
+                enabled=self.runtime_ready_greeting_enabled,
+                audio_input_mode=self.audio_input_mode,
+                audio_output_mode=self.audio_output_mode,
+                timeout_ms=self.runtime_ready_greeting_timeout_ms,
+            ),
+            generate_greeting=self._generate_runtime_ready_greeting,
+            is_valid_text=self.is_valid_tts_text,
+            schedule_text=schedule_text,
+            playback_start_key=self.playback_start_key,
+            playback_start_waiters=getattr(self, "playback_start_waiters", {}),
+            next_playback_order=lambda: getattr(self, "next_playback_order", 0),
         )
-        scheduled = await self.schedule_tts_text(text, session_id=None)
-        if scheduled.get("scheduled") is not True:
-            logger.warning(
-                "Runtime ready greeting could not be scheduled: reason=%s",
-                scheduled.get("reason") or "unknown",
-            )
-            return
 
-        generation = int(scheduled["generation"])
-        first_order = int(scheduled["order"])
-        last_order = int(scheduled.get("last_order", first_order))
-        first_key = self.playback_start_key(generation, first_order, None)
-        first_waiter = self.playback_start_waiters.get(first_key)
-        timeout_s = self.runtime_ready_greeting_timeout_ms / 1000.0
-        deadline = asyncio.get_running_loop().time() + timeout_s
+    async def _announce_runtime_ready(self) -> None:
+        """Delegate startup speech and playback barriers to one collaborator."""
 
-        if first_waiter is None:
-            logger.warning("Runtime ready greeting lost its playback-start waiter")
-            return
-
-        try:
-            started = await asyncio.wait_for(
-                asyncio.shield(first_waiter),
-                timeout=timeout_s,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Runtime ready greeting did not begin playback within timeout_ms=%s; "
-                "opening the microphone anyway",
-                self.runtime_ready_greeting_timeout_ms,
-            )
-            return
-
-        if not started:
-            logger.warning(
-                "Runtime ready greeting synthesis completed without starting playback; "
-                "opening the microphone anyway"
-            )
-            return
-
-        while self.next_playback_order <= last_order:
-            remaining = deadline - asyncio.get_running_loop().time()
-            if remaining <= 0:
-                logger.warning(
-                    "Runtime ready greeting playback did not finish within timeout_ms=%s; "
-                    "opening the microphone anyway",
-                    self.runtime_ready_greeting_timeout_ms,
-                )
-                return
-            await asyncio.sleep(min(0.05, remaining))
-
-        logger.info("Runtime ready greeting completed; live microphone turns are enabled")
+        await self._build_runtime_ready_greeting_coordinator().announce()
 
     async def run(self):
         gate = ServiceReadinessGate(

@@ -116,8 +116,8 @@ The following recommendations are not part of the current program:
 | Establish Incremental Type Checking | implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
 | Modernize Behavioral and Architecture Tests | implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | implemented and automatically verified | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
-| Decompose the VoiceAssistant Composition Root | active | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
-| Consolidate Current Documentation Authority | queued | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
+| Decompose the VoiceAssistant Composition Root | implemented and automatically verified | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
+| Consolidate Current Documentation Authority | active | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
 
 Closing one Issue does not automatically activate the next. The current tree,
 product milestone, and retained evidence determine whether the next queued Issue
@@ -502,6 +502,9 @@ Add typed service configuration boundaries
 ```
 
 ## Issue: Decompose the VoiceAssistant Composition Root
+
+Status: implemented and automatically verified through the runtime-ready greeting collaborator and the post-extraction composition audit in `VOICE_ASSISTANT_COMPOSITION_ROOT.md`.
+
 
 ### Problem
 
