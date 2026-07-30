@@ -1,0 +1,21 @@
+schema_version: "1.0"
+agent_skill_id: chromie.weather-information
+version: 1.0.0
+title: Weather Information
+description: Select for weather Goals involving location and time scope, rain, precipitation, temperature, apparent temperature, snow, wind, condition, or forecast interpretation; apply with the grounded external-information method.
+authority: agent_method_only
+execution_authority: none
+owner_approved: true
+content_digest: sha256:646bcc1c762d72c39237486fce3bc5ef792bd0484a984b6c2e04f74d9e03707c
+extends:
+  - chromie.grounded-external-information
+required_capabilities:
+  - chromie.weather.lookup
+optional_capabilities:
+  - chromie.memory.retrieve_verified_tool_result
+projections:
+  goal_association: projections/goal_association.md
+  fast_planner: projections/fast_planner.md
+  deep_planner: projections/deep_planner.md
+  response_composer: projections/response_composer.md
+  tool_result_interpreter: projections/tool_result_interpreter.md

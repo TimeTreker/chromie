@@ -37,12 +37,11 @@ environment-specific evidence work rather than inferred release claims.
 > target validation. No release version or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
-> **Accepted next architecture:** Agent Skills are passive, owner-approved
-> methods selected by Agents to inform Plans. Executable operations use
-> `capability_id`; legacy `skill_id` remains only a compatibility input during
-> migration. The first code slice makes Capability terminology canonical before
-> the Agent Skill registry, loader, selection, projections, and Plan provenance
-> are implemented.
+> **Implemented Agent Skills architecture:** Agent Skills are passive,
+> owner-approved methods selected by Agents to inform Plans. The repository now
+> includes grounded external-information and weather methods. Executable
+> operations still use registered `capability_id` contracts through the Trusted
+> Capability Runtime.
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
 
@@ -53,7 +52,7 @@ Host Orchestrator
   microphone -> VAD -> ASR -> Cognitive Gateway
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
-        -> Goal Association -> [planned] model-authored Agent Skill selection
+        -> Goal Association -> model-authored Agent Skill selection and bounded projection disclosure
         -> Fast Planner -> terminal Deep Planner when needed
         -> prospective Response Composer -> strict InteractionResponse
         -> Trusted Capability Runtime (legacy code name: Skill Runtime)

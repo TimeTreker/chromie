@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
-    def test_empty_repository_owned_root_is_valid_and_selection_can_be_enabled(self) -> None:
+    def test_repository_owned_domain_packages_load_and_selection_can_be_enabled(self) -> None:
         configured = load_agent_skill_registry([ROOT / "agent-skills"])
         snapshot = configured.snapshot()
         health = HealthResponse(
@@ -36,8 +36,14 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
             agent_skill_projection_count_limit=4,
         )
 
-        self.assertEqual(snapshot.summaries, ())
-        self.assertEqual(health.agent_skill_count, 0)
+        self.assertEqual(
+            [item.agent_skill_id for item in snapshot.summaries],
+            [
+                "chromie.grounded-external-information",
+                "chromie.weather-information",
+            ],
+        )
+        self.assertEqual(health.agent_skill_count, 2)
         self.assertTrue(health.agent_skill_model_selection_enabled)
         self.assertEqual(health.agent_skill_selection_model, "qwen3:test")
         self.assertEqual(health.agent_skill_selection_max_candidates, 12)
@@ -76,7 +82,7 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
             "${AGENT_SKILL_PROJECTION_COUNT_LIMIT:-4}",
         )
 
-    def test_agent_image_contains_repository_owned_empty_root(self) -> None:
+    def test_agent_image_contains_repository_owned_skill_root(self) -> None:
         dockerfile = (ROOT / "agent" / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("COPY agent-skills ./agent-skills", dockerfile)
 

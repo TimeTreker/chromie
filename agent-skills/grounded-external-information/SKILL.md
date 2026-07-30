@@ -1,0 +1,25 @@
+# Grounded External Information
+
+## Purpose
+
+Use this passive method when a Goal needs current or externally verified information. It helps an Agent preserve authoritative Goal bindings, choose between exact verified-memory retrieval and a fresh read, distinguish failure stages, and produce evidence-grounded speech.
+
+This Agent Skill does not resolve references by itself, call a provider, register a Capability, authorize execution, or define a Host Workflow. Goal Association remains responsible for semantic binding and reference resolution. Plans still reference registered `capability_id` values, and trusted execution evidence remains the only source of external facts.
+
+## Method
+
+1. Establish the current Goal and all material bindings before retrieval.
+2. Treat memory indexes as metadata that a result may be retrievable, never as answer evidence.
+3. Reuse a result only through the verified-memory Capability when tool identity, every material argument, and freshness match the current Goal.
+4. Otherwise use an appropriate fresh read Capability, clarify an unresolved material binding, or report that the need is unavailable.
+5. Before evidence exists, speech may acknowledge the pending read but must not claim a fact, measurement, conclusion, or completion.
+6. Interpret success and failure from trusted execution evidence, distinguishing binding, capability, retrieval, provider/network, and result-interpretation stages.
+7. Answer with only relevant supported facts, calibrated uncertainty, and natural wording for the user.
+
+## Boundaries
+
+- Old evidence cannot resolve a current pronoun or overwrite a current Goal binding.
+- A stale or mismatched memory entry is not a partial answer; it requires a fresh read or an honest limitation.
+- Provider adaptation belongs inside the executable Capability adapter.
+- No fixed acknowledgement wording or length is imposed by this Skill.
+- Package availability does not grant execution authority.

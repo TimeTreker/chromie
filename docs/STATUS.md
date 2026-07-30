@@ -34,24 +34,23 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Implement Grounded External-Information
-Agent Skill.** The prerequisite engineering safeguards and Canonical Plan
-provenance slice are implemented and automatically verified.
-`scripts/check_repository_policies.py` continues to enforce stable source,
-architecture, Agent Skill, contract, and local deployment boundaries.
+**Active implementation issue:** **Introduce High-Signal Ruff Gates.** The
+Agent Skills implementation track is code-complete: the repository-owned root now
+contains the owner-approved `chromie.grounded-external-information` base method
+and `chromie.weather-information` specialization, each with bounded projections
+for all five maintained Agent roles.
 
-Fast and Deep Planner outputs now retain exact content-free Skill provenance in
-`CanonicalPlan.selected_agent_skills`: selection/disclosure identity, selecting
-planner role, Skill/version, package/projection/disclosure digests, explicit
-relevant Goal IDs, rationale, and confidence. Deep Plans preserve ordered Fast
-Planner provenance before appending their own. Plan fingerprints, replay payloads,
-and runtime summaries retain that identity; recovery and cancellation child Plans
-narrow relevance to retained Goals. Capability registration, authorization,
-Provider validation, confirmation, and execution still inspect only registered
-`capability_id` steps. The repository-owned root still contains no domain Skill
-package; the active Issue adds the first passive grounded external-information
-method. Gateway/Core qualification remains an independent open evidence issue
-rather than a second code implementation mainline.
+The methods preserve authoritative Goal bindings, exact verified-memory versus
+fresh lookup, freshness, pre-evidence speech truth, typed failure interpretation,
+canonical weather location/time/aspect scope, and natural grounded result
+explanation. They remain passive and cannot register, authorize, or execute a
+Capability. Fast and Deep Plans retain exact content-free Skill provenance while
+Capability execution still inspects only registered `capability_id` steps.
+Maintained discourse, verified-memory, Neixiang/Chongqing, hierarchical geocoding,
+weather result, and response-composition regressions pass. Positive live-model
+selection and live-weather execution remain target-evidence tracks. Gateway/Core
+qualification remains an independent open evidence issue rather than a second
+code implementation mainline.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automatic evidence, target evidence, and deployment
@@ -63,7 +62,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,598 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,608 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,
@@ -676,7 +675,7 @@ Target validation or Release readiness.
 | High-level Chromie self and ability model | Implemented as an owner-approved structured self model plus a static Host ability ontology above concrete skills. Prompts bind first-person speech, perception, action, and body ownership to the self-model speaker entity, expose language/reasoning models only as internal components, and use a natural social presentation that foregrounds the name Chromie rather than volunteering system category, embodiment category, age labels, or internal architecture; capability inquiries use supplied catalog/provider evidence semantically and do not execute actions. The ontology uses only backend-neutral lifecycle states; provider-backed body skills remain non-executable there and are resolved only from the live provider catalog | Mind/self-model, conversation prompt, Goal Interpreter inquiry-versus-execution, DeepThinking, direct-fallback, ability-registry vocabulary, provider-confirmation parity, capability-evidence, dialogue-scenario, task-ledger, and Orchestrator TTS-alignment tests | Automated prompt/scenario evidence only; no claim that every live model response will be correct, and only existing text/provider paths exercise executable abilities | Registry enabled in host Orchestrator; no identity-question branch, hardcoded identity reply, normal-language identity/capability regex, simulator-only state, or hardware-only state is present; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Historical clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence is retained for its recorded revisions; a clean current goal-driven rerun remains open. Physical supervised mode is separate support evidence for human voice-device claims | Acceptance-only |
 | Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
-| Passive Agent Skill foundation and model-authored selection | Strict immutable `skill.yaml` metadata, bounded summaries, digest-bound lazy `SKILL.md`/projection reads, explicit owner approval, `authority=agent_method_only`, `execution_authority=none`, safe YAML/unique keys, semantic versions, path/symlink/package-size controls, duplicate/parent/cycle rejection, metadata-only `/agent-skills`, read-only Compose mount, and independent typed `/agent-skills/select` are implemented. Selection discloses only projection-compatible approved summaries and validates exact ID/version/projection/Goal/confidence/digest with one repair. The repository root currently contains no domain Skill package. | 31 focused Loader, runtime-surface, selection-contract, no/one/multi-Skill, context variation, repair/failure, candidate-bound, provenance, and Capability-isolation tests plus the maintained full gate | No domain-Skill or Cognitive Turn Loop projection evidence; default empty-root selection returns `no_candidates` without a model call | Selection endpoint enabled by default; no projection is loaded into another Agent, no Plan is changed, and the registry has no registration or execution API |
+| Passive Agent Skills, selection, disclosure, and Plan provenance | Strict immutable `skill.yaml` metadata, bounded summaries, digest-bound lazy projection reads, explicit approval/authority, safe paths/content, model-authored no/one/multi-Skill selection, role-specific disclosure, and content-free Canonical Plan provenance are implemented. The repository root contains `chromie.grounded-external-information` and `chromie.weather-information`, each exposing all five role projections. | Loader, runtime-surface, selection, disclosure, provenance, real-package, discourse, verified-memory, weather-location, result-interpretation, response-composition, policy, and maintained full-gate tests | Positive live model selection and live provider-backed weather execution are not yet retained target evidence | Enabled by default; packages remain passive, no projection crosses roles, and Capability registration/authorization/execution remain unchanged |
 | Capability registry and deployment probe | Implemented; materialization preserves provider compatibility tools but forces raw planar `commands[]` controller arrays out of model-facing catalogs, and the static audit rejects visible regressions | Registry, manifest, pagination, schema, materialization-visibility, and CLI safety tests | Checked-in Soridormi manifest is pinned to an upstream commit | Root Compose loads the static manifest by default; live Soridormi provider use remains off in the common safe base; normal model-authored motion uses named skills or structured task goals rather than controller recipes |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
@@ -1001,18 +1000,18 @@ Documentation status:
 
 Implementation status:
 
-- implemented and automatically verified: shared passive Agent Skill DTOs;
-- implemented and automatically verified: secure read-only Skill registry/Loader;
-- implemented and automatically verified: model-authored Skill discovery/selection;
-- implemented and automatically verified: role-specific progressive projection
-  disclosure with digest checks, budgets, forged-context removal, and content-free
-  trace metadata;
-- not implemented: CanonicalPlan Skill provenance;
-- not implemented: grounded external-information and weather Skill packages;
-- not retained: positive live model/domain-Skill evidence, because the repository
-  root intentionally contains no domain Skill package yet.
+- implemented and automatically verified: shared passive Agent Skill DTOs,
+  secure read-only Registry/Loader, model-authored selection, role-specific
+  progressive disclosure, and content-free Canonical Plan provenance;
+- implemented and automatically verified: owner-approved grounded
+  external-information and weather packages with five role projections each;
+- retained automated regressions cover scoped discourse, exact verified memory,
+  Neixiang/Chongqing grounding, hierarchical weather location resolution, typed
+  weather failures/results, and unchanged Capability authority;
+- not retained: positive live model selection and live provider-backed weather
+  execution for these package digests.
 
-Current runtime behavior is unchanged. The accepted target vocabulary uses
+Current execution authority is unchanged. The accepted target vocabulary uses
 `capability_id`, CapabilityRequest/CapabilityResult, named capability, and
 Trusted Capability Runtime; legacy `skill_id` and Skill Runtime names remain
 compatibility aliases until the first implementation slice migrates the typed

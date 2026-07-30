@@ -68,11 +68,12 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Implement Grounded External-Information Agent Skill
+## Completed implementation track — Grounded and Weather Agent Skills
 
 The executable Capability terminology, passive read-only Agent Skill
-contract/Loader, independent model-authored discovery/selection, and role-specific
-progressive disclosure slices are implemented and automatically verified. Both
+contract/Loader, independent model-authored discovery/selection, role-specific
+progressive disclosure, Plan provenance, grounded external-information method,
+and weather specialization are implemented and automatically verified. Both
 required engineering safeguards are also complete.
 
 `Issue: Make Runtime Failure Paths Explicit` replaced production assertions and
@@ -91,11 +92,15 @@ and confidence. Deep Plans preserve ordered Fast Planner provenance before
 appending their own. Plan fingerprints and replay summaries retain that identity,
 while execution still authorizes only registered `capability_id` steps.
 
-The active Issue now implements the repository-owned grounded external-
-information Agent Skill as a passive method package for evidence strategy,
-freshness, acknowledgement, typed failure interpretation, and grounded response.
-The weather-information Skill follows as its domain extension. Local target
-validation of loopback exposure remains a separate deployment-evidence item.
+The repository-owned root now contains `chromie.grounded-external-information`
+and its `chromie.weather-information` specialization. Both expose all five role
+projections, remain execution-authority-free, fit configured disclosure budgets,
+and preserve provider adaptation inside the Weather Capability adapter. Real
+model selection and live weather execution remain target-evidence work.
+
+The next active named code Issue is **Introduce High-Signal Ruff Gates** from the
+engineering sustainability plan. Local target validation of loopback exposure
+remains a separate deployment-evidence item.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -159,14 +164,16 @@ Completed implementation slices:
   relevance, deterministic Fast-to-Deep inheritance, and unchanged Capability
   execution authority.
 
-Current implementation slice:
+Completed domain implementation slices:
 
-> Implement Grounded External-Information Agent Skill.
+- `chromie.grounded-external-information` for authoritative bindings, exact
+  verified-memory versus fresh reads, freshness, truthful pending speech, typed
+  failure interpretation, and grounded explanation;
+- `chromie.weather-information` as its weather specialization for canonical
+  location/time/aspect scope, exact weather-memory matching, weather lookup, and
+  result interpretation.
 
-Add an owner-approved passive package under `agent-skills/` with exact projections
-for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool
-Result Interpreter. Selection remains model-authored and execution remains
-restricted to registered `capability_id` steps.
+The next active named code Issue is **Introduce High-Signal Ruff Gates**.
 
 Exit criteria:
 

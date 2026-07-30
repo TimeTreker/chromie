@@ -234,9 +234,9 @@ Implementation status:
   selections, and permits one bounded same-contract repair;
 - unavailable or invalid model output fails to optional no-Skill without changing
   the Capability Registry, Canonical Plans, prompts of other Agents, or execution;
-- the repository-owned root still contains no domain Skill package, so default
-  runtime calls currently return `no_candidates` without invoking the model;
-- Agent-specific projection disclosure is now implemented by the following slice.
+- the repository-owned root contains approved grounded external-information and
+  weather packages; unrelated Goals may still produce explicit `no_skill`;
+- Agent-specific projection disclosure is implemented by the following slice.
 
 ### Add Agent-specific progressive disclosure
 
@@ -354,6 +354,17 @@ Acceptance:
 - stale evidence cannot resolve discourse or silently become a current result;
 - no fixed acknowledgement length or wording is introduced.
 
+Implementation status:
+
+- complete as the owner-approved `chromie.grounded-external-information` package;
+- all five role projections preserve authoritative bindings, require explicit
+  exact verified-memory retrieval or a fresh read, distinguish clarification and
+  unavailable outcomes, prevent pre-evidence factual speech, and interpret typed
+  failure stages without a Host Workflow or phrase rule;
+- package digest, role disclosure, no-Skill behavior, prompt budgets, Plan
+  provenance, and unchanged Capability Registry authority are automatically
+  verified; positive live-model selection remains target evidence.
+
 ### Implement weather information Skill
 
 Add the first domain Skill extending grounded external information.
@@ -380,6 +391,20 @@ Acceptance:
 - exact fresh memory may be retrieved explicitly;
 - mismatched or stale memory leads to a fresh lookup;
 - the Skill improves related weather variants, not only one fixture sentence.
+
+Implementation status:
+
+- complete as `chromie.weather-information`, extending the grounded method and
+  exposing all five role projections;
+- the package preserves canonical location/time/aspect bindings, requires exact
+  weather-memory identity/freshness, otherwise uses `chromie.weather.lookup`, and
+  distinguishes successful no-rain evidence from `location_not_found`, network,
+  provider, timeout, and malformed-result failures;
+- provider-compatible geocoding remains exclusively in the Weather Capability
+  adapter; maintained Neixiang/Chongqing discourse, memory, hierarchical-location,
+  result-interpretation, and response-composition regressions pass;
+- automated evidence does not substitute for live model selection or live
+  provider acceptance.
 
 ### Add observability and review evidence
 
@@ -464,16 +489,18 @@ The issue may close only when:
 - automated, live-text, and live-tool evidence are reported separately;
 - documentation, changelog, roadmap, status, and contributor guidance agree.
 
-## Immediate next implementation slice
+## Implementation completion and remaining evidence
 
-`Issue: Make Runtime Failure Paths Explicit`, `Issue: Establish Repository
-Engineering Policy Checks`, and `Issue: Bind Agent Skill Provenance to Canonical
-Plans` are implemented and automatically verified. Resume this plan with:
+The generic Agent Skill contracts, secure Loader, model-authored selection,
+progressive disclosure, Canonical Plan provenance, grounded external-information
+method, and weather specialization are implemented and automatically verified.
+The Agent Skills implementation Issue is therefore code-complete.
 
-> **Implement Grounded External-Information Agent Skill.**
+Live-text evidence must still retain real model-authored selection and exact Plan
+provenance, and live weather evidence must prove that the selected methods still
+cross the existing Trusted Capability Runtime. Those are target-evidence tracks,
+not reasons to add Host selection rules or another execution path.
 
-Add the first repository-owned passive domain method with projections for the
-five maintained Agent roles. It must improve evidence-strategy reasoning without
-adding a Host-authored Workflow, phrase selector, Capability registration, or
-execution authority. The weather-information Skill follows as the domain
-extension.
+The next named code Issue is maintained in the engineering sustainability plan:
+
+> **Introduce High-Signal Ruff Gates.**

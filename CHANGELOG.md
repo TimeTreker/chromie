@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Grounded external-information and weather Agent Skills
+
+- Added the first two repository-owned, owner-approved passive Agent Skill
+  packages: `chromie.grounded-external-information` and its weather
+  specialization `chromie.weather-information`.
+- Added bounded role projections for Goal Association, Fast Planner, Deep
+  Planner, Response Composer, and Tool Result Interpreter covering exact Goal
+  bindings, verified-memory versus fresh lookup, evidence freshness, safe
+  acknowledgement, typed failures, and grounded result explanation.
+- Added weather-specific methods for location/time/aspect bindings, exact
+  weather-memory matching, canonical location preservation, rain/precipitation,
+  temperature/apparent-temperature, wind/condition interpretation, and the
+  distinction between successful negative weather evidence and provider failure.
+- Kept provider geocoding adaptation inside the Weather Capability adapter and
+  kept Skill packages passive: they do not register, authorize, or execute
+  Capabilities. Added real-package selection, disclosure, provenance, budget,
+  no-Skill, and Capability-authority tests across all five Agent roles.
+
 ## Unreleased — Canonical Plan Agent Skill provenance
 
 - Added a strict content-free `PlanAgentSkillProvenance` contract and

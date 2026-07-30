@@ -421,7 +421,10 @@ class AgentSkillSelectionService:
             "authorize Capabilities, resolve safety, or replace the current Goal and "
             "Plan contracts. Select only from the supplied summaries. Do not infer "
             "availability of unlisted Skills. A no_skill decision is valid and often "
-            "correct. Return only the required JSON object."
+            "correct. The extends field is dependency metadata, not automatic "
+            "selection: when both a reusable base method and its domain "
+            "specialization are useful, select both explicitly and order the base "
+            "method before the specialization. Return only the required JSON object."
         )
 
     def _selection_prompt(

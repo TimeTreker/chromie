@@ -49,4 +49,16 @@ scripts or references. Package code is never imported or executed. Startup
 retains metadata summaries only; explicit body/projection reads recheck the
 package digest before returning immutable text/provenance DTOs.
 
-No model-selection behavior or domain Skill package is included in this Issue.
+## Repository-owned packages
+
+- `chromie.grounded-external-information`: reusable evidence strategy for
+  authoritative bindings, exact verified-memory versus fresh lookup, freshness,
+  acknowledgement, typed failure stages, and grounded explanation.
+- `chromie.weather-information`: weather specialization extending the grounded
+  method for location/time/aspect bindings, exact weather-memory matching,
+  canonical location preservation, and weather-result interpretation.
+
+The selection model may choose zero, one, or both packages for a responsible
+Agent. `extends` is dependency metadata, not automatic Host selection; when both
+methods are useful, the model selects the base method before the specialization.
+Package presence still grants no Capability registration or execution authority.

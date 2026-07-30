@@ -6,6 +6,20 @@ disclosure, and Canonical Plan provenance implemented; domain Skills remain open
 Scope: Goal-Driven Cognitive Core, Agent roles, reusable cognitive methods,
 planning, capability execution, and evidence
 
+## Current repository-owned domain methods
+
+- `chromie.grounded-external-information`: reusable evidence strategy for exact
+  Goal bindings, verified-memory versus fresh reads, freshness, truthful pending
+  speech, typed failures, and grounded explanation.
+- `chromie.weather-information`: weather specialization for canonical
+  location/time/aspect scope, weather memory matching, lookup planning, and
+  result interpretation. It declares the grounded method as its parent.
+
+Both packages expose projections for the five maintained Agent roles. Parent
+metadata informs model-authored composition; the Host does not automatically
+select a parent or domain Skill. Neither package registers or executes a
+Capability.
+
 ## Purpose
 
 Chromie needs reusable task knowledge without creating a second planner, a

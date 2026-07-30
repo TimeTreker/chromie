@@ -66,12 +66,15 @@ running.
 | `POST` | `/tool-result/interpret` | Select exact grounded facts from complete tool evidence and synthesize a concise spoken answer. |
 
 `GET /agent-skills` reports the passive read-only cognitive-content registry.
-The maintained repository root is mounted read-only and currently contains no
-domain Skill package. Startup validates safe YAML, explicit
+The maintained repository root is mounted read-only and contains the approved
+`chromie.grounded-external-information` and `chromie.weather-information`
+packages. Startup validates safe YAML, explicit
 `authority=agent_method_only`, explicit `execution_authority=none`, owner
 approval, semantic version, deterministic package digest, projection paths,
 duplicate IDs, parent references, and inheritance cycles. The endpoint exposes
-only immutable bounded summaries.
+only immutable bounded summaries. The two packages expose projections for all
+five maintained Agent roles; the weather package declares the grounded method as
+its parent and remains passive despite referencing required/optional Capabilities.
 
 `POST /agent-skills/select` accepts the responsible Agent projection name, the
 current user text, bounded Goal context, optional bounded context summaries, and
