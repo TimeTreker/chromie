@@ -533,6 +533,7 @@ services:
       AGENT_TASK_GRAPH_TRACE_TTL_SEC: ${AGENT_TASK_GRAPH_TRACE_TTL_SEC:-900}
       AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES: ${AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES:-128}
       AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-/app/capabilities/soridormi.json}
+      AGENT_SKILL_ROOTS: ${AGENT_SKILL_ROOTS:-/app/agent-skills}
       AGENT_CAPABILITY_CATALOG_REFRESH_SEC: ${AGENT_CAPABILITY_CATALOG_REFRESH_SEC:?Set AGENT_CAPABILITY_CATALOG_REFRESH_SEC}
       AGENT_CAPABILITY_MATCH_MIN_SCORE: ${AGENT_CAPABILITY_MATCH_MIN_SCORE:?Set AGENT_CAPABILITY_MATCH_MIN_SCORE}
       AGENT_CAPABILITY_MATCH_LIMIT: ${AGENT_CAPABILITY_MATCH_LIMIT:?Set AGENT_CAPABILITY_MATCH_LIMIT}
@@ -602,6 +603,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./capabilities:/app/capabilities:ro
+      - ./agent-skills:/app/agent-skills:ro
     depends_on:
       chromie-llm:
         condition: service_healthy

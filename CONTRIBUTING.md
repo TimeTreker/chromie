@@ -42,6 +42,10 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   default-off rollout gates.
 - Preserve compatibility adapters until a documented migration and rollback
   path exists.
+- Treat `agent-skills/` as passive reviewed prompt content: never add an
+  executable entrypoint, provider registration, permission, confirmation
+  exemption, phrase selector, or hidden mutable state. Regenerate and review the
+  package digest after any content change.
 
 ## Tests
 

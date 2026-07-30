@@ -123,7 +123,7 @@ Implementation status:
 - contradictory dual identity fails closed;
 - canonical runtime/type names are aliases over the existing single registry and
   Trusted Runtime rather than a second authority;
-- the maintained full gate passes 1,527 primary tests plus 20 legacy Agent tests;
+- the maintained full gate passes 1,545 primary tests plus 20 legacy Agent tests;
 - no Agent Skill package, loader, selection, or execution authority is introduced
   by this slice.
 
@@ -147,6 +147,17 @@ Acceptance:
 - Agent Skill contracts cannot carry executable steps or grant permissions;
 - no behavior changes before the loader and selection boundaries exist.
 
+Implementation status:
+
+- complete in the current repository snapshot for metadata, bounded summaries,
+  projection/document DTOs, registry snapshots, and typed loader failures;
+- `authority=agent_method_only` and `execution_authority=none` are explicit
+  required metadata fields, and unknown executable/provider declarations fail
+  closed through strict schemas;
+- typed model-selection and Plan-provenance contracts remain intentionally
+  deferred to their owning slices rather than being prematurely attached to
+  model or execution behavior.
+
 ### Add a read-only Skill registry and loader
 
 Create a repository-owned `agent-skills/` root and a loader that:
@@ -166,6 +177,22 @@ Acceptance:
 - unapproved, malformed, duplicate, or path-escaping packages are excluded;
 - capability catalog contents and execution permissions are unchanged;
 - loader behavior is deterministic and covered by dependency-light tests.
+
+Implementation status:
+
+- complete for explicitly configured immediate-child packages under the
+  repository-owned `agent-skills/` root;
+- safe YAML, unique keys, semantic versions, owner approval, projection paths,
+  package size bounds, package-wide digest, duplicate IDs, unknown parents, and
+  inheritance cycles fail closed;
+- startup exposes immutable bounded summaries only; full `SKILL.md` and declared
+  projections are loaded lazily and revalidated against the approved digest;
+- the maintained Compose profile mounts the root read-only;
+- the registry has no registration or execution API, imports no package code,
+  and leaves the Capability Registry unchanged;
+- `GET /agent-skills` and `/health` provide metadata-only operational
+  visibility, with model selection explicitly reported disabled;
+- no domain Agent Skill package is present yet.
 
 ### Add model-authored Skill discovery and selection
 

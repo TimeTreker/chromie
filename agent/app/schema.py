@@ -343,6 +343,10 @@ class HealthResponse(BaseModel):
     available_agents: list[str] = Field(default_factory=list)
     capability_sources: list[str] = Field(default_factory=list)
     capability_manifest_files: list[str] = Field(default_factory=list)
+    agent_skill_roots: list[str] = Field(default_factory=list)
+    agent_skill_package_files: list[str] = Field(default_factory=list)
+    agent_skill_count: int = 0
+    agent_skill_model_selection_enabled: bool = False
     task_graph_planning_enabled: bool = False
     read_only_task_graph_execution_enabled: bool = False
     planning_task_graph_execution_enabled: bool = False

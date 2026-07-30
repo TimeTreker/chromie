@@ -170,7 +170,7 @@ both maintained Compose source files and Docker Compose's resolved JSON. The
 supported service launcher runs the resolved check before startup, and focused
 unit tests reject unspecified hosts, IPv4/IPv6 wildcards, and host networking.
 
-The maintained full gate passes 1,527 primary tests plus 20 legacy Agent tests,
+The maintained full gate passes 1,545 primary tests plus 20 legacy Agent tests,
 including eight focused exposure-policy tests. This establishes implementation
 and automatic verification. Local target acceptance still must confirm localhost
 reachability, failed LAN reachability, and unchanged container-to-container

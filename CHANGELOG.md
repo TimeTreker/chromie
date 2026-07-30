@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — Read-only Agent Skill contracts and loader
+
+- Added strict shared Agent Skill metadata, summary, projection, document,
+  registry-snapshot, and typed loader-failure contracts with stable
+  `agent_skill_id`, semantic version, owner approval, content digest, and
+  Agent-specific projection identities.
+- Added a repository-owned read-only `agent-skills/` root and deterministic
+  loader that scans only configured roots, validates safe YAML and unique keys,
+  blocks path escape and symlinks, rejects duplicate IDs and inheritance cycles,
+  and verifies package-wide SHA-256 content provenance.
+- Kept full `SKILL.md` and projection text out of startup summaries. Explicit
+  reads recheck the package digest, apply bounded UTF-8 Markdown limits, and
+  return immutable provenance-bound DTOs.
+- Proved package Python remains inert and Agent Skill loading cannot register or
+  execute Capabilities. Runtime inspection is metadata-only through
+  `GET /agent-skills`; model-authored Skill selection remains disabled.
+- Mounted the repository Skill root read-only in the maintained Compose profile
+  and added a deterministic digest authoring helper plus focused contract,
+  security, and runtime-surface tests.
+
 ## Unreleased — Secure local runtime exposure
 
 - Bound all maintained ASR, maintained/evaluation TTS, Ollama, and Agent host

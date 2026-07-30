@@ -14,6 +14,7 @@ COPY agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agent/app ./app
+COPY agent-skills ./agent-skills
 COPY shared/chromie_contracts ./chromie_contracts
 COPY shared/chromie_runtime ./chromie_runtime
 

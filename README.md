@@ -229,6 +229,7 @@ documented in
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |
 | `capabilities/` | Pinned external capability manifests and prompt-tier presets |
+| `agent-skills/` | Repository-owned passive Agent Skill packages; mounted read-only and never execution-authoritative |
 | `hardware/` | Legacy mock compatibility daemon |
 | `scripts/` | Startup, validation, evidence, and release tooling |
 | `docs/` | Project authority, interfaces, configuration, and decisions |

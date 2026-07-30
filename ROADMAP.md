@@ -68,13 +68,14 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Establish Agent Skill Contracts and Read-Only Loader
+## Active architecture issue — Add Model-Authored Agent Skill Discovery and Selection
 
-The executable Capability terminology slice is implemented and automatically
-verified. The active code slice now establishes passive Agent Skill contracts and
-a secure read-only owner-approved loader. Local target validation of loopback
-exposure remains a separate deployment-evidence item and does not block this
-repository implementation slice.
+The executable Capability terminology and passive read-only Agent Skill
+contract/loader slices are implemented and automatically verified. The active
+code slice now adds model-authored discovery and selection from bounded approved
+summaries. Local target validation of loopback exposure remains a separate
+deployment-evidence item and does not block this repository implementation
+slice.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -124,15 +125,22 @@ Semantic delivery order:
 - remove legacy aliases only after retained artifacts and external callers have
   migrated.
 
+Completed implementation slices:
+
+- canonical executable `capability_id` terminology with bounded legacy readers;
+- strict passive Agent Skill contracts and a repository-owned read-only loader.
+
 Current implementation slice:
 
-> Establish Agent Skill Contracts and Read-Only Loader.
+> Add Model-Authored Agent Skill Discovery and Selection.
 
-The loader is a passive cognitive-content boundary. It must validate
-`agent_skill_id`, version, owner approval, digest, and projection paths; it must
-not execute scripts, register Capabilities, grant permissions, or select Skills
-for the model. Do not begin with a weather keyword selector, fixed weather
-Workflow, model-authored selection, or provider-registration mechanism.
+The responsible Agent may receive bounded approved summaries and author a typed
+zero/one/multi-Skill or explicit no-Skill decision. Retrieval may narrow
+candidates but cannot decide semantics. The Host may validate identity, version,
+approval, digest, projection availability, Goal bindings, and output schema; it
+must not select Skills from phrases or routes. This slice does not yet attach
+projections to every Agent, bind Skill provenance to Canonical Plans, or add
+weather packages.
 
 Exit criteria:
 
@@ -241,7 +249,7 @@ maintained in
 The first named Issue is implemented and automatically verified: all maintained
 Compose host publications are loopback-bound, a dependency-light checker guards
 maintained source, the supported launcher audits the fully resolved Compose
-configuration before startup, and the maintained full gate passes 1,527 primary
+configuration before startup, and the maintained full gate passes 1,545 primary
 tests plus 20 legacy Agent tests. Local target acceptance proving localhost
 access, failed LAN access, and unchanged container networking remains open and
 must not be inferred from automated evidence.

@@ -27,6 +27,7 @@ Include:
 
 - guarded TaskGraph bearer-token handling;
 - capability-manifest substitution and remote MCP endpoints;
+- Agent Skill metadata/content substitution, path escape, digest drift, or unapproved prompt material;
 - confirmation grants and replay resistance;
 - interruption, cancellation, stop, and emergency fallback;
 - audio files, speaker profiles, and local recordings;
@@ -60,6 +61,24 @@ use Docker service names, while the host Orchestrator uses `127.0.0.1`.
 host networking. The supported service launcher audits Docker Compose's fully
 resolved configuration before starting containers, so local override files
 cannot silently broaden the host boundary.
+
+## Agent Skill content boundary
+
+Agent Skills are prompt-method assets, not executable plugins. The maintained
+runtime loads only explicitly configured roots, and Compose mounts the
+repository root read-only. `skill.yaml` is parsed with safe YAML and duplicate
+key rejection; packages require explicit owner approval, cognitive-only
+authority, no execution authority, semantic version, bounded relative Markdown
+projection paths, and a deterministic package digest. Symlinks, path escape,
+digest drift, duplicate IDs, unknown parents, inheritance cycles, oversized
+content, and unsafe YAML fail closed.
+
+The loader never imports package Python, executes scripts, registers a
+Capability/provider, grants permission, modifies confirmation policy, or writes
+to the package root. Directory presence alone has no authority. Full `SKILL.md`
+and projection text are excluded from startup/API summaries and are loaded only
+by explicit read methods that recheck the approved digest. Model-authored Skill
+selection is not enabled in this implementation slice.
 
 ## Safety boundary
 

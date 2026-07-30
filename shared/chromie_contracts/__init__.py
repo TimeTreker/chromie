@@ -1,3 +1,16 @@
+from .agent_skill import (
+    AgentSkillAuthority,
+    AgentSkillDocument,
+    AgentSkillExecutionAuthority,
+    AgentSkillLoadFailure,
+    AgentSkillLoadFailureReason,
+    AgentSkillMetadata,
+    AgentSkillProjection,
+    AgentSkillProjectionDeclaration,
+    AgentSkillProjectionName,
+    AgentSkillRegistrySnapshot,
+    AgentSkillSummary,
+)
 from .route import RouteDecision, RouteItem, RouteRequest
 from .core_interpretation import CoreInterpretationResult
 from .agent import AgentRequest, AgentResult, SpeechItem
@@ -153,6 +166,17 @@ from .tool_result import (
 )
 
 __all__ = [
+    "AgentSkillAuthority",
+    "AgentSkillDocument",
+    "AgentSkillExecutionAuthority",
+    "AgentSkillLoadFailure",
+    "AgentSkillLoadFailureReason",
+    "AgentSkillMetadata",
+    "AgentSkillProjection",
+    "AgentSkillProjectionDeclaration",
+    "AgentSkillProjectionName",
+    "AgentSkillRegistrySnapshot",
+    "AgentSkillSummary",
     "RouteRequest",
     "RouteDecision",
     "RouteItem",

@@ -332,7 +332,8 @@ agent-skills/
     SKILL.md
     projections/
       goal_association.md
-      planner.md
+      fast_planner.md
+      deep_planner.md
       response_composer.md
       tool_result_interpreter.md
     references/
@@ -342,7 +343,8 @@ agent-skills/
     SKILL.md
     projections/
       goal_association.md
-      planner.md
+      fast_planner.md
+      deep_planner.md
       response_composer.md
       tool_result_interpreter.md
     references/
@@ -352,6 +354,7 @@ agent-skills/
 The initial package contract should include:
 
 ```yaml
+schema_version: "1.0"
 agent_skill_id: chromie.weather-information
 version: 1.0.0
 title: Weather Information
@@ -359,6 +362,7 @@ description: Grounded methods for understanding, planning, and explaining weathe
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
+content_digest: sha256:<digest of every package file except skill.yaml>
 extends:
   - chromie.grounded-external-information
 required_capabilities:
@@ -367,21 +371,37 @@ optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
 projections:
   goal_association: projections/goal_association.md
-  planner: projections/planner.md
+  fast_planner: projections/fast_planner.md
+  deep_planner: projections/deep_planner.md
   response_composer: projections/response_composer.md
   tool_result_interpreter: projections/tool_result_interpreter.md
 ```
 
-The exact file schema will be finalized in the contract implementation slice.
-The following invariants are already fixed:
+This is now the implemented `skill.yaml` schema. `schema_version`, both
+Authority fields, owner approval, and `content_digest` are explicit. Metadata
+uses strict safe YAML with unknown and duplicate keys rejected. Projection paths
+are normalized package-relative Markdown paths and may not escape through `..`,
+absolute paths, or symlinks.
+
+The digest deterministically frames every package-relative path and byte length
+for all files except `skill.yaml`, then hashes their bytes. Generate it with:
+
+```bash
+python scripts/agent_skill_digest.py agent-skills/<package>
+```
+
+The following invariants are enforced:
 
 - `authority` is cognitive only;
 - `execution_authority` is none;
 - only owner-approved packages are model-visible;
 - a package cannot register a capability or provider;
 - unknown or malformed Skill packages fail closed and are not loaded;
-- package content is read-only during a turn;
-- Skill selection is model-authored and typed.
+- package content is mounted read-only in the maintained Compose profile;
+- startup retains bounded metadata summaries, not full `SKILL.md` or projection text;
+- explicit body/projection reads recheck the package digest before returning text;
+- package Python or scripts are inert and are never imported or executed;
+- Skill selection is model-authored and typed, but is not implemented by this loader Issue.
 
 ## Weather vertical slice
 

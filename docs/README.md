@@ -152,6 +152,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Tool Result Interpretation](TOOL_RESULT_INTERPRETATION.md)
 - [Shared Packages](../shared/README.md)
 - [Capability Manifests](../capabilities/README.md)
+- [Agent Skill Packages](../agent-skills/README.md)
 - [Legacy Hardware Daemon](../hardware/README.md)
 - [Hardware Profiles](../HARDWARE_PROFILES.md)
 

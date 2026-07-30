@@ -13,12 +13,14 @@ from pydantic import BaseModel, Field
 from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
+from .agent_skills import build_configured_agent_skill_registry
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
 
 try:
+    from chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
     from chromie_contracts.core_interpretation import CoreInterpretationResult
     from chromie_contracts.route import RouteDecision as SharedRouteDecision
     from chromie_contracts.tool_result import (
@@ -36,6 +38,7 @@ try:
         normalize_social_attention_mode,
     )
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
     from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
     from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
     from shared.chromie_contracts.tool_result import (
@@ -267,6 +270,9 @@ class Settings(BaseModel):
         le=10000,
     )
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
+    agent_skill_roots: str = Field(
+        default_factory=lambda: os.getenv("AGENT_SKILL_ROOTS", "agent-skills")
+    )
     capability_catalog_refresh_sec: float = Field(
         default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_CATALOG_REFRESH_SEC", "30")),
         ge=1.0,
@@ -556,6 +562,10 @@ task_continuity_resolver = (
 )
 configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
 capability_registry = configured_registry.registry
+configured_agent_skill_registry = build_configured_agent_skill_registry(
+    settings.agent_skill_roots
+)
+agent_skill_registry = configured_agent_skill_registry.registry
 local_tool_executor = LocalToolExecutor(
     capability_registry,
     weather_client=weather_client,
@@ -674,6 +684,12 @@ logger.info(
     ",".join(configured_registry.sources),
     ",".join(configured_registry.manifest_files) or "<none>",
     len(capability_registry.list_tools()),
+)
+logger.info(
+    "loaded read-only Agent Skill registry roots=%s packages=%s skills=%d",
+    ",".join(configured_agent_skill_registry.roots) or "<none>",
+    ",".join(configured_agent_skill_registry.package_files) or "<none>",
+    len(agent_skill_registry),
 )
 goal_association_client = (
     OllamaClient(
@@ -809,6 +825,10 @@ async def health() -> HealthResponse:
         available_agents=runtime.available_agents(),
         capability_sources=configured_registry.sources,
         capability_manifest_files=configured_registry.manifest_files,
+        agent_skill_roots=list(configured_agent_skill_registry.roots),
+        agent_skill_package_files=list(configured_agent_skill_registry.package_files),
+        agent_skill_count=len(agent_skill_registry),
+        agent_skill_model_selection_enabled=False,
         task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
         planning_task_graph_execution_enabled=planning_invoker is not None,
@@ -992,6 +1012,12 @@ async def resolve_task_continuity(request: AgentRunRequest) -> SemanticTaskOpera
                 "sid": request.sid,
             },
         )
+
+
+@app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)
+async def agent_skills() -> AgentSkillRegistrySnapshot:
+    """Return bounded metadata only; no Skill body or projection is disclosed."""
+    return configured_agent_skill_registry.snapshot()
 
 
 @app.get("/capabilities")

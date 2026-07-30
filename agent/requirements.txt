@@ -4,3 +4,4 @@ httpx==0.28.1
 mcp==1.27.2
 pydantic==2.13.3
 orjson==3.11.8
+PyYAML==6.0.3

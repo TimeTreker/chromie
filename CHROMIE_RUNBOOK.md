@@ -73,6 +73,29 @@ Stop services:
 ./scripts/compose.sh down
 ```
 
+### Inspect the passive Agent Skill registry
+
+The maintained Compose profile mounts `./agent-skills` at
+`/app/agent-skills:ro`. Startup validates the configured packages before the
+Agent becomes healthy. This Issue contains no domain Skill package and does not
+enable model selection.
+
+```bash
+curl -fsS http://127.0.0.1:8092/agent-skills | python -m json.tool
+curl -fsS http://127.0.0.1:8092/health | python -m json.tool
+```
+
+The registry response must contain summaries only, never `SKILL.md` or
+projection text. After editing a reviewed package, regenerate the declared
+digest before startup:
+
+```bash
+python scripts/agent_skill_digest.py agent-skills/<package>
+```
+
+Directory presence, a valid digest, or a declared Capability dependency never
+registers or authorizes a Capability.
+
 ## 3. Prepare Ollama
 
 ```bash

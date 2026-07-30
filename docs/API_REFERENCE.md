@@ -51,6 +51,7 @@ running.
 | `GET` | `/agents` | List specialized agents and ownership notes. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
+| `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body/projection text and no model selection. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
@@ -61,6 +62,17 @@ running.
 | `POST` | `/compose-response-plan` | Bind goal-scoped speech and optional auxiliary attention to an immutable terminal plan. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 | `POST` | `/tool-result/interpret` | Select exact grounded facts from complete tool evidence and synthesize a concise spoken answer. |
+
+`GET /agent-skills` reports the passive read-only cognitive-content registry.
+The maintained repository root is mounted read-only and currently contains no
+domain Skill package. Startup validates safe YAML, explicit
+`authority=agent_method_only`, explicit `execution_authority=none`, owner
+approval, semantic version, deterministic package digest, projection paths,
+duplicate IDs, parent references, and inheritance cycles. The endpoint exposes
+only immutable bounded summaries. It does not expose `SKILL.md`, load
+projections into prompts, select Skills, register Capabilities, or execute
+package content. `/health` separately reports configured roots, package files,
+Skill count, and `agent_skill_model_selection_enabled=false` for this slice.
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
