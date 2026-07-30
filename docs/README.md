@@ -5,6 +5,8 @@ authoritative home and other documents should link to it rather than repeat it.
 
 ## Authority order
 
+The machine-readable ownership map and archive rules are defined in [Documentation Authority](DOCUMENTATION_AUTHORITY.md).
+
 1. [Project Charter](PROJECT_CHARTER.md) - stable mission, ownership, principles,
    and non-goals.
 2. [Cognitive Gateway](COGNITIVE_GATEWAY.md) - authoritative target boundary
@@ -90,6 +92,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Project README](../README.md)
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
+- [Documentation Authority](DOCUMENTATION_AUTHORITY.md)
 - [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
 - [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
 - [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md)
@@ -271,3 +274,12 @@ Run:
 python scripts/check_docs.py
 ./scripts/run_tests.sh
 ```
+
+
+## Historical archives
+
+These files preserve detailed narrative and are not current authority:
+
+- [Changelog Archive — through 2026-07-30](../CHANGELOG_ARCHIVE_2026-07-30.md)
+- [Development Checkpoint Archive — 2026-07-30](../DEVELOPMENT_CHECKPOINT_ARCHIVE_2026-07-30.md)
+- [Implementation Status Archive — 2026-07-30](STATUS_ARCHIVE_2026-07-30.md)

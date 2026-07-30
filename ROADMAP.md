@@ -98,12 +98,7 @@ projections, remain execution-authority-free, fit configured disclosure budgets,
 and preserve provider adaptation inside the Weather Capability adapter. Real
 model selection and live weather execution remain target-evidence work.
 
-The high-signal Ruff gate is implemented as an explicit, pinned, monotonic
-defect-oriented ratchet. The incremental Mypy ratchet is implemented over selected clean contract and
-tooling boundaries. Behavioral, architecture-policy, and generated-artifact test ownership is now
-mechanically separated. The next active named code Issue is **Establish Typed
-Service Configuration Boundaries** from the engineering sustainability plan. Local target validation of loopback exposure
-remains a separate deployment-evidence item.
+The high-signal Ruff gate, incremental Mypy ratchet, test-ownership guard, typed ASR settings boundary, VoiceAssistant greeting collaborator, and documentation-authority consolidation are implemented. The accepted engineering-sustainability implementation program is complete. Open live and deployment evidence remains governed by the owning qualification documents; local target validation of loopback exposure remains separate deployment evidence.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -180,7 +175,7 @@ The typed ASR service configuration boundary is implemented: one immutable start
 
 The first VoiceAssistant decomposition set is complete: runtime-ready greeting scheduling and playback barriers are delegated to an independently tested collaborator, while the remaining lifecycle responsibilities are intentionally composed as documented in [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
-The next active named code Issue is **Consolidate Current Documentation Authority**.
+The accepted engineering-sustainability implementation program is complete. There is no active named code Issue; the next work is source-bound qualification and retained target evidence.
 
 Exit criteria:
 
@@ -301,10 +296,12 @@ classified; state-changing malformed semantic operations fail before mutation;
 and evidence loss remains observable. The audit is maintained in
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
-The active code implementation Issue is **Establish Repository Engineering
-Policy Checks**. It converts stable architecture and deployment boundaries into
-one dependency-light checker before Agent Skill Plan provenance resumes. The
-independent Gateway/Core evidence track remains open.
+The repository engineering policy checker, Agent Skill Plan provenance,
+domain Skills, Ruff/Mypy ratchets, test-ownership modernization, typed ASR
+configuration boundary, first VoiceAssistant collaborator extraction, and
+documentation-authority consolidation are implemented. No named code Issue from
+this program remains active. The independent Gateway/Core and other retained
+evidence tracks remain open under their owning qualification documents.
 
 The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
 strict typing, blanket removal of source-level tests, Git LFS for the current

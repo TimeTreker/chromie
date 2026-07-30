@@ -117,11 +117,16 @@ The following recommendations are not part of the current program:
 | Modernize Behavioral and Architecture Tests | implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | implemented and automatically verified | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | implemented and automatically verified | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
-| Consolidate Current Documentation Authority | active | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
+| Consolidate Current Documentation Authority | implemented and automatically verified | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
 
 Closing one Issue does not automatically activate the next. The current tree,
 product milestone, and retained evidence determine whether the next queued Issue
 is still the correct priority.
+
+
+## Program status
+
+All accepted implementation Issues are closed with automatic verification. This program is complete as a code-maintenance backlog. It does not imply release readiness or target validation; live Gateway/Core, Social Attention, provider, audio, simulator, LAN, and physical evidence remain owned by their qualification documents.
 
 ## Issue: Secure Local Runtime Exposure
 
@@ -558,6 +563,9 @@ Extract <semantic collaborator> from VoiceAssistant
 ```
 
 ## Issue: Consolidate Current Documentation Authority
+
+Status: implemented and automatically verified. Current ownership is defined in `DOCUMENTATION_AUTHORITY.md`; detailed superseded narratives remain indexed historical archives.
+
 
 ### Problem
 

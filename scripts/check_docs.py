@@ -37,6 +37,7 @@ CONFIGURATION_REFERENCE = ROOT / "docs" / "CONFIGURATION.md"
 PROJECT_CHARTER = ROOT / "docs" / "PROJECT_CHARTER.md"
 ROADMAP = ROOT / "ROADMAP.md"
 COMMON_ENV = ROOT / ".env.common"
+DOCUMENTATION_AUTHORITY = ROOT / "config" / "documentation_authority.json"
 
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 STATUS_FILES = [
@@ -56,6 +57,7 @@ RUNTIME_CONFIG_SOURCES = [
     ROOT / "orchestrator" / "orchestrator.py",
     ROOT / "agent" / "app" / "main.py",
     ROOT / "asr" / "server.py",
+    ROOT / "asr" / "settings.py",
     ROOT / "tts" / "server.py",
     ROOT / "agent" / "app" / "main.py",
 ]
@@ -456,6 +458,117 @@ def check_configuration_reference(errors: list[str]) -> None:
 
 
 
+
+def check_documentation_authority(errors: list[str]) -> None:
+    required_roles = {
+        "mission_architecture",
+        "delivery_order",
+        "implementation_and_evidence_status",
+        "resume_point",
+        "operations",
+        "configuration",
+        "api_contracts",
+        "security",
+        "documentation_index",
+        "notable_changes",
+    }
+    try:
+        payload = json.loads(DOCUMENTATION_AUTHORITY.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"Cannot read documentation authority registry: {exc}")
+        return
+    if payload.get("schema_version") != "1.0":
+        errors.append("documentation authority registry must use schema_version=1.0")
+
+    authorities = payload.get("authorities")
+    if not isinstance(authorities, list):
+        errors.append("documentation authority registry authorities must be a list")
+        return
+    roles: set[str] = set()
+    paths: set[str] = set()
+    for entry in authorities:
+        if not isinstance(entry, dict):
+            errors.append("documentation authority entry must be an object")
+            continue
+        role = str(entry.get("role") or "").strip()
+        raw_path = str(entry.get("path") or "").strip()
+        if not role or role in roles:
+            errors.append(f"documentation authority role is missing or duplicated: {role!r}")
+        else:
+            roles.add(role)
+        if not raw_path or raw_path in paths:
+            errors.append(f"documentation authority path is missing or duplicated: {raw_path!r}")
+            continue
+        paths.add(raw_path)
+        path = (ROOT / raw_path).resolve()
+        try:
+            path.relative_to(ROOT.resolve())
+        except ValueError:
+            errors.append(f"documentation authority path escapes repository: {raw_path}")
+            continue
+        if not path.is_file():
+            errors.append(f"documentation authority path does not exist: {raw_path}")
+    missing = sorted(required_roles - roles)
+    if missing:
+        errors.append(f"documentation authority registry is missing roles: {missing}")
+
+    archives = payload.get("historical_archives")
+    if not isinstance(archives, list):
+        errors.append("historical_archives must be a list")
+    else:
+        for raw_path in archives:
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                errors.append("historical archive path must be a non-empty string")
+                continue
+            path = (ROOT / raw_path).resolve()
+            try:
+                path.relative_to(ROOT.resolve())
+            except ValueError:
+                errors.append(f"historical archive path escapes repository: {raw_path}")
+                continue
+            if not path.is_file():
+                errors.append(f"historical archive does not exist: {raw_path}")
+                continue
+            text = path.read_text(encoding="utf-8")
+            if "Status: historical archive; not current authority" not in text:
+                errors.append(f"historical archive lacks authority marker: {raw_path}")
+
+    limits = payload.get("concise_line_limits")
+    if not isinstance(limits, dict):
+        errors.append("concise_line_limits must be an object")
+    else:
+        for raw_path, raw_limit in limits.items():
+            try:
+                limit = int(raw_limit)
+            except (TypeError, ValueError):
+                errors.append(f"invalid documentation line limit for {raw_path!r}")
+                continue
+            path = ROOT / str(raw_path)
+            if not path.is_file():
+                errors.append(f"concise authority document does not exist: {raw_path}")
+                continue
+            line_count = len(path.read_text(encoding="utf-8").splitlines())
+            if line_count > limit:
+                errors.append(
+                    f"{raw_path} has {line_count} lines, exceeding reviewed authority limit {limit}"
+                )
+
+    authority_doc = ROOT / "docs" / "DOCUMENTATION_AUTHORITY.md"
+    if not authority_doc.is_file():
+        errors.append("docs/DOCUMENTATION_AUTHORITY.md is missing")
+    else:
+        text = authority_doc.read_text(encoding="utf-8")
+        for phrase in (
+            "One owner per current fact",
+            "Four-axis",
+            "historical archive; not current authority",
+            "config/documentation_authority.json",
+        ):
+            if phrase not in text:
+                errors.append(
+                    f"docs/DOCUMENTATION_AUTHORITY.md is missing {phrase!r}"
+                )
+
 def check_artifact_reproducibility(errors: list[str]) -> None:
     errors.extend(exact_requirement_errors(ROOT))
     declared_images(ROOT, source_environment(ROOT))
@@ -517,6 +630,7 @@ def main() -> int:
     check_api_reference(errors)
     check_configuration_reference(errors)
     check_artifact_reproducibility(errors)
+    check_documentation_authority(errors)
 
     if errors:
         print("Documentation checks failed:", file=sys.stderr)
@@ -529,7 +643,7 @@ def main() -> int:
         f"{len(markdown_files())} Markdown files, project direction, "
         "local links, semantic project naming, current focus, API routes, "
         "runtime configuration coverage and safety defaults, "
-        "and reproducible development artifact inputs."
+        "reproducible development artifact inputs, and documentation authority."
     )
     return 0
 

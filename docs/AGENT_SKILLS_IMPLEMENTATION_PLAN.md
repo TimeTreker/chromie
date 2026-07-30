@@ -1,18 +1,20 @@
 # Agent Skills Implementation Plan
 
-Status: Open architecture issue; canonical Capability terminology, passive
-contracts/Loader, model-authored selection, and Agent-specific progressive
-disclosure are implemented and automatically verified
+Status: Implemented architecture issue; canonical Capability terminology,
+passive contracts/Loader, model-authored selection, progressive disclosure,
+Plan provenance, and the first domain Skills are automatically verified; positive
+live selection and provider-backed weather execution remain target evidence
 Related architecture: [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 
 ## Issue
 
 **Introduce Agent Skills on canonical Capability terminology without creating a second execution authority.**
 
-Chromie already has LLM-driven Agents, Canonical Plans, typed executable
-capabilities, a legacy-named Trusted Skill Runtime, provider validation, scoped memory, and
-scenario-based evaluation. What is missing is a first-class way to package and
-progressively load reusable task methods for those Agents.
+Chromie now has LLM-driven Agents, Canonical Plans, typed executable
+Capabilities, Trusted Capability Runtime validation, scoped memory, scenario-based
+evaluation, and first-class owner-approved packages for reusable Agent methods.
+The implementation below records the completed responsibility boundaries and
+remaining target-evidence requirements.
 
 The implementation must let Agents discover and use reusable methods while
 preserving these invariants:

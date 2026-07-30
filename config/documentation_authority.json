@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "authorities": [
+    {"role": "mission_architecture", "path": "docs/PROJECT_CHARTER.md"},
+    {"role": "delivery_order", "path": "ROADMAP.md"},
+    {"role": "implementation_and_evidence_status", "path": "docs/STATUS.md"},
+    {"role": "resume_point", "path": "DEVELOPMENT_CHECKPOINT.md"},
+    {"role": "operations", "path": "CHROMIE_RUNBOOK.md"},
+    {"role": "configuration", "path": "docs/CONFIGURATION.md"},
+    {"role": "api_contracts", "path": "docs/API_REFERENCE.md"},
+    {"role": "security", "path": "SECURITY.md"},
+    {"role": "documentation_index", "path": "docs/README.md"},
+    {"role": "notable_changes", "path": "CHANGELOG.md"}
+  ],
+  "historical_archives": [
+    "CHANGELOG_ARCHIVE_2026-07-30.md",
+    "DEVELOPMENT_CHECKPOINT_ARCHIVE_2026-07-30.md",
+    "docs/STATUS_ARCHIVE_2026-07-30.md"
+  ],
+  "concise_line_limits": {
+    "CHANGELOG.md": 220,
+    "DEVELOPMENT_CHECKPOINT.md": 160,
+    "docs/STATUS.md": 260
+  }
+}
