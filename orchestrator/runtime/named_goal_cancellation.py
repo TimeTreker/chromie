@@ -192,6 +192,9 @@ def _build_confirmation_remainder(
                     )
                 ],
                 "goal_satisfaction": None,
+                "selected_agent_skills": old_plan.agent_skill_provenance_for_goals(
+                    kept_goal_ids
+                ),
                 "response_text": (
                     old_plan.response_text if disposition == "respond" else ""
                 ),

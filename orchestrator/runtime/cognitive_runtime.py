@@ -338,6 +338,10 @@ class CognitiveEvidenceRecorder:
             "goal_ids": plan.goal_ids,
             "step_ids": [item.step_id for item in plan.steps],
             "skill_ids": [item.skill_id for item in plan.steps],
+            "selected_agent_skills": [
+                item.model_dump(mode="json")
+                for item in plan.selected_agent_skills
+            ],
             "goal_satisfaction": (
                 plan.goal_satisfaction.model_dump(mode="json")
                 if plan.goal_satisfaction is not None

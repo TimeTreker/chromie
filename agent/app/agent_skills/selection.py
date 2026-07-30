@@ -355,6 +355,14 @@ class AgentSkillSelectionService:
                     f"Agent Skill {item.agent_skill_id!r} does not expose "
                     f"projection {item.projection!r}"
                 )
+            if (
+                request.agent_role in {"fast_planner", "deep_planner"}
+                and allowed_goal_ids
+                and not item.relevant_goal_ids
+            ):
+                raise ValueError(
+                    "planner Agent Skill selections require explicit relevant_goal_ids"
+                )
             unknown_goal_ids = set(item.relevant_goal_ids) - allowed_goal_ids
             if unknown_goal_ids:
                 raise ValueError(

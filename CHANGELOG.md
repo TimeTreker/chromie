@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Canonical Plan Agent Skill provenance
+
+- Added a strict content-free `PlanAgentSkillProvenance` contract and
+  `CanonicalPlan.selected_agent_skills` for exact selection/disclosure identity,
+  selecting planner role, Skill/version, package/projection/disclosure digests,
+  model-authored relevant Goal IDs, rationale, and confidence.
+- Bound Fast Planner disclosure to Fast Plans and preserved exact Fast provenance
+  when Deep Planner appends its own selected methods. No-Skill paths remain
+  byte-for-byte behavior-neutral at the Plan boundary.
+- Made Plan validation reject unknown Goal references, duplicate/conflicting
+  Skill-role records, and planner-tier mismatches while leaving Capability
+  registration, authorization, schemas, confirmation, Provider validation, and
+  execution unchanged.
+- Included provenance in Canonical Plan fingerprints, replay serialization, and
+  content-free runtime summaries. Recovery and cancellation child Plans narrow
+  inherited provenance only to retained Goal IDs.
+
 ## Unreleased — Executable repository engineering policies
 
 - Added one dependency-light AST/configuration gate for production assertions,

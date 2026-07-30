@@ -1,8 +1,8 @@
 # Agent Skills Architecture
 
 Status: Accepted architecture with canonical Capability terminology, passive
-contracts/Loader, model-authored selection, and Agent-specific progressive
-disclosure implemented; Plan provenance and domain Skills remain open
+contracts/Loader, model-authored selection, Agent-specific progressive
+disclosure, and Canonical Plan provenance implemented; domain Skills remain open
 Scope: Goal-Driven Cognitive Core, Agent roles, reusable cognitive methods,
 planning, capability execution, and evidence
 
@@ -413,7 +413,7 @@ The following invariants are enforced:
   package/projection digest verification and prompt-budget checks;
 - untrusted caller-supplied projection context is stripped before disclosure;
 - selection/disclosure identity and digests are observable without logging content;
-- CanonicalPlan provenance remains the next separate slice.
+- Canonical Plans retain content-free exact planner Skill provenance; domain Skills remain the next separate slices.
 
 ## Weather vertical slice
 

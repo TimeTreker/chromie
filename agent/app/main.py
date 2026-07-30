@@ -18,6 +18,7 @@ from .agent_skills import (
     AgentSkillProgressiveDisclosureCoordinator,
     AgentSkillSelectionService,
     attach_disclosure_metadata,
+    inherited_plan_agent_skill_provenance,
     build_configured_agent_skill_registry,
 )
 from .clients.ollama_client import OllamaClient
@@ -1131,7 +1132,13 @@ async def resolve_deep_plan(request: AgentRunRequest):
         "deep_planner",
     )
     result = await deep_planner_resolver.resolve(prepared)
-    return attach_disclosure_metadata(result, disclosure)
+    return attach_disclosure_metadata(
+        result,
+        disclosure,
+        inherited_plan_provenance=inherited_plan_agent_skill_provenance(
+            prepared.context
+        ),
+    )
 
 
 @app.post("/compose-response-plan")

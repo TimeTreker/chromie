@@ -354,6 +354,9 @@ def _recovery_canonical_plan(
         goal_summary="Retry the confirmed recoverable plan steps.",
         steps=selected_steps,
         goal_outcomes=goal_outcomes,
+        selected_agent_skills=parent.agent_skill_provenance_for_goals(
+            selected_goal_ids
+        ),
         metadata={
             "plan_relation": "recovery_subset",
             "parent_plan_id": parent.plan_id,

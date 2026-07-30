@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
 PlanCoverage = Literal["complete", "partial", "uncertain"]
@@ -311,6 +312,7 @@ class CanonicalPlan(BaseModel):
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
     goal_outcomes: list[GoalPlanOutcome] = Field(default_factory=list)
     goal_satisfaction: GoalSatisfactionAssessment | None = None
+    selected_agent_skills: list[PlanAgentSkillProvenance] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("plan_id", "goal_summary", "response_text", "escalation_reason", mode="before")
@@ -340,6 +342,23 @@ class CanonicalPlan(BaseModel):
         if self.goal_outcomes:
             return [item.goal_id for item in self.goal_outcomes if item.disposition == "clarify"]
         return list(self.goal_ids) if self.disposition == "clarify" else []
+
+    def agent_skill_provenance_for_goals(
+        self,
+        goal_ids: list[str] | tuple[str, ...] | set[str],
+    ) -> list[PlanAgentSkillProvenance]:
+        """Narrow inherited method provenance to an exact derived Goal subset."""
+
+        allowed = {str(item).strip() for item in goal_ids if str(item).strip()}
+        narrowed: list[PlanAgentSkillProvenance] = []
+        for item in self.selected_agent_skills:
+            relevant = tuple(
+                goal_id for goal_id in item.relevant_goal_ids if goal_id in allowed
+            )
+            if not relevant:
+                continue
+            narrowed.append(item.model_copy(update={"relevant_goal_ids": relevant}))
+        return narrowed
 
     @model_validator(mode="after")
     def validate_coverage_contract(self) -> "CanonicalPlan":
@@ -385,6 +404,30 @@ class CanonicalPlan(BaseModel):
             raise ValueError("executable plans cannot retain blocking parameter resolutions")
 
         goal_id_set = set(self.goal_ids)
+        provenance_keys = [
+            (item.agent_skill_id, item.selected_by_agent_role)
+            for item in self.selected_agent_skills
+        ]
+        if len(provenance_keys) != len(set(provenance_keys)):
+            raise ValueError(
+                "Canonical Plan Agent Skill provenance must be unique per Skill and planner role"
+            )
+        allowed_roles = (
+            {"fast_planner"}
+            if self.planner_tier == "fast"
+            else {"fast_planner", "deep_planner"}
+        )
+        for item in self.selected_agent_skills:
+            if item.selected_by_agent_role not in allowed_roles:
+                raise ValueError(
+                    "Canonical Plan Agent Skill provenance is inconsistent with planner_tier"
+                )
+            unknown_provenance_goals = set(item.relevant_goal_ids) - goal_id_set
+            if unknown_provenance_goals:
+                raise ValueError(
+                    "Plan Agent Skill provenance references unknown goal IDs: "
+                    + ",".join(sorted(unknown_provenance_goals))
+                )
         if self.goal_satisfaction is not None:
             if (
                 self.coverage == "complete"

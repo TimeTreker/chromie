@@ -38,8 +38,9 @@ approve the exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
 Canonical executable terminology, the passive read-only Agent Skill foundation,
-independent model-authored selection, and Agent-specific progressive disclosure
-are implemented and automatically verified. The five maintained model boundaries
+independent model-authored selection, Agent-specific progressive disclosure, and
+content-free Canonical Plan Skill provenance are implemented and automatically
+verified. The five maintained model boundaries
 strip caller-supplied disclosure context, select from bounded approved summaries,
 revalidate package/projection digests, and inject only exact selected role
 projections under omission-not-truncation prompt budgets. Empty roots and no-Skill
@@ -54,12 +55,14 @@ input is narrowly classified; expected cleanup is debug-visible; and Runtime
 Trace or episode evidence loss remains observable. See
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
-`Issue: Establish Repository Engineering Policy Checks` is implemented and
-automatically verified. The next and only active code implementation Issue is now
-**Bind Agent Skill Provenance to Canonical Plans**, followed by the grounded
-external-information and weather vertical slices. The repository-owned root
-remains empty of domain Skills, and execution continues to depend only on
-registered `capability_id` steps.
+`Issue: Establish Repository Engineering Policy Checks` and `Issue: Bind Agent
+Skill Provenance to Canonical Plans` are implemented and automatically verified.
+Fast and Deep Plans now retain exact content-free method provenance, including
+ordered Fast-to-Deep inheritance, without changing execution authority. The next
+and only active code implementation Issue is **Implement Grounded External-
+Information Agent Skill**, followed by the weather domain extension. The
+repository-owned root remains empty of domain Skills until that package lands,
+and execution continues to depend only on registered `capability_id` steps.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for

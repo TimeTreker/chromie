@@ -473,6 +473,80 @@ class SelectedAgentSkill(BaseModel):
         return " ".join(str(value or "").strip().split())
 
 
+class PlanAgentSkillProvenance(BaseModel):
+    """Content-free record of one Agent Skill projection that informed a Plan."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    selection_id: str = Field(min_length=1, max_length=200)
+    disclosure_id: str = Field(min_length=1, max_length=200)
+    disclosure_digest: str
+    selected_by_agent_role: AgentSkillProjectionName
+    agent_skill_id: str
+    version: str
+    projection: AgentSkillProjectionName
+    content_digest: str
+    projection_digest: str
+    relevant_goal_ids: tuple[str, ...] = Field(min_length=1, max_length=16)
+    selection_rationale: str = Field(min_length=1, max_length=500)
+    selection_confidence: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("agent_skill_id", mode="before")
+    @classmethod
+    def normalize_agent_skill_id(cls, value: Any) -> str:
+        return _normalize_identifier(value, field_name="agent_skill_id")
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def validate_semantic_version(cls, value: Any) -> str:
+        text = str(value or "").strip()
+        if not _SEMANTIC_VERSION.fullmatch(text):
+            raise ValueError("version must be a valid semantic version")
+        return text
+
+    @field_validator(
+        "disclosure_digest",
+        "content_digest",
+        "projection_digest",
+        mode="before",
+    )
+    @classmethod
+    def validate_digests(cls, value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if not _SHA256.fullmatch(text):
+            raise ValueError("Plan Agent Skill digests must use sha256:<64 lowercase hex>")
+        return text
+
+    @field_validator("relevant_goal_ids", mode="before")
+    @classmethod
+    def normalize_goal_ids(cls, value: Any) -> tuple[str, ...]:
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("relevant_goal_ids must be an array")
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+        if not out:
+            raise ValueError("Plan Agent Skill provenance requires relevant Goal IDs")
+        return tuple(out)
+
+    @field_validator("selection_rationale", mode="before")
+    @classmethod
+    def normalize_rationale(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @model_validator(mode="after")
+    def validate_planner_projection(self) -> "PlanAgentSkillProvenance":
+        if self.selected_by_agent_role not in {"fast_planner", "deep_planner"}:
+            raise ValueError("Canonical Plan provenance may be selected only by a planner")
+        if self.projection != self.selected_by_agent_role:
+            raise ValueError("Plan Agent Skill projection must match the selecting planner role")
+        return self
+
+
 class AgentSkillSelectionResolution(BaseModel):
     """Observable optional method selection; never execution evidence."""
 

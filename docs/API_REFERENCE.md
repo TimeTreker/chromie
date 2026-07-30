@@ -141,6 +141,15 @@ The existing `skills` collection name in `InteractionResponse` is a bounded
 transport compatibility surface; each contained request is a canonical
 `CapabilityRequest`.
 
+Planner responses also expose `CanonicalPlan.selected_agent_skills`. Each item is
+a content-free provenance record containing the exact selection/disclosure IDs,
+selecting planner role, Agent Skill ID/version, package/projection/disclosure
+digests, explicit relevant Goal IDs, rationale, and confidence. Fast Plans may
+contain only Fast Planner provenance. Deep Plans preserve ordered Fast Planner
+provenance from the advisory Plan and append Deep Planner provenance. This field
+is included in Plan fingerprints and replay serialization but is ignored by
+Capability authorization and execution.
+
 `POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. Typed `plan_relation` and `user_confirmation_required` fields enforce confirmation for safe adjustments and alternatives before the host transfers those judgments to canonical metadata. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
 
 `POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.

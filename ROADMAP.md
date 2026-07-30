@@ -68,7 +68,7 @@ authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
 The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
-## Active architecture issue — Bind Agent Skill Provenance to Canonical Plans
+## Active architecture issue — Implement Grounded External-Information Agent Skill
 
 The executable Capability terminology, passive read-only Agent Skill
 contract/Loader, independent model-authored discovery/selection, and role-specific
@@ -84,13 +84,18 @@ model-contract actuation boundaries. See
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md) and
 [Repository Engineering Policies](docs/REPOSITORY_ENGINEERING_POLICIES.md).
 
-The active Issue now binds exact selected Agent Skill ID, version, role
-projection, package/projection digest, selection identity, and relevant Goal IDs
-to the immutable `CanonicalPlan`. This provenance explains which reviewed method
-content informed planning; it must not grant Capability authority or alter
-execution validation. The grounded external-information and weather vertical
-slices follow. Local target validation of loopback exposure remains a separate
-deployment-evidence item.
+Canonical Plans now retain exact content-free Agent Skill provenance: selection
+and disclosure identity, selecting planner role, Skill/version, package,
+projection, and disclosure digests, explicit relevant Goal IDs, model rationale,
+and confidence. Deep Plans preserve ordered Fast Planner provenance before
+appending their own. Plan fingerprints and replay summaries retain that identity,
+while execution still authorizes only registered `capability_id` steps.
+
+The active Issue now implements the repository-owned grounded external-
+information Agent Skill as a passive method package for evidence strategy,
+freshness, acknowledgement, typed failure interpretation, and grounded response.
+The weather-information Skill follows as its domain extension. Local target
+validation of loopback exposure remains a separate deployment-evidence item.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -148,17 +153,20 @@ Completed implementation slices:
   registry/Goal validation, one repair, and optional no-Skill degradation;
 - Agent-specific progressive disclosure across the five maintained model roles,
   with exact package/projection digest checks, omission-not-truncation budgets,
-  forged-context removal, and content-free trace metadata.
+  forged-context removal, and content-free trace metadata;
+- content-free Canonical Plan Skill provenance with exact planner role,
+  selection/disclosure identity, package/projection/disclosure digests, Goal
+  relevance, deterministic Fast-to-Deep inheritance, and unchanged Capability
+  execution authority.
 
 Current implementation slice:
 
-> Bind Agent Skill Provenance to Canonical Plans.
+> Implement Grounded External-Information Agent Skill.
 
-Planner-produced Canonical Plans must retain the exact selected Skill identity,
-version, role projection, package/projection digests, selection/disclosure IDs,
-and relevant Goal IDs. Plan validation may verify that provenance, but Trusted
-Capability Runtime continues to authorize and execute only `capability_id` steps.
-This slice does not add grounded-information/weather domain packages.
+Add an owner-approved passive package under `agent-skills/` with exact projections
+for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool
+Result Interpreter. Selection remains model-authored and execution remains
+restricted to registered `capability_id` steps.
 
 Exit criteria:
 

@@ -315,6 +315,23 @@ Acceptance:
 - removing a Skill package cannot create new execution authority;
 - replay and traces identify the exact Skill content used by the model.
 
+Implementation status:
+
+- complete for Fast and Deep Planner outputs through the shared immutable
+  `CanonicalPlan.selected_agent_skills` contract;
+- each record retains exact selection/disclosure IDs, selecting planner role,
+  Skill/version, package/projection/disclosure digests, explicit relevant Goal
+  IDs, model rationale, and confidence without projection text or source paths;
+- Deep Plans preserve ordered Fast Planner provenance and append their own exact
+  method records; no-Skill paths remain behavior-neutral;
+- Plan validation rejects unknown Goal references, planner-tier mismatches, and
+  duplicate or conflicting Skill-role records;
+- Plan fingerprints, serialized replay artifacts, and runtime summaries include
+  the content-free provenance while Capability execution continues to inspect
+  only registered `capability_id` steps;
+- mechanically derived recovery and cancellation Plans narrow inherited Goal
+  relevance without fabricating a new selection.
+
 ### Implement grounded external information Skill
 
 Add the reusable base Skill for read-only external information tasks. Its
@@ -449,17 +466,14 @@ The issue may close only when:
 
 ## Immediate next implementation slice
 
-`Issue: Make Runtime Failure Paths Explicit` and `Issue: Establish Repository
-Engineering Policy Checks` are implemented and automatically verified. Resume
-this plan with:
+`Issue: Make Runtime Failure Paths Explicit`, `Issue: Establish Repository
+Engineering Policy Checks`, and `Issue: Bind Agent Skill Provenance to Canonical
+Plans` are implemented and automatically verified. Resume this plan with:
 
-> **Bind Agent Skill Provenance to Canonical Plans.**
+> **Implement Grounded External-Information Agent Skill.**
 
-Record exact selected Agent Skill ID, version, role projection, package and
-projection digests, selection/disclosure identity, and relevant Goal IDs in the
-immutable Plan contract. Plan validation may verify this provenance but execution
-must continue to authorize only exact registered `capability_id` steps.
-
-Then implement the grounded external-information and weather Agent Skills. Do
-not add domain-specific Host selection, a second execution registry, or a
-Host-authored Workflow.
+Add the first repository-owned passive domain method with projections for the
+five maintained Agent roles. It must improve evidence-strategy reasoning without
+adding a Host-authored Workflow, phrase selector, Capability registration, or
+execution authority. The weather-information Skill follows as the domain
+extension.

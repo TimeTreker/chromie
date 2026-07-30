@@ -21,8 +21,10 @@ try:
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
         DisclosedAgentSkillProjection,
+        PlanAgentSkillProvenance,
     )
     from chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from chromie_contracts.plan import CanonicalPlan
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.agent_skill import (
         AgentSkillDisclosureFailure,
@@ -33,8 +35,10 @@ except ImportError:  # pragma: no cover - repository development path
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
         DisclosedAgentSkillProjection,
+        PlanAgentSkillProvenance,
     )
     from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from shared.chromie_contracts.plan import CanonicalPlan
 
 from ..schema import AgentRunRequest
 
@@ -490,13 +494,108 @@ def trace_disclosure_metadata(
     }
 
 
-def attach_disclosure_metadata(result: Any, resolution: AgentSkillDisclosureResolution) -> Any:
-    if (
+def plan_agent_skill_provenance_from_disclosure(
+    resolution: AgentSkillDisclosureResolution,
+) -> tuple[PlanAgentSkillProvenance, ...]:
+    """Project loaded planner methods into content-free Canonical Plan provenance."""
+
+    if resolution.agent_role not in {"fast_planner", "deep_planner"}:
+        return ()
+    return tuple(
+        PlanAgentSkillProvenance(
+            selection_id=item.selection_id,
+            disclosure_id=resolution.disclosure_id,
+            disclosure_digest=resolution.disclosure_digest,
+            selected_by_agent_role=item.selected_by_agent_role,
+            agent_skill_id=item.agent_skill_id,
+            version=item.version,
+            projection=item.projection,
+            content_digest=item.content_digest,
+            projection_digest=item.projection_digest,
+            relevant_goal_ids=item.relevant_goal_ids,
+            selection_rationale=item.selection_rationale,
+            selection_confidence=item.selection_confidence,
+        )
+        for item in resolution.projections
+    )
+
+
+def inherited_plan_agent_skill_provenance(
+    context: dict[str, Any] | None,
+) -> tuple[PlanAgentSkillProvenance, ...]:
+    """Read exact Fast Plan provenance supplied to Deep Planner by the Host."""
+
+    if not isinstance(context, dict):
+        return ()
+    raw = context.get("fast_plan_resolution") or context.get(
+        "fast_planner_resolution"
+    )
+    if raw is None:
+        return ()
+    plan = raw if isinstance(raw, CanonicalPlan) else CanonicalPlan.model_validate(raw)
+    if plan.planner_tier != "fast":
+        raise ValueError("Deep Planner inherited provenance requires a Fast Plan")
+    return tuple(plan.selected_agent_skills)
+
+
+def bind_agent_skill_provenance_to_plan(
+    plan: CanonicalPlan,
+    resolution: AgentSkillDisclosureResolution,
+    *,
+    inherited: tuple[PlanAgentSkillProvenance, ...] = (),
+) -> CanonicalPlan:
+    """Bind exact method provenance without changing Capability execution fields."""
+
+    ordered: list[PlanAgentSkillProvenance] = []
+    by_key: dict[tuple[str, str], PlanAgentSkillProvenance] = {}
+    for item in (*inherited, *plan_agent_skill_provenance_from_disclosure(resolution)):
+        key = (item.agent_skill_id, item.selected_by_agent_role)
+        previous = by_key.get(key)
+        if previous is not None:
+            if previous != item:
+                raise ValueError(
+                    "conflicting Canonical Plan Agent Skill provenance for "
+                    f"{item.agent_skill_id!r} selected by {item.selected_by_agent_role!r}"
+                )
+            continue
+        by_key[key] = item
+        ordered.append(item)
+    metadata = dict(plan.metadata)
+    if not (
         resolution.status == "no_skill"
         and not resolution.projections
         and not resolution.failures
     ):
+        metadata[_CONTEXT_KEY] = trace_disclosure_metadata(resolution)
+    return CanonicalPlan.model_validate(
+        plan.model_copy(
+            update={
+                "selected_agent_skills": ordered,
+                "metadata": metadata,
+            }
+        ).model_dump(mode="python")
+    )
+
+
+def attach_disclosure_metadata(
+    result: Any,
+    resolution: AgentSkillDisclosureResolution,
+    *,
+    inherited_plan_provenance: tuple[PlanAgentSkillProvenance, ...] = (),
+) -> Any:
+    if (
+        resolution.status == "no_skill"
+        and not resolution.projections
+        and not resolution.failures
+        and not inherited_plan_provenance
+    ):
         return result
+    if isinstance(result, CanonicalPlan):
+        return bind_agent_skill_provenance_to_plan(
+            result,
+            resolution,
+            inherited=inherited_plan_provenance,
+        )
     metadata = dict(getattr(result, "metadata", {}) or {})
     metadata[_CONTEXT_KEY] = trace_disclosure_metadata(resolution)
     if hasattr(result, "model_copy"):

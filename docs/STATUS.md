@@ -34,25 +34,24 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Bind Agent Skill Provenance to Canonical
-Plans.** The two prerequisite engineering safeguards are implemented and
-automatically verified. Runtime failures use explicit classified handling, and
-`scripts/check_repository_policies.py` now enforces stable source, architecture,
-Agent Skill, contract, and local deployment boundaries from the maintained test,
-CI, and Benchmark entrypoints. See [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
-and [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).
+**Active implementation issue:** **Implement Grounded External-Information
+Agent Skill.** The prerequisite engineering safeguards and Canonical Plan
+provenance slice are implemented and automatically verified.
+`scripts/check_repository_policies.py` continues to enforce stable source,
+architecture, Agent Skill, contract, and local deployment boundaries.
 
-Agent-specific progressive disclosure remains implemented and automatically
-verified across Goal Association, Fast Planner, Deep Planner, Response Composer,
-and Tool Result Interpreter. Each boundary receives only its selected role
-projection after package/projection digest and prompt-budget validation. Caller-
-supplied disclosure context is stripped, empty roots remain behavior-neutral,
-and traces retain identity/digests without content. The repository-owned root
-still contains no domain Skill package. Canonical Plans do not yet retain exact
-Skill provenance, and Capability registration, authorization, Provider validation,
-and execution remain unchanged. The active provenance Issue must preserve that
-execution separation. Gateway/Core qualification remains an independent open
-evidence issue rather than a second code implementation mainline.
+Fast and Deep Planner outputs now retain exact content-free Skill provenance in
+`CanonicalPlan.selected_agent_skills`: selection/disclosure identity, selecting
+planner role, Skill/version, package/projection/disclosure digests, explicit
+relevant Goal IDs, rationale, and confidence. Deep Plans preserve ordered Fast
+Planner provenance before appending their own. Plan fingerprints, replay payloads,
+and runtime summaries retain that identity; recovery and cancellation child Plans
+narrow relevance to retained Goals. Capability registration, authorization,
+Provider validation, confirmation, and execution still inspect only registered
+`capability_id` steps. The repository-owned root still contains no domain Skill
+package; the active Issue adds the first passive grounded external-information
+method. Gateway/Core qualification remains an independent open evidence issue
+rather than a second code implementation mainline.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automatic evidence, target evidence, and deployment
@@ -64,7 +63,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,590 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,598 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,

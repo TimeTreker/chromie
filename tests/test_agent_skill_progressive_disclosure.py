@@ -686,6 +686,7 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
                 disposition="escalate",
                 coverage="uncertain",
                 confidence=0.0,
+                goal_ids=["goal-weather"],
                 escalation_reason="Test",
                 metadata={},
             )

@@ -23,6 +23,7 @@ from .agent_skill import (
     AgentSkillSelectionStatus,
     AgentSkillSummary,
     DisclosedAgentSkillProjection,
+    PlanAgentSkillProvenance,
     SelectedAgentSkill,
 )
 from .route import RouteDecision, RouteItem, RouteRequest
