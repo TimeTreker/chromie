@@ -134,6 +134,21 @@ def _latin_compact_name(value: Any) -> str:
     return "".join(words).capitalize() if words else ""
 
 
+def _latin_provider_key(value: Any) -> str:
+    """Return a provider-facing bare Latin lookup key.
+
+    Open-Meteo's geocoder can accept a locality only in its compact Latin form
+    even when the canonical Goal binding is a qualified Chinese administrative
+    name.  Keep that transport detail inside the provider adapter and emit the
+    least ambiguous provider key first, for example ``河南省内乡县`` ->
+    ``neixiang``.  This does not rewrite the authoritative location carried by
+    the Goal or tool request.
+    """
+
+    words = re.findall(r"[A-Za-z0-9]+", _latin_place_text(value))
+    return "".join(words).casefold() if words else ""
+
+
 def _equivalent_place_keys(value: Any) -> set[str]:
     text = _normalize_location_text(value)
     stripped = _strip_admin_suffix(text)
@@ -238,14 +253,19 @@ def _provider_query_candidates(
     # names. This is transport normalization for the same authoritative Goal
     # binding, not semantic location substitution.
     locality_source = context.locality or location
-    locality = _latin_compact_name(_strip_admin_suffix(locality_source))
-    admin1 = _latin_compact_name(_strip_admin_suffix(context.admin1))
-    if locality:
-        add(locality)
-        add(f"{locality} County")
-        if admin1:
-            add(f"{locality}, {admin1}")
-            add(f"{locality} County, {admin1}")
+    locality_key = _latin_provider_key(_strip_admin_suffix(locality_source))
+    locality_display = _latin_compact_name(_strip_admin_suffix(locality_source))
+    admin1_display = _latin_compact_name(_strip_admin_suffix(context.admin1))
+    if locality_key:
+        # Prefer the provider-native bare key before descriptive English forms.
+        # Some provider indexes accept only this representation (for example,
+        # ``neixiang``) and reject a fully qualified phrase.
+        add(locality_key)
+    if locality_display:
+        add(f"{locality_display} County")
+        if admin1_display:
+            add(f"{locality_display}, {admin1_display}")
+            add(f"{locality_display} County, {admin1_display}")
     return candidates[:12]
 
 

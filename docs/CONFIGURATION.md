@@ -577,9 +577,12 @@ canonical Goal binding. It also accepts optional `location_context` fields
 (`locality`, `admin1`, `country`, and `aliases`) when those fields were supplied
 or unambiguously resolved by the LLM. The Open-Meteo adapter queries the exact
 canonical string first, then bounded equivalent locality forms only for provider
-recognition; it never changes the conversational referent or Goal. Candidates
-are qualified against available administrative context. If none match, the tool
-returns typed `location_not_found`.
+recognition; it never changes the conversational referent or Goal. For Chinese
+administrative names, the adapter also derives a compact lowercase Latin
+provider key such as `河南省内乡县` -> `neixiang` and tries that bare key before
+descriptive English forms. Candidates are qualified against available
+administrative context. If none match, the tool returns typed
+`location_not_found`.
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |

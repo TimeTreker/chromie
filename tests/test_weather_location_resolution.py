@@ -205,7 +205,7 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
                 query = params["name"][0]
                 language = params["language"][0]
                 geocode_queries.append((query, language))
-                if query == "Neixiang":
+                if query == "neixiang":
                     return httpx.Response(
                         200,
                         json={
@@ -246,7 +246,8 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
             WeatherQuery(location="河南省内乡县", language="zh-CN")
         )
 
-        self.assertIn(("Neixiang", "en"), geocode_queries)
+        self.assertIn(("neixiang", "en"), geocode_queries)
+        self.assertNotIn(("Neixiang", "en"), geocode_queries)
         self.assertEqual(report.location_name, "Neixiang")
         self.assertEqual(report.current_temperature_c, 28.0)
 
@@ -275,7 +276,7 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
                 "河南省内乡县",
                 "内乡县",
                 "内乡",
-                "Neixiang",
+                "neixiang",
                 "Neixiang County",
                 "Neixiang, Henan",
                 "Neixiang County, Henan",
