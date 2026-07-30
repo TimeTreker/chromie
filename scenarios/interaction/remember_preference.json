@@ -3,24 +3,43 @@
   "id": "remember_preference",
   "suite": "interaction",
   "level": "integration",
-  "description": "Memory request emits memory.store and no Soridormi motion skill.",
-  "tags": ["memory", "normal"],
+  "description": "A model-authored memory proposal emits memory.store without Host-authored acknowledgement speech or Soridormi motion.",
+  "tags": [
+    "memory",
+    "normal"
+  ],
   "input": {
     "text": "Remember that my favorite color is blue."
   },
   "stub": {
     "route_decision": {
       "route": "memory",
-      "agents": ["memory_agent", "speaker_agent"],
+      "agents": [
+        "memory_agent",
+        "speaker_agent"
+      ],
       "intent": "remember_user_fact",
       "confidence": 0.86,
       "language": "en-US",
-      "source": "rules"
+      "source": "llm",
+      "memory_update": {
+        "schema_version": "1.0",
+        "scope": "session",
+        "kind": "preference",
+        "text": "My favorite color is blue.",
+        "key": "favorite_color",
+        "persistence_policy": "ephemeral",
+        "confidence": 0.96
+      }
     }
   },
   "expect": {
-    "speech_any": ["remember"],
-    "skills": ["memory.store"],
-    "forbidden_skills": ["soridormi.walk_velocity", "soridormi.nod_yes"]
+    "skills": [
+      "memory.store"
+    ],
+    "forbidden_skills": [
+      "soridormi.walk_velocity",
+      "soridormi.nod_yes"
+    ]
   }
 }

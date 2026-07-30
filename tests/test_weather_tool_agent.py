@@ -5,6 +5,9 @@ from typing import Any
 
 from agent.app.agents import AgentServices
 from agent.app.agents.tool import ToolAgent
+from agent.app.capabilities.local import chromie_capability_bundle
+from agent.app.capabilities.models import CapabilityRegistry
+from agent.app.local_tool_execution import LocalToolExecutor
 from agent.app.clients.weather_client import (
     WeatherQuery,
     WeatherReport,
@@ -26,6 +29,18 @@ class _FakeOllama:
         self.response_formats.append(response_format)
         index = min(len(self.prompts) - 1, len(self.payloads) - 1)
         return dict(self.payloads[index])
+
+
+
+
+def _services(*, weather_client, **kwargs: Any) -> AgentServices:
+    return AgentServices(
+        local_tool_executor=LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            weather_client=weather_client,
+        ),
+        **kwargs,
+    )
 
 
 class _FakeWeatherClient:
@@ -54,9 +69,9 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_weather_tool_uses_llm_extracted_location_and_speaks_report(self) -> None:
         weather = _FakeWeatherClient()
         agent = ToolAgent(
-            AgentServices(
-                ollama=_FakeOllama({"location": "Chongqing", "date": "today", "units": "metric"}),
+            _services(
                 weather_client=weather,
+                ollama=_FakeOllama({"location": "Chongqing", "date": "today", "units": "metric"}),
             )
         )
         request = AgentRunRequest(
@@ -64,7 +79,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             language="en-US",
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.9,
                 language="en-US",
                 agents=["tool_agent", "speaker_agent"],
@@ -92,9 +107,9 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_weather_tool_asks_for_location_when_missing(self) -> None:
         weather = _FakeWeatherClient()
         agent = ToolAgent(
-            AgentServices(
-                ollama=_FakeOllama({"location": "", "date": "today", "units": "metric"}),
+            _services(
                 weather_client=weather,
+                ollama=_FakeOllama({"location": "", "date": "today", "units": "metric"}),
             )
         )
         request = AgentRunRequest(
@@ -102,7 +117,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             language="zh-CN",
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.9,
                 language="zh-CN",
                 agents=["tool_agent"],
@@ -113,17 +128,19 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         result = await agent.run(request, AgentResult())
 
         self.assertEqual(weather.queries, [])
-        self.assertEqual(result.speak_immediate[0].text, "你想查哪个城市的天气？")
+        self.assertEqual(result.speak_immediate, [])
+        self.assertEqual(result.status, "clarify")
+        self.assertEqual(result.reason, "weather_location_binding_missing")
 
     async def test_weather_tool_can_use_goal_interpretation_metadata_without_llm(self) -> None:
         weather = _FakeWeatherClient()
-        agent = ToolAgent(AgentServices(use_llm=False, weather_client=weather))
+        agent = ToolAgent(_services(weather_client=weather, use_llm=False))
         request = AgentRunRequest(
             text="重庆今天的天气怎么样",
             language="zh-CN",
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.9,
                 language="zh-CN",
                 agents=["tool_agent"],
@@ -158,9 +175,9 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         agent = ToolAgent(
-            AgentServices(
-                ollama=ollama,
+            _services(
                 weather_client=weather,
+                ollama=ollama,
                 tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
             )
         )
@@ -184,7 +201,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             },
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.95,
                 language="zh-CN",
                 agents=["tool_agent", "speaker_agent"],
@@ -229,9 +246,9 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         agent = ToolAgent(
-            AgentServices(
-                ollama=ollama,
+            _services(
                 weather_client=weather,
+                ollama=ollama,
                 tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
             )
         )
@@ -240,7 +257,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             language="zh-CN",
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.95,
                 language="zh-CN",
                 agents=["tool_agent"],
@@ -280,9 +297,9 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         agent = ToolAgent(
-            AgentServices(
-                ollama=ollama,
+            _services(
                 weather_client=weather,
+                ollama=ollama,
                 tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
             )
         )
@@ -291,7 +308,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
             language="zh-CN",
             route_decision=RouteDecision(
                 route="tool",
-                intent="weather_query",
+                intent="capability:chromie.weather.lookup",
                 confidence=0.95,
                 language="zh-CN",
                 agents=["tool_agent"],

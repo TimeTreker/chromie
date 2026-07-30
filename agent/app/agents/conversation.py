@@ -123,7 +123,7 @@ class ConversationAgent(BaseAgent):
                     (time.perf_counter() - started) * 1000.0,
                 )
                 result.trace.append(f"conversation_agent: llm failed: {type(exc).__name__}: {exc}")
-                fallback = self._fallback_reply(request)
+                fallback = self._operational_failure_reply(request)
                 result.add_speak_immediate(fallback, style="brief")
                 self.trace(result, "used fallback reply")
                 logger.info(
@@ -134,7 +134,7 @@ class ConversationAgent(BaseAgent):
                 )
                 return result
 
-        fallback = self._fallback_reply(request)
+        fallback = self._operational_failure_reply(request)
         result.add_speak_immediate(fallback, style="brief")
         self.trace(result, "used fallback reply")
         return result
@@ -627,31 +627,10 @@ class ConversationAgent(BaseAgent):
             )
         return "\n".join(lines)
 
-    def _fallback_reply(self, request: AgentRunRequest) -> str:
-        intent = request.route_decision.intent
-        has_history = bool(self._history_from_request(request))
-        has_pending = bool(self._pending_tasks_from_request(request))
+    def _operational_failure_reply(self, request: AgentRunRequest) -> str:
+        """Return a language-matched operational failure without interpreting meaning."""
 
-        if self.is_zh(request):
-            if request.route_decision.route == "clarify":
-                return "你是指什么？"
-            if has_pending:
-                return "我还在处理刚才的任务。"
-            if has_history:
-                return "我还记得刚才的上下文。"
-            if intent == "emotional_support":
-                return "听起来你有点累。"
-            return "我听到了，但我的语言理解暂时不可用。"
-
-        if request.route_decision.route == "clarify":
-            return "What do you mean?"
-        if has_pending:
-            return "I am still working on the previous task."
-        if has_history:
-            return "I remember the previous context, but my language understanding is temporarily unavailable."
-        if intent == "emotional_support":
-            return "That sounds tiring."
-        return "I heard you, but my language understanding is temporarily unavailable."
+        return self.invalid_spoken_response_fallback(zh=self.is_zh(request))
 
     def _clean_response(self, response: str, *, zh: bool) -> str:
         response = " ".join((response or "").strip().strip('"').split())

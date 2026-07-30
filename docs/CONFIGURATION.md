@@ -112,7 +112,7 @@ All risky or incomplete execution paths are default-off.
 
 `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1` requires guarded execution.
 Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
-The host Skill Runtime uses that same authenticated cancel endpoint for
+The host Trusted Capability Runtime uses that same authenticated cancel endpoint for
 planning TaskGraphs. Enabling host/planning TaskGraph execution without the
 token makes authoritative cancellation fail closed and is not a supported
 cancellable deployment.
@@ -345,7 +345,7 @@ canonical plan copy, and its fingerprint remain host-owned.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `apply`. |
+| `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
 | `ORCH_COGNITIVE_APPLY_LANES` | `chat,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,robot_action,tool`. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the Goal Interpreter effect envelope, and every executable step still requires a trusted provider. Disabled-lane and route-effect escalation fail closed without entering the legacy planner. |
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
 | `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; host-side emergency compatibility gate. It can create a legacy CapabilityAgent authority claim only on a turn that has not entered authoritative Goal-driven processing. |
@@ -562,7 +562,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_MIN_CONFIDENCE` | Minimum accepted overall and per-Skill confidence for a positive selection; default `0.55`. Explicit `no_skill` remains valid. |
 | `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection prompt; default `4096`. |
 | `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for selection and one repair; default `384`. |
-| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
+| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. Fast Goal Interpretation uses the common catalog snapshot instead of per-query catalog matching. |
@@ -608,9 +608,11 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
 | `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
 | `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/SkillRuntime/Soridormi validation. |
-| `ORCH_CONDITIONAL_DEEPTHINK_ENABLED` | Enable Orchestrator-side conditional semantic delegation to `deepthinking_agent`; code default `true`. This does not authorize physical execution or bypass SkillRuntime/Soridormi validation. |
-| `ORCH_DEEPTHINK_CONFIDENCE_CHAT`, `ORCH_DEEPTHINK_CONFIDENCE_MEMORY`, `ORCH_DEEPTHINK_CONFIDENCE_TOOL` | Route-specific confidence thresholds for semantic delegation; code defaults `0.75`, `0.85`, and `0.82`. |
-| `ORCH_DEEPTHINK_CONFIDENCE_ROBOT_ACTION_SINGLE_EXACT`, `ORCH_DEEPTHINK_CONFIDENCE_ROBOT_ACTION_COMPOUND`, `ORCH_DEEPTHINK_CONFIDENCE_NAVIGATION_OR_MANIPULATION` | Robot-action semantic delegation thresholds; code defaults `0.70`, `0.82`, and `0.95`. Physical action still always goes through proposal, confirmation/preflight, and Soridormi safety gates. |
+
+Ordinary semantic escalation and deep-thinking delegation are authored by the
+Goal-driven Cognitive Core and its planner models. The Host has no
+confidence-, intent-, user-state-, or phrase-based deep-thinking policy,
+and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; common default `80`, code default `160`. |
 | `ORCH_TTS_TEXT_CHUNKING` | Split complete Agent/interaction speech into ordered TTS chunks before synthesis; common default `true`. |
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
@@ -672,8 +674,8 @@ and Goal Interpretation validation.
 | `ORCH_ENABLE_CONVERSATION_STATE` | `1`. |
 | `ORCH_CONVERSATION_ID` | `local_default`. |
 | `ORCH_CONVERSATION_MAX_TURNS` | `12`. |
-| `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` | `180`. |
-| `ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC` | `900`. |
+| `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` | `180`; retained for compatibility and diagnostics. It does not trigger phrase-based topic or follow-up classification. |
+| `ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC` | `900`; deterministic context boundary when no active Goal or pending work exists. |
 | `ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS` | `260`. |
 | `ORCH_CONVERSATION_MAX_CONTEXT_CHARS` | `2200`. |
 | `ORCH_CONVERSATION_MAX_PENDING_TASKS` | `8`. |
@@ -682,8 +684,6 @@ and Goal Interpretation validation.
 | `ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS` | `24`; maximum scoped model-authored entity referents retained across conversation/task/Goal scopes. This is not a global location slot and does not represent robot physical state. |
 | `ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS` | `8`; maximum ordered referent IDs in the LLM-authored discourse focus stack. |
 | `ORCH_CONVERSATION_RESET_PHRASES` | Optional `|`-separated override. |
-| `ORCH_CONVERSATION_FOLLOWUP_PHRASES` | Optional `|`-separated override used only to preserve a conversation boundary across idle time. It never selects or associates a Goal; Goal Association remains LLM-authored. |
-| `ORCH_CONVERSATION_NEW_TOPIC_STARTERS` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
 | `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
 | `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
@@ -692,6 +692,10 @@ and Goal Interpretation validation.
 `ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
 `ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
 should use the `ORCH_CONVERSATION_*` names.
+Conversation-boundary logic accepts explicit reset commands and hard-idle
+expiry only. Follow-up, correction, reference, and new-topic meaning is not
+configured through phrase lists and remains Goal Association responsibility.
+
 The task-context store never resumes physical work by itself; restored
 robot-action tasks are prompt-facing recoverable context and require fresh
 confirmation before any new action can run.
@@ -703,7 +707,7 @@ from that boundary. Planners may reuse a prior verified result only by executing
 original tool ID, and material arguments that match the resolved Goal bindings.
 See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
-## Skill Runtime and Soridormi
+## Trusted Capability Runtime and Soridormi
 
 | Variable | Default |
 |---|---:|
@@ -712,7 +716,7 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
 | `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
-The Skill Runtime uses a process-local scheduler. Imported Soridormi named
+Trusted Capability Runtime uses a process-local scheduler. Imported Soridormi named
 skills share the exclusive group `soridormi.robot_motion`; Soridormi remains
 responsible for cross-process resource safety.
 

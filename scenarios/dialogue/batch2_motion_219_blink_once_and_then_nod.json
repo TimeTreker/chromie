@@ -53,9 +53,6 @@
         }
       },
       "expect": {
-        "speech_any": [
-          "selected actions in order"
-        ],
         "skills": [
           "soridormi.blink_eyes",
           "soridormi.nod_yes"

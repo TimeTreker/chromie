@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .interaction import reject_forbidden_low_level_fields
+from .interaction import OptionalCapabilityIdentityModel, reject_forbidden_low_level_fields
 
 
 ProposalState = Literal[
@@ -31,7 +31,7 @@ class TaskProposalPreflight(BaseModel):
     world_feasibility: str = "unknown_until_runtime"
 
 
-class TaskProposal(BaseModel):
+class TaskProposal(OptionalCapabilityIdentityModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
@@ -44,7 +44,6 @@ class TaskProposal(BaseModel):
     priority: str = "normal"
     sequence: int = Field(default=0, ge=0)
     ability_id: str | None = None
-    skill_id: str | None = None
     request_id: str | None = None
     speech_id: str | None = None
     committed_by: str | None = None
@@ -63,7 +62,7 @@ class TaskProposal(BaseModel):
         "reason",
         "priority",
         "ability_id",
-        "skill_id",
+        "capability_id",
         "request_id",
         "speech_id",
         "committed_by",

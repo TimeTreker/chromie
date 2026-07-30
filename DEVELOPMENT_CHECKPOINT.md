@@ -31,6 +31,10 @@ feasibility, collision safety, stop, and recovery.
 - Ruff, Mypy, and test-ownership ratchets.
 - Typed ASR service settings and the first `VoiceAssistant` collaborator extraction.
 - Consolidated documentation authority.
+- Final core-principle audit closure: Host semantic delegation, phrase agents,
+  catalog/action boosts, weather route repair, conversation phrase
+  classification, ontology wording, and duplicate Provider execution paths are
+  removed; memory is model-authored and current identities are canonical.
 
 Implementation and evidence claims are owned by [Current Status](docs/STATUS.md).
 Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
@@ -60,6 +64,7 @@ python scripts/check_docs.py
 ## Authority links
 
 - [Documentation Authority](docs/DOCUMENTATION_AUTHORITY.md)
+- [Final Core-Principle Audit](docs/FINAL_CORE_PRINCIPLE_AUDIT.md)
 - [Project Charter](docs/PROJECT_CHARTER.md)
 - [Current Status](docs/STATUS.md)
 - [Roadmap](ROADMAP.md)

@@ -303,7 +303,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("not authoritative grounding", prompt)
         self.assertIn("compact body/tool affordance interface", prompt)
         self.assertIn("not a phrase table", prompt)
-        self.assertIn("One parameterized skill", prompt)
+        self.assertIn("One parameterized capability", prompt)
         self.assertIn("CapabilityAgent", prompt)
         self.assertIn("Isolated letters", prompt)
         self.assertIn("low-information ASR fragments", prompt)
@@ -966,7 +966,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             await interpreter._repair_semantic_route(
                 request,
                 decision,
-                reason="weather_semantics_require_tool_route",
+                reason="route_name_intent_mismatch",
             )
 
         self.assertEqual(raised.exception.failure_class, "prompt_budget_exceeded")
@@ -2301,8 +2301,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("fast-speech repairer", rendered)
         self.assertIn("Do not change route", rendered)
-        self.assertIn("will check the requested location/date", rendered)
-        self.assertIn("Never claim a tool result", rendered)
+        self.assertIn("exact model-authored bindings", rendered)
+        self.assertIn("Never claim an external result", rendered)
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
 

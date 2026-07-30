@@ -101,11 +101,11 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   memory, deep-planning, tool, and skill responsibilities without making the
   Host a semantic authority;
 - staged task/action proposals merged into shared task proposals before
-  deterministic Agent and Skill Runtime validation;
+  deterministic Agent and Trusted Capability Runtime validation;
 - single-authority goal-driven cognition with exact turn-bound authority claims,
   atomic Goal-state application, and fail-closed trusted adaptation;
 - native strict `POST /interaction` plus explicit compatibility rollback;
-- trusted Skill Runtime with validation, confirmation, timeout, cancellation,
+- Trusted Capability Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
 - evidence-bound named-Goal cancellation that resolves semantic targets to exact
   runtime bindings, reconciles provider widening atomically, and preserves
@@ -222,7 +222,7 @@ documented in
 
 | Path | Responsibility |
 |---|---|
-| `orchestrator/` | Host audio, interruption, conversation state, and Skill Runtime |
+| `orchestrator/` | Host audio, interruption, conversation state, and Trusted Capability Runtime |
 | `agent/app/cognitive_core/goal_interpreter/` | Compatibility Cognitive Gateway backend for attention review and advisory routing |
 | `agent/` | Native interaction, capabilities, and TaskGraph APIs |
 | `asr/`, `tts/` | Speech services |

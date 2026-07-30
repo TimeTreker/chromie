@@ -365,7 +365,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(skill.timing, "sequential")
         self.assertTrue(skill.requires_confirmation)
         self.assertEqual(skill.metadata["source"], "deepthinking_skill_task")
-        self.assertEqual(response.metadata["deepthinking_output_mode"], "skill_tasks")
+        self.assertEqual(response.metadata["deepthinking_output_mode"], "capability_tasks")
         self.assertEqual(response.metadata["deepthinking_proposed_task_count"], 2)
         self.assertEqual(response.metadata["deepthinking_valid_task_count"], 2)
         self.assertEqual(response.metadata["deepthinking_proposed_effect_task_count"], 1)

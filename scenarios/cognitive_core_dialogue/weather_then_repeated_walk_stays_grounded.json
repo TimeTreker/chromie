@@ -3,7 +3,7 @@
   "id": "weather_then_repeated_walk_stays_grounded",
   "suite": "cognitive_core_dialogue",
   "level": "integration",
-  "description": "After a weather query, repeated walking requests must remain grounded to the walking capability even when the mocked quick model repeatedly emits the stale weather intent; semantic route repair must not author planner arguments or execution requests.",
+  "description": "After a weather query, repeated walking requests remain grounded because the model authors the walking Capability directly; the Host does not repair a stale weather decision or invent planner arguments.",
   "tags": [
     "voice-log",
     "multi-turn",
@@ -118,21 +118,10 @@
           {
             "stage": "quick_intent",
             "decision": {
-              "route": "chat",
-              "intent": "weather_query",
-              "confidence": 0.95,
-              "language": "en-US",
-              "metadata": {
-                "tool_name": "weather"
-              }
-            }
-          },
-          {
-            "stage": "semantic_route_repair",
-            "decision": {
               "route": "robot_action",
               "intent": "capability:soridormi.walk_velocity",
-              "confidence": 0.97
+              "confidence": 0.97,
+              "language": "en-US"
             }
           }
         ]
@@ -141,10 +130,9 @@
         "route": "robot_action",
         "intent": "capability:soridormi.walk_velocity",
         "source": "llm",
-        "llm_calls": 2,
+        "llm_calls": 1,
         "llm_stages": [
-          "quick_intent",
-          "semantic_route_repair"
+          "quick_intent"
         ],
         "history_contains": [
           "What is the weather in Beijing today?"
@@ -154,7 +142,6 @@
           "task.execute_skill"
         ],
         "metadata_json_contains": [
-          "semantic_route_repair",
           "soridormi.walk_velocity"
         ]
       }
@@ -168,21 +155,10 @@
           {
             "stage": "quick_intent",
             "decision": {
-              "route": "chat",
-              "intent": "weather_query",
-              "confidence": 0.95,
-              "language": "en-US",
-              "metadata": {
-                "tool_name": "weather"
-              }
-            }
-          },
-          {
-            "stage": "semantic_route_repair",
-            "decision": {
               "route": "robot_action",
               "intent": "capability:soridormi.walk_velocity",
-              "confidence": 0.97
+              "confidence": 0.97,
+              "language": "en-US"
             }
           }
         ]
@@ -191,10 +167,9 @@
         "route": "robot_action",
         "intent": "capability:soridormi.walk_velocity",
         "source": "llm",
-        "llm_calls": 2,
+        "llm_calls": 1,
         "llm_stages": [
-          "quick_intent",
-          "semantic_route_repair"
+          "quick_intent"
         ],
         "history_contains": [
           "What is the weather in Beijing today?",
@@ -205,7 +180,6 @@
           "task.execute_skill"
         ],
         "metadata_json_contains": [
-          "semantic_route_repair",
           "soridormi.walk_velocity"
         ]
       }

@@ -2,7 +2,7 @@
 
 The Orchestrator is Chromie's host-side realtime runtime. It stays outside
 Docker because it owns microphone capture, VAD, utterance boundaries, speaker
-playback, barge-in, short-term conversation state, and trusted Skill Runtime
+playback, barge-in, short-term conversation state, and Trusted Capability Runtime
 coordination.
 
 For authoritative architecture, status, and configuration, see:
@@ -21,14 +21,14 @@ For authoritative architecture, status, and configuration, see:
   Response Composition, plus compatibility `AgentResult`/`InteractionResponse`
   surfaces.
 - TTS streams PCM synthesis; the Orchestrator plays and interrupts it.
-- The Skill Runtime resolves and schedules trusted named skills.
+- The Trusted Capability Runtime resolves and schedules trusted named capabilities.
 - Soridormi plans and executes embodied skills and owns physical safety.
 - `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
   embodiment path.
 
 The Agent does not call TTS or low-level hardware. Separately gated TaskGraph
 read/planning/guarded endpoints may use MCP, but normal embodied apply is
-adapted and authorized by the host Skill Runtime. The language model is never
+adapted and authorized by the Trusted Capability Runtime. The language model is never
 the final authorization boundary for a side effect.
 
 ## Cognitive ingress boundary
@@ -48,7 +48,7 @@ cancellation scopes, and projects only admitted envelopes into the Core.
 Output, embodied-motion, foreground-interaction, and global-emergency reflex
 scopes are implemented. Exact named-Goal cancellation is also implemented in
 the cognitive path: the Core selects semantic Goal IDs, the host resolves exact
-plan/runtime bindings, validates Skill Runtime receipts, atomically reconciles
+plan/runtime bindings, validates Trusted Capability Runtime receipts, atomically reconciles
 Goal state, and rebuilds an unaffected confirmation remainder when possible.
 A shared-owner pending request fails closed without changing its token, while a
 post-dispatch reconciliation failure is surfaced as an uncertain final state.
@@ -73,15 +73,15 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> Fast Planner -> terminal Deep Planner when required
       -> exact verified-memory retrieval or fresh external read
   -> prospective Response Composer -> host-built strict InteractionResponse
-  -> InteractionCoordinator -> Skill Runtime
+  -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi provider -> MCP -> simulator/robot
   -> exact plan/request/result/trace join -> per-goal outcome commit
   -> validated speech-only final response -> TTS -> playback
 ```
 
 For an effectful cognitive response, the Orchestrator commits requests only
-when plan ID/fingerprint, step, skill, arguments, timing, goal ownership, and
-output-schema identity match. Terminal `SkillResult` and `SkillTrace` records
+when plan ID/fingerprint, step, capability, arguments, timing, goal ownership, and
+output-schema identity match. Terminal `CapabilityResult` and `CapabilityTrace` records
 then produce an immutable `ExecutionOutcomeBundle`; missing results become
 `not_run`, and only bounded schema-validated observations may appear in the
 final result speech. Cancellation or a newer turn suppresses stale final audio
@@ -123,7 +123,7 @@ ASR -> Cognitive Gateway -> Goal-Driven Cognitive Core /run -> AgentResult
 ```
 
 This path remains for regression coverage and gradual migration. It must not be
-used to turn a failed named-skill request into an unvalidated low-level action.
+used to turn a failed named-capability request into an unvalidated low-level action.
 
 ### Direct conversational fallback
 
@@ -262,8 +262,8 @@ If another VAD utterance closes while ASR is still decoding, the Orchestrator
 retains the newest pending audio instead of dropping it; at most one pending
 utterance is kept to bound memory and latency.
 
-The Interaction Coordinator validates the response and submits speech and skill
-requests to the Skill Runtime. Scheduling is bounded by
+The Interaction Coordinator validates the response and submits speech and capability
+requests to the Trusted Capability Runtime. Scheduling is bounded by
 `ORCH_SKILL_MAX_CONCURRENCY` and provider/exclusive-group policy.
 
 Cancellation:
@@ -284,12 +284,12 @@ Cancellation:
    TaskGraph work and treats a missing/negative cancellation receipt as failure.
 
 TaskGraph execution itself is also terminal-evidence bound. Only explicit
-`success` completes the SkillResult; absent, `pending`, `running`, or unknown
+`success` completes the CapabilityResult; absent, `pending`, `running`, or unknown
 status fails closed. The provider exposes a closed summary/result contract to
 the cognitive turn while detailed Agent-side TaskGraph traces remain the
 authoritative execution record.
 
-Independent unselected Skill Runtime work continues; existing sequencing,
+Independent unselected Trusted Capability Runtime work continues; existing sequencing,
 dependency, and required-delivery barriers still apply. A request shared by
 targeted and untargeted goals is reported as a conflict. Resource arbitration
 is process-local; Soridormi is the cross-process robot authority.
@@ -336,7 +336,7 @@ disable it. Agent and Goal Interpretation Ollama diagnostics also respect
 `CHROMIE_CLI_COLOR=1` for forced color, falling back to the same auto/NO_COLOR
 terminal behavior. Finished sessions also write
 `session_workflow` and `session_workflow_graph` evidence covering
-VAD, ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Skill Runtime, TTS, playback, per-stage deltas, and
+VAD, ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Trusted Capability Runtime, TTS, playback, per-stage deltas, and
 final timing. The operator console keeps only a compact
 `session_workflow_summary` line with the slowest steps.
 

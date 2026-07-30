@@ -50,9 +50,6 @@
         }
       },
       "expect": {
-        "speech_any": [
-          "run that action"
-        ],
         "skills": [
           "soridormi.walk_velocity"
         ],

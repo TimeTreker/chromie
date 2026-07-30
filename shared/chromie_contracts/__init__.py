@@ -26,12 +26,13 @@ from .agent_skill import (
     PlanAgentSkillProvenance,
     SelectedAgentSkill,
 )
-from .route import RouteDecision, RouteItem, RouteRequest
+from .route import MemoryUpdateProposal, RouteDecision, RouteItem, RouteRequest
 from .core_interpretation import CoreInterpretationResult
 from .agent import AgentRequest, AgentResult, SpeechItem
 from .action import ActionCommand, ActionResult
 from .interaction import (
     CapabilityIdentityModel,
+    OptionalCapabilityIdentityModel,
     CapabilityRequest,
     CapabilityResult,
     CapabilityResultStatus,
@@ -209,6 +210,7 @@ __all__ = [
     "RouteRequest",
     "RouteDecision",
     "RouteItem",
+    "MemoryUpdateProposal",
     "AgentRequest",
     "AgentResult",
     "SpeechItem",
@@ -217,6 +219,7 @@ __all__ = [
     "InteractionResponse",
     "InteractionSpeech",
     "CapabilityIdentityModel",
+    "OptionalCapabilityIdentityModel",
     "CapabilityRequest",
     "CapabilityResult",
     "CapabilityResultStatus",

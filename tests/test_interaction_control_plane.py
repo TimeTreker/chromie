@@ -173,7 +173,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(spoken, ["I will run that action."])
+        self.assertEqual(spoken, [])
         self.assertEqual(
             invoker.calls,
             [
@@ -238,11 +238,11 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
         self.assertEqual(graphs[0]["graph_id"], "rich-body-task")
         self.assertEqual(execution.status, "failed")
-        self.assertEqual(execution.results[1].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(execution.results[0].skill_id, "chromie.task_graph.execute")
         self.assertNotIn("Arrived.", spoken)
         self.assertEqual(
             spoken,
-            ["I prepared a task plan.", "I could not complete that task safely."],
+            ["I could not complete that task safely."],
         )
 
 

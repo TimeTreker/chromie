@@ -67,10 +67,6 @@ from orchestrator.runtime.fast_first_audio import (
     CachedFastFirstAudio,
     FastFirstAudioCache,
 )
-from orchestrator.runtime.deepthinking_policy import (
-    DeepThinkingDelegationPolicy,
-    DeepThinkingPolicyConfig,
-)
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
@@ -427,9 +423,6 @@ class VoiceAssistant:
         self.cognitive_run_identity_path = cognitive_run_identity_path
         self.cognitive_run_identity = load_runtime_evidence_identity(
             cognitive_run_identity_path
-        )
-        self.deepthinking_policy = DeepThinkingDelegationPolicy(
-            DeepThinkingPolicyConfig.from_env()
         )
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
@@ -2818,41 +2811,6 @@ class VoiceAssistant:
             enable_agent=bool(getattr(self, "enable_agent", True)),
         )
 
-    def _ability_unavailable_response(
-        self,
-        ability_id: str,
-        *,
-        language: str | None,
-        user_text: str = "",
-    ) -> InteractionResponse:
-        abilities = self._ability_registry()
-        ability = abilities.get(ability_id)
-        return InteractionResponse(
-            speech=[
-                {
-                    "text": abilities.unavailable_message(
-                        ability_id,
-                        language=language,
-                        user_text=user_text,
-                    ),
-                    "style": "brief",
-                    "timing": "immediate",
-                    "priority": "normal",
-                    "interruptible": True,
-                    "metadata": {
-                        "source": "host_ability_registry",
-                        "ability_id": ability.ability_id,
-                        "ability_status": ability.status,
-                    },
-                }
-            ],
-            metadata={
-                "source": "host_ability_registry",
-                "ability_id": ability.ability_id,
-                "ability_status": ability.status,
-            },
-        )
-
     def _deep_thought_prelude_allowed(self, decision: RouteDecision) -> bool:
         if decision.route != "deep_thought" or not decision.should_speak:
             return False
@@ -2874,29 +2832,14 @@ class VoiceAssistant:
         decision: RouteDecision,
         user_text: str,
     ) -> str | None:
+        del user_text
         if not self._deep_thought_prelude_allowed(decision):
             return None
-        if decision.fast_speech is not None and getattr(
-            self,
-            "core_generated_fast_speech_enabled",
-            False,
-        ):
-            model_text = self._validated_fast_speech_payload_text(
-                decision.fast_speech
-            )
-            if model_text:
-                return model_text
-
-        abilities = self._ability_registry()
-        if not abilities.can_execute("speech.thinking_ack"):
+        if not getattr(self, "core_generated_fast_speech_enabled", False):
             return None
-        return self._safe_immediate_route_speech(
-            abilities.localized_speech(
-                "speech.thinking_ack",
-                language=decision.language,
-                user_text=user_text,
-            )
-        )
+        if decision.fast_speech is None:
+            return None
+        return self._validated_fast_speech_payload_text(decision.fast_speech)
 
     def _route_item_dicts(self, decision: RouteDecision) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
@@ -3263,31 +3206,6 @@ class VoiceAssistant:
             scheduled.get("reason", "unknown"),
         )
         return False
-
-    def _apply_conditional_deepthinking_policy(
-        self,
-        decision: RouteDecision,
-        *,
-        context: dict[str, Any],
-        session_id: str,
-    ) -> RouteDecision:
-        policy = getattr(self, "deepthinking_policy", None)
-        if policy is None:
-            policy = DeepThinkingDelegationPolicy()
-        delegation = policy.evaluate(decision, context=context)
-        if not delegation.should_delegate:
-            return decision
-        delegated = policy.delegate_decision(decision, delegation)
-        self.session_log(
-            session_id,
-            "conditional_deepthinking_delegate: original_route=%s original_intent=%s "
-            "confidence=%.2f reasons=%s",
-            delegation.original_route,
-            delegation.original_intent,
-            delegation.original_confidence,
-            ",".join(delegation.reasons),
-        )
-        return delegated
 
     def _cognitive_gateway_adapter(self) -> GatewayCoreCompatibilityAdapter:
         adapter = getattr(self, "cognitive_gateway", None)
@@ -4880,13 +4798,8 @@ class VoiceAssistant:
                 turn_envelope=turn_envelope,
             )
 
-        # The legacy conditional-deepthinking and task-continuity chain remains
-        # the compatibility path.  Goal-driven apply never loops back through it.
-        decision = self._apply_conditional_deepthinking_policy(
-            decision,
-            context=context,
-            session_id=session_id,
-        )
+        # Compatibility observation paths may continue below, but ordinary
+        # semantic/deep-thinking delegation remains owned by the Cognitive Core.
         if self.cognitive_runtime_mode == "off":
             decision = self._schedule_goal_association_report(
                 session,
@@ -5842,20 +5755,20 @@ class VoiceAssistant:
         *,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        embodied = self._looks_like_embodied_request(user_text, context=context)
+        """Return one non-semantic operational fallback after Core failure.
+
+        The Host does not classify the user's request to choose different
+        wording. Exact effect safety is already enforced by the absence of a
+        validated Canonical Plan and Trusted Capability Runtime execution.
+        """
+
+        del context
         zh = self._looks_zh(user_text)
-        if embodied:
-            text = (
-                "我听到了动作请求，但这次认知处理没有完成，所以我不会执行动作。"
-                if zh
-                else "I heard an action request, but cognitive processing did not complete, so I will not perform it."
-            )
-        else:
-            text = (
-                "我这次没能处理好你的请求，请再说一次。"
-                if zh
-                else "I couldn't complete that request. Please try again."
-            )
+        text = (
+            "我这次没能处理好你的请求，所以没有执行任何操作。请再说一次。"
+            if zh
+            else "I couldn't complete that request, so no operation was executed. Please try again."
+        )
         response = self._host_speech_response(
             text,
             style="warning",
@@ -5865,7 +5778,7 @@ class VoiceAssistant:
             update={
                 "metadata": {
                     **response.metadata,
-                    "embodied_request": embodied,
+                    "effect_execution": "not_authorized",
                     "semantic_fallback": False,
                 }
             }
@@ -6086,40 +5999,6 @@ class VoiceAssistant:
             style="warning",
             source="host_agent_exception_safe_fallback",
         )
-
-    def _looks_like_embodied_request(
-        self,
-        user_text: str,
-        *,
-        context: dict[str, Any] | None = None,
-    ) -> bool:
-        normalized = " ".join((user_text or "").casefold().split())
-        embodied_terms = (
-            "walk",
-            "move",
-            "go forward",
-            "turn",
-            "nod",
-            "shake your head",
-            "blink",
-            "look at",
-            "快一点",
-            "走",
-            "前进",
-            "转",
-            "点头",
-            "眨眼",
-        )
-        if any(term in normalized for term in embodied_terms):
-            return True
-        for task in (context or {}).get("active_pending_tasks", []) or []:
-            if not isinstance(task, dict):
-                continue
-            summary = str(task.get("summary") or "").casefold()
-            task_type = str(task.get("type") or "").casefold()
-            if "soridormi" in summary or task_type in {"confirmation", "robot_action"}:
-                return True
-        return False
 
     @staticmethod
     def _looks_zh(text: str) -> bool:

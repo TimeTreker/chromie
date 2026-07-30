@@ -28,12 +28,13 @@ preserving these invariants:
   not solve ordinary semantic association.
 - Benchmarks evaluate intelligence and must not implement it.
 
-## Current problem
+## Problem addressed
 
-Task knowledge is currently distributed across broad model prompts, capability
-descriptions, runtime validators, provider adapters, documentation, and tests.
-This makes reusable domain methods difficult to review, version, select, trace,
-and improve independently.
+Before this implementation, task knowledge was distributed across broad model
+prompts, Capability descriptions, runtime validators, Provider adapters,
+documentation, and tests. The implemented Agent Skill boundary makes reusable
+domain methods reviewable, versioned, model-selectable, and traceable without
+creating execution authority.
 
 The recent weather conversation exposed the distinction:
 
@@ -114,8 +115,7 @@ Acceptance:
 - conflicting `skill_id`/`capability_id` values fail closed;
 - provider requests and results correlate through the canonical Capability ID;
 - maintained tests, scenarios, traces, and legacy replay fixtures remain green;
-- no Agent Skill contract exists yet, so the rename cannot accidentally add a
-  second execution authority.
+- the terminology migration itself did not add a second execution authority.
 
 Implementation status:
 
@@ -126,7 +126,7 @@ Implementation status:
 - contradictory dual identity fails closed;
 - canonical runtime/type names are aliases over the existing single registry and
   Trusted Runtime rather than a second authority;
-- the maintained full gate passes 1,545 primary tests plus 20 legacy Agent tests;
+- the maintained full repository gate covers canonical and legacy replay boundaries;
 - no Agent Skill package, loader, selection, or execution authority is introduced
   by this slice.
 
@@ -158,8 +158,8 @@ Implementation status:
   required metadata fields, and unknown executable/provider declarations fail
   closed through strict schemas;
 - typed model-selection contracts are now implemented in the following slice;
-  Plan-provenance contracts remain deferred to their owning slice rather than
-  being prematurely attached to execution behavior.
+  Plan provenance is implemented by its later owning slice and remains
+  execution-authority-free.
 
 ### Add a read-only Skill registry and loader
 
@@ -503,6 +503,6 @@ provenance, and live weather evidence must prove that the selected methods still
 cross the existing Trusted Capability Runtime. Those are target-evidence tracks,
 not reasons to add Host selection rules or another execution path.
 
-The next named code Issue is maintained in the engineering sustainability plan:
-
-> **Introduce High-Signal Ruff Gates.**
+All named implementation slices in this plan are complete. Positive live model
+selection, exact Plan provenance, and Provider-backed weather execution remain
+target-evidence work governed by the current status and qualification documents.

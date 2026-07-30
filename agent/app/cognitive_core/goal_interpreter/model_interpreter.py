@@ -278,48 +278,6 @@ def _capability_route_lookup_from_request(request: RouteRequest) -> dict[str, st
     return routes
 
 
-def _decision_selects_weather_tool(decision: RouteDecision) -> bool:
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    intent = str(decision.intent or "").casefold()
-    if decision.route == "tool" and ("weather" in intent or "forecast" in intent):
-        return True
-    if decision.route == "tool" and str(metadata.get("tool_name") or "").casefold() == "weather":
-        return True
-    if decision.route == "tool" and isinstance(metadata.get("weather_query"), dict):
-        return True
-    for item in decision.routes or []:
-        item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
-        item_intent = str(item.intent or "").casefold()
-        if item.route == "tool" and ("weather" in item_intent or "forecast" in item_intent):
-            return True
-        if item.route == "tool" and str(item_metadata.get("tool_name") or "").casefold() == "weather":
-            return True
-        if item.route == "tool" and isinstance(item_metadata.get("weather_query"), dict):
-            return True
-    return False
-
-
-def _decision_has_weather_semantics(decision: RouteDecision) -> bool:
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    intent = str(decision.intent or "").casefold()
-    if "weather" in intent or "forecast" in intent:
-        return True
-    if str(metadata.get("tool_name") or "").casefold() == "weather":
-        return True
-    if isinstance(metadata.get("weather_query"), dict):
-        return True
-    for item in decision.routes or []:
-        item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
-        item_intent = str(item.intent or "").casefold()
-        if "weather" in item_intent or "forecast" in item_intent:
-            return True
-        if str(item_metadata.get("tool_name") or "").casefold() == "weather":
-            return True
-        if isinstance(item_metadata.get("weather_query"), dict):
-            return True
-    return False
-
-
 def _route_intent_contract_conflict(
     request: RouteRequest,
     decision: RouteDecision,
@@ -329,12 +287,6 @@ def _route_intent_contract_conflict(
     Semantic repair is delegated to a model. This guard only notices that the
     model's own output contradicts a declared route contract.
     """
-
-    if (
-        _decision_has_weather_semantics(decision)
-        and not _decision_selects_weather_tool(decision)
-    ):
-        return "weather_semantics_require_tool_route"
 
     intent = str(decision.intent or "").strip()
     if intent in ROUTE_NAMES and intent != decision.route:
@@ -512,7 +464,7 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
             if str(effect).strip()
         ]
         entry: dict[str, Any] = {
-            "skill_id": capability_id,
+            "capability_id": capability_id,
             "route": str(item.get("route") or ""),
         }
         if description:
@@ -538,10 +490,10 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
 def _compact_prompt_capability_lines(entries: list[dict[str, Any]]) -> list[str]:
     lines: list[str] = []
     for entry in entries:
-        skill_id = str(entry.get("skill_id") or "").strip()
-        if not skill_id:
+        capability_id = str(entry.get("capability_id") or "").strip()
+        if not capability_id:
             continue
-        parts = [skill_id]
+        parts = [capability_id]
         route = str(entry.get("route") or "").strip()
         if route and route != "robot_action":
             parts.append(f"route={route}")
@@ -1027,9 +979,9 @@ class OllamaGoalInterpreter:
             prompt_capabilities = request.context.get("prompt_capabilities_common", [])
         compact_prompt_capabilities = _compact_prompt_capabilities(prompt_capabilities)
         common_ability_ids = [
-            item["skill_id"]
+            item["capability_id"]
             for item in compact_prompt_capabilities
-            if item.get("skill_id")
+            if item.get("capability_id")
         ]
         common_ability_catalog_json = _bounded_json_array(
             _compact_prompt_capability_lines(compact_prompt_capabilities),
@@ -1058,11 +1010,11 @@ class OllamaGoalInterpreter:
             "Task Continuity:\n"
             "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. A status follow-up such as whether a lookup finished should associate with the relevant scheduled, running, or recoverable task and preserve its exact bound tool arguments. If that safe read has no completed evidence, route it for resume or retry rather than answering from another task's result. A follow-up that supplies or replaces a material lookup parameter, such as another city, inherits the lookup responsibility and must remain a tool route. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
             "Capability Affordance Proposal:\n"
-            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Use an available trusted lookup tool when the user needs current external facts; select it from capability meaning and context rather than a topic keyword. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact capability only for an explicit execution method with one clear match. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Use an available trusted lookup tool when the user needs current external facts; select it from capability meaning and context rather than a topic keyword. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. routes[] split independent responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker) only for explicit skills. metadata.semantic_task_operations may contain advisory operations with operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, and reason_summary. create requires goal.description and source_text; later operations use exact supplied task IDs. fast_speech/speak_first and metadata.response_plan.immediate are process acknowledgement only, with human-like social warmth, not a program, programme, backend, software process, or language model; they must not claim completion. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. For route=memory, memory_update is required and must contain scope=session, kind, text, optional key, persistence_policy=ephemeral, and confidence. routes[] split independent responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker) only for explicit capabilities. metadata.semantic_task_operations may contain advisory operations with operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, and reason_summary. create requires goal.description and source_text; later operations use exact supplied task IDs. fast_speech/speak_first and metadata.response_plan.immediate are process acknowledgement only, with human-like social warmth, not a program, programme, backend, software process, or language model; they must not claim completion. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
 
     def build_fast_speech_repair_payload(
@@ -1097,8 +1049,8 @@ class OllamaGoalInterpreter:
                         "Safety Contract:\n"
                         "- fast_speech is emitted before downstream work finishes.\n"
                         "- It must be a process acknowledgement only, not a final answer.\n"
-                        "- Never claim a tool result, weather value, memory commit, physical movement, execution, or completion.\n"
-                        "- For weather/tool lookup, say that Chromie will check the requested location/date.\n"
+                        "- Never claim an external result, memory commit, physical movement, execution, or completion.\n"
+                        "- For a pending read-only Capability, acknowledge only that Chromie will check the exact model-authored bindings.\n"
                         "- If location or date is unclear, ask a brief clarification instead of guessing.\n\n"
                         "Output Contract:\n"
                         "- Return compact JSON only.\n"
@@ -1223,20 +1175,18 @@ class OllamaGoalInterpreter:
                         "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable common ability can satisfy them.\n"
                         "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
                         "- capability_inquiry applies only when the user is asking about Chromie's abilities, not when discussing capabilities of another person, model, vehicle, sensor, or system.\n"
-                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion or tool lookup is explicitly requested.\n"
+                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless a supplied executable Capability is explicitly selected.\n"
+                        "- For external information, use tool only when the model selects an exact supplied Capability; domain methods come from disclosed Agent Skills, not Host topic rules.\n"
                         "- Never choose ignore. A separate focused addressedness stage owns bounded ambient suppression.\n"
-                        "- Current or upcoming weather and forecast questions are tool work when a weather lookup capability is present. Use route=tool with intent=weather_query, not ordinary chat, and do not answer weather from memory.\n"
-                        "- For weather route metadata, include metadata.tool_name=weather and metadata.weather_query with location/date/units when clear from the user text.\n\n"
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
                         "- Choose deep_thought for complex reasoning, debugging, design, implementation planning, or multi-step task-session work.\n\n"
                         "Output Contract:\n"
                         "- Return compact JSON only. Required keys are route, intent, and confidence; metadata and fast_speech are allowed when they change downstream routing or immediate user acknowledgement.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
                         "- fast_speech, when present, must be a short process acknowledgement only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
-                        "- For weather, fast_speech may say that Chromie will check the requested location/date, for example that it will check today's weather for the city.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Never choose interrupt or ignore.\n"
-                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action or weather_query."
+                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
                     ),
                 },
                 {
@@ -1347,8 +1297,6 @@ class OllamaGoalInterpreter:
                         "- Decide from meaning and common ability descriptions, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
-                        "- Speech-only requests are chat. Current or upcoming weather/forecast lookup is tool work when a weather capability is present.\n"
-                        "- Use route=tool and intent=weather_query for weather lookup; include metadata.tool_name=weather and metadata.weather_query when location/date/units are clear.\n"
                         "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
                         "- Use task context and recent action history for follow-ups, but never as standalone authorization.\n\n"
                         "Output Contract:\n"
@@ -1357,7 +1305,7 @@ class OllamaGoalInterpreter:
                         "- fast_speech must be a short process acknowledgement only; never claim tool results, physical completion, or memory commit.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
-                        "- For a selected capability, set intent to capability:<exact capability_id>.\n"
+                        "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"
                         "- Confidence is semantic routing confidence; use at least 0.72 when the request clearly maps to a common ability."
                     ),
                 },
@@ -1415,7 +1363,7 @@ class OllamaGoalInterpreter:
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
                         "Return exactly route, intent, and confidence. "
                         "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
-                        "Use tool for changing external facts, including current weather. "
+                        "Use tool only when the model selects an exact supplied external-read Capability. "
                         "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
                         "Use clarify only when the user meaning remains genuinely underdetermined. "
                         "No analysis, rationale, metadata, actions, markdown, or extra fields."

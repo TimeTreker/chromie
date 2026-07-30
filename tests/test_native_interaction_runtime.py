@@ -742,19 +742,16 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["interaction_output_mode"], "native")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
         self.assertEqual(response.skills[0].args, {"count": 2})
-        self.assertEqual(response.speech[0].text, "I will run that action.")
+        self.assertEqual(response.speech, [])
         self.assertIn("capability_agent", response.metadata["handled_by"])
         proposals = [
             TaskProposal.model_validate(item)
             for item in response.metadata["agent_task_proposals"]
         ]
-        self.assertEqual([item.proposal_kind for item in proposals], ["speech", "skill"])
-        self.assertEqual(proposals[0].skill_id, "chromie.speak")
-        self.assertEqual(proposals[0].speech_id, response.speech[0].id)
-        self.assertFalse(proposals[0].effectful)
-        self.assertEqual(proposals[1].skill_id, "soridormi.nod_yes")
-        self.assertEqual(proposals[1].request_id, response.skills[0].request_id)
-        self.assertTrue(proposals[1].effectful)
+        self.assertEqual([item.proposal_kind for item in proposals], ["skill"])
+        self.assertEqual(proposals[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(proposals[0].request_id, response.skills[0].request_id)
+        self.assertTrue(proposals[0].effectful)
 
     async def test_native_runtime_preserves_model_selected_skill_and_args(self) -> None:
         request = _request(
@@ -922,7 +919,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             response.skills[0].metadata["source"],
             "social_attention_plan",
         )
-        self.assertEqual(response.metadata["social_attention_skills"][0], "soridormi.express_attention")
+        self.assertEqual(response.metadata["social_attention_capability_ids"][0], "soridormi.express_attention")
 
     async def test_chat_only_response_adds_attention_cue(self) -> None:
         request = _request(
@@ -958,7 +955,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "A subtle attention cue supports the spoken reply.",
         )
         self.assertEqual(
-            response.metadata["social_attention_skills"][0],
+            response.metadata["social_attention_capability_ids"][0],
             "soridormi.express_attention",
         )
 
@@ -1044,7 +1041,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_decision"], "unsupported")
         self.assertEqual(
             response.speech[0].text,
-            "I cannot map that to an available action, so I will not move.",
+            "I got stuck forming that answer. Please say it again.",
         )
         self.assertEqual(response.skills, [])
 
@@ -1219,7 +1216,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
-            "I heard you, but my language understanding is temporarily unavailable.",
+            "I got stuck forming that answer. Please say it again.",
         )
 
     async def test_weak_catalog_match_does_not_promote_chat_identity_to_motion(self) -> None:
@@ -1343,10 +1340,10 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
-            "I heard you, but my language understanding is temporarily unavailable.",
+            "I got stuck forming that answer. Please say it again.",
         )
 
-    async def test_legacy_run_contract_remains_unchanged(self) -> None:
+    async def test_removed_phrase_agent_cannot_be_reenabled(self) -> None:
         request = _request(
             agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
         )
@@ -1355,9 +1352,8 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             _legacy_services(ollama=None, use_llm=False, max_speak_chars=160)
         ).run(request)
 
-        self.assertEqual(result.actions[0].type, "head.nod")
-        self.assertEqual(result.actions[0].params, {"times": 1})
-        self.assertEqual(result.speak_immediate[0].text, "Okay.")
+        self.assertEqual(result.actions, [])
+        self.assertNotIn("robot_pose_controller_agent", result.handled_by)
 
     async def test_native_task_graph_is_emitted_as_structured_skill(self) -> None:
         response = await InteractionRuntime(

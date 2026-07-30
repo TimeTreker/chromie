@@ -6,6 +6,13 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+try:
+    from chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from chromie_contracts.route import MemoryUpdateProposal
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from shared.chromie_contracts.route import MemoryUpdateProposal
+
 
 RouteName = Literal[
     "chat",
@@ -84,7 +91,7 @@ class FastSpeech(BaseModel):
         return self
 
 
-class RouteItem(BaseModel):
+class RouteItem(OptionalCapabilityIdentityModel):
     route: RouteName
     intent: str = "unknown"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -95,7 +102,7 @@ class RouteItem(BaseModel):
     direct_to_tts: bool = False
     text: str | None = None
     fast_speech: FastSpeech | None = None
-    skill_id: str | None = None
+    memory_update: MemoryUpdateProposal | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -163,6 +170,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     fast_speech: FastSpeech | None = None
+    memory_update: MemoryUpdateProposal | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None

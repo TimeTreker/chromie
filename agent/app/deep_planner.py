@@ -417,15 +417,15 @@ class DeepPlannerResolver:
         if len(parallel_fast) < 2:
             return
         expected_skills = sorted(
-            str(item.get("skill_id") or "").strip()
+            str(item.get("capability_id") or item.get("skill_id") or "").strip()
             for item in parallel_fast
-            if str(item.get("skill_id") or "").strip()
+            if str(item.get("capability_id") or item.get("skill_id") or "").strip()
         )
         actual_skills = sorted(
-            str(item.get("skill_id") or "").strip()
+            str(item.get("capability_id") or item.get("skill_id") or "").strip()
             for item in raw_steps
             if isinstance(item, dict)
-            and str(item.get("skill_id") or "").strip()
+            and str(item.get("capability_id") or item.get("skill_id") or "").strip()
         )
         if expected_skills != actual_skills:
             return
@@ -503,7 +503,7 @@ class DeepPlannerResolver:
             f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
-            "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound skill with the exact arguments. "
+            "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
             f"{route_effect_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -513,8 +513,8 @@ class DeepPlannerResolver:
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
             "User-facing speech is owned by Response Composer and is never an executable plan step. A conversational answer, joke, explanation, or greeting uses a respond outcome with non-empty response_text and zero step_ids. Combine that outcome with physical execution as disposition=mixed; do not create a speech transport step. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
-            "A plan step may contain only step_id, skill_id, args, timing, source_goal_ids, and reason_summary. "
-            "Do not copy catalog field names such as capability_id, input_schema, parameters, route, step_type, or effects into a plan step. "
+            "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
+            "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
             "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
             "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
@@ -524,7 +524,7 @@ class DeepPlannerResolver:
             "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{self._bounded(grounding, 5000)}\n\n"
-            f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 4000)}"
+            f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 4000)}"
         )
 
     @staticmethod
@@ -532,7 +532,7 @@ class DeepPlannerResolver:
         return (
             "You are Chromie's Deep Planner. Plan only the final authoritative user turn and canonical goals supplied at the end of the prompt. "
             "You may revise once from structured validator feedback, but you never call or return to the Fast Planner. "
-            "Skills are plan leaves, not planner ownership boundaries. Do not execute, authorize, or claim completion. Return JSON only."
+            "Capabilities are plan leaves, not planner ownership boundaries. Do not execute, authorize, or claim completion. Return JSON only."
         )
 
     @staticmethod
@@ -666,17 +666,17 @@ class DeepPlannerResolver:
             if resolution.blocking and plan.disposition == "execute":
                 errors.append({"type": "blocking_parameter_resolution", "step_id": resolution.step_id, "parameter": resolution.parameter})
         for step in plan.steps:
-            capability = allowed.get(step.skill_id)
+            capability = allowed.get(step.capability_id)
             if capability is None:
-                errors.append({"type": "unknown_capability", "step_id": step.step_id, "skill_id": step.skill_id})
+                errors.append({"type": "unknown_capability", "step_id": step.step_id, "capability_id": step.capability_id})
                 continue
             if not capability.get("available") or not capability.get("interaction_executable"):
                 errors.append({"type": "capability_not_executable", "step_id": step.step_id,
-                               "skill_id": step.skill_id})
+                               "capability_id": step.capability_id})
                 continue
             schema_errors = validate_args_for_schema(step.args, capability.get("input_schema") or {})
             if schema_errors:
-                errors.append({"type": "invalid_args", "step_id": step.step_id, "skill_id": step.skill_id,
+                errors.append({"type": "invalid_args", "step_id": step.step_id, "capability_id": step.capability_id,
                                "errors": schema_errors[:8]})
         return errors
 

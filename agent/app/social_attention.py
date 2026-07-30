@@ -177,18 +177,18 @@ class SocialAttentionPlanner:
         }
         return (
             "Plan optional social attention for the current spoken interaction.\n"
-            "Attention is the goal; blinking, gaze, nodding, and other supplied skills are only possible expressions.\n"
+            "Attention is the goal; blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
             "Choose decision=none when speech alone is natural, when a gesture would be repetitive, distracting, "
             "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "
             "one is available.\n"
             "Use only supplied semantic target evidence. Never invent a perceived person, target location, "
             "body calibration, joint target, or controller parameter.\n"
             "Do not create or change the user's primary task. Do not add speech, tool calls, memory writes, or raw "
-            "joint/motor controls. Select only exact skill_id values from eligible_social_capabilities and provide "
+            "joint/motor controls. Select only exact capability_id values from eligible_social_capabilities and provide "
             "schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
             "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. "
             "decision is none or express. target contains target_ref, source, relative_direction, confidence, metadata. "
-            "Each behavior contains skill_id, args, timing, and reason.\n\n"
+            "Each behavior contains capability_id, args, timing, and reason.\n\n"
             f"Interaction context:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
         )
 

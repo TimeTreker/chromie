@@ -146,7 +146,7 @@ Current-compatible example shape:
   },
   "behaviors": [
     {
-      "skill_id": "soridormi.nod_yes",
+      "capability_id": "soridormi.nod_yes",
       "args": {"count": 1, "amplitude": 0.3, "duration_s": 1.0},
       "timing": "parallel",
       "social_function": "acknowledge"

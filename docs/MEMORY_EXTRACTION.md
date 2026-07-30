@@ -12,12 +12,13 @@ fields and use compact session memory instead. Deepthinking prompts consume the
 extracted memory block. Ordinary conversation prompts now use extracted memory
 plus a tiny recent-turn fallback for immediate reference resolution; capability
 planning/review prompts use extracted memory and omit raw history.
-Explicit `memory` routes now make `memory_agent` emit a refined
-`extracted_memory` update in addition to the legacy raw `user_statement`; the
-host consumes the refined entry into process-local session memory.
+Explicit `memory` routes now carry a typed model-authored
+`MemoryUpdateProposal`. `memory_agent` only validates and applies that proposal,
+emitting refined `extracted_memory` plus a bounded compatibility
+`user_statement` derived from the same content. It never reclassifies raw user
+text with keyword or regex rules; missing proposals clarify and fail closed.
 
-Durable personal memory, LLM-assisted memory extraction, and experience-fed
-memory selection remain future work.
+Durable personal memory and experience-fed memory selection remain future work.
 
 This document defines the intended next architecture so code changes can be
 made against a stable contract.

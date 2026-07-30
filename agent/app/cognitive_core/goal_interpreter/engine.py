@@ -695,12 +695,6 @@ def _goal_interpretation_action_schema_errors(args: Any, schema: Any) -> list[st
     return errors
 
 
-def _default_thinking_speak_first(language: str) -> str:
-    if (language or "").startswith("zh"):
-        return "给我一点时间想清楚。"
-    return "Give me a moment to think that through."
-
-
 def _safe_thinking_speak_first(text: str | None, *, language: str) -> str | None:
     cleaned = " ".join((text or "").strip().split())
     if not cleaned:
@@ -743,37 +737,6 @@ def _thinking_ack_allowed_from_decision(decision: RouteDecision) -> bool:
             decision.speak_first,
             language=decision.language or "auto",
         )
-    )
-
-
-def _clarify_capability_decision(
-    request: RouteRequest,
-    result: CapabilityCatalogResult,
-    *,
-    reason: str,
-) -> RouteDecision:
-    language = request.language or "auto"
-    speak_first = (
-        "你希望我现在执行动作，还是只创建动作计划？"
-        if language.startswith("zh")
-        else "Should I execute the motion now, or only create a motion plan?"
-    )
-    return finalize_decision(
-        RouteDecision(
-            route="clarify",
-            agents=["speaker_agent"],
-            intent="clarify_capability_selection",
-            confidence=0.0,
-            language=language,
-            needs_agent=True,
-            should_speak=True,
-            speak_first=speak_first,
-            candidate_capabilities=list(result.matches),
-            reason=reason,
-            source="llm",
-        ),
-        request,
-        source="llm",
     )
 
 
@@ -938,17 +901,6 @@ def _validate_llm_capability_decision(
                         required_agents.append("speaker_agent")
                     decision.agents = list(dict.fromkeys([*decision.agents, *required_agents]))
                     return finalize_decision(decision, request, source="llm")
-                if low_confidence_reasons and not _safe_thinking_speak_first(
-                    decision.speak_first,
-                    language=decision.language or request.language or "auto",
-                ):
-                    decision.speak_first = _default_thinking_speak_first(
-                        decision.language or request.language or "auto"
-                    )
-                    decision.metadata = {
-                        **(decision.metadata or {}),
-                        "validator_default_thinking_ack": True,
-                    }
                 return _deep_thought_from_low_confidence(
                     request,
                     decision,
@@ -1131,12 +1083,9 @@ def _deep_thought_from_low_confidence(
     if decision.reason:
         reason_parts.append(f"quick_reason={decision.reason}")
     thinking_ack_allowed = _thinking_ack_allowed_from_decision(decision)
-    if (decision.metadata or {}).get("validator_default_thinking_ack") is True:
-        thinking_ack_source = "quick_validator_default_speak_first"
-    elif thinking_ack_allowed:
-        thinking_ack_source = "quick_llm_speak_first"
-    else:
-        thinking_ack_source = "none"
+    thinking_ack_source = (
+        "quick_llm_speak_first" if thinking_ack_allowed else "none"
+    )
     quick_stage = route_stage_output(
         decision,
         stage="quick_intent",

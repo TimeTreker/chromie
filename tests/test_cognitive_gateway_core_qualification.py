@@ -313,7 +313,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             events = [json.loads(line) for line in events_path.read_text().splitlines()]
             for event in events:
                 if event.get("sid") == "sid-weather-2" and event.get("event") == "cognitive_runtime_resolution":
-                    event["terminal_plan"]["skill_ids"] = ["chromie.weather.lookup"]
+                    event["terminal_plan"]["capability_ids"] = ["chromie.weather.lookup"]
             events_path.write_text(
                 "".join(json.dumps(item) + "\n" for item in events),
                 encoding="utf-8",
@@ -327,7 +327,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 expected_soridormi_revision="soridormi-current",
             )
         self.assertFalse(report["passed"])
-        self.assertIn("forbidden repeated terminal skill", "\n".join(report["errors"]))
+        self.assertIn("forbidden repeated terminal capability", "\n".join(report["errors"]))
 
     def test_runtime_agent_fingerprint_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

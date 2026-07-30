@@ -41,7 +41,7 @@ class SpeakerAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("soridormi", updated.speak_immediate[0].text)
 
-    async def test_internal_only_speech_falls_back_after_filtering(self) -> None:
+    async def test_internal_only_speech_is_removed_without_host_fallback(self) -> None:
         result = AgentResult()
         result.add_speak_immediate("soridormi.express_attention.")
 
@@ -50,7 +50,7 @@ class SpeakerAgentTests(unittest.IsolatedAsyncioTestCase):
             result,
         )
 
-        self.assertEqual(updated.speak_immediate[0].text, "I understand.")
+        self.assertEqual(updated.speak_immediate, [])
 
     async def test_filters_internal_plan_labels_before_tts(self) -> None:
         result = AgentResult()

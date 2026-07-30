@@ -79,7 +79,7 @@ class ExperienceManager:
             skill_results = [
                 {
                     "request_id": result.request_id,
-                    "skill_id": result.skill_id,
+                    "capability_id": result.capability_id,
                     "status": result.status,
                     "reason_code": result.reason_code,
                     "message": result.message,

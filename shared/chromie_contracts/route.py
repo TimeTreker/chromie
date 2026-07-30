@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .interaction import OptionalCapabilityIdentityModel
 
 RouteName = Literal[
     "chat",
@@ -59,7 +61,42 @@ class FastSpeech(BaseModel):
         return self
 
 
-class RouteItem(BaseModel):
+MemoryKind = Literal[
+    "preference",
+    "fact",
+    "note",
+    "instruction",
+    "constraint",
+    "relationship",
+    "other",
+]
+
+
+class MemoryUpdateProposal(BaseModel):
+    """Model-authored, Host-validated session-memory proposal."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1.0"] = "1.0"
+    scope: Literal["session"] = "session"
+    kind: MemoryKind
+    text: str = Field(min_length=1, max_length=1000)
+    key: str | None = Field(default=None, max_length=160)
+    persistence_policy: Literal["ephemeral"] = "ephemeral"
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+    @field_validator("text", "key", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+        normalized = " ".join(value.strip().split())
+        return normalized or None
+
+
+class RouteItem(OptionalCapabilityIdentityModel):
     route: RouteName
     intent: str = "unknown"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -70,7 +107,7 @@ class RouteItem(BaseModel):
     direct_to_tts: bool = False
     text: str | None = None
     fast_speech: FastSpeech | None = None
-    skill_id: str | None = None
+    memory_update: MemoryUpdateProposal | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -97,6 +134,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     fast_speech: FastSpeech | None = None
+    memory_update: MemoryUpdateProposal | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None

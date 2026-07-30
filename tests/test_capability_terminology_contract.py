@@ -4,6 +4,13 @@ import unittest
 
 from pydantic import ValidationError
 
+from agent.app.cognitive_core.goal_interpreter.schema import RouteItem as GoalInterpreterRouteItem
+from agent.app.schema import RouteItem as AgentRouteItem
+from orchestrator.runtime.episode import (
+    EpisodeSkillRequestRecord,
+    EpisodeSkillResultRecord,
+)
+from orchestrator.schemas.route import RouteItem as OrchestratorRouteItem
 from orchestrator.runtime.skill_runtime import (
     CapabilityDefinition,
     CapabilityRegistry,
@@ -22,6 +29,9 @@ from shared.chromie_contracts import (
     SkillRequest,
     SkillResult,
     SkillTrace,
+    RouteItem as SharedRouteItem,
+    SocialAttentionBehavior,
+    TaskProposal,
 )
 from shared.chromie_contracts.interaction import CapabilityTraceEvent
 
@@ -176,6 +186,51 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
 
         self.assertEqual(copied.capability_id, "soridormi.shake_no")
         self.assertNotIn("skill_id", copied.model_dump(mode="json"))
+
+
+    def test_remaining_model_and_evidence_contracts_emit_capability_id(self) -> None:
+        contracts = [
+            SharedRouteItem(route="tool", skill_id="chromie.weather.lookup"),
+            AgentRouteItem(route="tool", skill_id="chromie.weather.lookup"),
+            GoalInterpreterRouteItem(route="tool", skill_id="chromie.weather.lookup"),
+            OrchestratorRouteItem(route="tool", skill_id="chromie.weather.lookup"),
+            SocialAttentionBehavior(skill_id="soridormi.blink_eyes"),
+            TaskProposal(
+                id="proposal-1",
+                state="advisory",
+                skill_id="chromie.weather.lookup",
+            ),
+            EpisodeSkillRequestRecord(
+                request_id="request-episode",
+                skill_id="chromie.weather.lookup",
+            ),
+            EpisodeSkillResultRecord(
+                request_id="request-episode",
+                skill_id="chromie.weather.lookup",
+                status="completed",
+            ),
+        ]
+
+        for contract in contracts:
+            with self.subTest(contract=type(contract).__name__):
+                payload = contract.model_dump(mode="json")
+                self.assertEqual(payload["capability_id"], contract.capability_id)
+                self.assertNotIn("skill_id", payload)
+                self.assertNotIn("skill_id", contract.model_json_schema()["properties"])
+
+    def test_optional_identity_contracts_accept_omitted_identity_and_reject_conflict(self) -> None:
+        item = SharedRouteItem(route="chat")
+        self.assertIsNone(item.capability_id)
+        self.assertNotIn("skill_id", item.model_dump(mode="json"))
+
+        with self.assertRaisesRegex(ValidationError, "conflicting capability_id"):
+            SharedRouteItem.model_validate(
+                {
+                    "route": "tool",
+                    "capability_id": "chromie.weather.lookup",
+                    "skill_id": "chromie.memory.retrieve_verified_tool_result",
+                }
+            )
 
     def test_runtime_definition_uses_canonical_identity_with_legacy_reader(self) -> None:
         definition = CapabilityDefinition(

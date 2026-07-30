@@ -20,7 +20,11 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 22,
       "capabilities": [
         {
@@ -51,7 +55,11 @@
     },
     "llm_decision": {
       "route": "robot_action",
-      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "intent": "compound_common_catalog_task",
       "confidence": 0.87,
       "language": "en-US",
@@ -59,7 +67,9 @@
       "actions": [
         {
           "capability_id": "soridormi.walk_forward",
-          "args": {"duration_s": 20},
+          "args": {
+            "duration_s": 20
+          },
           "sequence": 0,
           "timing": "sequential",
           "confidence": 0.89
@@ -76,7 +86,9 @@
         },
         {
           "capability_id": "soridormi.blink_eyes",
-          "args": {"count": 6},
+          "args": {
+            "count": 6
+          },
           "sequence": 2,
           "timing": "sequential",
           "confidence": 0.84
@@ -88,13 +100,20 @@
     "route": "deep_thought",
     "intent": "deep_thought_low_confidence",
     "source": "llm",
-    "task_types_include": ["speech.thinking_ack", "cognition.deep_think"],
-    "task_types_forbid": ["task.execute_skill", "speech.speak"],
-    "metadata_true": ["thinking_ack_allowed"],
+    "task_types_include": [
+      "cognition.delegate_deep_thought",
+      "cognition.deep_think"
+    ],
+    "task_types_forbid": [
+      "task.execute_skill",
+      "speech.speak"
+    ],
+    "metadata_true": [],
     "metadata_json_contains": [
       "fast_goal_interpreter_review_request",
       "not_committed",
-      "quick_validator_default_speak_first",
+      "thinking_ack_source",
+      "none",
       "action[1] confidence 0.31 below threshold"
     ],
     "llm_calls": 1

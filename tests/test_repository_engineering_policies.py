@@ -154,6 +154,102 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             {policies.RULE_AGENT_SKILL_SELECTION},
         )
 
+
+    def test_host_semantic_delegation_and_phrase_agents_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            deep = root / "orchestrator" / "runtime" / "deepthinking_policy.py"
+            deep.parent.mkdir(parents=True)
+            deep.write_text("class DeepThinkingDelegationPolicy: pass\n", encoding="utf-8")
+            runtime = root / "agent" / "app" / "runtime.py"
+            runtime.parent.mkdir(parents=True)
+            runtime.write_text("MotionPlannerAgent = object\n", encoding="utf-8")
+            catalog = root / "agent" / "app" / "capabilities" / "catalog.py"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text("def _semantic_action_score(): pass\n", encoding="utf-8")
+            interpreter = (
+                root
+                / "agent"
+                / "app"
+                / "cognitive_core"
+                / "goal_interpreter"
+                / "model_interpreter.py"
+            )
+            interpreter.parent.mkdir(parents=True)
+            interpreter.write_text(
+                "weather_semantics_require_tool_route = True\n", encoding="utf-8"
+            )
+            coordinator = root / "orchestrator" / "runtime" / "interaction_coordinator.py"
+            coordinator.parent.mkdir(parents=True, exist_ok=True)
+            coordinator.write_text(
+                "def _truth_reconciliation_message(): pass\n", encoding="utf-8"
+            )
+            conversation_state = root / "orchestrator" / "runtime" / "conversation_state.py"
+            conversation_state.write_text(
+                "DEFAULT_FOLLOWUP_PHRASES = ('that',)\n"
+                "def is_followup_reference(text): return text in DEFAULT_FOLLOWUP_PHRASES\n",
+                encoding="utf-8",
+            )
+            tool = root / "agent" / "app" / "agents" / "tool.py"
+            tool.parent.mkdir(parents=True, exist_ok=True)
+            tool.write_text(
+                "async def run(services, query): return await services.weather_client.lookup(query)\n",
+                encoding="utf-8",
+            )
+            memory = root / "agent" / "app" / "agents" / "memory.py"
+            memory.parent.mkdir(parents=True, exist_ok=True)
+            memory.write_text(
+                "import re\n"
+                "class MemoryAgent:\n"
+                "    def run(self, request):\n"
+                "        return re.sub('remember', '', request.text)\n"
+                "    acknowledgement = 'I will remember that.'\n",
+                encoding="utf-8",
+            )
+            speaker = root / "agent" / "app" / "agents" / "speaker.py"
+            speaker.write_text(
+                "class SpeakerAgent:\n"
+                "    def _default_speech(self): return 'I understand.'\n",
+                encoding="utf-8",
+            )
+            conversation = root / "agent" / "app" / "agents" / "conversation.py"
+            conversation.write_text(
+                "class ConversationAgent:\n"
+                "    def _fallback_reply(self): return 'That sounds tiring.'\n",
+                encoding="utf-8",
+            )
+            schema = root / "agent" / "app" / "cognitive_core" / "goal_interpreter" / "schema.py"
+            schema.parent.mkdir(parents=True, exist_ok=True)
+            schema.write_text(
+                'decision.speak_first = "What do you mean?"\n',
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_semantic_authority_boundaries(root)
+
+        rule_ids = {item.rule_id for item in findings}
+        self.assertIn(policies.RULE_HOST_SEMANTIC_AUTHORITY, rule_ids)
+        self.assertIn(policies.RULE_LEGACY_PHRASE_AGENTS, rule_ids)
+        self.assertIn(policies.RULE_MEMORY_MODEL_AUTHORED, rule_ids)
+
+    def test_model_facing_skill_id_field_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = root / "shared" / "chromie_contracts" / "route.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "class RouteItem:\n"
+                "    skill_id: str | None = None\n",
+                encoding="utf-8",
+            )
+
+            findings = policies.audit_canonical_capability_identity(root)
+
+        self.assertIn(
+            policies.RULE_CANONICAL_CAPABILITY_ID,
+            {item.rule_id for item in findings},
+        )
+
     def test_reviewed_exception_is_exact_and_stale_exception_fails(self) -> None:
         finding = policies.PolicyFinding(
             rule_id=policies.RULE_PRODUCTION_ASSERT,

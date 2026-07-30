@@ -36,6 +36,10 @@ RULE_LOCAL_EXPOSURE = "compose.local_loopback"
 RULE_REMOVED_AUTHORITY = "architecture.removed_authority"
 RULE_AGENT_SKILL_AUTHORITY = "agent_skills.execution_authority"
 RULE_AGENT_SKILL_SELECTION = "agent_skills.model_authored_selection"
+RULE_HOST_SEMANTIC_AUTHORITY = "architecture.host_semantic_authority"
+RULE_LEGACY_PHRASE_AGENTS = "architecture.legacy_phrase_agents"
+RULE_MEMORY_MODEL_AUTHORED = "memory.model_authored_update"
+RULE_CANONICAL_CAPABILITY_ID = "contracts.canonical_capability_identity"
 RULE_EXCEPTION_CONFIG = "policy.exception_config"
 RULE_STALE_EXCEPTION = "policy.exception_stale"
 
@@ -50,6 +54,10 @@ EXCEPTION_TARGET_RULES = frozenset(
         RULE_REMOVED_AUTHORITY,
         RULE_AGENT_SKILL_AUTHORITY,
         RULE_AGENT_SKILL_SELECTION,
+        RULE_HOST_SEMANTIC_AUTHORITY,
+        RULE_LEGACY_PHRASE_AGENTS,
+        RULE_MEMORY_MODEL_AUTHORED,
+        RULE_CANONICAL_CAPABILITY_ID,
     }
 )
 
@@ -606,6 +614,378 @@ def audit_agent_skill_selection(root: Path) -> list[PolicyFinding]:
     return findings
 
 
+
+def _source_policy_finding(
+    *,
+    root: Path,
+    path: str,
+    rule_id: str,
+    symbol: str,
+    message: str,
+    line: int = 0,
+) -> PolicyFinding:
+    return PolicyFinding(
+        rule_id=rule_id,
+        path=path,
+        line=line,
+        symbol=symbol,
+        message=message,
+    )
+
+
+def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
+    """Reject Host semantic delegation, phrase agents, and memory inference."""
+
+    findings: list[PolicyFinding] = []
+    forbidden_files = {
+        "orchestrator/runtime/deepthinking_policy.py": RULE_HOST_SEMANTIC_AUTHORITY,
+        "agent/app/agents/motion_planner.py": RULE_LEGACY_PHRASE_AGENTS,
+        "agent/app/agents/robot_pose_controller.py": RULE_LEGACY_PHRASE_AGENTS,
+    }
+    for relative, rule_id in forbidden_files.items():
+        if (root / relative).exists():
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=rule_id,
+                    symbol="<module>",
+                    message="removed Host semantic authority must not be reintroduced",
+                )
+            )
+
+    source_checks = {
+        "orchestrator/orchestrator.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "DeepThinkingDelegationPolicy",
+                "ORCH_CONDITIONAL_DEEPTHINK_ENABLED",
+                "_apply_conditional_deepthinking_policy",
+                "_ability_unavailable_response",
+                "abilities.localized_speech",
+                "_looks_like_embodied_request",
+                "embodied_terms =",
+            ),
+            "ordinary deep-thinking and user-facing wording must remain model/Core-authored",
+        ),
+        "agent/app/runtime.py": (
+            RULE_LEGACY_PHRASE_AGENTS,
+            (
+                "MotionPlannerAgent",
+                "RobotPoseControllerAgent",
+                "allow_legacy_rule_agents",
+            ),
+            "caller context must not reactivate phrase-based semantic agents",
+        ),
+        "agent/app/capabilities/catalog.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_semantic_action_score",
+                "_is_forward_motion_query",
+            ),
+            "capability candidate retrieval may not contain phrase-to-Capability semantic boosts",
+        ),
+        "agent/app/cognitive_core/goal_interpreter/model_interpreter.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_decision_has_weather_semantics",
+                "_decision_selects_weather_tool",
+                "weather_semantics_require_tool_route",
+                "Current or upcoming weather and forecast questions",
+                "Use route=tool and intent=weather_query for weather lookup",
+                "For weather/tool lookup",
+                "Use tool for changing external facts, including current weather",
+            ),
+            "general Goal Interpretation may not contain weather-specific Host routing policy",
+        ),
+        "orchestrator/runtime/interaction_coordinator.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_truth_reconciliation_message",
+                "_looks_like_warning_correction",
+                "host_truth_reconciliation",
+            ),
+            "Host truth reconciliation must preserve safe model speech or fail closed without authoring semantic wording",
+        ),
+        "agent/app/agents/tool.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_is_weather_request",
+                '"weather" in intent',
+                '"forecast" in intent',
+                "services.weather_client",
+                "weather_client.lookup",
+                "client.lookup(query)",
+            ),
+            "ToolAgent may dispatch only from an exact model-authored Capability identity",
+        ),
+        "orchestrator/runtime/conversation_state.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "DEFAULT_FOLLOWUP_PHRASES",
+                "DEFAULT_NEW_TOPIC_STARTERS",
+                "ORCH_CONVERSATION_FOLLOWUP_PHRASES",
+                "ORCH_CONVERSATION_NEW_TOPIC_STARTERS",
+                "is_followup_reference",
+                "is_new_topic_like",
+                "soft_idle_new_topic",
+            ),
+            "conversation boundaries may use explicit reset and idle expiry but may not classify discourse semantics",
+        ),
+        "orchestrator/runtime/abilities.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "speech_templates",
+                'implementation="host_tts"',
+                'implementation="host_speech"',
+                "unavailable_en",
+                "unavailable_zh",
+            ),
+            "the static ability ontology may describe responsibility but may not author user-facing speech",
+        ),
+        "agent/app/agents/speaker.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "def _default_speech",
+                "Please confirm that action first.",
+                "What should I remember?",
+                "What do you mean?",
+                "I understand.",
+            ),
+            "SpeakerAgent may normalize model-authored speech but may not invent route-specific wording",
+        ),
+        "agent/app/agents/memory.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "I will remember that.",
+                "What should I remember?",
+                "我记下了。",
+                "你想让我记住什么？",
+            ),
+            "MemoryAgent may apply typed model proposals but may not author acknowledgement or clarification speech",
+        ),
+        "agent/app/agents/conversation.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "def _fallback_reply",
+                "I am still working on the previous task.",
+                "That sounds tiring.",
+                "I remember the previous context",
+            ),
+            "unavailable-model fallback must remain operational and may not infer conversational meaning",
+        ),
+        "agent/app/cognitive_core/goal_interpreter/schema.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                'decision.speak_first = "你是指什么？"',
+                'decision.speak_first = "What do you mean?"',
+                "Core-authored process acknowledgement",
+            ),
+            "Goal Interpretation contracts may preserve model speech but may not synthesize clarification wording",
+        ),
+        "agent/app/social_attention.py": (
+            RULE_CANONICAL_CAPABILITY_ID,
+            (
+                "exact skill_id values",
+                "Each behavior contains skill_id",
+            ),
+            "Social Attention model prompts must emit canonical capability_id",
+        ),
+    }
+    for relative, (rule_id, tokens, message) in source_checks.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token in text:
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path=relative,
+                        rule_id=rule_id,
+                        symbol=token,
+                        message=message,
+                    )
+                )
+
+    memory_path = root / "agent/app/agents/memory.py"
+    tree, parse_findings = _parse_python(memory_path, root)
+    findings.extend(parse_findings)
+    if tree is not None:
+        for module_name, node in _imported_module_names(tree):
+            if module_name.split(".", 1)[0] in {"re", "regex"}:
+                findings.append(
+                    PolicyFinding(
+                        rule_id=RULE_MEMORY_MODEL_AUTHORED,
+                        path=_relative(memory_path, root),
+                        line=getattr(node, "lineno", 0) or 0,
+                        symbol="<module>",
+                        message="MemoryAgent may not use regex or phrase classification",
+                    )
+                )
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and _attribute_chain(node) == "request.text":
+                findings.append(
+                    PolicyFinding(
+                        rule_id=RULE_MEMORY_MODEL_AUTHORED,
+                        path=_relative(memory_path, root),
+                        line=node.lineno,
+                        symbol="MemoryAgent.run",
+                        message="MemoryAgent must consume the typed model proposal, not infer semantics from raw text",
+                    )
+                )
+        if not any(
+            isinstance(node, ast.Attribute) and node.attr == "memory_update"
+            for node in ast.walk(tree)
+        ):
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=_relative(memory_path, root),
+                    rule_id=RULE_MEMORY_MODEL_AUTHORED,
+                    symbol="MemoryAgent.run",
+                    message="MemoryAgent must consume a typed memory_update proposal",
+                )
+            )
+    return findings
+
+
+def _base_name(node: ast.expr) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return _attribute_chain(node)
+    return ""
+
+
+def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
+    targets = {
+        "shared/chromie_contracts/route.py": {
+            "RouteItem": "OptionalCapabilityIdentityModel",
+        },
+        "agent/app/schema.py": {"RouteItem": "OptionalCapabilityIdentityModel"},
+        "agent/app/cognitive_core/goal_interpreter/schema.py": {
+            "RouteItem": "OptionalCapabilityIdentityModel",
+        },
+        "orchestrator/schemas/route.py": {
+            "RouteItem": "OptionalCapabilityIdentityModel",
+        },
+        "shared/chromie_contracts/social_attention.py": {
+            "SocialAttentionBehavior": "CapabilityIdentityModel",
+        },
+        "shared/chromie_contracts/task_proposal.py": {
+            "TaskProposal": "OptionalCapabilityIdentityModel",
+        },
+        "orchestrator/runtime/episode.py": {
+            "EpisodeSkillRequestRecord": "CapabilityIdentityModel",
+            "EpisodeSkillResultRecord": "CapabilityIdentityModel",
+        },
+    }
+    findings: list[PolicyFinding] = []
+    for relative, classes in targets.items():
+        path = root / relative
+        tree, parse_findings = _parse_python(path, root)
+        findings.extend(parse_findings)
+        if tree is None:
+            continue
+        class_nodes = {
+            node.name: node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
+        }
+        for class_name, expected_base in classes.items():
+            node = class_nodes.get(class_name)
+            if node is None:
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path=relative,
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol=class_name,
+                        message="canonical model/evidence contract is missing",
+                    )
+                )
+                continue
+            bases = {_base_name(base).rsplit(".", 1)[-1] for base in node.bases}
+            if expected_base not in bases:
+                findings.append(
+                    PolicyFinding(
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        path=relative,
+                        line=node.lineno,
+                        symbol=class_name,
+                        message=f"must inherit {expected_base} so legacy input normalizes and new output emits capability_id",
+                    )
+                )
+            for field_name, field_node in _class_field_names(node):
+                if field_name == "skill_id":
+                    findings.append(
+                        PolicyFinding(
+                            rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                            path=relative,
+                            line=getattr(field_node, "lineno", 0) or 0,
+                            symbol=f"{class_name}.skill_id",
+                            message="new model/evidence contracts must declare capability_id, not skill_id",
+                        )
+                    )
+    canonical_source_checks = {
+        "agent/app/fast_planner.py": (
+            "FINAL ALLOWED EXECUTABLE SKILL IDS",
+            "exact supplied skill IDs",
+            "Do not use capability_id",
+        ),
+        "agent/app/deep_planner.py": (
+            "step_id, skill_id",
+            "FINAL ALLOWED EXECUTABLE SKILL IDS",
+            "Skills are plan leaves",
+        ),
+        "agent/app/agents/deepthinking.py": (
+            '"skill_id": task.skill_id',
+            'item["skill_id"]',
+        ),
+        "orchestrator/runtime/cognitive_runtime.py": (
+            '"skill_id": step.skill_id',
+            '"skill_id": request.skill_id',
+            '"skill_ids": [item.skill_id',
+        ),
+        "orchestrator/runtime/experience.py": (
+            '"skill_id": result.skill_id',
+        ),
+        "orchestrator/runtime/interaction_preflight.py": (
+            '"skill_id": request.skill_id',
+        ),
+        "orchestrator/runtime/interaction_coordinator.py": (
+            '"suppressed_skill_ids"',
+        ),
+        "orchestrator/runtime/task_proposals.py": (
+            'proposal["skill_id"]',
+            '"skill_id": skill_id',
+        ),
+        "orchestrator/runtime/conversation_state.py": (
+            '"skill_id": "chromie.speak"',
+        ),
+    }
+    for relative, tokens in canonical_source_checks.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token in text:
+                findings.append(
+                    _source_policy_finding(
+                        root=root,
+                        path=relative,
+                        rule_id=RULE_CANONICAL_CAPABILITY_ID,
+                        symbol=token,
+                        message=(
+                            "current model, trace, API, and evidence output must use "
+                            "canonical capability_id/capability_ids"
+                        ),
+                    )
+                )
+    return findings
+
+
 def audit_compose_policy(root: Path) -> list[PolicyFinding]:
     compose = root / "docker-compose.yml"
     if not compose.is_file():
@@ -788,6 +1168,8 @@ def audit_repository(
     findings.extend(audit_removed_authority(root))
     findings.extend(audit_agent_skill_authority(root))
     findings.extend(audit_agent_skill_selection(root))
+    findings.extend(audit_semantic_authority_boundaries(root))
+    findings.extend(audit_canonical_capability_identity(root))
     exceptions, config_findings = load_policy_exceptions(
         configured_exception_path, root
     )

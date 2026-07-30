@@ -43,7 +43,6 @@
     }
   },
   "expect": {
-    "speech_any": ["in order"],
     "skills": ["soridormi.walk_velocity", "soridormi.nod_yes", "soridormi.blink_eyes"],
     "requires_confirmation": true
   }

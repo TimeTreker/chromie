@@ -6,6 +6,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 try:
+    from chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from chromie_contracts.route import MemoryUpdateProposal
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from shared.chromie_contracts.route import MemoryUpdateProposal
+
+try:
     from chromie_contracts.task_proposal import TaskProposal
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.task_proposal import TaskProposal
@@ -109,7 +116,7 @@ class FastSpeech(BaseModel):
         return self
 
 
-class RouteItem(BaseModel):
+class RouteItem(OptionalCapabilityIdentityModel):
     """One semantic route item inside a multi-route decision.
 
     The top-level RouteDecision.route remains for compatibility. Route items
@@ -127,7 +134,7 @@ class RouteItem(BaseModel):
     direct_to_tts: bool = False
     text: str | None = None
     fast_speech: FastSpeech | None = None
-    skill_id: str | None = None
+    memory_update: MemoryUpdateProposal | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -149,6 +156,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     fast_speech: FastSpeech | None = None
+    memory_update: MemoryUpdateProposal | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -256,7 +264,7 @@ def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
         effectful=_is_effectful_task_type(task_type),
         priority=str(item.get("priority") or "normal"),
         sequence=_safe_int(item.get("merged_sequence"), _safe_int(item.get("sequence"), 0)),
-        skill_id=capability_id or None,
+        capability_id=capability_id or None,
         metadata={
             "route": str(item.get("route") or ""),
             "intent": str(item.get("intent") or ""),
@@ -324,9 +332,15 @@ def _desired_ability_proposals(
             "intent": str(item.get("intent") or decision.intent or ""),
             "status": status,
         }
-        matched_skill_id = str(item.get("matched_skill_id") or item.get("skill_id") or "").strip()
-        if matched_skill_id:
-            metadata["matched_skill_id"] = matched_skill_id
+        matched_capability_id = str(
+            item.get("matched_capability_id")
+            or item.get("matched_skill_id")
+            or item.get("capability_id")
+            or item.get("skill_id")
+            or ""
+        ).strip()
+        if matched_capability_id:
+            metadata["matched_capability_id"] = matched_capability_id
         if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
             metadata["confidence"] = max(0.0, min(1.0, float(confidence)))
         proposal = TaskProposal(
@@ -343,7 +357,7 @@ def _desired_ability_proposals(
             priority=str(item.get("priority") or decision.priority or "normal"),
             sequence=_safe_int(item.get("sequence"), index),
             ability_id=ability_id,
-            skill_id=matched_skill_id or None,
+            capability_id=matched_capability_id or None,
             metadata=metadata,
         )
         proposals.append(proposal.model_dump(mode="json", exclude_none=True))
@@ -429,6 +443,7 @@ def _default_route_item(decision: RouteDecision) -> RouteItem:
         direct_to_tts=direct_to_tts,
         text=decision.speak_first if direct_to_tts else None,
         fast_speech=decision.fast_speech,
+        memory_update=decision.memory_update,
         actions=list(decision.actions or []),
         reason=decision.reason,
     )
@@ -473,6 +488,15 @@ def normalize_route_items(decision: RouteDecision) -> RouteDecision:
         for item in route_items
     ]
     decision.routes = route_items
+    if decision.memory_update is None:
+        decision.memory_update = next(
+            (
+                item.memory_update
+                for item in route_items
+                if item.route == "memory" and item.memory_update is not None
+            ),
+            None,
+        )
     decision.metadata = {
         **(decision.metadata or {}),
         "route_items": route_item_dicts,
@@ -534,8 +558,10 @@ def _route_item_extra(item: RouteItem, index: int) -> dict[str, Any]:
         extra["text"] = item.text
     if item.fast_speech:
         extra["fast_speech"] = item.fast_speech.model_dump(mode="json", exclude_none=True)
-    if item.skill_id:
-        extra["capability_id"] = item.skill_id
+    if item.memory_update:
+        extra["memory_update"] = item.memory_update.model_dump(mode="json", exclude_none=True)
+    if item.capability_id:
+        extra["capability_id"] = item.capability_id
         extra["args"] = item.args
     if item.reason:
         extra["reason"] = item.reason
@@ -586,10 +612,10 @@ def _task_items_for_route_item(
         return tasks
 
     actions = list(item.actions or [])
-    if not actions and item.skill_id:
+    if not actions and item.capability_id:
         actions = [
             {
-                "capability_id": item.skill_id,
+                "capability_id": item.capability_id,
                 "args": item.args,
                 "sequence": index,
                 "confidence": item.confidence,
@@ -1153,8 +1179,6 @@ def finalize_decision(
             decision.speak_first = None
             decision.fast_speech = None
             decision.agents = ["conversation_agent", "speaker_agent"]
-        elif not decision.speak_first:
-            decision.speak_first = "你是指什么？" if decision.language.startswith("zh") else "What do you mean?"
 
     elif decision.route == "deep_thought":
         decision.needs_agent = True

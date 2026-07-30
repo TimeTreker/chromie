@@ -102,11 +102,14 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
         for item in runtime_events
         if isinstance(item.get("timings_ms"), dict)
     ]
-    applied_skills: list[str] = []
+    applied_capabilities: list[str] = []
     for item in runtime_events:
         interaction = item.get("interaction")
         if isinstance(interaction, dict):
-            applied_skills.extend(str(value) for value in interaction.get("skill_ids") or [])
+            applied_capabilities.extend(
+                str(value)
+                for value in (interaction.get("capability_ids") or interaction.get("skill_ids") or [])
+            )
     return {
         "evidence_class": "live_text_operational",
         "event_count": len(runtime_events),
@@ -115,7 +118,7 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
         "lane_counts": dict(sorted(lanes.items())),
         "mode_counts": dict(sorted(modes.items())),
         "mean_total_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0.0,
-        "applied_skill_ids": applied_skills,
+        "applied_capability_ids": applied_capabilities,
     }
 
 

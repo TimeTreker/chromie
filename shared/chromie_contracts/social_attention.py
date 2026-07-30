@@ -4,7 +4,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .interaction import reject_forbidden_low_level_fields
+from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
 SocialAttentionMode = Literal["off", "report_only", "on"]
 _LEGACY_SIMULATOR_ONLY_MODE = "sim" + "_only"
@@ -126,24 +126,13 @@ class SocialAttentionSpeechExpression(BaseModel):
         return self
 
 
-class SocialAttentionBehavior(BaseModel):
+class SocialAttentionBehavior(CapabilityIdentityModel):
     """One model-authored body expression selected from the live catalog."""
 
-    model_config = ConfigDict(extra="forbid")
-
-    skill_id: str = Field(min_length=1)
     args: dict[str, Any] = Field(default_factory=dict)
     timing: SocialAttentionSkillTiming = "parallel"
     social_function: str | None = None
     reason: str | None = None
-
-    @field_validator("skill_id")
-    @classmethod
-    def normalize_skill_id(cls, value: str) -> str:
-        normalized = (value or "").strip()
-        if not normalized:
-            raise ValueError("skill_id must not be empty")
-        return normalized
 
     @field_validator("args")
     @classmethod

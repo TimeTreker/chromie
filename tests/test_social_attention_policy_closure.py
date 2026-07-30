@@ -311,7 +311,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
             ["soridormi.hardware_attention"],
         )
         evidence = adapter.recent_auxiliary_behavior_evidence()
-        self.assertEqual(evidence[-1]["skill_id"], "soridormi.hardware_attention")
+        self.assertEqual(evidence[-1]["capability_id"], "soridormi.hardware_attention")
         self.assertEqual(evidence[-1]["execution_claim"], "not_observed")
         self.assertEqual(evidence[-1]["session_id"], "social-policy")
         self.assertEqual(adapter.recent_auxiliary_behavior_evidence("other-session"), [])

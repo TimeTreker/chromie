@@ -2044,7 +2044,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             response.skills[0].args,
             {"duration_s": 15.0, "speed": "quick"},
         )
-        self.assertEqual(response.metadata["deepthinking_output_mode"], "skill_tasks")
+        self.assertEqual(response.metadata["deepthinking_output_mode"], "capability_tasks")
         self.assertEqual(response.metadata["deepthinking_valid_effect_task_count"], 1)
         self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
         spoken = " ".join(item.text for item in response.speech)
@@ -2141,8 +2141,9 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(response.skills, [])
-        self.assertIn("action detail", response.speech[0].text)
+        self.assertTrue(response.speech)
         self.assertNotIn("schema-valid plan", response.speech[0].text)
+        self.assertNotIn("duration_s", response.speech[0].text)
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.metadata["invalid_capability_args"]["errors"],

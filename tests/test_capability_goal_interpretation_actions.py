@@ -114,7 +114,7 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(skill.metadata["goal_interpretation_action_index"], index)
             self.assertTrue(skill.metadata["goal_interpretation_compound_action_plan"])
             self.assertEqual(skill.metadata["goal_interpretation_action_sequence"], index)
-        self.assertEqual(response.speech[0].text, "I will run the selected actions in order.")
+        self.assertEqual(response.speech, [])
 
     async def test_goal_interpretation_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
         runtime = InteractionRuntime(

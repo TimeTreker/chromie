@@ -3,14 +3,14 @@
   "id": "chinese_walk_after_weather_intent_repaired",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The Chinese walking request observed in live logs must not inherit the previous weather intent; semantic repair must ground the lane and exact capability identity without authoring planner arguments.",
+  "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; the Host does not repair a stale domain decision.",
   "tags": [
     "voice-log",
     "router-contract",
-    "semantic-repair",
     "weather-context-pollution",
     "walk",
-    "zh-CN"
+    "zh-CN",
+    "model-grounding"
   ],
   "input": {
     "text": "往前跑个十来秒，速度点。",
@@ -70,21 +70,10 @@
       {
         "stage": "quick_intent",
         "decision": {
-          "route": "chat",
-          "intent": "weather_query",
-          "confidence": 0.95,
-          "language": "zh-CN",
-          "metadata": {
-            "tool_name": "weather"
-          }
-        }
-      },
-      {
-        "stage": "semantic_route_repair",
-        "decision": {
           "route": "robot_action",
           "intent": "capability:soridormi.walk_velocity",
-          "confidence": 0.96
+          "confidence": 0.97,
+          "language": "zh-CN"
         }
       }
     ]
@@ -93,10 +82,9 @@
     "route": "robot_action",
     "intent": "capability:soridormi.walk_velocity",
     "source": "llm",
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "semantic_route_repair"
+      "quick_intent"
     ],
     "actions": [],
     "task_types_include": [
@@ -107,8 +95,6 @@
       "speech.answer"
     ],
     "metadata_json_contains": [
-      "semantic_route_repair",
-      "weather_semantics_require_tool_route",
       "soridormi.walk_velocity"
     ]
   }

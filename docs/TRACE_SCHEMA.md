@@ -15,10 +15,10 @@ The first supported schema covers these retained artifact families:
 
 | Family | Files | Producer | Purpose |
 |---|---|---|---|
-| Session events | `events.jsonl`, other `*.jsonl` files | Host Orchestrator acceptance runners | Correlate VAD, ASR, Cognitive Gateway, Goal Interpreter, Agent, Skill Runtime, TTS, playback, cancellation, and fallback log events by session id. |
+| Session events | `events.jsonl`, other `*.jsonl` files | Host Orchestrator acceptance runners | Correlate VAD, ASR, Cognitive Gateway, Goal Interpreter, Agent, Trusted Capability Runtime, TTS, playback, cancellation, and fallback log events by session id. |
 | Route decision | `route.json` | Text/MuJoCo acceptance runner | Retain the Core Goal Interpreter route, intent, confidence, candidate actions, stage proposals, merge ledger, merged task metadata, and optional post-interrupt review/correction metadata. |
-| Interaction response | `interaction_response.json` | Agent `/interaction` response | Retain speech, skill requests, confirmation requirements, interaction id, and response status. |
-| Skill Runtime execution | `execution.json` | Host trusted Skill Runtime | Retain interaction-level status, per-skill results, and per-skill trace events. |
+| Interaction response | `interaction_response.json` | Agent `/interaction` response | Retain speech, capability requests, confirmation requirements, interaction id, and response status. |
+| Capability Runtime execution | `execution.json` | Host Trusted Capability Runtime | Retain interaction-level status, per-capability results, and per-capability trace events. |
 | TaskGraph trace | `trace.json` or API-returned trace JSON | Agent TaskGraph service | Retain graph id, graph status, node results, execution events, and deterministic `outcome_summary`. |
 | Acceptance summary | `summary.json` | Acceptance runners | Retain run-level pointers and nested route/interaction/execution payloads when present. |
 
@@ -58,7 +58,7 @@ workflow evidence:
   slowest graph deltas.
 
 These cover the same per-session stages, such as VAD, ASR, Goal Interpreter, Agent,
-fast-first response, Skill Runtime, TTS, playback, and final timing. They are
+fast-first response, Trusted Capability Runtime, TTS, playback, and final timing. They are
 debug evidence only; they do not authorize or change execution. `trace view`
 summarizes `session_workflow_graph` JSONL records with `workflow_graph_count`,
 bounded `workflow_graphs[]`, node and edge counts, first event names, total
@@ -92,10 +92,10 @@ TaskGraph traces should follow the Agent `ExecutionTrace` model:
 }
 ```
 
-Skill Runtime execution artifacts should retain `interaction_id`, `status`,
+Trusted Capability Runtime execution artifacts should retain `interaction_id`, `status`,
 `results`, and `traces`. Each result may carry `trace_id`; each trace carries
-`trace_id`, `interaction_id`, `request_id`, `skill_id`, `provider_id`, `status`,
-and ordered events.
+`trace_id`, `interaction_id`, `request_id`, `capability_id`, `provider_id`, `status`,
+and ordered events. Readers may accept retained historical `skill_id` fields only at the declared compatibility boundary; new artifacts emit `capability_id`.
 
 ## CLI Output
 

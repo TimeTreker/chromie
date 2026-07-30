@@ -6,10 +6,6 @@ import unittest
 from agent.app.agents.base import AgentServices
 from agent.app.runtime import AgentRuntime
 from agent.app.schema import AgentRunRequest, RouteDecision as AgentRouteDecision
-from orchestrator.runtime.deepthinking_policy import (
-    DeepThinkingDelegationPolicy,
-    DeepThinkingPolicyConfig,
-)
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.schemas.route import RouteDecision, RouteItem
 from agent.app.cognitive_core.goal_interpreter.engine import (
@@ -88,31 +84,6 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertEqual(guarded.intent, "clarify_insufficient_information")
         self.assertFalse(any(item.route == "robot_action" for item in guarded.routes))
 
-    def test_duplicate_audit_route_items_do_not_make_exact_walk_compound(self) -> None:
-        policy = DeepThinkingDelegationPolicy(DeepThinkingPolicyConfig())
-        duplicated_route_item = {
-            "route": "robot_action",
-            "intent": "capability:soridormi.walk_forward",
-            "confidence": 1.0,
-            "skill_id": "soridormi.walk_forward",
-        }
-        decision = RouteDecision(
-            route="robot_action",
-            agents=["capability_agent", "safety_agent", "speaker_agent"],
-            intent="capability:soridormi.walk_forward",
-            confidence=1.0,
-            routes=[RouteItem(**duplicated_route_item)],
-            metadata={"route_items": [dict(duplicated_route_item)]},
-            source="llm",
-        )
-
-        delegation = policy.evaluate(decision, context={})
-
-        self.assertFalse(delegation.should_delegate)
-        self.assertTrue(delegation.high_risk_physical)
-        self.assertFalse(delegation.compound_action)
-        self.assertNotIn("high_risk_physical_goal", delegation.reasons)
-
     def test_uncommitted_walk_speech_becomes_confirmation_not_execution_claim(self) -> None:
         coordinator = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
         response = InteractionResponse(
@@ -125,8 +96,9 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         spoken = " ".join(item.text for item in prepared.speech)
 
         self.assertNotIn("我这就往前走", spoken)
-        self.assertIn("需要先确认", spoken)
+        self.assertEqual(spoken, "")
         self.assertTrue(prepared.metadata.get("truth_reconciled"))
+        self.assertTrue(prepared.metadata.get("truth_reconciliation_requires_model_repair"))
 
     def test_gratitude_is_not_resolved_by_deterministic_phrase_routing(self) -> None:
         decision = route_by_priority_rules(

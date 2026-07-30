@@ -839,7 +839,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = FakeOllama({"disposition":"respond","coverage":"complete","confidence":0.9,"response_text":"你好。","steps":[],"goal_satisfaction":{"score":1.0,"status":"exact"}})
         asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(request("你好。", route="chat", goal_ids=["goal-greet"])))
         prompt = ollama.prompts[0][0]
-        self.assertIn("Finding one matching skill is not complete coverage", prompt)
+        self.assertIn("Finding one matching capability is not complete coverage", prompt)
         self.assertIn("zero steps", prompt)
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):

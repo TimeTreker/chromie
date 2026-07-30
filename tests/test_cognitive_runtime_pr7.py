@@ -1323,7 +1323,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "type": "runtime_parallel_singleton_group",
                     "step_id": "blink-second",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                 }
             ],
         )
@@ -1369,7 +1369,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 },
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 4},
                     "timing": "parallel",
                     "source_goal_ids": ["goal-1"],
@@ -1690,7 +1690,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             steps=[
                 {
                     "step_id": "blink",
-                    "skill_id": "soridormi.blink_eyes",
+                    "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
                     "source_goal_ids": ["goal-blink"],
                 }

@@ -169,11 +169,11 @@
         ]
       }
     ],
-    "skill_ids": [
+    "capability_ids": [
       "soridormi.blink_eyes",
       "soridormi.blink_eyes"
     ],
-    "skill_args": [
+    "capability_args": [
       {
         "count": 2
       },
@@ -181,7 +181,7 @@
         "count": 1
       }
     ],
-    "skill_source_goal_ids": [
+    "capability_source_goal_ids": [
       [
         "goal-first-blink"
       ],

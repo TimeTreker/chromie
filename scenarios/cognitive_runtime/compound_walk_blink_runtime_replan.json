@@ -97,7 +97,7 @@
     "planner_tier": "deep",
     "disposition": "execute",
     "coverage": "complete",
-    "skill_ids": ["soridormi.walk_forward", "soridormi.blink_eyes"],
+    "capability_ids": ["soridormi.walk_forward", "soridormi.blink_eyes"],
     "requires_confirmation": true,
     "runtime_replan_count": 1,
     "deep_feedback_present": true,

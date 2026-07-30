@@ -213,7 +213,7 @@ class ConversationStateTests(unittest.TestCase):
             ["goal-coffee", "goal-weather"],
         )
 
-    def test_followup_keeps_context_after_soft_idle(self) -> None:
+    def test_soft_idle_does_not_semantically_classify_followup_text(self) -> None:
         manager = ConversationStateManager(soft_idle_timeout_sec=10, hard_idle_timeout_sec=100)
         manager.record_user_turn("s1", "check the weather")
         manager.last_activity_ms -= 20_000
@@ -221,7 +221,7 @@ class ConversationStateTests(unittest.TestCase):
         boundary = manager.prepare_for_user_text("what about it?", "s2")
 
         self.assertFalse(boundary["started_new"])
-        self.assertEqual(boundary["reason"], "followup_reference")
+        self.assertEqual(boundary["reason"], "kept_default")
 
     def test_last_task_phrase_does_not_create_host_task_association(self) -> None:
         manager = ConversationStateManager()

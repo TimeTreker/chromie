@@ -49,9 +49,6 @@
         }
       },
       "expect": {
-        "speech_any": [
-          "run that action"
-        ],
         "skills": [
           "soridormi.blink_eyes"
         ],

@@ -1003,53 +1003,7 @@ class CapabilityCatalog:
             score += 0.08
         if entry.interaction_executable:
             score += 0.03
-        semantic_score = self._semantic_action_score(query, entry)
-        if semantic_score > 0:
-            score = max(score, semantic_score)
         return max(0.0, min(1.0, score))
-
-    @staticmethod
-    def _semantic_action_score(query: str, entry: CatalogCapability) -> float:
-        normalized_query = " ".join((query or "").strip().lower().split())
-        if not normalized_query:
-            return 0.0
-        entry_text = " ".join(
-            [
-                entry.capability_id.lower(),
-                entry.description.lower(),
-                " ".join(entry.tags).lower(),
-                " ".join(str(value) for value in entry.hints.values()).lower(),
-            ]
-        )
-        if "眨" in normalized_query and "blink" in entry_text and "eye" in entry_text:
-            return 0.86 if entry.interaction_executable else 0.62
-        if CapabilityCatalog._is_forward_motion_query(normalized_query):
-            walk_surface = (
-                "walk_forward" in entry_text
-                or "walk velocity" in entry_text
-                or "walk_velocity" in entry_text
-                or "walk forward" in entry_text
-                or "move forward" in entry_text
-                or ("walking" in entry_text and "forward" in entry_text)
-            )
-            if walk_surface:
-                return 0.88 if entry.interaction_executable else 0.58
-            if "motion" in entry_text and ("create_plan" in entry_text or "task preview" in entry_text):
-                return 0.36
-        return 0.0
-
-    @staticmethod
-    def _is_forward_motion_query(normalized_query: str) -> bool:
-        query = normalized_query or ""
-        zh_forward = any(phrase in query for phrase in ("往前", "向前", "朝前", "前进"))
-        zh_motion = any(phrase in query for phrase in ("走", "移动", "挪", "行走"))
-        if zh_forward and zh_motion:
-            return True
-        if re.search(r"\b(?:walk|move|go|step)\s+(?:forward|ahead)\b", query):
-            return True
-        if re.search(r"\b(?:forward|ahead)\s+(?:walk|motion|move|movement|step)\b", query):
-            return True
-        return False
 
     def _route_for(self, matches: list[CapabilityMatch]) -> CapabilityRoute:
         if not matches:

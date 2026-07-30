@@ -3,19 +3,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..clients.weather_client import (
-    WeatherLocationContext,
-    WeatherLookupError,
-    WeatherQuery,
-    WeatherReport,
-    format_weather_brief,
-    weather_code_text,
-)
+from ..clients.weather_client import WeatherLocationContext, WeatherQuery
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
 
 try:
     from chromie_contracts.tool_result import (
+        ToolExecutionRequest,
         ToolResultEvidence,
         ToolResultInterpretation,
         ToolResultInterpretationRequest,
@@ -23,6 +17,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.tool_result import (
+        ToolExecutionRequest,
         ToolResultEvidence,
         ToolResultInterpretation,
         ToolResultInterpretationRequest,
@@ -58,10 +53,6 @@ class ToolAgent(BaseAgent):
                     context=request.context,
                 )
                 result.add_task_graph(graph.model_dump(mode="json"))
-                result.add_speak_immediate(
-                    "我已经准备好一个执行计划。" if self.is_zh(request) else "I prepared a task plan.",
-                    style="brief",
-                )
                 self.trace(result, f"planned TaskGraph {graph.graph_id} with {len(graph.nodes)} node(s)")
                 return result
             except Exception as exc:
@@ -74,7 +65,7 @@ class ToolAgent(BaseAgent):
                 )
                 result.trace.append(f"tool_agent: TaskGraph planning failed: {type(exc).__name__}: {exc}")
 
-        if self._is_weather_request(request) and self.services.weather_client is not None:
+        if self._selects_weather_capability(request) and self.services.local_tool_executor is not None:
             logger.info(
                 "tool_agent_dispatch sid=%s tool=weather intent=%s",
                 request.sid,
@@ -91,47 +82,42 @@ class ToolAgent(BaseAgent):
             timeout_ms=5000,
             reason="tool_request_planned_by_agent",
         )
-        if not result.speak_immediate:
-            result.add_speak_immediate("我看一下。" if self.is_zh(request) else "Let me check.", style="brief")
         self.trace(result, f"planned tool.{intent}")
         return result
 
-    def _is_weather_request(self, request: AgentRunRequest) -> bool:
+    @staticmethod
+    def _selects_weather_capability(request: AgentRunRequest) -> bool:
         decision = request.route_decision
-        intent = str(decision.intent or "").casefold()
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        if str(metadata.get("tool_name") or "").casefold() == "weather":
-            return True
-        if isinstance(metadata.get("weather_query"), dict):
-            return True
-        if "weather" in intent or "forecast" in intent:
-            return True
+        selected_ids: set[str] = set()
+        intent = str(decision.intent or "").strip()
+        if intent.startswith("capability:"):
+            selected_ids.add(intent.split(":", 1)[1].strip())
         for item in decision.routes or []:
-            item_intent = str(item.intent or "").casefold()
-            item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
-            if item.route == "tool" and ("weather" in item_intent or "forecast" in item_intent):
-                return True
-            if str(item_metadata.get("tool_name") or "").casefold() == "weather":
-                return True
-            if isinstance(item_metadata.get("weather_query"), dict):
-                return True
-        return False
+            capability_id = str(item.capability_id or "").strip()
+            if capability_id:
+                selected_ids.add(capability_id)
+            item_intent = str(item.intent or "").strip()
+            if item_intent.startswith("capability:"):
+                selected_ids.add(item_intent.split(":", 1)[1].strip())
+        return "chromie.weather.lookup" in selected_ids
 
     async def _run_weather(self, request: AgentRunRequest, result: AgentResult) -> AgentResult:
         zh = self.is_zh(request)
-        client = self.services.weather_client
+        executor = self.services.local_tool_executor
         logger.info(
-            "weather_tool_start sid=%s language=%s has_client=%s",
+            "weather_tool_start sid=%s language=%s has_executor=%s",
             request.sid,
             self.language(request),
-            client is not None,
+            executor is not None,
         )
-        if client is None:
+        if executor is None:
+            result.status = "error"
+            result.reason = "weather_capability_executor_unavailable"
             result.add_speak_immediate(
-                "我现在还没有启用天气查询工具。" if zh else "I do not have the weather lookup tool enabled right now.",
+                self.invalid_spoken_response_fallback(zh=zh),
                 style="warning",
             )
-            self.trace(result, "weather tool unavailable")
+            self.trace(result, "weather capability executor unavailable")
             return result
 
         query = await self._extract_weather_query(request)
@@ -144,71 +130,79 @@ class ToolAgent(BaseAgent):
             query.language,
         )
         if not query.location:
-            result.add_speak_immediate(
-                "你想查哪个城市的天气？" if zh else "Which city should I check the weather for?",
-                style="brief",
-            )
-            self.trace(result, "weather query needs location clarification")
+            result.status = "clarify"
+            result.reason = "weather_location_binding_missing"
+            result.metadata["information_gaps"] = [
+                {
+                    "field": "location",
+                    "reason": "authoritative Goal binding is missing",
+                }
+            ]
+            self.trace(result, "weather query needs model-authored location binding")
             return result
 
-        try:
-            logger.info("weather_lookup_start sid=%s location=%r date=%s", request.sid, query.location, query.date)
-            report = await client.lookup(query)
-        except WeatherLookupError as exc:
+        execution = await executor.execute(
+            ToolExecutionRequest(
+                request_id=f"weather-{request.sid or 'turn'}",
+                tool_id="chromie.weather.lookup",
+                args={
+                    "location": query.location,
+                    "date": query.date,
+                    "units": query.units,
+                    **(
+                        {"location_context": query.location_context.model_dump(mode="json", exclude_none=True)}
+                        if query.location_context is not None
+                        else {}
+                    ),
+                },
+                correlation_id=request.sid or "",
+                language=self.language(request),
+            )
+        )
+        if execution.status != "completed":
             logger.info(
-                "weather_tool_failed sid=%s reason=lookup_error location=%r error=%s",
+                "weather_tool_failed sid=%s status=%s reason=%s location=%r",
                 request.sid,
+                execution.status,
+                execution.reason_code,
                 query.location,
-                exc,
+            )
+            result.status = "error"
+            result.reason = execution.reason_code or execution.status
+            result.metadata.setdefault("tool_results", []).append(
+                {
+                    "tool_id": "chromie.weather.lookup",
+                    "status": execution.status,
+                    "reason_code": execution.reason_code,
+                    "location": query.location,
+                }
             )
             result.add_speak_immediate(
-                (
-                    f"天气服务没有识别出这个地点：{query.location}。"
-                    if zh and exc.reason_code == "location_not_found"
-                    else f"我没查到这个地点的天气：{query.location}。"
-                    if zh
-                    else f"The weather provider did not recognize {query.location}."
-                    if exc.reason_code == "location_not_found"
-                    else f"I could not find weather for {query.location}."
-                ),
+                self.invalid_spoken_response_fallback(zh=zh),
                 style="warning",
             )
             self.trace(
                 result,
-                f"weather lookup failed: reason={exc.reason_code} error={exc}",
+                f"weather lookup failed: status={execution.status} reason={execution.reason_code}",
             )
-            return result
-        except Exception as exc:
-            logger.warning(
-                "weather_lookup_failed sid=%s location=%r error_type=%s error=%s",
-                request.sid,
-                query.location,
-                type(exc).__name__,
-                exc,
-                exc_info=True,
-            )
-            result.add_speak_immediate(
-                "我现在连不上天气服务，稍后再试一下。" if zh else "I cannot reach the weather service right now. Please try again later.",
-                style="warning",
-            )
-            self.trace(result, f"weather service error: {type(exc).__name__}")
             return result
 
+        output = dict(execution.output)
         logger.info(
             "weather_lookup_done sid=%s location=%r source=%s date=%r temp_c=%s high_c=%s low_c=%s code=%s",
             request.sid,
-            report.location_name,
-            report.source,
-            report.date,
-            report.current_temperature_c,
-            report.daily_high_c,
-            report.daily_low_c,
-            report.weather_code,
+            output.get("location"),
+            output.get("source"),
+            output.get("date"),
+            output.get("current_temperature_c"),
+            output.get("high_c"),
+            output.get("low_c"),
+            output.get("weather_code"),
         )
         spoken_response, evidence, interpretation = await self._compose_weather_response(
             request,
             query=query,
-            report=report,
+            output=output,
         )
         result.add_speak_immediate(spoken_response, style="brief")
         result.metadata.setdefault("tool_results", []).append(
@@ -225,7 +219,7 @@ class ToolAgent(BaseAgent):
         )
         result.trace.append(
             "tool_agent: weather_lookup_completed "
-            f"location={report.location_name!r} source={report.source} date={report.date!r}"
+            f"location={output.get('location')!r} source={output.get('source')} date={output.get('date')!r}"
         )
         result.handled_by.append(self.name)
         return result
@@ -235,27 +229,20 @@ class ToolAgent(BaseAgent):
         request: AgentRunRequest,
         *,
         query: WeatherQuery,
-        report: WeatherReport,
+        output: dict[str, Any],
     ) -> tuple[str, ToolResultEvidence, ToolResultInterpretation]:
-        fallback = self._brief_weather_fallback(
-            report,
-            language=self.language(request),
-            units=query.units,
-        )
+        fallback = str(output.get("summary") or "").strip()
         report_payload = {
-            "location_name": report.location_name,
-            "date": report.date,
-            "condition": weather_code_text(
-                report.weather_code,
-                zh=self.is_zh(request),
-            ),
-            "current_temperature_c": report.current_temperature_c,
-            "apparent_temperature_c": report.apparent_temperature_c,
-            "daily_high_c": report.daily_high_c,
-            "daily_low_c": report.daily_low_c,
-            "precipitation_probability_max": report.precipitation_probability_max,
-            "precipitation_sum_mm": report.precipitation_sum_mm,
-            "wind_speed_kmh": report.wind_speed_kmh,
+            "location_name": output.get("location"),
+            "date": output.get("date"),
+            "condition": output.get("condition"),
+            "current_temperature_c": output.get("current_temperature_c"),
+            "apparent_temperature_c": output.get("apparent_temperature_c"),
+            "daily_high_c": output.get("high_c"),
+            "daily_low_c": output.get("low_c"),
+            "precipitation_probability_max": output.get("precipitation_probability_max"),
+            "precipitation_sum_mm": output.get("precipitation_sum_mm"),
+            "wind_speed_kmh": output.get("wind_speed_kmh"),
             "requested_units": query.units,
         }
         evidence = ToolResultEvidence(
@@ -329,21 +316,6 @@ class ToolAgent(BaseAgent):
             default=str,
         )
         return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
-
-    @staticmethod
-    def _brief_weather_fallback(
-        report: WeatherReport,
-        *,
-        language: str,
-        units: str,
-    ) -> str:
-        """Use the shared bounded provider fallback when semantic composition fails."""
-
-        return format_weather_brief(
-            report,
-            language=language,
-            units=units,
-        )
 
     async def _extract_weather_query(self, request: AgentRunRequest) -> WeatherQuery:
         language = self.language(request)

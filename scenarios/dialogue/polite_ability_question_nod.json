@@ -42,7 +42,6 @@
         }
       },
       "expect": {
-        "speech_any": ["run that action"],
         "history_contains": ["approved gesture skills"],
         "skills": ["soridormi.nod_yes"],
         "requires_confirmation": true

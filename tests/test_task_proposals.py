@@ -30,8 +30,8 @@ class TaskProposalLedgerTests(unittest.TestCase):
         route_proposal = ledger["proposals"][0]
 
         self.assertEqual(route_proposal["state"], "not_committed")
-        self.assertEqual(route_proposal["skill_id"], "soridormi.look_at_window")
-        self.assertIn("requires an InteractionResponse skill", route_proposal["reason"])
+        self.assertEqual(route_proposal["capability_id"], "soridormi.look_at_window")
+        self.assertIn("requires an InteractionResponse capability", route_proposal["reason"])
         self.assertEqual(ledger["summary"]["not_committed_effectful_count"], 1)
         self.assertEqual(ledger["summary"]["states"]["committed"], 1)
 
@@ -69,7 +69,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
 
         self.assertEqual(proposals[0]["id"], "quick_intent:0:task.execute_skill")
         self.assertEqual(proposals[0]["state"], "not_committed")
-        self.assertEqual(proposals[0]["skill_id"], "soridormi.look_at_window")
+        self.assertEqual(proposals[0]["capability_id"], "soridormi.look_at_window")
         self.assertNotIn("legacy:0:speech.answer", {item["id"] for item in proposals})
 
     def test_matching_interaction_skill_commits_route_proposal(self) -> None:
@@ -98,7 +98,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
         proposals = annotated.metadata["task_proposal_ledger"]["proposals"]
 
         self.assertEqual(proposals[0]["state"], "committed")
-        self.assertEqual(proposals[0]["committed_by"], "interaction_response.skill")
+        self.assertEqual(proposals[0]["committed_by"], "interaction_response.capability")
         self.assertEqual(proposals[1]["state"], "committed")
         self.assertEqual(proposals[1]["request_id"], "look-1")
 

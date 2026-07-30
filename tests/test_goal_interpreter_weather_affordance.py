@@ -30,30 +30,6 @@ class _EmptyReviewInterpreter(OllamaGoalInterpreter):
         return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
 
 
-class _SemanticRepairInterpreter(OllamaGoalInterpreter):
-    async def _chat_logged(
-        self,
-        payload: dict[str, Any],
-        *,
-        stage: str,
-        request=None,
-    ) -> dict[str, Any]:
-        if stage != "semantic_route_repair":
-            raise AssertionError(f"unexpected review stage {stage!r}")
-        return {
-            "message": {
-                "content": json.dumps(
-                    {
-                        "route": "tool",
-                        "intent": "weather_query",
-                        "confidence": 0.96,
-                    }
-                )
-            },
-            "done": True,
-            "done_reason": "stop",
-        }
-
 
 class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
     def _interpreter(self, cls=_EmptyReviewInterpreter):
@@ -78,9 +54,9 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_weather_route_contract_is_repaired_by_semantic_model(self) -> None:
+    async def test_weather_semantics_do_not_trigger_host_route_repair(self) -> None:
         request = self._request("what is the weather in Chongqing today")
-        inconsistent = finalize_decision(
+        model_authored = finalize_decision(
             RouteDecision(
                 route="chat",
                 routes=[
@@ -100,23 +76,18 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        repaired = await self._interpreter(_SemanticRepairInterpreter)._repair_route_intent_contract(
+        result = await self._interpreter()._repair_route_intent_contract(
             request,
-            inconsistent,
+            model_authored,
         )
 
-        self.assertEqual(repaired.route, "tool")
-        self.assertEqual(repaired.intent, "weather_query")
-        self.assertNotIn("tool_name", repaired.metadata)
-        self.assertNotIn("weather_query", repaired.metadata)
-        self.assertEqual(
-            repaired.metadata.get("semantic_route_repair", {}).get("status"),
-            "repaired",
-        )
+        self.assertIs(result, model_authored)
+        self.assertEqual(result.route, "chat")
+        self.assertNotIn("semantic_route_repair", result.metadata)
 
-    async def test_failed_weather_contract_repair_clarifies(self) -> None:
+    async def test_weather_intent_alone_does_not_create_host_conflict(self) -> None:
         request = self._request("what is the weather in Chongqing today")
-        inconsistent = finalize_decision(
+        model_authored = finalize_decision(
             RouteDecision(
                 route="chat",
                 intent="weather_query",
@@ -131,13 +102,12 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
 
         result = await self._interpreter()._repair_route_intent_contract(
             request,
-            inconsistent,
+            model_authored,
         )
 
-        self.assertEqual(result.route, "clarify")
-        self.assertEqual(result.intent, "clarify_uncertain_request")
-        self.assertTrue(result.metadata.get("llm_clarification_required"))
-        self.assertIn("semantic repair failed", result.reason or "")
+        self.assertIs(result, model_authored)
+        self.assertEqual(result.route, "chat")
+        self.assertFalse(result.metadata.get("llm_clarification_required", False))
 
     async def test_failed_underspecified_robot_review_never_uses_keyword_recovery(
         self,

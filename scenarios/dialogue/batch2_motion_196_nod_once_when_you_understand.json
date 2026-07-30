@@ -47,9 +47,6 @@
         }
       },
       "expect": {
-        "speech_any": [
-          "run that action"
-        ],
         "skills": [
           "soridormi.nod_yes"
         ],

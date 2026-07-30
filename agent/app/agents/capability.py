@@ -1338,15 +1338,8 @@ class CapabilityAgent(BaseAgent):
         return adjusted, adjustments
 
     def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
-        if action_count <= 0:
-            return ""
-        if self.is_zh(request):
-            return "我会按顺序执行这些动作。" if action_count > 1 else "我会执行这个动作。"
-        return (
-            "I will run the selected actions in order."
-            if action_count > 1
-            else "I will run that action."
-        )
+        # Exact action speech belongs to the model-authored route/response plan.
+        return ""
 
     def _format_session_context(self, request: AgentRunRequest) -> str:
         context = dict(request.context or {})
@@ -1773,37 +1766,13 @@ class CapabilityAgent(BaseAgent):
         request: AgentRunRequest,
         gaps: list[InformationGap],
     ) -> str:
-        descriptions = [
-            " ".join(gap.description.strip().split())
-            for gap in gaps
-            if gap.blocking and gap.description.strip()
-        ][:3]
-        if not descriptions:
-            return (
-                "请告诉我完成这个动作所需的具体信息。"
-                if self.is_zh(request)
-                else "Please tell me the specific information needed for this action."
-            )
-        if self.is_zh(request):
-            return "请告诉我：" + "；".join(descriptions) + "。"
-        return "Please tell me: " + "; ".join(descriptions) + "."
+        return self.invalid_spoken_response_fallback(zh=self.is_zh(request))
 
     def _legacy_planner_disabled_speech(self, request: AgentRunRequest) -> str:
-        if self.is_zh(request):
-            return (
-                "这次没有经过统一目标规划，我不会启动旧的动作规划器。"
-                "请稍后重试，或由运维显式启用应急回退。"
-            )
-        return (
-            "This turn did not pass through the unified goal planner, so I will "
-            "not start the legacy action planner. Please retry or use an "
-            "explicit operator-enabled emergency fallback."
-        )
+        return self.invalid_spoken_response_fallback(zh=self.is_zh(request))
 
     def _unsupported_action_speech(self, request: AgentRunRequest) -> str:
-        if self.is_zh(request):
-            return "我没有找到能对应这句话的可用动作，所以我不会移动。"
-        return "I cannot map that to an available action, so I will not move."
+        return self.invalid_spoken_response_fallback(zh=self.is_zh(request))
 
     @staticmethod
     def _natural_plan_speech(value: str) -> str:

@@ -477,7 +477,7 @@ class ChromieCliTests(unittest.TestCase):
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
         self.assertNotIn("candidate_capabilities", summary["route"])
-        self.assertEqual(summary["interaction_response"]["skill_count"], 1)
+        self.assertEqual(summary["interaction_response"]["capability_count"], 1)
         self.assertEqual(summary["session_state"]["done_logged"], True)
         self.assertNotIn(long_description, stdout)
         self.assertEqual(stderr, "")

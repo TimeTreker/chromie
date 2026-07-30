@@ -265,6 +265,48 @@ def normalize_capability_identity_payload(value: Any) -> Any:
     return payload
 
 
+class OptionalCapabilityIdentityModel(BaseModel):
+    """Optional canonical executable identity with bounded legacy input support."""
+
+    capability_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_identity(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "capability_id" not in payload and "skill_id" not in payload:
+            return payload
+        capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
+        legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
+        if capability_id and legacy_skill_id and capability_id != legacy_skill_id:
+            raise ValueError(
+                "conflicting capability_id and legacy skill_id executable identities"
+            )
+        payload["capability_id"] = capability_id or legacy_skill_id or None
+        payload.pop("skill_id", None)
+        return payload
+
+    @field_validator("capability_id", mode="before")
+    @classmethod
+    def normalize_capability_id(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        normalized = " ".join(str(value).strip().split())
+        return normalized or None
+
+    @property
+    def skill_id(self) -> str | None:
+        """Read-only compatibility projection for retained callers."""
+
+        return self.capability_id
+
+    def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False):
+        normalized = self.normalize_legacy_identity(update) if update else update
+        return super().model_copy(update=normalized, deep=deep)
+
+
 class CapabilityIdentityModel(BaseModel):
     """Canonical executable identity with a bounded legacy read alias."""
 

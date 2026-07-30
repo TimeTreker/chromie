@@ -23,7 +23,6 @@
         }
       },
       "expect": {
-        "speech_any": ["run that action"],
         "skills": ["soridormi.blink_eyes"],
         "requires_confirmation": true
       }
@@ -44,7 +43,7 @@
       },
       "expect": {
         "speech_any": ["will not blink", "new confirmed request"],
-        "history_contains": ["Blink twice", "run that action"],
+        "history_contains": ["Blink twice"],
         "no_skills": true
       }
     }

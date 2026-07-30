@@ -181,7 +181,7 @@ A representative mixed plan has this shape:
   "steps": [
     {
       "step_id": "physical-step",
-      "skill_id": "catalog.skill_id",
+      "capability_id": "catalog.capability_id",
       "args": {"count": 2},
       "timing": "sequential",
       "source_goal_ids": ["goal-action"],

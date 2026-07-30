@@ -105,8 +105,8 @@ Recommended top-level shape:
       },
       "execution": {
         "status": "completed",
-        "skill_results": [
-          {"skill_id": "soridormi.look_at_person", "status": "completed"}
+        "capability_results": [
+          {"capability_id": "soridormi.look_at_person", "status": "completed"}
         ]
       },
       "timing": {

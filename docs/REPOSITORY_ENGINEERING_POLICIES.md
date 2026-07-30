@@ -39,6 +39,10 @@ answers.
 | `architecture.removed_authority` | The removed Router service, client, port, imports, metadata, and current-architecture claims may not return. |
 | `agent_skills.execution_authority` | Agent Skill code remains passive and read-only: no plugin import path, Capability Runtime dependency, registration, authorization, dispatch, or execution method. |
 | `agent_skills.model_authored_selection` | Candidate discovery may filter only declared IDs and role projections; it may not inspect semantic text, use phrase rules, or replace the configured model selection call. |
+| `architecture.host_semantic_authority` | The Host may not own ordinary deep-thinking delegation, domain route repair, catalog phrase boosts, discourse classification, memory meaning, or route-specific user-facing wording. Compatibility fallbacks may report only bounded operational failure. |
+| `architecture.legacy_phrase_agents` | Removed phrase/regex motion and pose agents cannot be restored or enabled through caller context. |
+| `memory.model_authored_update` | Session-memory meaning must come from a typed model-authored proposal; `MemoryAgent` may not classify raw text. |
+| `contracts.canonical_capability_identity` | Current model, Plan, API, trace, and evidence identities emit `capability_id`; bounded readers may still normalize retained `skill_id` input. |
 
 The failure rules are intentionally narrower than a generic style linter. A broad
 handler that re-raises, emits diagnostics/evidence, or returns an explicit typed
@@ -125,7 +129,7 @@ This gate does not:
 
 ## Automatic evidence
 
-Focused tests inject one violation for each rule family, verify machine-readable
+Focused tests inject one violation for each of the thirteen rule families, verify machine-readable
 output, verify exact exception matching, and require stale exceptions to fail.
 The full maintained suite proves that the canonical gate composes with existing
 unit, architecture, documentation, benchmark, and legacy Agent tests.

@@ -14,8 +14,6 @@ from .agents import (
     ConversationAgent,
     DeepThinkingAgent,
     MemoryAgent,
-    MotionPlannerAgent,
-    RobotPoseControllerAgent,
     SafetyAgent,
     SpeakerAgent,
     ToolAgent,
@@ -79,14 +77,7 @@ def _is_missing_ability_clarify(decision: RouteDecision) -> bool:
 
 
 def _safe_missing_ability_text(request: AgentRunRequest) -> str:
-    text = " ".join((request.route_decision.speak_first or "").strip().split())
-    if text:
-        return text
-    language = (request.language or request.route_decision.language or "").lower()
-    zh = language.startswith("zh") or any("\u4e00" <= ch <= "\u9fff" for ch in request.text)
-    if zh:
-        return "我没有找到能安全执行这个动作的对应技能，所以不会猜一个相似动作来做。"
-    return "I do not have a matching skill for that action, so I will not guess a similar movement."
+    return " ".join((request.route_decision.speak_first or "").strip().split())
 
 
 def _goal_interpretation_fast_first_already_scheduled(decision: RouteDecision) -> bool:
@@ -117,8 +108,6 @@ class _AgentPipeline:
             CapabilityAgent(services),
             ConversationAgent(services),
             DeepThinkingAgent(services),
-            RobotPoseControllerAgent(services),
-            MotionPlannerAgent(services),
             SafetyAgent(services),
             ToolAgent(services),
             MemoryAgent(services),
@@ -685,7 +674,7 @@ class InteractionRuntime(_AgentPipeline):
         for skill in skills:
             result.add_skill(skill)
         result.metadata["social_attention_status"] = "applied"
-        result.metadata["social_attention_skills"] = [skill.skill_id for skill in skills]
+        result.metadata["social_attention_capability_ids"] = [skill.capability_id for skill in skills]
         result.trace.append(
             "runtime: applied model-authored social attention "
             + ",".join(skill.skill_id for skill in skills)

@@ -699,7 +699,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(launched), 2)
         self.assertEqual(launched[-1][1], {"walk-1", "blink-1"})
 
-    async def test_deep_thought_ack_is_language_matched_and_scheduled(self) -> None:
+    async def test_model_authored_deep_thought_ack_is_scheduled(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
@@ -708,6 +708,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.playback_generation = 0
         assistant.active_synthesis_tasks = set()
         assistant.playback_start_waiters = {}
+        assistant.core_generated_fast_speech_enabled = True
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
@@ -734,6 +735,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             route="deep_thought",
             agents=["deepthinking_agent", "speaker_agent"],
             language="zh-CN",
+            fast_speech={
+                "text": "我想一下。",
+                "purpose": "thinking",
+                "commitment": "prelude_only",
+                "must_not_claim_completion": True,
+            },
         )
 
         scheduled = await assistant._schedule_deep_thought_ack(
@@ -746,7 +753,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*pending)
 
         self.assertTrue(scheduled)
-        self.assertEqual(seen, [(0, "好的，我想一下。")])
+        self.assertEqual(seen, [(0, "我想一下。")])
         self.assertEqual(
             assistant.sessions.state[session_id]["scheduled_tts"],
             1,
@@ -1124,7 +1131,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(text=text):
                 self.assertIsNone(VoiceAssistant._safe_immediate_route_speech(text))
 
-    def test_unsafe_deep_thought_speak_first_uses_trusted_ack(self) -> None:
+    def test_unsafe_deep_thought_speak_first_does_not_trigger_host_wording(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.core_generated_fast_speech_enabled = True
         decision = RouteDecision(
@@ -1134,12 +1141,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             speak_first="That's taken care of.",
         )
 
-        self.assertEqual(
-            assistant._deep_thought_ack_text(decision, "Please make a plan."),
-            "Okay, let me think about that.",
+        self.assertIsNone(
+            assistant._deep_thought_ack_text(decision, "Please make a plan.")
         )
 
-    def test_incomplete_deep_thought_fast_speech_uses_trusted_ack(self) -> None:
+    def test_incomplete_deep_thought_fast_speech_fails_closed(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.core_generated_fast_speech_enabled = True
         decision = RouteDecision(
@@ -1149,9 +1155,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             fast_speech={"text": "Let me think."},
         )
 
-        self.assertEqual(
-            assistant._deep_thought_ack_text(decision, "Please make a plan."),
-            "Okay, let me think about that.",
+        self.assertIsNone(
+            assistant._deep_thought_ack_text(decision, "Please make a plan.")
         )
 
     def test_validated_response_plan_uses_structured_claims_not_phrase_blocking(self) -> None:
@@ -1264,20 +1269,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
-    def test_unavailable_ability_response_is_language_matched(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-
-        response = assistant._ability_unavailable_response(
-            "social.look_at_user",
-            language=None,
-            user_text="请看着我。",
-        )
-
-        self.assertEqual(response.speech[0].text, "抱歉，我现在还没有这个能力。")
-        self.assertEqual(response.metadata["ability_id"], "social.look_at_user")
-        self.assertEqual(response.metadata["ability_status"], "known_missing")
-
-    def test_cognitive_core_exception_on_embodied_text_fails_closed(self) -> None:
+    def test_cognitive_core_exception_does_not_semantically_classify_embodied_text(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
         response = assistant._cognitive_core_exception_safe_response(
@@ -1289,7 +1281,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "I heard an action request, but cognitive processing did not complete, so I will not perform it.",
+            "I couldn't complete that request, so no operation was executed. Please try again.",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -1306,9 +1298,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "I couldn't complete that request. Please try again.",
+            "I couldn't complete that request, so no operation was executed. Please try again.",
         )
-        self.assertFalse(response.metadata["embodied_request"])
+        self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 
     def test_direct_llm_prompt_uses_chromie_social_self_model(self) -> None:

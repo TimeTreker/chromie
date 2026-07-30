@@ -73,12 +73,12 @@ It outputs one `RouteDecision`. That decision may contain one selected intent
 or an ordered `actions` array when the request is a compound task made from
 unlocked common catalog skills:
 
-- `robot_action` with `intent=capability:<exact skill_id>` when an unlocked
-  common skill clearly satisfies the request;
+- `robot_action` with `intent=capability:<exact capability_id>` when an unlocked
+  common Capability clearly satisfies the request;
 - `robot_action` with `intent=compound_common_catalog_task` and `actions[]`
-  when multiple unlocked common skills should be proposed together;
+  when multiple unlocked common Capabilities should be proposed together;
 - `chat`, `tool`, `memory`, or `clarify` for non-body or ambiguous requests;
-- `deep_thought` when no unlocked common skill clearly fits, confidence is low,
+- `deep_thought` when no unlocked common Capability clearly fits, confidence is low,
   or the request needs careful reasoning.
 
 `actions[]` is a task proposal surface, not execution authorization. Each item

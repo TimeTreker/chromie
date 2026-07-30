@@ -177,10 +177,10 @@
         "step_ids": []
       }
     ],
-    "skill_ids": [
+    "capability_ids": [
       "soridormi.nod_yes"
     ],
-    "skill_source_goal_ids": [
+    "capability_source_goal_ids": [
       [
         "goal-nod"
       ]

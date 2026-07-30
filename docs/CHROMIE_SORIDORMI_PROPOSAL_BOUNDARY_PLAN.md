@@ -99,7 +99,12 @@ Required fields:
 }
 ```
 
-The field is intentionally sent at `soridormi.skill.create_plan`, not only at
+`skill_id` and `upstream_skill_id` in this object are explicitly Soridormi-native
+compatibility fields at the external Provider boundary. Chromie model, Plan,
+trace, and evidence contracts use canonical `capability_id`; this compatibility
+projection does not reintroduce `skill_id` as a current Chromie semantic field.
+
+The object is intentionally sent at `soridormi.skill.create_plan`, not only at
 `execute_plan`, because Soridormi's feasibility checks and plan shaping happen
 while creating the body-owned plan.
 
@@ -129,19 +134,17 @@ This keeps the generic `SoridormiNamedSkillAdapter` as a protocol adapter
 rather than a per-skill registry. `SoridormiMcpSkillProvider` remains only as
 a backward-compatible alias for older imports.
 
-### Conditional deep-thinking delegation policy
+### Deep-thinking delegation authority
 
-Status: implemented in the conditional deepthinking policy patch.
+Status: superseded by the Goal-driven Cognitive Core closure audit.
 
-The Orchestrator now has a `DeepThinkingDelegationPolicy` helper. It decides
-whether to involve the `deepthinking_agent`; it does not decide whether physical
-skills bypass SkillRuntime.
-
-The policy is configurable by route type. It delegates semantic work for
-explicit deep-thought route items, missing/partial capability matches, ambiguous
-or frustrated user state, live-perception dependencies, high-risk physical goals
-such as navigation or manipulation, and route-specific low confidence. Simple
-exact low-risk body cues can remain fast proposals.
+The former Host `DeepThinkingDelegationPolicy` was removed. Ordinary semantic
+escalation, uncertainty, task complexity, capability coverage, and planner-tier
+selection belong to Goal Interpretation, Goal Association, Fast Planner, and
+terminal Deep Planner. The Host validates typed results and may deterministically
+handle stop, cancel, emergency, silence, and unusable input, but it does not
+reroute normal turns from confidence thresholds, intent labels, user-state
+classifications, physical-term lists, or phrases.
 
 ### Compound fast-route proposals with mandatory runtime gates
 
@@ -155,10 +158,10 @@ compound action position, catalog safety metadata, and runtime validation flags
 so the Soridormi boundary can audit how the request was formed.
 
 If any action in the compound request is high-risk, ambiguous, unavailable, or
-perception-dependent, the compound request must escalate to a deeper agent path.
-The conditional deep-thinking policy therefore treats Goal Interpretation action
-`capability_id` values, action-level live-perception flags, and selected
-capability risk metadata as first-class escalation evidence.
+perception-dependent, the model-authored planning path must clarify, escalate, or
+report the missing capability. The Host still validates exact `capability_id`
+values, schemas, confirmation policy, and Provider safety, but does not make the
+semantic escalation decision.
 
 ### Confirmed bounded recovery protocol
 

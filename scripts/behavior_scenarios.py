@@ -1810,10 +1810,10 @@ async def evaluate_cognitive_runtime_scenario(
         "disposition": terminal.disposition if terminal is not None else None,
         "coverage": terminal.coverage if terminal is not None else None,
         "goal_outcomes": goal_outcomes,
-        "skill_ids": [item.skill_id for item in interaction.skills] if interaction else [],
-        "skill_args": [item.args for item in interaction.skills] if interaction else [],
-        "skill_timings": [item.timing for item in interaction.skills] if interaction else [],
-        "skill_source_goal_ids": [
+        "capability_ids": [item.capability_id for item in interaction.skills] if interaction else [],
+        "capability_args": [item.args for item in interaction.skills] if interaction else [],
+        "capability_timings": [item.timing for item in interaction.skills] if interaction else [],
+        "capability_source_goal_ids": [
             list(item.metadata.get("source_goal_ids") or [])
             for item in interaction.skills
         ] if interaction else [],
@@ -1837,17 +1837,28 @@ async def evaluate_cognitive_runtime_scenario(
             f"goal_outcomes={actual['goal_outcomes']!r}, "
             f"expected {list(expect['goal_outcomes'])!r}"
         )
-    if "skill_ids" in expect and actual["skill_ids"] != list(expect["skill_ids"]):
-        errors.append(
-            f"skill_ids={actual['skill_ids']!r}, expected {list(expect['skill_ids'])!r}"
-        )
-    for key in (
-        "skill_args",
-        "skill_timings",
-        "skill_source_goal_ids",
-        "speech_covers_goal_ids",
+    expected_capability_ids = expect.get("capability_ids")
+    if expected_capability_ids is None and "skill_ids" in expect:
+        expected_capability_ids = expect["skill_ids"]
+    if (
+        expected_capability_ids is not None
+        and actual["capability_ids"] != list(expected_capability_ids)
     ):
-        if key in expect and actual[key] != list(expect[key]):
+        errors.append(
+            "capability_ids="
+            f"{actual['capability_ids']!r}, expected {list(expected_capability_ids)!r}"
+        )
+    compatibility_keys = {
+        "capability_args": "skill_args",
+        "capability_timings": "skill_timings",
+        "capability_source_goal_ids": "skill_source_goal_ids",
+        "speech_covers_goal_ids": "speech_covers_goal_ids",
+    }
+    for key, legacy_key in compatibility_keys.items():
+        expected_value = expect.get(key)
+        if expected_value is None and legacy_key in expect:
+            expected_value = expect[legacy_key]
+        if expected_value is not None and actual[key] != list(expected_value):
             errors.append(f"{key}={actual[key]!r}, expected {list(expect[key])!r}")
     if "interaction_status" in expect and actual["interaction_status"] != expect["interaction_status"]:
         errors.append(

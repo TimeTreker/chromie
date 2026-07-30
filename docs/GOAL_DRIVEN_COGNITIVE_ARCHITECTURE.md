@@ -333,13 +333,13 @@ planner tier.
   "steps": [
     {
       "step_id": "step_walk",
-      "skill_id": "soridormi.walk_forward",
+      "capability_id": "soridormi.walk_forward",
       "args": {"duration_s": 15, "speed": "quick"},
       "timing": "parallel"
     },
     {
       "step_id": "step_blink",
-      "skill_id": "soridormi.blink_eyes",
+      "capability_id": "soridormi.blink_eyes",
       "args": {"count": 4},
       "timing": "parallel"
     }

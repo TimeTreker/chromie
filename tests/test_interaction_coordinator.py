@@ -202,7 +202,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 speech=[{"text": "Moving now."}],
                 metadata={
                     "language": "en-US",
-                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_output_mode": "capability_tasks",
                     "deepthinking_proposed_effect_task_count": 1,
                     "deepthinking_valid_effect_task_count": 0,
                 },
@@ -210,19 +210,9 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             session_id="sid-unverified-action",
         )
 
-        self.assertEqual(result.status, "completed")
-        self.assertEqual(
-            scheduled[0]["text"],
-            "I understand you want me to do a movement. For safety, I need to confirm first.",
-        )
-        self.assertEqual(
-            scheduled[0]["metadata"]["source"],
-            "host_truth_reconciliation",
-        )
-        self.assertEqual(
-            scheduled[0]["metadata"]["session_id"],
-            "sid-unverified-action",
-        )
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(scheduled, [])
+        self.assertEqual(result.results, [])
 
     async def test_prepare_response_suppresses_effectful_skills_when_structured_planner_blocks(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
@@ -250,7 +240,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(prepared.requires_confirmation)
         self.assertTrue(prepared.metadata["structured_planning_execution_suppressed"])
         self.assertEqual(
-            prepared.metadata["suppressed_skill_ids"],
+            prepared.metadata["suppressed_capability_ids"],
             ["soridormi.walk_forward"],
         )
 
@@ -322,7 +312,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                             "capability_id": "walk_forward",
                         }
                     ],
-                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_output_mode": "capability_tasks",
                     "deepthinking_proposed_effect_task_count": 1,
                     "deepthinking_valid_effect_task_count": 0,
                 },
@@ -330,14 +320,13 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             session_id="sid-prepared",
         )
 
-        self.assertEqual(
-            prepared.speech[0].text,
-            "I understand you want me to do a movement. For safety, I need to confirm first.",
-        )
+        self.assertEqual(prepared.status, "error")
+        self.assertEqual(prepared.reason, "truth_reconciliation_requires_model_repair")
+        self.assertEqual(prepared.speech, [])
+        self.assertTrue(prepared.metadata["truth_reconciliation_requires_model_repair"])
         ledger = prepared.metadata["task_proposal_ledger"]
         self.assertEqual(ledger["summary"]["not_committed_effectful_count"], 1)
         self.assertEqual(ledger["proposals"][0]["state"], "not_committed")
-        self.assertEqual(prepared.speech[0].metadata["session_id"], "sid-prepared")
 
     async def test_warning_misread_uses_specific_truth_repair_speech(self) -> None:
         coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
@@ -359,12 +348,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                             "source": "quick_intent",
                             "proposal_kind": "action",
                             "task_type": "task.execute_skill",
-                            "skill_id": "soridormi.look_at_window",
+                            "capability_id": "soridormi.look_at_window",
                             "reason": "deepthinking interpreted Look out as a warning",
                             "superseded_by": "deepthinking:0:speech.speak",
                         }
                     ],
-                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_output_mode": "capability_tasks",
                     "deepthinking_proposed_effect_task_count": 1,
                     "deepthinking_valid_effect_task_count": 0,
                 },
@@ -424,7 +413,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         skill_proposals = [
             proposal
             for proposal in prepared.metadata["task_proposal_ledger"]["proposals"]
-            if proposal["proposal_kind"] == "skill"
+            if proposal["proposal_kind"] == "capability"
         ]
         self.assertEqual(
             [proposal["preflight"]["status"] for proposal in skill_proposals],

@@ -476,12 +476,12 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
         summary["errors"] = [_shorten(item) for item in value["errors"][:limit]]
         summary["error_count"] = len(value["errors"])
     if isinstance(value.get("skills"), list):
-        summary["skill_ids"] = [
-            str(item.get("skill_id") or item.get("id") or "")
+        summary["capability_ids"] = [
+            str(item.get("capability_id") or item.get("skill_id") or item.get("id") or "")
             for item in value["skills"][:limit]
             if isinstance(item, dict)
         ]
-        summary["skill_count"] = len(value["skills"])
+        summary["capability_count"] = len(value["skills"])
     if isinstance(value.get("results"), list):
         summary["results"] = [
             _summarize_result(item)
@@ -605,12 +605,12 @@ def _summarize_interaction_response(
         summary["speech_count"] = len(speech)
     skills = response.get("skills")
     if isinstance(skills, list):
-        summary["skill_ids"] = [
-            str(item.get("skill_id") or item.get("id") or "")
+        summary["capability_ids"] = [
+            str(item.get("capability_id") or item.get("skill_id") or item.get("id") or "")
             for item in skills[:limit]
             if isinstance(item, dict)
         ]
-        summary["skill_count"] = len(skills)
+        summary["capability_count"] = len(skills)
     metadata = response.get("metadata")
     if isinstance(metadata, dict):
         summary["metadata_keys"] = sorted(str(key) for key in metadata.keys())[:limit]

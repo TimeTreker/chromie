@@ -337,7 +337,7 @@ class CognitiveEvidenceRecorder:
             "confidence": plan.confidence,
             "goal_ids": plan.goal_ids,
             "step_ids": [item.step_id for item in plan.steps],
-            "skill_ids": [item.skill_id for item in plan.steps],
+            "capability_ids": [item.capability_id for item in plan.steps],
             "selected_agent_skills": [
                 item.model_dump(mode="json")
                 for item in plan.selected_agent_skills
@@ -377,7 +377,7 @@ class CognitiveEvidenceRecorder:
             "interaction_id": response.interaction_id,
             "status": response.status,
             "speech_count": len(response.speech),
-            "skill_ids": [item.skill_id for item in response.skills],
+            "capability_ids": [item.capability_id for item in response.skills],
             "requires_confirmation": response.requires_confirmation,
         }
 
@@ -470,7 +470,7 @@ class CanonicalPlanRuntimeAdapter:
                 "evidence_kind": "host_accepted_auxiliary_request",
                 "execution_claim": "not_observed",
                 "request_id": request.request_id,
-                "skill_id": request.skill_id,
+                "capability_id": request.capability_id,
                 "semantic_args": dict(request.args),
                 "purpose": request.metadata.get("social_attention_purpose"),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
@@ -533,7 +533,7 @@ class CanonicalPlanRuntimeAdapter:
                     {
                         "type": "unknown_runtime_skill",
                         "step_id": step.step_id,
-                        "skill_id": step.skill_id,
+                        "capability_id": step.capability_id,
                         "message": str(exc)[:300],
                     }
                 )
@@ -544,7 +544,7 @@ class CanonicalPlanRuntimeAdapter:
                     {
                         "type": "runtime_skill_unavailable",
                         "step_id": step.step_id,
-                        "skill_id": step.skill_id,
+                        "capability_id": step.capability_id,
                         "reason": definition.unavailable_reason,
                     }
                 )
@@ -557,7 +557,7 @@ class CanonicalPlanRuntimeAdapter:
                     {
                         "type": "runtime_invalid_output_schema",
                         "step_id": step.step_id,
-                        "skill_id": step.skill_id,
+                        "capability_id": step.capability_id,
                         "message": str(exc)[:160],
                     }
                 )
@@ -567,7 +567,7 @@ class CanonicalPlanRuntimeAdapter:
                     {
                         "type": "runtime_invalid_args",
                         "step_id": step.step_id,
-                        "skill_id": step.skill_id,
+                        "capability_id": step.capability_id,
                         "errors": schema_errors[:8],
                     }
                 )
@@ -609,7 +609,7 @@ class CanonicalPlanRuntimeAdapter:
                 {
                     "type": "runtime_parallel_singleton_group",
                     "step_id": step.step_id,
-                    "skill_id": step.skill_id,
+                    "capability_id": step.capability_id,
                 }
             ]
         errors: list[dict[str, Any]] = []
@@ -622,7 +622,7 @@ class CanonicalPlanRuntimeAdapter:
                     {
                         "type": "runtime_parallel_not_supported",
                         "step_id": step.step_id,
-                        "skill_id": step.skill_id,
+                        "capability_id": step.capability_id,
                     }
                 )
             left_group = str(definition.exclusive_group or "")
@@ -1533,12 +1533,12 @@ class CanonicalPlanRuntimeAdapter:
                             f"invalid:{behavior.skill_id}:{type(exc).__name__}"
                         )
 
-        proposed_social_skill_ids = (
+        proposed_social_capability_ids = (
             [behavior.skill_id for behavior in attention.behaviors]
             if attention is not None and attention.decision == "express"
             else []
         )
-        materialized_social_skill_ids = [
+        materialized_social_capability_ids = [
             request.skill_id
             for request in skills
             if request.metadata.get("auxiliary_social_attention") is True
@@ -1591,12 +1591,12 @@ class CanonicalPlanRuntimeAdapter:
             "social_attention_model_decision": (
                 attention.decision if attention is not None else "missing"
             ),
-            "social_attention_proposed_skill_ids": proposed_social_skill_ids,
-            "social_attention_materialized_skill_ids": (
-                materialized_social_skill_ids
+            "social_attention_proposed_capability_ids": proposed_social_capability_ids,
+            "social_attention_materialized_capability_ids": (
+                materialized_social_capability_ids
             ),
             "social_attention_materialized_count": len(
-                materialized_social_skill_ids
+                materialized_social_capability_ids
             ),
             "recent_auxiliary_behavior_evidence": (
                 self.recent_auxiliary_behavior_evidence(session_id)
@@ -2203,7 +2203,7 @@ class GoalDrivenRuntimeCoordinator:
             )
             composition_context["execution_capabilities"] = [
                 {
-                    "skill_id": step.skill_id,
+                    "capability_id": step.capability_id,
                     "effects": list(
                         self.adapter.interaction_runtime.skill_definition(
                             step.skill_id

@@ -155,14 +155,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "sid": sid,
             }
 
-        def conditional_policy(
-            self: VoiceAssistant,
-            decision: RouteDecision,
-            **kwargs: Any,
-        ) -> RouteDecision:
-            del self, kwargs
-            return decision
-
         self_interruption_ids: list[str | None] = []
         assistant.agent_client = _CoreInterpreter()
         assistant.get_http_session = MethodType(get_http_session, assistant)
@@ -176,10 +168,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
             assistant,
         )
         assistant.build_context = MethodType(build_context, assistant)
-        assistant._apply_conditional_deepthinking_policy = MethodType(
-            conditional_policy,
-            assistant,
-        )
         assistant.session_log = lambda *args, **kwargs: None
 
         await assistant.handle_routed_text(

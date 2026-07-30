@@ -29,13 +29,13 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                     "status": "applied",
                     "lane": "robot_action",
                     "timings_ms": {"total": 123.4},
-                    "interaction": {"skill_ids": ["soridormi.blink_eyes"]},
+                    "interaction": {"capability_ids": ["soridormi.blink_eyes"]},
                 }
             ]
         )
         self.assertEqual(report["evidence_class"], "live_text_operational")
         self.assertEqual(report["status_counts"]["applied"], 1)
-        self.assertEqual(report["applied_skill_ids"], ["soridormi.blink_eyes"])
+        self.assertEqual(report["applied_capability_ids"], ["soridormi.blink_eyes"])
         mixed = _events_report(
             [
                 {

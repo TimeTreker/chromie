@@ -33,23 +33,23 @@ _SKILL_TOKEN_STOPWORDS = {
 
 def pending_action_stage_direction_claims(
     text: str,
-    skill_ids: list[str] | tuple[str, ...],
+    capability_ids: list[str] | tuple[str, ...],
 ) -> list[str]:
     """Return pending plan-action tokens narrated as completed stage directions.
 
     Response Composer runs before effectful steps execute.  A marked direction
     such as ``*Blinks twice*`` therefore counts as an unsupported completion
     claim when the plan still contains ``soridormi.blink_eyes``.  Tokens are
-    derived from the actual pending skill IDs rather than a case-specific phrase
+    derived from the actual pending Capability IDs rather than a case-specific phrase
     table.
     """
 
     normalized_text = str(text or "")
-    if not normalized_text or not skill_ids:
+    if not normalized_text or not capability_ids:
         return []
     tokens: set[str] = set()
-    for skill_id in skill_ids:
-        for token in re.findall(r"[a-z0-9]+", str(skill_id or "").casefold()):
+    for capability_id in capability_ids:
+        for token in re.findall(r"[a-z0-9]+", str(capability_id or "").casefold()):
             if len(token) >= 3 and token not in _SKILL_TOKEN_STOPWORDS:
                 tokens.add(token)
     if not tokens:

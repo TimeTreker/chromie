@@ -144,7 +144,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         )
         self.assertEqual(
             turns[1]["llm_stages"],
-            ["quick_intent", "semantic_route_repair"],
+            ["quick_intent"],
         )
         self.assertIsNone(turns[2]["interaction"])
         self.assertEqual(turns[2]["route"]["actions"], [])

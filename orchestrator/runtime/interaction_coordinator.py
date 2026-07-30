@@ -264,6 +264,11 @@ class InteractionRuntimeCoordinator:
             session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
+        if prepared.status == "error" and not prepared.skills and not prepared.speech:
+            return SkillRuntimeResult(
+                interaction_id=prepared.interaction_id,
+                status="failed",
+            )
         cognitive_effectful = self._is_cognitive_effectful(prepared)
         body_requests = [
             request
@@ -477,7 +482,7 @@ class InteractionRuntimeCoordinator:
                 "metadata": {
                     **metadata,
                     "structured_planning_execution_suppressed": True,
-                    "suppressed_skill_ids": [
+                    "suppressed_capability_ids": [
                         request.skill_id for request in effectful
                     ],
                 },
@@ -847,24 +852,20 @@ class InteractionRuntimeCoordinator:
             metadata["truth_reconciliation_speech_source"] = "llm_safe_existing_speech"
             return response.model_copy(deep=True, update={"metadata": metadata})
 
-        language = str(response.metadata.get("language") or "")
-        text = self._truth_reconciliation_message(response, language=language)
+        metadata.update(
+            {
+                "truth_reconciliation_speech_source": "none_model_repair_required",
+                "truth_reconciliation_requires_model_repair": True,
+                "truth_reconciliation_session_id": session_id,
+            }
+        )
         return response.model_copy(
             deep=True,
             update={
-                "speech": [
-                    InteractionSpeech(
-                        text=text,
-                        timing="sequential",
-                        style="warning",
-                        priority="high",
-                        interruptible=True,
-                        metadata={
-                            "source": "host_truth_reconciliation",
-                            "session_id": session_id,
-                        },
-                    )
-                ],
+                "speech": [],
+                "skills": [],
+                "status": "error",
+                "reason": "truth_reconciliation_requires_model_repair",
                 "metadata": metadata,
             },
         )
@@ -893,45 +894,6 @@ class InteractionRuntimeCoordinator:
                 flags=re.IGNORECASE,
             )
         )
-
-    def _truth_reconciliation_message(
-        self,
-        response: InteractionResponse,
-        *,
-        language: str,
-    ) -> str:
-        zh = language.lower().startswith("zh")
-        if self._looks_like_warning_correction(response):
-            return (
-                "抱歉，我刚才把提醒误解成了方向指令。谢谢提醒，我会保持不动。"
-                if zh
-                else "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still."
-            )
-        return (
-            "我理解你是想让我做一个动作。为了安全，我需要先确认一下。"
-            if zh
-            else "I understand you want me to do a movement. For safety, I need to confirm first."
-        )
-
-    @staticmethod
-    def _looks_like_warning_correction(response: InteractionResponse) -> bool:
-        metadata = response.metadata
-        route_intent = str(metadata.get("route_intent") or "").casefold()
-        reason = str(metadata.get("truth_reconciliation_reason") or "").casefold()
-        if "warning" in route_intent or "warning" in reason:
-            return True
-        superseded = metadata.get("superseded_task_proposals")
-        if isinstance(superseded, list):
-            for item in superseded:
-                if not isinstance(item, dict):
-                    continue
-                text = " ".join(
-                    str(item.get(key) or "")
-                    for key in ("reason", "intent", "task_type", "skill_id")
-                ).casefold()
-                if "warning" in text:
-                    return True
-        return False
 
     @staticmethod
     def _int_metadata(

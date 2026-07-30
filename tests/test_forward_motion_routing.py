@@ -11,15 +11,20 @@ from tests.test_goal_interpreter_capability_routing import _Catalog, _LlmInterpr
 
 
 class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_chinese_forward_motion_ranks_live_walk_skill(self) -> None:
+    async def test_chinese_forward_motion_does_not_host_select_live_walk_skill(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 
         result = await catalog.search("你往前走个15秒。", language="zh-CN")
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.suggested_route, "robot_action")
-        self.assertEqual(result.matches[0].capability_id, "soridormi.walk_forward")
-        self.assertTrue(result.matches[0].interaction_executable)
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        self.assertTrue(
+            any(
+                match.capability_id == "soridormi.walk_forward"
+                and match.interaction_executable
+                for match in result.matches
+            )
+        )
 
     async def test_goal_interpreter_does_not_phrase_match_generic_motion_to_a_skill(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main

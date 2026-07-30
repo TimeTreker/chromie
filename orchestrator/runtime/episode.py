@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import CapabilityIdentityModel, InteractionResponse
 from shared.chromie_contracts.mind import MindProfile
 from shared.chromie_runtime.runtime_events import persist_runtime_event
 
@@ -41,11 +41,8 @@ class EpisodeGoalInterpretationRecord(BaseModel):
     latency_ms: float | None = Field(default=None, ge=0.0)
 
 
-class EpisodeSkillRequestRecord(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class EpisodeSkillRequestRecord(CapabilityIdentityModel):
     request_id: str
-    skill_id: str
     args: dict[str, Any] = Field(default_factory=dict)
     timing: str = "parallel"
     requires_confirmation: bool = False
@@ -67,11 +64,8 @@ class EpisodeAgentRecord(BaseModel):
         return [_compact_text(item, limit=500) for item in value if item.strip()]
 
 
-class EpisodeSkillResultRecord(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class EpisodeSkillResultRecord(CapabilityIdentityModel):
     request_id: str
-    skill_id: str
     status: str
     reason_code: str | None = None
     message: str = ""
@@ -390,7 +384,7 @@ class EpisodeRecorder:
             skill_results = [
                 EpisodeSkillResultRecord(
                     request_id=result.request_id,
-                    skill_id=result.skill_id,
+                    capability_id=result.capability_id,
                     status=result.status,
                     reason_code=result.reason_code,
                     message=result.message,
@@ -414,7 +408,7 @@ class EpisodeRecorder:
                 selected_skills=[
                     EpisodeSkillRequestRecord(
                         request_id=request.request_id,
-                        skill_id=request.skill_id,
+                        capability_id=request.capability_id,
                         args=request.args,
                         timing=request.timing,
                         requires_confirmation=request.requires_confirmation,

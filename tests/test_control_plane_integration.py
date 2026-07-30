@@ -4,41 +4,9 @@ import unittest
 
 from agent.app.agents import AgentServices
 from agent.app.runtime import AgentRuntime
-from agent.app.schema import AgentRunRequest
+from agent.app.schema import AgentRunRequest, RouteDecision
 from hardware.schema import ActionCommand as HardwareActionCommand
 from hardware.service import HardwareService
-from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest, finalize_decision
-
-
-def _pose_route(request: RouteRequest) -> RouteDecision:
-    return finalize_decision(
-        RouteDecision(
-            route="robot_action",
-            agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
-            intent="turn_left",
-            confidence=0.95,
-            language="en-US",
-            source="catalog",
-        ),
-        request,
-        source="catalog",
-    )
-
-
-def _motion_route(request: RouteRequest) -> RouteDecision:
-    return finalize_decision(
-        RouteDecision(
-            route="robot_action",
-            agents=["motion_planner_agent", "safety_agent", "speaker_agent"],
-            intent="move_closer_to_user",
-            confidence=0.95,
-            language="en-US",
-            source="catalog",
-        ),
-        request,
-        source="catalog",
-    )
 
 
 class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
@@ -46,74 +14,27 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = AgentRuntime(AgentServices(ollama=None, use_llm=False, max_speak_chars=160))
         self.hardware = HardwareService()
 
-    async def test_text_to_gateway_core_to_agent_to_mock_hardware(self) -> None:
-        route_request = RouteRequest(sid="e2e-turn", text="turn left")
-        decision = _pose_route(route_request)
-
-        agent_request = AgentRunRequest(
-            sid=route_request.sid,
-            text=route_request.text,
-            route_decision=decision.model_dump(mode="json"),
-            context={
-                "robot_state": {"emergency_stop": False},
-                "allow_legacy_rule_agents": True,
-            },
+    async def test_removed_phrase_agents_cannot_be_reenabled_by_request_context(self) -> None:
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["robot_pose_controller_agent", "motion_planner_agent", "speaker_agent"],
+            intent="legacy_phrase_request",
+            confidence=0.99,
+            language="en-US",
+            source="catalog",
         )
-        agent_result = await self.runtime.run(agent_request)
-
-        self.assertEqual(agent_result.status, "ok")
-        self.assertEqual(len(agent_result.actions), 1)
-        self.assertEqual(agent_result.actions[0].type, "head.turn")
-        self.assertEqual(agent_result.actions[0].params["yaw_degrees"], -20)
-
-        command = HardwareActionCommand.model_validate(agent_result.actions[0].model_dump(mode="json"))
-        hardware_result = await self.hardware.execute(command)
-
-        self.assertEqual(hardware_result.status.value, "completed")
-        self.assertEqual(self.hardware.driver.state().pose["head_yaw_degrees"], -20.0)
-        self.assertIs(self.hardware.get_action(command.id), hardware_result)
-
-    async def test_agent_blocks_motion_when_emergency_stop_is_active(self) -> None:
-        decision = _motion_route(RouteRequest(sid="blocked", text="come here"))
-
         result = await self.runtime.run(
             AgentRunRequest(
-                sid="blocked",
-                text="come here",
-                route_decision=decision.model_dump(mode="json"),
-                context={
-                    "robot_state": {"emergency_stop": True},
-                    "allow_legacy_rule_agents": True,
-                },
+                sid="removed-legacy-agents",
+                text="turn left and come here",
+                route_decision=decision,
+                context={"allow_legacy_rule_agents": True},
             )
         )
 
-        self.assertEqual(result.status, "blocked")
+        self.assertNotIn("robot_pose_controller_agent", self.runtime.available_agents())
+        self.assertNotIn("motion_planner_agent", self.runtime.available_agents())
         self.assertEqual(result.actions, [])
-        self.assertIn("robot_emergency_stop_active", result.reason or "")
-
-    async def test_confirmation_required_motion_is_not_safe_to_auto_execute(self) -> None:
-        decision = fallback_decision(RouteRequest(sid="confirm", text="move somewhere"))
-        decision.route = "robot_action"
-        decision.intent = "move_unknown"
-        decision.agents = ["motion_planner_agent", "safety_agent", "speaker_agent"]
-
-        result = await self.runtime.run(
-            AgentRunRequest(
-                sid="confirm",
-                text="move somewhere",
-                route_decision=decision.model_dump(mode="json"),
-                context={
-                    "robot_state": {"emergency_stop": False},
-                    "allow_legacy_rule_agents": True,
-                },
-            )
-        )
-
-        self.assertTrue(result.requires_confirmation)
-        self.assertEqual(len(result.actions), 1)
-        self.assertTrue(result.actions[0].requires_confirmation)
-        self.assertIn("confirm", result.speak_immediate[0].text.lower())
 
     async def test_hardware_rejects_unsafe_namespace_and_emergency_stop(self) -> None:
         confirmation_required = HardwareActionCommand(

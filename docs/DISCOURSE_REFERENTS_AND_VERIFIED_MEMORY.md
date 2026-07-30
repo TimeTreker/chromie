@@ -194,7 +194,7 @@ resolved material Goal binding and is fresh enough, the Planner may execute:
 
 ```json
 {
-  "skill_id": "chromie.memory.retrieve_verified_tool_result",
+  "capability_id": "chromie.memory.retrieve_verified_tool_result",
   "args": {
     "evidence_id": "evidence_neixiang_weather",
     "tool_id": "chromie.weather.lookup",

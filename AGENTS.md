@@ -34,11 +34,14 @@ archives, and old milestone prose are context only.
 - For user-visible behavior changes, run or update the relevant
   `scripts/general_ability_acceptance.py` ability class and report the evidence
   level. Do not claim live robot behavior from Level A output.
-- Fix the earliest responsible boundary. Hardcoded phrase rules are acceptable
-  only for deterministic operational controls or as a last-resort guard after
-  the architecture, contract, and prompt boundary have been checked.
-- Keep microphone, VAD, playback, interruption, conversation state, and trusted
-  Skill Runtime coordination in the host Orchestrator.
+- Fix the earliest responsible boundary. Hardcoded phrase rules are allowed
+  only for deterministic operational controls such as stop, cancel, emergency,
+  silence, or unusable input. They must never select semantic lanes, Goals,
+  Agent Skills, Capabilities, memory content, deep-thinking delegation, or
+  social behavior. Semantic uncertainty must use model repair, clarification,
+  or fail-closed behavior rather than a phrase fallback.
+- Keep microphone, VAD, playback, interruption, conversation state, and Trusted
+  Capability Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,
   and hardware commissioning in Soridormi.
 - Do not add new robot work to the legacy host hardware daemon.

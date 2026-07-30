@@ -110,7 +110,7 @@ Example:
 {
   "tasks": [
     {
-      "skill_id": "chromie.speak",
+      "capability_id": "chromie.speak",
       "args": {
         "text": "I understand you want me to pick up the bottle, but I do not have a trusted grasping ability yet.",
         "style": "brief",

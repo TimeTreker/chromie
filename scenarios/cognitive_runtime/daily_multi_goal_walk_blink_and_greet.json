@@ -231,15 +231,15 @@
         "step_ids": []
       }
     ],
-    "skill_ids": [
+    "capability_ids": [
       "soridormi.walk_forward",
       "soridormi.blink_eyes"
     ],
-    "skill_timings": [
+    "capability_timings": [
       "sequential",
       "sequential"
     ],
-    "skill_source_goal_ids": [
+    "capability_source_goal_ids": [
       [
         "goal-walk"
       ],

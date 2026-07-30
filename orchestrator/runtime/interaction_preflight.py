@@ -71,7 +71,7 @@ def _preflight_skill_request(
 ) -> dict[str, Any]:
     base: dict[str, Any] = {
         "request_id": request.request_id,
-        "skill_id": request.skill_id,
+        "capability_id": request.capability_id,
     }
     try:
         definition = registry.get(request.skill_id)

@@ -1,76 +1,63 @@
 from __future__ import annotations
 
-import re
-
 from ..schema import AgentResult, AgentRunRequest, MemoryUpdate
 from .base import BaseAgent
 
 
 class MemoryAgent(BaseAgent):
+    """Apply one model-authored session-memory proposal without semantic inference."""
+
     name = "memory_agent"
 
     async def run(self, request: AgentRunRequest, result: AgentResult) -> AgentResult:
-        if request.route_decision.route != "memory" and self.name not in request.route_decision.agents:
+        if (
+            request.route_decision.route != "memory"
+            and self.name not in request.route_decision.agents
+        ):
             return result
 
-        entry = self._memory_entry(request)
+        proposal = request.route_decision.memory_update
+        if proposal is None:
+            proposal = next(
+                (
+                    item.memory_update
+                    for item in request.route_decision.routes
+                    if item.route == "memory" and item.memory_update is not None
+                ),
+                None,
+            )
+        if proposal is None:
+            result.status = "clarify"
+            result.reason = "memory_update_missing"
+            self.trace(result, "memory proposal missing; semantic inference forbidden")
+            return result
+
+        entry = proposal.model_dump(mode="json")
         result.memory_updates.append(
             MemoryUpdate(
                 type="extracted_memory",
-                key=entry["kind"],
+                key=proposal.key or proposal.kind,
                 value=entry,
-                confidence=request.route_decision.confidence,
+                confidence=proposal.confidence,
+                metadata={"source": "goal_interpreter_memory_proposal"},
             )
         )
         result.memory_updates.append(
             MemoryUpdate(
                 type="user_statement",
-                key=None,
-                value={"text": request.text, "intent": request.route_decision.intent},
-                confidence=request.route_decision.confidence,
+                key=proposal.key,
+                value={"text": proposal.text, "kind": proposal.kind},
+                confidence=proposal.confidence,
+                metadata={"source": "model_authored_memory_proposal"},
             )
         )
         result.add_action(
             "memory_store",
             "memory.store",
-            params={"text": request.text, "intent": request.route_decision.intent},
+            params=entry,
             blocking=False,
             timeout_ms=1000,
-            reason="memory_update_planned_by_agent",
+            reason="model_authored_memory_update",
         )
-        if not result.speak_immediate:
-            result.add_speak_immediate("我记下了。" if self.is_zh(request) else "I will remember that.", style="brief")
-        self.trace(result, "planned memory update")
+        self.trace(result, "applied model-authored memory proposal")
         return result
-
-    def _memory_entry(self, request: AgentRunRequest) -> dict[str, str]:
-        statement = self._refined_statement(request.text)
-        intent = (request.route_decision.intent or "").lower()
-        lowered = request.text.lower()
-        kind = (
-            "preference"
-            if "preference" in intent
-            or "favorite" in lowered
-            or "preferred" in lowered
-            or "prefer" in lowered
-            else "note"
-        )
-        return {
-            "scope": "session",
-            "kind": kind,
-            "text": statement,
-            "persistence_policy": "ephemeral",
-        }
-
-    @staticmethod
-    def _refined_statement(text: str) -> str:
-        cleaned = " ".join((text or "").strip().split())
-        cleaned = re.sub(
-            r"^(?:please\s+)?(?:remember|memorize|note|save|store)\s+(?:that\s+)?",
-            "",
-            cleaned,
-            flags=re.IGNORECASE,
-        ).strip()
-        if cleaned:
-            return f"User asked Chromie to remember: {cleaned}"
-        return "User asked Chromie to remember the current session note."

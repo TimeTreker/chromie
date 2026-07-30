@@ -175,7 +175,7 @@ class DeepThinkingAgent(BaseAgent):
                 )
                 result.trace.append(f"deepthinking_agent: llm failed: {type(exc).__name__}: {exc}")
 
-        fallback = self._fallback_reply(request)
+        fallback = self._operational_failure_reply(request)
         result.add_speak_immediate(fallback, style="brief")
         self.trace(result, "used fallback reply")
         return result
@@ -197,7 +197,7 @@ class DeepThinkingAgent(BaseAgent):
 
         system = (
             "Priority Rule 1: For physical robot action requests, output ONLY a short spoken acknowledgement or routing sentence. "
-            "Absolutely NO Task Split, Key Risk, Next Step, internal skill IDs, schema fields, or raw execution arguments in the spoken response. "
+            "Absolutely NO Task Split, Key Risk, Next Step, internal capability IDs, schema fields, or raw execution arguments in the spoken response. "
             "Do not claim movement is executing unless you also emit a matching validated action task. "
             "You are Chromie's deepthinking agent, not the normal conversation agent. "
             "Your job is to split complex requests into clear tasks and use session working memory for architecture, debugging, planning, decisions, and candidate action requests. "
@@ -213,8 +213,8 @@ class DeepThinkingAgent(BaseAgent):
             "When voicing a cognitive task plan, weave the task split, key risk, and next step into one fluid first-person spoken paragraph. Never output bullet points, labels, or numbered lists in the final TTS output. "
             "For short follow-ups, resolve references from task context before asking for more context. "
             "If more tools, code changes, or robot actions are needed, describe the plan or ask for confirmation; do not invent results. "
-            "For direct physical robot action requests, do not narrate Task Split, Key Risk, Next Step, internal skill IDs, or execution arguments in chromie.speak text. "
-            "For physical action, emit skill tasks: one chromie.speak acknowledgement task when speech is useful, plus exact candidate skill tasks for embodied/tool work; if you do not emit a matching non-speech skill task, your speech must ask for confirmation or say you are still checking, never that you are doing the motion now. "
+            "For direct physical robot action requests, do not narrate Task Split, Key Risk, Next Step, internal capability IDs, or execution arguments in chromie.speak text. "
+            "For physical action, emit skill tasks: one chromie.speak acknowledgement task when speech is useful, plus exact candidate capability tasks for embodied/tool work; if you do not emit a matching non-speech capability task, your speech must ask for confirmation or say you are still checking, never that you are doing the motion now. "
             "Do not pretend to remember anything outside the supplied context, and do not invent tool results. "
             "For common factual questions, answer directly and correct obvious false premises. "
             "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
@@ -234,7 +234,7 @@ class DeepThinkingAgent(BaseAgent):
             "Set quick_review.decision to accept when the quick plan is correct, revise when it is partly right but needs changed tasks/arguments/order, or supersede when it misunderstood the user. "
             "When revising or superseding, emit the replacement tasks you think are correct. If the quick proposal was not committed, do not apologize merely for revising it; if context shows a wrong action already ran or was visibly started, include a brief chromie.speak apology/correction. "
             "Return compact JSON only with keys tasks, task_proposals, quick_review, and reason. "
-            "tasks is a unified ordered list of robot skill tasks. Each task has capability_id, args, timing, timeout_ms, cancellable, requires_confirmation, and reason. "
+            "tasks is a unified ordered list of robot capability tasks. Each task has capability_id, args, timing, timeout_ms, cancellable, requires_confirmation, and reason. "
             "task_proposals is an optional ordered list of understood desired abilities that are not executable now; each item has ability_id, intent, status, matched_capability_id, confidence, and reason. "
             "Use capability_id chromie.speak with args {\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"} for anything Chromie should say. "
             "Every non-speech task capability_id must be copied exactly from the supplied Capability catalog and its args must satisfy that candidate input_schema. "
@@ -258,8 +258,8 @@ class DeepThinkingAgent(BaseAgent):
             "Apply the Priority Rules strictly. First understand the user's desired ability broadly, then compare it with the supplied executable catalog. "
             "Emit only the tasks Chromie should perform now. "
             "For cognitive tasks, this is usually one chromie.speak task with a concise natural-spoken plan. "
-            "For physical actions, include a short chromie.speak acknowledgement only if useful, and include candidate executable skill tasks for the actual work. "
-            "Never produce speech that says or implies movement is starting now unless this same JSON also includes the matching non-speech skill task. "
+            "For physical actions, include a short chromie.speak acknowledgement only if useful, and include candidate executable capability tasks for the actual work. "
+            "Never produce speech that says or implies movement is starting now unless this same JSON also includes the matching non-speech capability task. "
             "If no supplied capability safely matches, emit only a brief chromie.speak clarification or limitation plus a task_proposals missing_ability item. "
             "Output the JSON contract and nothing else."
         )
@@ -486,7 +486,7 @@ class DeepThinkingAgent(BaseAgent):
                     )
                     rejected_tasks.append(
                         {
-                            "skill_id": task.skill_id,
+                            "capability_id": task.capability_id,
                             "reason": "not_available_interaction_executable_candidate",
                         }
                     )
@@ -507,7 +507,7 @@ class DeepThinkingAgent(BaseAgent):
                     )
                     rejected_tasks.append(
                         {
-                            "skill_id": task.skill_id,
+                            "capability_id": task.capability_id,
                             "reason": "schema_validation_failed",
                             "errors": arg_errors,
                         }
@@ -518,9 +518,9 @@ class DeepThinkingAgent(BaseAgent):
                     if task.requires_confirmation is None
                     else bool(task.requires_confirmation)
                 )
-                skill_id = self._candidate_skill_id(candidate) or task.skill_id
+                capability_id = self._candidate_skill_id(candidate) or task.capability_id
                 skill = CapabilityRequest(
-                    capability_id=skill_id,
+                    capability_id=capability_id,
                     args=args,
                     timing=self._skill_timing(task),
                     timeout_ms=task.timeout_ms,
@@ -538,8 +538,8 @@ class DeepThinkingAgent(BaseAgent):
                         task,
                         index=index,
                         state="advisory",
-                        reason=task.reason or plan.reason or "deepthinking skill task",
-                        skill_id=skill_id,
+                        reason=task.reason or plan.reason or "deepthinking capability task",
+                        capability_id=capability_id,
                     )
                 )
                 valid_task_count += 1
@@ -555,7 +555,7 @@ class DeepThinkingAgent(BaseAgent):
             )
             rejected_tasks.append(
                 {
-                    "skill_id": task.skill_id,
+                    "capability_id": task.capability_id,
                     "reason": "result_surface_has_no_skill_lane",
                 }
             )
@@ -571,7 +571,7 @@ class DeepThinkingAgent(BaseAgent):
             )
 
         if isinstance(metadata, dict):
-            metadata["deepthinking_output_mode"] = "skill_tasks"
+            metadata["deepthinking_output_mode"] = "capability_tasks"
             metadata["deepthinking_proposed_task_count"] = len(tasks)
             metadata["deepthinking_desired_ability_proposal_count"] = len(plan.task_proposals)
             metadata["deepthinking_valid_task_count"] = valid_task_count
@@ -662,7 +662,7 @@ class DeepThinkingAgent(BaseAgent):
                 proposal.get("capability_id") or proposal.get("skill_id") or ""
             ).strip()
             if skill_id:
-                item["skill_id"] = skill_id
+                item["capability_id"] = skill_id
             superseded.append(item)
         return superseded
 
@@ -682,11 +682,11 @@ class DeepThinkingAgent(BaseAgent):
         index: int,
         state: str,
         reason: str,
-        skill_id: str | None = None,
+        capability_id: str | None = None,
         committed_by: str | None = None,
     ) -> dict[str, Any]:
-        normalized_skill_id = skill_id or task.skill_id.strip()
-        task_type = self._task_type_for_skill(normalized_skill_id)
+        normalized_capability_id = capability_id or task.capability_id.strip()
+        task_type = self._task_type_for_skill(normalized_capability_id)
         proposal = TaskProposal(
             id=f"deepthinking:{index}:{task_type}",
             source="deepthinking",
@@ -694,10 +694,10 @@ class DeepThinkingAgent(BaseAgent):
             task_type=task_type,
             state=state,  # type: ignore[arg-type]
             reason=self._bounded_text(reason, 240),
-            effectful=self._is_effectful_skill_id(normalized_skill_id),
+            effectful=self._is_effectful_skill_id(normalized_capability_id),
             priority="normal",
             sequence=index,
-            skill_id=normalized_skill_id,
+            capability_id=normalized_capability_id,
             committed_by=committed_by,
             timing=task.timing,
             requires_confirmation=task.requires_confirmation,
@@ -746,7 +746,7 @@ class DeepThinkingAgent(BaseAgent):
             priority="normal",
             sequence=index,
             ability_id=proposal.ability_id,
-            skill_id=proposal.matched_capability_id,
+            capability_id=proposal.matched_capability_id,
             metadata=metadata,
         )
         return item.model_dump(mode="json", exclude_none=True)
@@ -1315,10 +1315,10 @@ class DeepThinkingAgent(BaseAgent):
             return text[:max_chars].rstrip() + "..."
         return text
 
-    def _fallback_reply(self, request: AgentRunRequest) -> str:
-        if self.is_zh(request):
-            return "我可以把这个复杂任务拆开，但我现在没连上深度思考模型。"
-        return "I can split this into a plan, but my deep-thinking model is not responding."
+    def _operational_failure_reply(self, request: AgentRunRequest) -> str:
+        """Return a non-semantic operational failure when the model is unavailable."""
+
+        return self.invalid_spoken_response_fallback(zh=self.is_zh(request))
 
     def _clean_response(self, response: str, *, zh: bool) -> str:
         response = " ".join((response or "").strip().strip('"').split())

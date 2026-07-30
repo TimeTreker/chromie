@@ -39,7 +39,7 @@ class AgentServices:
     task_graph_planner: "TaskGraphPlanner | None" = None
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8
-    weather_client: Any | None = None
+    local_tool_executor: Any | None = None
     tool_result_interpreter: Any | None = None
 
     def effective_social_attention_mode(self) -> str:

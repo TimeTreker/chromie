@@ -20,13 +20,13 @@ The Agent:
 - never opens the microphone, plays audio, or controls robot hardware directly.
 
 The host Orchestrator owns realtime audio, conversation state, interruption, and
-the trusted Skill Runtime. Soridormi owns embodied planning, execution policy,
+the Trusted Capability Runtime. Soridormi owns embodied planning, execution policy,
 resource exclusivity, cancellation, emergency behavior, and hardware
 commissioning.
 
 `POST /interaction` now uses `InteractionRuntime` by default. Specialized agents
 write through a native accumulator that creates `InteractionSpeech` and
-`SkillRequest` objects as the pipeline runs; the endpoint does not convert a
+`CapabilityRequest` objects (with `SkillRequest` retained as a compatibility alias) as the pipeline runs; the endpoint does not convert a
 final `AgentResult`. The serialized result is validated again against the strict
 shared contract before it is returned.
 
@@ -42,11 +42,9 @@ separate and default-off; enable it only with
 | `conversation_agent` | Produces short conversational speech with Ollama or deterministic fallback behavior. |
 | `deepthinking_agent` | Handles `deep_thought` requests by using session working memory to split complex tasks, plan, debug, and produce a spoken final answer. |
 | `speaker_agent` | Normalizes wording, brevity, and speaking style. It never plays audio. |
-| `robot_pose_controller_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
-| `motion_planner_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `safety_agent` | Rejects or clamps unsafe action proposals. |
 | `tool_agent` | Handles read-only weather lookup directly; preserves the canonical resolved place while the provider adapter may use bounded equivalent geocoding forms and typed `location_not_found`; produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
-| `memory_agent` | Produces refined `extracted_memory` updates plus compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
+| `memory_agent` | Applies an exact model-authored, schema-validated session-memory proposal. It does not infer memory kind or content from keywords. Chromie's current conversation state is process-local and not a durable memory store. |
 | `chromie.memory.retrieve_verified_tool_result` | Read-only Host-runtime capability that retrieves one exact fresh prior tool result after Goal Association has already resolved references and bound material arguments. It never resolves pronouns or performs loose semantic search. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
 
@@ -126,7 +124,7 @@ execution authority.
 | `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction gate: `off`, `report_only`, or `on`. It never selects a simulator or physical backend; Soridormi/provider owns backend selection and body safety. See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `0` | Deprecated compatibility input retained for diagnostics. Social Attention is never awaited after the primary response; the effective wait is always `0`. |
-| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for semantic selection; this list does not force any gesture. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named capabilities | Exact catalog IDs eligible for semantic selection; this list does not force any gesture. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Goal Interpretation capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
@@ -137,7 +135,7 @@ execution authority.
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Goal Interpretation actions are always adapter-only. |
-| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |
+| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named capabilities while keeping the last known-good catalog. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |
 | `AGENT_CAPABILITY_NUM_CTX` | `24576` | Verification-mode context window for LLM capability selection prompts. Optimize downward only after feasibility and latency evidence are both acceptable. |
@@ -210,7 +208,7 @@ export and pinned to the exact `metadata.upstream_commit` recorded in
 TaskGraph planning and execution are separate operations. A graph returned from
 the legacy `/run` path in `AgentResult.task_graphs` is not automatically
 dispatched by the Agent service. The native `/interaction` path emits planned
-graphs as `chromie.task_graph.execute` Skill Runtime requests; the host
+graphs as `chromie.task_graph.execute` Capability Runtime requests; the host
 Orchestrator can dispatch those to the Agent's planning executor when
 `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1`, and otherwise the request fails
 closed.
@@ -233,7 +231,7 @@ closed.
   audible `chromie.speak` stays outside the planning lane.
 - LLM-planned Soridormi task-submit nodes receive a default trace-only report
   fallback when the model omits an explicit failure fallback.
-- The host Skill Runtime maps failed or cancelled TaskGraph traces back to
+- The Trusted Capability Runtime maps failed or cancelled TaskGraph traces back to
   failed/cancelled `chromie.task_graph.execute` results and suppresses
   completion speech after graph failure.
 - Traces and confirmation grants are retained in process memory only. Traces
@@ -329,7 +327,7 @@ Normally start the complete service set through:
 
 ## Compatibility planner semantic boundary
 
-The emergency-only legacy CapabilityAgent preserves the exact named skill chosen
+The emergency-only legacy CapabilityAgent preserves the exact named capability chosen
 by its model and validates arguments only against that skill's advertised schema.
 It does not replace `soridormi.look_direction` with
 `soridormi.look_at_person`, reinterpret yaw/pitch fields, or silently clamp one

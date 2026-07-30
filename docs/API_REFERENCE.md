@@ -55,7 +55,7 @@ running.
 | `POST` | `/agent-skills/select` | Let the declared responsible Agent role make a typed model-authored no/one/multi-Skill decision from bounded approved summaries; this endpoint does not load projections, mutate Plans, or execute Capabilities. |
 | `POST` | `/agent-skills/disclose` | Load only exact projections from a validated selection under digest and prompt-budget checks; it does not mutate Plans or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
-| `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
+| `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named capabilities and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
@@ -121,7 +121,7 @@ caller-supplied disclosure context is removed before trusted injection.
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
-| `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read skill requests already selected by the Goal-driven planner. |
+| `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
 
 The interaction, goal-association, and task-continuity endpoints accept the same request shape:
@@ -188,12 +188,14 @@ summaries, not durable user-profile memory and not authorization for side
 effects. Fast Goal Interpretation prompts sanitize raw `history` and `conversation` fields
 from their bounded context payload and rely on these compact memory fields
 instead.
-For explicit `memory` routes, `memory_agent` emits an `extracted_memory`
-`memory_updates` entry with a scoped compact statement plus the legacy
-`user_statement` compatibility entry. The Orchestrator consumes only the
-refined entry into prompt-facing session memory.
+For explicit `memory` routes, Goal Interpretation must return a typed
+`memory_update` proposal. `memory_agent` validates and applies that exact model
+decision, emits an `extracted_memory` entry plus a bounded compatibility
+`user_statement` derived from it, and clarifies when the proposal is missing.
+It never infers memory semantics from raw text. The Orchestrator consumes only
+the refined entry into prompt-facing session memory.
 
-`InteractionResponse` can contain speech items and named skill requests. Shared
+`InteractionResponse` can contain speech items and executable Capability requests; the `skills` container name remains a bounded compatibility surface. Shared
 contracts reject unknown fields and recursively reject low-level motor, joint,
 torque, and actuator fields. Native mode is the Agent default. The response
 metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
@@ -210,7 +212,7 @@ membership, schemas, target evidence, resource conflicts, confirmation policy,
 and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
 coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary
 CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests are routed through the model-assisted
-Goal Interpretation, capability catalog, Agent capability planner, schemas, and Skill
+Goal Interpretation, capability catalog, Agent capability planner, schemas, and Trusted Capability
 Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
@@ -269,14 +271,14 @@ deterministically from node results. Failed Soridormi task nodes preserve
 summary so user-facing report/speech code does not need to infer the refusal.
 Planning execution can run `chromie.report` as a trace-only local report node;
 it does not play audio. `chromie.speak` remains rejected from planning
-execution and should be emitted through `InteractionResponse`/Skill Runtime when
+execution and should be emitted through `InteractionResponse`/Trusted Capability Runtime when
 audible playback is required.
 When native `POST /interaction` emits `chromie.task_graph.execute`, the host
-Skill Runtime can route that request to `POST /task-graphs/execute-planning`.
+Trusted Capability Runtime can route that request to `POST /task-graphs/execute-planning`.
 The Agent-side planning execution flag still controls whether the graph runs;
 disabled planning execution returns a safe failure instead of falling back to
 raw control or guarded execution. Failed, aborted, or cancelled graph traces are
-reported back as non-completed skill results so `after_skills` speech is not
+reported back as non-completed capability results so `after_skills` speech is not
 played as if the task succeeded.
 TaskGraph `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`,
 or `<node>.status`; LLM-planned Soridormi task-submit nodes that omit a failure

@@ -13,10 +13,6 @@ AbilityStatus = Literal[
     "disabled",
 ]
 
-DEFAULT_UNAVAILABLE_EN = "Sorry, I don't have that ability yet."
-DEFAULT_UNAVAILABLE_ZH = "抱歉，我现在还没有这个能力。"
-
-
 @dataclass(frozen=True)
 class AbilitySpec:
     ability_id: str
@@ -25,12 +21,6 @@ class AbilitySpec:
     status: AbilityStatus = "stub"
     implementation: str = "stub"
     optional_by_default: bool = False
-    speech_templates: Mapping[str, str] = field(default_factory=dict)
-    unavailable_en: str = DEFAULT_UNAVAILABLE_EN
-    unavailable_zh: str = DEFAULT_UNAVAILABLE_ZH
-    soridormi_skill_id: str | None = None
-    default_args: Mapping[str, Any] = field(default_factory=dict)
-    timeout_ms: int | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     @property
@@ -69,28 +59,6 @@ class AbilityRegistry:
     def can_execute(self, ability_id: str) -> bool:
         return self.get(ability_id).can_execute
 
-    def localized_speech(
-        self,
-        ability_id: str,
-        *,
-        language: str | None = None,
-        user_text: str = "",
-    ) -> str | None:
-        ability = self.get(ability_id)
-        lang = _language_key(language, user_text)
-        return ability.speech_templates.get(lang) or ability.speech_templates.get("en")
-
-    def unavailable_message(
-        self,
-        ability_id: str,
-        *,
-        language: str | None = None,
-        user_text: str = "",
-    ) -> str:
-        ability = self.get(ability_id)
-        if _language_key(language, user_text) == "zh":
-            return ability.unavailable_zh
-        return ability.unavailable_en
 
 
 def build_default_ability_registry(
@@ -101,7 +69,7 @@ def build_default_ability_registry(
 
     Embodied skills are intentionally not activated here. Their availability,
     confirmation policy, and execution contract come from the live provider
-    catalog and are validated by Skill Runtime. The static registry therefore
+    catalog and are validated by Trusted Capability Runtime. The static registry therefore
     cannot infer body capability from simulator, hardware, or dry-run settings.
     """
 
@@ -158,7 +126,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "cognition",
             "Ask a clarifying question when a task is underspecified.",
             status="available",
-            implementation="host_speech",
+            implementation="response_composer",
         ),
         AbilitySpec(
             "cognition.self_check_ability",
@@ -172,57 +140,49 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "speech",
             "Give an immediate acknowledgement before longer reasoning.",
             status="available",
-            implementation="host_tts",
-            speech_templates={
-                "en": "Okay, let me think about that.",
-                "zh": "好的，我想一下。",
-            },
+            implementation="model_authored_speech",
         ),
         AbilitySpec(
             "speech.answer",
             "speech",
             "Speak the final answer to the user.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "speech.confirm",
             "speech",
             "Confirm before executing a risky or physical request.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "speech.apologize_unavailable",
             "speech",
             "Explain that a requested ability is not available yet.",
             status="available",
-            implementation="host_tts",
-            speech_templates={
-                "en": DEFAULT_UNAVAILABLE_EN,
-                "zh": DEFAULT_UNAVAILABLE_ZH,
-            },
+            implementation="model_authored_speech",
         ),
         AbilitySpec(
             "speech.report_progress",
             "speech",
             "Report progress during a long task.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "speech.report_done",
             "speech",
             "Report that a task finished.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "speech.report_failure",
             "speech",
             "Report that a task failed or was refused.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "memory.remember_session_context",
@@ -272,8 +232,6 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "Blink Chromie's visible eyes as a social expression.",
             status="known_missing",
             implementation="missing_skill",
-            unavailable_en="I understand blinking, but I don't have an executable eye-blink skill available right now.",
-            unavailable_zh="我理解你想让我眨眼，但我现在没有可执行的眨眼技能。",
         ),
         AbilitySpec(
             "social.look_at_user",
@@ -325,14 +283,14 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "social",
             "Greet the user.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "social.goodbye",
             "social",
             "Close a conversation politely.",
             status="available",
-            implementation="host_tts",
+            implementation="response_composer_tts",
         ),
         AbilitySpec(
             "social.express_attention",
@@ -392,8 +350,6 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "Pick up a small object with a trusted manipulation skill.",
             status="known_missing",
             implementation="missing_skill",
-            unavailable_en="I understand picking things up, but I do not have a trusted grasping ability yet.",
-            unavailable_zh="我理解你想让我拿东西，但我现在还没有可信的抓取能力。",
         ),
         AbilitySpec(
             "manipulation.place_object",
@@ -470,7 +426,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "task",
             "Report the result of an action.",
             status="available",
-            implementation="host_speech",
+            implementation="response_composer",
         ),
         AbilitySpec(
             "safety.check_capability",
@@ -491,7 +447,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "safety",
             "Refuse unsafe or unsupported requests.",
             status="available",
-            implementation="host_speech",
+            implementation="response_composer",
         ),
         AbilitySpec(
             "state.report_robot_status",
@@ -515,12 +471,3 @@ def _set_status(
     **updates: Any,
 ) -> None:
     abilities[ability_id] = abilities[ability_id].with_updates(**updates)
-
-
-def _language_key(language: str | None, user_text: str) -> str:
-    normalized = (language or "").lower()
-    if normalized.startswith("zh"):
-        return "zh"
-    if any("\u4e00" <= ch <= "\u9fff" for ch in user_text):
-        return "zh"
-    return "en"

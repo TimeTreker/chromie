@@ -111,81 +111,17 @@ DEFAULT_RESET_PHRASES = (
     "清空会话",
 )
 
-DEFAULT_FOLLOWUP_PHRASES = (
-    "when",
-    "when will",
-    "how about",
-    "what about",
-    "did you",
-    "did it",
-    "is it",
-    "that one",
-    "this one",
-    "continue",
-    "go on",
-    "then",
-    "why",
-    "what do you mean",
-    "answer",
-    "result",
-    "it",
-    "that",
-    "them",
-    "him",
-    "her",
-    "什么时候",
-    "结果",
-    "查到了吗",
-    "好了没",
-    "继续",
-    "然后呢",
-    "为什么",
-    "什么意思",
-    "那个",
-    "这个",
-    "它",
-    "他",
-    "她",
-    "刚才",
-)
-
-DEFAULT_NEW_TOPIC_STARTERS = (
-    "check ",
-    "search ",
-    "look up ",
-    "tell me ",
-    "what is ",
-    "what's ",
-    "who is ",
-    "where is ",
-    "can you ",
-    "could you ",
-    "please ",
-    "turn ",
-    "move ",
-    "go ",
-    "查",
-    "搜索",
-    "帮我",
-    "告诉我",
-    "什么是",
-    "请",
-    "转",
-    "移动",
-    "去",
-)
-
 
 class ConversationStateManager:
     """Host-side short-term conversation state for Chromie.
 
-    This is not long-term memory. It keeps only recent turns and lightweight
-    pending-task hints in RAM so follow-up utterances can resolve references
-    such as "when will you give me the answer?" or "what about it?".
+    This is not long-term memory. It stores bounded recent turns, active Goal
+    snapshots, typed discourse referents, and evidence for LLM-owned reference
+    resolution. It does not classify follow-ups or new topics from user phrases.
 
     The orchestrator still creates one SID per VAD utterance. This manager adds
-    a separate conversation_id that can span many SIDs until a reset phrase or
-    idle timeout starts a new conversation.
+    a separate conversation_id that spans SIDs until an explicit reset command
+    or the deterministic hard-idle timeout starts a new conversation.
     """
 
     def __init__(
@@ -207,14 +143,12 @@ class ConversationStateManager:
         task_store_enabled: bool = False,
         task_store_path: str | os.PathLike[str] | None = None,
         reset_phrases: tuple[str, ...] = DEFAULT_RESET_PHRASES,
-        followup_phrases: tuple[str, ...] = DEFAULT_FOLLOWUP_PHRASES,
-        new_topic_starters: tuple[str, ...] = DEFAULT_NEW_TOPIC_STARTERS,
     ) -> None:
         self.base_conversation_id = base_conversation_id or "local_default"
         self.enabled = enabled
         self.max_turns = max(0, int(max_turns))
         self.soft_idle_timeout_sec = max(1, int(soft_idle_timeout_sec))
-        self.hard_idle_timeout_sec = max(self.soft_idle_timeout_sec, int(hard_idle_timeout_sec))
+        self.hard_idle_timeout_sec = max(1, int(hard_idle_timeout_sec))
         self.turn_max_text_chars = max(20, int(turn_max_text_chars))
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
@@ -227,8 +161,6 @@ class ConversationStateManager:
         self.task_store_path = self._resolve_task_store_path(task_store_path)
         self.last_task_store_error: str | None = None
         self.reset_phrases = tuple(p.lower() for p in reset_phrases)
-        self.followup_phrases = tuple(p.lower() for p in followup_phrases)
-        self.new_topic_starters = tuple(p.lower() for p in new_topic_starters)
 
         self._conversation_seq = 1
         self.conversation_id = self.base_conversation_id
@@ -286,8 +218,6 @@ class ConversationStateManager:
             task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
             task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
             reset_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_RESET_PHRASES"), DEFAULT_RESET_PHRASES),
-            followup_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_FOLLOWUP_PHRASES"), DEFAULT_FOLLOWUP_PHRASES),
-            new_topic_starters=_split_phrases(os.getenv("ORCH_CONVERSATION_NEW_TOPIC_STARTERS"), DEFAULT_NEW_TOPIC_STARTERS),
         )
 
     @staticmethod
@@ -2706,48 +2636,16 @@ class ConversationStateManager:
         if changed:
             self._pending_tasks = deque(retained, maxlen=max(1, self.max_pending_tasks))
 
-    def _contains_phrase(self, text: str, phrases: tuple[str, ...]) -> bool:
-        if not text:
-            return False
-        padded = f" {text} "
-        for phrase in phrases:
-            phrase = phrase.strip().lower()
-            if not phrase:
-                continue
-            # Chinese phrases and multi-word English phrases are safest with substring matching.
-            if re.search(r"[\u4e00-\u9fff]", phrase) or " " in phrase:
-                if phrase in text:
-                    return True
-            elif f" {phrase} " in padded or text == phrase:
-                return True
-        return False
-
     def is_explicit_reset(self, text: str | None) -> bool:
         # Conversation reset is an operational control, so require one explicit
-        # whole-utterance command. Goal cancellation, replacement, and phrases
-        # such as “never mind” or “算了” are semantic and must be resolved by
-        # Goal Association rather than clearing every active goal here.
+        # whole-utterance command. Goal cancellation, replacement, and ordinary
+        # discourse references remain model-authored.
         normalized = self._normalized(text).strip(" \t\r\n.,!?;:，。！？；：")
         return normalized in {
             phrase.strip().lower().strip(" \t\r\n.,!?;:，。！？；：")
             for phrase in self.reset_phrases
             if phrase.strip()
         }
-
-    def is_followup_reference(self, text: str | None) -> bool:
-        normalized = self._normalized(text)
-        if not normalized:
-            return False
-        if self._contains_phrase(normalized, self.followup_phrases):
-            return True
-        # Very short pronoun-like turns are usually context-dependent.
-        return normalized in {"it", "that", "this", "him", "her", "them", "那个", "这个", "它", "他", "她"}
-
-    def is_new_topic_like(self, text: str | None) -> bool:
-        normalized = self._normalized(text)
-        if not normalized:
-            return False
-        return any(normalized.startswith(prefix) for prefix in self.new_topic_starters)
 
     def start_new_conversation(self, *, reason: str, sid: str | None = None) -> dict[str, Any]:
         self._conversation_seq += 1
@@ -2771,11 +2669,11 @@ class ConversationStateManager:
         }
 
     def prepare_for_user_text(self, text: str | None, sid: str | None = None) -> dict[str, Any]:
-        """Decide whether this user turn starts a new conversation.
+        """Apply only deterministic conversation-boundary controls.
 
-        This does not record the current user text. It only performs boundary
-        detection so the context snapshot sent to the Cognitive Core contains previous
-        turns from the correct conversation, not the current turn duplicated.
+        Explicit whole-utterance reset and hard idle expiry are operational
+        controls. Follow-up, correction, and new-topic semantics are preserved
+        for Goal Association instead of being classified by Host phrases.
         """
         if not self.enabled:
             return {"started_new": False, "reason": "disabled", "conversation_id": self.conversation_id, "sid": sid}
@@ -2806,13 +2704,6 @@ class ConversationStateManager:
 
         if self._has_any_context() and idle_sec >= self.hard_idle_timeout_sec:
             return self.start_new_conversation(reason="hard_idle_timeout", sid=sid)
-
-        if self.is_followup_reference(normalized):
-            self.last_split_reason = "kept_followup_reference"
-            return {"started_new": False, "reason": "followup_reference", "conversation_id": self.conversation_id, "sid": sid}
-
-        if self._has_any_context() and idle_sec >= self.soft_idle_timeout_sec and self.is_new_topic_like(normalized):
-            return self.start_new_conversation(reason="soft_idle_new_topic", sid=sid)
 
         self.last_split_reason = "kept_default"
         return {"started_new": False, "reason": "kept_default", "conversation_id": self.conversation_id, "sid": sid}
@@ -3247,7 +3138,6 @@ class ConversationStateManager:
             "forgetting_policy": {
                 "explicit_reset_clears_history_and_tasks": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
-                "soft_idle_new_topic_timeout_sec": self.soft_idle_timeout_sec,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
                 "last_split_reason": self.last_split_reason,
             },
@@ -4372,7 +4262,7 @@ class ConversationStateManager:
                 planning_result="respond",
                 planned_skills=[
                     {
-                        "skill_id": "chromie.speak",
+                        "capability_id": "chromie.speak",
                         "request_id": request_id,
                         "source_goal_ids": [goal_id],
                     }
@@ -4393,7 +4283,7 @@ class ConversationStateManager:
             else:
                 item = {
                     "request_id": getattr(action, "request_id", None),
-                    "skill_id": getattr(action, "skill_id", None),
+                    "capability_id": getattr(action, "capability_id", None) or getattr(action, "skill_id", None),
                     "type": getattr(action, "type", None),
                     "target": getattr(action, "target", None),
                     "metadata": dict(getattr(action, "metadata", {}) or {}),

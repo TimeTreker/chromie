@@ -104,7 +104,7 @@
       }
     ],
     "skill_metadata_json_contains": ["social_attention_plan", "known_right_side"],
-    "metadata_json_contains": ["social_attention_plan", "social_attention_skills", "conversation_context"],
+    "metadata_json_contains": ["social_attention_plan", "social_attention_capability_ids", "conversation_context"],
     "requires_confirmation": false
   }
 }

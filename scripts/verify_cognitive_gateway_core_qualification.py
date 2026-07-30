@@ -122,11 +122,14 @@ def _target_goal_ids(event: dict[str, Any]) -> set[str]:
     return values
 
 
-def _terminal_skills(event: dict[str, Any]) -> list[str]:
+def _terminal_capabilities(event: dict[str, Any]) -> list[str]:
     terminal = event.get("terminal_plan")
     if not isinstance(terminal, dict):
         return []
-    return [str(item) for item in terminal.get("skill_ids") or []]
+    return [
+        str(item)
+        for item in (terminal.get("capability_ids") or terminal.get("skill_ids") or [])
+    ]
 
 
 def _validate_runtime_identity(
@@ -329,13 +332,27 @@ def _validate_turn(
             errors.append(
                 f"Core authority {actual_authority!r} != {expected_authority!r}"
             )
-        terminal_skills = _terminal_skills(runtime)
-        for skill in expectations.get("required_terminal_skills") or []:
-            if skill not in terminal_skills:
-                errors.append(f"required terminal skill {skill!r} is missing")
-        for skill in expectations.get("forbidden_terminal_skills") or []:
-            if skill in terminal_skills:
-                errors.append(f"forbidden repeated terminal skill {skill!r} was planned")
+        terminal_capabilities = _terminal_capabilities(runtime)
+        required_capabilities = (
+            expectations.get("required_terminal_capabilities")
+            or expectations.get("required_terminal_skills")
+            or []
+        )
+        for capability_id in required_capabilities:
+            if capability_id not in terminal_capabilities:
+                errors.append(
+                    f"required terminal capability {capability_id!r} is missing"
+                )
+        forbidden_capabilities = (
+            expectations.get("forbidden_terminal_capabilities")
+            or expectations.get("forbidden_terminal_skills")
+            or []
+        )
+        for capability_id in forbidden_capabilities:
+            if capability_id in terminal_capabilities:
+                errors.append(
+                    f"forbidden repeated terminal capability {capability_id!r} was planned"
+                )
 
     for context_type in expectations.get("required_context_reference_types") or []:
         if context_type not in set(gateway.get("context_reference_types") or []):
@@ -760,19 +777,26 @@ def verify(
                 and isinstance(cognitive.get("terminal_plan"), dict)
                 else {}
             )
-            terminal_skills = [str(item) for item in terminal.get("skill_ids") or []]
+            terminal_capabilities = [
+                str(item)
+                for item in (terminal.get("capability_ids") or terminal.get("skill_ids") or [])
+            ]
             minimum_skills = int(
                 simulator_expectations.get("minimum_terminal_skill_count") or 0
             )
-            if len(terminal_skills) < minimum_skills:
+            if len(terminal_capabilities) < minimum_skills:
                 errors.append(
                     "MuJoCo terminal plan contains "
-                    f"{len(terminal_skills)} skills; expected at least {minimum_skills}"
+                    f"{len(terminal_capabilities)} capabilities; expected at least {minimum_skills}"
                 )
-            for skill in simulator_expectations.get("required_terminal_skills") or []:
-                if skill not in terminal_skills:
+            for capability_id in (
+                simulator_expectations.get("required_terminal_capabilities")
+                or simulator_expectations.get("required_terminal_skills")
+                or []
+            ):
+                if capability_id not in terminal_capabilities:
                     errors.append(
-                        f"MuJoCo terminal plan is missing required skill {skill!r}"
+                        f"MuJoCo terminal plan is missing required capability {capability_id!r}"
                     )
             minimum_completed = int(
                 simulator_expectations.get("minimum_completed_soridormi_results") or 0

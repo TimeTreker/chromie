@@ -108,13 +108,16 @@ The same rule applies to ordinary chat history: bounded raw turns may be
 retained for traceability, but they should not become the default memory block
 for future prompts.
 
-When a request routes to `memory`, `memory_agent` emits a refined
-`extracted_memory` update. The host records that entry in process-local
-`session_memory.memory_summary` and `session_memory.extracted_memory`; the
-legacy raw `user_statement` remains compatibility evidence only.
-Structured updates with the same `scope`, `kind`, and `key` replace the prior
-entry, which lets explicit corrections revise prompt memory without stacking
-stale statements.
+When a request routes to `memory`, Goal Interpretation must author a typed
+`MemoryUpdateProposal` containing normalized session content, kind, optional
+key, ephemeral persistence policy, and confidence. `memory_agent` validates and
+applies that exact proposal; it does not infer memory kind or content from raw
+user text, keywords, or regular expressions. A missing proposal produces a
+clarification rather than a Host-authored guess. The Host records the resulting
+`extracted_memory` entry in process-local `session_memory.memory_summary` and
+`session_memory.extracted_memory`; the bounded `user_statement` entry remains
+compatibility evidence derived from the same proposal. Structured updates with
+the same `scope`, `kind`, and `key` replace the prior entry.
 
 This is separate from the durable mind and experience layer documented in
 [`chromie_mind.md`](chromie_mind.md). Session memory tracks the current
@@ -173,12 +176,17 @@ ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS=8
 ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=300
 ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
 ORCH_CONVERSATION_RESET_PHRASES=
-ORCH_CONVERSATION_NEW_TOPIC_STARTERS=
-ORCH_CONVERSATION_FOLLOWUP_PHRASES=
 ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC=180
 ORCH_ENABLE_TASK_CONTEXT_STORE=0
 ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
 ```
+
+
+Conversation boundaries are deliberately non-semantic. The Host accepts only an
+explicit whole-utterance reset command or the hard-idle timeout. It does not use
+follow-up phrases, pronoun lists, or new-topic starters; Goal Association owns
+those meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a compatibility
+configuration value but no longer authorizes phrase-based soft-idle splitting.
 
 Legacy `ORCH_CONTEXT_*` aliases remain accepted for compatibility. Use the
 current names in new deployments. Exact defaults and precedence are documented

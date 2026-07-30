@@ -520,8 +520,8 @@ class FastPlannerResolver:
                 f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
-                "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
-                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound skill and exact arguments and execute or retry it; never answer from another task's result. On a tool route, every top-level and per-goal response_text must be empty: do not greet, acknowledge, self-introduce, narrate a lookup, or predict the result. Response Composer owns optional pre-execution speech, and post-execution speech is produced only from evidence returned by an executed retrieval or external read. "
+                "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a capability, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
+                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. On a tool route, every top-level and per-goal response_text must be empty: do not greet, acknowledge, self-introduce, narrate a lookup, or predict the result. Response Composer owns optional pre-execution speech, and post-execution speech is produced only from evidence returned by an executed retrieval or external read. "
                 f"{argument_grounding_contract}"
                 f"{semantic_scope_contract}"
                 f"{IDENTITY_SEMANTIC_CONTRACT}"
@@ -539,7 +539,7 @@ class FastPlannerResolver:
                 "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
                 f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
                 f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
-                f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
+                f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
                 "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
                 f"{validation_errors or '[]'}\n"
                 "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
@@ -557,9 +557,9 @@ class FastPlannerResolver:
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent weather, temperature, status, price, schedule, or another external result from model memory or from index metadata. "
             "There are exactly two legal output shapes for one or many goals. A terminal plan uses coverage=complete, a goal_outcomes entry keyed exactly once by every canonical Goal ID, and non-null prospective satisfaction. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], one escalate outcome for every canonical Goal ID, non-exact prospective satisfaction, and a specific non-empty escalation_reason. "
-            "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the complete model-authored semantic-escalation shape; never return an empty outcome map or null satisfaction. "
+            "Finding one matching capability is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the complete model-authored semantic-escalation shape; never return an empty outcome map or null satisfaction. "
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "
-            "For complete direct execution, use exact supplied skill IDs and schema-valid args. "
+            "For complete direct execution, use exact supplied capability IDs and schema-valid args. "
             f"{argument_grounding_contract}"
             f"{semantic_scope_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
@@ -567,7 +567,7 @@ class FastPlannerResolver:
             f"{route_effect_contract}"
             f"{concise_output_contract}"
             "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
-            "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "
+            "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
             "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
             "For every terminal or escalation result, goal_outcomes must be keyed exactly once by every supplied canonical Goal ID. Each execute outcome needs its real step_ids; each respond outcome needs non-empty response_text and step_ids=[]; each escalation outcome needs its unresolved reason and non-exact satisfaction. "
             "Valid examples: execute uses owned steps and execute outcomes; mixed uses owned steps plus respond outcomes; escalation uses steps=[], one escalate outcome per Goal, and non-null non-exact goal_satisfaction. "
@@ -577,7 +577,7 @@ class FastPlannerResolver:
             "Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
-            f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
+            f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
             "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
             f"{validation_errors or '[]'}\n"
             "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
@@ -793,13 +793,13 @@ class FastPlannerResolver:
                 metadata={**counts},
             )
         for step in plan.steps:
-            capability = allowed.get(step.skill_id)
+            capability = allowed.get(step.capability_id)
             if capability is None:
                 return self._escalation(
                     plan.plan_id,
                     request,
                     "step_not_in_executable_common_catalog",
-                    unresolved=[step.skill_id],
+                    unresolved=[step.capability_id],
                     metadata={**counts},
                 )
         metadata = dict(plan.metadata)

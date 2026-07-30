@@ -13,6 +13,21 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 - Added grounded external-information and weather methods while preserving Goal
   Association, verified-memory, Capability, Provider, and Soridormi authority.
 
+### Final core-principle audit closure
+
+- Removed Host-owned conditional deep-thinking delegation, re-enableable
+  phrase/regex motion and pose agents, catalog phrase-action boosts, weather-
+  specific route repair, and conversation follow-up/new-topic phrase classifiers.
+- Made session-memory meaning an exact typed model proposal and routed the legacy
+  weather ToolAgent through the common trusted local-tool boundary.
+- Removed Host-authored semantic correction, route-specific Core exception
+  classification, ontology speech templates, and default deep-thinking wording.
+- Completed canonical `capability_id`/`capability_ids` output across remaining
+  current model, Plan, API, task-proposal, trace, scenario, and qualification
+  contracts while retaining bounded historical readers.
+- Extended the executable repository policy gate to protect the corrected
+  semantic-authority, wording, conversation, Provider, and identity boundaries.
+
 ### Runtime and repository safeguards
 
 - Canonicalized executable `capability_id` terminology with bounded legacy

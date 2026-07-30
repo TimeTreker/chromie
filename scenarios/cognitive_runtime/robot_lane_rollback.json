@@ -37,7 +37,7 @@
     "planner_tier": "fast",
     "disposition": "execute",
     "coverage": "complete",
-    "skill_ids": [],
+    "capability_ids": [],
     "requires_confirmation": false,
     "calls": ["goal_association", "fast_plan", "response_composer"]
   }

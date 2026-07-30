@@ -137,16 +137,16 @@ may declare the expected model stage and a compact decision:
       "stage": "quick_intent",
       "decision": {
         "route": "chat",
-        "intent": "weather_query",
-        "confidence": 0.95
+        "intent": "clarify",
+        "confidence": 0.90
       }
     },
     {
       "stage": "semantic_route_repair",
       "decision": {
-        "route": "robot_action",
-        "intent": "capability:soridormi.walk_velocity",
-        "confidence": 0.97
+        "route": "clarify",
+        "intent": "ambiguous_reference",
+        "confidence": 0.85
       }
     }
   ]

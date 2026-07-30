@@ -764,7 +764,7 @@ services = AgentServices(
     task_graph_planner=task_graph_planner,
     capability_catalog=capability_catalog,
     capability_match_limit=settings.capability_match_limit,
-    weather_client=weather_client,
+    local_tool_executor=local_tool_executor,
     tool_result_interpreter=tool_result_interpreter,
 )
 runtime = AgentRuntime(services)
@@ -1060,8 +1060,6 @@ async def agents() -> dict:
         "agents": runtime.available_agents(),
         "notes": {
             "speaker_agent": "decides wording/style only; it does not access audio devices",
-            "robot_pose_controller_agent": "legacy compatibility parser; disabled unless context.allow_legacy_rule_agents=true",
-            "motion_planner_agent": "legacy compatibility parser; disabled unless context.allow_legacy_rule_agents=true",
             "safety_agent": "validates and clamps risky actions",
         },
     }

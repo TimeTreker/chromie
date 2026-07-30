@@ -21,6 +21,35 @@ do so.
 
 The final closure audit also removed stale 8091 developer-tool/configuration contracts, integrated-container tests, Router-named metadata/provenance fields, and unused Host-authored weather acknowledgement composition. The maintained full test entrypoint and Benchmark checks must pass before the Social Attention benchmark expansion begins.
 
+## Completed final core-principle audit
+
+The post-plan audit found and corrected remaining code/architecture drift rather
+than treating plan completion as proof of principle compliance:
+
+- removed Host-owned conditional deep-thinking delegation and re-enableable
+  phrase/regex motion and pose agents;
+- made memory meaning a typed model-authored proposal;
+- removed catalog phrase-action boosts, weather-specific Host route repair, and
+  conversation follow-up/new-topic phrase classification;
+- routed the legacy weather ToolAgent through the common trusted local-tool
+  boundary instead of a direct Provider call;
+- removed Host-authored semantic correction, route-specific Core exception
+  classification, static ontology speech templates, and fixed deep-thinking
+  wording;
+- completed canonical `capability_id`/`capability_ids` output across current
+  prompts, DTOs, task proposals, traces, scenarios, and qualification artifacts,
+  while retaining bounded historical readers;
+- strengthened the canonical repository policy checker so these boundaries fail
+  closed if reintroduced.
+
+The audit found no maintained Benchmark path implementing semantic answers or
+runtime policy, and no current Chromie semantic branch depending on simulator
+versus physical backend identity. See
+[Final Core-Principle Audit](docs/FINAL_CORE_PRINCIPLE_AUDIT.md).
+
+No named implementation Issue is reopened. Remaining work is retained target
+evidence under the owning qualification documents.
+
 ## Open evidence issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
 
 The Goal-Driven Cognitive Turn Loop and the Gateway/Core code migration are now
@@ -328,7 +357,7 @@ Earlier incremental work is represented by two completed capability foundations:
 | Foundation | Included outcomes | State |
 |---|---|---|
 | Realtime interaction foundation | Five-service runtime, host audio/VAD/playback, deterministic routing, contracts, generated configuration, GPU and target tooling | Implemented and automatically verified; some target evidence remains open |
-| Structured embodiment foundation | Native interaction, Skill Runtime, Soridormi named skills, TaskGraphs, confirmation, cancellation, bounded scheduling, traces, and MuJoCo integration | Implemented and automatically verified locally and in simulation |
+| Structured embodiment foundation | Native interaction, Trusted Capability Runtime, Soridormi named capabilities, TaskGraphs, confirmation, cancellation, bounded scheduling, traces, and MuJoCo integration | Implemented and automatically verified locally and in simulation |
 
 Historical Git commits retain their original messages. Current source, tests,
 documentation, and evidence indexes use capability- and issue-oriented names.
@@ -338,7 +367,7 @@ documentation, and evidence indexes use capability- and issue-oriented names.
 ### Objective
 
 Prove the deterministic text-input path through Goal Interpretation, native `/interaction`,
-trusted Skill Runtime, Soridormi named skills, MuJoCo execution, and safe-idle
+Trusted Capability Runtime, Soridormi named capabilities, MuJoCo execution, and safe-idle
 recovery.
 
 This phase is complete. The retained `text-mujoco` evidence proves a compound
@@ -493,7 +522,7 @@ Exit criteria before treating this as a complete smart merge layer:
 - static host preflight records schema/provider/availability/confirmation
   status without pretending to prove real-world feasibility;
 - effectful proposals never execute until committed and authorized through the
-  trusted Skill Runtime;
+  Trusted Capability Runtime;
 - later-stage corrections can produce concise user-facing repair speech without
   claiming unverified execution;
 - retained traces and experience summaries expose proposal, commit, execution,
@@ -591,7 +620,7 @@ Exit criteria before treating the Gateway/Core migration as complete:
 The complete manager-owned lifecycle is defined in
 [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md). Its host/runtime baseline is
 implemented around Goal Association, Fast/terminal Deep planning, canonical
-validation, confirmation, prospective composition, Skill Runtime, tools,
+validation, confirmation, prospective composition, Trusted Capability Runtime, tools,
 memory, and Soridormi integration:
 
 1. the versioned `UserTurnEnvelope` and behavior-preserving Core compatibility
@@ -749,8 +778,7 @@ authored selection and progressive disclosure. It does **not** add arbitrary
 script execution, automatic provider registration, a second execution registry,
 or a package-install command. Typed capability manifests, live provider schemas,
 Trusted Capability Runtime, and Soridormi remain execution-authoritative.
-Current code may retain the legacy Skill Runtime name during compatibility
-migration. Third-party
+Internal compatibility aliases may retain legacy Skill Runtime names, but current model-facing and evidence contracts use Trusted Capability Runtime terminology. Third-party
 installation and broader interoperability remain deferred until a concrete use
 case and explicit review justify them.
 
@@ -788,7 +816,7 @@ conformance must be designed and verified together.
   result, cancellation races, and safe user-facing fallback;
 - define repeatable scenario batches and thresholds for success, timeout,
   cancellation latency, and safe idle;
-- stabilize versioned named-skill request, progress, terminal status, and error
+- stabilize versioned named-capability request, progress, terminal status, and error
   semantics;
 - define provider conformance tests shared by simulator and physical backends;
 - add shadow and dry-run commissioning modes;
@@ -1055,7 +1083,7 @@ lane-gated `apply`. PR8 makes the unified runtime the single semantic authority
 for applied lanes, constrains Goal Association at the model boundary, and
 reduces the old CapabilityAgent planner to a gated emergency path requiring a
 non-empty matching-turn claim. All applied plans still pass existing trusted
-preparation, confirmation, Skill Runtime, and provider boundaries. Goal-state
+preparation, confirmation, Trusted Capability Runtime, and provider boundaries. Goal-state
 updates are atomic, and technical failures after authority acquisition fail
 closed rather than becoming hidden success or a second semantic plan.
 Operational details and evidence commands are maintained in

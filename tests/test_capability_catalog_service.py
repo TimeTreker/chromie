@@ -479,7 +479,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    async def test_chinese_blink_query_ranks_live_blink_skill_first(self) -> None:
+    async def test_chinese_blink_query_returns_context_without_host_rule_match(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 
         result = await catalog.search(
@@ -488,11 +488,16 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             prefer_interaction_executable=True,
         )
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.suggested_route, "robot_action")
-        self.assertEqual(result.matches[0].capability_id, "soridormi.blink_eyes")
-        self.assertGreaterEqual(result.matches[0].score, 0.80)
-        self.assertFalse(result.matches[0].requires_confirmation)
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        self.assertTrue(
+            any(
+                match.capability_id == "soridormi.blink_eyes"
+                and match.interaction_executable
+                and not match.requires_confirmation
+                for match in result.matches
+            )
+        )
 
     async def test_prefers_relevant_executable_skill_over_planning_only_tool(self) -> None:
         catalog = CapabilityCatalog(

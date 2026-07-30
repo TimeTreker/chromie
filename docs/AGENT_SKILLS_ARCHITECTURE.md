@@ -1,8 +1,9 @@
 # Agent Skills Architecture
 
-Status: Accepted architecture with canonical Capability terminology, passive
+Status: Implemented architecture with canonical Capability terminology, passive
 contracts/Loader, model-authored selection, Agent-specific progressive
-disclosure, and Canonical Plan provenance implemented; domain Skills remain open
+disclosure, Canonical Plan provenance, and the grounded-information/weather
+domain Skills implemented; positive live evidence remains open
 Scope: Goal-Driven Cognitive Core, Agent roles, reusable cognitive methods,
 planning, capability execution, and evidence
 
@@ -132,9 +133,11 @@ or useful, but that declaration does not register or authorize the capability.
 
 ## Canonical naming and compatibility migration
 
-The current runtime historically uses `skill_id`, `SkillRequest`, `SkillResult`,
-“named skill”, and “Trusted Skill Runtime” for executable capabilities. For
-example:
+Earlier retained artifacts and Provider-native compatibility boundaries used
+`skill_id`, `SkillRequest`, `SkillResult`, “named skill”, and “Trusted Skill
+Runtime” for executable Capabilities. New model-facing and current evidence
+contracts use canonical Capability terminology. A historical payload may look
+like:
 
 ```json
 {
@@ -189,10 +192,10 @@ repository-wide textual replacement:
 - the rename changes readability only and must not change registry, policy,
   confirmation, provider, or physical-safety authority.
 
-This terminology migration is the first implementation slice before Agent Skill
-selection is added. Otherwise `selected_agent_skills` and executable `skill_id`
-would coexist in the same Plan and preserve the ambiguity this architecture is
-intended to remove.
+This terminology migration was completed before Agent Skill selection was
+enabled. Current Canonical Plans therefore distinguish content-free
+`selected_agent_skills` provenance from executable `capability_id` steps.
+Bounded compatibility readers do not make legacy names canonical again.
 
 ## Architectural principles
 
@@ -218,7 +221,7 @@ Allowed:
 ```text
 retrieve bounded candidate summaries
 → Agent evaluates current Goal and context
-→ Agent emits typed selected_skill_ids
+→ Agent emits typed selected Agent Skill IDs
 → Host validates that those IDs and versions exist
 ```
 
