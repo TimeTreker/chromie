@@ -13,3 +13,4 @@ websockets==16.0
 PyYAML==6.0.3
 
 ruff==0.16.0
+mypy==2.3.0

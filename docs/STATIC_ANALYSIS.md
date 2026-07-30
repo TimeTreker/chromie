@@ -38,3 +38,22 @@ python -m pip install -r requirements-test.txt
 
 Passing this gate is implementation evidence only. It does not establish live,
 hardware, or release qualification.
+
+## Mypy
+
+The maintained Mypy version is pinned in `requirements-test.txt`. The gate runs:
+
+```bash
+python scripts/run_mypy.py
+```
+
+`config/mypy_scope.txt` is a smaller, monotonic ratchet over selected clean
+contracts and tooling boundaries. `mypy.ini` requires complete function
+annotations, checks untyped bodies, forbids implicit optional values, and reports
+unsafe `Any` returns and stale ignores. It does not skip imports or enable a
+whole-tree error suppression.
+
+A checked path may leave the ratchet only through a separate reviewed
+architecture change. New modules should enter once their real optionality,
+containers, callables, and async return types are clean; broad `Any` conversion
+is not an accepted migration strategy.

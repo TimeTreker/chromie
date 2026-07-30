@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Incremental Mypy enforcement
+
+- Pinned Mypy 2.3.0 and added a monotonic initial scope over selected shared
+  contracts and dependency-light tooling boundaries.
+- Added a version- and scope-validating runner with complete-definition, implicit
+  optional, return-Any, stale-ignore, and strict-equality checks without skipping
+  imports or suppressing whole modules.
+- Wired the same type-check command after Ruff in the maintained test entrypoint
+  and added focused tests for scope drift, version drift, configuration weakening,
+  dependency pinning, and gate order.
+
 ## Unreleased — High-signal Ruff enforcement
 
 - Pinned Ruff 0.16.0 and added an explicit defect-oriented rule set covering

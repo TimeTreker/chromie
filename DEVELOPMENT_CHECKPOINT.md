@@ -62,7 +62,8 @@ are implemented and automatically verified. The repository-owned root contains
 the two approved passive methods with all five role projections; execution still
 depends only on registered `capability_id` steps. Positive live selection and
 live weather execution remain target evidence. The high-signal Ruff ratchet is implemented and wired into the maintained gate.
-The next active code Issue is **Establish Incremental Type Checking**.
+The incremental Mypy ratchet is implemented after Ruff in the maintained gate.
+The next active code Issue is **Modernize Behavioral and Architecture Tests**.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for

@@ -10,6 +10,7 @@ fi
 
 python scripts/check_repository_policies.py
 python scripts/run_ruff.py
+python scripts/run_mypy.py
 python scripts/check_docs.py
 
 python -m unittest discover -s tests -v

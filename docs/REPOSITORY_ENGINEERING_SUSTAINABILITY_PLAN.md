@@ -113,8 +113,8 @@ The following recommendations are not part of the current program:
 | Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
 | Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
-| Establish Incremental Type Checking | active | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
-| Modernize Behavioral and Architecture Tests | queued | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
+| Establish Incremental Type Checking | implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
+| Modernize Behavioral and Architecture Tests | active | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | queued | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | queued | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
 | Consolidate Current Documentation Authority | queued | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
@@ -379,6 +379,16 @@ high-noise and risky; selected clean boundaries can provide value immediately.
 - third-party gaps use narrow stubs or documented boundaries;
 - CI executes the same type-check command;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+Mypy 2.3.0 is pinned in the test dependency boundary. `mypy.ini` enforces
+complete definitions, typed bodies, explicit optionality, return-Any warnings,
+stale-ignore warnings, and strict equality without skipping imports.
+`config/mypy_scope.txt` is a sorted, duplicate-free monotonic ratchet over
+selected shared contracts and tooling boundaries. `scripts/run_mypy.py` validates
+the executable version and scope before invoking Mypy, and the maintained test
+entrypoint runs it after Ruff. No whole-module ignore baseline was introduced.
 
 Suggested commit:
 

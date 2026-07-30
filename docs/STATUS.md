@@ -34,14 +34,14 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Establish Incremental Type Checking.** The
+**Active implementation issue:** **Modernize Behavioral and Architecture Tests.** The
 Agent Skills implementation track is code-complete: the repository-owned root now
 contains the owner-approved `chromie.grounded-external-information` base method
 and `chromie.weather-information` specialization, each with bounded projections
 for all five maintained Agent roles.
 
-The Ruff gate now pins an explicit high-signal rule set and a monotonic initial
-source scope; it is part of the maintained test entrypoint. The methods preserve
+The Ruff and Mypy gates now pin explicit versions and monotonic initial source
+scopes; both are part of the maintained test entrypoint. The methods preserve
 authoritative Goal bindings, exact verified-memory versus
 fresh lookup, freshness, pre-evidence speech truth, typed failure interpretation,
 canonical weather location/time/aspect scope, and natural grounded result
@@ -64,7 +64,7 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,615 primary
+The maintained `./scripts/run_tests.sh` entrypoint now passes 1,622 primary
 tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,
