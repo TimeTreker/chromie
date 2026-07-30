@@ -11,6 +11,7 @@ scipy==1.17.0
 uvicorn[standard]==0.46.0
 websockets==16.0
 PyYAML==6.0.3
+Unidecode==1.4.0
 
 ruff==0.16.0
 mypy==2.3.0

@@ -27,6 +27,7 @@ from .planner_contract import (
     materialize_planner_metadata,
     planner_contract_diagnostics,
     validate_explicit_numeric_parameter_grounding,
+    validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_planner_model_output,
 )
@@ -243,6 +244,10 @@ class FastPlannerResolver:
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
                 )
+                validate_external_response_evidence_boundary(
+                    validated_model_output,
+                    context=request.context,
+                )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
                 logger.warning(
@@ -360,7 +365,7 @@ class FastPlannerResolver:
             if not isinstance(outcome, dict):
                 return schema
             disposition = outcome.get("disposition")
-            if disposition not in {"execute", "respond", "escalate"}:
+            if disposition not in {"execute", "respond", "clarify", "escalate"}:
                 return schema
             dispositions.append(disposition)
         disposition_set = set(dispositions)
@@ -370,6 +375,8 @@ class FastPlannerResolver:
             aggregate = "respond"
         elif disposition_set == {"execute", "respond"}:
             aggregate = "mixed"
+        elif disposition_set == {"clarify"}:
+            aggregate = "clarify"
         elif disposition_set == {"escalate"}:
             aggregate = "escalate"
         else:

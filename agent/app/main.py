@@ -306,7 +306,7 @@ class Settings(BaseModel):
     )
     agent_skill_selection_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_TIMEOUT_MS", "3000")
+            os.getenv("AGENT_SKILL_SELECTION_TIMEOUT_MS", "10000")
         ),
         ge=100,
         le=120000,
@@ -334,13 +334,13 @@ class Settings(BaseModel):
     )
     agent_skill_selection_num_ctx: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_NUM_CTX", "4096")
+            os.getenv("AGENT_SKILL_SELECTION_NUM_CTX", "8192")
         ),
         ge=512,
     )
     agent_skill_selection_num_predict: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_NUM_PREDICT", "384")
+            os.getenv("AGENT_SKILL_SELECTION_NUM_PREDICT", "512")
         ),
         ge=32,
         le=4096,

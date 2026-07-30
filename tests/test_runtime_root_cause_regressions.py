@@ -125,7 +125,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             fast["properties"]["disposition"]["enum"],
-            ["execute", "escalate"],
+            ["execute", "clarify", "escalate"],
         )
         self.assertEqual(
             fast["properties"]["response_text"]["maxLength"],
@@ -134,7 +134,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         fast_outcome = fast["properties"]["goal_outcomes"]["properties"]["goal-weather"]
         self.assertEqual(
             fast_outcome["properties"]["disposition"]["enum"],
-            ["execute", "escalate"],
+            ["execute", "clarify", "escalate"],
         )
         self.assertEqual(
             fast_outcome["properties"]["response_text"]["maxLength"],

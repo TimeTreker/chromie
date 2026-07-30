@@ -4,7 +4,11 @@ import asyncio
 import unittest
 
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app.planner_contract import validate_planner_model_output
+from agent.app.planner_contract import (
+    PlannerModelOutput,
+    validate_external_response_evidence_boundary,
+    validate_planner_model_output,
+)
 from agent.app.schema import AgentRunRequest, RouteDecision
 from agent.app.capabilities.catalog import CatalogCapability
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -292,6 +296,118 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
 
 
+
+    def test_fast_clarification_is_a_terminal_valid_outcome(self):
+        raw = {
+            "disposition": "clarify",
+            "coverage": "partial",
+            "confidence": 0.9,
+            "goal_summary": "Clarify the requested place.",
+            "response_text": "Which place do you mean?",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": ["location"],
+            "parameter_resolutions": [],
+            "goal_outcomes": {
+                "goal-place": {
+                    "disposition": "clarify",
+                    "coverage": "partial",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [],
+                    "satisfaction": {
+                        "score": 0.0,
+                        "status": "partial",
+                        "satisfied_goal_ids": [],
+                        "unmet_goal_ids": ["goal-place"],
+                        "unmet_requirements": ["location"],
+                        "rationale": "The location is unresolved.",
+                    },
+                    "rationale": "The location is unresolved.",
+                }
+            },
+            "goal_satisfaction": {
+                "score": 0.0,
+                "status": "partial",
+                "satisfied_goal_ids": [],
+                "unmet_goal_ids": ["goal-place"],
+                "unmet_requirements": ["location"],
+                "rationale": "The location is unresolved.",
+            },
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw, planner_tier="fast", expected_goal_ids_for_turn=["goal-place"]
+        )
+        self.assertEqual(output.disposition, "clarify")
+        self.assertEqual(
+            output.goal_outcomes["goal-place"].response_text,
+            "Which place do you mean?",
+        )
+        self.assertEqual(output.goal_satisfaction.status, "unsatisfied")
+
+    def test_unresolved_safe_read_cannot_become_direct_factual_response(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "respond",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "response_text": "It rained 2 mm.",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-weather": {
+                        "disposition": "respond",
+                        "coverage": "complete",
+                        "response_text": "It rained 2 mm.",
+                        "unresolved": [],
+                        "step_ids": [],
+                        "satisfaction": {
+                            "score": 1.0,
+                            "status": "exact",
+                            "satisfied_goal_ids": ["goal-weather"],
+                            "unmet_goal_ids": [],
+                            "unmet_requirements": [],
+                            "rationale": "Claims a weather result.",
+                        },
+                        "rationale": "Claims a weather result.",
+                    }
+                },
+                "goal_satisfaction": {
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-weather"],
+                    "unmet_goal_ids": [],
+                    "unmet_requirements": [],
+                    "rationale": "Claims a weather result.",
+                },
+            }
+        )
+        context = {
+            "active_goal_snapshots": [
+                {
+                    "goal_id": "goal-weather",
+                    "metadata": {
+                        "execution_binding": {
+                            "execution_outcome_status": "failed",
+                            "retryable_safe_read": True,
+                            "planned_skills": [
+                                {
+                                    "capability_id": "chromie.weather.lookup",
+                                    "safety_class": "safe_read",
+                                    "retryable_safe_read": True,
+                                }
+                            ],
+                        }
+                    },
+                }
+            ]
+        }
+        with self.assertRaisesRegex(
+            ValueError, "external_read_response_requires_completed_or_verified_evidence"
+        ):
+            validate_external_response_evidence_boundary(output, context=context)
+
     def test_chat_route_schema_is_response_only(self):
         raw = {
             "disposition": "respond",
@@ -313,7 +429,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
         self.assertEqual(
             schema["properties"]["disposition"]["enum"],
-            ["respond", "escalate"],
+            ["respond", "clarify", "escalate"],
         )
         self.assertIn("response_text", schema["required"])
         self.assertIn("escalation_reason", schema["required"])

@@ -42,16 +42,7 @@ but a separate focused classifier owns ambient suppression. Do not emit ignore
 here. Direct speech and active engagement are addressed. Informal or imperfect
 speech remains normal semantic input.
 
-Tool And Affordance Proposal: when the user needs current external facts, select an available trusted lookup capability from the whole meaning, context, and capability descriptions. Do not infer changing facts from memory, and do not map a topic keyword to a fixed route, intent, or tool. Catalog entries are a body/tool affordance interface,
-not a phrase table: candidate proposals, not authoritative grounding or
-authorization. Bind an exact
-capability in the quick route only when the user explicitly requests that method and
-one listed capability clearly matches. Outcome requests with multiple methods,
-missing context, or role/permission/world dependence use deep_thought and retain
-an open semantic goal. One parameterized direct capability may leave args to
-CapabilityAgent. Compound explicit listed capabilities use ordered actions[] with exact
-capability_id values only when schema-compatible; otherwise leave actions[] out
-so CapabilityAgent can plan from the original text and semantic goal.
+Tool And Affordance Proposal: for current external facts, choose an available trusted lookup capability from meaning and context. When one lookup exactly matches, emit route=tool and intent=capability:<exact capability_id>, never a domain label; do not map a topic keyword to a tool. Catalog entries are a body/tool affordance interface: candidate proposals, not authoritative grounding or execution authority, and not a phrase table. Bind one clear match; compound explicit capabilities may use ordered actions[]. Otherwise preserve the semantic goal for CapabilityAgent rather than inventing args, methods, or abilities.
 
 Safety And Output Contract: never claim physical execution/completion, invent
 abilities/agents, or output raw motor, joint, actuator, controller-array,

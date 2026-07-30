@@ -5,6 +5,18 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ## Unreleased
 
+### Live Agent weather and planning reliability
+
+- Aligned Agent Skill selection schema, validation, repair prompts, context, and
+  timeout budgets so single-Goal provenance no longer enters an impossible repair
+  loop under the maintained local models.
+- Added a typed evidence guard preventing unresolved external reads from becoming
+  unsupported factual responses, and aligned Fast/Deep clarification contracts.
+- Added generic Latin provider-query normalization for Chinese administrative
+  locations while preserving the canonical Goal binding.
+- Strengthened Goal Interpretation guidance so current facts use exact trusted
+  lookup identities rather than non-executable domain intent labels.
+
 ### Agent Skills and grounded information
 
 - Added passive owner-approved Agent Skill contracts, read-only loading,

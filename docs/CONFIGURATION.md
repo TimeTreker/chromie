@@ -535,12 +535,12 @@ retained. See
 | `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
-| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
+| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `512`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. A legacy simulator-scoped input is migrated to `on` at the environment boundary. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `CHROMIE_SOCIAL_ATTENTION_MODE` | Optional host-launcher override with the same `off`, `report_only`, or `on` semantics. It is never a body-backend selector. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
-| `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `4096`. |
+| `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `8192`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
@@ -552,7 +552,7 @@ retained. See
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
 | `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
-| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `3000`. |
+| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
 | `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, Deep Planner, Response Composer, and Tool Result Interpreter; default `1`. |
@@ -560,8 +560,8 @@ retained. See
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
 | `AGENT_SKILL_SELECTION_MIN_CONFIDENCE` | Minimum accepted overall and per-Skill confidence for a positive selection; default `0.55`. Explicit `no_skill` remains valid. |
-| `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection prompt; default `4096`. |
-| `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for selection and one repair; default `384`. |
+| `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection and one compact repair prompt; default `8192`. |
+| `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for selection and one repair; default `512`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |

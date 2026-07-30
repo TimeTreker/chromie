@@ -5,3 +5,4 @@ mcp==1.27.2
 pydantic==2.13.3
 orjson==3.11.8
 PyYAML==6.0.3
+Unidecode==1.4.0

@@ -33,6 +33,7 @@ from .planner_contract import (
     materialize_goal_outcomes,
     materialize_planner_metadata,
     planner_contract_diagnostics,
+    validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_planner_model_output,
 )
@@ -559,6 +560,10 @@ class DeepPlannerResolver:
         validate_goal_binding_argument_grounding(
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
+        )
+        validate_external_response_evidence_boundary(
+            model_output,
+            context=request.context,
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)

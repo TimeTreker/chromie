@@ -251,6 +251,52 @@ class AgentSkillSelectionTests(unittest.TestCase):
         self.assertEqual(selected.projection, "fast_planner")
         self.assertNotIn("content", selected.model_dump())
 
+
+    def test_single_goal_selection_omission_is_identity_normalized_without_repair(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            summary = self._registry(root).list_summaries()[0]
+            model = ScriptedModel(
+                [
+                    {
+                        "decision": "select_skills",
+                        "selected_agent_skills": [
+                            {
+                                "agent_skill_id": summary.agent_skill_id,
+                                "version": summary.version,
+                                "projection": "fast_planner",
+                                "rationale": "Weather method matches the sole Goal.",
+                                "confidence": 0.93,
+                            }
+                        ],
+                        "confidence": 0.93,
+                        "reason_summary": "Use the weather method.",
+                    }
+                ]
+            )
+            result = asyncio.run(
+                AgentSkillSelectionService(model, self._registry(root)).select(
+                    self._request()
+                )
+            )
+
+        self.assertEqual(len(model.prompts), 1)
+        self.assertFalse(result.contract_repair_attempted)
+        self.assertEqual(
+            result.selected_agent_skills[0].relevant_goal_ids,
+            ("goal-1",),
+        )
+        item_schema = (
+            model.prompts[0][1]["response_format"]["$defs"]
+            ["AgentSkillSelectionModelItem"]
+        )
+        self.assertIn("relevant_goal_ids", item_schema["required"])
+        self.assertEqual(
+            item_schema["properties"]["relevant_goal_ids"]["minItems"],
+            1,
+        )
+
     def test_model_can_select_multiple_skills_in_authored_order(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

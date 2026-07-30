@@ -58,8 +58,8 @@ class AgentSkillSelectionService:
         max_candidates: int = 12,
         max_selected: int = 4,
         min_confidence: float = 0.55,
-        num_ctx: int = 4096,
-        num_predict: int = 384,
+        num_ctx: int = 8192,
+        num_predict: int = 512,
     ) -> None:
         if max_candidates < 1:
             raise ValueError("max_candidates must be positive")
@@ -154,7 +154,7 @@ class AgentSkillSelectionService:
             )
         except Exception as exc:
             failure = llm_failure_metadata(exc)
-            logger.exception(
+            logger.warning(
                 "agent_skill_selection_model_unavailable sid=%s turn_id=%s role=%s "
                 "failure_class=%s failure_domain=%s error_type=%s error=%s",
                 request.sid,
@@ -218,7 +218,7 @@ class AgentSkillSelectionService:
             return resolution
         except Exception as exc:
             failure = llm_failure_metadata(exc)
-            logger.exception(
+            logger.warning(
                 "agent_skill_selection_contract_failed sid=%s turn_id=%s role=%s "
                 "failure_class=%s failure_domain=%s error_type=%s error=%s",
                 request.sid,
@@ -355,24 +355,25 @@ class AgentSkillSelectionService:
                     f"Agent Skill {item.agent_skill_id!r} does not expose "
                     f"projection {item.projection!r}"
                 )
-            if (
-                request.agent_role in {"fast_planner", "deep_planner"}
-                and allowed_goal_ids
-                and not item.relevant_goal_ids
-            ):
-                raise ValueError(
-                    "planner Agent Skill selections require explicit relevant_goal_ids"
-                )
-            unknown_goal_ids = set(item.relevant_goal_ids) - allowed_goal_ids
+            relevant_goal_ids = item.relevant_goal_ids
+            if request.goals and not relevant_goal_ids:
+                if len(request.goals) == 1:
+                    # The model already authored the Skill choice. Binding that
+                    # choice to the sole authoritative Goal is identity
+                    # normalization, not a semantic selection or Host routing
+                    # decision. Multi-Goal turns still require explicit model
+                    # ownership.
+                    relevant_goal_ids = (request.goals[0].goal_id,)
+                else:
+                    raise ValueError(
+                        "multi-Goal Agent Skill selections require explicit "
+                        "relevant_goal_ids"
+                    )
+            unknown_goal_ids = set(relevant_goal_ids) - allowed_goal_ids
             if unknown_goal_ids:
                 raise ValueError(
                     "selection references unknown Goal IDs: "
                     + ", ".join(sorted(unknown_goal_ids))
-                )
-            if request.goals and not item.relevant_goal_ids:
-                raise ValueError(
-                    f"Agent Skill {item.agent_skill_id!r} must identify at least "
-                    "one relevant Goal ID"
                 )
             if item.confidence < self.min_confidence:
                 raise ValueError(
@@ -385,7 +386,7 @@ class AgentSkillSelectionService:
                     version=item.version,
                     projection=item.projection,
                     content_digest=summary.content_digest,
-                    relevant_goal_ids=item.relevant_goal_ids,
+                    relevant_goal_ids=relevant_goal_ids,
                     rationale=item.rationale,
                     confidence=item.confidence,
                 )
@@ -424,7 +425,10 @@ class AgentSkillSelectionService:
             "correct. The extends field is dependency metadata, not automatic "
             "selection: when both a reusable base method and its domain "
             "specialization are useful, select both explicitly and order the base "
-            "method before the specialization. Return only the required JSON object."
+            "method before the specialization. Whenever supplied Goals exist, "
+            "every selected item must include relevant_goal_ids copied exactly from "
+            "those Goal IDs; planner roles must never omit them. Return only the "
+            "required JSON object."
         )
 
     def _selection_prompt(
@@ -472,7 +476,17 @@ class AgentSkillSelectionService:
                 "not introduce a new Skill, version, projection, Goal, Capability, or "
                 "execution proposal. Return only the repaired JSON object."
             ),
-            "original_request": json.loads(self._selection_prompt(request, candidates)),
+            "agent_role": request.agent_role,
+            "allowed_candidates": [
+                {
+                    "agent_skill_id": item.agent_skill_id,
+                    "version": item.version,
+                    "available_projections": list(item.available_projections),
+                    "extends": list(item.extends),
+                }
+                for item in candidates
+            ],
+            "allowed_goal_ids": [item.goal_id for item in request.goals],
             "previous_output": initial_raw,
             "validation_error": validation_error,
         }
@@ -508,6 +522,11 @@ class AgentSkillSelectionService:
                             "enum": goal_ids,
                         }
                         relevant_goal_ids["uniqueItems"] = True
+                        if goal_ids:
+                            relevant_goal_ids["minItems"] = 1
+                            required_fields = node.setdefault("required", [])
+                            if "relevant_goal_ids" not in required_fields:
+                                required_fields.append("relevant_goal_ids")
                     selected = properties.get("selected_agent_skills")
                     if isinstance(selected, dict):
                         selected["maxItems"] = self.max_selected

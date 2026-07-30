@@ -195,6 +195,61 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(captured.exception.reason_code, "location_not_found")
 
+
+    async def test_chinese_location_can_resolve_through_latin_provider_index(self) -> None:
+        geocode_queries: list[tuple[str, str]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                params = parse_qs(request.url.query.decode())
+                query = params["name"][0]
+                language = params["language"][0]
+                geocode_queries.append((query, language))
+                if query == "Neixiang":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "results": [
+                                {
+                                    "name": "Neixiang",
+                                    "admin1": "Henan",
+                                    "country": "China",
+                                    "latitude": 33.046,
+                                    "longitude": 111.849,
+                                }
+                            ]
+                        },
+                    )
+                return httpx.Response(200, json={"results": []})
+            return httpx.Response(
+                200,
+                json={
+                    "timezone": "Asia/Shanghai",
+                    "current": {"temperature_2m": 28.0},
+                    "daily": {
+                        "time": ["2026-07-30", "2026-07-31"],
+                        "weather_code": [3, 3],
+                        "temperature_2m_max": [30.0, 30.0],
+                        "temperature_2m_min": [22.0, 22.0],
+                        "precipitation_sum": [0.0, 0.0],
+                        "precipitation_probability_max": [10.0, 10.0],
+                    },
+                },
+            )
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            transport=httpx.MockTransport(handler),
+        )
+        report = await client.lookup(
+            WeatherQuery(location="河南省内乡县", language="zh-CN")
+        )
+
+        self.assertIn(("Neixiang", "en"), geocode_queries)
+        self.assertEqual(report.location_name, "Neixiang")
+        self.assertEqual(report.current_temperature_c, 28.0)
+
     async def test_location_not_found_is_typed_after_all_equivalent_queries_fail(self) -> None:
         queries: list[str] = []
 
@@ -216,9 +271,17 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured.exception.reason_code, "location_not_found")
         self.assertEqual(
             captured.exception.attempted_queries,
-            ("河南省内乡县", "内乡县", "内乡"),
+            (
+                "河南省内乡县",
+                "内乡县",
+                "内乡",
+                "Neixiang",
+                "Neixiang County",
+                "Neixiang, Henan",
+                "Neixiang County, Henan",
+            ),
         )
-        self.assertEqual(queries, ["河南省内乡县", "内乡县", "内乡"])
+        self.assertEqual(queries, list(captured.exception.attempted_queries))
 
 
 if __name__ == "__main__":

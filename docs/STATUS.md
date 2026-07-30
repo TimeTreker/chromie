@@ -18,11 +18,15 @@ ToolAgent's direct weather Provider path. Session memory now requires a typed
 model-authored `MemoryUpdateProposal`. Current model, Plan, task-proposal, API,
 trace, scenario, and qualification identities emit canonical
 `capability_id`/`capability_ids`; retained legacy artifacts remain readable at
-bounded compatibility boundaries. The repository policy gate mechanically
-protects these corrections. The final audited tree passes 1,644 primary tests
-and 20 legacy Agent tests; pinned Ruff/Mypy execution remains a required local
-static gate rather than evidence claimed from the restricted artifact sandbox.
-See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md).
+bounded compatibility boundaries. A later live weather trace corrected four
+operational gaps without adding semantic Host rules: Agent Skill selection now
+has a schema-consistent single-Goal binding and viable repair budget, Fast/Deep
+clarification fields are structurally aligned, unresolved external reads cannot
+become factual responses, and Chinese place bindings may receive generic Latin
+provider-query forms while remaining canonically unchanged. The repository
+policy gate protects the authority boundaries. Pinned Ruff/Mypy execution remains
+a required local static gate rather than evidence claimed from the restricted
+artifact sandbox. See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md).
 
 ## Four-axis status
 

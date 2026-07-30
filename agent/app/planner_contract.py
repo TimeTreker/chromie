@@ -82,6 +82,26 @@ class PlannerModelStep(CapabilityIdentityModel):
 class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
     """Prospective adequacy of the proposed plan, not execution progress."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_redundant_status(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        score = normalized.get("score")
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            numeric = float(score)
+            normalized["status"] = (
+                "exact"
+                if numeric >= 0.95
+                else "substantial"
+                if numeric >= 0.75
+                else "partial"
+                if numeric > 0.0
+                else "unsatisfied"
+            )
+        return normalized
+
     score: float = Field(
         ge=0.0,
         le=1.0,
@@ -213,6 +233,32 @@ class PlannerModelOutput(BaseModel):
     goal_satisfaction: PlannerGoalSatisfaction | None = None
     plan_relation: PlannerPlanRelation = "exact"
     user_confirmation_required: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_single_goal_clarification(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = copy.deepcopy(value)
+        outcomes = normalized.get("goal_outcomes")
+        if not isinstance(outcomes, dict) or len(outcomes) != 1:
+            return normalized
+        outcome = next(iter(outcomes.values()))
+        if not isinstance(outcome, dict):
+            return normalized
+        if (
+            normalized.get("disposition") == "clarify"
+            and outcome.get("disposition") == "clarify"
+        ):
+            if not str(outcome.get("response_text") or "").strip():
+                response_text = str(normalized.get("response_text") or "").strip()
+                if response_text:
+                    outcome["response_text"] = response_text
+            if not outcome.get("unresolved"):
+                unresolved = normalized.get("unresolved")
+                if isinstance(unresolved, list) and unresolved:
+                    outcome["unresolved"] = list(unresolved)
+        return normalized
 
     @model_validator(mode="after")
     def validate_semantic_shape(self) -> "PlannerModelOutput":
@@ -499,6 +545,85 @@ def validate_goal_binding_argument_grounding(
                         f"binding: material_args.{name}={actual!r}, "
                         f"expected={expected!r}"
                     )
+
+
+def validate_external_response_evidence_boundary(
+    output: PlannerModelOutput,
+    *,
+    context: dict[str, Any] | None,
+) -> None:
+    """Reject factual responses for unresolved external-read Goals.
+
+    Active Goal snapshots may record that a trusted safe-read Capability was
+    planned but has not produced completed evidence.  A planner may retry that
+    read, retrieve an exact verified result, clarify, or report a limitation.
+    It may not turn the unresolved execution binding into a direct factual
+    response.  This validator reads typed lifecycle evidence only; it does not
+    inspect user wording or choose a Capability.
+    """
+
+    context = context or {}
+    snapshots = context.get("active_goal_snapshots")
+    if not isinstance(snapshots, list):
+        snapshots = []
+
+    unresolved_external_goal_ids: set[str] = set()
+    completed_statuses = {"completed", "done", "success", "succeeded"}
+    external_safety_classes = {"safe_read", "read_only", "external_read"}
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        goal_id = " ".join(str(snapshot.get("goal_id") or "").strip().split())
+        if not goal_id:
+            continue
+        metadata = snapshot.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        binding = metadata.get("execution_binding")
+        if not isinstance(binding, dict):
+            continue
+        outcome_status = " ".join(
+            str(binding.get("execution_outcome_status") or "").strip().split()
+        ).casefold()
+        if outcome_status in completed_statuses:
+            continue
+        planned = binding.get("planned_skills")
+        if not isinstance(planned, list):
+            planned = []
+        has_external_read = bool(binding.get("retryable_safe_read"))
+        for item in planned:
+            if not isinstance(item, dict):
+                continue
+            safety_class = " ".join(
+                str(item.get("safety_class") or "").strip().split()
+            ).casefold()
+            if safety_class in external_safety_classes or item.get(
+                "retryable_safe_read"
+            ) is True:
+                has_external_read = True
+                break
+        if has_external_read:
+            unresolved_external_goal_ids.add(goal_id)
+
+    if not unresolved_external_goal_ids:
+        return
+
+    responding_goal_ids: set[str] = set()
+    if output.goal_outcomes:
+        responding_goal_ids = {
+            goal_id
+            for goal_id, outcome in output.goal_outcomes.items()
+            if outcome.disposition == "respond"
+        }
+    elif output.disposition == "respond":
+        responding_goal_ids = set(unresolved_external_goal_ids)
+
+    unsupported = responding_goal_ids & unresolved_external_goal_ids
+    if unsupported:
+        raise ValueError(
+            "external_read_response_requires_completed_or_verified_evidence: "
+            + ",".join(sorted(unsupported))
+        )
 
 
 def validate_explicit_numeric_parameter_grounding(
@@ -1069,11 +1194,11 @@ def fast_multi_goal_response_schema(
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
         disposition["enum"] = (
-            ["respond", "escalate"]
+            ["respond", "clarify", "escalate"]
             if response_only
-            else ["execute", "escalate"]
+            else ["execute", "clarify", "escalate"]
             if requires_execution
-            else ["respond", "execute", "mixed", "escalate"]
+            else ["respond", "execute", "mixed", "clarify", "escalate"]
         )
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
@@ -1189,11 +1314,11 @@ def fast_multi_goal_response_schema(
         outcome_disposition = outcome_properties.get("disposition")
         if isinstance(outcome_disposition, dict):
             outcome_disposition["enum"] = (
-                ["respond", "escalate"]
+                ["respond", "clarify", "escalate"]
                 if response_only
-                else ["execute", "escalate"]
+                else ["execute", "clarify", "escalate"]
                 if requires_execution
-                else ["respond", "execute", "escalate"]
+                else ["respond", "execute", "clarify", "escalate"]
             )
         if response_only:
             step_ids = outcome_properties.get("step_ids")
@@ -1402,7 +1527,7 @@ def fast_multi_goal_response_schema(
                     "disposition"
                 )
                 if isinstance(disposition_field, dict):
-                    disposition_field["enum"] = ["execute", "escalate"]
+                    disposition_field["enum"] = ["execute", "clarify", "escalate"]
                 response_text_field = specialized_outcome_properties.get(
                     "response_text"
                 )
@@ -1434,7 +1559,7 @@ def fast_multi_goal_response_schema(
                 step_ids["uniqueItems"] = True
                 step_ids["description"] = (
                     "The one simple Fast Planner step owned by this goal, or an "
-                    "empty list for respond/escalate."
+                    "empty list for respond/clarify/escalate."
                 )
             goal_property.clear()
             goal_property.update(specialized_outcome)
@@ -1448,7 +1573,7 @@ def fast_multi_goal_response_schema(
         disposition["description"] = (
             "Aggregate the already-authored goal_outcomes: execute when all "
             "outcomes execute, respond when all respond, mixed when execute and "
-            "respond are both present, and escalate when all escalate."
+            "respond are both present, clarify when all clarify, and escalate when all escalate."
         )
 
     # Encode the aggregate invariant in the decoder grammar.  The model still
@@ -1465,6 +1590,7 @@ def fast_multi_goal_response_schema(
             if requires_execution
             else list(product(("execute", "respond"), repeat=len(allowed_goals)))
         )
+        assignments.append(tuple("clarify" for _ in allowed_goals))
         assignments.append(tuple("escalate" for _ in allowed_goals))
         for assignment in assignments:
             assignment_set = set(assignment)
@@ -1474,6 +1600,8 @@ def fast_multi_goal_response_schema(
                 aggregate = "execute"
             elif assignment_set == {"respond"}:
                 aggregate = "respond"
+            elif assignment_set == {"clarify"}:
+                aggregate = "clarify"
             elif assignment_set == {"escalate"}:
                 aggregate = "escalate"
             else:
@@ -1770,11 +1898,12 @@ def planner_contract_diagnostics(
             if planner_tier == "fast" and outcome_disposition not in {
                 "execute",
                 "respond",
+                "clarify",
                 "escalate",
             }:
                 add(
                     ["goal_outcomes", goal_id, "disposition"],
-                    "fast goal outcomes may only execute, respond, or escalate",
+                    "fast goal outcomes may only execute, respond, clarify, or escalate",
                     value=outcome_disposition,
                 )
             inspect_satisfaction(
@@ -2046,7 +2175,7 @@ def validate_planner_model_output(
                     + ",".join(missing_authority_fields)
                 )
     allowed_dispositions = (
-        {"respond", "execute", "mixed", "escalate"}
+        {"respond", "execute", "mixed", "clarify", "escalate"}
         if planner_tier == "fast"
         else {"respond", "execute", "mixed", "clarify", "unavailable", "refused"}
     )
@@ -2112,13 +2241,25 @@ def validate_planner_model_output(
         outcome_dispositions = {
             outcome.disposition for outcome in output.goal_outcomes.values()
         }
-        unsupported = outcome_dispositions - {"execute", "respond", "escalate"}
+        unsupported = outcome_dispositions - {"execute", "respond", "clarify", "escalate"}
         if unsupported:
             raise ValueError(
-                "fast goal outcomes may only execute, respond, or escalate: "
+                "fast goal outcomes may only execute, respond, clarify, or escalate: "
                 + ",".join(sorted(unsupported))
             )
-        if "escalate" in outcome_dispositions:
+        if "clarify" in outcome_dispositions:
+            if outcome_dispositions != {"clarify"}:
+                raise ValueError(
+                    "fast clarification must not mix clarify outcomes with "
+                    "execute or respond outcomes"
+                )
+            if output.disposition != "clarify":
+                raise ValueError(
+                    "all-clarify goal outcomes require top-level disposition=clarify"
+                )
+            if output.steps:
+                raise ValueError("fast clarification must not carry steps")
+        elif "escalate" in outcome_dispositions:
             if outcome_dispositions != {"escalate"}:
                 raise ValueError(
                     "fast semantic escalation must not mix escalate outcomes "

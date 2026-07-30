@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import httpx
+from unidecode import unidecode
 
 logger = logging.getLogger("chromie.agent.weather")
 
@@ -123,6 +124,30 @@ def _strip_admin_suffix(value: Any) -> str:
     return text
 
 
+def _latin_place_text(value: Any) -> str:
+    transliterated = " ".join(unidecode(_normalize_location_text(value)).split())
+    return transliterated.strip(" ,")
+
+
+def _latin_compact_name(value: Any) -> str:
+    words = re.findall(r"[A-Za-z0-9]+", _latin_place_text(value))
+    return "".join(words).capitalize() if words else ""
+
+
+def _equivalent_place_keys(value: Any) -> set[str]:
+    text = _normalize_location_text(value)
+    stripped = _strip_admin_suffix(text)
+    keys = {
+        _compact_place_key(text),
+        _compact_place_key(stripped),
+        _compact_place_key(_latin_place_text(text)),
+        _compact_place_key(_latin_place_text(stripped)),
+        _compact_place_key(_latin_compact_name(text)),
+        _compact_place_key(_latin_compact_name(stripped)),
+    }
+    return {item for item in keys if item}
+
+
 def _lexical_location_context(location: str) -> WeatherLocationContext:
     """Derive provider search structure without changing semantic authority.
 
@@ -198,13 +223,30 @@ def _provider_query_candidates(
 ) -> list[str]:
     candidates: list[str] = []
     seen: set[str] = set()
-    for item in (location, context.locality, *context.aliases):
-        text = _normalize_location_text(item)
+
+    def add(value: Any) -> None:
+        text = _normalize_location_text(value)
         key = text.casefold()
         if text and key not in seen:
             seen.add(key)
             candidates.append(text)
-    return candidates[:8]
+
+    for item in (location, context.locality, *context.aliases):
+        add(item)
+
+    # Some providers index Chinese administrative places only by their Latin
+    # names. This is transport normalization for the same authoritative Goal
+    # binding, not semantic location substitution.
+    locality_source = context.locality or location
+    locality = _latin_compact_name(_strip_admin_suffix(locality_source))
+    admin1 = _latin_compact_name(_strip_admin_suffix(context.admin1))
+    if locality:
+        add(locality)
+        add(f"{locality} County")
+        if admin1:
+            add(f"{locality}, {admin1}")
+            add(f"{locality} County, {admin1}")
+    return candidates[:12]
 
 
 _WEATHER_CODE_EN = {
@@ -574,7 +616,13 @@ class OpenMeteoWeatherClient:
                 params={
                     "name": candidate,
                     "count": 10,
-                    "language": "zh" if language.lower().startswith("zh") else "en",
+                    "language": (
+                        "en"
+                        if candidate.isascii()
+                        else "zh"
+                        if language.lower().startswith("zh")
+                        else "en"
+                    ),
                     "format": "json",
                 },
             )
@@ -643,36 +691,28 @@ class OpenMeteoWeatherClient:
         name = _normalize_location_text(result.get("name"))
         if not name:
             return None
-        requested_key = _compact_place_key(requested_location)
-        query_key = _compact_place_key(query_candidate)
-        name_key = _compact_place_key(name)
-        locality_key = _compact_place_key(context.locality)
-        locality_base_key = _compact_place_key(_strip_admin_suffix(context.locality))
-        name_base_key = _compact_place_key(_strip_admin_suffix(name))
+        requested_keys = _equivalent_place_keys(requested_location)
+        query_keys = _equivalent_place_keys(query_candidate)
+        name_keys = _equivalent_place_keys(name)
+        locality_keys = _equivalent_place_keys(context.locality)
 
         score = 0
-        if name_key == requested_key:
+        if requested_keys & name_keys:
             score += 180
-        if name_key == query_key:
+        if query_keys & name_keys:
             score += 140
-        if locality_key and name_key == locality_key:
+        if locality_keys & name_keys:
             score += 160
-        if locality_base_key and name_base_key == locality_base_key:
-            score += 120
-        if query_key and query_key in name_key:
-            score += 30
 
         if context.admin1:
-            expected_admin1 = _compact_place_key(_strip_admin_suffix(context.admin1))
-            actual_admin1 = _compact_place_key(
-                _strip_admin_suffix(result.get("admin1"))
-            )
+            expected_admin1 = _equivalent_place_keys(context.admin1)
+            actual_admin1 = _equivalent_place_keys(result.get("admin1"))
             if actual_admin1:
-                if actual_admin1 == expected_admin1:
+                if actual_admin1 & expected_admin1:
                     score += 100
                 else:
                     return None
-            elif _compact_place_key(query_candidate) != requested_key:
+            elif not (query_keys & requested_keys):
                 return None
 
         if context.country:
@@ -687,7 +727,7 @@ class OpenMeteoWeatherClient:
         # A fallback query must still identify the same lexical locality. This
         # guards against accepting an unrelated first provider result merely
         # because a broad query returned something.
-        if locality_base_key and name_base_key != locality_base_key:
+        if locality_keys and not (name_keys & locality_keys):
             return None
         return score
 
