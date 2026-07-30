@@ -91,13 +91,6 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         self.assertIn("没查成功", spoken)
         self.assertNotIn("没有动", spoken)
 
-    def test_generic_runtime_failure_does_not_claim_user_was_misunderstood(self) -> None:
-        source = Path("orchestrator/orchestrator.py").read_text(encoding="utf-8")
-
-        self.assertIn("这次处理流程没有正确完成", source)
-        self.assertNotIn("我没能可靠地完成这次理解", source)
-        self.assertNotIn("Please rephrase it", source)
-
     def test_warmup_uses_a_one_token_non_thinking_generation(self) -> None:
         source = Path("scripts/warm_ollama.sh").read_text(encoding="utf-8")
 

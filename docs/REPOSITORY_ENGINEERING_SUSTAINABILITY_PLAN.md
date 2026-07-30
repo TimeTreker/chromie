@@ -114,8 +114,8 @@ The following recommendations are not part of the current program:
 | Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
 | Establish Incremental Type Checking | implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
-| Modernize Behavioral and Architecture Tests | active | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
-| Establish Typed Service Configuration Boundaries | queued | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
+| Modernize Behavioral and Architecture Tests | implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
+| Establish Typed Service Configuration Boundaries | active | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | queued | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
 | Consolidate Current Documentation Authority | queued | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
 
@@ -436,6 +436,16 @@ introducing narrow collaborator or helper seams when behavior permits.
 - affected tests run faster or with a narrower import graph where practical;
 - the test matrix continues to identify the earliest responsible boundary;
 - the maintained full tests and documentation checks pass.
+
+### Implementation status
+
+Behavioral expectations for gratitude routing, Cognitive Core endpoint ownership,
+temporal-scope Planner guidance, and failure responses now execute through rule,
+API, prompt-capture, or user-visible boundaries. Redundant Router source-string
+suites were removed because the canonical policy checker and retained Router
+guard own that architecture. `scripts/check_test_ownership.py` rejects new
+unclassified Python-source reads and validates the exact registry of genuine
+generated-artifact contracts; stale approvals fail closed.
 
 Suggested commit:
 

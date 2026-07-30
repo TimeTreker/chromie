@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Behavioral and architecture test ownership
+
+- Replaced source-string assertions for gratitude routing, Cognitive Core endpoint
+  ownership, temporal-scope prompt guidance, and generic runtime failure wording
+  with executable rule, API, prompt-capture, and user-visible behavior assertions.
+- Removed redundant Router source-reading suites; the canonical repository policy
+  checker and retained Router-removal guard now own that forbidden architecture.
+- Added an exact test-source ownership registry and dependency-light checker.
+  Unclassified Python implementation reads, weak approvals, and stale entries fail
+  closed, while genuine generated-artifact contracts remain explicitly reviewed.
+
 ## Unreleased — Incremental Mypy enforcement
 
 - Pinned Mypy 2.3.0 and added a monotonic initial scope over selected shared

@@ -97,3 +97,7 @@ unredacted acceptance logs.
 ## Static analysis
 
 Run the pinned incremental static-analysis gates through `./scripts/run_tests.sh`. The reviewed scope, rules, and ratchet policy are documented in [Static Analysis Ratchets](docs/STATIC_ANALYSIS.md). Do not add blanket ignores or remove checked paths to make a gate pass.
+
+## Test ownership
+
+Behavior belongs in executable assertions, forbidden architecture in the repository policy checker, and literal source checks only in reviewed generated-artifact contracts. See [Test Ownership](docs/TEST_OWNERSHIP.md) and run `python scripts/check_test_ownership.py`.

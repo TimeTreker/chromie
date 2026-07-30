@@ -100,8 +100,9 @@ model selection and live weather execution remain target-evidence work.
 
 The high-signal Ruff gate is implemented as an explicit, pinned, monotonic
 defect-oriented ratchet. The incremental Mypy ratchet is implemented over selected clean contract and
-tooling boundaries. The next active named code Issue is **Modernize Behavioral
-and Architecture Tests** from the engineering sustainability plan. Local target validation of loopback exposure
+tooling boundaries. Behavioral, architecture-policy, and generated-artifact test ownership is now
+mechanically separated. The next active named code Issue is **Establish Typed
+Service Configuration Boundaries** from the engineering sustainability plan. Local target validation of loopback exposure
 remains a separate deployment-evidence item.
 
 The accepted design is defined in
@@ -175,7 +176,7 @@ Completed domain implementation slices:
   location/time/aspect scope, exact weather-memory matching, weather lookup, and
   result interpretation.
 
-The next active named code Issue is **Modernize Behavioral and Architecture Tests**.
+The next active named code Issue is **Establish Typed Service Configuration Boundaries**.
 
 Exit criteria:
 

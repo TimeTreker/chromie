@@ -34,14 +34,15 @@ active-cancellation, reviewed, and paired-source MuJoCo evidence remain open. So
 Qualification stays paused until that evidence checkpoint closes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
-**Active implementation issue:** **Modernize Behavioral and Architecture Tests.** The
+**Active implementation issue:** **Establish Typed Service Configuration Boundaries.** The
 Agent Skills implementation track is code-complete: the repository-owned root now
 contains the owner-approved `chromie.grounded-external-information` base method
 and `chromie.weather-information` specialization, each with bounded projections
 for all five maintained Agent roles.
 
 The Ruff and Mypy gates now pin explicit versions and monotonic initial source
-scopes; both are part of the maintained test entrypoint. The methods preserve
+scopes. Test ownership is also enforced so behavior tests cannot inspect Python
+implementation text without an exact reviewed architecture/artifact classification. The methods preserve
 authoritative Goal bindings, exact verified-memory versus
 fresh lookup, freshness, pre-evidence speech truth, typed failure interpretation,
 canonical weather location/time/aspect scope, and natural grounded result
@@ -64,8 +65,9 @@ recreated. The repository does not define a replacement tag.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-The maintained `./scripts/run_tests.sh` entrypoint now passes 1,622 primary
-tests plus 20 legacy Agent tests; historical Router-removal counts remain scoped
+The maintained behavioral unittest inventory now passes 1,627 primary
+tests plus 20 legacy Agent tests; the complete maintained entrypoint additionally
+requires the pinned Ruff and Mypy executables from `requirements-test.txt`; historical Router-removal counts remain scoped
 to their recorded revisions. The completed
 Benchmark foundation inventories 528 entries, normalizes 527 semantic scenarios,
 retains 128 reviewed Social Attention cases, adds E2E evidence profiles and six

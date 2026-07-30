@@ -15,6 +15,7 @@ from orchestrator.schemas.route import RouteDecision, RouteItem
 from agent.app.cognitive_core.goal_interpreter.engine import (
     _guard_low_information_side_effect,
 )
+from agent.app.cognitive_core.goal_interpreter.rules import route_by_priority_rules
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as GoalInterpreterRouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -127,14 +128,12 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertIn("需要先确认", spoken)
         self.assertTrue(prepared.metadata.get("truth_reconciled"))
 
-    def test_goal_interpreter_has_no_phrase_routed_gratitude_shortcut(self) -> None:
-        from pathlib import Path
+    def test_gratitude_is_not_resolved_by_deterministic_phrase_routing(self) -> None:
+        decision = route_by_priority_rules(
+            RouteRequest(text="Thank you.", language="en-US")
+        )
 
-        source = Path("agent/app/cognitive_core/goal_interpreter/engine.py").read_text(encoding="utf-8")
-
-        self.assertNotIn("_is_standalone_gratitude", source)
-        self.assertNotIn("_gratitude_acknowledgement_decision", source)
-        self.assertNotIn("_GRATITUDE_EN", source)
+        self.assertIsNone(decision)
 
     def test_gratitude_ack_is_terminal_in_agent_runtime(self) -> None:
         decision = AgentRouteDecision(

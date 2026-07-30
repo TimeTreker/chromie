@@ -5,6 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 from agent.app.capabilities.local import chromie_capability_bundle
+from agent.app.deep_planner import DeepPlannerResolver
+from agent.app.fast_planner import FastPlannerResolver
+from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
+from agent.app.schema import AgentRunRequest, RouteDecision
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 
 
@@ -48,9 +52,52 @@ def test_safe_read_step_uses_model_owned_specific_language() -> None:
 
 
 def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
-    goal_source = open("agent/app/goal_association.py", encoding="utf-8").read()
-    fast_source = open("agent/app/fast_planner.py", encoding="utf-8").read()
-    deep_source = open("agent/app/deep_planner.py", encoding="utf-8").read()
-    assert "Never silently rewrite annual" in goal_source
-    assert "Never silently narrow a goal" in fast_source
-    assert "Never silently narrow a canonical goal" in deep_source
+    request = AgentRunRequest(
+        sid="scope-contract",
+        text="Compare annual weather.",
+        language="en-US",
+        route_decision=RouteDecision(
+            route="tool",
+            intent="weather_query",
+            confidence=0.9,
+            source="llm",
+        ),
+        context={
+            "goal_association_resolution": {
+                "associations": [],
+                "new_goals": [
+                    {
+                        "goal_id": "goal-weather",
+                        "description": "Compare annual weather.",
+                        "bindings": [],
+                    }
+                ],
+            },
+            "fast_plan_resolution": {
+                "disposition": "escalate",
+                "coverage": "uncertain",
+                "steps": [],
+            },
+        },
+    )
+    goal_prompt = GoalAssociationResolver(object())._build_prompt(
+        request,
+        [],
+        output_type=GoalSegmentationModelOutput,
+    )
+    fast_prompt = FastPlannerResolver(object(), object())._prompt(
+        request,
+        [],
+        response_schema={},
+    )
+    deep_prompt = DeepPlannerResolver(object(), object())._prompt(
+        request,
+        [],
+        feedback=[],
+        response_schema={},
+        expected_goal_ids=["goal-weather"],
+    )
+
+    assert "Never silently rewrite annual" in goal_prompt
+    assert "Never silently narrow a goal" in fast_prompt
+    assert "Never silently narrow a canonical goal" in deep_prompt

@@ -71,6 +71,7 @@ When documents disagree, correct the lower-authority document.
 | How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
 | Where is the reviewed Social Attention benchmark dataset? | `benchmarks/datasets/social_attention/README.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
+| Which facts belong to behavior, architecture-policy, or generated-artifact tests? | `docs/TEST_OWNERSHIP.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
@@ -124,6 +125,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
+- [Test Ownership](TEST_OWNERSHIP.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
