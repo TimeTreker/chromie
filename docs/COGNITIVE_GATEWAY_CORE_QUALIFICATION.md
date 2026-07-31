@@ -74,10 +74,13 @@ Chromie's cognitive models.
 ## Retained active-Goal cancellation case
 
 The cancellation runner starts the manifest-owned walking request through the
-authoritative Gateway/Core and trusted Skill Runtime path. It waits on a bounded
-read-only Skill Runtime observation until `soridormi.walk_velocity` has actually
-entered its Provider, then sends the exact manifest-owned `Stop.` turn through
-the normal Gateway. Qualification requires:
+authoritative Gateway/Core and trusted Skill Runtime path. Before execution it
+commits the exact model response and any confirmed request IDs through the same
+conversation-state binding boundary used by the Host. It then reads the trusted
+Skill Runtime through its Host-owned coordinator and waits on a bounded read-only
+observation until `soridormi.walk_velocity` has actually entered its Provider.
+Only then does it send the exact manifest-owned `Stop.` turn through the normal
+Gateway. Qualification requires:
 
 - a non-empty semantic Goal binding on the started request;
 - `reflex_and_admit` with deterministic `interrupt` and

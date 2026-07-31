@@ -17,6 +17,7 @@ from scripts.interaction_text_mujoco_check import (
     build_debug_summary,
     collect_run_provenance,
     parse_expected_arg,
+    record_execution_bindings,
     safe_idle_errors,
     should_apply_cognitive_runtime,
     should_require_tts_speech,
@@ -609,6 +610,42 @@ class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
             ["goal-1"],
         )
 
+    async def test_wait_for_provider_started_accepts_runtime_coordinator(self) -> None:
+        from orchestrator.runtime.skill_runtime import (
+            SkillRuntimeExecutionObservation,
+            SkillRuntimeRequestObservation,
+        )
+
+        class Runtime:
+            async def execution_observation(self):
+                return SkillRuntimeExecutionObservation(
+                    captured_at="2026-07-31T00:00:00+00:00",
+                    open_interaction_ids=["interaction-1"],
+                    executing_interaction_ids=["interaction-1"],
+                    requests=[
+                        SkillRuntimeRequestObservation(
+                            interaction_id="interaction-1",
+                            request_id="request-1",
+                            skill_id="soridormi.walk_velocity",
+                            provider_id="soridormi.mcp",
+                            source_goal_ids=["goal-1"],
+                            provider_started=True,
+                            task_done=False,
+                        )
+                    ],
+                )
+
+        class Coordinator:
+            runtime = Runtime()
+
+        observation = await wait_for_provider_started(
+            Coordinator(),
+            interaction_id="interaction-1",
+            skill_prefix="soridormi.",
+            timeout_s=0.2,
+        )
+        self.assertEqual(observation["requests"][0]["provider_id"], "soridormi.mcp")
+
     async def test_wait_for_provider_started_rejects_missing_observer(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "observation is unavailable"):
             await wait_for_provider_started(
@@ -617,6 +654,34 @@ class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
                 skill_prefix="soridormi.",
                 timeout_s=0.01,
             )
+
+
+class ExecutionBindingTests(unittest.TestCase):
+    def test_acceptance_execution_records_exact_host_binding_first(self) -> None:
+        calls: list[tuple[str, object, set[str] | None]] = []
+
+        class ConversationState:
+            def record_agent_result(
+                self,
+                sid: str,
+                response: object,
+                *,
+                confirmed_request_ids: set[str] | None,
+            ) -> None:
+                calls.append((sid, response, confirmed_request_ids))
+
+        class Assistant:
+            conversation_state = ConversationState()
+
+        response = object()
+        record_execution_bindings(
+            Assistant(),
+            response,
+            sid="sid-1",
+            confirmed_request_ids={"request-1"},
+        )
+
+        self.assertEqual(calls, [("sid-1", response, {"request-1"})])
 
 
 if __name__ == "__main__":

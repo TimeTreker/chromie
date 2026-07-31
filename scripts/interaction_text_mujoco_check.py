@@ -582,7 +582,11 @@ async def wait_for_provider_started(
     boundary for the retained stop command.
     """
 
-    observe = getattr(runtime, "execution_observation", None)
+    # VoiceAssistant exposes the trusted runtime through its coordinator. Keep
+    # the qualification boundary read-only while accepting either the
+    # coordinator or the underlying SkillRuntime in focused tests/tools.
+    observer = getattr(runtime, "runtime", runtime)
+    observe = getattr(observer, "execution_observation", None)
     if not callable(observe):
         raise RuntimeError("Skill Runtime execution observation is unavailable")
     deadline = time.monotonic() + timeout_s
@@ -603,6 +607,26 @@ async def wait_for_provider_started(
         "no matching provider request started within "
         f"{timeout_s:.1f}s for interaction={interaction_id!r} "
         f"skill_prefix={skill_prefix!r}; last_observation={last_observation!r}"
+    )
+
+
+def record_execution_bindings(
+    assistant: Any,
+    response: Any,
+    *,
+    sid: str,
+    confirmed_request_ids: set[str] | None,
+) -> None:
+    """Mirror the Host commit boundary before an acceptance-only execution."""
+
+    conversation_state = getattr(assistant, "conversation_state", None)
+    record = getattr(conversation_state, "record_agent_result", None)
+    if not callable(record):
+        raise RuntimeError("conversation state execution binding is unavailable")
+    record(
+        sid,
+        response,
+        confirmed_request_ids=confirmed_request_ids,
     )
 
 
@@ -854,6 +878,12 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         if not errors and not args.preview_only:
             execution_start = time.perf_counter()
             confirmed = confirmation_request_ids if args.grant_confirmation else None
+            record_execution_bindings(
+                assistant,
+                response,
+                sid=sid,
+                confirmed_request_ids=confirmed,
+            )
             if args.interrupt_text:
                 assistant._launch_interaction(
                     response,

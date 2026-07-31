@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-07-31,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,664 primary tests, and 20 legacy Agent tests.
+1,670 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -53,7 +53,7 @@ partial events, dirty or mismatched source, missing or incomplete runtime
 identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
-installation or model warm-up. The 2026-07-31 canonical run passes 1,664
+installation or model warm-up. The 2026-07-31 canonical run passes 1,670
 primary tests plus 20 legacy Agent tests.
 
 The managed `Chromie` environment is now Python 3.11.15 and passes the runtime
@@ -113,6 +113,12 @@ second-machine LAN exposure reports, then finalize the default development
 profile. Select `supervised_physical_pilot` only when supervised physical voice
 and robot evidence will also be attached. Human review remains explicit and
 fingerprint-bound.
+
+Diagnostic root `20260731T115108Z` proved the cognitive budgets, five live-text
+cases, and compound walk/nod/turn MuJoCo execution with safe idle. Cancellation
+then exposed that its runner queried the Host coordinator instead of its trusted
+Skill Runtime and skipped production's conversation-state execution binding.
+Validate the covered fix, push, and start a new clean root; do not resume this one.
 
 ## Work after evidence closure
 
