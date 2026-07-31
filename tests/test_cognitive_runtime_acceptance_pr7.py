@@ -102,7 +102,7 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                             "status": "completed",
                             "results": [
                                 {
-                                    "skill_id": "soridormi.nod_yes",
+                                    "capability_id": "soridormi.nod_yes",
                                     "status": "completed",
                                     "output": {"mode": "sim", "completed": True},
                                 }
@@ -222,7 +222,7 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
                             "status": "completed",
                             "results": [
                                 {
-                                    "skill_id": "soridormi.nod_yes",
+                                    "capability_id": "soridormi.nod_yes",
                                     "status": "completed",
                                     "output": {"mode": "sim", "completed": True},
                                 }

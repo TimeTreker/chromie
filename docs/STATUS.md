@@ -37,7 +37,7 @@ artifact sandbox. See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md
 
 | Capability area | Implementation | Automatic verification | Target validation | Deployment state / owner |
 |---|---|---|---|---|
-| Cognitive Gateway and Goal-driven Core | Gateway admission, Goal Association, Fast/terminal Deep Planning, composition, execution reconciliation, and fail-closed ownership are implemented. The source-bound workflow loads and binds the launcher-generated Orchestrator environment. Its cancellation runner mirrors the Host execution binding, observes the coordinator-owned trusted Skill Runtime, and recognizes the Host's explicit interrupted-session terminal state. | Core, planning, continuity, cancellation, tool, response, environment-binding, qualification-runner, policy, and full-suite tests. | Clean current live-text, active-cancellation, paired-source MuJoCo, and approved review bundle remain open. Diagnostic root `20260731T120530Z` proved Provider-backed cancellation, Goal reconciliation, and safe idle, then exposed the corrected mutually exclusive session-completion predicate; it is not qualifying evidence. | Enabled in maintained apply lanes. Evidence owner: [Gateway/Core Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md). |
+| Cognitive Gateway and Goal-driven Core | Gateway admission, Goal Association, planning, composition, execution reconciliation, and fail-closed ownership are implemented. The source-bound workflow binds its generated environment. Its cancellation runner mirrors Host binding, trusted observation, and interrupted-session completion; its verifier reads canonical `capability_id` evidence and Plan steps. | Core, planning, continuity, cancellation, tool, response, environment-binding, qualification-runner/verifier, policy, and full-suite tests. | Diagnostic root `20260731T121727Z` validates paired-source MuJoCo and active cancellation after the verifier correction, but live text fails inactive ambient suppression and grounded weather lookup/continuity. Human review remains pending; the root is not qualifying evidence. | Enabled in maintained apply lanes. Evidence owner: [Gateway/Core Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md). |
 | Capabilities and Soridormi boundary | Canonical `capability_id`, one Trusted Capability Runtime, provider validation, confirmation, scheduling, and evidence joins are implemented. | Contract, runtime, TaskGraph, cancellation, and policy tests. | Current paired live provider/MuJoCo and supervised physical evidence remain open. | Chromie authorizes named contracts; Soridormi owns physical feasibility and safety. |
 | Agent Skills | Read-only approved packages, model selection, role disclosure, Plan provenance, grounded external-information, and weather methods are implemented. | Loader, selection, disclosure, provenance, discourse, verified-memory, weather, result, response, policy, and full-suite tests. | Positive live selection and provider-backed weather execution are not yet retained. | Enabled; packages are passive and cannot register or execute Capabilities. Owner: [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md). |
 | Social Attention | Embodiment-independent `off`, `report_only`, and `on` behavior domain with owner-approved style and provider-safe auxiliary expression is implemented. | Dataset, mode/style, priority, stillness, provider, backend-neutrality, and qualification-foundation tests. | Current 128-case live baseline, reviewed samples, and selected MuJoCo evidence remain open. | Maintained default `on`. Owner: [Social Attention Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md). |
@@ -57,29 +57,15 @@ Ollama before the CosyVoice synthesis probe and the laptop profile permits only
 one resident 32K runner. This is an implemented correction, not target evidence;
 the complete current-revision closure must be initialized again and rerun.
 
-The first clean paired-source Gateway/Core collection then reached Goal-driven
-processing but stopped before planning because its evidence subprocesses did not
-load the generated Orchestrator environment and used the 3.5-second
-Goal-Association code default. The launcher now materializes the profile-owned
-budgets, runtime identity verifies their exact alignment, and the workflow loads
-and fingerprints that environment. This is an implemented provenance/runtime
-correction. Diagnostic root `20260731T115108Z` subsequently completed all five
-live-text cases and the compound walk/nod/turn MuJoCo execution with safe idle,
-but active cancellation stopped before Provider observation because the
-qualification runner inspected the Host coordinator rather than its owned Skill
-Runtime and had not committed the production conversation-state execution
-binding. The runner now mirrors both production boundaries. A new
-committed-source evidence root is still required; the diagnostic root is not a
-qualification claim.
-
-Diagnostic root `20260731T120530Z` then proved the repaired Provider observation
-and Goal binding: the exact active interaction was cancelled, the trusted
-Soridormi result and Goal outcome were `cancelled`, and safe idle was restored.
-The runner nevertheless waited 180 seconds for normal `session_done` on the
-original command session even though the Host intentionally marks superseded
-sessions `interrupted` instead. Its completion predicate now accepts that
-explicit terminal state only on the interrupt path. Another clean root is
-required after commit.
+Diagnostic root `20260731T121727Z` completed live text, compound MuJoCo, and
+active cancellation on clean paired source. The final verifier exposed stale
+`skill_id` reads even though current evidence emits canonical `capability_id`;
+after the bounded verifier correction, MuJoCo and cancellation validate. The
+same report retains two real semantic blockers: inactive ambient speech entered
+Core, while the Beijing weather request stayed on `chat`, executed no verified
+lookup, produced no completed outcome, and lost Goal continuity on follow-up.
+These general attention and grounded-information boundaries remain open. The
+root is diagnostic only after source changes and human review remains pending.
 
 ## Target-evidence closure
 

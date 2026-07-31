@@ -25,6 +25,7 @@ from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
 )
 from scripts.cognitive_runtime_acceptance import (  # noqa: E402
+    _evidence_capability_id,
     _run_provenance,
     _simulator_report,
 )
@@ -126,9 +127,16 @@ def _terminal_capabilities(event: dict[str, Any]) -> list[str]:
     terminal = event.get("terminal_plan")
     if not isinstance(terminal, dict):
         return []
-    return [
+    explicit = [
         str(item)
         for item in (terminal.get("capability_ids") or terminal.get("skill_ids") or [])
+    ]
+    if explicit:
+        return explicit
+    return [
+        _evidence_capability_id(item)
+        for item in terminal.get("steps") or []
+        if isinstance(item, dict) and _evidence_capability_id(item)
     ]
 
 
@@ -448,7 +456,7 @@ def _validate_cancellation_summary(
         for item in requests
         if isinstance(item, dict)
         and item.get("interaction_id") == interaction_id
-        and item.get("skill_id") == required_skill
+        and _evidence_capability_id(item) == required_skill
         and item.get("provider_started") is True
         and item.get("task_done") is False
     ]
@@ -473,7 +481,7 @@ def _validate_cancellation_summary(
         item
         for item in results
         if isinstance(item, dict)
-        and item.get("skill_id") == required_skill
+        and _evidence_capability_id(item) == required_skill
         and item.get("status") == "cancelled"
         and str(item.get("reason_code") or "").startswith("cancelled")
     ]
@@ -771,16 +779,11 @@ def verify(
             if not isinstance(simulator_expectations, dict):
                 simulator_expectations = {}
             cognitive = simulator_summary.get("cognitive_runtime")
-            terminal = (
-                cognitive.get("terminal_plan")
+            terminal_capabilities = (
+                _terminal_capabilities(cognitive)
                 if isinstance(cognitive, dict)
-                and isinstance(cognitive.get("terminal_plan"), dict)
-                else {}
+                else []
             )
-            terminal_capabilities = [
-                str(item)
-                for item in (terminal.get("capability_ids") or terminal.get("skill_ids") or [])
-            ]
             minimum_skills = int(
                 simulator_expectations.get("minimum_terminal_skill_count") or 0
             )

@@ -192,6 +192,12 @@ def _run_provenance(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _evidence_capability_id(item: dict[str, Any]) -> str:
+    """Read the canonical evidence identity with bounded legacy compatibility."""
+
+    return str(item.get("capability_id") or item.get("skill_id") or "")
+
+
 def _simulator_report(
     summary: dict[str, Any] | None,
     *,
@@ -302,7 +308,7 @@ def _simulator_report(
         item
         for item in execution_results
         if isinstance(item, dict)
-        and str(item.get("skill_id") or "").startswith("soridormi.")
+        and _evidence_capability_id(item).startswith("soridormi.")
         and item.get("status") == "completed"
         and isinstance(item.get("output"), dict)
         and item["output"].get("mode") == "sim"

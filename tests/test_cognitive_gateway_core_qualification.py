@@ -366,10 +366,10 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                     {
                         "cognitive_runtime": {
                             "terminal_plan": {
-                                "skill_ids": [
-                                    "soridormi.walk_velocity",
-                                    "soridormi.nod_yes",
-                                    "soridormi.turn_in_place",
+                                "steps": [
+                                    {"capability_id": "soridormi.walk_velocity"},
+                                    {"capability_id": "soridormi.nod_yes"},
+                                    {"capability_id": "soridormi.turn_in_place"},
                                 ]
                             }
                         },
@@ -418,7 +418,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                                     {
                                         "interaction_id": "interaction-active-cancel",
                                         "request_id": "request-walk",
-                                        "skill_id": "soridormi.walk_velocity",
+                                        "capability_id": "soridormi.walk_velocity",
                                         "provider_id": "soridormi.mcp",
                                         "source_goal_ids": ["goal-walk"],
                                         "provider_started": True,
@@ -432,7 +432,7 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "results": [
                                 {
                                     "request_id": "request-walk",
-                                    "skill_id": "soridormi.walk_velocity",
+                                    "capability_id": "soridormi.walk_velocity",
                                     "status": "cancelled",
                                     "reason_code": "cancelled_current_interaction",
                                 }

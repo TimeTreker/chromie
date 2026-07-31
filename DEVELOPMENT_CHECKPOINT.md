@@ -114,11 +114,11 @@ profile. Select `supervised_physical_pilot` only when supervised physical voice
 and robot evidence will also be attached. Human review remains explicit and
 fingerprint-bound.
 
-Diagnostic root `20260731T120530Z` proved live text, compound MuJoCo, trusted
-Provider-backed cancellation, Goal reconciliation, and safe idle. It then exposed
-the runner waiting for normal `session_done` on a session the Host intentionally
-marked `interrupted`. Validate the corrected interrupt-only terminal predicate,
-push, and start a new clean root; do not resume this one after source changes.
+Diagnostic root `20260731T121727Z` validates paired-source MuJoCo and active
+cancellation after correcting canonical `capability_id` evidence reads. It still
+fails two real live boundaries: inactive ambient suppression and grounded weather
+lookup/Goal continuity. Validate and push the verifier fix, then address those
+semantic Issues one at a time; do not approve or resume this diagnostic root.
 
 ## Work after evidence closure
 

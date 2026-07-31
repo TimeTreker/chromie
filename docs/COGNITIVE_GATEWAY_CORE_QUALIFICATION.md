@@ -100,6 +100,10 @@ The observation contains request identity, named skill, Provider identity, Goal
 ownership, and started/done state only. It excludes arguments and Provider
 payloads and does not authorize cancellation.
 
+Current execution results, Provider observations, and canonical Plan steps bind
+named work with `capability_id`. The verifier reads that canonical field and
+accepts `skill_id` only as a bounded retained-artifact compatibility alias.
+
 ## Retained MuJoCo case
 
 The maintained compound request runs through the same Goal-Driven Runtime and
