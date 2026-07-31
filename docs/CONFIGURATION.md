@@ -360,6 +360,14 @@ canonical plan copy, and its fingerprint remain host-owned.
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. |
 | `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 
+`scripts/start_chromie.sh` generates
+`.chromie/voice-runtime/orchestrator.env` and synchronizes the complete
+profile-owned cognitive budget set from `.env.runtime`; the generated file must
+not be edited by hand. Source-bound Gateway/Core qualification loads that exact
+file into every cognitive evidence subprocess. Runtime identity capture rejects
+a missing budget or any value that differs from
+`.chromie/runtime_profile.json`, and workflow resume also checks the file digest.
+
 `apply` additionally requires `ORCH_ENABLE_INTERACTION_RESPONSE=1`. The common
 profile satisfies that prerequisite for `chat` and explicitly trusted local
 read-only `tool` execution; robot action remains outside its authority allowlist

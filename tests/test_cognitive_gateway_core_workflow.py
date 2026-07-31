@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +14,7 @@ from scripts.run_cognitive_gateway_core_qualification import (
     _finalize_stage,
     _initial_state,
     _paths,
+    _run_stage,
     _stage_is_resumable,
 )
 
@@ -62,6 +64,16 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
         self.assertIn("Manifest-owned stop.", cancellation)
         self.assertIn("soridormi.walk_velocity", cancellation)
         self.assertNotIn("approve", " ".join(by_name["human-review-template"].command))
+        for name in (
+            "runtime-identity",
+            "live-text",
+            "mujoco",
+            "active-cancellation",
+        ):
+            self.assertEqual(
+                by_name[name].env_files,
+                (root / "orchestrator.env",),
+            )
 
 
     def test_collect_plan_runs_fail_fast_preflight_first(self) -> None:
@@ -106,12 +118,47 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
                                 "size_bytes": artifact.stat().st_size,
                             }
                         ],
+                        "environment_files": [],
                     }
                 }
             }
             self.assertTrue(_stage_is_resumable(state, stage))
             artifact.write_text('{"ok":false}\n', encoding="utf-8")
             self.assertFalse(_stage_is_resumable(state, stage))
+
+    def test_stage_loads_and_binds_generated_orchestrator_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = _paths(root / "evidence")
+            artifact = root / "effective.txt"
+            env_file = root / "orchestrator.env"
+            env_file.write_text(
+                "BOUND_RUNTIME_VALUE=from-generated-env\n", encoding="utf-8"
+            )
+            stage = StageSpec(
+                "bound-stage",
+                (
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,pathlib,sys; "
+                        "pathlib.Path(sys.argv[1]).write_text("
+                        "os.environ['BOUND_RUNTIME_VALUE'], encoding='utf-8')"
+                    ),
+                    str(artifact),
+                ),
+                (artifact,),
+                (env_file,),
+            )
+            state = _initial_state(paths, {"qualification_id": "qualification-one"})
+            _run_stage(paths, state, stage, resume=False)
+
+            self.assertEqual(artifact.read_text(encoding="utf-8"), "from-generated-env")
+            self.assertTrue(_stage_is_resumable(state, stage))
+            env_file.write_text("BOUND_RUNTIME_VALUE=changed\n", encoding="utf-8")
+            self.assertFalse(_stage_is_resumable(state, stage))
+            with self.assertRaisesRegex(RuntimeError, "start a new evidence root"):
+                _run_stage(paths, state, stage, resume=False)
 
     def test_finalize_command_uses_all_bound_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

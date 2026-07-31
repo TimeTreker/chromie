@@ -28,6 +28,7 @@ capture binds:
 
 - exact Chromie revision and clean-worktree state;
 - generated runtime-profile digest and fingerprint;
+- the complete launcher-effective, profile-owned cognitive budget set;
 - launcher-effective cognitive model topology;
 - running Agent, LLM, ASR, and TTS container image IDs;
 - the Agent container's effective runtime fingerprint and models;
@@ -38,6 +39,14 @@ The normal launcher may intentionally override profile-planned cognitive models,
 for example when CosyVoice uses one resident `qwen3:4b` model. Qualification
 compares the running Agent with that launcher-effective topology, not with the
 unmodified hardware-profile plan.
+
+The generated Orchestrator environment must contain every cognitive budget from
+the generated runtime profile with the same value. The live-text, MuJoCo, and
+cancellation stages load that exact file, and the workflow binds its SHA-256
+digest before identity capture and across every dependent stage. Missing budgets,
+profile drift, or an environment change during or after collection therefore
+invalidate the collection or resume instead of silently
+falling back to code-default timeouts.
 
 Missing, dirty, stale, mismatched, or digest-invalid identity fails closed. An
 identity generated with `--allow-dirty` or `--allow-missing-images` is diagnostic
@@ -155,7 +164,8 @@ python scripts/run_cognitive_gateway_core_qualification.py status \
 ```
 
 Resume skips a stage only when the state says it completed and every retained
-artifact still matches its SHA-256 fingerprint. The workflow reads the active
+artifact and effective environment file still matches its SHA-256 fingerprint.
+The workflow reads the active
 cancellation command, interrupt text, and required Provider skill from the
 versioned qualification manifest. It does not contain a second copy of those
 semantic inputs.
@@ -198,6 +208,15 @@ python scripts/capture_runtime_identity.py \
   --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml \
   --orchestrator-env .chromie/voice-runtime/orchestrator.env \
   --output "${EVIDENCE_ROOT}/runtime-identity.json"
+```
+
+For the expanded individual-stage diagnostics below, load the same captured
+Orchestrator environment first. The maintained workflow does this automatically:
+
+```bash
+set -a
+source .chromie/voice-runtime/orchestrator.env
+set +a
 ```
 
 Run the maintained live-service text cases:

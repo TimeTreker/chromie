@@ -20,6 +20,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.generate_runtime_env import parse_env_file  # noqa: E402
+
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
 )
@@ -51,6 +56,7 @@ class StageSpec:
     name: str
     command: tuple[str, ...]
     artifacts: tuple[Path, ...]
+    env_files: tuple[Path, ...] = ()
 
 
 def _utc_now() -> str:
@@ -172,7 +178,49 @@ def _stage_is_resumable(state: dict[str, Any], stage: StageSpec) -> bool:
             return False
         if record.get("sha256") != _sha256(resolved):
             return False
+    retained_env = item.get("environment_files")
+    if not isinstance(retained_env, list) or len(retained_env) != len(stage.env_files):
+        return False
+    env_by_path = {
+        str(value.get("path") or ""): value
+        for value in retained_env
+        if isinstance(value, dict)
+    }
+    for env_file in stage.env_files:
+        resolved = env_file.expanduser().resolve()
+        record = env_by_path.get(str(resolved))
+        if not resolved.is_file() or not isinstance(record, dict):
+            return False
+        if record.get("sha256") != _sha256(resolved):
+            return False
     return True
+
+
+def _stage_environment(stage: StageSpec) -> dict[str, str]:
+    environment = dict(os.environ)
+    for env_file in stage.env_files:
+        resolved = env_file.expanduser().resolve()
+        environment.update(parse_env_file(resolved))
+    return environment
+
+
+def _bind_environment_files(
+    state: dict[str, Any], stage: StageSpec
+) -> list[dict[str, Any]]:
+    records = [_artifact_record(path) for path in stage.env_files]
+    bindings = state.setdefault("environment_bindings", {})
+    if not isinstance(bindings, dict):
+        raise ValueError("workflow state environment_bindings must be an object")
+    for record in records:
+        path = str(record["path"])
+        retained = bindings.get(path)
+        if isinstance(retained, dict) and retained.get("sha256") != record["sha256"]:
+            raise RuntimeError(
+                "effective environment changed during source-bound collection; "
+                f"start a new evidence root: {path}"
+            )
+        bindings[path] = record
+    return records
 
 
 def _run_stage(
@@ -189,12 +237,14 @@ def _run_stage(
     paths.logs.mkdir(parents=True, exist_ok=True)
     log_path = paths.logs / f"{stage.name}.log"
     stages = state.setdefault("stages", {})
+    environment_files = _bind_environment_files(state, stage)
     stages[stage.name] = {
         "status": "running",
         "started_at": _utc_now(),
         "command": list(stage.command),
         "log": str(log_path),
         "artifacts": [],
+        "environment_files": environment_files,
     }
     _write_state(paths, state)
     print(f"[gateway-core-workflow] running: {stage.name}")
@@ -206,6 +256,7 @@ def _run_stage(
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        env=_stage_environment(stage),
         check=False,
     )
     output = completed.stdout or ""
@@ -377,13 +428,29 @@ def _collect_stages(
 
     return [
         StageSpec("preflight", tuple(preflight_command), (paths.preflight,)),
-        StageSpec("runtime-identity", tuple(identity_command), (paths.runtime_identity,)),
-        StageSpec("live-text", tuple(live_command), (paths.live_summary,)),
-        StageSpec("mujoco", tuple(mujoco_command), (paths.mujoco_summary,)),
+        StageSpec(
+            "runtime-identity",
+            tuple(identity_command),
+            (paths.runtime_identity,),
+            (args.orchestrator_env,),
+        ),
+        StageSpec(
+            "live-text",
+            tuple(live_command),
+            (paths.live_summary,),
+            (args.orchestrator_env,),
+        ),
+        StageSpec(
+            "mujoco",
+            tuple(mujoco_command),
+            (paths.mujoco_summary,),
+            (args.orchestrator_env,),
+        ),
         StageSpec(
             "active-cancellation",
             tuple(cancellation_command),
             (paths.cancellation_summary,),
+            (args.orchestrator_env,),
         ),
         StageSpec("human-review-template", tuple(review_command), (paths.human_review,)),
     ]

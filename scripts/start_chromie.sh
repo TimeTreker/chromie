@@ -66,7 +66,7 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
-for path in scripts/build_runtime_env.sh scripts/check_orchestrator_idle.sh scripts/generate_runtime_env.py scripts/verify_runtime_profile.sh scripts/list_runtime_ollama_models.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
+for path in scripts/build_runtime_env.sh scripts/check_orchestrator_idle.sh scripts/generate_runtime_env.py scripts/sync_orchestrator_profile_env.py scripts/verify_runtime_profile.sh scripts/list_runtime_ollama_models.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
   [ -e "$path" ] || {
     echo "[chromie][error] Missing repository file: $path" >&2
     exit 1
@@ -571,6 +571,10 @@ AGENT_SOCIAL_ATTENTION_MODEL=${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
 AGENT_RESPONSE_REVIEW_MODEL=${EFFECTIVE_RESPONSE_REVIEW_MODEL}
 OLLAMA_MAX_LOADED_MODELS=${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}
 EOF_ORCH
+
+python3 scripts/sync_orchestrator_profile_env.py \
+  --source .env.runtime \
+  --destination "$ORCH_OVERRIDE"
 
 case "$TTS_BACKEND" in
   cosyvoice3)

@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from orchestrator.runtime.evidence_identity import canonical_json_sha256  # noqa: E402
+from scripts.generate_runtime_env import COGNITIVE_BUDGET_KEYS  # noqa: E402
 
 DEFAULT_OUTPUT = ROOT / ".chromie" / "evidence" / "runtime-identity.json"
 DEFAULT_SERVICES = ("chromie-agent", "chromie-llm", "chromie-asr", "chromie-tts")
@@ -215,6 +216,40 @@ def _manifest_identity(path: Path) -> dict[str, Any]:
     }
 
 
+def _validated_orchestrator_cognitive_budgets(
+    runtime_profile: dict[str, Any],
+    orchestrator_env: dict[str, str],
+) -> dict[str, str]:
+    profile_budgets = runtime_profile.get("cognitive_budgets")
+    if not isinstance(profile_budgets, dict):
+        raise CaptureError("runtime profile has no cognitive_budgets object")
+    missing_profile = [key for key in COGNITIVE_BUDGET_KEYS if key not in profile_budgets]
+    if missing_profile:
+        raise CaptureError(
+            "runtime profile is missing cognitive budget keys: "
+            + ", ".join(missing_profile)
+        )
+    missing_effective = [
+        key for key in COGNITIVE_BUDGET_KEYS if key not in orchestrator_env
+    ]
+    if missing_effective:
+        raise CaptureError(
+            "generated Orchestrator environment is missing profile-owned cognitive "
+            "budgets: " + ", ".join(missing_effective)
+        )
+    mismatches = [
+        key
+        for key in COGNITIVE_BUDGET_KEYS
+        if str(orchestrator_env[key]) != str(profile_budgets[key])
+    ]
+    if mismatches:
+        raise CaptureError(
+            "generated Orchestrator environment cognitive budgets differ from the "
+            "runtime profile: " + ", ".join(mismatches)
+        )
+    return {key: str(orchestrator_env[key]) for key in COGNITIVE_BUDGET_KEYS}
+
+
 def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     runtime_profile_path = Path(args.runtime_profile).expanduser().resolve()
@@ -244,6 +279,10 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
         else None
     )
     orchestrator_env = _read_env(orchestrator_env_path)
+    effective_cognitive_budgets = _validated_orchestrator_cognitive_budgets(
+        runtime_profile,
+        orchestrator_env,
+    )
     deployment = _deployment_identity(
         root=root,
         services=list(args.service or DEFAULT_SERVICES),
@@ -271,6 +310,7 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
                 "active_validation_profile"
             ),
             "models": runtime_profile.get("models"),
+            "cognitive_budgets": runtime_profile.get("cognitive_budgets"),
             "active_ollama_models": runtime_profile.get("active_ollama_models"),
         },
         "orchestrator_runtime": {
@@ -285,6 +325,7 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
                 for key in MODEL_KEYS
                 if str(orchestrator_env.get(key) or "").strip()
             },
+            "effective_cognitive_budgets": effective_cognitive_budgets,
             "cognitive_runtime_mode": orchestrator_env.get(
                 "ORCH_COGNITIVE_RUNTIME_MODE"
             ),
