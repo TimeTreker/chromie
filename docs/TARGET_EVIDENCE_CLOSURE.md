@@ -25,6 +25,12 @@ revision cannot be mixed into the closure. A completed closure report always
 contains `release_qualified=false`; product or physical release approval remains
 a separate owner decision.
 
+The active proof-before-refactor Issue is narrower than either closure profile:
+it retains one supervised current-revision `speech-only` microphone-to-audible
+loop. That proof is a prerequisite for queued structural work, but it does not
+satisfy Gateway/Core MuJoCo, Agent Skill/weather, Social Attention, LAN, full
+voice-device, or physical-robot tracks in this closure.
+
 ## Profiles
 
 ### `source_bound_development`

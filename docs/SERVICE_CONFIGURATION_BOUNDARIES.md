@@ -57,6 +57,13 @@ adding another compatibility layer indefinitely.
 
 ## Remaining migration map
 
+The 2026-07-31 source audit found 295 distinct literal environment keys read by
+the maintained Orchestrator, Agent, ASR, TTS, and shared runtime Python, while
+the Configuration reference documents 321 keys. These counts mix public
+choices, profile-owned constants, service internals, acceptance overrides, and
+compatibility aliases. They are a baseline for classification, not a claim that
+every key is a supported operator switch.
+
 The remaining services keep their current behavior and are future ratchet work:
 
 | Boundary | Current concentration | Recommended next seam |
@@ -67,4 +74,8 @@ The remaining services keep their current behavior and are future ratchet work:
 | Shared runtime | trace/resource modules | inject narrow typed policy values where repeated reads remain |
 
 Each future migration must be independently tested and must not become one global
-cross-service settings object.
+cross-service settings object. The active sequence first retains a
+current-revision live voice loop, then classifies broad failure boundaries,
+then establishes typed Host settings before reducing supported deployment
+combinations. See
+[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

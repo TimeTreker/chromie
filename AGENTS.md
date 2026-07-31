@@ -18,12 +18,13 @@ archives, and old milestone prose are context only.
 
 ## Current delivery constraint
 
-Until the default current-revision target-evidence closure is retained and
-reviewed, treat evidence collection as the only active delivery line. Do not add
-a new architecture layer, ordinary behavior flag, standalone design document,
-compatibility path, or first-class project term unless it is required to remove a
-reproduced evidence blocker. When one must be added, remove or merge an
-equivalent item in the same change or record the exception in the active Issue.
+Until the canonical local gate, narrow current-revision live voice proof, and
+default target-evidence closure are retained and reviewed, treat that sequence
+as the only active delivery line. Do not add a new architecture layer, ordinary
+behavior flag, standalone design document, compatibility path, or first-class
+project term unless required to remove a reproduced blocker. When one must be
+added, remove or merge an equivalent item in the same change or record the
+exception in the active Issue.
 
 After evidence closure, follow the semantic Issue order in
 `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md`. Do not use file length,
@@ -33,6 +34,12 @@ semantics become clearer.
 
 ## Working rules
 
+- Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md`. Until the canonical
+  local gate is reproducible and the current-revision live voice proof is
+  retained and the default target-evidence profile closes, do not add product
+  features, new architecture, new runtime switches, or new terminology unless
+  the change directly closes those prerequisites or a demonstrated
+  safety/provenance blocker.
 - Inspect implementation and tests before editing documentation or behavior.
 - For user-visible robot weirdness, diagnose the root architectural or
   interaction-policy cause before changing prompts or phrasing.
@@ -84,6 +91,23 @@ semantics become clearer.
   physical microphone/speaker evidence with operator notes.
 - Do not convert automated or historical evidence into unsupported target,
   hardware, or deployment claims.
+
+## Repository surface budget
+
+- Prefer changing an existing owner over creating another document, environment
+  variable, compatibility path, or architectural term.
+- A new current document must name its audience and authoritative owner, and
+  explain why an existing owner cannot hold the fact. Documentation-only index
+  links do not by themselves justify a document.
+- A new environment variable must name its owning profile or service, default,
+  supported combinations, validation, and removal or compatibility plan. Do not
+  add a boolean merely to postpone a design decision.
+- A new architectural term must be defined once in an authority document and
+  replace or clearly distinguish any overlapping term.
+- Changes that grow one of these surfaces must report the before/after count and
+  identify a consolidation or deletion opportunity. Net growth requires an
+  explicit project need; a mechanical one-in/one-out deletion is not required
+  when it would remove useful evidence or a real contract.
 
 ## Required checks
 

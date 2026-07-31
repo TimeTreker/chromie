@@ -87,60 +87,30 @@ When documents disagree, correct the lower-authority document.
 README files should describe their component. They should not carry global
 milestone histories or duplicate complete setup and acceptance procedures.
 
-## Start here
+## Core reading path
+
+A new collaborator should not need the complete reference catalog. Read these
+in order:
 
 - [Project README](../README.md)
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
-- [Documentation Authority](DOCUMENTATION_AUTHORITY.md)
-- [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md)
-- [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
-- [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
-- [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md)
-- [VoiceAssistant Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md)
-- [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md)
-- [Static Analysis Ratchets](STATIC_ANALYSIS.md)
-- [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
-- [Runtime Trace Contract](RUNTIME_TRACE.md)
-- [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
-- [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
-- [Tool Result Interpretation](TOOL_RESULT_INTERPRETATION.md)
-- [Built-In TTS Voice Catalog](../assets/tts/voices/README.md)
-- [Owner-Editable Mind Profile](../config/mind/README.md)
-- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
-- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
-- [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md)
-- [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
-- [Benchmark Suite](../benchmarks/README.md)
-- [Stress Benchmark Workloads](../benchmarks/stress/README.md)
-- [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
-- [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
-- [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
-- [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)
-- [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
-- [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
-- [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
-- [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
-- [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
-- [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
-- [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
-- [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
-- [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
-- [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
-- [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
-- [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
-- [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
-- [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
-- [Test Ownership](TEST_OWNERSHIP.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
-- [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
-- [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-- [User Manual](USER_MANUAL.md)
-- [Project Handoff](HANDOFF.md)
+- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
+- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
+- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
+- [Acceptance and Evidence](ACCEPTANCE.md)
+- [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md)
+- [Operations Runbook](../CHROMIE_RUNBOOK.md)
+- [Documentation Authority](DOCUMENTATION_AUTHORITY.md)
+
+Use the catalog below only for the component or evidence boundary being
+changed. Listing a document here does not by itself justify keeping it; the
+queued documentation-surface Issue will require a real component, operator, or
+mechanical-contract owner.
 
 ## Architecture and runtime
 
@@ -157,6 +127,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Benchmark Suite](../benchmarks/README.md)
+- [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
+- [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Agent](../agent/README.md)
@@ -187,6 +159,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
+- [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
 - [Benchmark Suite](../benchmarks/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
@@ -201,11 +174,13 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
 - [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
+- [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
+- [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
 - [Interaction Agent and Capability Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)
@@ -233,6 +208,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Operations and release
 
 - [Bilingual OuteTTS Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md)
+- [Built-In TTS Voice Catalog](../assets/tts/voices/README.md)
+- [Owner-Editable Mind Profile](../config/mind/README.md)
 - [Deployment](DEPLOYMENT.md)
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [User Manual](USER_MANUAL.md)
@@ -250,6 +227,14 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Governance
 
+- [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md)
+- [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
+- [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
+- [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md)
+- [VoiceAssistant Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md)
+- [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md)
+- [Static Analysis Ratchets](STATIC_ANALYSIS.md)
+- [Test Ownership](TEST_OWNERSHIP.md)
 - [Contributing](../CONTRIBUTING.md)
 - [Security](../SECURITY.md)
 - [Support](../SUPPORT.md)

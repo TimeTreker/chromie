@@ -19,6 +19,8 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
+| Canonical local gate | Latest discovery ran 1,654 tests with 5 failures and 8 errors; pinned Mypy reports 42 errors; reproducibility repair active | Not applicable | Not applicable | Not applicable |
+| Narrow current-revision live voice loop | Component and evidence checks exist; narrow verifier profile open | Deployed speech-only runner exists | Not applicable | Clean supervised microphone/audible bundle open |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
@@ -46,6 +48,49 @@ they are not eligible for a human physical voice-device claim. The retained
 Text-MuJoCo bundle closes the historical text interaction scope. It
 intentionally skips microphone and ASR and therefore does not prove physical
 audio-device quality.
+
+## Proof-before-refactor live voice profile
+
+After restoring the canonical local gate, the next repository Issue is to
+retain the smallest complete current-revision live loop before structural
+refactoring:
+
+```text
+physical microphone
+→ ASR final utterance
+→ Cognitive Gateway admission
+→ Goal-driven chat handling
+→ validated speech
+→ TTS scheduling and audible playback
+```
+
+The existing runner already accepts:
+
+```bash
+python scripts/voice_acceptance.py \
+  --mode supervised \
+  --cases speech-only \
+  --start-services
+```
+
+That command is currently diagnostic. `verify_voice_evidence.py` requires the
+full seven-case matrix, Soridormi source binding, and both applied `chat` and
+`robot_action` lanes, so it correctly rejects a partial bundle.
+
+That Issue will add a separate narrow verification profile to the existing
+tools. It must require clean Chromie source, captured running runtime identity,
+real microphone input, `asr_final`, admitted Gateway/Core processing, applied
+`chat`, zero executable skills, correlated TTS playback completion, and an
+operator audible-output verdict. It must reject synthetic input, critical
+model failure, stale playback, dirty/mismatched source, missing runtime
+identity, or any executable skill.
+
+A passing narrow profile supports only this claim: one reviewed
+current-revision speech-only conversation completed through the physical audio
+loop. It does not establish broad microphone accuracy, simulator behavior,
+Soridormi execution, physical-robot support, or release readiness. Until the
+profile is implemented and a clean bundle is retained, target validation
+remains open.
 
 ## Level A — automated suite
 

@@ -4,29 +4,75 @@ The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
 are tracked in [Status](docs/STATUS.md).
 
-## Current delivery order — evidence first, then simplification
+## Active Issue — Restore Canonical Local Gate Reproducibility
 
-The active Issue is **Close Current-Revision Target Evidence**. The default
-`source_bound_development` profile must retain and review current-revision
-Gateway/Core, Agent Skill/weather, Social Attention, paired MuJoCo, and
-second-machine LAN evidence before another architecture or maintainability Issue
-becomes active.
+Before collecting new target evidence or beginning structural work, restore the
+documented dependency-light test contract. The 2026-07-31 re-audit installed
+`requirements-test.txt` and ran 1,654 unittest cases, but the run ended with 5
+failures and 8 errors; the pinned four-file Mypy ratchet also reports 42 errors
+across 11 imported files:
 
-While that Issue is open:
+- one test imports undeclared `pytest`;
+- ignored historical Router bytecode makes the Router-removal policy treat a
+  deleted source tree as present;
+- generated runtime configuration leaks deployment TTS and LLM values into
+  unit tests;
+- the current typed-contract boundary has drifted beyond its pinned ratchet.
 
-- fix only reproduced evidence blockers or provenance defects;
-- do not add architecture layers, ordinary behavior flags, standalone design
-  documents, or new project terminology;
-- prefer deleting stale compatibility, duplicated prose, or dead configuration;
-- keep every claim bound to the exact clean Chromie and Soridormi revisions.
-
-After closure, the accepted order is: narrow broad runtime exception boundaries,
-decompose `VoiceAssistant` around proven runtime seams, consolidate typed runtime
-configuration, expand Mypy by boundary, consolidate documentation and vocabulary,
-and rerun the source-bound evidence profile. File length, method count, Boolean
-count, and document count are diagnostic signals, not mechanical architecture
-gates. Detailed scopes are maintained in
+The active Issue must fix those owned boundaries without weakening Router
+removal or deleting user caches as a workaround. Its exit is a passing
+`INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` from the documented setup.
+Detailed scope and exit criteria are in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+
+## Next proof Issue — Retain a Current-Revision Live Voice Loop
+
+After the canonical gate passes—and before further architecture, feature,
+configuration, terminology, or broad documentation growth—retain the smallest
+complete proof of the current Goal-driven authority path:
+
+```text
+physical microphone
+→ ASR final utterance
+→ Cognitive Gateway admission
+→ Goal-driven chat handling
+→ validated response
+→ TTS scheduling and audible playback
+```
+
+The existing supervised runner can collect its `speech-only` case, but the
+canonical verifier currently requires the complete seven-case voice/MuJoCo
+matrix and both `chat` and `robot_action` apply lanes. The next proof Issue
+therefore adds a narrow verifier profile without weakening the full matrix,
+binds the run to clean source and running runtime identity, and retains one
+reviewed current-revision bundle.
+
+This claim excludes Soridormi, simulator execution, physical robots, broad
+voice-device support, and release readiness. If the run exposes a defect, fix
+the earliest responsible boundary and rerun it before starting structural work.
+Detailed scope and exit criteria are in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+
+## Next evidence and simplification Issues
+
+After the canonical gate and live proof pass, close the default
+`source_bound_development` target-evidence profile. It must retain reviewed
+current-revision Gateway/Core, Agent Skill/weather, Social Attention, paired
+MuJoCo, and second-machine LAN evidence.
+
+Only after that evidence closes, work one semantic Issue at a time:
+
+- classify all broad runtime exception boundaries;
+- establish typed Host configuration snapshots;
+- extract playback delivery lifecycle;
+- extract input-turn and session lifecycle;
+- reduce supported configuration combinations around maintained profiles;
+- expand Mypy by owned package;
+- reduce the current documentation surface.
+
+Arbitrary file, method, boolean, or document counts are not substitute exit
+criteria. Every Issue refreshes its baseline, preserves public behavior and
+safety ownership, and proves a measurable reduction at its own boundary.
 
 ## Completed architecture correction — Router removal
 
@@ -71,8 +117,9 @@ runtime policy, and no current Chromie semantic branch depending on simulator
 versus physical backend identity. See
 [Final Core-Principle Audit](docs/FINAL_CORE_PRINCIPLE_AUDIT.md).
 
-No named implementation Issue is reopened. Remaining work is retained target
-evidence under the owning qualification documents.
+The semantic-authority audit remains closed. The newly active proof and
+repository-simplification Issues do not reopen Router or Host semantic
+authority; they address current evidence and maintenance risk.
 
 ## Open evidence issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
 
@@ -151,7 +198,14 @@ projections, remain execution-authority-free, fit configured disclosure budgets,
 and preserve provider adaptation inside the Weather Capability adapter. Real
 model selection and live weather execution remain target-evidence work.
 
-The high-signal Ruff gate, incremental Mypy ratchet, test-ownership guard, typed ASR settings boundary, VoiceAssistant greeting collaborator, and documentation-authority consolidation are implemented as the initial bounded sustainability slices. They do not retire the larger composition, configuration, failure-surface, type-coverage, or documentation-simplification backlog. Open live and deployment evidence remains governed by the owning qualification documents; local target validation of loopback exposure remains separate deployment evidence.
+The high-signal Ruff gate, initial four-file Mypy ratchet, test-ownership guard,
+typed ASR settings boundary, VoiceAssistant greeting collaborator, and
+documentation-authority mapping are implemented. That first engineering intake
+is complete. The 2026-07-31 re-audit opened a second proof-first simplification
+intake. These slices do not retire the larger composition, configuration,
+failure-surface, type-coverage, or documentation-simplification backlog. Open
+live and deployment evidence remains governed by the owning qualification
+documents; local target validation of loopback exposure remains separate.
 
 The accepted design is defined in
 [docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
@@ -226,9 +280,18 @@ Completed domain implementation slices:
 
 The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
 
-The first VoiceAssistant extraction is complete: runtime-ready greeting scheduling and playback barriers are delegated to an independently tested collaborator. The remaining root is still a large maintenance surface; further extraction is queued after current-revision evidence and must follow the proven seams in [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
+The first VoiceAssistant extraction is complete: runtime-ready greeting
+scheduling and playback barriers are delegated to an independently tested
+collaborator. The 8,886-line/167-method root still requires typed Host settings
+and behavior-preserving playback/input lifecycle extractions after the current
+live proof and target-evidence closure. See
+[VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
-The initial bounded engineering-sustainability program is complete. There is no active code Issue; the active evidence Issue is **Close Current-Revision Target Evidence**. Post-evidence simplification is queued in [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+The first engineering-sustainability intake is complete. The active named Issue
+is **Restore Canonical Local Gate Reproducibility**. **Retain a
+Current-Revision Live Voice Loop** and **Close Current-Revision Target
+Evidence** follow it; later simplification Issues are queued behind all three in
+the same plan.
 
 Exit criteria:
 
@@ -350,10 +413,10 @@ and evidence loss remains observable. The audit is maintained in
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
 The repository engineering policy checker, Agent Skill Plan provenance,
-domain Skills, Ruff/Mypy ratchets, test-ownership modernization, typed ASR
-configuration boundary, first VoiceAssistant collaborator extraction, and
-documentation-authority consolidation are implemented. No named code Issue from
-this program remains active. The independent Gateway/Core and other retained
+domain Skills, initial Ruff/Mypy ratchets, test-ownership modernization, typed
+ASR configuration boundary, first VoiceAssistant collaborator extraction, and
+documentation-authority mapping are implemented. The second proof-first
+simplification intake is active. Independent Gateway/Core and other retained
 evidence tracks remain open under their owning qualification documents.
 
 The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
@@ -686,9 +749,9 @@ Exit criteria before treating the implemented loop as target-qualified:
 
 ## Target-evidence closure track
 
-The named implementation backlog is complete, but current development evidence
-remains open. It is coordinated through the source-bound profiles and resumable
-workflow defined in
+The earlier named implementation backlog is complete. Current development
+evidence is coordinated, but not yet closed, through the source-bound profiles
+and resumable workflow defined in
 [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
 
 The default `source_bound_development` profile requires:

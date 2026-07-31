@@ -53,6 +53,19 @@ annotations, checks untyped bodies, forbids implicit optional values, and report
 unsafe `Any` returns and stale ignores. It does not skip imports or enable a
 whole-tree error suppression.
 
+The current baseline contains four files. The mechanism is implemented, but
+that is not meaningful package coverage. On the 2026-07-31 maintained tree,
+the pinned Mypy 2.3.0 command reports 42 errors across 11 imported files while
+checking those four entries. Restoring the existing ratchet without ignores or
+scope removal belongs to the active canonical-gate Issue; package expansion
+must not begin first.
+
+After the existing gate is clean, the queued expansion replaces file-by-file
+contract entries with all 23 current Python files under
+`shared/chromie_contracts/`, then adds independently owned Orchestrator runtime
+packages after their decomposition boundaries stabilize. A directory/package
+entry must include future files automatically.
+
 A checked path may leave the ratchet only through a separate reviewed
 architecture change. New modules should enter once their real optionality,
 containers, callables, and async return types are clean; broad `Any` conversion

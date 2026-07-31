@@ -2,27 +2,15 @@
 
 Chromie is a local-first realtime interaction control plane for voice assistants
 that can invoke trusted embodied skills. It combines host audio and interruption,
-containerized ASR/Cognitive Gateway/Goal-Driven Cognitive Core/TTS services, native structured interaction, and
+containerized speech and cognition services, structured capability requests, and
 optional Soridormi-backed simulator or robot skills.
 
 The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
-Chromie also adopts a Runtime Observability architecture. Runtime Trace records
-architecture-independent execution topology and timing; Runtime Events package
-immutable evidence for the external data loop; Experience Episodes preserve
-semantic interaction history; and Scenario Candidates are derived offline under
-human review. See
+Chromie can retain correlated traces, events, resource samples, and reviewed
+experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md).
-The default-off implementation now provides generic nested spans, cross-service
-trace fragments, topology-aware summaries, detached voice-session traces,
-VAD/ASR and execution/audio milestones, bounded resource samples, active-trace
-restart recovery, configurable latency/sampling retention, optional Runtime
-Events, and active-trace attachment to cognitive-integrity incidents. GPU
-telemetry is now collected through an optional non-blocking provider, and
-retained trace reports can be evaluated by explicit evidence-qualified latency
-gates. Real simulator/hardware baselines and approved thresholds remain
-environment-specific evidence work rather than inferred release claims.
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->
@@ -33,8 +21,13 @@ environment-specific evidence work rather than inferred release claims.
 > authoritative chat in the common safe base; the maintained Soridormi launcher
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
-> A clean live rerun of the current authority path is still required before
-> target validation. No release version or publication target is planned. See
+> The active Issue is to restore a reproducible canonical local gate; the
+> current run executes 1,654 tests but ends with 5 failures and 8 errors, and
+> pinned Mypy reports 42 errors. Test dependencies, runtime-environment
+> isolation, ignored-cache policy, and the current typed boundary all need
+> repair. A clean live microphone-to-audible-response proof follows, then
+> broader Gateway/Core and MuJoCo evidence. No release version or publication
+> target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
 > **Implemented Agent Skills architecture:** Agent Skills are passive,
@@ -83,19 +76,21 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 
 These are implementation claims, not current-revision live qualification:
 
-- accepts microphone audio, detects speech, transcribes final utterances, and plays ordered TTS;
-- admits normal turns through Cognitive Gateway before Goal-driven model reasoning;
-- handles stop, cancel, emergency, silence, and unusable audio deterministically;
-- lets the LLM interpret Goals, choose passive Agent Skills, and propose Plans;
-- validates, authorizes, schedules, cancels, and records named Capability execution;
-- keeps provider adaptation inside trusted Capability adapters rather than planner prompts;
-- reconciles external results against the exact request before allowing factual speech;
-- delegates embodied feasibility, collision safety, stop, and recovery to Soridormi;
-- supports named Soridormi skills through MCP and MuJoCo-backed execution;
-- retains runtime traces, execution receipts, evidence manifests, and acceptance reports;
-- evaluates behavior through module, integration, E2E, stress, and General Ability tooling.
+- Capture microphone audio, transcribe final utterances, and play ordered TTS.
+- Admit normal turns through Cognitive Gateway before Goal-driven reasoning.
+- Handle stop, cancel, emergency, silence, and unusable audio deterministically.
+- Let the LLM interpret Goals, choose passive Agent Skills, and propose Plans.
+- Validate, authorize, schedule, cancel, and record named Capability execution.
+- Keep provider adaptation inside trusted Capability adapters.
+- Reconcile external results against the exact request before factual speech.
+- Delegate embodied feasibility, collision safety, stop, and recovery to
+  Soridormi.
+- Retain runtime traces, execution receipts, evidence manifests, and acceptance
+  reports.
+- Evaluate behavior through module, integration, E2E, stress, and General
+  Ability tooling.
 
-The current revision still needs retained source-bound evidence for:
+## Not yet proven on the current revision
 
 - live Gateway/Core text interaction and active cancellation;
 - positive Agent Skill selection with real provider-backed weather execution;
@@ -105,9 +100,10 @@ The current revision still needs retained source-bound evidence for:
 - second-machine LAN exposure validation;
 - physical robot and Jetson deployment.
 
-Until the default target-evidence profile closes, new architecture layers, ordinary
-behavior flags, standalone design documents, and project terminology are frozen
-unless they are required to remove a demonstrated evidence blocker.
+Until the canonical gate, narrow live voice proof, and default target-evidence
+profile close, new architecture layers, ordinary behavior flags, standalone
+design documents, and project terminology are frozen unless required to remove
+a demonstrated blocker.
 
 ## Quick start
 
@@ -219,20 +215,15 @@ documented in
 ## Read next
 
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
+- [Status](docs/STATUS.md): current implementation and evidence
+- [Roadmap](ROADMAP.md): active Issue and delivery order
+- [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
+- [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md): behavior-change rules
 - [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md): input, reflex, attention, and turn-admission boundary
 - [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md): Core-managed delegation, evidence reconciliation, and final-response lifecycle
 - [Agent Skills Architecture](docs/AGENT_SKILLS_ARCHITECTURE.md): Agent, Agent Skill, Plan, and Capability boundaries
-- [Agent Skills Implementation Plan](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md): open issue and semantic delivery slices
-- [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md): trace, event, episode, and scenario relationships
-- [Runtime Trace Contract](docs/RUNTIME_TRACE.md): architecture-independent trace-item schema and lifecycle
-- [Status](docs/STATUS.md): what exists and what is evidenced
 - [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md): current source-bound evidence workflow
-- [Roadmap](ROADMAP.md): milestone order and exit criteria
-- [SenseVoice ASR](docs/SENSEVOICE_ASR.md): runtime contract, model provenance,
-  evaluation, and release evidence
-- [TTS Provider Evaluation](docs/TTS_PROVIDER_EVALUATION.md): provider contract,
-  common A/B matrix, candidate policy, and selection gates
+- [Acceptance](docs/ACCEPTANCE.md): evidence levels and claim limits
+- [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
-- [Project Handoff](docs/HANDOFF.md): resume point for the next developer
-- [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
 - [Documentation Index](docs/README.md): owner for every documentation fact

@@ -1,13 +1,17 @@
 # Repository Engineering Sustainability Plan
 
-Status: the initial bounded implementation program is complete; the active
-Issue is current-revision target-evidence closure; post-evidence simplification
-Issues are accepted and queued
+Status: current repository-proof and simplification plan; active Issue is
+**Restore Canonical Local Gate Reproducibility**
 
-This document records the engineering recommendations accepted after the
-repository-wide external review and decomposes them into independently closable
-Issues. It exists so useful work is not lost when the active product or
-qualification context changes.
+This document records engineering recommendations accepted after
+repository-wide external reviews and decomposes them into independently
+closable Issues. The first intake produced the completed safeguards retained
+below. A 2026-07-31 current-tree re-audit opened a second, evidence-first set of
+Issues because the remaining repository size and configuration surface were not
+resolved by one greeting extraction, a four-file Mypy ratchet, or documentation
+indexing. Validation during that re-audit also found that the declared local
+test setup does not currently reproduce a passing canonical gate, so that
+prerequisite precedes live proof and structural work.
 
 The plan is intentionally not one broad refactor. Each Issue must preserve the
 Goal-driven single semantic authority, deterministic Host safety boundaries,
@@ -88,9 +92,48 @@ The following recommendations are not part of the current program:
 - authentication retrofitted casually into local internal APIs without a
   separate remote-deployment trust and identity design.
 
+### Accepted from the 2026-07-31 review
+
+- restore one hermetic, dependency-complete canonical local gate before making
+  a fresh automatic-verification claim;
+- retain one current-revision live microphone-to-audible-response proof before
+  further structural work;
+- continue decomposing `VoiceAssistant` at real lifecycle seams instead of
+  treating the first greeting collaborator as closure;
+- inventory and reduce the supported configuration surface around maintained
+  deployment profiles;
+- expand Mypy by owned package rather than isolated files;
+- classify every broad runtime exception boundary and mechanically reject new
+  unreviewed handlers;
+- shorten the README and the core reading path, merge duplicated tracing
+  documentation, and remove in-tree archives after their provenance value is
+  confirmed to exist in Git history;
+- require an explicit growth justification for new documents, flags,
+  compatibility paths, and architectural terms.
+
+### Accepted with constraints from the 2026-07-31 review
+
+- `1,500` lines per file, `40` methods per class, fewer than `15` booleans, and
+  `12–15` total documents are useful pressure tests, not immediate mechanical
+  gates. The first patch for each Issue must establish an owned baseline and a
+  behavior-preserving reduction target.
+- Some top-level service boundaries and best-effort cleanup paths legitimately
+  catch broadly. Each must still be explicit: narrow the exception, re-raise,
+  map it to a typed failure, fail closed, or preserve the primary failure while
+  recording an expected-cleanup diagnostic.
+- Specialized safety, interface, and evidence contracts may remain separate
+  when they have a real audience and owner. An index link alone is not enough
+  to justify a document.
+- The proof-first freeze does not block fixes required to obtain trustworthy
+  source identity, fail-closed behavior, or the retained live proof itself.
+
 ## Delivery rules
 
 - Work one Issue at a time. Only one Issue from this program may be active.
+- Restore the canonical local gate, then retain the current-revision live proof
+  before starting the queued structural Issues. If either exposes a defect, fix
+  the earliest responsible boundary and rerun the same evidence before
+  continuing.
 - Use the semantic Issue names below; do not introduce numbered Step, Stage,
   Phase, or milestone identities.
 - Re-audit the current tree at Issue start. Counts from the originating review
@@ -105,17 +148,61 @@ The following recommendations are not part of the current program:
   readiness.
 - Run the maintained full suite and documentation checks for every Issue. Add
   focused checks appropriate to the Issue.
+- Do not close a reduction Issue from a prose audit alone. Record the
+  before/after surface and preserve behavior at the public boundary.
 
-## Initial bounded issue registry
+## Current-tree re-audit — 2026-07-31
+
+The originating review could not run the repository. The current-tree re-audit
+therefore treats its counts as hypotheses and records reproducible local
+measurements from `aedfebabe5d7f519c0a21863a75acb6918382764`:
+
+| Surface | Current observation | Interpretation |
+|---|---:|---|
+| Maintained Python files | 496 | Size alone is not a defect, but changes need narrower ownership. |
+| `orchestrator/orchestrator.py` | 8,886 lines | The Host composition root remains physically entangled. |
+| `VoiceAssistant` | 167 methods; 615-line `__init__`; 160 distinct `self` attributes initialized | The greeting extraction did not close decomposition risk. |
+| `orchestrator/runtime/conversation_state.py` | 4,424 lines | A second large state/lifecycle boundary needs ownership review. |
+| Literal runtime environment keys | 295 across Orchestrator, Agent, ASR, TTS, and shared runtime | These include public, profile-owned, internal, and compatibility values; they must be classified before a reduction target is set. |
+| Documented configuration keys | 321 | Documentation currently exposes more knobs than the four deployment-mode summary suggests. |
+| Current Mypy ratchet | 4 files | The mechanism exists, but package coverage is not yet meaningful. |
+| `except Exception` handlers | 141: 85 Orchestrator, 53 Agent, 3 shared; 57 in `orchestrator.py` | The existing gate rejects only trivially silent handlers; a complete classification is still open. |
+| Markdown surface | 125 repository files, including 80 directly under `docs/`; 31,438 lines | The core reading path and specialized reference set are not clearly separated. |
+| In-tree historical archives | 3 files; 237,276 bytes | They are indexed and marked historical, but Git history may be the better owner. |
+| Canonical local gate | `python -m unittest discover -s tests -q` runs 1,654 tests but ends with 5 failures and 8 errors after installing the declared test dependencies; pinned Mypy reports 42 errors in 11 imported files while checking its 4-file scope | Ignored stale Router bytecode trips the policy gate; `pytest` is imported but undeclared; generated runtime configuration leaks into TTS provider and LLM-budget tests; the checked type boundary has drifted beyond its ratchet. |
+| Current-revision retained live voice loop | none | This follows restoration of the canonical gate and blocks structural work. |
+
+These are source observations, not automatic or target validation. Every later
+Issue must refresh its own baseline because counts may change.
+
+## Issue registry
+
+### Current proof and simplification Issues
+
+| Issue | State | Depends on | Purpose |
+|---|---|---|---|
+| Restore Canonical Local Gate Reproducibility | **active** | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
+| Retain a Current-Revision Live Voice Loop | queued | canonical local gate | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on the current revision. |
+| Close Current-Revision Target Evidence | queued | current live voice loop | Retain and review the complete default source-bound evidence profile before structural work. |
+| Classify Broad Runtime Exception Boundaries | queued | target-evidence closure | Ensure every broad handler has an explicit failure contract and regression boundary. |
+| Establish Typed Host Configuration Snapshots | queued | broad-exception classification | Stop `VoiceAssistant` from parsing its operating environment across a 615-line constructor. |
+| Extract Playback Delivery Lifecycle | queued | typed Host settings | Isolate ordered TTS generation, playback, echo, cancellation, and delivery evidence. |
+| Extract Input Turn and Session Lifecycle | queued | playback lifecycle | Isolate microphone/VAD/ASR/session ownership without moving deterministic reflexes or authority. |
+| Reduce Supported Configuration Combinations | queued | typed Host settings and live proof | Make maintained deployment profiles own supported combinations and retire redundant public switches. |
+| Expand Mypy by Owned Package | queued | stable extracted boundaries | Cover all shared contracts, then independently owned runtime packages. |
+| Reduce the Current Documentation Surface | queued | structural Issues complete | Shrink the core reading path, merge duplicated trace material, and remove superseded archives safely. |
+| Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
+
+### Completed first-intake Issues
 
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
 | Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
 | Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
-| Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
+| Establish Repository Engineering Policy Checks | mechanism implemented; retained verification exists; current cache-residue repair active | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
-| Establish Incremental Type Checking | implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
-| Modernize Behavioral and Architecture Tests | implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
+| Establish Incremental Type Checking | mechanism implemented; retained verification exists; current ratchet repair active | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
+| Modernize Behavioral and Architecture Tests | first intake implemented; retained verification exists; current dependency/environment repair active | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | implemented and automatically verified | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | implemented and automatically verified | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
 | Consolidate Current Documentation Authority | implemented and automatically verified | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
@@ -125,68 +212,146 @@ product milestone, and retained evidence determine whether the next queued Issue
 is still the correct priority.
 
 
-## Initial bounded program status
+## Program status
 
-All Issues in the initial bounded program are closed at their declared first-slice exit criteria. That means the repository now has policy gates, one typed service boundary, one composition-root extraction, and documentation authority; it does **not** mean the underlying maintainability concerns are fully retired. Release readiness and target validation remain separate.
+The first-intake implementation Issues are closed with their retained automatic
+verification. The second intake begins by restoring a trustworthy canonical
+local gate, retaining current-revision live voice proof, and closing the default
+source-bound target-evidence profile. Structural work follows those
+prerequisites. Existing focused checks remain useful, but a fresh full-suite
+automatic-verification claim is open until the active Issue closes. This
+program does not imply release readiness or physical support; Gateway/Core,
+Social Attention, provider, audio, simulator, LAN, and physical claims remain
+owned by their qualification documents.
 
-## Evidence-first continuation program
+## Issue: Restore Canonical Local Gate Reproducibility
 
-### Current-tree observations
+Status: **active**
 
-The 2026-07-30 archive confirms that the external review identified real
-maintenance pressure:
+### Problem
 
-- 496 Python files and 183,142 Python lines;
-- `orchestrator/orchestrator.py` has 8,886 lines; `VoiceAssistant` has 167
-  directly declared methods, a 615-line initializer, and 155 initialized
-  attributes;
-- `orchestrator/runtime/conversation_state.py` has 4,424 lines and its manager
-  directly declares 80 methods;
-- maintained runtime sources directly read about 276 distinct environment keys;
-- `orchestrator/`, `agent/`, and `shared/` contain 142 `except Exception`
-  handlers;
-- the Mypy ratchet covers four files;
-- `docs/` contains 80 Markdown files.
+The documented setup says that installing `requirements-test.txt` and running
+`./scripts/run_tests.sh` is the canonical dependency-light gate. On the
+2026-07-31 maintained working tree, that contract is not reproducible:
 
-These counts are observations from one archive, not permanent pass/fail limits.
-The engineering problem is unclear ownership, unbounded configuration and failure
-surfaces, duplicated current truth, and insufficient current-revision live
-evidence—not the numbers by themselves.
+- `requirements-test.txt` omits `pytest`, although
+  `tests/test_weather_goal_scope_contract.py` imports it;
+- ignored historical bytecode under `router/app/__pycache__/` makes the Router
+  removal guard report that the deleted source tree still exists;
+- importing the Orchestrator loads generated `.env.runtime` values into the
+  process, so later unit tests inherit a deployment TTS provider and LLM
+  budgets instead of their owned defaults or fixtures;
+- the pinned Mypy 2.3.0 gate reports 42 errors in 11 imported files while
+  checking the configured four-file ratchet.
 
-### Governing decisions
+After installing the declared test dependencies, direct unittest discovery ran
+1,654 tests in 14.921 seconds and ended with 5 failures and 8 errors. This is
+Level A diagnostic evidence, not a passing automatic-verification claim. Ruff,
+documentation, test-ownership, and focused documentation-authority checks pass
+independently; they do not override the failing policy, Mypy, and unittest
+results.
 
-- Evidence comes first. Do not start a broad refactor before one retained and
-  reviewed default source-bound evidence closure exists.
-- Freeze architecture growth during evidence collection. A blocker fix may
-  correct contracts, prompts, provider adaptation, provenance, or runtime bugs,
-  but must not create another semantic authority or compatibility architecture.
-- Make subtraction the default. Adding a maintained document, ordinary behavior
-  flag, compatibility path, or first-class term requires removing or merging an
-  equivalent item in the same change, unless the active Issue records why that is
-  impossible.
-- Decompose by ownership and independently testable lifecycle seams. File length
-  and method count are diagnostic signals, not mechanical gates.
-- Preserve the existing safety assets: deterministic protective controls,
-  model-authored semantic reasoning, trusted Host authorization, Soridormi
-  embodiment authority, and four-axis evidence honesty.
+### Scope
 
-### Continuation issue registry
+- make every dependency imported by the canonical test entrypoint explicit and
+  pinned in the declared test dependency set;
+- make the Router removal check reject maintained or source-bearing Router
+  content without treating ignored bytecode/cache residue as deployed source;
+- isolate unit tests from generated runtime configuration, or load deployment
+  configuration only through an explicit runtime bootstrap that tests can
+  control;
+- repair the existing Mypy scope without suppressing errors, removing checked
+  files, or broadening ignores, and retain a regression for each corrected
+  contract boundary;
+- add focused regression coverage for dependency completeness, ignored
+  historical cache residue, and test-order/environment independence;
+- keep the canonical entrypoint and documented setup aligned.
 
-| Issue | State | Depends on | Purpose |
-|---|---|---|---|
-| Close Current-Revision Target Evidence | active evidence Issue | clean candidate source | Prove the narrow maintained loop and retain exact source-bound evidence before structural expansion. |
-| Audit Broad Runtime Failure Boundaries | queued | target-evidence closure | Narrow catches where programming defects or critical failures could be converted into ambiguous degradation. |
-| Decompose VoiceAssistant Around Proven Runtime Seams | queued | evidence closure; failure audit where touched | Extract independently testable lifecycle owners selected from real traces rather than static aesthetics. |
-| Consolidate Runtime Configuration Profiles | queued | evidence closure; typed seams where touched | Replace repeated direct environment parsing and unsupported Boolean combinations with typed service settings and a small orthogonal profile model. |
-| Expand Type Checking by Boundary | queued | stable extracted/configuration boundaries | Ratchet complete contract and runtime directories without broad `Any`, ignores, or scope retreat. |
-| Consolidate Documentation and Vocabulary | queued | structural/configuration changes settled | Merge duplicated current truth, reduce trace-document fragmentation, archive or delete stale narrative, and simplify public wording. |
-| Requalify the Simplified Runtime | queued | all accepted simplification Issues | Re-run the same source-bound profile and compare behavior, latency, cancellation, safety, and evidence completeness. |
+### Non-goals
 
-Only one continuation Issue may be active. Closing an Issue does not
-automatically activate the next; the current evidence and risk decide whether the
-queued scope remains correct.
+- no weakening of the Router-removal architecture rule;
+- no deletion of user caches as a substitute for a robust policy check;
+- no replacement of generated runtime configuration or maintained deployment
+  profiles;
+- no product behavior, prompt, provider, or live-evidence change;
+- no broad test-framework migration.
+
+### Exit criteria
+
+- a fresh environment using only the documented test setup can import and run
+  every canonical test;
+- ignored cache residue cannot fail the Router removal check, while any
+  maintained Router source, import, service, or current contract still fails;
+- relevant TTS and LLM tests pass regardless of whether `.env.runtime` exists
+  or which canonical test order is used;
+- the pinned Mypy ratchet passes its existing scope before any later package
+  expansion;
+- `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passes from a maintained working
+  tree;
+- `docs/STATUS.md` records the fresh result before the live-proof Issue becomes
+  active.
+
+## Issue: Retain a Current-Revision Live Voice Loop
+
+Status: queued; depends on **Restore Canonical Local Gate Reproducibility**
+
+### Problem
+
+Chromie has extensive Level A coverage and historical live evidence, but no
+retained current-revision proof of the smallest complete user loop:
+
+```text
+physical microphone
+→ final ASR transcript
+→ Gateway admission
+→ Goal-driven chat handling
+→ validated speech
+→ TTS scheduling and audible playback
+```
+
+The existing supervised voice runner can collect only the `speech-only` case,
+but the canonical verifier requires the complete seven-case voice/MuJoCo matrix
+and both `chat` and `robot_action` apply lanes. That makes the narrow diagnostic
+run useful but unable to support its own honest, smaller claim.
+
+### Scope
+
+- add a named narrow verification profile to the existing voice evidence tools;
+- keep the complete voice/MuJoCo matrix and its release-oriented verifier
+  unchanged;
+- bind the run to a clean Chromie checkout, generated runtime profile, running
+  service image IDs, effective models, and exact retained artifacts;
+- require real microphone input, an `asr_final` event, admitted Gateway/Core
+  processing, an applied `chat` lane, zero executable skills, correlated TTS
+  schedule/playback completion, and an operator audible-output verdict;
+- fail on critical LLM timeout, truncation, fallback after authority
+  acquisition, stale playback, missing source identity, or dirty source;
+- retain the exact command, logs, structured events, audio-device identity, and
+  a machine-readable claim that is limited to the live speech-only loop.
+
+### Non-goals
+
+- no Soridormi, MuJoCo, robot-action, cancellation, or physical-robot claim;
+- no weakening of the full supervised voice-device matrix;
+- no new cognition, prompt tuning, deployment mode, or general evidence
+  framework;
+- no release qualification from one successful conversation.
+
+### Exit criteria
+
+- focused tests prove the narrow verifier rejects synthetic input, partial
+  events, dirty or mismatched source, missing runtime identity, skills, stale
+  playback, and absent operator review;
+- the maintained full matrix verifier retains its existing requirements;
+- a clean committed current revision produces one retained passing supervised
+  `speech-only` bundle;
+- `docs/STATUS.md` records the exact target-validation claim without promoting
+  simulator, physical-robot, or release status;
+- the canonical repository gates pass.
 
 ## Issue: Close Current-Revision Target Evidence
+
+Status: queued; depends on **Retain a Current-Revision Live Voice Loop**
 
 ### Scope
 
@@ -195,8 +360,7 @@ queued scope remains correct.
 - include live Gateway/Core text behavior, active cancellation, positive Agent
   Skill/weather execution, reviewed Social Attention, paired MuJoCo safe-idle,
   and second-machine LAN evidence;
-- retain physical voice or robot evidence only through the stricter supervised
-  profile;
+- keep physical voice and robot claims scoped to their supervised evidence;
 - fix only blockers reproduced by the maintained evidence workflow.
 
 ### Exit criteria
@@ -207,123 +371,294 @@ queued scope remains correct.
 - the default closure is eligible while still reporting
   `release_qualified=false`;
 - Status, Roadmap, Checkpoint, and Handoff point to the retained bundle;
-- every blocker fix is regression-tested and the closure is restarted from the
+- every blocker fix is regression-tested and the closure restarts from the
   fixed revision.
 
-## Issue: Audit Broad Runtime Failure Boundaries
+## Issue: Classify Broad Runtime Exception Boundaries
+
+Status: queued; depends on **Close Current-Revision Target Evidence**
+
+### Problem
+
+The existing repository policy rejects only broad handlers whose bodies are
+trivially silent. The maintained runtime still contains 141
+`except Exception` handlers, including 57 in `VoiceAssistant`. Some are valid
+top-level containment or cleanup; a passing policy gate does not currently prove
+that each one has a reviewed failure contract.
 
 ### Scope
 
-Inventory every maintained `except Exception` by boundary and classify it as
-expected cleanup, typed degradation, operational failure, evidence failure, or
-invariant failure. Prioritize model, provider, execution, cancellation, state,
-and evidence paths. Narrow exception types where possible; otherwise map the
-error to an explicit typed result, visible diagnostic, or fail-closed transition.
+- create a complete symbol-level inventory for maintained Orchestrator, Agent,
+  and shared runtime handlers;
+- classify each handler as narrow/re-raise, typed failure mapping, fail-closed
+  boundary, or expected cleanup that preserves the primary error and records a
+  diagnostic;
+- replace broad catches where the handled failure set is known;
+- add focused tests for model, Provider, execution, cancellation, state, audio,
+  and evidence boundaries changed by the audit;
+- mechanically reject new or unclassified broad handlers without relying on
+  line-number-only exceptions.
 
 ### Non-goals
 
-- no blanket re-raise rule for best-effort cleanup;
-- no logging churn that hides the primary failure;
-- no semantic fallback added to recover from an operational error.
+- no blanket conversion of every handler to an error log;
+- no removal of required top-level service containment;
+- no user-visible wording change unless a retained failure trace proves the
+  current speech violates the interaction contract;
+- no giant mechanical exception rewrite.
 
 ### Exit criteria
 
-- each remaining broad catch has an explicit reviewed reason and regression
-  boundary;
-- critical paths cannot continue as success after an unknown exception;
-- cleanup containment cannot replace the primary error;
-- the maintained full gates pass.
+- every maintained broad handler has a checked classification and owner;
+- operational failures re-raise, map to a typed result, or fail closed;
+- expected cleanup cannot hide or replace the primary failure;
+- unreviewed new broad handlers fail the repository policy gate;
+- focused failure tests, the live speech-only regression, and full gates pass.
 
-## Issue: Decompose VoiceAssistant Around Proven Runtime Seams
+## Issue: Establish Typed Host Configuration Snapshots
+
+Status: queued
+
+### Problem
+
+`VoiceAssistant.__init__` spans 615 lines and directly or indirectly builds a
+large environment-derived state. The ASR service already proves that an
+immutable typed startup snapshot can preserve generated profile authority. The
+Host still lacks equivalent narrow configuration ownership.
 
 ### Scope
 
-Use retained traces and failure evidence to select one collaborator at a time.
-Candidate owners include audio-output/playback lifecycle, TTS chunk scheduling
-and echo handling, input-turn lifecycle, session registry, Cognitive turn
-execution, and observability/evidence coordination. `VoiceAssistant` remains the
-public composition and shutdown owner.
+- classify Host variables as operator-facing, profile-owned, service-internal,
+  acceptance-only, or compatibility-only;
+- define immutable typed settings groups for audio input, cognition,
+  playback/TTS, session lifecycle, and evidence;
+- parse and validate the environment once before `VoiceAssistant` composition;
+- inject narrow settings groups into collaborators rather than one global
+  settings object;
+- preserve `.env.runtime`, hardware-profile precedence, safe diagnostics, and
+  all current defaults;
+- freeze new Host booleans while the inventory is active.
 
-Each extraction must remove the old implementation from the root, accept typed
-inputs, expose a narrow lifecycle, preserve ordering/cancellation, and have
-independent tests. Prefer constructor-injected collaborator bundles over another
-set of root-owned fields.
+### Non-goals
+
+- no simultaneous migration of Agent, TTS, and shared runtime settings;
+- no behavior or default changes hidden inside parsing cleanup;
+- no owner-editable personality or semantic policy in Python settings;
+- no one-object configuration dumping ground.
 
 ### Exit criteria
 
-- the selected responsibilities have one clear owner and no duplicate root
-  implementation;
-- affected collaborators can be tested without constructing the whole voice
-  runtime;
-- deterministic controls, semantic authority, provider authorization, and
-  Soridormi ownership do not move;
-- source-bound behavior is rerun after each coherent extraction set.
+- a checked inventory accounts for every Host environment read and duplicate
+  parser;
+- invalid values fail with the owning variable and expected type;
+- `VoiceAssistant` receives typed settings and no longer performs scattered
+  startup parsing for the migrated groups;
+- precedence and supported-profile tests pass;
+- configuration documentation is generated or checked against the owned
+  inventory;
+- the retained live voice loop and full gates pass unchanged.
 
-## Issue: Consolidate Runtime Configuration Profiles
+## Issue: Extract Playback Delivery Lifecycle
+
+Status: queued
+
+### Problem
+
+Ordered synthesis, playback-start waiters, chunking, echo detection,
+cancellation, output streams, and delivery evidence currently occupy a large
+contiguous part of `VoiceAssistant`. These responsibilities have one realtime
+ordering contract but no independent owner.
 
 ### Scope
 
-Inventory direct environment reads and classify each key as generated
-hardware/profile authority, service-owned setting, operator override, diagnostic
-control, experiment, or stale compatibility. Migrate one service boundary at a
-time to immutable typed settings. Remove obsolete keys and unsupported
-combinations instead of preserving them indefinitely.
+- extract one playback-delivery collaborator with explicit queues, policy,
+  session/evidence callbacks, and lifecycle methods;
+- preserve ordered audible playback, bounded service-worker concurrency,
+  generation cancellation, stale-output suppression, barge-in, echo handling,
+  and playback start/end evidence;
+- keep `VoiceAssistant` as composition root and make it delegate rather than
+  duplicate the extracted logic;
+- establish a structural ratchet so new playback behavior enters the
+  collaborator.
 
-Supported runtime behavior should be composed from a small set of orthogonal
-profile axes—hardware/resources, execution authority, evidence level, and
-diagnostics—not from freely combined Boolean flags.
+### Non-goals
+
+- no TTS provider replacement or pronunciation tuning;
+- no change to confirmation barriers or deterministic interruption semantics;
+- no line-count-only extraction or forwarding facade with shared mutable
+  internals left behind.
 
 ### Exit criteria
 
-- each migrated service parses its environment once;
-- supported combinations are explicit and emitted in the runtime manifest;
-- ordinary behavior no longer depends on undocumented Boolean combinations;
-- removed keys have bounded compatibility or a deliberate clean break;
-- invalid combinations fail before service startup.
+- playback ownership, inputs, outputs, cancellation, and cleanup are explicit;
+- black-box alignment, interruption, stale-output, and evidence tests run
+  against the collaborator through the public Host path;
+- `VoiceAssistant` method and initialized-state counts decrease and cannot grow
+  back without a reviewed update;
+- the current live voice proof and complete gates pass.
 
-## Issue: Expand Type Checking by Boundary
+## Issue: Extract Input Turn and Session Lifecycle
+
+Status: queued
+
+### Problem
+
+Microphone callbacks, injected audio, VAD/ASR task ownership, session creation,
+idle cleanup, and routed-turn tracking remain interleaved with cognition,
+execution, and output delivery. `conversation_state.py` is also a 4,424-line
+boundary whose persistence, Goal, confirmation, and lifecycle responsibilities
+need an ownership audit.
 
 ### Scope
 
-Expand the monotonic ratchet through complete ownership boundaries, beginning
-with `shared/chromie_contracts/` and then stable slices of
-`orchestrator/runtime/`. Add a boundary only after its real optionality, async
-results, containers, and callables are represented accurately.
+- extract microphone/VAD/ASR utterance and session-task lifecycle behind typed
+  events and explicit cancellation;
+- separate session registry mechanics from semantic conversation/Goal state;
+- audit the remaining direct-LLM compatibility path before moving it: remove it
+  when maintained apply lanes cannot reach it, or confine it behind an explicit
+  rollback contract when still required;
+- keep Protective Reflex effects immediate and Host-owned;
+- preserve turn identity from audio capture through final response evidence.
+
+### Non-goals
+
+- no movement of Gateway admission or Core meaning into audio code;
+- no movement of deterministic interruption or Soridormi safety authority;
+- no rewrite of conversation semantics while extracting lifecycle mechanics.
 
 ### Exit criteria
 
-- checked scope grows by directory or coherent contract family rather than
-  isolated showcase files;
-- no blanket `Any`, global ignore, import skipping, or scope removal is used to
-  manufacture a pass;
-- runtime tests and the pinned Mypy gate pass together.
+- microphone/VAD/ASR tasks have one owner and deterministic shutdown;
+- session registry and semantic state have documented, tested boundaries;
+- direct-LLM reachability in maintained profiles is proved and its compatibility
+  status is explicit;
+- interruption, barge-in, injected-audio, idle-session, and current live voice
+  regressions pass;
+- structural counts decrease under a monotonic ratchet.
 
-## Issue: Consolidate Documentation and Vocabulary
+## Issue: Reduce Supported Configuration Combinations
+
+Status: queued
+
+### Problem
+
+The repository documents 321 environment keys and has 295 literal runtime
+environment reads. These counts mix legitimate service internals with public
+deployment choices, but the operator documentation presents only four
+deployment modes. The supported combination set is therefore unclear and much
+larger than the tested profile set.
 
 ### Scope
 
-- keep the existing authority map and reduce repeated current claims to links;
-- merge the trace/event/observability documents into the smallest set that still
-  has clear contract and operational owners;
-- move superseded plans and archives out of the current reading path or delete
-  them when Git history is sufficient;
-- rewrite README and operator-facing claims in short, direct sentences;
-- keep only terms that identify a real authority, contract, state, or lifecycle.
+- derive a machine-readable inventory from typed settings and generated
+  profiles;
+- designate each key as public choice, profile constant, service internal,
+  acceptance override, or bounded compatibility alias;
+- make maintained speech and MuJoCo profiles own complete tested combinations;
+- keep physical operation experimental and fail closed until commissioned;
+- deprecate redundant public booleans with warnings, migration tests, and
+  removal criteria;
+- report a measured public-switch reduction in every patch.
+
+### Non-goals
+
+- no forced removal of internal resource/model values needed by services;
+- no arbitrary “under 15” closure if it hides required safety or hardware
+  distinctions;
+- no use of profile selection to bypass confirmation, Provider availability, or
+  source-bound evidence.
 
 ### Exit criteria
 
-- a new developer can find mission, status, delivery order, evidence workflow,
-  configuration, API, and runbook without reading historical migration prose;
-- every maintained document is linked by an entry point or mechanically required;
-- current documents do not contradict Status or Roadmap;
-- terminology has one definition and one canonical name.
+- supported combinations are enumerable and covered by profile tests;
+- an operator chooses a maintained mode without assembling dozens of booleans;
+- contradictory and unsupported combinations fail before startup;
+- public boolean and compatibility-alias counts are lower than the refreshed
+  baseline and protected by a ratchet;
+- Configuration, README, Runbook, and generated profile diagnostics agree.
+
+## Issue: Expand Mypy by Owned Package
+
+Status: queued
+
+### Problem
+
+The strict Mypy mechanism is implemented, but its ratchet contains only four
+files. That coverage is too small to protect cross-file contracts or the
+runtime seams created by decomposition.
+
+### Scope
+
+- replace file-by-file contract entries with all of
+  `shared/chromie_contracts/`;
+- add independently owned Orchestrator runtime packages after their lifecycle
+  boundaries stabilize;
+- require new files in a checked package to enter automatically;
+- retain strict optionality, return, ignore, and untyped-body rules.
+
+### Non-goals
+
+- no whole-tree strict conversion in one patch;
+- no blanket `Any`, import skipping, or mass ignore baseline;
+- no annotation churn mixed with behavior changes.
+
+### Exit criteria
+
+- all 23 current shared-contract Python files pass as one owned package;
+- a package-scoped ratchet cannot silently omit a newly added module;
+- the next runtime package is selected from the extracted ownership map and
+  passes independently;
+- Mypy scope grows monotonically and full gates pass.
+
+## Issue: Reduce the Current Documentation Surface
+
+Status: queued
+
+### Problem
+
+Chromie has strong evidence discipline but 125 repository Markdown files,
+including 80 directly under `docs/`, and a core index that previously presented
+dozens of “start here” links. Eight closely related trace/observability
+documents and three large in-tree archives are the clearest consolidation
+candidates.
+
+### Scope
+
+- keep the core reading path at no more than 15 documents;
+- merge trace schema, instrumentation, lifecycle, event, resource, and recovery
+  material into the smallest owned set that preserves real interfaces;
+- remove the three 2026-07-30 archives from the working tree after verifying
+  their commits and any still-current facts;
+- require every specialized document to have a current component/operator
+  entrypoint or a concrete mechanical contract beyond being listed in the
+  documentation index;
+- simplify prose and define necessary terms once.
+
+### Non-goals
+
+- no deletion of current safety, API, configuration, or evidence contracts;
+- no replacement with one giant document;
+- no loss of retained evidence identifiers or migration provenance that Git
+  history cannot supply.
+
+### Exit criteria
+
+- the core reading path is short and sufficient for a new collaborator;
+- trace documentation has one clear contract owner and no duplicated current
+  procedures;
+- historical archives no longer inflate or confuse the current tree;
+- total file and line counts decrease from a refreshed baseline;
+- `check_docs.py` enforces ownership rather than mere index presence;
+- links, authority, documentation, and full repository gates pass.
 
 ## Issue: Requalify the Simplified Runtime
 
-Run the same default source-bound closure after the accepted structural changes.
-The program closes only when behavior, cancellation, safety ownership, latency,
-and evidence completeness are no worse than the pre-change retained baseline,
-and every claim is bound to the final clean revisions.
+Status: queued; depends on all accepted simplification Issues
+
+Run the same default source-bound closure after the accepted structural
+changes. The program closes only when behavior, cancellation, safety ownership,
+latency, and evidence completeness are no worse than the retained baseline and
+every claim is bound to the final clean revisions.
 
 ## Issue: Secure Local Runtime Exposure
 
@@ -385,6 +720,9 @@ Bind local runtime services to loopback
 ```
 
 ## Issue: Make Runtime Failure Paths Explicit
+
+Status: first-intake audit implemented and automatically verified; the broader
+symbol-level classification is a separate current Issue.
 
 ### Problem
 
@@ -539,9 +877,9 @@ remain disabled. `config/ruff_scope.txt` is a sorted, duplicate-free monotonic
 ratchet over selected clean contract and tooling modules. `scripts/run_ruff.py`
 validates the executable version and scope before invoking Ruff, and the
 maintained test entrypoint runs the same command used by CI. No blanket ignore
-baseline was introduced. Focused Ruff gate tests and the maintained behavioral
-suite pass; actual Ruff execution requires the pinned dependency in the clean
-development/CI environment.
+baseline was introduced. The focused Ruff command passes on the 2026-07-31
+tree; retained full-suite evidence exists, but the current full suite is open
+under **Restore Canonical Local Gate Reproducibility**.
 
 Suggested commit:
 
@@ -550,6 +888,10 @@ Add high-signal Ruff enforcement
 ```
 
 ## Issue: Establish Incremental Type Checking
+
+Status: initial four-file mechanism implemented with retained automatic
+verification; current ratchet repair belongs to the active canonical-gate
+Issue; package-level expansion is queued separately.
 
 ### Problem
 
@@ -591,6 +933,9 @@ stale-ignore warnings, and strict equality without skipping imports.
 selected shared contracts and tooling boundaries. `scripts/run_mypy.py` validates
 the executable version and scope before invoking Mypy, and the maintained test
 entrypoint runs it after Ruff. No whole-module ignore baseline was introduced.
+The 2026-07-31 current-tree run exposes 42 errors in 11 imported files. Those
+errors must be fixed under **Restore Canonical Local Gate Reproducibility**
+before this boundary expands.
 
 Suggested commit:
 
@@ -705,7 +1050,8 @@ Add typed service configuration boundaries
 
 ## Issue: Decompose the VoiceAssistant Composition Root
 
-Status: implemented and automatically verified through the runtime-ready greeting collaborator and the post-extraction composition audit in `VOICE_ASSISTANT_COMPOSITION_ROOT.md`.
+Status: first-intake greeting extraction implemented and automatically verified;
+the 2026-07-31 re-audit supersedes the earlier structural-closure interpretation.
 
 
 ### Problem
@@ -750,8 +1096,9 @@ For every extraction activity:
 - cancellation and failure semantics are retained;
 - the maintained full tests and documentation checks pass.
 
-The Issue closes only after the agreed first decomposition set is complete and a
-new audit shows that remaining responsibilities are intentionally composed.
+The historical first-intake scope closed after the agreed greeting extraction.
+It does not close the current typed-settings, playback-delivery, or
+input/session lifecycle Issues.
 
 Suggested commit pattern:
 
@@ -761,7 +1108,10 @@ Extract <semantic collaborator> from VoiceAssistant
 
 ## Issue: Consolidate Current Documentation Authority
 
-Status: implemented and automatically verified. Current ownership is defined in `DOCUMENTATION_AUTHORITY.md`; detailed superseded narratives remain indexed historical archives.
+Status: first-intake authority mapping implemented and automatically verified;
+current-surface reduction is queued separately. Current ownership is defined in
+`DOCUMENTATION_AUTHORITY.md`; detailed superseded narratives remain indexed
+historical archives until the reduction Issue reviews them.
 
 
 ### Problem

@@ -32,6 +32,11 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 
 ## Change rules
 
+- Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md`. Until the canonical
+  local gate is reproducible and the current-revision live voice loop is
+  retained and the default target-evidence profile closes, feature,
+  architecture, flag, and terminology growth is frozen except for work that
+  closes those prerequisites or a demonstrated safety/provenance blocker.
 - Keep microphone, playback, VAD, interruption, and trusted Skill Runtime
   coordination in the host Orchestrator.
 - Keep robot-body execution and physical safety in Soridormi.
@@ -53,6 +58,11 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 - Run `scripts/check_repository_policies.py` for stable architecture and
   deployment boundaries. Policy exceptions must be exact, reviewed, and recorded
   only in `config/repository_policy_exceptions.json`; stale exceptions fail.
+- Prefer an existing owner over a new document, environment variable,
+  compatibility path, or architectural term. Any necessary addition must name
+  its owner, supported lifetime, validation, and the overlapping surface it
+  replaces or why none can be removed. Report before/after counts when one of
+  these repository surfaces grows.
 
 ## Tests
 

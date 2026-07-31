@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 This file is a concise resume aid. Current claims belong to
 [Current Status](STATUS.md), delivery order belongs to
@@ -27,22 +27,23 @@ The Host owns deterministic protective controls, validation, authorization,
 scheduling, cancellation, evidence, and lifecycle coordination. Soridormi owns
 backend selection, embodied feasibility, collision safety, stop, and recovery.
 
-The active Issue is **Close Current-Revision Target Evidence**. No retained bundle
-yet proves all required default-profile tracks for the current clean revisions.
-Automatic tests and historical bundles must not be promoted into that claim.
+The active Issue is **Restore Canonical Local Gate Reproducibility**. Direct
+unittest discovery runs 1,654 tests but ends with 5 failures and 8 errors;
+pinned Mypy reports 42 errors. No fresh full-suite automatic-verification claim
+or current-revision target-evidence claim is closed.
 
 ## What to do now
 
-- apply only fixes that remove a reproduced evidence or provenance blocker;
-- initialize a fresh closure root after every source change;
-- collect and review Gateway/Core, Agent Skill/weather, Social Attention, paired
-  MuJoCo, active cancellation, and second-machine LAN evidence;
-- keep physical voice and robot evidence in the supervised profile only;
-- finalize only from the exact clean revisions used to initialize the closure.
+- declare every imported test dependency, including `pytest`;
+- make Router removal distinguish ignored bytecode from maintained source;
+- isolate unit tests from generated runtime configuration;
+- repair the existing Mypy scope without ignores or scope removal;
+- require `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` to pass.
 
-During this Issue, freeze new architecture layers, ordinary behavior flags,
-standalone design documents, compatibility paths, and new project terminology.
-Prefer deleting stale code, configuration, or prose over adding another surface.
+Then retain one narrow current-revision physical microphone-to-audible-response
+bundle. After that, initialize a fresh closure root and collect the default
+Gateway/Core, Agent Skill/weather, Social Attention, paired MuJoCo, active
+cancellation, and second-machine LAN evidence.
 
 ## Work after evidence closure
 

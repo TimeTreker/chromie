@@ -1,9 +1,10 @@
 # Development Checkpoint
 
 **Development identity:** `development`
-**Status refresh date:** 2026-07-30
-**Current code Issue:** none.
-**Current evidence Issue:** Close Current-Revision Target Evidence.
+**Status refresh date:** 2026-07-31
+**Active prerequisite Issue:** **Restore Canonical Local Gate Reproducibility**
+**Next evidence Issues:** **Retain a Current-Revision Live Voice Loop**, then
+**Close Current-Revision Target Evidence**
 
 ## Resume point
 
@@ -40,12 +41,51 @@ feasibility, collision safety, stop, and recovery.
 Implementation and evidence claims are owned by [Current Status](docs/STATUS.md).
 Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 
-## Target-evidence resume point
+## Immediate resume point
 
-This is the only active delivery line. Freeze new architecture layers, ordinary
-behavior flags, standalone design documents, and project terminology unless a
-change is required to remove a reproduced evidence blocker. Prefer deletion,
-merging, or simplification over adding another compatibility surface.
+Do not start the live-evidence or queued structural work yet. First restore the
+documented dependency-light gate:
+
+- declare every imported test dependency, including `pytest`;
+- make Router-removal policy reject source and maintained contracts without
+  treating ignored bytecode residue as deployed Router source;
+- prevent generated `.env.runtime` values from changing TTS and LLM unit-test
+  behavior;
+- fix the pinned Mypy gate's 42 current errors without ignores or scope removal;
+- add focused order/environment-independence coverage;
+- finish with `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
+
+The post-rebase discovery run executed 1,654 tests in 14.921 seconds and
+ended with 5 failures and 8 errors. Pinned Mypy reports 42 errors across 11
+imported files while checking its configured four-file scope. Do not copy prior
+full-suite or static-gate pass claims forward.
+
+After that gate passes, extend the existing voice evidence verifier with a
+narrow profile for the supervised `speech-only` case. It must require:
+
+- clean Chromie source and captured running runtime identity;
+- physical microphone input and `asr_final`;
+- admitted Gateway/Core processing and applied `chat`;
+- zero executable skills;
+- correlated TTS schedule, playback start/end, and clean session completion;
+- an operator audible-output verdict;
+- `release_qualified=false` and no simulator/robot claim.
+
+The full seven-case supervised verifier must retain its current requirements.
+After focused and full gates pass, commit the verifier and collect one
+retained bundle from that exact revision. If the live run exposes a defect, fix
+the earliest responsible boundary and rerun this same proof.
+
+Detailed Issue scope is in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+
+## Broader target-evidence resume point
+
+After the canonical gate and narrow live voice proof close, this becomes the
+active delivery line. Freeze new architecture layers, ordinary behavior flags,
+standalone design documents, and project terminology unless a change is
+required to remove a reproduced evidence blocker. Prefer deletion, merging, or
+simplification over adding another compatibility surface.
 
 Use the single resumable workflow in
 [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). Initialize one clean
@@ -61,11 +101,13 @@ fingerprint-bound.
 After the default source-bound profile is retained and reviewed, continue one
 semantic Issue at a time:
 
-- audit and narrow broad runtime exception boundaries;
-- decompose `VoiceAssistant` around seams observed in live traces;
-- collapse direct environment parsing into typed, profile-owned settings;
+- classify and narrow broad runtime exception boundaries;
+- establish typed Host configuration snapshots;
+- extract playback delivery, then input/session lifecycle owners around seams
+  observed in live traces;
+- reduce unsupported configuration combinations;
 - expand Mypy by complete contract/runtime boundaries;
-- merge duplicated documentation and remove stale vocabulary;
+- merge duplicated documentation and remove stale vocabulary and archives;
 - rerun the source-bound evidence profile after structural changes.
 
 Detailed scope and exit criteria are in

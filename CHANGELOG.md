@@ -15,6 +15,25 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 - Emit GPU-process and Ollama-runner diagnostics when the TTS readiness probe
   still fails.
 
+### Proof-first repository simplification
+
+- Re-audited the current tree against an external maintainability review and
+  recorded reproducible baselines for the Orchestrator, configuration surface,
+  broad exception handlers, Mypy scope, and documentation surface.
+- Found that the documented local test setup is not currently hermetic:
+  `pytest` is undeclared, ignored Router bytecode trips the removal policy, and
+  generated runtime configuration leaks into TTS/LLM tests. Pinned Mypy also
+  exposes 42 errors beyond the existing ratchet. Made restoration of the
+  canonical gate the active Issue.
+- Queued a retained current-revision microphone-to-audible-response loop
+  immediately after the gate and before structural or feature work.
+- Queued independently closable exception, typed Host configuration,
+  playback/input lifecycle, configuration-profile, package-level typing, and
+  documentation-reduction Issues.
+- Shortened the README and core reading path, corrected stale Agent Skill
+  guidance, and added repository-surface growth rules for documents, flags,
+  compatibility paths, and terminology.
+
 ### Live Agent weather and planning reliability
 
 - Aligned Agent Skill selection schema, validation, repair prompts, context, and

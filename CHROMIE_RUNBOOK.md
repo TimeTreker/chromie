@@ -77,8 +77,9 @@ Stop services:
 
 The maintained Compose profile mounts `./agent-skills` at
 `/app/agent-skills:ro`. Startup validates the configured packages before the
-Agent becomes healthy. This Issue contains no domain Skill package and does not
-enable model selection.
+Agent becomes healthy. The repository currently includes approved grounded
+external-information and weather packages; model selection remains passive
+reasoning input and never registers or authorizes a Capability.
 
 ```bash
 curl -fsS http://127.0.0.1:8092/agent-skills | python -m json.tool

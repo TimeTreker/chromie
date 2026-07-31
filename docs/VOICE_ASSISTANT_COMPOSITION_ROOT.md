@@ -1,6 +1,7 @@
 # VoiceAssistant Composition Root
 
-Status: current composition and decomposition contract
+Status: first extraction implemented; further decomposition queued after
+current-revision live proof
 
 ## Role
 
@@ -34,27 +35,42 @@ and playback barrier semantics live in the collaborator. Existing timeout,
 fallback, injected-audio skip, cancellation, and playback ordering behavior is
 preserved.
 
-## Remaining decomposition backlog
+## Current structural baseline
 
-The first extraction proves the collaborator pattern; it does not retire the
-composition-root risk. The current archive still contains an 8,886-line module,
-a `VoiceAssistant` class with 167 directly declared methods, and a 615-line
-initializer. These counts are diagnostic signals, not mechanical limits. Further
-extraction begins only after current-revision target evidence is retained, then
-uses live traces and failure evidence to select one independently tested owner at
-a time.
+The 2026-07-31 re-audit found that the first extraction did not close the
+maintenance risk:
 
-The main candidate responsibilities are:
-
-| Responsibility | Required extraction boundary |
+| Measure | Current value |
 |---|---|
-| audio device creation and VAD/ASR handoff | one input-turn lifecycle owner with explicit queue and injected-audio contracts |
-| playback worker and synthesis ordering | one output/playback owner preserving interruption, cancellation, ordering, and delivery evidence |
+| `orchestrator/orchestrator.py` | 8,886 lines |
+| `VoiceAssistant` methods | 167 |
+| `VoiceAssistant.__init__` | 615 lines |
+| distinct `self` attributes initialized by `__init__` | 160 |
+
+These counts are baselines, not semantic quality measures. They show that
+calling all remaining responsibilities “intentionally composed” is not a
+sufficient closure criterion. Further extraction begins only after the
+canonical gate, current-revision live proof, and default target-evidence profile
+close, then uses live traces and failure evidence to select one independently
+tested owner at a time.
+
+## Queued ownership seams
+
+Further work is ordered by
+[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md):
+
+| Responsibility | Required ownership direction |
+|---|---|
+| Host configuration | immutable typed audio, cognition, playback, session, and evidence settings composed before `VoiceAssistant` |
+| playback delivery | one owner for TTS chunking, synthesis order, playback barriers, echo handling, cancellation, and delivery evidence |
+| input turn/session lifecycle | one owner for microphone/VAD/ASR tasks, injected audio, session registry, and deterministic shutdown |
+| direct-LLM compatibility path | prove maintained-profile reachability; remove it when unreachable or confine it to an explicit rollback contract |
 | Cognitive Gateway/Core turn dispatch | one turn-execution owner that delegates semantic work without gaining semantic authority |
-| stop, interruption, approval revocation, and active-Goal cancellation | an atomic deterministic control owner with explicit state transitions |
-| evidence, episode, and runtime trace recording | one observability coordinator with typed events and no semantic decisions |
+| observability recording | keep storage mechanics delegated and move lifecycle sampling only when a concrete owner can preserve correlation |
+| stop, interruption, approval revocation, and active-Goal cancellation | remain atomic and Host-owned unless a narrow collaborator preserves the exact deterministic contract |
 | cleanup | the root retains only top-level reverse-order collaborator shutdown |
 
-This audit is not a prohibition on future extraction. Each future activity must
-name a concrete seam, preserve ordering and cancellation, add narrow tests, and
-leave `VoiceAssistant` as the public lifecycle owner.
+Each activity must reduce the structural baseline, preserve ordering and
+cancellation, add narrow tests, and leave `VoiceAssistant` as the public
+lifecycle owner. Arbitrary file-size or method-count targets do not replace
+behavioral evidence.

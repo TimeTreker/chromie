@@ -1,6 +1,7 @@
 # Repository Engineering Policies
 
-Status: implemented and automatically verified
+Status: mechanism implemented; retained automatic verification exists; current
+local gate repair is active
 Scope: stable source, architecture, Agent Skill, contract, and local deployment
 boundaries
 
@@ -25,6 +26,13 @@ The checker is dependency-light. It uses the Python AST, JSON, the maintained
 Compose source checker, and the existing removed-Router guard. It does not call a
 model, inspect prompt meaning, choose an Agent Skill, or evaluate benchmark
 answers.
+
+On the 2026-07-31 maintained working tree, ignored historical bytecode under
+`router/app/__pycache__/` makes the removed-Router guard fail because it tests
+only whether the top-level path exists. The active canonical-gate Issue must
+distinguish ignored cache residue from maintained source without weakening any
+Router service, import, contract, or architecture prohibition. Until that
+closes, do not claim a fresh current policy-gate pass.
 
 ## Rule ownership
 
@@ -129,10 +137,12 @@ This gate does not:
 
 ## Automatic evidence
 
-Focused tests inject one violation for each of the thirteen rule families, verify machine-readable
-output, verify exact exception matching, and require stale exceptions to fail.
-The full maintained suite proves that the canonical gate composes with existing
-unit, architecture, documentation, benchmark, and legacy Agent tests.
+Focused tests inject one violation for each of the thirteen rule families,
+verify machine-readable output, verify exact exception matching, and require
+stale exceptions to fail. Retained full-suite evidence showed that the
+canonical gate composes with unit, architecture, documentation, benchmark, and
+legacy Agent tests. The current working-tree gate is open for the ignored-cache
+reason above; historical success must not be presented as a fresh pass.
 
 Automatic policy success is implementation evidence. It does not prove live
 provider behavior, LAN isolation on a deployed host, microphone/speaker quality,

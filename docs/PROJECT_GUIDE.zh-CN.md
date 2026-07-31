@@ -45,11 +45,15 @@ Soridormi 负责：
 
 ## 当前状态
 
-当前重点是 **在统一 Goal-driven Runtime 与单一语义权威边界上重新保留
-当前源码对应的语音及文本到 MuJoCo 证据**。仓库使用 `development` 作为中性
-开发身份，当前没有版本发布或公开分发计划。Chromie 是真实的主机控制平面；
-这里的 `sim` 只表示 Soridormi 使用 MuJoCo 模式执行机器人动作，不代表实体
-机器人支持。
+当前第一优先级是 **恢复可复现的本地标准测试门禁**。2026-07-31 的直接测试
+运行执行了 1,654 个用例，但因测试依赖声明、旧 Router 字节码判断和运行环境
+变量泄漏而出现 5 个失败、8 个错误；固定版本的 Mypy 也报告了 42 个错误。
+门禁恢复后，下一项才是保留当前源码对应的最小真实语音闭环证据：真实麦克风
+输入，经 ASR、Cognitive Gateway、
+Goal-driven chat、TTS 到可听播放。这两个前置项完成前，除直接修复或明确的
+安全/来源阻塞外，不新增功能架构、运行开关或术语。之后再继续当前版本的
+Gateway/Core、取消和 MuJoCo 证据。仓库使用 `development` 作为中性开发
+身份，当前没有版本发布或公开分发计划。
 
 已完成的开发基础包括：
 
@@ -75,7 +79,7 @@ acoustic 模式使用 TTS 生成语音，通过主机扬声器播放并由配置
 可以降低人工语音测试成本。真实人声、真实麦克风/扬声器支持声明和人工审核
 需要单独完成 supervised 验收。现阶段不能宣称实体机器人支持。
 
-## Agent Skills 新架构 Issue
+## Agent Skills
 
 Chromie 已接受 Agent Skills 架构：Agent 在自己的职责范围内，根据当前
 Goal 和上下文选择零个、一个或多个 Agent Skills，并生成本次 Plan；Skill
@@ -84,18 +88,21 @@ Plan 最终仍只能通过 `capability_id` 调用已注册 Capability，并经�
 Capability Runtime（当前代码兼容名仍为 Trusted Skill Runtime）与
 Provider/Soridormi 校验。
 
-当前仅完成文档和实施计划，运行时代码尚未实现。下一项代码工作是先把
-`capability_id` 设为可执行 Plan、请求、结果和 Trace 的规范字段，同时保留有界的
-`skill_id` 兼容读取；之后再实现通用的 Agent Skill 合同与 owner-approved 只读
-Loader。不能从天气关键词映射或固定 Workflow 开始。详见 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) 和
+该架构已经实现：当前输出使用 `capability_id`，保留有界的历史
+`skill_id` 读取；仓库拥有只读 Loader、模型选择、按 Agent 职责投影、Plan
+provenance，以及 grounded external information 与 weather 两个方法包。真实
+模型选择和 Provider-backed weather 仍需保留当前版本的目标证据。详见
+[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) 和
 [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)。
 
 ## 开发主线
 
-- **当前代码 Issue**：先完成 `skill_id` → `capability_id` 的兼容迁移，再建立
-  Agent Skill 通用合同和 owner-approved 只读 Loader，随后依次完成模型选择、
-  Agent 投影、Plan provenance、grounded external information 与 weather vertical
-  slice。
+- **当前 Issue**：为现有 supervised `speech-only` runner 增加独立、严格的
+  source-bound verifier profile，并从提交后的同一 revision 保留一次真实麦克风
+  到可听播放的通过证据。
+- **后续工程 Issue**：依次完成 broad exception 分类、Host typed settings、
+  playback/input lifecycle 拆分、受支持配置组合收缩、按 package 扩大 Mypy、
+  文档表面收缩。
 - **开放证据 Issue**：保留统一 Goal-driven Runtime 的干净、来源绑定 live-text、
   active cancellation 和 MuJoCo safe-idle 证据。
 - **取消证据**：named-goal 精确取消、Goal 状态原子协调和剩余确认令牌重建已

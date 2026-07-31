@@ -21,6 +21,12 @@ Status: current normative documentation-governance contract
 Lower-authority documents link to these owners instead of restating full current
 claims. Component documents own local implementation details only.
 
+The [Documentation Index](README.md) maintains a core reading path of no more
+than 15 documents. The complete reference catalog is not a required reading
+list. A specialized document needs a current component/operator audience or a
+concrete mechanically checked contract; being linked only from the index is not
+permanent justification.
+
 ## Four-axis status vocabulary
 
 Current claims use four separate axes:
@@ -43,6 +49,12 @@ Status: historical archive; not current authority
 
 Current archives are indexed from [Documentation Index](README.md). They must not
 be cited as the owner of current architecture, status, or delivery order.
+
+The current registry still contains three 2026-07-30 archives. Their removal
+from the working tree is queued under
+[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
+after current facts and Git-history provenance are verified. Until then they
+remain explicitly non-authoritative.
 
 ## Mechanical governance
 

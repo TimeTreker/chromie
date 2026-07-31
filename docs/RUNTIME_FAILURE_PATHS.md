@@ -1,6 +1,7 @@
 # Runtime Failure Paths
 
-Status: implemented and automatically verified
+Status: first failure-path audit implemented; complete broad-handler
+classification queued
 Scope: maintained Agent, Orchestrator, shared Runtime/contract, audio-service,
 and generated-runtime-environment boundaries
 
@@ -76,9 +77,20 @@ The audit covered:
 - `asr/` and maintained `tts/` optional protocol/telemetry parsing;
 - `scripts/generate_runtime_env.py`, which is part of every supported launch.
 
-Remaining broad handlers are intentional boundaries that already re-raise,
-return typed failure results, or log a defined degradation. Stable enforcement is
-now centralized in the dependency-light checker documented by
+The 2026-07-31 re-audit found 141 remaining `except Exception` handlers: 85 in
+Orchestrator, 53 in Agent, and 3 in shared runtime, including 57 in
+`orchestrator/orchestrator.py`. The current policy checker rejects trivially
+silent broad handlers, but it does not maintain a complete reviewed
+classification for every remaining symbol. The earlier statement that every
+remaining handler was already intentional was therefore stronger than the
+mechanical evidence.
+
+The queued
+[broad exception Issue](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
+will inventory each handler and require one explicit outcome: narrow/re-raise,
+typed failure mapping, fail-closed containment, or expected cleanup that
+preserves the primary failure and records a diagnostic. Stable enforcement must
+remain centralized in the dependency-light checker documented by
 [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).
 
 ## Automatic evidence
@@ -98,10 +110,10 @@ tracks.
 
 ## Post-evidence narrowing audit
 
-The classification above records the completed first audit, not proof that every
-remaining broad catch is permanently optimal. The current archive contains 142
-`except Exception` handlers across `orchestrator/`, `agent/`, and `shared/`. After
-the source-bound runtime baseline closes, each handler must retain an explicit
-reviewed classification and regression boundary. Model, provider, execution,
-cancellation, state, and evidence paths take priority; expected cleanup may stay
-contained when it cannot replace the primary failure.
+The classification above records the completed first audit, not proof that
+every remaining broad catch is permanently optimal. The current tree contains
+141 `except Exception` handlers across `orchestrator/`, `agent/`, and `shared/`.
+After the source-bound runtime baseline closes, each handler must retain an
+explicit reviewed classification and regression boundary. Model, provider,
+execution, cancellation, state, and evidence paths take priority; expected
+cleanup may stay contained when it cannot replace the primary failure.
