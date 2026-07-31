@@ -53,12 +53,10 @@ annotations, checks untyped bodies, forbids implicit optional values, and report
 unsafe `Any` returns and stale ignores. It does not skip imports or enable a
 whole-tree error suppression.
 
-The current baseline contains four files. The mechanism is implemented, but
-that is not meaningful package coverage. On the 2026-07-31 maintained tree,
-the pinned Mypy 2.3.0 command reports 42 errors across 11 imported files while
-checking those four entries. Restoring the existing ratchet without ignores or
-scope removal belongs to the active canonical-gate Issue; package expansion
-must not begin first.
+The current baseline contains four files. The mechanism is implemented and the
+pinned Mypy 2.3.0 command passes that scope on the 2026-07-31 maintained tree
+without ignores or scope removal, but four files are not meaningful package
+coverage.
 
 After the existing gate is clean, the queued expansion replaces file-by-file
 contract entries with all 23 current Python files under

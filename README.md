@@ -21,13 +21,12 @@ experience artifacts. See
 > authoritative chat in the common safe base; the maintained Soridormi launcher
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
-> The active Issue is to restore a reproducible canonical local gate; the
-> current run executes 1,654 tests but ends with 5 failures and 8 errors, and
-> pinned Mypy reports 42 errors. Test dependencies, runtime-environment
-> isolation, ignored-cache policy, and the current typed boundary all need
-> repair. A clean live microphone-to-audible-response proof follows, then
-> broader Gateway/Core and MuJoCo evidence. No release version or publication
-> target is planned. See
+> The canonical local gate is reproducible again: repository policy,
+> test-ownership, Ruff, Mypy, documentation, 1,656 primary tests, and 20 legacy
+> Agent tests pass from the documented setup. The active Issue is now a clean
+> current-revision microphone-to-audible-response proof, followed by broader
+> Gateway/Core and MuJoCo evidence. No release version or publication target is
+> planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
 > **Implemented Agent Skills architecture:** Agent Skills are passive,

@@ -4,32 +4,22 @@ The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
 are tracked in [Status](docs/STATUS.md).
 
-## Active Issue — Restore Canonical Local Gate Reproducibility
+## Completed prerequisite — Restore Canonical Local Gate Reproducibility
 
-Before collecting new target evidence or beginning structural work, restore the
-documented dependency-light test contract. The 2026-07-31 re-audit installed
-`requirements-test.txt` and ran 1,654 unittest cases, but the run ended with 5
-failures and 8 errors; the pinned four-file Mypy ratchet also reports 42 errors
-across 11 imported files:
+The documented dependency-light test contract is reproducible again. The
+2026-07-31 canonical run installed `requirements-test.txt`, passed repository
+policy, test-ownership, Ruff, Mypy, and documentation gates, then passed 1,656
+primary tests plus 20 legacy Agent tests. The repair declared `pytest`, made the
+Router-removal check ignore cache-only residue while still rejecting maintained
+Router content, moved generated runtime configuration behind explicit startup,
+and repaired the existing four-file Mypy ratchet without ignores or scope
+removal.
 
-- one test imports undeclared `pytest`;
-- ignored historical Router bytecode makes the Router-removal policy treat a
-  deleted source tree as present;
-- generated runtime configuration leaks deployment TTS and LLM values into
-  unit tests;
-- the current typed-contract boundary has drifted beyond its pinned ratchet.
+## Active Issue — Retain a Current-Revision Live Voice Loop
 
-The active Issue must fix those owned boundaries without weakening Router
-removal or deleting user caches as a workaround. Its exit is a passing
-`INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` from the documented setup.
-Detailed scope and exit criteria are in
-[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
-
-## Next proof Issue — Retain a Current-Revision Live Voice Loop
-
-After the canonical gate passes—and before further architecture, feature,
-configuration, terminology, or broad documentation growth—retain the smallest
-complete proof of the current Goal-driven authority path:
+Before further architecture, feature, configuration, terminology, or broad
+documentation growth, retain the smallest complete proof of the current
+Goal-driven authority path:
 
 ```text
 physical microphone
@@ -55,7 +45,7 @@ Detailed scope and exit criteria are in
 
 ## Next evidence and simplification Issues
 
-After the canonical gate and live proof pass, close the default
+After the live proof passes, close the default
 `source_bound_development` target-evidence profile. It must retain reviewed
 current-revision Gateway/Core, Agent Skill/weather, Social Attention, paired
 MuJoCo, and second-machine LAN evidence.
@@ -287,11 +277,10 @@ and behavior-preserving playback/input lifecycle extractions after the current
 live proof and target-evidence closure. See
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
-The first engineering-sustainability intake is complete. The active named Issue
-is **Restore Canonical Local Gate Reproducibility**. **Retain a
-Current-Revision Live Voice Loop** and **Close Current-Revision Target
-Evidence** follow it; later simplification Issues are queued behind all three in
-the same plan.
+The first engineering-sustainability intake and canonical local-gate repair are
+complete. The active named Issue is **Retain a Current-Revision Live Voice
+Loop**. **Close Current-Revision Target Evidence** follows it; later
+simplification Issues are queued behind the evidence work in the same plan.
 
 Exit criteria:
 

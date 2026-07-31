@@ -19,7 +19,7 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Latest discovery ran 1,654 tests with 5 failures and 8 errors; pinned Mypy reports 42 errors; reproducibility repair active | Not applicable | Not applicable | Not applicable |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
 | Narrow current-revision live voice loop | Component and evidence checks exist; narrow verifier profile open | Deployed speech-only runner exists | Not applicable | Clean supervised microphone/audible bundle open |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
@@ -51,9 +51,8 @@ audio-device quality.
 
 ## Proof-before-refactor live voice profile
 
-After restoring the canonical local gate, the next repository Issue is to
-retain the smallest complete current-revision live loop before structural
-refactoring:
+With the canonical local gate restored, the active repository Issue is to retain
+the smallest complete current-revision live loop before structural refactoring:
 
 ```text
 physical microphone

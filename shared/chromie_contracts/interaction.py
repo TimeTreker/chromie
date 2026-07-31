@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Self, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -51,6 +52,7 @@ _FIELD_SEPARATOR = re.compile(r"[^a-z0-9]+")
 
 RAW_PLANAR_CONTROLLER_FIELDS = frozenset({"vx", "vy", "yaw"})
 _OUTPUT_SCHEMA_DIGEST_DOMAIN = b"chromie-output-schema-v1\x00"
+_ValueT = TypeVar("_ValueT")
 
 
 def output_schema_sha256(output_schema: dict[str, Any]) -> str:
@@ -110,7 +112,11 @@ def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | No
     return None
 
 
-def reject_forbidden_low_level_fields(value: Any, *, path: str = "$") -> Any:
+def reject_forbidden_low_level_fields(
+    value: _ValueT,
+    *,
+    path: str = "$",
+) -> _ValueT:
     if isinstance(value, dict):
         for key, item in value.items():
             expanded = _FIELD_CAMEL_BOUNDARY.sub(" ", str(key).strip())
@@ -234,17 +240,9 @@ def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
     return schema
 
 
-def normalize_capability_identity_payload(value: Any) -> Any:
-    """Normalize one bounded legacy ``skill_id`` input to ``capability_id``.
-
-    New contracts serialize only ``capability_id``.  Historical payloads may
-    still provide ``skill_id`` at declared decode/persistence boundaries.  A
-    payload containing both names is accepted only when the normalized values
-    are identical; contradictory executable identity fails closed.
-    """
-
-    if not isinstance(value, dict):
-        return value
+def _normalize_capability_identity_mapping(
+    value: Mapping[str, Any],
+) -> dict[str, Any]:
     payload = dict(value)
     has_capability = "capability_id" in payload
     has_legacy = "skill_id" in payload
@@ -265,6 +263,37 @@ def normalize_capability_identity_payload(value: Any) -> Any:
     return payload
 
 
+def normalize_capability_identity_payload(value: Any) -> Any:
+    """Normalize one bounded legacy ``skill_id`` input to ``capability_id``.
+
+    New contracts serialize only ``capability_id``.  Historical payloads may
+    still provide ``skill_id`` at declared decode/persistence boundaries.  A
+    payload containing both names is accepted only when the normalized values
+    are identical; contradictory executable identity fails closed.
+    """
+
+    if not isinstance(value, Mapping):
+        return value
+    return _normalize_capability_identity_mapping(value)
+
+
+def _normalize_optional_capability_identity_mapping(
+    value: Mapping[str, Any],
+) -> dict[str, Any]:
+    payload = dict(value)
+    if "capability_id" not in payload and "skill_id" not in payload:
+        return payload
+    capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
+    legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
+    if capability_id and legacy_skill_id and capability_id != legacy_skill_id:
+        raise ValueError(
+            "conflicting capability_id and legacy skill_id executable identities"
+        )
+    payload["capability_id"] = capability_id or legacy_skill_id or None
+    payload.pop("skill_id", None)
+    return payload
+
+
 class OptionalCapabilityIdentityModel(BaseModel):
     """Optional canonical executable identity with bounded legacy input support."""
 
@@ -273,20 +302,9 @@ class OptionalCapabilityIdentityModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_identity(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
+        if not isinstance(value, Mapping):
             return value
-        payload = dict(value)
-        if "capability_id" not in payload and "skill_id" not in payload:
-            return payload
-        capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
-        legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
-        if capability_id and legacy_skill_id and capability_id != legacy_skill_id:
-            raise ValueError(
-                "conflicting capability_id and legacy skill_id executable identities"
-            )
-        payload["capability_id"] = capability_id or legacy_skill_id or None
-        payload.pop("skill_id", None)
-        return payload
+        return _normalize_optional_capability_identity_mapping(value)
 
     @field_validator("capability_id", mode="before")
     @classmethod
@@ -302,8 +320,17 @@ class OptionalCapabilityIdentityModel(BaseModel):
 
         return self.capability_id
 
-    def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False):
-        normalized = self.normalize_legacy_identity(update) if update else update
+    def model_copy(
+        self,
+        *,
+        update: Mapping[str, Any] | None = None,
+        deep: bool = False,
+    ) -> Self:
+        normalized = (
+            _normalize_optional_capability_identity_mapping(update)
+            if update is not None
+            else None
+        )
         return super().model_copy(update=normalized, deep=deep)
 
 
@@ -330,8 +357,17 @@ class CapabilityIdentityModel(BaseModel):
 
         return self.capability_id
 
-    def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False):
-        normalized = normalize_capability_identity_payload(update) if update else update
+    def model_copy(
+        self,
+        *,
+        update: Mapping[str, Any] | None = None,
+        deep: bool = False,
+    ) -> Self:
+        normalized = (
+            _normalize_capability_identity_mapping(update)
+            if update is not None
+            else None
+        )
         return super().model_copy(update=normalized, deep=deep)
 
 

@@ -49,10 +49,10 @@ maintenance risk:
 
 These counts are baselines, not semantic quality measures. They show that
 calling all remaining responsibilities “intentionally composed” is not a
-sufficient closure criterion. Further extraction begins only after the
-canonical gate, current-revision live proof, and default target-evidence profile
-close, then uses live traces and failure evidence to select one independently
-tested owner at a time.
+sufficient closure criterion. The canonical gate prerequisite is complete.
+Further extraction begins only after the current-revision live proof and default
+target-evidence profile close, then uses live traces and failure evidence to
+select one independently tested owner at a time.
 
 ## Queued ownership seams
 

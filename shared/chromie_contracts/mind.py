@@ -463,11 +463,11 @@ class MindProfile(BaseModel):
             ),
             "Core principles, owner-approved and not experience-mutable:",
         ]
-        for item in self.core_principles:
-            lines.append(f"- {item.principle_id}: {item.statement}")
+        for principle in self.core_principles:
+            lines.append(f"- {principle.principle_id}: {principle.statement}")
         lines.append("Long-term goals:")
-        for item in self.long_term_goals:
-            lines.append(f"- {item.goal_id}: {item.statement}")
+        for goal in self.long_term_goals:
+            lines.append(f"- {goal.goal_id}: {goal.statement}")
         lines.append("Reflex policy:")
         lines.extend(f"- {item}" for item in self.reflex_policy)
         lines.append("Deliberation policy:")

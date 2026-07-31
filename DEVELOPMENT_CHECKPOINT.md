@@ -2,9 +2,8 @@
 
 **Development identity:** `development`
 **Status refresh date:** 2026-07-31
-**Active prerequisite Issue:** **Restore Canonical Local Gate Reproducibility**
-**Next evidence Issues:** **Retain a Current-Revision Live Voice Loop**, then
-**Close Current-Revision Target Evidence**
+**Active prerequisite Issue:** **Retain a Current-Revision Live Voice Loop**
+**Next evidence Issue:** **Close Current-Revision Target Evidence**
 
 ## Resume point
 
@@ -43,25 +42,13 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 
 ## Immediate resume point
 
-Do not start the live-evidence or queued structural work yet. First restore the
-documented dependency-light gate:
+The canonical local gate is restored. On 2026-07-31,
+`INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
+test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
+1,656 primary tests, and 20 legacy Agent tests.
 
-- declare every imported test dependency, including `pytest`;
-- make Router-removal policy reject source and maintained contracts without
-  treating ignored bytecode residue as deployed Router source;
-- prevent generated `.env.runtime` values from changing TTS and LLM unit-test
-  behavior;
-- fix the pinned Mypy gate's 42 current errors without ignores or scope removal;
-- add focused order/environment-independence coverage;
-- finish with `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
-
-The post-rebase discovery run executed 1,654 tests in 14.921 seconds and
-ended with 5 failures and 8 errors. Pinned Mypy reports 42 errors across 11
-imported files while checking its configured four-file scope. Do not copy prior
-full-suite or static-gate pass claims forward.
-
-After that gate passes, extend the existing voice evidence verifier with a
-narrow profile for the supervised `speech-only` case. It must require:
+Now extend the existing voice evidence verifier with a narrow profile for the
+supervised `speech-only` case. It must require:
 
 - clean Chromie source and captured running runtime identity;
 - physical microphone input and `asr_final`;
@@ -72,17 +59,17 @@ narrow profile for the supervised `speech-only` case. It must require:
 - `release_qualified=false` and no simulator/robot claim.
 
 The full seven-case supervised verifier must retain its current requirements.
-After focused and full gates pass, commit the verifier and collect one
-retained bundle from that exact revision. If the live run exposes a defect, fix
-the earliest responsible boundary and rerun this same proof.
+After focused and full gates pass, commit the verifier and collect one retained
+bundle from that exact clean revision. If the live run exposes a defect, fix the
+earliest responsible boundary and rerun this same proof.
 
 Detailed Issue scope is in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 ## Broader target-evidence resume point
 
-After the canonical gate and narrow live voice proof close, this becomes the
-active delivery line. Freeze new architecture layers, ordinary behavior flags,
+After the narrow live voice proof closes, this becomes the active delivery
+line. Freeze new architecture layers, ordinary behavior flags,
 standalone design documents, and project terminology unless a change is
 required to remove a reproduced evidence blocker. Prefer deletion, merging, or
 simplification over adding another compatibility surface.

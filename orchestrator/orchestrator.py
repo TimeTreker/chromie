@@ -17,8 +17,21 @@ from dotenv import load_dotenv
 
 ORCH_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ORCH_DIR.parent
-load_dotenv(PROJECT_ROOT / ".env.runtime")
-load_dotenv(ORCH_DIR / ".env.local")
+
+
+def load_runtime_environment(
+    *,
+    project_root: Path = PROJECT_ROOT,
+    orchestrator_dir: Path = ORCH_DIR,
+) -> None:
+    """Load generated runtime configuration only for an explicit bootstrap."""
+
+    load_dotenv(project_root / ".env.runtime")
+    load_dotenv(orchestrator_dir / ".env.local")
+
+
+if __name__ == "__main__":
+    load_runtime_environment()
 
 import aiohttp
 import numpy as np

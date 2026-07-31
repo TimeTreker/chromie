@@ -27,23 +27,26 @@ The Host owns deterministic protective controls, validation, authorization,
 scheduling, cancellation, evidence, and lifecycle coordination. Soridormi owns
 backend selection, embodied feasibility, collision safety, stop, and recovery.
 
-The active Issue is **Restore Canonical Local Gate Reproducibility**. Direct
-unittest discovery runs 1,654 tests but ends with 5 failures and 8 errors;
-pinned Mypy reports 42 errors. No fresh full-suite automatic-verification claim
-or current-revision target-evidence claim is closed.
+The canonical local gate is restored: repository policy, test ownership, Ruff,
+Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests pass. The
+active Issue is **Retain a Current-Revision Live Voice Loop**. No
+current-revision live or broader target-evidence claim is closed.
 
 ## What to do now
 
-- declare every imported test dependency, including `pytest`;
-- make Router removal distinguish ignored bytecode from maintained source;
-- isolate unit tests from generated runtime configuration;
-- repair the existing Mypy scope without ignores or scope removal;
-- require `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` to pass.
+- add a narrow verifier profile for the supervised `speech-only` case while
+  retaining every requirement of the full seven-case verifier;
+- require clean source and running runtime identity, physical microphone input,
+  `asr_final`, admitted Gateway/Core chat with zero executable skills, correlated
+  TTS playback completion, and an operator audible-output verdict;
+- keep `release_qualified=false` and make no Soridormi, simulator, or robot
+  claim;
+- commit the verifier after focused and canonical gates pass, then collect and
+  review one bundle from that exact revision.
 
-Then retain one narrow current-revision physical microphone-to-audible-response
-bundle. After that, initialize a fresh closure root and collect the default
-Gateway/Core, Agent Skill/weather, Social Attention, paired MuJoCo, active
-cancellation, and second-machine LAN evidence.
+After that, initialize a fresh closure root and collect the default Gateway/Core,
+Agent Skill/weather, Social Attention, paired MuJoCo, active cancellation, and
+second-machine LAN evidence.
 
 ## Work after evidence closure
 

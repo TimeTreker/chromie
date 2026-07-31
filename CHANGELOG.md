@@ -20,13 +20,14 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 - Re-audited the current tree against an external maintainability review and
   recorded reproducible baselines for the Orchestrator, configuration surface,
   broad exception handlers, Mypy scope, and documentation surface.
-- Found that the documented local test setup is not currently hermetic:
-  `pytest` is undeclared, ignored Router bytecode trips the removal policy, and
-  generated runtime configuration leaks into TTS/LLM tests. Pinned Mypy also
-  exposes 42 errors beyond the existing ratchet. Made restoration of the
-  canonical gate the active Issue.
-- Queued a retained current-revision microphone-to-audible-response loop
-  immediately after the gate and before structural or feature work.
+- Reproduced and repaired the non-hermetic local test setup: declared `pytest`,
+  distinguished ignored Router cache residue from maintained source, isolated
+  generated runtime configuration behind explicit startup, and restored the
+  pinned Mypy ratchet without ignores or scope removal.
+- Passed the canonical gate with repository policy, test ownership, Ruff,
+  Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests.
+- Activated the retained current-revision microphone-to-audible-response loop
+  before structural or feature work.
 - Queued independently closable exception, typed Host configuration,
   playback/input lifecycle, configuration-profile, package-level typing, and
   documentation-reduction Issues.

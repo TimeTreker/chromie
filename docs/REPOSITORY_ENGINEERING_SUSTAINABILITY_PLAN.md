@@ -1,7 +1,7 @@
 # Repository Engineering Sustainability Plan
 
 Status: current repository-proof and simplification plan; active Issue is
-**Restore Canonical Local Gate Reproducibility**
+**Retain a Current-Revision Live Voice Loop**
 
 This document records engineering recommendations accepted after
 repository-wide external reviews and decomposes them into independently
@@ -9,9 +9,9 @@ closable Issues. The first intake produced the completed safeguards retained
 below. A 2026-07-31 current-tree re-audit opened a second, evidence-first set of
 Issues because the remaining repository size and configuration surface were not
 resolved by one greeting extraction, a four-file Mypy ratchet, or documentation
-indexing. Validation during that re-audit also found that the declared local
-test setup does not currently reproduce a passing canonical gate, so that
-prerequisite precedes live proof and structural work.
+indexing. Validation during that re-audit also found and drove repair of a
+non-reproducible canonical local gate. The current-revision live proof now
+precedes broader target evidence and structural work.
 
 The plan is intentionally not one broad refactor. Each Issue must preserve the
 Goal-driven single semantic authority, deterministic Host safety boundaries,
@@ -130,10 +130,10 @@ The following recommendations are not part of the current program:
 ## Delivery rules
 
 - Work one Issue at a time. Only one Issue from this program may be active.
-- Restore the canonical local gate, then retain the current-revision live proof
-  before starting the queued structural Issues. If either exposes a defect, fix
-  the earliest responsible boundary and rerun the same evidence before
-  continuing.
+- Retain the current-revision live proof, then close the default target-evidence
+  profile before starting the queued structural Issues. If either exposes a
+  defect, fix the earliest responsible boundary and rerun the same evidence
+  before continuing.
 - Use the semantic Issue names below; do not introduce numbered Step, Stage,
   Phase, or milestone identities.
 - Re-audit the current tree at Issue start. Counts from the originating review
@@ -169,8 +169,8 @@ measurements from `aedfebabe5d7f519c0a21863a75acb6918382764`:
 | `except Exception` handlers | 141: 85 Orchestrator, 53 Agent, 3 shared; 57 in `orchestrator.py` | The existing gate rejects only trivially silent handlers; a complete classification is still open. |
 | Markdown surface | 125 repository files, including 80 directly under `docs/`; 31,438 lines | The core reading path and specialized reference set are not clearly separated. |
 | In-tree historical archives | 3 files; 237,276 bytes | They are indexed and marked historical, but Git history may be the better owner. |
-| Canonical local gate | `python -m unittest discover -s tests -q` runs 1,654 tests but ends with 5 failures and 8 errors after installing the declared test dependencies; pinned Mypy reports 42 errors in 11 imported files while checking its 4-file scope | Ignored stale Router bytecode trips the policy gate; `pytest` is imported but undeclared; generated runtime configuration leaks into TTS provider and LLM-budget tests; the checked type boundary has drifted beyond its ratchet. |
-| Current-revision retained live voice loop | none | This follows restoration of the canonical gate and blocks structural work. |
+| Canonical local gate | At Issue intake, `python -m unittest discover -s tests -q` ran 1,654 tests but ended with 5 failures and 8 errors; pinned Mypy reported 42 errors in 11 imported files while checking its 4-file scope | Historical reproduced baseline; the Issue and its current result are recorded below. |
+| Current-revision retained live voice loop | none | This is now active and blocks broader target evidence and structural work. |
 
 These are source observations, not automatic or target validation. Every later
 Issue must refresh its own baseline because counts may change.
@@ -181,8 +181,8 @@ Issue must refresh its own baseline because counts may change.
 
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
-| Restore Canonical Local Gate Reproducibility | **active** | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
-| Retain a Current-Revision Live Voice Loop | queued | canonical local gate | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on the current revision. |
+| Restore Canonical Local Gate Reproducibility | implemented and automatically verified | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
+| Retain a Current-Revision Live Voice Loop | **active** | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on the current revision. |
 | Close Current-Revision Target Evidence | queued | current live voice loop | Retain and review the complete default source-bound evidence profile before structural work. |
 | Classify Broad Runtime Exception Boundaries | queued | target-evidence closure | Ensure every broad handler has an explicit failure contract and regression boundary. |
 | Establish Typed Host Configuration Snapshots | queued | broad-exception classification | Stop `VoiceAssistant` from parsing its operating environment across a 615-line constructor. |
@@ -199,10 +199,10 @@ Issue must refresh its own baseline because counts may change.
 |---|---|---|---|
 | Secure Local Runtime Exposure | implemented and automatically verified; local target validation pending | none | Remove unintended LAN exposure from the default local Compose profile. |
 | Make Runtime Failure Paths Explicit | implemented and automatically verified | none | Replace silent operational failures and production assertions with intentional, observable invariants. |
-| Establish Repository Engineering Policy Checks | mechanism implemented; retained verification exists; current cache-residue repair active | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
+| Establish Repository Engineering Policy Checks | implemented and automatically verified | Runtime Failure Paths audit complete | Convert stable source and deployment principles into dependency-light AST/configuration checks. |
 | Introduce High-Signal Ruff Gates | implemented and automatically verified | Engineering Policy Checks | Add defect-oriented lint enforcement without broad formatting churn. |
-| Establish Incremental Type Checking | mechanism implemented; retained verification exists; current ratchet repair active | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
-| Modernize Behavioral and Architecture Tests | first intake implemented; retained verification exists; current dependency/environment repair active | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
+| Establish Incremental Type Checking | initial four-file mechanism implemented and automatically verified | Engineering Policy Checks | Type-check clean contracts and runtime boundaries, then ratchet coverage outward. |
+| Modernize Behavioral and Architecture Tests | first intake implemented and automatically verified | Policy Checks and static gates | Replace implementation-string coupling with behavioral, AST-policy, or artifact-contract ownership. |
 | Establish Typed Service Configuration Boundaries | implemented and automatically verified | static gates; tests modernized where touched | Preserve profile authority while removing repeated internal environment parsing. |
 | Decompose the VoiceAssistant Composition Root | implemented and automatically verified | test modernization; typed settings where relevant | Extract independently testable collaborators without changing interaction behavior or authority. |
 | Consolidate Current Documentation Authority | implemented and automatically verified | may proceed after policy checks; final consolidation follows structural work | Separate current normative truth, status, evidence, and history while keeping documentation validation. |
@@ -214,25 +214,23 @@ is still the correct priority.
 
 ## Program status
 
-The first-intake implementation Issues are closed with their retained automatic
-verification. The second intake begins by restoring a trustworthy canonical
-local gate, retaining current-revision live voice proof, and closing the default
-source-bound target-evidence profile. Structural work follows those
-prerequisites. Existing focused checks remain useful, but a fresh full-suite
-automatic-verification claim is open until the active Issue closes. This
-program does not imply release readiness or physical support; Gateway/Core,
-Social Attention, provider, audio, simulator, LAN, and physical claims remain
-owned by their qualification documents.
+The first-intake implementation Issues and the canonical local-gate repair are
+closed with automatic verification. The active second-intake Issue retains
+current-revision live voice proof; closing the default source-bound
+target-evidence profile follows it before structural work. This program does not
+imply release readiness or physical support; Gateway/Core, Social Attention,
+provider, audio, simulator, LAN, and physical claims remain owned by their
+qualification documents.
 
 ## Issue: Restore Canonical Local Gate Reproducibility
 
-Status: **active**
+Status: implemented and automatically verified
 
 ### Problem
 
 The documented setup says that installing `requirements-test.txt` and running
 `./scripts/run_tests.sh` is the canonical dependency-light gate. On the
-2026-07-31 maintained working tree, that contract is not reproducible:
+2026-07-31 Issue-start working tree, that contract was not reproducible:
 
 - `requirements-test.txt` omits `pytest`, although
   `tests/test_weather_goal_scope_contract.py` imports it;
@@ -250,6 +248,18 @@ Level A diagnostic evidence, not a passing automatic-verification claim. Ruff,
 documentation, test-ownership, and focused documentation-authority checks pass
 independently; they do not override the failing policy, Mypy, and unittest
 results.
+
+### Implementation outcome
+
+- `pytest==9.1.1` is part of the pinned test dependency boundary;
+- the removed-Router guard ignores cache-only residue while focused regression
+  coverage proves maintained Router source still fails;
+- Orchestrator imports no longer load generated runtime configuration; the
+  canonical module entrypoint invokes an explicit runtime-environment bootstrap;
+- the existing four-file Mypy ratchet passes without ignores or scope removal;
+- on 2026-07-31, `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository
+  policy, test ownership, Ruff, Mypy, documentation, 1,656 primary tests, and
+  20 legacy Agent tests.
 
 ### Scope
 
@@ -293,7 +303,8 @@ results.
 
 ## Issue: Retain a Current-Revision Live Voice Loop
 
-Status: queued; depends on **Restore Canonical Local Gate Reproducibility**
+Status: **active**; dependency **Restore Canonical Local Gate
+Reproducibility** is satisfied
 
 ### Problem
 
@@ -878,8 +889,7 @@ ratchet over selected clean contract and tooling modules. `scripts/run_ruff.py`
 validates the executable version and scope before invoking Ruff, and the
 maintained test entrypoint runs the same command used by CI. No blanket ignore
 baseline was introduced. The focused Ruff command passes on the 2026-07-31
-tree; retained full-suite evidence exists, but the current full suite is open
-under **Restore Canonical Local Gate Reproducibility**.
+tree together with the maintained full suite.
 
 Suggested commit:
 
@@ -889,9 +899,8 @@ Add high-signal Ruff enforcement
 
 ## Issue: Establish Incremental Type Checking
 
-Status: initial four-file mechanism implemented with retained automatic
-verification; current ratchet repair belongs to the active canonical-gate
-Issue; package-level expansion is queued separately.
+Status: initial four-file mechanism implemented and automatically verified;
+package-level expansion is queued separately.
 
 ### Problem
 
@@ -933,9 +942,9 @@ stale-ignore warnings, and strict equality without skipping imports.
 selected shared contracts and tooling boundaries. `scripts/run_mypy.py` validates
 the executable version and scope before invoking Mypy, and the maintained test
 entrypoint runs it after Ruff. No whole-module ignore baseline was introduced.
-The 2026-07-31 current-tree run exposes 42 errors in 11 imported files. Those
-errors must be fixed under **Restore Canonical Local Gate Reproducibility**
-before this boundary expands.
+The 2026-07-31 current-tree run passes the configured four-file scope without
+ignores or scope removal. Package-level expansion remains a separate queued
+Issue.
 
 Suggested commit:
 
