@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import logging
 import os
 from typing import Any
-
-logger = logging.getLogger(__name__)
 
 
 def _sounddevice() -> Any:
@@ -22,6 +19,22 @@ def _parse_device(value: str | None) -> int | str | None:
         return value
 
 
+def _system_default_device(sd: Any, kind: str) -> int | str:
+    """Return sounddevice's current OS-selected device for one direction."""
+
+    pair = sd.default.device
+    if isinstance(pair, (int, str)):
+        selected = pair
+    else:
+        try:
+            selected = pair[0 if kind == "input" else 1]
+        except (IndexError, KeyError, TypeError):
+            selected = pair
+    if selected is None or selected == -1:
+        raise RuntimeError(f"No system-default {kind} audio device is available")
+    return selected
+
+
 class AudioDeviceManager:
     """Small host-side audio device resolver.
 
@@ -33,26 +46,83 @@ class AudioDeviceManager:
         self.input_device = _parse_device(os.getenv("ORCH_INPUT_DEVICE"))
         self.output_device = _parse_device(os.getenv("ORCH_OUTPUT_DEVICE"))
 
-    def _query(self, device: int | str | None, kind: str) -> dict[str, Any]:
+    def _resolve(
+        self,
+        device: int | str | None,
+        kind: str,
+    ) -> tuple[int | str, dict[str, Any], str]:
         sd = _sounddevice()
+        explicit = device is not None
+        selected = device if explicit else _system_default_device(sd, kind)
         try:
-            info = sd.query_devices(device=device, kind=kind)
+            info = dict(sd.query_devices(device=selected, kind=kind))
         except Exception as exc:
-            logger.warning("Could not query %s audio device %r: %s; using defaults", kind, device, exc)
-            info = sd.query_devices(kind=kind)
-        return dict(info)
+            authority = "configured" if explicit else "system-default"
+            raise RuntimeError(
+                f"The {authority} {kind} audio device {selected!r} is unavailable: {exc}"
+            ) from exc
+        return selected, info, "configured" if explicit else "system_default"
+
+    @staticmethod
+    def _validate(
+        sd: Any,
+        *,
+        device: int | str,
+        info: dict[str, Any],
+        kind: str,
+        rate: int,
+        channels: int,
+    ) -> None:
+        channel_key = f"max_{kind}_channels"
+        try:
+            available_channels = int(info.get(channel_key) or 0)
+        except (TypeError, ValueError):
+            available_channels = 0
+        if channels <= 0 or available_channels < channels:
+            raise RuntimeError(
+                f"Selected {kind} audio device {device!r} provides "
+                f"{available_channels} channel(s), but {channels} are required"
+            )
+        checker = (
+            sd.check_input_settings
+            if kind == "input"
+            else sd.check_output_settings
+        )
+        dtype = "float32" if kind == "input" else "int16"
+        try:
+            checker(
+                device=device,
+                channels=channels,
+                dtype=dtype,
+                samplerate=rate,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Selected {kind} audio device {device!r} rejected "
+                f"{channels} channel(s) at {rate} Hz: {exc}"
+            ) from exc
 
     def get_input_params(self) -> dict[str, Any]:
-        info = self._query(self.input_device, "input")
+        sd = _sounddevice()
+        device, info, selection_source = self._resolve(self.input_device, "input")
         rate = int(float(os.getenv("ORCH_INPUT_RATE") or info.get("default_samplerate") or 48000))
         channels = int(os.getenv("ORCH_INPUT_CHANNELS", "1"))
+        self._validate(
+            sd,
+            device=device,
+            info=info,
+            kind="input",
+            rate=rate,
+            channels=channels,
+        )
         block_ms = int(os.getenv("ORCH_INPUT_BLOCK_MS", "30"))
         blocksize = int(os.getenv("ORCH_INPUT_BLOCKSIZE", "0"))
         if blocksize <= 0:
             blocksize = max(1, int(rate * block_ms / 1000))
         return {
             "name": info.get("name", "default input"),
-            "device": self.input_device,
+            "device": device,
+            "selection_source": selection_source,
             "rate": rate,
             "channels": channels,
             "blocksize": blocksize,
@@ -61,16 +131,26 @@ class AudioDeviceManager:
         }
 
     def get_output_params(self) -> dict[str, Any]:
-        info = self._query(self.output_device, "output")
+        sd = _sounddevice()
+        device, info, selection_source = self._resolve(self.output_device, "output")
         rate = int(float(os.getenv("ORCH_OUTPUT_RATE") or info.get("default_samplerate") or 48000))
         channels = int(os.getenv("ORCH_OUTPUT_CHANNELS", "2"))
+        self._validate(
+            sd,
+            device=device,
+            info=info,
+            kind="output",
+            rate=rate,
+            channels=channels,
+        )
         block_ms = int(os.getenv("ORCH_OUTPUT_BLOCK_MS", "30"))
         blocksize = int(os.getenv("ORCH_OUTPUT_BLOCKSIZE", "0"))
         if blocksize <= 0:
             blocksize = 0
         return {
             "name": info.get("name", "default output"),
-            "device": self.output_device,
+            "device": device,
+            "selection_source": selection_source,
             "rate": rate,
             "channels": channels,
             "blocksize": blocksize,

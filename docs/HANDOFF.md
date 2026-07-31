@@ -29,14 +29,16 @@ backend selection, embodied feasibility, collision safety, stop, and recovery.
 
 The canonical local gate is restored: repository policy, test ownership, Ruff,
 Mypy, documentation, and the full canonical test suites pass. The strict narrow
-verifier is implemented. This PC has no microphone, so physical target
-validation is deferred without a claim. The active Issue is **Close
-Current-Revision Target Evidence** using the non-physical default profile.
+verifier is implemented. A physical input is now visible but has produced only
+unusable ASR transcripts, so physical target validation remains open without a
+claim. The active Issue is **Close Current-Revision Target Evidence** using the
+non-physical default profile.
 
 ## What to do now
 
-- keep the failed `20260731T110834Z` attempt as diagnostic-only: Python 3.11.15
-  and services were ready, but no microphone input existed;
+- keep failed physical attempts `20260731T110834Z`, `20260731T134457Z`, and
+  `20260731T134946Z` diagnostic-only; the latest reached VAD/ASR but did not
+  produce an intelligible required utterance;
 - retain the old `20260731T121727Z` root as diagnostic-only; its ambient and
   grounded-weather failures were corrected in rebuilt-Agent dirty-source
   headless diagnostics, not qualifying evidence;

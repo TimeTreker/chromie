@@ -19,8 +19,8 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Deferred: current host has no microphone; no physical claim |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,686 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Open: current physical input reaches VAD/ASR but has not produced an intelligible required utterance; no physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
@@ -107,10 +107,12 @@ is automatically verified; until a clean supervised bundle is retained, target
 validation remains open.
 
 On 2026-07-31, attempt `20260731T110834Z` ran from clean revision `e931af3`
-with the rebuilt Python 3.11.15 environment and healthy services, but captured
-no microphone input. The operator confirmed that this PC has no microphone and
-directed that physical validation be skipped. The failed directory is
-diagnostic-only; it does not satisfy or weaken this profile.
+with healthy services but no attached microphone. After an input device became
+available, attempts `20260731T134457Z` and `20260731T134946Z` captured physical
+VAD activity. The second retained ASR finals `I.` and `.`, neither containing
+the required Moon meaning, so the runner correctly stopped before cognition or
+an audible response. All three directories are diagnostic-only failures and do
+not satisfy or weaken this profile.
 
 ## Level A — automated suite
 

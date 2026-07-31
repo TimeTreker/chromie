@@ -656,9 +656,10 @@ class VoiceAssistant:
         self.output_latency = self.output_params["latency"]
 
         logger.info(
-            "Input device name=%s index=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s min_rms=%s barge_in_min_rms=%s input_gain=%.2f",
+            "Input device name=%s index=%s selection=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s min_rms=%s barge_in_min_rms=%s input_gain=%.2f",
             self.input_params["name"],
             self.input_device,
+            self.input_params.get("selection_source", "injected"),
             self.input_rate,
             self.input_channels,
             self.input_block_size,
@@ -669,9 +670,10 @@ class VoiceAssistant:
             self.input_gain,
         )
         logger.info(
-            "Output device name=%s index=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s",
+            "Output device name=%s index=%s selection=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s",
             self.output_params["name"],
             self.output_device,
+            self.output_params.get("selection_source", "discard"),
             self.output_rate,
             self.output_channels,
             self.output_params["blocksize"],

@@ -647,7 +647,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 
 | Variable | Default |
 |---|---:|
-| `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE` | Platform default; explicit device is recommended. |
+| `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE` | Empty, `default`, or `auto` follows the operating system's current default for that direction; an explicit index/name pins the operator-selected device. Startup resolves the choice, validates channels/rate, and fails clearly instead of silently switching away from an invalid explicit device. |
 | `ORCH_INPUT_RATE`, `ORCH_OUTPUT_RATE` | Device default or `48000` in the example file. |
 | `ORCH_INPUT_CHANNELS`, `ORCH_OUTPUT_CHANNELS` | `1`, `2`. |
 | `ORCH_INPUT_BLOCK_MS`, `ORCH_OUTPUT_BLOCK_MS` | `30`, `30`. |
@@ -668,6 +668,14 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_EVENT_LOG_PATH` | Empty by default; when set, append correlated session events as JSON Lines. |
 | `ORCH_SAVE_AUDIO` | `false`. |
 | `RECORDINGS_DIR` | `recordings`, resolved from repository root when relative. |
+
+Audio jack, USB, Bluetooth, and other external-device detection remains owned by
+the operating system. Chromie does not guess that a device is external from its
+name and does not change the system default, route, mute, or volume. Select the
+preferred plugged-in device in the OS and leave the corresponding variable
+empty/`default`/`auto`, or set an explicit device when the OS default must not be
+followed. The startup log records `selection=system_default` or
+`selection=configured` plus the resolved stream device.
 
 The Orchestrator always resamples captured audio to 16 kHz before ASR. For
 speech output, complete Agent/interaction text is split into ordered chunks. The

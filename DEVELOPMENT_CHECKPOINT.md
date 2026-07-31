@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-07-31,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,681 primary tests, and 20 legacy Agent tests.
+1,686 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -54,15 +54,14 @@ identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
 installation or model warm-up. The latest 2026-07-31 attention-contract run
-passes 1,681 primary tests plus 20 legacy Agent tests.
+passes 1,686 primary tests plus 20 legacy Agent tests.
 
-The managed `Chromie` environment is now Python 3.11.15 and passes the runtime
-gate. Clean supervised attempt `20260731T110834Z` at revision `e931af3` then
-confirmed that this PC has no usable microphone input: the Orchestrator and ASR
-service were ready, but both guided utterances produced no audio or `asr_final`.
-The operator confirmed that no microphone is installed and directed that this
-physical test be skipped. This is not live-loop evidence; target validation is
-deferred to a host with input hardware. When such a host is available, use:
+The managed `Chromie` environment is Python 3.11.15. A microphone is now visible,
+but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
+short VAD segments and ASR finals `I.`/`.` rather than the required Moon request.
+They correctly stopped before cognition and are not live-loop evidence. Startup
+now follows and validates OS-default devices unless an explicit device is pinned;
+rerun after the selected microphone produces intelligible speech:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"

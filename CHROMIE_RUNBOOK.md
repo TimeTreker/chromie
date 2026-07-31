@@ -125,7 +125,11 @@ cp -n orchestrator/.env.local.example orchestrator/.env.local
 python orchestrator/list_devices.py
 ```
 
-Set `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE`, then start:
+Select the preferred plugged-in microphone and headphones in the operating
+system. Leave `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` empty or set them to
+`default`/`auto` to follow those OS defaults. Set an explicit device name or
+index only when Chromie must pin one device; an unavailable explicit device now
+fails startup instead of silently switching. Then start:
 
 ```bash
 ./scripts/start_orchestrator.sh
