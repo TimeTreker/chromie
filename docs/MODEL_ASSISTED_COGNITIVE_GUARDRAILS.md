@@ -150,8 +150,10 @@ validation, but it must not automatically resume interrupted physical work.
    requests, imperatives, and greetings from ambient reports, dictation,
    narration, and contextless replies. Deterministic code maps only a
    high-confidence inactive ambient act to non-speaking `ambient_speech`;
-   classifier failure, low confidence, a direct or unclear speech act, direct
-   question form, or active engagement preserves the original route.
+   an internally contradictory `addressed=false` directed/unclear act receives
+   one schema-constrained semantic repair. Classifier failure, low confidence,
+   a direct or unresolved unclear speech act, direct question form, or active
+   engagement preserves the original route.
 4. Schemas and policies revalidate everything.
    `RouteDecision`, `InteractionResponse`, Skill Runtime requests, TaskGraphs,
    and MCP calls must be validated after model output is produced.
@@ -180,7 +182,8 @@ wrong action." The expected outcome is one of:
 - the focused addressedness classifier may suppress only an inactive,
   high-confidence, explicitly ambient speech act and otherwise fails open to
   the original route, including when `addressed=false` contradicts a direct
-  question or request;
+  question or request; an inconsistent directed/unclear pair may receive one
+  bounded model repair but never deterministic semantic relabeling;
 - a model `robot_action` for a factual knowledge question is addressed by the
   Goal Interpreter prompt/review model and, if it reaches conversation, by semantic
   spoken-response review rather than phrase-based Agent rules;

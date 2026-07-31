@@ -8,8 +8,15 @@ from shared.chromie_contracts.user_turn import AttentionReviewRequest
 
 
 class _Client:
-    def __init__(self, result: Any = None, *, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        result: Any = None,
+        *,
+        results: list[Any] | None = None,
+        error: Exception | None = None,
+    ) -> None:
         self.result = result
+        self.results = list(results or [])
         self.error = error
         self.calls = 0
 
@@ -18,6 +25,8 @@ class _Client:
         self.calls += 1
         if self.error is not None:
             raise self.error
+        if self.results:
+            return self.results.pop(0)
         return self.result
 
 
@@ -71,6 +80,59 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.disposition, "admit")
         self.assertIn("direct_question_form", result.reason)
+
+    async def test_inconsistent_unaddressed_unclear_output_is_repaired(self) -> None:
+        client = _Client(
+            results=[
+                {
+                    "addressed": False,
+                    "speech_act": "unclear",
+                    "confidence": 0.90,
+                },
+                {
+                    "addressed": False,
+                    "speech_act": "ambient_report",
+                    "confidence": 0.94,
+                },
+            ]
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(
+            self.request("The deployment pipeline completed before lunch.")
+        )
+
+        self.assertEqual(result.disposition, "suppress")
+        self.assertEqual(result.speech_act, "ambient_report")
+        self.assertEqual(
+            result.source,
+            "cognitive_gateway.attention_review_model_repaired",
+        )
+        self.assertEqual(client.calls, 2)
+
+    async def test_failed_semantic_repair_still_admits_uncertain_input(self) -> None:
+        client = _Client(
+            results=[
+                {
+                    "addressed": False,
+                    "speech_act": "unclear",
+                    "confidence": 0.90,
+                },
+                {
+                    "addressed": False,
+                    "speech_act": "unclear",
+                    "confidence": 0.91,
+                },
+            ]
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("Maybe this is for Chromie"))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "unclear")
+        self.assertIn("failed open", result.reason)
+        self.assertEqual(client.calls, 2)
 
     async def test_active_exchange_bypasses_model_and_is_admitted(self) -> None:
         client = _Client(error=AssertionError("model must not run"))

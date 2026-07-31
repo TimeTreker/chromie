@@ -20,8 +20,10 @@ continuity proposals, capability intent, planning handoff, and response intent.
 
 `POST /cognitive-gateway/attention-review` accepts only normalized turn identity,
 text, language, and bounded host engagement evidence. Suppression is limited to
-high-confidence inactive ambient speech; direct, unclear, malformed, unavailable,
-or failed review admits the turn.
+high-confidence inactive ambient speech. An internally contradictory
+`addressed=false` result with a directed or unclear speech act receives one
+schema-constrained model repair; direct, unresolved unclear, malformed,
+unavailable, or failed review admits the turn.
 
 `POST /cognitive-core/interpret` accepts only a schema-valid admitted
 `CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,

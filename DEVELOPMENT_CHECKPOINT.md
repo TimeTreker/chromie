@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-07-31,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,671 primary tests, and 20 legacy Agent tests.
+1,673 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -53,8 +53,8 @@ partial events, dirty or mismatched source, missing or incomplete runtime
 identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
-installation or model warm-up. The 2026-07-31 canonical run passes 1,671
-primary tests plus 20 legacy Agent tests.
+installation or model warm-up. The latest 2026-07-31 attention-contract run
+passes 1,673 primary tests plus 20 legacy Agent tests.
 
 The managed `Chromie` environment is now Python 3.11.15 and passes the runtime
 gate. Clean supervised attempt `20260731T110834Z` at revision `e931af3` then
@@ -114,11 +114,10 @@ profile. Select `supervised_physical_pilot` only when supervised physical voice
 and robot evidence will also be attached. Human review remains explicit and
 fingerprint-bound.
 
-Diagnostic root `20260731T121727Z` validates paired-source MuJoCo and active
-cancellation after correcting canonical `capability_id` evidence reads. It still
-fails two real live boundaries: inactive ambient suppression and grounded weather
-lookup/Goal continuity. Validate and push the verifier fix, then address those
-semantic Issues one at a time; do not approve or resume this diagnostic root.
+Diagnostic root `20260731T121727Z` validates paired-source MuJoCo and active cancellation after correcting canonical `capability_id` reads.
+Its ambient failure was reproduced independently; Attention Review now uses general speech-act contrasts, rejects `addressed=false` directed/unclear pairs, and permits one fail-open schema repair.
+Focused tests and `robust_intent_understanding` 8/8 pass; a rebuilt-Agent dirty-source headless diagnostic suppressed the turn before Core with zero speech or skills.
+This is diagnostic, not microphone or target evidence. Address grounded Beijing weather lookup/Goal continuity next; do not approve or resume that root.
 
 ## Work after evidence closure
 

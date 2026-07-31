@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from chromie_contracts.user_turn import (
@@ -88,21 +88,53 @@ class AttentionReviewer:
                 reason="attention model is unavailable",
             )
 
+        options = {
+            "temperature": 0,
+            "top_p": 0.9,
+            "num_ctx": self.num_ctx,
+            "num_predict": self.num_predict,
+        }
+        source = "cognitive_gateway.attention_review_model"
         try:
             raw = await self.client.generate(
                 self._prompt(request),
                 system=self._system_prompt(),
-                options={
-                    "temperature": 0,
-                    "top_p": 0.9,
-                    "num_ctx": self.num_ctx,
-                    "num_predict": self.num_predict,
-                },
+                options=options,
                 response_format=self._response_schema(),
             )
             if not isinstance(raw, dict):
                 raise ValueError("attention model did not return a JSON object")
-            result = _AttentionModelOutput.model_validate(raw)
+            try:
+                result = self._validate_model_output(raw)
+            except (ValidationError, ValueError) as initial_exc:
+                logger.warning(
+                    "attention_review_contract_repair_start turn_id=%s "
+                    "error_type=%s error=%s raw_output=%s",
+                    request.turn_id,
+                    type(initial_exc).__name__,
+                    initial_exc,
+                    raw,
+                )
+                repaired = await self.client.generate(
+                    self._repair_prompt(
+                        request,
+                        initial_output=raw,
+                        validation_error=str(initial_exc),
+                    ),
+                    system=self._system_prompt(),
+                    options=options,
+                    response_format=self._response_schema(),
+                )
+                if not isinstance(repaired, dict):
+                    raise ValueError(
+                        "attention model repair did not return a JSON object"
+                    )
+                result = self._validate_model_output(repaired)
+                source = "cognitive_gateway.attention_review_model_repaired"
+                logger.info(
+                    "attention_review_contract_repair_done turn_id=%s status=success",
+                    request.turn_id,
+                )
         except Exception as exc:
             logger.warning(
                 "attention_review_failed turn_id=%s error_type=%s error=%s",
@@ -138,7 +170,7 @@ class AttentionReviewer:
                 disposition="admit",
                 speech_act=result.speech_act,
                 confidence=result.confidence,
-                source="cognitive_gateway.attention_review_model",
+                source=source,
                 reason=f"attention review admitted: {fail_open_reason}",
             )
         return AttentionReviewResult(
@@ -148,9 +180,22 @@ class AttentionReviewer:
             disposition="suppress",
             speech_act=result.speech_act,
             confidence=result.confidence,
-            source="cognitive_gateway.attention_review_model",
+            source=source,
             reason="inactive turn reviewed as unaddressed ambient speech",
         )
+
+    @staticmethod
+    def _validate_model_output(raw: dict[str, Any]) -> _AttentionModelOutput:
+        result = _AttentionModelOutput.model_validate(raw)
+        if not result.addressed and (
+            result.speech_act in DIRECTED_SPEECH_ACTS
+            or result.speech_act == "unclear"
+        ):
+            raise ValueError(
+                "addressed=false requires an explicit ambient speech act; "
+                f"got speech_act={result.speech_act}"
+            )
+        return result
 
     @staticmethod
     def _admit(
@@ -205,20 +250,52 @@ class AttentionReviewer:
     def _system_prompt() -> str:
         return (
             "You are Chromie's focused Cognitive Gateway Attention Review. "
-            "Classify only whether the latest transcript is directed to Chromie "
-            "and its speech act. Do not infer route, intent, goal, capability, "
-            "tool, action, plan, or response. Questions, requests, imperatives, "
-            "greetings, and Chromie's name are addressed even when the name or "
-            "pronoun 'you' is omitted. Third-person reports, dictation, meeting "
-            "talk, or narration without a second-person addressee may be ambient. "
-            "Delivery to this classifier is not evidence of addressedness. If "
-            "genuinely unclear, use addressed=true and speech_act=unclear. Return "
-            "only the schema-valid JSON object."
+            "Classify only the latest transcript's speech act and whether it is "
+            "directed to Chromie. Do not infer route, intent, goal, capability, "
+            "tool, action, plan, or response. First identify direct-address "
+            "evidence: questions, requests, imperatives, greetings, Chromie's "
+            "name, and second-person language are addressed. Questions and "
+            "requests remain addressed when Chromie's name or the pronoun 'you' "
+            "is omitted. Then classify speech without direct-address evidence by "
+            "its communicative function: third-person factual or status reports "
+            "are ambient_report; dictated wording is dictation; scene or story "
+            "description is narration; and a contextless acknowledgement is "
+            "reply. Do not use unclear merely because an utterance has no named "
+            "addressee. Delivery to this classifier is not evidence of "
+            "addressedness. Semantic contrasts: 'The train arrived at noon.' is "
+            "an unaddressed ambient_report; 'Did the train arrive at noon?' is an "
+            "addressed question. 'She said the model runs locally.' is "
+            "unaddressed narration; 'Tell me whether the model runs locally.' is "
+            "an addressed request. With no active exchange, isolated 'Yeah.' is "
+            "an unaddressed reply. If the linguistic function or addressee is "
+            "genuinely ambiguous, use addressed=true and speech_act=unclear. "
+            "addressed=false is valid only with reply, ambient_report, dictation, "
+            "or narration. Return only the schema-valid JSON object."
         )
 
     @staticmethod
     def _prompt(request: AttentionReviewRequest) -> str:
         return (
+            f"Host engagement evidence: {request.engagement}\n"
+            f"Language hint: {request.language}\n"
+            f"Latest transcript: {request.text}"
+        )
+
+    @staticmethod
+    def _repair_prompt(
+        request: AttentionReviewRequest,
+        *,
+        initial_output: dict[str, Any],
+        validation_error: str,
+    ) -> str:
+        return (
+            "Revise the previous Attention Review output so the speech act and "
+            "addressedness agree. Preserve direct questions, requests, "
+            "imperatives, and greetings as addressed. Use addressed=false only "
+            "for an explicit reply, ambient_report, dictation, or narration. "
+            "Use addressed=true with unclear when ambiguity remains.\n"
+            f"Validation error: {validation_error[:500]}\n"
+            f"Previous output: {initial_output}\n"
             f"Host engagement evidence: {request.engagement}\n"
             f"Language hint: {request.language}\n"
             f"Latest transcript: {request.text}"
