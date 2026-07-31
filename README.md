@@ -22,11 +22,12 @@ experience artifacts. See
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
 > The canonical local gate is reproducible again: repository policy,
-> test-ownership, Ruff, Mypy, documentation, 1,656 primary tests, and 20 legacy
-> Agent tests pass from the documented setup. The active Issue is now a clean
-> current-revision microphone-to-audible-response proof, followed by broader
-> Gateway/Core and MuJoCo evidence. No release version or publication target is
-> planned. See
+> test-ownership, Ruff, Mypy, documentation, 1,662 primary tests, and 20 legacy
+> Agent tests pass from the documented setup. A strict source-bound verifier for
+> the current-revision microphone-to-audible-response loop is implemented; the
+> active Issue remains open until one clean supervised bundle is collected and
+> reviewed. Broader Gateway/Core and MuJoCo evidence follows. No release version
+> or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
 > **Implemented Agent Skills architecture:** Agent Skills are passive,

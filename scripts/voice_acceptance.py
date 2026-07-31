@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import ast
 import getpass
+import hashlib
 import importlib.util
 import json
 import os
@@ -66,6 +67,7 @@ BODY_CASES = {"speech-skill", "refusal", "body-cancel", "stop"}
 AGENT_COMPOSE_SERVICE = "chromie-agent"
 HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 RUNTIME_REEXEC_ENV = "CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"
+LIVE_VOICE_PROFILE = "current-revision-live-voice"
 
 
 def _missing_automatic_runtime_packages(mode: str) -> list[str]:
@@ -752,6 +754,40 @@ def write_json(path: Path, payload: Any) -> None:
     path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
         encoding="utf-8",
+    )
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_bundle_manifest(evidence_dir: Path) -> None:
+    """Bind the retained collection artifacts without claiming qualification."""
+
+    manifest_path = evidence_dir / "bundle-manifest.json"
+    artifacts = []
+    for path in sorted(evidence_dir.rglob("*")):
+        if not path.is_file() or path == manifest_path:
+            continue
+        artifacts.append(
+            {
+                "path": path.relative_to(evidence_dir).as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+    write_json(
+        manifest_path,
+        {
+            "schema_version": 1,
+            "evidence_claim": "artifact_identity_only",
+            "release_qualified": False,
+            "artifacts": artifacts,
+        },
     )
 
 
@@ -2164,6 +2200,7 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
         except Exception:
             soridormi_local_revision = "unknown"
             soridormi_local_dirty = None
+    live_voice_candidate = args.mode == "supervised" and selected == ["speech-only"]
     return {
         "schema_version": 2,
         "acceptance_id": args.acceptance_id,
@@ -2191,10 +2228,24 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
         "soridormi_mcp_url": args.soridormi_mcp_url or "not-configured",
         "selected_cases": selected,
         "runner": {
+            "verification_profile": (
+                LIVE_VOICE_PROFILE if live_voice_candidate else None
+            ),
+            "command": list(
+                getattr(
+                    args,
+                    "invocation",
+                    [sys.executable, str(Path(__file__).relative_to(ROOT)), *sys.argv[1:]],
+                )
+            ),
             "mode": args.mode,
             "semantic_runtime": {
                 "mode": "apply",
-                "apply_lanes": ["chat", "robot_action"],
+                "apply_lanes": (
+                    ["chat", "tool"]
+                    if not BODY_CASES.intersection(selected)
+                    else ["chat", "robot_action", "tool"]
+                ),
                 "fallback_policy": "fail_closed",
                 "legacy_semantic_fallback": False,
             },
@@ -2247,6 +2298,7 @@ def write_override_file(
     mode: str = "supervised",
     virtual_mic_source: str | None = None,
     acoustic_response_output_mode: str = "discard",
+    runtime_identity_path: Path | None = None,
 ) -> None:
     values = {
         "ORCH_ENABLE_AGENT": "1",
@@ -2254,7 +2306,9 @@ def write_override_file(
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
-        "ORCH_COGNITIVE_APPLY_LANES": "chat,robot_action,tool",
+        "ORCH_COGNITIVE_APPLY_LANES": (
+            "chat,robot_action,tool" if enable_soridormi else "chat,tool"
+        ),
         "ORCH_COGNITIVE_FALLBACK_POLICY": "fail_closed",
         "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED": "0",
         "ORCH_COGNITIVE_EVIDENCE_ENABLED": "1",
@@ -2269,6 +2323,8 @@ def write_override_file(
         "AGENT_INTERACTION_OUTPUT_MODE": "native",
         "AGENT_NATIVE_INTERACTION_FALLBACK": "0",
     }
+    if runtime_identity_path is not None:
+        values["ORCH_COGNITIVE_RUN_IDENTITY_PATH"] = str(runtime_identity_path)
     if mode == "synthetic":
         values.update(
             {
@@ -2394,6 +2450,7 @@ def write_service_override_file(path: Path, values: dict[str, str]) -> None:
 
 def run_acceptance(args: argparse.Namespace) -> int:
     selected = parse_case_list(args.cases)
+    live_voice_candidate = args.mode == "supervised" and selected == ["speech-only"]
     if args.mode not in ACCEPTANCE_MODES:
         raise ValueError(f"Unsupported acceptance mode: {args.mode}")
     if args.countdown_s < 0:
@@ -2446,6 +2503,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
     recordings_dir = evidence_dir / "recordings"
     recordings_dir.mkdir(parents=True, exist_ok=True)
     events_path = evidence_dir / "events.jsonl"
+    runtime_identity_path = evidence_dir / "runtime-identity.json"
     override_path = evidence_dir / "acceptance-overrides.env"
     service_override_path = evidence_dir / "service-overrides.env"
     write_json(evidence_dir / "metadata.json", metadata)
@@ -2460,6 +2518,13 @@ def run_acceptance(args: argparse.Namespace) -> int:
             virtual_microphone.source_name if virtual_microphone else None
         ),
         acoustic_response_output_mode=args.acoustic_response_output_mode,
+        runtime_identity_path=(
+            runtime_identity_path if live_voice_candidate else None
+        ),
+    )
+    (evidence_dir / "command.txt").write_text(
+        shlex.join(metadata["runner"]["command"]) + "\n",
+        encoding="utf-8",
     )
     service_overrides = service_runtime_overrides(
         soridormi_mcp_url=args.soridormi_mcp_url,
@@ -2546,6 +2611,25 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 env=service_env,
                 check=True,
                 timeout=args.service_timeout_s,
+            )
+        if live_voice_candidate:
+            identity_command = [
+                sys.executable,
+                "scripts/capture_runtime_identity.py",
+                "--runtime-profile",
+                str(ROOT / ".chromie" / "runtime_profile.json"),
+                "--orchestrator-env",
+                str(ROOT / ".env.runtime"),
+                "--output",
+                str(runtime_identity_path),
+            ]
+            if args.allow_dirty:
+                identity_command.append("--allow-dirty")
+            run_command(
+                identity_command,
+                evidence_dir / "runtime-identity.log",
+                check=True,
+                timeout=120,
             )
         if virtual_microphone is not None:
             virtual_microphone.start()
@@ -2647,6 +2731,11 @@ def run_acceptance(args: argparse.Namespace) -> int:
             readiness_marker,
             args.orchestrator_timeout_s,
         )
+        if live_voice_candidate:
+            shutil.copy2(
+                ROOT / ".chromie" / "runtime_profile.json",
+                evidence_dir / "runtime-profile.json",
+            )
 
         print(f"\nVoice acceptance evidence: {evidence_dir}")
         print(f"Acceptance mode: {args.mode}")
@@ -2820,6 +2909,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
             ),
             encoding="utf-8",
         )
+        write_bundle_manifest(evidence_dir)
         print(f"\nVoice acceptance status: {final_status}")
         print(f"Evidence bundle: {evidence_dir}")
 
@@ -2973,7 +3063,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    args = parser.parse_args(raw_argv)
+    args.invocation = [
+        sys.executable,
+        str(Path(__file__).relative_to(ROOT)),
+        *raw_argv,
+    ]
     try:
         return run_acceptance(args)
     except (ValueError, FileExistsError, RuntimeError, TimeoutError) as exc:

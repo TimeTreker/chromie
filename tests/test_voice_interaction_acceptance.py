@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -36,10 +38,19 @@ from scripts.voice_acceptance import (
     wait_for_confirmation_prompt_completion,
     write_service_override_file,
     write_override_file,
+    write_bundle_manifest,
 )
+from orchestrator.runtime.evidence_identity import canonical_json_sha256
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
 from scripts.acceptance_audio import AudioFixture, HostSpeakerPlayer, PulseVirtualMicrophone
-from scripts.verify_voice_evidence import REQUIRED_FILES, verify_bundle
+from scripts.verify_voice_evidence import (
+    CURRENT_REVISION_LIVE_VOICE_PROFILE,
+    FULL_VOICE_MUJOCO_PROFILE,
+    LIVE_VOICE_REQUIRED_FILES,
+    REQUIRED_FILES,
+    build_parser as build_verifier_parser,
+    verify_bundle,
+)
 import scripts.prepare_release as release_module
 
 
@@ -274,6 +285,206 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
     )
 
 
+def write_live_voice_fixture(root: Path) -> None:
+    sid = "live-speech"
+    command = [
+        "/usr/bin/python",
+        "scripts/voice_acceptance.py",
+        "--mode",
+        "supervised",
+        "--cases",
+        "speech-only",
+    ]
+    for name in LIVE_VOICE_REQUIRED_FILES - {
+        "bundle-manifest.json",
+        "cognitive-runtime.jsonl",
+        "events.jsonl",
+        "metadata.json",
+        "cases.json",
+    }:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text("fixture\n", encoding="utf-8")
+    (root / "command.txt").write_text(shlex.join(command) + "\n", encoding="utf-8")
+    (root / "audio-devices.log").write_text(
+        "Input device name=physical-microphone\n"
+        "Output device name=physical-speaker\n",
+        encoding="utf-8",
+    )
+    metadata = {
+        "schema_version": 2,
+        "status": "passed",
+        "event_count": 7,
+        "acceptance_id": "live-voice",
+        "operator": "operator",
+        "runner": {
+            "dry_run": False,
+            "mode": "supervised",
+            "verification_profile": CURRENT_REVISION_LIVE_VOICE_PROFILE,
+            "command": command,
+        },
+        "chromie": {
+            "revision": "abc123",
+            "version": "development",
+            "dirty": False,
+        },
+        "selected_cases": ["speech-only"],
+    }
+    (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+    cases = [
+        {
+            "case_id": "speech-only",
+            "operator_verdict": "pass",
+            "operator_notes": "Audible response confirmed.",
+            "event_count": 7,
+            "session_ids": [sid],
+            "checks": [{"name": "fixture", "passed": True}],
+        }
+    ]
+    (root / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+    (root / "acceptance-overrides.env").write_text(
+        "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
+        "ORCH_ENABLE_SORIDORMI_SKILLS=0\n"
+        "AGENT_INTERACTION_OUTPUT_MODE=native\n"
+        "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
+        "ORCH_AUDIO_INPUT_MODE=device\n"
+        "ORCH_AUDIO_OUTPUT_MODE=device\n"
+        "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
+        "ORCH_COGNITIVE_APPLY_LANES=chat,tool\n"
+        "ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed\n"
+        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0\n"
+        "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
+        f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={root / 'runtime-identity.json'}\n",
+        encoding="utf-8",
+    )
+    retained_runtime_profile = {
+        "fingerprint": "profile-fingerprint",
+        "models": {"fast": "qwen3:4b"},
+    }
+    runtime_profile_path = root / "runtime-profile.json"
+    runtime_profile_path.write_text(
+        json.dumps(retained_runtime_profile),
+        encoding="utf-8",
+    )
+    runtime_profile_sha256 = hashlib.sha256(runtime_profile_path.read_bytes()).hexdigest()
+    identity = {
+        "schema_version": 1,
+        "captured_at": "2026-07-31T00:00:00+00:00",
+        "evidence_claim": "runtime_identity_only",
+        "chromie": {"revision": "abc123", "dirty": False},
+        "runtime_profile": {
+            "fingerprint": "profile-fingerprint",
+            "sha256": runtime_profile_sha256,
+            "models": {"fast": "qwen3:4b"},
+        },
+        "orchestrator_runtime": {
+            "effective_models": {"AGENT_FAST_PLANNER_MODEL": "qwen3:4b"},
+        },
+        "capability_manifests": [{"path": "fixture", "sha256": "b" * 64}],
+        "deployment": {
+            "complete": True,
+            "service_images": {
+                service: {
+                    "image_id": f"sha256:{service}",
+                    "effective_runtime": (
+                        {"CHROMIE_RUNTIME_ENV_FINGERPRINT": "profile-fingerprint"}
+                        if service == "chromie-agent"
+                        else {}
+                    ),
+                    "effective_models": (
+                        {"AGENT_FAST_PLANNER_MODEL": "qwen3:4b"}
+                        if service == "chromie-agent"
+                        else {}
+                    ),
+                }
+                for service in (
+                    "chromie-agent",
+                    "chromie-asr",
+                    "chromie-llm",
+                    "chromie-tts",
+                )
+            },
+        },
+        "qualification": {
+            "source_clean": True,
+            "deployment_complete": True,
+            "release_qualified": False,
+        },
+    }
+    identity["identity_sha256"] = canonical_json_sha256(identity)
+    (root / "runtime-identity.json").write_text(
+        json.dumps(identity),
+        encoding="utf-8",
+    )
+    reference = {
+        "identity_sha256": identity["identity_sha256"],
+        "complete": True,
+    }
+    cognitive_events = [
+        {
+            "event": "cognitive_gateway_admission",
+            "sid": sid,
+            "channel": "voice",
+            "admission": "admit",
+            "quality": {"source": "asr_final"},
+            "run_identity": reference,
+        },
+        {
+            "event": "cognitive_runtime_resolution",
+            "sid": sid,
+            "mode": "apply",
+            "status": "applied",
+            "lane": "chat",
+            "run_identity": reference,
+            "terminal_plan": {"capability_ids": []},
+            "interaction": {"capability_ids": [], "speech_count": 1},
+            "fallback_reason": None,
+            "metadata": {},
+        },
+    ]
+    (root / "cognitive-runtime.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in cognitive_events),
+        encoding="utf-8",
+    )
+    runtime_events = [
+        event("asr_final", "asr_final: text='Tell me a Moon fact.'", sid),
+        event("goal_interpretation_done", "goal_interpretation_done: route=chat", sid),
+        event(
+            "cognitive_interaction_ready",
+            "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False",
+            sid,
+        ),
+        *tts_completion_events(sid, "The Moon has lower gravity than Earth."),
+    ]
+    (root / "events.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in runtime_events),
+        encoding="utf-8",
+    )
+    recordings = root / "recordings"
+    recordings.mkdir()
+    (recordings / f"input_{sid}_1.raw").write_bytes(b"microphone")
+    (recordings / f"output_{sid}_2.raw").write_bytes(b"speaker")
+    write_bundle_manifest(root)
+
+
+def _update_json(path: Path, updater) -> None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    updater(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _update_jsonl(path: Path, updater) -> None:
+    payload = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    updated = updater(payload)
+    path.write_text(
+        "".join(json.dumps(item) + "\n" for item in updated),
+        encoding="utf-8",
+    )
+
+
 class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_parse_all_cases_preserves_release_order(self) -> None:
         self.assertEqual(parse_case_list("all"), list(FULL_CASE_ORDER))
@@ -295,6 +506,10 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_synthetic_mode_is_the_default(self) -> None:
         args = build_parser().parse_args([])
         self.assertEqual(args.mode, "synthetic")
+
+    def test_full_voice_mujoco_verification_profile_remains_the_default(self) -> None:
+        args = build_verifier_parser().parse_args(["evidence"])
+        self.assertEqual(args.profile, FULL_VOICE_MUJOCO_PROFILE)
 
     def test_automatic_mode_reexecs_in_managed_runtime_when_needed(self) -> None:
         with (
@@ -588,6 +803,25 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             text = path.read_text()
             self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
             self.assertIn("ORCH_AUDIO_OUTPUT_MODE=device", text)
+
+    def test_live_voice_override_disables_body_work_and_binds_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "acceptance-overrides.env"
+            identity = Path(temp_dir) / "runtime-identity.json"
+            write_override_file(
+                path,
+                event_path=Path(temp_dir) / "events.jsonl",
+                recordings_dir=Path(temp_dir) / "recordings",
+                soridormi_mcp_url=None,
+                enable_soridormi=False,
+                mode="supervised",
+                runtime_identity_path=identity,
+            )
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("ORCH_ENABLE_SORIDORMI_SKILLS=0", text)
+            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,tool", text)
+            self.assertIn(f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={identity}", text)
 
     def test_host_speaker_player_uses_pw_play_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1363,6 +1597,216 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             self.assertNotIn("abc", text)
             self.assertEqual(text.count("<redacted>"), 2)
 
+    def test_current_revision_live_voice_profile_verifies_narrow_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_live_voice_fixture(root)
+
+            report = verify_bundle(
+                root,
+                profile=CURRENT_REVISION_LIVE_VOICE_PROFILE,
+                expected_chromie_revision="abc123",
+                expected_chromie_version="development",
+            )
+
+            self.assertTrue(report["passed"], report)
+            self.assertTrue(
+                report["current_revision_live_voice_claim"]["eligible"]
+            )
+            self.assertFalse(report["release_qualified"])
+            self.assertFalse(report["human_voice_device_claim_eligible"])
+            self.assertTrue(report["runtime_identity"]["source_bound"])
+            self.assertTrue(report["artifact_manifest"]["valid"])
+            self.assertEqual(report["cognitive_runtime"]["applied_lanes"], ["chat"])
+            full_report = verify_bundle(
+                root,
+                expected_chromie_revision="abc123",
+                expected_chromie_version="development",
+                expected_soridormi_revision="def456",
+            )
+            self.assertFalse(full_report["passed"])
+            self.assertTrue(
+                any("Missing required cases" in item for item in full_report["errors"])
+            )
+
+    def test_current_revision_live_voice_rejects_nonphysical_or_unreviewed_input(self) -> None:
+        mutations = {
+            "synthetic input": lambda root: (
+                _update_json(
+                    root / "metadata.json",
+                    lambda payload: payload["runner"].update({"mode": "synthetic"}),
+                )
+            ),
+            "absent operator verdict": lambda root: _update_json(
+                root / "cases.json",
+                lambda payload: payload[0].pop("operator_verdict"),
+            ),
+            "missing microphone recording": lambda root: next(
+                (root / "recordings").glob("input_*.raw")
+            ).unlink(),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_live_voice_fixture(root)
+                mutate(root)
+                write_bundle_manifest(root)
+                report = verify_bundle(
+                    root,
+                    profile=CURRENT_REVISION_LIVE_VOICE_PROFILE,
+                    expected_chromie_revision="abc123",
+                    expected_chromie_version="development",
+                )
+                self.assertFalse(report["passed"], report)
+                self.assertFalse(
+                    report["current_revision_live_voice_claim"]["eligible"]
+                )
+
+    def test_current_revision_live_voice_rejects_incomplete_or_unsafe_turns(self) -> None:
+        def remove_playback_end(root: Path) -> None:
+            _update_jsonl(
+                root / "events.jsonl",
+                lambda events: [
+                    item for item in events if item.get("event") != "playback_end"
+                ],
+            )
+
+        def add_skill(root: Path) -> None:
+            _update_jsonl(
+                root / "cognitive-runtime.jsonl",
+                lambda events: [
+                    {
+                        **item,
+                        "terminal_plan": {"capability_ids": ["soridormi.nod_yes"]},
+                    }
+                    if item.get("event") == "cognitive_runtime_resolution"
+                    else item
+                    for item in events
+                ],
+            )
+
+        def add_stale_playback(root: Path) -> None:
+            _update_jsonl(
+                root / "events.jsonl",
+                lambda events: [
+                    *events,
+                    event(
+                        "playback_drop_stale_before_order",
+                        "playback_drop_stale_before_order: order=1",
+                        "live-speech",
+                    ),
+                ],
+            )
+
+        def add_timeout(root: Path) -> None:
+            _update_jsonl(
+                root / "cognitive-runtime.jsonl",
+                lambda events: [
+                    {
+                        **item,
+                        "metadata": {"failure_class": "timeout"},
+                    }
+                    if item.get("event") == "cognitive_runtime_resolution"
+                    else item
+                    for item in events
+                ],
+            )
+
+        def add_truncation(root: Path) -> None:
+            _update_jsonl(
+                root / "events.jsonl",
+                lambda events: [
+                    *events,
+                    event(
+                        "llm_output_truncated",
+                        "llm_output_truncated: purpose=response_composer",
+                        "live-speech",
+                    ),
+                ],
+            )
+
+        def add_authority_fallback(root: Path) -> None:
+            _update_jsonl(
+                root / "cognitive-runtime.jsonl",
+                lambda events: [
+                    {**item, "fallback_reason": "model unavailable"}
+                    if item.get("event") == "cognitive_runtime_resolution"
+                    else item
+                    for item in events
+                ],
+            )
+
+        for label, mutate in {
+            "partial playback": remove_playback_end,
+            "executable skill": add_skill,
+            "stale playback": add_stale_playback,
+            "critical model timeout": add_timeout,
+            "truncated model output": add_truncation,
+            "post-authority fallback": add_authority_fallback,
+        }.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_live_voice_fixture(root)
+                mutate(root)
+                write_bundle_manifest(root)
+                report = verify_bundle(
+                    root,
+                    profile=CURRENT_REVISION_LIVE_VOICE_PROFILE,
+                    expected_chromie_revision="abc123",
+                    expected_chromie_version="development",
+                )
+                self.assertFalse(report["passed"], report)
+
+    def test_current_revision_live_voice_rejects_unbound_source_and_artifacts(self) -> None:
+        def mark_dirty(root: Path) -> None:
+            _update_json(
+                root / "metadata.json",
+                lambda payload: payload["chromie"].update({"dirty": True}),
+            )
+
+        def mismatch_source(root: Path) -> None:
+            _update_json(
+                root / "metadata.json",
+                lambda payload: payload["chromie"].update({"revision": "old-source"}),
+            )
+
+        def remove_runtime_identity(root: Path) -> None:
+            (root / "runtime-identity.json").unlink()
+
+        def remove_running_service(root: Path) -> None:
+            def mutate(payload: dict[str, object]) -> None:
+                payload["deployment"]["service_images"].pop("chromie-tts")
+                payload["identity_sha256"] = canonical_json_sha256(
+                    {key: value for key, value in payload.items() if key != "identity_sha256"}
+                )
+
+            _update_json(root / "runtime-identity.json", mutate)
+
+        def tamper_after_manifest(root: Path) -> None:
+            with (root / "events.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write("{}\n")
+
+        for label, mutate, refresh_manifest in (
+            ("dirty source", mark_dirty, True),
+            ("mismatched source", mismatch_source, True),
+            ("missing runtime identity", remove_runtime_identity, True),
+            ("missing running service", remove_running_service, True),
+            ("artifact digest mismatch", tamper_after_manifest, False),
+        ):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_live_voice_fixture(root)
+                mutate(root)
+                if refresh_manifest:
+                    write_bundle_manifest(root)
+                report = verify_bundle(
+                    root,
+                    profile=CURRENT_REVISION_LIVE_VOICE_PROFILE,
+                    expected_chromie_revision="abc123",
+                    expected_chromie_version="development",
+                )
+                self.assertFalse(report["passed"], report)
+
     def test_complete_evidence_bundle_verifies(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1415,6 +1859,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 expected_soridormi_revision="def456",
             )
             self.assertTrue(report["passed"], report)
+            self.assertEqual(report["verification_profile"], FULL_VOICE_MUJOCO_PROFILE)
             self.assertTrue(report["policy_evaluation_ready"])
             self.assertTrue(report["human_voice_device_claim_eligible"])
 

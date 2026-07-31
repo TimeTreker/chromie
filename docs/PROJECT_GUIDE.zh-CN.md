@@ -46,7 +46,7 @@ Soridormi 负责：
 ## 当前状态
 
 可复现的本地标准测试门禁已经恢复：仓库策略、测试归属、Ruff、Mypy、文档、
-1,656 个主要测试及 20 个旧 Agent 测试均已通过。当前第一优先级是保留与当前
+1,662 个主要测试及 20 个旧 Agent 测试均已通过。当前第一优先级是保留与当前
 源码一致的最小真实语音闭环证据：真实麦克风输入，经 ASR、Cognitive
 Gateway、Goal-driven chat、TTS 到可听播放。在该证据和随后的完整目标证据
 关闭前，除直接修复或明确的安全/来源阻塞外，不新增功能架构、运行开关或
@@ -95,9 +95,10 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 开发主线
 
-- **当前 Issue**：为现有 supervised `speech-only` runner 增加独立、严格的
-  source-bound verifier profile，并从提交后的同一 revision 保留一次真实麦克风
-  到可听播放的通过证据。
+- **当前 Issue**：独立、严格的 `current-revision-live-voice` source-bound
+  verifier profile 已实现并通过自动测试；下一步是在提交后的同一干净 revision
+  上，用 supervised `speech-only` runner 保留一次真实麦克风到可听播放的通过
+  证据和操作员听觉确认。
 - **后续工程 Issue**：依次完成 broad exception 分类、Host typed settings、
   playback/input lifecycle 拆分、受支持配置组合收缩、按 package 扩大 Mypy、
   文档表面收缩。

@@ -45,10 +45,34 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-07-31,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,656 primary tests, and 20 legacy Agent tests.
+1,662 primary tests, and 20 legacy Agent tests.
 
-Now extend the existing voice evidence verifier with a narrow profile for the
-supervised `speech-only` case. It must require:
+The `current-revision-live-voice` verifier profile is implemented and preserves
+the default full seven-case verifier. Focused coverage rejects synthetic input,
+partial events, dirty or mismatched source, missing or incomplete runtime
+identity, executable skills, timeout/truncation/fallback, stale playback,
+artifact tampering, and absent operator review. The 2026-07-31 canonical run
+passes 1,662 primary tests plus 20 legacy Agent tests.
+
+Commit the implementation, then collect the supervised bundle from that exact
+clean revision:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+
+python scripts/voice_acceptance.py \
+  --mode supervised \
+  --cases speech-only \
+  --start-services \
+  --acceptance-id "$RUN_ID"
+
+python scripts/verify_voice_evidence.py \
+  ".chromie/acceptance/voice/$RUN_ID" \
+  --profile current-revision-live-voice \
+  --require-clean
+```
+
+The retained run must contain:
 
 - clean Chromie source and captured running runtime identity;
 - physical microphone input and `asr_final`;
@@ -58,10 +82,10 @@ supervised `speech-only` case. It must require:
 - an operator audible-output verdict;
 - `release_qualified=false` and no simulator/robot claim.
 
-The full seven-case supervised verifier must retain its current requirements.
-After focused and full gates pass, commit the verifier and collect one retained
-bundle from that exact clean revision. If the live run exposes a defect, fix the
-earliest responsible boundary and rerun this same proof.
+The full seven-case supervised verifier retains its current requirements. If
+the live run exposes a defect, fix the earliest responsible boundary and rerun
+this same proof. Do not activate broader target-evidence closure until the
+machine-readable narrow claim reports `eligible=true`.
 
 Detailed Issue scope is in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

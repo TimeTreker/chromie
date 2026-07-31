@@ -347,5 +347,24 @@ python scripts/voice_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
+The narrower proof-before-refactor profile uses no Soridormi authority:
+
+```bash
+python scripts/voice_acceptance.py \
+  --mode supervised \
+  --cases speech-only \
+  --start-services \
+  --acceptance-id <acceptance-id>
+
+python scripts/verify_voice_evidence.py \
+  .chromie/acceptance/voice/<acceptance-id> \
+  --profile current-revision-live-voice \
+  --require-clean
+```
+
+That profile proves only one source-bound physical microphone-to-audible chat
+loop and always reports `release_qualified=false`. The verifier's default
+profile remains the complete seven-case voice/MuJoCo matrix.
+
 Audio capture retention is controlled by `ORCH_SAVE_AUDIO`; both recordings and
 session events may contain private speech and require review before sharing.

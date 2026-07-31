@@ -19,8 +19,8 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Component and evidence checks exist; narrow verifier profile open | Deployed speech-only runner exists | Not applicable | Clean supervised microphone/audible bundle open |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,662 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Narrow current-revision live voice loop | Strict profile and 66 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Clean supervised microphone/audible bundle open |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
@@ -72,24 +72,32 @@ python scripts/voice_acceptance.py \
   --start-services
 ```
 
-That command is currently diagnostic. `verify_voice_evidence.py` requires the
-full seven-case matrix, Soridormi source binding, and both applied `chat` and
-`robot_action` lanes, so it correctly rejects a partial bundle.
+The default verifier still requires the full seven-case matrix, Soridormi
+source binding, and both applied `chat` and `robot_action` lanes. The separate
+`current-revision-live-voice` profile verifies the honest smaller claim:
 
-That Issue will add a separate narrow verification profile to the existing
-tools. It must require clean Chromie source, captured running runtime identity,
-real microphone input, `asr_final`, admitted Gateway/Core processing, applied
-`chat`, zero executable skills, correlated TTS playback completion, and an
-operator audible-output verdict. It must reject synthetic input, critical
-model failure, stale playback, dirty/mismatched source, missing runtime
-identity, or any executable skill.
+```bash
+python scripts/verify_voice_evidence.py \
+  .chromie/acceptance/voice/<acceptance-id> \
+  --profile current-revision-live-voice \
+  --require-clean
+```
+
+It requires clean Chromie source, captured running runtime identity, generated
+profile and effective models, immutable image IDs for Agent/LLM/ASR/TTS, real
+microphone and output recordings, selected audio devices, `asr_final`, admitted
+Gateway/Core processing bound to that identity, applied `chat`, zero executable
+skills, correlated TTS playback completion, exact command/artifact digests, and
+an operator audible-output verdict. It rejects synthetic input, critical model
+failure, truncation, post-authority fallback, stale playback, dirty/mismatched
+source, missing runtime identity, artifact tampering, or executable work.
 
 A passing narrow profile supports only this claim: one reviewed
 current-revision speech-only conversation completed through the physical audio
 loop. It does not establish broad microphone accuracy, simulator behavior,
-Soridormi execution, physical-robot support, or release readiness. Until the
-profile is implemented and a clean bundle is retained, target validation
-remains open.
+Soridormi execution, physical-robot support, or release readiness. The profile
+is automatically verified; until a clean supervised bundle is retained, target
+validation remains open.
 
 ## Level A — automated suite
 

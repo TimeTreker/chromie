@@ -28,6 +28,15 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
   Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests.
 - Activated the retained current-revision microphone-to-audible-response loop
   before structural or feature work.
+- Added the strict `current-revision-live-voice` verifier profile, runtime
+  identity/event binding, physical recording and device checks, exact command
+  retention, and digest-bound bundle manifests while preserving the default
+  seven-case voice/MuJoCo verifier.
+- Added focused rejection coverage for synthetic input, incomplete events,
+  dirty or mismatched source, missing service identity, executable work,
+  timeout/truncation/fallback, stale playback, artifact tampering, and missing
+  operator review. The supervised target bundle remains to be collected from
+  the committed implementation revision.
 - Queued independently closable exception, typed Host configuration,
   playback/input lifecycle, configuration-profile, package-level typing, and
   documentation-reduction Issues.

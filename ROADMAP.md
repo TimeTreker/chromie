@@ -30,12 +30,13 @@ physical microphone
 → TTS scheduling and audible playback
 ```
 
-The existing supervised runner can collect its `speech-only` case, but the
-canonical verifier currently requires the complete seven-case voice/MuJoCo
-matrix and both `chat` and `robot_action` apply lanes. The next proof Issue
-therefore adds a narrow verifier profile without weakening the full matrix,
-binds the run to clean source and running runtime identity, and retains one
-reviewed current-revision bundle.
+The named `current-revision-live-voice` verifier profile is implemented without
+weakening the default seven-case voice/MuJoCo matrix. It requires clean source,
+digest-bound running runtime identity, physical input/output recordings,
+admitted and applied speech-only chat with zero executable work, complete
+playback, artifact hashes, and an operator audible-output verdict. The remaining
+exit is to commit this implementation and retain one passing supervised bundle
+from that exact clean revision.
 
 This claim excludes Soridormi, simulator execution, physical robots, broad
 voice-device support, and release readiness. If the run exposes a defect, fix

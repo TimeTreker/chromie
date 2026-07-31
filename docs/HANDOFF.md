@@ -28,21 +28,22 @@ scheduling, cancellation, evidence, and lifecycle coordination. Soridormi owns
 backend selection, embodied feasibility, collision safety, stop, and recovery.
 
 The canonical local gate is restored: repository policy, test ownership, Ruff,
-Mypy, documentation, 1,656 primary tests, and 20 legacy Agent tests pass. The
-active Issue is **Retain a Current-Revision Live Voice Loop**. No
+Mypy, documentation, 1,662 primary tests, and 20 legacy Agent tests pass. The
+strict narrow verifier is implemented, but the active Issue **Retain a
+Current-Revision Live Voice Loop** still needs one clean supervised bundle. No
 current-revision live or broader target-evidence claim is closed.
 
 ## What to do now
 
-- add a narrow verifier profile for the supervised `speech-only` case while
-  retaining every requirement of the full seven-case verifier;
-- require clean source and running runtime identity, physical microphone input,
-  `asr_final`, admitted Gateway/Core chat with zero executable skills, correlated
-  TTS playback completion, and an operator audible-output verdict;
-- keep `release_qualified=false` and make no Soridormi, simulator, or robot
-  claim;
-- commit the verifier after focused and canonical gates pass, then collect and
-  review one bundle from that exact revision.
+- commit and push the implemented `current-revision-live-voice` profile;
+- from that exact clean revision, run `voice_acceptance.py --mode supervised
+  --cases speech-only --start-services` and provide the real microphone input
+  plus audible-output verdict;
+- verify the retained directory with `verify_voice_evidence.py --profile
+  current-revision-live-voice --require-clean`;
+- close the Issue only when the machine-readable narrow claim reports
+  `eligible=true`; it must remain `release_qualified=false` and make no
+  Soridormi, simulator, or robot claim.
 
 After that, initialize a fresh closure root and collect the default Gateway/Core,
 Agent Skill/weather, Social Attention, paired MuJoCo, active cancellation, and

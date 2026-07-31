@@ -320,10 +320,10 @@ physical microphone
 → TTS scheduling and audible playback
 ```
 
-The existing supervised voice runner can collect only the `speech-only` case,
-but the canonical verifier requires the complete seven-case voice/MuJoCo matrix
-and both `chat` and `robot_action` apply lanes. That makes the narrow diagnostic
-run useful but unable to support its own honest, smaller claim.
+The supervised voice runner could collect only the `speech-only` case, while
+the canonical verifier required the complete seven-case voice/MuJoCo matrix and
+both `chat` and `robot_action` apply lanes. The implemented named profile now
+supports the smaller claim without changing the default matrix.
 
 ### Scope
 
@@ -339,6 +339,17 @@ run useful but unable to support its own honest, smaller claim.
   acquisition, stale playback, missing source identity, or dirty source;
 - retain the exact command, logs, structured events, audio-device identity, and
   a machine-readable claim that is limited to the live speech-only loop.
+
+### Implementation status
+
+The `current-revision-live-voice` profile and runner integration are implemented
+and automatically verified. The runner captures a digest-valid runtime identity,
+binds Gateway/Core evidence to it, retains physical input/output recordings and
+device selection, and hashes the exact collection artifacts. The verifier keeps
+the full seven-case profile as its default and fails closed on every rejection
+class in the exit criteria. Sixty-six focused tests and the canonical 1,662-test
+suite pass. Target validation remains open until one clean committed revision
+produces and retains a passing supervised bundle with operator review.
 
 ### Non-goals
 
