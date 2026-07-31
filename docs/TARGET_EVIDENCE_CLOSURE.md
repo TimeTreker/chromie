@@ -25,11 +25,12 @@ revision cannot be mixed into the closure. A completed closure report always
 contains `release_qualified=false`; product or physical release approval remains
 a separate owner decision.
 
-The active proof-before-refactor Issue is narrower than either closure profile:
-it retains one supervised current-revision `speech-only` microphone-to-audible
-loop. That proof is a prerequisite for queued structural work, but it does not
-satisfy Gateway/Core MuJoCo, Agent Skill/weather, Social Attention, LAN, full
-voice-device, or physical-robot tracks in this closure.
+The strict current-revision `speech-only` verifier is implemented, but physical
+target validation is deferred because the current host has no microphone. That
+does not weaken the physical claim and does not block `source_bound_development`,
+whose required tracks are non-physical. It remains required for
+`supervised_physical_pilot` and does not satisfy Gateway/Core MuJoCo, Agent
+Skill/weather, Social Attention, LAN, or physical-robot tracks.
 
 ## Profiles
 

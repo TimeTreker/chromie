@@ -29,26 +29,15 @@ backend selection, embodied feasibility, collision safety, stop, and recovery.
 
 The canonical local gate is restored: repository policy, test ownership, Ruff,
 Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests pass. The
-strict narrow verifier is implemented, but the active Issue **Retain a
-Current-Revision Live Voice Loop** still needs one clean supervised bundle. No
-current-revision live or broader target-evidence claim is closed.
+strict narrow verifier is implemented. This PC has no microphone, so physical
+target validation is deferred without a claim. The active Issue is **Close
+Current-Revision Target Evidence** using the non-physical default profile.
 
 ## What to do now
 
-- select a managed Python 3.11+ environment; the first supervised attempt
-  `20260731T101957Z` correctly remains failed because the selected `Chromie`
-  environment was Python 3.10.20;
-- commit and push the shared preflight/launcher Python runtime gate;
-- from that exact clean revision, run `voice_acceptance.py --mode supervised
-  --cases speech-only --start-services` and provide the real microphone input
-  plus audible-output verdict;
-- verify the retained directory with `verify_voice_evidence.py --profile
-  current-revision-live-voice --require-clean`;
-- close the Issue only when the machine-readable narrow claim reports
-  `eligible=true`; it must remain `release_qualified=false` and make no
-  Soridormi, simulator, or robot claim.
-
-After that, initialize a fresh closure root and collect the default Gateway/Core,
+- keep the failed `20260731T110834Z` attempt as diagnostic-only: Python 3.11.15
+  and services were ready, but no microphone input existed;
+- initialize a fresh `source_bound_development` closure and collect Gateway/Core,
 Agent Skill/weather, Social Attention, paired MuJoCo, active cancellation, and
 second-machine LAN evidence.
 

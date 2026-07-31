@@ -2,8 +2,8 @@
 
 **Development identity:** `development`
 **Status refresh date:** 2026-07-31
-**Active prerequisite Issue:** **Retain a Current-Revision Live Voice Loop**
-**Next evidence Issue:** **Close Current-Revision Target Evidence**
+**Deferred physical validation:** **Retain a Current-Revision Live Voice Loop**
+**Active evidence Issue:** **Close Current-Revision Target Evidence**
 
 ## Resume point
 
@@ -56,12 +56,13 @@ both the supervised preflight and the Orchestrator launcher before dependency
 installation or model warm-up. The 2026-07-31 canonical run passes 1,664
 primary tests plus 20 legacy Agent tests.
 
-The first clean supervised attempt, `20260731T101957Z` at revision `4719771`,
-failed before Orchestrator readiness: the selected `Chromie` Conda environment
-was Python 3.10.20, below the repository's declared Python 3.11 floor. This is
-a diagnostic failure, not live-loop evidence. Select or create a conforming
-managed environment, commit the runtime gate, and collect from that exact clean
-revision:
+The managed `Chromie` environment is now Python 3.11.15 and passes the runtime
+gate. Clean supervised attempt `20260731T110834Z` at revision `e931af3` then
+confirmed that this PC has no usable microphone input: the Orchestrator and ASR
+service were ready, but both guided utterances produced no audio or `asr_final`.
+The operator confirmed that no microphone is installed and directed that this
+physical test be skipped. This is not live-loop evidence; target validation is
+deferred to a host with input hardware. When such a host is available, use:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -78,9 +79,7 @@ python scripts/verify_voice_evidence.py \
   --require-clean
 ```
 
-Set `CHROMIE_CONDA_ENV` when using a conforming environment whose name is not
-`Chromie`. Do not weaken the shared contracts to make the stale Python 3.10
-environment appear supported.
+Do not replace physical input with synthetic input for this claim.
 
 The retained run must contain:
 
@@ -92,18 +91,16 @@ The retained run must contain:
 - an operator audible-output verdict;
 - `release_qualified=false` and no simulator/robot claim.
 
-The full seven-case supervised verifier retains its current requirements. If
-the live run exposes a defect, fix the earliest responsible boundary and rerun
-this same proof. Do not activate broader target-evidence closure until the
-machine-readable narrow claim reports `eligible=true`.
+The full seven-case supervised verifier retains its current requirements. The
+default `source_bound_development` closure is now active because physical voice
+is optional for that profile; the deferred narrow claim remains ineligible.
 
 Detailed Issue scope is in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
-## Broader target-evidence resume point
+## Active target-evidence resume point
 
-After the narrow live voice proof closes, this becomes the active delivery
-line. Freeze new architecture layers, ordinary behavior flags,
+This is the active delivery line. Freeze new architecture layers, ordinary behavior flags,
 standalone design documents, and project terminology unless a change is
 required to remove a reproduced evidence blocker. Prefer deletion, merging, or
 simplification over adding another compatibility surface.

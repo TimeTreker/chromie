@@ -4,9 +4,10 @@
 verification, target-validation, and deployment claims.
 **Development identity:** `development`; no release version or publication target is planned.
 **Status refresh date:** 2026-07-31
-**Active Issue:** **Retain a Current-Revision Live Voice Loop**. The canonical
-local gate prerequisite is complete; default target-evidence closure follows
-the live proof. Structural refactors and repository-surface growth are queued
+**Active Issue:** **Close Current-Revision Target Evidence**. The canonical
+local gate and live-voice verifier implementation are complete; physical voice
+validation is deferred because the current host has no microphone. Structural
+refactors and repository-surface growth are queued
 behind the remaining evidence work
 unless they close a demonstrated safety or provenance blocker.
 
@@ -43,7 +44,7 @@ artifact sandbox. See [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md
 | Speech stack | SenseVoice final-utterance ASR, CosyVoice3 default TTS, cancellation/watchdogs, content gates, and ordered playback are implemented. | ASR/TTS provider, cancellation, alignment, startup, and voice acceptance tests. | Physical microphone accuracy, listening quality, shared-load recovery, and supervised device evidence remain open. | Local containers plus Host audio lifecycle. Owner: [TTS Evaluation](TTS_PROVIDER_EVALUATION.md) and [Acceptance](ACCEPTANCE.md). |
 | Benchmark suite | Module, integration, E2E profiles, stress workloads, migration inventory, and reviewed Social Attention data are implemented. | Inventory/migration parity, dataset validation, adapters, workload, and report tests. | Real model/service/MuJoCo/physical evidence must be collected per profile. | Evaluator only; it cannot implement intelligence. Owner: [Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md). |
 | Canonical local gate | The dependency-light entrypoint now declares every imported test dependency, ignores cache-only Router residue while rejecting maintained Router content, loads deployment environment explicitly, and retains its four-file Mypy scope. | On 2026-07-31, the latest canonical run passed repository policy, test ownership, Ruff, Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests. | Not a target-validation claim. | Completed prerequisite. Owner: [Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md). |
-| Current live voice loop | The `current-revision-live-voice` profile is implemented alongside the unchanged default full-matrix profile. It binds clean source, generated profile, running image/model identity, Gateway/Core events, physical recordings/devices, playback, operator review, command, and artifact digests into a claim that remains `release_qualified=false`. Shared preflight/launcher validation now rejects managed Python below 3.11 before evidence creation or model warm-up. | Sixty-eight focused voice/evidence tests and the 1,664-test canonical suite pass, including rejection of synthetic/partial/dirty/mismatched/unbound/skill/stale/unreviewed evidence and an incompatible Python runtime. | No retained clean current-revision microphone → audible-response bundle yet; attempt `20260731T101957Z` stopped before readiness because the selected environment was Python 3.10.20. | Active target-retention Issue; select a conforming managed runtime, then rerun. Owner: [Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md). |
+| Current live voice loop | The `current-revision-live-voice` profile is implemented alongside the unchanged default full-matrix profile. It binds clean source, generated profile, running image/model identity, Gateway/Core events, physical recordings/devices, playback, operator review, command, and artifact digests into a claim that remains `release_qualified=false`. Shared preflight/launcher validation rejects managed Python below 3.11 before evidence creation or model warm-up. | Sixty-eight focused voice/evidence tests and the 1,664-test canonical suite pass, including rejection of synthetic/partial/dirty/mismatched/unbound/skill/stale/unreviewed evidence and an incompatible Python runtime. | No retained microphone → audible-response bundle. Attempt `20260731T110834Z` ran on Python 3.11.15 but produced no input because this PC has no microphone; no claim is made. | Implementation verified; physical target validation deferred to a host with input hardware. Owner: [Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md). |
 | Engineering safeguards | Loopback publication, first failure-path audit, repository policies, Ruff/Mypy mechanisms, and test ownership are implemented. | Repository policy, Ruff, Mypy, test ownership, documentation, and the full canonical local suite pass. The 141 broad handlers still need symbol-level classification under a later Issue. | LAN exposure acceptance and live failure evidence remain open. | Development/CI gates. Owners: [Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md), [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md), and [Static Analysis](STATIC_ANALYSIS.md). |
 | Typed service configuration | Complete ASR service environment is parsed once into immutable typed settings with safe diagnostics. | ASR parsing, precedence, invalid-input, backend projection, Compose, and full-suite tests. | Host/profile startup remains operational evidence. | ASR migrated; Host still participates in a 295-key literal runtime environment surface. Owner: [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md). |
 | VoiceAssistant composition root | Runtime-ready greeting scheduling/playback barriers are extracted; the remaining root is 8,886 lines with 167 methods and a 615-line constructor. | Greeting collaborator and current behavior suites are automatic evidence only; no structural closure is claimed. | The current live voice proof remains open. | `VoiceAssistant` remains lifecycle owner; typed settings and playback/input lifecycle extractions are queued. Owner: [Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md). |
@@ -66,10 +67,10 @@ voice and robot evidence remain optional and supervised; they are required only
 for the stricter physical-pilot profile. No current retained bundle closes these
 tracks yet, and no automatic workflow grants release qualification.
 
-The canonical local gate is restored. Before those broader tracks, add and
-retain the smallest honest current-revision live voice claim. That proof will
-not substitute for Gateway/Core MuJoCo, Social Attention, full voice-device,
-LAN, or physical evidence.
+The canonical local gate is restored. The live-voice verifier remains available
+for a future microphone-equipped host, but physical voice is optional for the
+active default closure and cannot substitute for Gateway/Core MuJoCo, Social
+Attention, LAN, or other required tracks.
 
 During these prerequisite and evidence Issues, changes may repair a reproduced
 blocker, improve provenance, or remove dead material, but must not add another

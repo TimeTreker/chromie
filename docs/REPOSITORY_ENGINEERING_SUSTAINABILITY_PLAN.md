@@ -1,7 +1,7 @@
 # Repository Engineering Sustainability Plan
 
 Status: current repository-proof and simplification plan; active Issue is
-**Retain a Current-Revision Live Voice Loop**
+**Close Current-Revision Target Evidence**
 
 This document records engineering recommendations accepted after
 repository-wide external reviews and decomposes them into independently
@@ -182,8 +182,8 @@ Issue must refresh its own baseline because counts may change.
 | Issue | State | Depends on | Purpose |
 |---|---|---|---|
 | Restore Canonical Local Gate Reproducibility | implemented and automatically verified | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
-| Retain a Current-Revision Live Voice Loop | **active** | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on the current revision. |
-| Close Current-Revision Target Evidence | queued | current live voice loop | Retain and review the complete default source-bound evidence profile before structural work. |
+| Retain a Current-Revision Live Voice Loop | implementation verified; physical target validation deferred | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on a microphone-equipped host. |
+| Close Current-Revision Target Evidence | **active** | canonical gate and live-voice verifier implementation, satisfied; physical voice is optional for this profile | Retain and review the complete default source-bound evidence profile before structural work. |
 | Classify Broad Runtime Exception Boundaries | queued | target-evidence closure | Ensure every broad handler has an explicit failure contract and regression boundary. |
 | Establish Typed Host Configuration Snapshots | queued | broad-exception classification | Stop `VoiceAssistant` from parsing its operating environment across a 615-line constructor. |
 | Extract Playback Delivery Lifecycle | queued | typed Host settings | Isolate ordered TTS generation, playback, echo, cancellation, and delivery evidence. |
@@ -303,8 +303,8 @@ results.
 
 ## Issue: Retain a Current-Revision Live Voice Loop
 
-Status: **active**; dependency **Restore Canonical Local Gate
-Reproducibility** is satisfied
+Status: implementation and automatic verification complete; physical target
+validation deferred because the current host has no microphone
 
 ### Problem
 
@@ -351,6 +351,11 @@ class in the exit criteria. Sixty-eight focused tests and the canonical 1,664-te
 suite pass. Target validation remains open until one clean committed revision
 produces and retains a passing supervised bundle with operator review.
 
+Attempt `20260731T110834Z` used the supported Python 3.11.15 runtime and healthy
+services but captured no input; the operator confirmed that the PC has no
+microphone and directed that physical validation be skipped. No live claim is
+made, and the unfulfilled physical exit criterion remains open.
+
 ### Non-goals
 
 - no Soridormi, MuJoCo, robot-action, cancellation, or physical-robot claim;
@@ -373,7 +378,7 @@ produces and retains a passing supervised bundle with operator review.
 
 ## Issue: Close Current-Revision Target Evidence
 
-Status: queued; depends on **Retain a Current-Revision Live Voice Loop**
+Status: **active**; the default profile does not require physical voice evidence
 
 ### Scope
 

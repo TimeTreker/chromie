@@ -46,11 +46,11 @@ Soridormi 负责：
 ## 当前状态
 
 可复现的本地标准测试门禁已经恢复：仓库策略、测试归属、Ruff、Mypy、文档、
-1,664 个主要测试及 20 个旧 Agent 测试均已通过。当前第一优先级是保留与当前
-源码一致的最小真实语音闭环证据：真实麦克风输入，经 ASR、Cognitive
-Gateway、Goal-driven chat、TTS 到可听播放。在该证据和随后的完整目标证据
-关闭前，除直接修复或明确的安全/来源阻塞外，不新增功能架构、运行开关或
-术语。之后再继续当前版本的 Gateway/Core、取消和 MuJoCo 证据。仓库使用
+1,664 个主要测试及 20 个旧 Agent 测试均已通过。与当前源码一致的最小真实
+语音闭环 strict verifier 已实现；但本机没有麦克风，因此不伪造真实输入证据，
+物理语音目标验证延后。当前优先级是完成不要求物理语音的
+`source_bound_development` 证据闭环。在该证据关闭前，除直接修复或明确的
+安全/来源阻塞外，不新增功能架构、运行开关或术语。仓库使用
 `development` 作为中性开发身份，当前没有版本发布或公开分发计划。
 
 已完成的开发基础包括：
@@ -95,10 +95,10 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 开发主线
 
-- **当前 Issue**：独立、严格的 `current-revision-live-voice` source-bound
-  verifier profile 已实现并通过自动测试；下一步是在提交后的同一干净 revision
-  上，用 supervised `speech-only` runner 保留一次真实麦克风到可听播放的通过
-  证据和操作员听觉确认。
+- **延后的物理验证**：独立、严格的 `current-revision-live-voice`
+  source-bound verifier 已实现；待有麦克风的主机再保留 supervised bundle。
+- **当前 Issue**：完成默认 `source_bound_development` 证据闭环；该 profile
+  不要求物理语音或物理机器人证据。
 - **后续工程 Issue**：依次完成 broad exception 分类、Host typed settings、
   playback/input lifecycle 拆分、受支持配置组合收缩、按 package 扩大 Mypy、
   文档表面收缩。

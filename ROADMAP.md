@@ -15,7 +15,7 @@ Router content, moved generated runtime configuration behind explicit startup,
 and repaired the existing four-file Mypy ratchet without ignores or scope
 removal.
 
-## Active Issue — Retain a Current-Revision Live Voice Loop
+## Deferred target validation — Retain a Current-Revision Live Voice Loop
 
 Before further architecture, feature, configuration, terminology, or broad
 documentation growth, retain the smallest complete proof of the current
@@ -30,26 +30,27 @@ physical microphone
 → TTS scheduling and audible playback
 ```
 
-The named `current-revision-live-voice` verifier profile is implemented without
+The named `current-revision-live-voice` verifier profile is implemented and
+automatically verified without
 weakening the default seven-case voice/MuJoCo matrix. It requires clean source,
 digest-bound running runtime identity, physical input/output recordings,
 admitted and applied speech-only chat with zero executable work, complete
-playback, artifact hashes, and an operator audible-output verdict. The remaining
-exit is to commit this implementation and retain one passing supervised bundle
-from that exact clean revision.
+playback, artifact hashes, and an operator audible-output verdict. The current
+host has no microphone, so a real attempt correctly retained no input claim and
+physical target validation is deferred to a host with input hardware.
 
 This claim excludes Soridormi, simulator execution, physical robots, broad
-voice-device support, and release readiness. If the run exposes a defect, fix
-the earliest responsible boundary and rerun it before starting structural work.
+voice-device support, and release readiness. The unfulfilled physical exit
+criterion remains visible and cannot be satisfied by synthetic evidence.
 Detailed scope and exit criteria are in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
-## Next evidence and simplification Issues
+## Active Issue — Close Current-Revision Target Evidence
 
-After the live proof passes, close the default
-`source_bound_development` target-evidence profile. It must retain reviewed
+Close the default `source_bound_development` target-evidence profile. It must retain reviewed
 current-revision Gateway/Core, Agent Skill/weather, Social Attention, paired
-MuJoCo, and second-machine LAN evidence.
+MuJoCo, and second-machine LAN evidence. That profile explicitly does not
+require physical voice or robot evidence.
 
 Only after that evidence closes, work one semantic Issue at a time:
 
@@ -279,8 +280,9 @@ live proof and target-evidence closure. See
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
 The first engineering-sustainability intake and canonical local-gate repair are
-complete. The active named Issue is **Retain a Current-Revision Live Voice
-Loop**. **Close Current-Revision Target Evidence** follows it; later
+complete. The live-voice verifier is implemented while physical validation is
+deferred because the current host has no microphone. The active named Issue is
+**Close Current-Revision Target Evidence**; later
 simplification Issues are queued behind the evidence work in the same plan.
 
 Exit criteria:
