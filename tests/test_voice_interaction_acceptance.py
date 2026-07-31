@@ -40,6 +40,7 @@ from scripts.voice_acceptance import (
     write_override_file,
     write_bundle_manifest,
 )
+from scripts.check_python_runtime import runtime_is_supported
 from orchestrator.runtime.evidence_identity import canonical_json_sha256
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
 from scripts.acceptance_audio import AudioFixture, HostSpeakerPlayer, PulseVirtualMicrophone
@@ -486,6 +487,11 @@ def _update_jsonl(path: Path, updater) -> None:
 
 
 class VoiceInteractionAcceptanceTests(unittest.TestCase):
+    def test_host_runtime_requires_python_311_or_newer(self) -> None:
+        self.assertFalse(runtime_is_supported((3, 10, 20)))
+        self.assertTrue(runtime_is_supported((3, 11, 0)))
+        self.assertTrue(runtime_is_supported((3, 13, 1)))
+
     def test_parse_all_cases_preserves_release_order(self) -> None:
         self.assertEqual(parse_case_list("all"), list(FULL_CASE_ORDER))
 
@@ -681,7 +687,11 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             mock.patch(
                 "scripts.voice_acceptance.shutil.which",
                 side_effect=lambda command: (
-                    "/usr/bin/docker" if command == "docker" else None
+                    "/usr/bin/docker"
+                    if command == "docker"
+                    else "/usr/bin/conda"
+                    if command == "conda"
+                    else None
                 ),
             ),
             mock.patch(
@@ -700,6 +710,44 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             next(item.detail for item in checks if item.name == "TTS endpoint"),
             "Chromie services will be started by --start-services",
         )
+
+    def test_preflight_rejects_an_unsupported_orchestrator_python(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "--preflight-only",
+                "--mode",
+                "supervised",
+                "--cases",
+                "speech-only",
+                "--start-services",
+            ]
+        )
+
+        def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            if command[-1] == "info":
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                "",
+                "[orchestrator][error] Python 3.10.20 is unsupported; "
+                "Python 3.11+ is required.",
+            )
+
+        with (
+            mock.patch(
+                "scripts.voice_acceptance.shutil.which",
+                side_effect=lambda command: f"/usr/bin/{command}",
+            ),
+            mock.patch("scripts.voice_acceptance.subprocess.run", side_effect=run),
+        ):
+            checks = acceptance_readiness(args, ["speech-only"])
+
+        runtime = next(
+            item for item in checks if item.name == "Orchestrator Python runtime"
+        )
+        self.assertFalse(runtime.passed)
+        self.assertIn("Python 3.10.20 is unsupported", runtime.detail)
 
     def test_preflight_only_does_not_create_evidence_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

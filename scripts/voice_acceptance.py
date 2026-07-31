@@ -502,6 +502,61 @@ def acceptance_readiness(
                 )
             )
 
+    conda = shutil.which("conda")
+    conda_env = os.getenv(
+        "CONDA_ENV_NAME", os.getenv("CHROMIE_CONDA_ENV", "Chromie")
+    )
+    if conda is None:
+        checks.append(
+            CheckResult(
+                "Orchestrator Python runtime",
+                False,
+                "conda was not found on PATH; the managed Orchestrator "
+                "runtime cannot be checked",
+            )
+        )
+    else:
+        try:
+            runtime = subprocess.run(
+                [
+                    conda,
+                    "run",
+                    "--no-capture-output",
+                    "-n",
+                    conda_env,
+                    "python",
+                    "scripts/check_python_runtime.py",
+                    "--component",
+                    "orchestrator",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            runtime_detail = (
+                runtime.stdout.strip()
+                or runtime.stderr.strip()
+                or f"managed runtime check exited {runtime.returncode}"
+            )
+            checks.append(
+                CheckResult(
+                    "Orchestrator Python runtime",
+                    runtime.returncode == 0,
+                    runtime_detail,
+                )
+            )
+        except subprocess.TimeoutExpired:
+            checks.append(
+                CheckResult(
+                    "Orchestrator Python runtime",
+                    False,
+                    f"managed environment {conda_env!r} did not report its "
+                    "Python version within 30 seconds",
+                )
+            )
+
     if args.mode in AUTOMATIC_MODES:
         missing_runtime_packages = _missing_automatic_runtime_packages(args.mode)
         managed_conda = shutil.which("conda")

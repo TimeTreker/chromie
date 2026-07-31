@@ -347,7 +347,7 @@ and automatically verified. The runner captures a digest-valid runtime identity,
 binds Gateway/Core evidence to it, retains physical input/output recordings and
 device selection, and hashes the exact collection artifacts. The verifier keeps
 the full seven-case profile as its default and fails closed on every rejection
-class in the exit criteria. Sixty-six focused tests and the canonical 1,662-test
+class in the exit criteria. Sixty-eight focused tests and the canonical 1,664-test
 suite pass. Target validation remains open until one clean committed revision
 produces and retains a passing supervised bundle with operator review.
 

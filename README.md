@@ -22,7 +22,7 @@ experience artifacts. See
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
 > The canonical local gate is reproducible again: repository policy,
-> test-ownership, Ruff, Mypy, documentation, 1,662 primary tests, and 20 legacy
+> test-ownership, Ruff, Mypy, documentation, 1,664 primary tests, and 20 legacy
 > Agent tests pass from the documented setup. A strict source-bound verifier for
 > the current-revision microphone-to-audible-response loop is implemented; the
 > active Issue remains open until one clean supervised bundle is collected and

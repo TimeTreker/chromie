@@ -28,14 +28,17 @@ scheduling, cancellation, evidence, and lifecycle coordination. Soridormi owns
 backend selection, embodied feasibility, collision safety, stop, and recovery.
 
 The canonical local gate is restored: repository policy, test ownership, Ruff,
-Mypy, documentation, 1,662 primary tests, and 20 legacy Agent tests pass. The
+Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests pass. The
 strict narrow verifier is implemented, but the active Issue **Retain a
 Current-Revision Live Voice Loop** still needs one clean supervised bundle. No
 current-revision live or broader target-evidence claim is closed.
 
 ## What to do now
 
-- commit and push the implemented `current-revision-live-voice` profile;
+- select a managed Python 3.11+ environment; the first supervised attempt
+  `20260731T101957Z` correctly remains failed because the selected `Chromie`
+  environment was Python 3.10.20;
+- commit and push the shared preflight/launcher Python runtime gate;
 - from that exact clean revision, run `voice_acceptance.py --mode supervised
   --cases speech-only --start-services` and provide the real microphone input
   plus audible-output verdict;

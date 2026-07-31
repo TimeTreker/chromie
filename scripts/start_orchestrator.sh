@@ -80,6 +80,10 @@ conda activate "$CONDA_ENV_NAME"
 
 echo "[orchestrator] Python: $(which python)"
 
+# Fail before dependency installation or model warm-up when the selected host
+# runtime cannot import the repository's Python 3.11+ shared contracts.
+python scripts/check_python_runtime.py --component orchestrator
+
 # Install host Python dependencies only when orchestrator/requirements.txt changed.
 if [ -x "./scripts/install_orchestrator_deps.sh" ]; then
   ./scripts/install_orchestrator_deps.sh

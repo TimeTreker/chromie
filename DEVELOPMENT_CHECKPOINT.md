@@ -45,17 +45,23 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-07-31,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,662 primary tests, and 20 legacy Agent tests.
+1,664 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
 partial events, dirty or mismatched source, missing or incomplete runtime
 identity, executable skills, timeout/truncation/fallback, stale playback,
-artifact tampering, and absent operator review. The 2026-07-31 canonical run
-passes 1,662 primary tests plus 20 legacy Agent tests.
+artifact tampering, and absent operator review. Python 3.11+ is now checked by
+both the supervised preflight and the Orchestrator launcher before dependency
+installation or model warm-up. The 2026-07-31 canonical run passes 1,664
+primary tests plus 20 legacy Agent tests.
 
-Commit the implementation, then collect the supervised bundle from that exact
-clean revision:
+The first clean supervised attempt, `20260731T101957Z` at revision `4719771`,
+failed before Orchestrator readiness: the selected `Chromie` Conda environment
+was Python 3.10.20, below the repository's declared Python 3.11 floor. This is
+a diagnostic failure, not live-loop evidence. Select or create a conforming
+managed environment, commit the runtime gate, and collect from that exact clean
+revision:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -71,6 +77,10 @@ python scripts/verify_voice_evidence.py \
   --profile current-revision-live-voice \
   --require-clean
 ```
+
+Set `CHROMIE_CONDA_ENV` when using a conforming environment whose name is not
+`Chromie`. Do not weaken the shared contracts to make the stale Python 3.10
+environment appear supported.
 
 The retained run must contain:
 

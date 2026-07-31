@@ -19,8 +19,8 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,662 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Strict profile and 66 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Clean supervised microphone/audible bundle open |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Clean supervised microphone/audible bundle open; the selected managed environment must first satisfy Python 3.11+ |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
@@ -71,6 +71,13 @@ python scripts/voice_acceptance.py \
   --cases speech-only \
   --start-services
 ```
+
+Before it starts services or creates an evidence bundle, the supervised
+preflight checks the selected `CONDA_ENV_NAME`/`CHROMIE_CONDA_ENV` (default
+`Chromie`) against the repository's Python 3.11+ requirement. The Orchestrator
+launcher repeats the same check before installing dependencies or warming
+models. An incompatible environment is an operational blocker, not evidence;
+select or create a conforming environment and rerun from a clean revision.
 
 The default verifier still requires the full seven-case matrix, Soridormi
 source binding, and both applied `chat` and `robot_action` lanes. The separate

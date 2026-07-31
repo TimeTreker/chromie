@@ -159,6 +159,13 @@ cp orchestrator/.env.local.example orchestrator/.env.local
 python orchestrator/list_devices.py
 ```
 
+Python 3.11 is the minimum supported host runtime. Both supervised voice
+preflight and `scripts/start_orchestrator.sh` validate the selected Conda
+environment before evidence creation, dependency installation, or model
+warm-up. To use another conforming environment, set `CHROMIE_CONDA_ENV` (or
+`CONDA_ENV_NAME`) explicitly; an older environment is rejected rather than
+treated as partial runtime evidence.
+
 Set explicit `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` values. Relative
 `RECORDINGS_DIR` paths are resolved from the repository root.
 
@@ -202,8 +209,8 @@ Recommended:
 ```
 
 This generates runtime configuration, activates the selected Conda environment,
-installs changed requirements, warms Ollama, avoids duplicate processes, and
-starts the module from the repository root.
+checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
+duplicate processes, and starts the module from the repository root.
 
 The Orchestrator has a true fast-first audio path for slow tool, planning,
 memory, and embodied turns. At startup it primes a small speaker-specific

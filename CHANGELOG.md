@@ -37,6 +37,10 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
   timeout/truncation/fallback, stale playback, artifact tampering, and missing
   operator review. The supervised target bundle remains to be collected from
   the committed implementation revision.
+- Added a shared Python 3.11+ runtime gate to supervised preflight and the
+  Orchestrator launcher after a real clean attempt exposed a stale Python 3.10
+  managed environment; incompatible runtimes now stop before evidence creation
+  or model warm-up.
 - Queued independently closable exception, typed Host configuration,
   playback/input lifecycle, configuration-profile, package-level typing, and
   documentation-reduction Issues.
