@@ -72,11 +72,7 @@
               },
               "source_revision": {
                 "type": "string",
-                "description": "Optional provider-reported source revision for evidence binding."
-              },
-              "provider_revision": {
-                "type": "string",
-                "description": "Optional provider build or source revision alias for evidence binding."
+                "description": "Provider-reported source revision for evidence binding."
               }
             }
           },
@@ -782,7 +778,7 @@
               },
               "chromie_intent": {
                 "type": "object",
-                "description": "Chromie-side proposal metadata. Soridormi must treat it as advisory intent, not a hardware command.",
+                "description": "Chromie-side proposal metadata. Soridormi treats it as advisory intent, never as a hardware command.",
                 "properties": {
                   "execution_mode": {
                     "type": "string",
@@ -908,7 +904,7 @@
             "then": null
           },
           "llm_hints": {
-            "chromie_intent_contract": "Chromie sends proposal metadata only; Soridormi must validate, plan, monitor, and may refuse every physical execution."
+            "chromie_intent_contract": "Chromie sends proposal metadata only; Soridormi validates, plans, monitors, and may refuse every physical execution."
           }
         },
         {
@@ -2821,6 +2817,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "e0b310af090cf0b9451a952eb3de6440daaf530b"
+    "upstream_commit": "c5a3debf4819fa3cc6b631f3b0a25570ce5f5c17"
   }
 }
