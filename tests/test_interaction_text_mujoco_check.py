@@ -24,6 +24,7 @@ from scripts.interaction_text_mujoco_check import (
     validate_contract,
     validate_speech_contract,
     wait_for_provider_started,
+    wait_for_session_done,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -682,6 +683,30 @@ class ExecutionBindingTests(unittest.TestCase):
         )
 
         self.assertEqual(calls, [("sid-1", response, {"request-1"})])
+
+
+class SessionCompletionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_explicit_interrupt_is_a_terminal_session_state(self) -> None:
+        class Sessions:
+            state = {
+                "sid-1": {
+                    "done_logged": False,
+                    "interrupted": True,
+                    "llm_done": True,
+                }
+            }
+
+        class Assistant:
+            sessions = Sessions()
+
+        terminal = await wait_for_session_done(
+            Assistant(),
+            "sid-1",
+            timeout_s=0.01,
+            allow_interrupted=True,
+        )
+
+        self.assertEqual(terminal, "interrupted")
 
 
 if __name__ == "__main__":

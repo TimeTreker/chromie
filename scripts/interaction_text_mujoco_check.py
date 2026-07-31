@@ -557,12 +557,26 @@ async def _invoke_soridormi_status(invoker: Any) -> dict[str, Any]:
     return outcome.output
 
 
-async def wait_for_session_done(assistant: Any, sid: str, *, timeout_s: float) -> None:
+async def wait_for_session_done(
+    assistant: Any,
+    sid: str,
+    *,
+    timeout_s: float,
+    allow_interrupted: bool = False,
+) -> str:
+    """Wait for the normal or explicitly allowed interrupted terminal state."""
+
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         state = assistant.sessions.state.get(sid) or {}
         if state.get("done_logged"):
-            return
+            return "done"
+        if (
+            allow_interrupted
+            and state.get("interrupted")
+            and state.get("llm_done")
+        ):
+            return "interrupted"
         await asyncio.sleep(0.05)
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")
 
@@ -973,7 +987,12 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                             f"{result.reason_code or result.message}"
                         )
             try:
-                await wait_for_session_done(assistant, sid, timeout_s=args.timeout_s)
+                await wait_for_session_done(
+                    assistant,
+                    sid,
+                    timeout_s=args.timeout_s,
+                    allow_interrupted=bool(args.interrupt_text),
+                )
             except Exception as exc:
                 errors.append(f"session completion wait failed: {_exception_text(exc)}")
 

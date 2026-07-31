@@ -90,6 +90,12 @@ Gateway. Qualification requires:
 - endpoint-reported source identity and the same runtime-identity digest;
 - explicit safe idle before the request and after cancellation.
 
+The interrupt session must complete normally. The superseded command session is
+terminal when the Host marks it interrupted after model work is complete; it
+must not be required to emit the mutually exclusive normal `session_done` event.
+The trusted execution result and Goal outcome reconciliation remain the
+cancellation-completion authorities.
+
 The observation contains request identity, named skill, Provider identity, Goal
 ownership, and started/done state only. It excludes arguments and Provider
 payloads and does not authorize cancellation.
