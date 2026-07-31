@@ -20,6 +20,7 @@ from .cognitive_identity import (
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
+    evidence_bound_dialogue,
     expected_goal_ids,
     fast_multi_goal_response_schema,
     is_planner_step_skill,
@@ -525,6 +526,7 @@ class FastPlannerResolver:
                 f"{skill_section}"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
+                f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
                 f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a capability, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
@@ -559,6 +561,7 @@ class FastPlannerResolver:
             f"{skill_section}"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
+            f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{self._bounded(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 5000)}\n\n"
             f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
@@ -595,6 +598,7 @@ class FastPlannerResolver:
         return (
             "You are Chromie's Fast Planner. Plan only the final authoritative user turn and canonical goals at the end of the prompt. "
             "Author the semantic plan from the goals and executable catalog; never use phrase-to-action rules and never delegate semantic planning to the host. "
+            "A verified-memory index is provenance only, never answer evidence. For a retained completed external-result Goal, a direct response may use only supplied delivered evidence-bound dialogue: preserve every measurement and condition exactly and omit unsupported embellishment. If that dialogue is absent, retrieve matching verified evidence, perform a fresh read, or escalate. "
             "Produce a complete simple response, common-skill plan, or simple execute-plus-respond mixed plan only when every responsibility is covered; otherwise author a complete per-goal semantic escalation. "
             "Do not execute, authorize, or claim completion. Return JSON only."
         )

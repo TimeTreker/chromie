@@ -419,7 +419,7 @@ class GoalAssociationResolver:
                     module=self.TRACE_MODULE,
                     operation="resolve",
                     attributes={
-                        "active_goal_count": len(self._active_goals(request)),
+                        "candidate_goal_count": len(self._candidate_goals(request)),
                         "num_ctx": self.num_ctx,
                         "num_predict": self.num_predict,
                     },
@@ -439,19 +439,19 @@ class GoalAssociationResolver:
         return result
 
     async def _resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
-        active_goals = self._active_goals(request)
+        candidate_goals = self._candidate_goals(request)
         turn_id = self._turn_id(request)
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ) = (
             GoalAssociationModelOutput
-            if active_goals
+            if candidate_goals
             else GoalSegmentationModelOutput
         )
         discourse_referents = self._discourse_referents(request)
         response_schema = self._response_schema(
             output_type,
-            active_goals,
+            candidate_goals,
             discourse_referents,
             clarification_only=self._clarification_only(request),
         )
@@ -468,7 +468,7 @@ class GoalAssociationResolver:
 
         try:
             raw = await self.ollama.generate(
-                self._build_prompt(request, active_goals, output_type=output_type),
+                self._build_prompt(request, candidate_goals, output_type=output_type),
                 system=self._system_prompt(output_type),
                 options=generation_options,
                 response_format=response_schema,
@@ -496,7 +496,7 @@ class GoalAssociationResolver:
                 repaired = await self.ollama.generate(
                     self._build_repair_prompt(
                         request=request,
-                        active_goals=active_goals,
+                        candidate_goals=candidate_goals,
                         turn_id=turn_id,
                         output_type=output_type,
                         raw=raw,
@@ -557,7 +557,7 @@ class GoalAssociationResolver:
                 "error_type": type(exc).__name__,
                 "error": str(exc)[:500],
                 **failure,
-                "active_goal_count": len(active_goals),
+                "candidate_goal_count": len(candidate_goals),
                 "sid": request.sid,
                 "contract_schema": output_type.__name__,
                 "contract_repair_attempted": repair_attempted,
@@ -574,7 +574,7 @@ class GoalAssociationResolver:
                 turn_id=turn_id,
                 clarification=self._safe_clarification(
                     request,
-                    has_active_goals=bool(active_goals),
+                    has_candidate_goals=bool(candidate_goals),
                 ),
                 confidence=0.0,
                 reason_summary=(
@@ -584,7 +584,11 @@ class GoalAssociationResolver:
                 ),
                 metadata=metadata,
             )
-        return self._validate(resolution, active_goals=active_goals, request=request)
+        return self._validate(
+            resolution,
+            candidate_goals=candidate_goals,
+            request=request,
+        )
 
     def _validate_contract_output(
         self,
@@ -628,7 +632,7 @@ class GoalAssociationResolver:
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
-        active_goals: list[dict[str, Any]],
+        candidate_goals: list[dict[str, Any]],
         discourse_referents: list[dict[str, Any]],
         *,
         clarification_only: bool = False,
@@ -636,7 +640,7 @@ class GoalAssociationResolver:
         schema = copy.deepcopy(output_type.model_json_schema())
         active_ids = [
             " ".join(str(item.get("goal_id") or "").strip().split())
-            for item in active_goals
+            for item in candidate_goals
             if " ".join(str(item.get("goal_id") or "").strip().split())
         ]
         referent_ids = [
@@ -648,6 +652,10 @@ class GoalAssociationResolver:
         new_goals = properties.get("new_goals")
         if isinstance(new_goals, dict):
             new_goals["maxItems"] = 8
+        if not referent_ids:
+            resolved_references = properties.get("resolved_references")
+            if isinstance(resolved_references, dict):
+                resolved_references["maxItems"] = 0
 
         def constrain(node: Any) -> None:
             if isinstance(node, dict):
@@ -733,25 +741,35 @@ class GoalAssociationResolver:
         schema.pop("anyOf", None)
         return schema
 
-    def _active_goals(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+    def _candidate_goals(self, request: AgentRunRequest) -> list[dict[str, Any]]:
         context = request.context if isinstance(request.context, dict) else {}
-        raw = context.get("active_goal_snapshots")
-        if not isinstance(raw, list):
-            raw = []
+        active = context.get("active_goal_snapshots")
+        recent = context.get("recent_goal_snapshots")
+        if not isinstance(active, list):
+            active = []
+        if not isinstance(recent, list):
+            recent = []
+        raw = [*active, *recent]
         out: list[dict[str, Any]] = []
-        for index, item in enumerate(raw[: self.max_active_goals]):
+        seen: set[str] = set()
+        for index, item in enumerate(raw):
+            if len(out) >= self.max_active_goals:
+                break
             if not isinstance(item, dict):
                 continue
             try:
-                out.append(
-                    ActiveGoalSnapshot.model_validate(item).model_dump(
-                        mode="json",
-                        exclude_none=True,
-                    )
+                snapshot = ActiveGoalSnapshot.model_validate(item).model_dump(
+                    mode="json",
+                    exclude_none=True,
                 )
+                goal_id = str(snapshot.get("goal_id") or "").strip()
+                if not goal_id or goal_id in seen:
+                    continue
+                seen.add(goal_id)
+                out.append(snapshot)
             except ValidationError as exc:
                 logger.debug(
-                    "Ignoring malformed active Goal snapshot index=%s error=%s",
+                    "Ignoring malformed Goal association candidate index=%s error=%s",
                     index,
                     exc,
                 )
@@ -800,7 +818,7 @@ class GoalAssociationResolver:
     def _build_prompt(
         self,
         request: AgentRunRequest,
-        active_goals: list[dict[str, Any]],
+        candidate_goals: list[dict[str, Any]],
         *,
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
@@ -823,7 +841,7 @@ class GoalAssociationResolver:
         )
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
-                "There are no active Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
+                "There are no active or retained recent Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
                 "Segment the authoritative user turn into independent new Goals, or return a clarification if the meaning is materially ambiguous. "
             )
             output_instructions = (
@@ -836,7 +854,7 @@ class GoalAssociationResolver:
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
-                "Associations may target only IDs from the active-goal list. "
+                "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
             )
             output_instructions = (
                 "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
@@ -856,7 +874,7 @@ class GoalAssociationResolver:
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
-            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; active Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active or recoverable Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
+            "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
@@ -874,26 +892,26 @@ class GoalAssociationResolver:
             f"{personality_json}\n\n"
             + skill_section
             + "Bounded active goals JSON:\n"
-            f"{self._bounded_json(active_goals, 6500)}\n\n"
+            f"{self._bounded_json(candidate_goals, 6500)}\n\n"
             "Scoped discourse referents JSON:\n"
             f"{self._bounded_json(self._discourse_referents(request), 6500)}\n\n"
             "Discourse focus stack JSON (most recent/foreground last):\n"
             f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-            "Tool-result contents are intentionally absent at this boundary. Resolve references and Goal bindings from user semantics, scoped referents, active Goals, and dialogue only. A later Planner may explicitly retrieve an exact verified memory record after bindings are fixed. "
+            "Tool-result contents are intentionally absent at this boundary. Resolve references and Goal bindings from user semantics, scoped referents, candidate Goals, and dialogue only. A later Planner may explicitly retrieve an exact verified memory record after bindings are fixed. "
             "For a scheduled, running, or recoverable safe-read Goal, associate a semantic follow-up with that exact Goal when appropriate; do not answer from another task's result. "
             "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
-            f"FINAL ACTIVE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in active_goals], 1600)}"
+            f"FINAL CANDIDATE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in candidate_goals], 1600)}"
         )
 
     def _build_repair_prompt(
         self,
         *,
         request: AgentRunRequest,
-        active_goals: list[dict[str, Any]],
+        candidate_goals: list[dict[str, Any]],
         turn_id: str,
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
@@ -919,7 +937,7 @@ class GoalAssociationResolver:
             contract_name = "Goal Segmentation"
             revision_action = "Re-evaluate the independent goal segmentation"
             state_instructions = (
-                "There are no active Goals. Existing-goal associations are structurally invalid and must not appear. "
+                "There are no active or retained recent Goals. Existing-goal associations are structurally invalid and must not appear. "
                 "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the meaning is materially ambiguous. "
                 "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. A greeting attached to substantive work is framing, not a second Goal. Identity and personality shape wording only and never create a Goal. A lookup plus an interpretation derived from the same result is one Goal. "
             )
@@ -931,7 +949,7 @@ class GoalAssociationResolver:
             contract_name = "Goal Association"
             revision_action = "Re-evaluate the semantic associations"
             state_instructions = (
-                "Re-evaluate continuity against only the supplied active Goal IDs. "
+                "Re-evaluate continuity against only the supplied bounded candidate Goal IDs. "
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
@@ -954,7 +972,7 @@ class GoalAssociationResolver:
             + skill_section
             + f"Latest user turn:\n{request.text}\n\n"
             "Bounded active goals JSON:\n"
-            f"{self._bounded_json(active_goals, 7000)}\n\n"
+            f"{self._bounded_json(candidate_goals, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"
             f"{self._bounded_json(self._discourse_referents(request), 6500)}\n\n"
             "Discourse focus stack JSON:\n"
@@ -995,16 +1013,19 @@ class GoalAssociationResolver:
     ) -> str:
         if output_type is GoalSegmentationModelOutput:
             return (
-                "You are Chromie's Goal Segmentation model. No active Goal IDs exist, so association with existing work is impossible. "
+                "You are Chromie's Goal Segmentation model. No active or retained recent Goal IDs exist, so association with existing work is impossible. "
                 "Use semantic reasoning to resolve current-turn references from scoped discourse context and preserve independently satisfiable user responsibilities as separate new Goals, but never turn plan steps into goals. "
+                "Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. A standalone social interaction remains one conversational Goal. "
+                "When one evidence acquisition satisfies both a factual lookup and the requested interpretation of its result, preserve them as one Goal. "
                 "Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
                 "You are advisory only and never execute or commit. Return JSON only."
             )
         return (
             "You are Chromie's Goal Association and Segmentation model. Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
-            "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded active Goals and their bindings, and dialogue context. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
+            "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded candidate Goals and their bindings, and dialogue context. Candidate Goals may be active, recoverable, or recently terminal; referencing a terminal Goal does not reopen it. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
             "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
             "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "
+            "Conversational framing attached to substantive work is not a separate Goal; a standalone social interaction remains one conversational Goal. One lookup and an interpretation derived from the same evidence are one Goal. "
             "You are advisory only and never execute or commit. Return JSON only."
         )
 
@@ -1015,10 +1036,10 @@ class GoalAssociationResolver:
         request: AgentRunRequest,
         turn_id: str,
     ) -> GoalAssociationResolution:
-        active_goals = self._active_goals(request)
+        candidate_goals = self._candidate_goals(request)
         active_goal_ids = {
             str(item.get("goal_id") or "").strip()
-            for item in active_goals
+            for item in candidate_goals
             if str(item.get("goal_id") or "").strip()
         }
         existing_referents = {
@@ -1286,17 +1307,22 @@ class GoalAssociationResolver:
         self,
         resolution: GoalAssociationResolution,
         *,
-        active_goals: list[dict[str, Any]],
+        candidate_goals: list[dict[str, Any]],
         request: AgentRunRequest,
     ) -> GoalAssociationResolution:
-        active_ids = {str(item.get("goal_id") or "") for item in active_goals}
+        candidate_ids = {
+            str(item.get("goal_id") or "") for item in candidate_goals
+        }
         accepted: list[GoalAssociation] = []
         rejected: list[dict[str, Any]] = []
         for association in resolution.associations:
             reason = None
             if association.confidence < self.min_confidence:
                 reason = "below_confidence_threshold"
-            elif any(goal_id not in active_ids for goal_id in association.target_goal_ids):
+            elif any(
+                goal_id not in candidate_ids
+                for goal_id in association.target_goal_ids
+            ):
                 reason = "unknown_target_goal"
             if reason:
                 rejected.append({"association_id": association.association_id, "reason": reason})
@@ -1314,7 +1340,7 @@ class GoalAssociationResolver:
             {
                 "resolver": "goal_association_agent",
                 "status": "resolved",
-                "active_goal_count": len(active_goals),
+                "candidate_goal_count": len(candidate_goals),
                 "accepted_association_count": len(accepted),
                 "new_goal_count": len(new_goals),
                 "referent_update_count": len(resolution.referent_updates),
@@ -1335,7 +1361,7 @@ class GoalAssociationResolver:
                 turn_id=resolution.turn_id,
                 clarification=self._safe_clarification(
                     request,
-                    has_active_goals=bool(active_goals),
+                    has_candidate_goals=bool(candidate_goals),
                 ),
                 confidence=0.0,
                 reason_summary="No sufficiently grounded goal association or new goal was accepted.",
@@ -1347,9 +1373,9 @@ class GoalAssociationResolver:
     def _safe_clarification(
         request: AgentRunRequest,
         *,
-        has_active_goals: bool,
+        has_candidate_goals: bool,
     ) -> str:
-        if has_active_goals:
+        if has_candidate_goals:
             return (
                 "你是在继续刚才的事情，还是想开始一件新的事情？"
                 if (request.language or "").startswith("zh")

@@ -21,6 +21,7 @@ class ContextAssembly:
         "conversation": "orchestrator.conversation_state",
         "history": "orchestrator.conversation_state",
         "active_goal_snapshots": "orchestrator.conversation_state",
+        "recent_goal_snapshots": "orchestrator.conversation_state",
         "interaction_engagement": "orchestrator.attention_policy",
         "mind": "orchestrator.mind",
         "robot_state": "orchestrator.runtime_state",

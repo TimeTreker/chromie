@@ -17,8 +17,8 @@ Chromie's cognitive stages have distinct responsibilities:
    `chat`, `tool`, or `robot_action`. It does not decide what `那边`, `那里`,
    `there`, or another reference means.
 2. **Goal Association** uses the current user meaning, scoped discourse
-   referents, focus, active Goal bindings, and recent dialogue to resolve
-   references and create explicit Goal bindings.
+   referents, focus, active or bounded recent terminal Goal bindings, and
+   recent dialogue to resolve references and create explicit Goal bindings.
 3. **Host conversation state** validates and stores the LLM-authored typed
    referent/focus mutations, IDs, provenance, and bounded persistence. It does
    not contain phrase rules or choose a semantic referent.
@@ -26,7 +26,9 @@ Chromie's cognitive stages have distinct responsibilities:
    retrieve one exact verified prior result or execute a fresh read.
 5. **Response Composer** authors natural pre-result speech. It may say that
    Chromie is checking a source or retrieving a recently checked result, but it
-   cannot state the result before trusted evidence returns.
+   cannot state the result before trusted evidence returns. For a follow-up
+   that references one retained completed Goal, it may also receive the exact
+   evidence-bound dialogue that was already delivered to the user.
 6. **Tool Result Interpreter** produces the final grounded answer from the
    executed memory-retrieval or external-read evidence.
 
@@ -43,10 +45,12 @@ low- or high-confidence decision.
 
 Goal references are generic, not location-specific. A phrase such as “the last
 task I told you” is associated by the same Goal Association LLM against bounded
-active/recoverable Goals and dialogue context. The Host does not contain a phrase
-map for “last task,” “that one,” “那里,” or any other normal semantic reference.
-Operational follow-up phrase settings may preserve context across idle time, but
-they never select a Goal.
+active, recoverable, or recent terminal Goals and dialogue context. The Host
+does not contain a phrase map for “last task,” “that one,” “那里,” or any other
+normal semantic reference. A `continue` or `reference` association to a terminal
+Goal records continuity without reopening or changing its terminal lifecycle
+state. Operational follow-up phrase settings may preserve context across idle
+time, but they never select a Goal.
 
 ## Why there is no global `current_location`
 
@@ -214,6 +218,32 @@ resolve references.
 If the index contains only `location=重庆`, it is not a match for the Neixiang
 Goal. The Planner must use a fresh weather lookup for Neixiang instead.
 
+## Completed-Goal conversational continuity
+
+The verified-memory index proves only identity, arguments, freshness, and
+provenance. It is never answer evidence. Separately, conversation state may
+retain a bounded assistant turn only when the post-execution interpreter's
+speech was actually delivered and the Host marks it with its source Goal and
+Canonical Plan IDs. Fast Planner and Response Composer may use this delivered
+evidence-bound dialogue to interpret or restate the same completed Goal without
+reopening it or repeating the external read.
+
+This projection is deliberately narrower than raw result memory:
+
+- it contains only user-visible text that was already delivered;
+- it is accepted only from the Host's post-execution evidence boundary;
+- it remains scoped to the recorded source Goal IDs;
+- measurements and conditions must be preserved exactly; and
+- it cannot supply a new fact, changed binding, fresher time scope, or detail
+  absent from the delivered dialogue.
+
+If a response Goal is represented only by the verified-memory index and has no
+matching delivered evidence-bound dialogue, validation rejects a direct factual
+response. The Planner must execute exact verified-memory retrieval, perform a
+fresh read, or escalate. This preserves ordinary follow-up conversation without
+turning provenance metadata or general chat history into external-fact
+authority.
+
 ## Safe-read speech
 
 A pending safe read requires one model-authored immediate acknowledgement, and
@@ -233,11 +263,13 @@ Only the post-execution interpreter may state weather facts.
 - No Host keyword, regex, or “latest city wins” reference rule.
 - No global location slot shared by unrelated Goals.
 - Explicit current user meaning outranks discourse focus; foreground scoped
-  referents outrank active Goal bindings and recent dialogue.
+  referents outrank candidate Goal bindings and recent dialogue.
 - Tool memory cannot decide a reference.
 - Goal bindings are immutable planner grounding.
 - Memory retrieval must exactly match those bindings.
-- Old evidence remains usable only through an explicit executed retrieval.
+- Old result contents remain usable only through explicit executed retrieval;
+  already-delivered evidence-bound dialogue may be restated only for its exact
+  completed Goal.
 - Physical robot location remains Soridormi/runtime state, not a discourse
   location referent.
 

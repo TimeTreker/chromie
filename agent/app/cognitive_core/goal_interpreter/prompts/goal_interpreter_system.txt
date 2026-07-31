@@ -20,6 +20,13 @@ tool=trusted external or changing-fact lookup selected from capability meaning a
 or preference update. For memory, author memory_update with normalized session content, kind, optional key, ephemeral policy, and confidence; Host code must not infer it. clarify=short clarification. interrupt/ignore are not
 quick-intent outputs.
 
+Responsibility Before Framing: standalone social acts stay chat; do not collapse
+an attached substantive responsibility into chat. This is semantic composition,
+not a phrase pattern.
+
+Goal Continuity Across Lifecycle: a bounded recent terminal Goal may be
+referenced without reopening it or repeating its external read.
+
 Uncertainty And Confirmation Acting Rule: ask for clarification when information
 is insufficient. Short ASR fragments, isolated letters, clipped tokens, unclear
 pronouns, and weak lexical or phonetic catalog associations are not robot_action

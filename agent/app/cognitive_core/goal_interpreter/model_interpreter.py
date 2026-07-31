@@ -82,15 +82,6 @@ REVIEW_STAGES = {
     "fast_speech_repair",
 }
 
-_GENERIC_CHAT_INTENTS = {
-    "",
-    "unknown",
-    "chat",
-    "conversation",
-    "acknowledge",
-    "acknowledgement",
-    "response",
-}
 class SemanticRouteRepairOutput(BaseModel):
     """Minimal repair DTO; it cannot carry planner or runtime diagnostics."""
 
@@ -168,6 +159,7 @@ _AGENT_GOAL_INTERPRETER_CONTEXT_OMIT_KEYS = {
     "task_contexts",
     "active_task_contexts",
     "active_task_snapshots",
+    "recent_goal_snapshots",
     "current_task_context",
 }
 
@@ -299,7 +291,7 @@ def _route_intent_contract_conflict(
     return None
 
 
-def _has_executable_robot_affordance(request: RouteRequest) -> bool:
+def _has_executable_non_chat_affordance(request: RouteRequest) -> bool:
     for key in (
         "common_ability_catalog",
         "prompt_capabilities_common",
@@ -312,7 +304,11 @@ def _has_executable_robot_affordance(request: RouteRequest) -> bool:
         for item in items:
             if not isinstance(item, dict):
                 continue
-            if str(item.get("route") or "") != "robot_action":
+            if str(item.get("route") or "") not in {
+                "memory",
+                "robot_action",
+                "tool",
+            }:
                 continue
             if item.get("available") is False:
                 continue
@@ -795,6 +791,74 @@ def _compact_active_task_snapshots(
     return compact
 
 
+def _compact_recent_goal_snapshots(
+    context: dict[str, Any],
+    *,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    raw = context.get("recent_goal_snapshots")
+    if not isinstance(raw, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in raw[-max(1, limit) :]:
+        if not isinstance(item, dict):
+            continue
+        goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+        goal_id = str(item.get("goal_id") or goal.get("goal_id") or "").strip()
+        if not goal_id:
+            continue
+        compact.append(
+            {
+                "goal_id": goal_id,
+                "status": str(item.get("status") or ""),
+                "goal": {
+                    "description": str(goal.get("description") or "")[:240],
+                    "object": (
+                        goal.get("object")
+                        if isinstance(goal.get("object"), dict)
+                        else {}
+                    ),
+                },
+                "commitment_state": item.get("commitment_state"),
+                "last_user_update": str(item.get("last_user_update") or "")[:220],
+            }
+        )
+    return compact
+
+
+def _compact_verified_tool_memory_index(
+    context: dict[str, Any],
+    *,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    """Project only verified-result provenance, never provider result contents."""
+
+    raw = context.get("verified_tool_memory_index")
+    if not isinstance(raw, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in raw[-max(1, limit) :]:
+        if not isinstance(item, dict):
+            continue
+        evidence_id = str(item.get("evidence_id") or "").strip()
+        tool_id = str(item.get("tool_id") or "").strip()
+        if not evidence_id or not tool_id:
+            continue
+        request_args = item.get("request_args")
+        compact.append(
+            {
+                "evidence_id": evidence_id,
+                "tool_id": tool_id,
+                "status": str(item.get("status") or ""),
+                "request_args": request_args if isinstance(request_args, dict) else {},
+                "age_ms": item.get("age_ms"),
+                "goal_ids": list(item.get("goal_ids") or [])[:8],
+                "source": "verified_tool_memory_index",
+            }
+        )
+    return compact
+
+
 def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     prompt_context = _context_without_prompt_globals(context)
     memory = prompt_context.get("session_memory")
@@ -994,6 +1058,15 @@ class OllamaGoalInterpreter:
             _compact_active_task_snapshots(request.context),
             max_chars=1800,
         )
+        recent_goals_json = _bounded_json_array(
+            _compact_recent_goal_snapshots(request.context),
+            max_chars=1400,
+        )
+        recent_goals_section = (
+            f"Recent Terminal Goal Snapshot JSON:{recent_goals_json}\n\n"
+            if recent_goals_json != "[]"
+            else ""
+        )
         return (
             "Global Context Group:\n"
             f"{_goal_interpretation_fast_context_section(mind)}\n\n"
@@ -1001,16 +1074,17 @@ class OllamaGoalInterpreter:
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
             f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
+            f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter already ran. Decide from meaning, bounded context, active semantic goals, and common abilities. The result is bounded cognitive evidence and source-effect bound, not final goal meaning or a plan. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
+            "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter already ran. Decide from meaning, bounded context, active/recent Goals, and common abilities. Terminal references do not reopen Goals. The result is bounded cognitive evidence and source-effect bound, not final goal meaning or a plan. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. A status follow-up such as whether a lookup finished should associate with the relevant scheduled, running, or recoverable task and preserve its exact bound tool arguments. If that safe read has no completed evidence, route it for resume or retry rather than answering from another task's result. A follow-up that supplies or replaces a material lookup parameter, such as another city, inherits the lookup responsibility and must remain a tool route. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
+            "Use active tasks, open Goals, and retained recent terminal Goals semantically. A turn may update, reference, or create work. Decide by meaning, never keywords, regexes, overlap, or recency alone. A safe-read status follow-up preserves its exact bound arguments and resumes/retries only without completed evidence. A completed-Goal reference may use evidence-bound dialogue without reopening the Goal or repeating the read. A new material lookup parameter inherits the lookup responsibility. One independent responsibility is one route item; clarify ambiguous targets.\n"
             "Capability Affordance Proposal:\n"
-            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact capability only for an explicit execution method with one clear match. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. For current external facts, choose a trusted lookup by meaning and context, not keywords. Exact match: route=tool and intent=capability:<exact capability_id>, not a domain label. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone social acts stay chat; social framing attached to a substantive request never replaces its substantive lane. Bind an exact capability only for an explicit execution method with one clear match. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. For current external facts, choose a trusted lookup by meaning and context, not keywords. Exact match: route=tool and intent=capability:<exact capability_id>, not a domain label. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
@@ -1332,13 +1406,18 @@ class OllamaGoalInterpreter:
         decision: RouteDecision,
         *,
         reason: str,
+        model: str | None = None,
     ) -> dict[str, Any]:
-        abilities_json = _bounded_json(
-            _compact_candidate_capabilities(
+        # The common catalog is ordered by route, which intentionally places
+        # tool affordances after common embodied actions.  Keep the complete
+        # bounded common projection here: taking only the first few entries can
+        # hide the exact affordance that made this semantic repair necessary.
+        abilities_json = _bounded_json_array(
+            _compact_prompt_capabilities(
                 _review_capabilities_from_request(request),
-                limit=12,
+                limit=24,
             ),
-            max_chars=1600,
+            max_chars=3600,
         )
         session_context = _bounded_json(
             _goal_interpretation_prompt_context(request.context),
@@ -1349,8 +1428,16 @@ class OllamaGoalInterpreter:
             "intent": decision.intent,
             "confidence": decision.confidence,
         }
+        recent_goals_json = _bounded_json_array(
+            _compact_recent_goal_snapshots(request.context),
+            max_chars=1400,
+        )
+        verified_tool_index_json = _bounded_json_array(
+            _compact_verified_tool_memory_index(request.context),
+            max_chars=1600,
+        )
         return {
-            "model": self.review_model or self.model,
+            "model": model or self.review_model or self.model,
             "stream": False,
             "think": False,
             "format": SemanticRouteRepairOutput.model_json_schema(),
@@ -1363,6 +1450,12 @@ class OllamaGoalInterpreter:
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
                         "Return exactly route, intent, and confidence. "
                         "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
+                        "A standalone greeting or thanks remains chat, but social framing attached "
+                        "to a substantive request must not replace the substantive lane. "
+                        "A topical match to a Capability is not itself an execution request. When "
+                        "the latest turn asks to interpret, clarify, or restate a retained completed "
+                        "Goal and the bounded verified-tool index already contains its result "
+                        "provenance, retain chat unless the user requests new bindings or fresh data. "
                         "Use tool only when the model selects an exact supplied external-read Capability. "
                         "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
                         "Use clarify only when the user meaning remains genuinely underdetermined. "
@@ -1376,6 +1469,8 @@ class OllamaGoalInterpreter:
                         f"Latest user input: {request.text}\n"
                         f"Language hint: {request.language or 'auto'}\n"
                         f"Bounded context JSON: {session_context}\n"
+                        f"Recent terminal Goal snapshot JSON: {recent_goals_json}\n"
+                        f"Verified completed tool-memory index JSON: {verified_tool_index_json}\n"
                         f"Supplied abilities JSON: {abilities_json}\n"
                         f"Rejected minimal decision JSON: {_bounded_json(previous, max_chars=500)}"
                     ),
@@ -1882,21 +1977,20 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        """Semantically recheck generic chat when embodied affordances exist.
+        """Semantically recheck every chat proposal against non-chat affordances.
 
         This is deliberately model-based.  The deterministic trigger observes
-        only that the first model returned a content-free generic chat label
-        while the supplied catalog contains executable embodied affordances; it
-        does not inspect the user's words or choose an action by phrase rules.
+        only that the first model returned chat while the supplied catalog
+        contains executable non-chat affordances. Intent labels are open-ended
+        model output and cannot safely decide whether the recheck runs. The
+        trigger does not inspect user words or choose a route by phrase rules.
         """
 
         if not self.generic_chat_review_enabled or not self.slow_review_recovery_enabled:
             return decision
         if decision.route != "chat":
             return decision
-        if str(decision.intent or "").strip().casefold() not in _GENERIC_CHAT_INTENTS:
-            return decision
-        if not _has_executable_robot_affordance(request):
+        if not _has_executable_non_chat_affordance(request):
             return decision
 
         try:
@@ -1904,7 +1998,8 @@ class OllamaGoalInterpreter:
                 self.build_semantic_route_repair_payload(
                     request,
                     decision,
-                    reason="generic_chat_requires_capability_grounding_review",
+                    reason="chat_or_social_framing_requires_capability_grounding_review",
+                    model=self.model,
                 ),
                 stage="capability_grounding_review",
                 request=request,

@@ -408,6 +408,44 @@ class FastPlannerResolverTests(unittest.TestCase):
         ):
             validate_external_response_evidence_boundary(output, context=context)
 
+        index_only_context = {
+            "verified_tool_memory_index": [
+                {
+                    "evidence_id": "evidence-weather",
+                    "tool_id": "chromie.weather.lookup",
+                    "status": "completed",
+                    "request_args": {"location": "Beijing", "date": "today"},
+                    "goal_ids": ["goal-weather"],
+                }
+            ],
+            "history": [],
+        }
+        with self.assertRaisesRegex(
+            ValueError,
+            "external_read_response_requires_evidence_bound_dialogue_or_retrieval",
+        ):
+            validate_external_response_evidence_boundary(
+                output,
+                context=index_only_context,
+            )
+
+        index_only_context["history"] = [
+            {
+                "role": "assistant",
+                "text": "Beijing is hot: 28°C and feels like 33°C.",
+                "metadata": {
+                    "source": "evidence_bound_tool_result_interpretation",
+                    "evidence_bound": True,
+                    "source_goal_ids": ["goal-weather"],
+                    "canonical_plan_id": "plan-weather",
+                },
+            }
+        ]
+        validate_external_response_evidence_boundary(
+            output,
+            context=index_only_context,
+        )
+
     def test_chat_route_schema_is_response_only(self):
         raw = {
             "disposition": "respond",
@@ -953,10 +991,30 @@ class FastPlannerResolverTests(unittest.TestCase):
 
     def test_prompt_defines_complete_coverage_not_skill_matching(self):
         ollama = FakeOllama({"disposition":"respond","coverage":"complete","confidence":0.9,"response_text":"你好。","steps":[],"goal_satisfaction":{"score":1.0,"status":"exact"}})
-        asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(request("你好。", route="chat", goal_ids=["goal-greet"])))
+        planner_request = request("你好。", route="chat", goal_ids=["goal-greet"])
+        context = dict(planner_request.context)
+        context["history"] = [
+            {
+                "role": "assistant",
+                "text": "北京现在约28℃，体感约33℃。",
+                "metadata": {
+                    "source": "evidence_bound_tool_result_interpretation",
+                    "evidence_bound": True,
+                    "source_goal_ids": ["goal-weather"],
+                    "canonical_plan_id": "plan-weather",
+                },
+            }
+        ]
+        planner_request = planner_request.model_copy(update={"context": context})
+        asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(planner_request))
         prompt = ollama.prompts[0][0]
         self.assertIn("Finding one matching capability is not complete coverage", prompt)
         self.assertIn("zero steps", prompt)
+        self.assertIn("Delivered evidence-bound dialogue JSON", prompt)
+        self.assertIn("北京现在约28℃", prompt)
+        system = ollama.prompts[0][1]["system"]
+        self.assertIn("verified-memory index is provenance only", system)
+        self.assertIn("preserve every measurement and condition exactly", system)
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
         raw = multi_goal_plan(

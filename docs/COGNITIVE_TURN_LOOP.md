@@ -355,6 +355,14 @@ conversation history. The same rule applies to host confirmation and recovery
 prompts: a scheduler, provider, or playback-start failure cannot create an
 assistant turn that the user never heard.
 
+Delivered post-execution tool speech is retained with a Host-authored
+evidence-bound marker plus its source Goal and Canonical Plan IDs. A later turn
+may use that bounded user-visible dialogue to interpret or restate the same
+terminal Goal, preserving its measurements and conditions exactly. The
+verified-tool index alone contains no result facts and cannot authorize a
+direct external-fact response; without matching delivered dialogue, the plan
+must retrieve exact evidence, perform a fresh read, or escalate.
+
 The current deterministic composer is the conservative, language-matched
 status path. If its input validation or composition fails, the host retains the
 execution evidence and suppresses an unvalidated outcome response; failure

@@ -2,8 +2,9 @@
 
 Status: Implemented architecture issue; canonical Capability terminology,
 passive contracts/Loader, model-authored selection, progressive disclosure,
-Plan provenance, and the first domain Skills are automatically verified; positive
-live selection and provider-backed weather execution remain target evidence
+Plan provenance, and the first domain Skills are automatically verified; a
+rebuilt-service diagnostic selected the weather Skill and completed a
+provider-backed lookup, while clean source-bound target evidence remains open
 Related architecture: [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 
 ## Issue
@@ -365,7 +366,9 @@ Implementation status:
   failure stages without a Host Workflow or phrase rule;
 - package digest, role disclosure, no-Skill behavior, prompt budgets, Plan
   provenance, and unchanged Capability Registry authority are automatically
-  verified; positive live-model selection remains target evidence.
+  verified; positive live-model selection has been observed in a dirty-source
+  rebuilt-service diagnostic, but retained clean source-bound evidence remains
+  required.
 
 ### Implement weather information Skill
 

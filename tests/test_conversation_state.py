@@ -837,6 +837,43 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             )
         )
         self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(
+            [item["goal_id"] for item in manager.recent_goal_snapshots()],
+            ["goal-walk", "goal-blink"],
+        )
+        self.assertEqual(
+            [
+                item["goal_id"]
+                for item in manager.goal_association_candidate_snapshots()
+            ],
+            ["goal-walk", "goal-blink"],
+        )
+        continuity = manager.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-reference-completed",
+                "associations": [
+                    {
+                        "association_id": "assoc-reference-completed",
+                        "relationship": "reference",
+                        "target_goal_ids": ["goal-walk"],
+                        "confidence": 0.99,
+                        "reason_summary": "The user referred to the completed walk Goal.",
+                    }
+                ],
+                "confidence": 0.99,
+            },
+            sid="sid-reference-completed",
+            user_text="Was that completed?",
+            route="chat",
+            intent="status_followup",
+        )
+        self.assertTrue(continuity[0]["applied"])
+        self.assertEqual(continuity[0]["state_change"], "continuity_marker")
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(
+            manager.recent_goal_snapshots()[0]["status"],
+            "done",
+        )
 
     def test_respond_goal_waits_for_scoped_speech_runtime_result(self) -> None:
         manager = ConversationStateManager(base_conversation_id="respond-lifecycle")

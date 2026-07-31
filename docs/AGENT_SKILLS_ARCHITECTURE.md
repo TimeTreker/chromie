@@ -3,7 +3,8 @@
 Status: Implemented architecture with canonical Capability terminology, passive
 contracts/Loader, model-authored selection, Agent-specific progressive
 disclosure, Canonical Plan provenance, and the grounded-information/weather
-domain Skills implemented; positive live evidence remains open
+domain Skills implemented; positive rebuilt-service diagnostic evidence exists,
+while clean source-bound target evidence remains open
 Scope: Goal-Driven Cognitive Core, Agent roles, reusable cognitive methods,
 planning, capability execution, and evidence
 

@@ -28,18 +28,22 @@ scheduling, cancellation, evidence, and lifecycle coordination. Soridormi owns
 backend selection, embodied feasibility, collision safety, stop, and recovery.
 
 The canonical local gate is restored: repository policy, test ownership, Ruff,
-Mypy, documentation, 1,664 primary tests, and 20 legacy Agent tests pass. The
-strict narrow verifier is implemented. This PC has no microphone, so physical
-target validation is deferred without a claim. The active Issue is **Close
+Mypy, documentation, and the full canonical test suites pass. The strict narrow
+verifier is implemented. This PC has no microphone, so physical target
+validation is deferred without a claim. The active Issue is **Close
 Current-Revision Target Evidence** using the non-physical default profile.
 
 ## What to do now
 
 - keep the failed `20260731T110834Z` attempt as diagnostic-only: Python 3.11.15
   and services were ready, but no microphone input existed;
-- initialize a fresh `source_bound_development` closure and collect Gateway/Core,
-Agent Skill/weather, Social Attention, paired MuJoCo, active cancellation, and
-second-machine LAN evidence.
+- retain the old `20260731T121727Z` root as diagnostic-only; its ambient and
+  grounded-weather failures were corrected in rebuilt-Agent dirty-source
+  headless diagnostics, not qualifying evidence;
+- after the correction is committed, initialize a fresh
+  `source_bound_development` closure and collect Gateway/Core, Agent
+  Skill/weather, Social Attention, paired MuJoCo, active cancellation, and
+  second-machine LAN evidence.
 
 ## Work after evidence closure
 

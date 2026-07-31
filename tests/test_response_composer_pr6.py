@@ -995,10 +995,31 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "social_attention_plan": {"decision": "none"},
         }
         ollama = FakeOllama(raw)
-        asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+        context = {
+            "history": [
+                {
+                    "role": "assistant",
+                    "text": "北京现在约28℃，体感约33℃。",
+                    "metadata": {
+                        "source": "evidence_bound_tool_result_interpretation",
+                        "evidence_bound": True,
+                        "source_goal_ids": ["goal-weather"],
+                        "canonical_plan_id": "plan-weather",
+                    },
+                }
+            ]
+        }
+        asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(canonical, context=context)
+            )
+        )
         prompt = ollama.prompts[0][0]
         self.assertIn("CanonicalPlan is immutable", prompt)
         self.assertIn("never a user goal or task step", prompt)
+        self.assertIn("Delivered evidence-bound dialogue JSON", prompt)
+        self.assertIn("北京现在约28℃", prompt)
+        self.assertIn("Preserve every measurement and condition", prompt)
 
 
 class OrchestratorResponseComposerTests(unittest.TestCase):

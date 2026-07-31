@@ -640,6 +640,51 @@ class ConversationStateManager:
             for item in task_snapshots
         ]
 
+    def recent_goal_snapshots(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return retained terminal Goals for bounded semantic association only."""
+
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0 or self.completed_task_retention_sec <= 0:
+            return []
+        now = _now_ms()
+        retained: list[dict[str, Any]] = []
+        for context in self._task_contexts:
+            status = str(context.get("status") or "open").strip().lower()
+            if status not in _DONE_TASK_STATUSES:
+                continue
+            updated_ms = context.get("updated_ms") or now
+            try:
+                age_sec = max(0.0, (now - float(updated_ms)) / 1000.0)
+            except (TypeError, ValueError):
+                age_sec = 0.0
+            if age_sec >= self.completed_task_retention_sec:
+                continue
+            retained.append(
+                ActiveGoalSnapshot.from_task_snapshot(
+                    self._task_snapshot(context)
+                ).model_dump(mode="json", exclude_none=True)
+            )
+        return retained[-limit:]
+
+    def goal_association_candidate_snapshots(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Prefer active Goals, then fill the bounded association set with recent terminal Goals."""
+
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
+        active = self.active_goal_snapshots(limit=limit)
+        remaining = max(0, limit - len(active))
+        recent = self.recent_goal_snapshots(limit=remaining)
+        return [*active, *recent]
+
     @staticmethod
     def _semantic_operations_from_metadata(
         metadata: dict[str, Any] | None,
@@ -2103,9 +2148,11 @@ class ConversationStateManager:
             if isinstance(resolution, GoalAssociationResolution)
             else GoalAssociationResolution.model_validate(resolution)
         )
-        active = {
+        candidates = {
             item["goal_id"]: item
-            for item in self.active_goal_snapshots(limit=self.max_pending_tasks)
+            for item in self.goal_association_candidate_snapshots(
+                limit=self.max_pending_tasks
+            )
             if isinstance(item, dict) and item.get("goal_id")
         }
         operations: list[SemanticTaskOperation] = []
@@ -2146,9 +2193,9 @@ class ConversationStateManager:
         }
         for association in resolved.associations:
             target_task_ids = [
-                str(active[goal_id].get("source_task_id") or goal_id)
+                str(candidates[goal_id].get("source_task_id") or goal_id)
                 for goal_id in association.target_goal_ids
-                if goal_id in active
+                if goal_id in candidates
             ]
             if len(target_task_ids) != len(association.target_goal_ids):
                 results.append(
@@ -3157,6 +3204,7 @@ class ConversationStateManager:
             "task_contexts": list(self._task_contexts),
             "active_task_contexts": self._active_task_contexts(),
             "active_task_snapshots": self.active_task_snapshots(),
+            "recent_goal_snapshots": self.recent_goal_snapshots(),
             "current_task_context": self._current_task_context(),
             "discourse_referents": self.discourse_referents(),
             "discourse_focus": self.discourse_focus(),
@@ -4223,7 +4271,27 @@ class ConversationStateManager:
                 if text:
                     speech_parts.append(text)
         if speech_parts:
-            self.record_assistant_turn(sid, " ".join(speech_parts), metadata={"source": "agent_result"})
+            assistant_turn_metadata: dict[str, Any] = {"source": "agent_result"}
+            if isinstance(result_metadata, dict):
+                result_source = str(result_metadata.get("source") or "").strip()
+                if (
+                    result_source == "evidence_bound_tool_result_interpretation"
+                    and result_metadata.get("full_tool_result_retained") is True
+                ):
+                    assistant_turn_metadata = {
+                        "source": result_source,
+                        "evidence_bound": True,
+                        "phase": "post_execution",
+                        "source_goal_ids": self._string_list(
+                            result_metadata.get("source_goal_ids")
+                        ),
+                        "canonical_plan_id": canonical_plan_id,
+                    }
+            self.record_assistant_turn(
+                sid,
+                " ".join(speech_parts),
+                metadata=assistant_turn_metadata,
+            )
 
         # A conversational Goal is not complete merely because Response
         # Composer produced text. Bind it to the concrete chromie.speak request

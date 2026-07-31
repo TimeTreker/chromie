@@ -549,6 +549,12 @@ runtime delivery evidence; producing Response Composer text is not completion.
 This prevents a completed compound action from remaining in the active-goal
 projection and being accidentally associated with a later turn.
 
+Goal Association also receives a separate bounded projection of recently
+terminal Goals. A semantic `continue` or `reference` relationship may point to
+one of them, but the Host records only a continuity marker and preserves the
+terminal state. This permits questions about a just-completed result without
+reopening work or treating recency as semantic authority.
+
 ### 6.6 Active goals protect conversational continuity
 
 A goal remains conversationally active while it is planning, waiting for user
@@ -559,6 +565,11 @@ Soft-topic and idle-boundary heuristics must not clear active goals. A short
 answer after a long pause may still resolve an existing information gap.
 Candidate history remains bounded, but goal lifecycle is the authority for
 whether continuity is still possible.
+
+For a completed external-read Goal, a conversational follow-up may use only the
+Host-marked evidence-bound dialogue that was already delivered for that Goal.
+A verified-result index without that dialogue is provenance, not factual answer
+evidence, and requires explicit retrieval, a fresh read, or escalation.
 
 ### 6.7 Explicit reset is narrower than semantic cancellation
 

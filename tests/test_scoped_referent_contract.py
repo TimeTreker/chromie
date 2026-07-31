@@ -100,6 +100,36 @@ class ScopedReferentPlannerContractTests(unittest.TestCase):
             "内乡",
         )
 
+    def test_canonical_goal_grounding_reads_retained_terminal_candidate(self) -> None:
+        terminal_goal = self.context["goal_association_resolution"]["new_goals"][0]
+        context = {
+            "active_goal_snapshots": [],
+            "recent_goal_snapshots": [
+                {
+                    "goal_id": self.goal_id,
+                    "status": "done",
+                    "goal": terminal_goal,
+                }
+            ],
+            "goal_association_resolution": {
+                "associations": [
+                    {
+                        "relationship": "reference",
+                        "target_goal_ids": [self.goal_id],
+                    }
+                ],
+                "new_goals": [],
+            },
+        }
+
+        grounding = canonical_goal_grounding(context)
+
+        self.assertEqual(grounding[0]["goal_id"], self.goal_id)
+        self.assertEqual(
+            grounding[0]["object"]["bindings"]["location"]["value"],
+            "内乡",
+        )
+
     def test_weather_step_cannot_replace_neixiang_with_chongqing(self) -> None:
         output = validate_planner_model_output(
             _execute_output(

@@ -48,6 +48,7 @@ def request(
     discourse_referents=None,
     discourse_focus=None,
     recent_tool_evidence=None,
+    recent_goals=None,
 ):
     return AgentRunRequest(
         sid="sid-pr2",
@@ -56,6 +57,7 @@ def request(
         route_decision=RouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm"),
         context={
             "active_goal_snapshots": active_goals or [],
+            "recent_goal_snapshots": recent_goals or [],
             "history": history or [],
             "discourse_referents": discourse_referents or [],
             "discourse_focus": discourse_focus or [],
@@ -547,6 +549,62 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn('"goal_id":"goal-weather"', prompt)
         self.assertIn('"goal_id":"goal-coffee"', prompt)
 
+    def test_recent_terminal_goal_remains_a_bounded_association_candidate(self):
+        ollama = FakeOllama(
+            {
+                "decision": "associate",
+                "associations": [
+                    {
+                        "relationship": "reference",
+                        "target_goal_ids": ["goal-weather"],
+                        "confidence": 0.99,
+                        "reason_summary": "The follow-up asks about the retained weather Goal.",
+                    }
+                ],
+                "new_goals": [],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 0.99,
+                "reason_summary": "Continuity with the recent completed lookup.",
+            }
+        )
+        completed = active_goal("goal-weather", "Check today's weather in Beijing")
+        completed["status"] = "done"
+        completed["commitment_state"] = "completed"
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "So is it hot or not?",
+                    language="en-US",
+                    recent_goals=[completed],
+                    history=[
+                        {"role": "user", "text": "Check today's weather in Beijing."},
+                        {"role": "assistant", "text": "Beijing is hot today."},
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(result.associations[0].target_goal_ids, ["goal-weather"])
+        self.assertEqual(result.new_goals, [])
+        prompt = ollama.prompts[0][0]
+        self.assertIn("retained recent terminal Goal", prompt)
+        self.assertIn('"status":"done"', prompt)
+
+    def test_schema_forbids_reference_objects_without_supplied_referents(self):
+        schema = GoalAssociationResolver._response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+        )
+
+        self.assertEqual(
+            schema["properties"]["resolved_references"]["maxItems"],
+            0,
+        )
+
     def test_ambiguous_reference_returns_natural_clarification_only(self):
         ollama = FakeOllama({"associations": [], "new_goals": [], "clarification": "你是说咖啡不用了，还是天气也不用查了？", "confidence": 0.58})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("算了，不用了。", active_goals=[active_goal("goal-coffee", "Get coffee"), active_goal("goal-weather", "Check weather")])))
@@ -723,6 +781,14 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("physical action and a conversational answer are independent goals", prompt)
         self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
         self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
+        self.assertIn(
+            "Conversational framing attached to a substantive responsibility",
+            ollama.prompts[0][1]["system"],
+        )
+        self.assertIn(
+            "one evidence acquisition satisfies both a factual lookup",
+            ollama.prompts[0][1]["system"],
+        )
 
     def test_empty_greeting_segmentation_repairs_to_one_conversational_goal(self):
         ollama = ScriptedOllama(
@@ -1005,6 +1071,15 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
         self.assertIn("politeness preamble", prompt)
         self.assertIn("identity and personality shape expression only", prompt)
         self.assertIn("one Goal when one capability result can satisfy both", prompt)
+        system_prompt = resolver._system_prompt(GoalSegmentationModelOutput)
+        self.assertIn(
+            "Conversational framing attached to a substantive responsibility",
+            system_prompt,
+        )
+        self.assertIn(
+            "one evidence acquisition satisfies both a factual lookup",
+            system_prompt,
+        )
 
 
 if __name__ == "__main__":

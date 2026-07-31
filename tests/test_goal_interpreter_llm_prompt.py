@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from unittest import mock
 
@@ -46,6 +47,9 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("cognitive evidence", prompt)
         self.assertIn("final plan", prompt)
         self.assertIn("Route Taxonomy", prompt)
+        self.assertIn("Responsibility Before Framing", prompt)
+        self.assertIn("substantive responsibility", prompt)
+        self.assertIn("do not collapse", prompt)
         self.assertIn("trusted external or changing-fact lookup", prompt)
         self.assertIn("Tool And Affordance Proposal", prompt)
         self.assertIn("current external facts", prompt)
@@ -516,6 +520,69 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("RAW_CONVERSATION_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
+
+    def test_user_and_repair_prompts_include_recent_terminal_goal_projection(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="s1",
+            text="So what was the answer?",
+            language="en-US",
+            context={
+                "recent_goal_snapshots": [
+                    {
+                        "goal_id": "goal-weather-complete",
+                        "status": "done",
+                        "commitment_state": "completed",
+                        "last_user_update": "Check today's weather in Beijing.",
+                        "goal": {
+                            "goal_id": "goal-weather-complete",
+                            "description": "Check today's weather in Beijing.",
+                            "object": {
+                                "bindings": {
+                                    "location": {
+                                        "name": "location",
+                                        "entity_type": "place",
+                                        "value": "Beijing",
+                                        "confidence": 1.0,
+                                    }
+                                }
+                            },
+                        },
+                    }
+                ],
+                "verified_tool_memory_index": [
+                    {
+                        "evidence_id": "evidence-weather-complete",
+                        "tool_id": "chromie.weather.lookup",
+                        "status": "completed",
+                        "request_args": {"location": "Beijing", "date": "today"},
+                        "age_ms": 1200,
+                        "goal_ids": ["goal-weather-complete"],
+                    }
+                ],
+            },
+        )
+
+        prompt = interpreter.build_user_prompt(request)
+        repair = interpreter.build_semantic_route_repair_payload(
+            request,
+            RouteDecision(route="chat", intent="clarify", confidence=0.9),
+            reason="route_name_intent_mismatch",
+        )
+        rendered_repair = json.dumps(repair, ensure_ascii=False)
+
+        self.assertIn("Recent Terminal Goal Snapshot JSON", prompt)
+        self.assertIn("goal-weather-complete", prompt)
+        self.assertIn("goal-weather-complete", rendered_repair)
+        self.assertIn("evidence-weather-complete", rendered_repair)
+        self.assertIn("Verified completed tool-memory index JSON", rendered_repair)
+        self.assertIn("A topical match to a Capability is not itself", rendered_repair)
+        self.assertIn("Terminal references do not reopen Goals", prompt)
 
     def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -2305,6 +2372,164 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Never claim an external result", rendered)
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
+
+    async def test_social_framing_chat_is_rechecked_on_fast_model(self) -> None:
+        class FramingInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="slow-review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if len(self.payloads) == 1:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"chat","intent":"user_question",'
+                                '"confidence":0.95}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool",'
+                            '"intent":"capability:chromie.weather.lookup",'
+                            '"confidence":0.96}'
+                        )
+                    }
+                }
+
+        interpreter = FramingInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="你好，今天北京天气热不热？",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "description": "Retrieve current weather for a place.",
+                            "effects": ["external_read", "weather_lookup"],
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
+        self.assertEqual(
+            decision.metadata["generic_chat_affordance_review"]["original_intent"],
+            "user_question",
+        )
+        self.assertEqual(
+            [payload["model"] for payload in interpreter.payloads],
+            ["quick-model", "quick-model"],
+        )
+
+    def test_social_framing_review_keeps_trailing_tool_affordance(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        common_catalog = [
+            {
+                "capability_id": f"robot.common_{index:02d}",
+                "route": "robot_action",
+                "description": "Perform one bounded embodied interaction.",
+                "available": True,
+                "interaction_executable": True,
+            }
+            for index in range(14)
+        ]
+        common_catalog.append(
+            {
+                "capability_id": "chromie.external.lookup",
+                "route": "tool",
+                "description": "Retrieve a current external fact.",
+                "effects": ["read_only", "external_read"],
+                "available": True,
+                "interaction_executable": True,
+            }
+        )
+        request = RouteRequest(
+            text="Hello, could you check the current value for me?",
+            language="en",
+            context={"common_ability_catalog": common_catalog},
+        )
+
+        payload = interpreter.build_semantic_route_repair_payload(
+            request,
+            RouteDecision(route="chat", intent="greeting", confidence=0.95),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+            model="quick-model",
+        )
+        rendered = json.dumps(payload, ensure_ascii=False)
+
+        self.assertIn("robot.common_00", rendered)
+        self.assertIn("robot.common_13", rendered)
+        self.assertIn("chromie.external.lookup", rendered)
+
+    async def test_standalone_greeting_remains_chat_after_focused_review(self) -> None:
+        class GreetingInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="slow-review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.calls = 0
+
+            async def _chat(self, payload: dict) -> dict:
+                self.calls += 1
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"chat","intent":"greeting",'
+                            '"confidence":0.96}'
+                        )
+                    }
+                }
+
+        interpreter = GreetingInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="你好！",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "description": "Retrieve current weather for a place.",
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "greeting")
+        self.assertEqual(interpreter.calls, 2)
 
 
 if __name__ == "__main__":

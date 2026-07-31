@@ -2622,6 +2622,7 @@ class VoiceAssistant:
             "active_task_contexts": conversation.get("active_task_contexts", []),
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
+            "recent_goal_snapshots": conversation.get("recent_goal_snapshots", []),
             "current_task_context": conversation.get("current_task_context"),
             "discourse_referents": conversation.get("discourse_referents", []),
             "discourse_focus": conversation.get("discourse_focus", []),

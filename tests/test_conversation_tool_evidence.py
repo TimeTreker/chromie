@@ -12,6 +12,8 @@ class ConversationToolEvidenceTests(unittest.TestCase):
             "sid-weather",
             {
                 "metadata": {
+                    "source": "evidence_bound_tool_result_interpretation",
+                    "full_tool_result_retained": True,
                     "user_request": "Is Beijing hot today?",
                     "canonical_plan_id": "plan-weather",
                     "source_goal_ids": ["goal-weather"],
@@ -54,6 +56,16 @@ class ConversationToolEvidenceTests(unittest.TestCase):
         self.assertEqual(
             snapshot["session_memory"]["recent_tool_evidence"][0]["evidence_id"],
             "evidence-weather",
+        )
+        delivered = snapshot["history"][-1]
+        self.assertEqual(
+            delivered["metadata"]["source"],
+            "evidence_bound_tool_result_interpretation",
+        )
+        self.assertTrue(delivered["metadata"]["evidence_bound"])
+        self.assertEqual(
+            delivered["metadata"]["source_goal_ids"],
+            ["goal-weather"],
         )
         memory_index = snapshot["verified_tool_memory_index"]
         self.assertEqual(memory_index[0]["request_args"]["location"], "Beijing")

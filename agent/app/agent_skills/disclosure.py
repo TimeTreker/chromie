@@ -295,7 +295,7 @@ def _bounded_items(value: Any) -> tuple[str, ...]:
 
 def _goal_contexts(context: dict[str, Any]) -> tuple[AgentSkillSelectionGoalContext, ...]:
     candidates: list[Any] = []
-    for key in ("active_goal_snapshots", "goals"):
+    for key in ("active_goal_snapshots", "recent_goal_snapshots", "goals"):
         value = context.get(key)
         if isinstance(value, list):
             candidates.extend(value)

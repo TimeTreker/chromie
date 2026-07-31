@@ -369,7 +369,10 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
 
     context = context or {}
     association = context.get("goal_association_resolution")
-    active = context.get("active_goal_snapshots") or []
+    active = [
+        *(context.get("active_goal_snapshots") or []),
+        *(context.get("recent_goal_snapshots") or []),
+    ]
     active_by_id: dict[str, dict[str, Any]] = {}
     for item in active:
         if not isinstance(item, dict):
@@ -605,9 +608,6 @@ def validate_external_response_evidence_boundary(
         if has_external_read:
             unresolved_external_goal_ids.add(goal_id)
 
-    if not unresolved_external_goal_ids:
-        return
-
     responding_goal_ids: set[str] = set()
     if output.goal_outcomes:
         responding_goal_ids = {
@@ -624,6 +624,74 @@ def validate_external_response_evidence_boundary(
             "external_read_response_requires_completed_or_verified_evidence: "
             + ",".join(sorted(unsupported))
         )
+
+    verified_goal_ids: set[str] = set()
+    verified_index = context.get("verified_tool_memory_index")
+    if isinstance(verified_index, list):
+        for item in verified_index:
+            if not isinstance(item, dict):
+                continue
+            verified_goal_ids.update(
+                normalized
+                for value in item.get("goal_ids") or []
+                if (normalized := " ".join(str(value or "").strip().split()))
+            )
+    dialogue_goal_ids = {
+        goal_id
+        for item in evidence_bound_dialogue(context)
+        for goal_id in item.get("source_goal_ids") or []
+    }
+    index_only_goal_ids = responding_goal_ids & verified_goal_ids - dialogue_goal_ids
+    if index_only_goal_ids:
+        raise ValueError(
+            "external_read_response_requires_evidence_bound_dialogue_or_retrieval: "
+            + ",".join(sorted(index_only_goal_ids))
+        )
+
+
+def evidence_bound_dialogue(
+    context: dict[str, Any] | None,
+    *,
+    fallback_history: list[dict[str, Any]] | None = None,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    """Return delivered, Host-marked post-execution speech for Goal continuity."""
+
+    context = context or {}
+    history = context.get("history")
+    if not isinstance(history, list):
+        history = fallback_history if isinstance(fallback_history, list) else []
+    out: list[dict[str, Any]] = []
+    for item in history:
+        if not isinstance(item, dict) or item.get("role") != "assistant":
+            continue
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        if (
+            metadata.get("evidence_bound") is not True
+            or str(metadata.get("source") or "").strip()
+            != "evidence_bound_tool_result_interpretation"
+        ):
+            continue
+        text = " ".join(str(item.get("text") or "").strip().split())
+        if not text:
+            continue
+        out.append(
+            {
+                "text": text[:1200],
+                "source_goal_ids": [
+                    normalized
+                    for value in metadata.get("source_goal_ids") or []
+                    if (normalized := " ".join(str(value or "").strip().split()))
+                ][:8],
+                "canonical_plan_id": str(
+                    metadata.get("canonical_plan_id") or ""
+                )[:200],
+                "source": "evidence_bound_tool_result_interpretation",
+            }
+        )
+    return out[-max(1, int(limit)) :]
 
 
 def validate_explicit_numeric_parameter_grounding(
