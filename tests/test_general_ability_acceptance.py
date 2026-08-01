@@ -51,6 +51,34 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("wal_forward_typo_walk", live_ids)
         self.assertIn("multi_goal_look_then_blink", live_ids)
         self.assertIn("weather_then_chinese_walk_blink_song", live_ids)
+        self.assertIn("beijing_rain_pending_acknowledgement", live_ids)
+
+    def test_live_validation_requires_structured_pending_work_speech(self) -> None:
+        case = TextScenarioCase(
+            case_id="weather",
+            text="今天北京下雨了没有？",
+            expected_routes=("tool",),
+            require_speech=False,
+            require_fast_speech=True,
+            expected_fast_speech_purposes=("acknowledge_and_check",),
+        )
+        summary = {
+            "route": {"route": "tool", "fast_speech": None},
+            "interaction_response": {"speech": [], "skills": []},
+            "preview_only": True,
+            "cognitive_runtime": {},
+        }
+
+        missing = validate_live_text_result(case, summary)
+        self.assertTrue(any("omitted" in item for item in missing))
+
+        summary["route"]["fast_speech"] = {
+            "text": "我看看北京今天会不会下雨。",
+            "purpose": "acknowledge_and_check",
+            "commitment": "checking_only",
+            "must_not_claim_completion": True,
+        }
+        self.assertEqual(validate_live_text_result(case, summary), [])
 
     def test_retained_voice_incident_is_a_two_turn_live_episode(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

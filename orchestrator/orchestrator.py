@@ -10,6 +10,7 @@ import re
 import sys
 import time
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -252,11 +253,11 @@ class VoiceAssistant:
         )
         self.fast_first_tool_response_enabled = env_bool(
             "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
-            False,
+            True,
         )
         self.core_generated_fast_speech_enabled = env_bool(
-            "ORCH_CORE_GENERATED_FAST_SPEECH_ENABLED",
-            False,
+            "ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED",
+            True,
         )
         self.fast_first_audio_enabled = env_bool(
             "ORCH_FAST_FIRST_AUDIO_ENABLED",
@@ -3074,7 +3075,10 @@ class VoiceAssistant:
             return None
         if decision.fast_speech is None:
             return None
-        return self._validated_fast_speech_payload_text(decision.fast_speech)
+        return self._validated_fast_speech_payload_text(
+            decision.fast_speech,
+            route="deep_thought",
+        )
 
     def _route_item_dicts(self, decision: RouteDecision) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
@@ -3127,7 +3131,12 @@ class VoiceAssistant:
         return cleaned
 
     @classmethod
-    def _validated_fast_speech_payload_text(cls, payload: Any) -> str | None:
+    def _validated_fast_speech_payload_text(
+        cls,
+        payload: Any,
+        *,
+        route: str | None = None,
+    ) -> str | None:
         """Validate the whole dynamic FastSpeech contract before playback.
 
         Bare strings and partially structured objects remain parseable at API
@@ -3157,6 +3166,20 @@ class VoiceAssistant:
             "prelude_only",
         }:
             return None
+        route_contracts = {
+            "tool": ("acknowledge_and_check", "checking_only"),
+            "robot_action": ("safety_prelude", "needs_confirmation"),
+            "deep_thought": ("thinking", "prelude_only"),
+            "memory": ("acknowledge", "prelude_only"),
+        }
+        expected = route_contracts.get(str(route or ""))
+        if expected is not None:
+            actual = (
+                str(payload.get("purpose") or "").strip().casefold(),
+                str(payload.get("commitment") or "").strip().casefold(),
+            )
+            if actual != expected:
+                return None
         return cls._safe_immediate_route_speech(str(payload.get("text") or ""))
 
     @staticmethod
@@ -3216,7 +3239,8 @@ class VoiceAssistant:
     def _goal_interpretation_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
         top_raw = self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
         top_safe = self._validated_fast_speech_payload_text(
-            getattr(decision, "fast_speech", None)
+            getattr(decision, "fast_speech", None),
+            route=decision.route,
         )
         item_raw_count = 0
         item_safe_count = 0
@@ -3225,7 +3249,10 @@ class VoiceAssistant:
             item_raw = self._fast_speech_payload_text(item.get("fast_speech"))
             if item_raw:
                 item_raw_count += 1
-                if self._validated_fast_speech_payload_text(item.get("fast_speech")):
+                if self._validated_fast_speech_payload_text(
+                    item.get("fast_speech"),
+                    route=str(item.get("route") or ""),
+                ):
                     item_safe_count += 1
             if str(item.get("lane") or "") in {"immediate_speech", "fast_tts"} and item.get("direct_to_tts") is True:
                 direct_item_count += 1
@@ -3268,14 +3295,16 @@ class VoiceAssistant:
             return None
 
         text = self._validated_fast_speech_payload_text(
-            getattr(decision, "fast_speech", None)
+            getattr(decision, "fast_speech", None),
+            route=decision.route,
         )
         if text:
             return text
 
         for item in self._route_item_dicts(decision):
             item_fast = self._validated_fast_speech_payload_text(
-                item.get("fast_speech")
+                item.get("fast_speech"),
+                route=str(item.get("route") or ""),
             )
             if item_fast:
                 return item_fast
@@ -3999,6 +4028,13 @@ class VoiceAssistant:
         fast_first_hedge = self._start_fast_first_audio_hedge(
             decision, user_text, session_id
         )
+        core_fast_first_scheduled = False
+        if fast_first_hedge is None and decision.fast_speech is not None:
+            core_fast_first_scheduled = await self._schedule_fast_first_response(
+                decision,
+                user_text,
+                session_id,
+            )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
             user_text=user_text,
@@ -4020,10 +4056,13 @@ class VoiceAssistant:
         decision = decision.model_copy(update={"metadata": metadata})
 
         if resolution.status != "applied" or resolution.interaction_response is None:
-            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+            hedge_scheduled = await self._settle_fast_first_audio_hedge(
                 fast_first_hedge,
                 decision=decision,
                 session_id=session_id,
+            )
+            fast_first_scheduled = (
+                core_fast_first_scheduled or hedge_scheduled
             )
             safe_response = await self._compose_cognitive_failure_response(
                 resolution,
@@ -4199,10 +4238,13 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+            hedge_scheduled = await self._settle_fast_first_audio_hedge(
                 fast_first_hedge,
                 decision=decision,
                 session_id=session_id,
+            )
+            fast_first_scheduled = (
+                core_fast_first_scheduled or hedge_scheduled
             )
             resolution = resolution.model_copy(
                 deep=True,
@@ -4296,11 +4338,12 @@ class VoiceAssistant:
                 request.requires_confirmation,
                 json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             )
-        fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+        hedge_scheduled = await self._settle_fast_first_audio_hedge(
             fast_first_hedge,
             decision=decision,
             session_id=session_id,
         )
+        fast_first_scheduled = core_fast_first_scheduled or hedge_scheduled
         if await self._stage_interaction_confirmation(
             response,
             session_id,
@@ -8910,10 +8953,49 @@ class VoiceAssistant:
             language=language,
         )
 
-    def _runtime_ready_greeting_prompt(self) -> str:
+    @staticmethod
+    def _runtime_ready_greeting_time_context(
+        local_now: datetime | None = None,
+    ) -> dict[str, str]:
+        observed = local_now or datetime.now().astimezone()
+        if observed.tzinfo is None:
+            observed = observed.astimezone()
+        hour = observed.hour
+        if 5 <= hour < 11:
+            local_period = "morning"
+        elif 11 <= hour < 14:
+            local_period = "midday"
+        elif 14 <= hour < 18:
+            local_period = "afternoon"
+        elif 18 <= hour < 23:
+            local_period = "evening"
+        else:
+            local_period = "late_night"
+        offset = observed.strftime("%z")
+        if len(offset) == 5:
+            offset = f"{offset[:3]}:{offset[3:]}"
+        return {
+            "local_iso": observed.isoformat(timespec="minutes"),
+            "local_period": local_period,
+            "timezone": str(observed.tzname() or "local"),
+            "utc_offset": offset,
+            "weekday": observed.strftime("%A"),
+        }
+
+    def _runtime_ready_greeting_prompt(
+        self,
+        *,
+        local_now: datetime | None = None,
+    ) -> str:
         language = self.runtime_ready_greeting_language
         identity_json = self._direct_llm_identity_json()
         mind_summary = self._direct_llm_mind_summary()
+        time_context = json.dumps(
+            self._runtime_ready_greeting_time_context(local_now),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         return (
             "Chromie has just woken up and can now hear and talk with the people "
             "nearby. Write exactly one complete, very short greeting she naturally "
@@ -8923,9 +9005,12 @@ class VoiceAssistant:
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
             "services, models, being an assistant, or operational status. Do not "
-            "introduce yourself or ask what help is required. Do not mention clock "
-            "time, time of day, meals, hunger, sleepiness, weather, or another "
-            "ungrounded personal state. Do not ask a question or end mid-clause. "
+            "introduce yourself, repeat your name or age, or ask what help is required. "
+            "Use the supplied local period to vary the greeting naturally across the "
+            "day. A broad time-of-day greeting is allowed only when grounded by that "
+            "context. Do not quote the exact clock time, calendar date, or weekday. "
+            "Do not invent meals, hunger, sleepiness, weather, or another personal "
+            "state. Do not ask a question or end mid-clause. "
             "Nobody nearby has "
             "been identified at startup, so do not address anyone as mother, father, "
             "owner, friend, or by any other invented name or relationship. Return only a JSON "
@@ -8933,6 +9018,7 @@ class VoiceAssistant:
             "sentence, normally four to twelve Chinese characters and never more "
             "than twenty-four characters. Prefer a complete greeting over filling "
             "the available length.\n\n"
+            f"Grounded local temporal context JSON: {time_context}\n"
             f"Owner-approved identity JSON: {identity_json}\n"
             f"Owner-approved mind summary: {mind_summary}\n"
         )
@@ -8944,6 +9030,23 @@ class VoiceAssistant:
                 "runtime ready greeting is not a complete punctuated sentence"
             )
         return text
+
+    @staticmethod
+    def _validate_runtime_ready_greeting_semantics(text: str) -> str:
+        normalized = " ".join(str(text or "").strip().split())
+        lowered = normalized.casefold()
+        if re.search(r"(?:我是|我叫)|(?:\bi(?:['’]m|\s+am)\b|my name is)", lowered):
+            raise RuntimeError(
+                "runtime ready greeting introduced the speaker"
+            )
+        if re.search(
+            r"(?:[0-9一二三四五六七八九十]+岁|year[- ]old)",
+            lowered,
+        ):
+            raise RuntimeError(
+                "runtime ready greeting repeated the speaker age"
+            )
+        return normalized
 
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
         try:
@@ -8980,15 +9083,15 @@ class VoiceAssistant:
                     )
                 ),
                 "num_predict": self.runtime_ready_greeting_num_predict,
-                "temperature": 0.35,
+                "temperature": 0.55,
                 "top_p": 0.9,
             },
         }
         timeout_s = self.runtime_ready_greeting_generation_timeout_ms / 1000.0
 
-        async def request_greeting() -> dict[str, Any]:
+        async def request_greeting(request_payload: dict[str, Any]) -> dict[str, Any]:
             session = await self.get_http_session()
-            async with session.post(self.llm_url, json=payload) as response:
+            async with session.post(self.llm_url, json=request_payload) as response:
                 body = await response.text()
                 if response.status != 200:
                     raise RuntimeError(
@@ -8997,38 +9100,61 @@ class VoiceAssistant:
                     )
                 return json.loads(body)
 
-        try:
-            data = await asyncio.wait_for(request_greeting(), timeout=timeout_s)
-            generated = self._decode_spoken_text_envelope(
-                data,
-                purpose="runtime ready greeting",
-                max_chars=24,
-                one_sentence=True,
-                language=self.runtime_ready_greeting_language,
-            )
-            if re.search(
-                r"(?:妈妈|爸爸|妈咪|爹地|主人|哥哥|姐姐|爷爷|奶奶)",
-                generated,
-            ):
-                raise RuntimeError(
-                    "runtime ready greeting invented an unidentified relationship"
+        generation_error: Exception | None = None
+        for attempt in range(2):
+            request_payload = dict(payload)
+            if attempt:
+                request_payload["prompt"] = (
+                    f"{payload['prompt']}\n"
+                    "The previous candidate violated the greeting contract. "
+                    "Choose a different short, time-grounded greeting without "
+                    "self-introduction, age, or invented personal state."
                 )
-            self._validate_runtime_ready_greeting_completion(generated)
-            return generated, f"llm:{model}"
-        except Exception as exc:
-            logger.warning("Runtime ready greeting generation failed: %s", exc)
             try:
-                fallback = self._validate_spoken_text_contract(
-                    self.runtime_ready_greeting_fallback_text,
-                    purpose="runtime ready greeting fallback",
+                data = await asyncio.wait_for(
+                    request_greeting(request_payload),
+                    timeout=timeout_s,
+                )
+                generated = self._decode_spoken_text_envelope(
+                    data,
+                    purpose="runtime ready greeting",
                     max_chars=24,
                     one_sentence=True,
                     language=self.runtime_ready_greeting_language,
                 )
-            except RuntimeError as fallback_exc:
-                logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)
-                return "", "unavailable"
-            return fallback, "fallback"
+                if re.search(
+                    r"(?:妈妈|爸爸|妈咪|爹地|主人|哥哥|姐姐|爷爷|奶奶)",
+                    generated,
+                ):
+                    raise RuntimeError(
+                        "runtime ready greeting invented an unidentified relationship"
+                    )
+                self._validate_runtime_ready_greeting_completion(generated)
+                self._validate_runtime_ready_greeting_semantics(generated)
+                return generated, f"llm:{model}"
+            except Exception as exc:
+                generation_error = exc
+                logger.warning(
+                    "Runtime ready greeting generation attempt %s failed: %s",
+                    attempt + 1,
+                    exc,
+                )
+        logger.warning(
+            "Runtime ready greeting generation failed after retries: %s",
+            generation_error,
+        )
+        try:
+            fallback = self._validate_spoken_text_contract(
+                self.runtime_ready_greeting_fallback_text,
+                purpose="runtime ready greeting fallback",
+                max_chars=24,
+                one_sentence=True,
+                language=self.runtime_ready_greeting_language,
+            )
+        except RuntimeError as fallback_exc:
+            logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)
+            return "", "unavailable"
+        return fallback, "fallback"
 
     def _build_runtime_ready_greeting_coordinator(
         self,

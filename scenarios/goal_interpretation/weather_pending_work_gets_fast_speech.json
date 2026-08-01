@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "id": "weather_pending_work_gets_fast_speech",
+  "suite": "goal_interpretation",
+  "level": "integration",
+  "description": "A weather lookup whose first Core interpretation omits fast speech receives a second bounded model-authored process acknowledgement before downstream planning; the acknowledgement does not claim a result.",
+  "tags": [
+    "reported-live-voice",
+    "weather",
+    "fast-first",
+    "pending-work",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "今天北京下雨了没有？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "pending_work_fast_speech_repair_enabled": true,
+    "catalog": {
+      "catalog_version": 81,
+      "capabilities": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "agent_id": "chromie.tool",
+          "description": "Retrieve current weather or forecast for a supplied place and date.",
+          "route": "tool",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "read_only",
+            "weather_lookup"
+          ],
+          "safety_class": "safe_read",
+          "requires_confirmation": false
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "tool",
+          "intent": "capability:chromie.weather.lookup",
+          "confidence": 0.95,
+          "language": "zh-CN",
+          "metadata": {
+            "tool_name": "weather",
+            "weather_query": {
+              "location": "北京",
+              "date": "today",
+              "units": "metric"
+            }
+          }
+        }
+      },
+      {
+        "stage": "fast_speech_repair",
+        "decision": {
+          "fast_speech": {
+            "text": "我看看北京今天会不会下雨。",
+            "purpose": "acknowledge_and_check",
+            "commitment": "checking_only",
+            "must_not_claim_completion": true
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "tool",
+    "intent": "capability:chromie.weather.lookup",
+    "source": "llm",
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "fast_speech_repair"
+    ],
+    "fast_speech_present": true,
+    "fast_speech_purpose": "acknowledge_and_check",
+    "fast_speech_commitment": "checking_only",
+    "fast_speech_must_not_claim_completion": true,
+    "task_types_include": [
+      "task.use_tool"
+    ]
+  }
+}

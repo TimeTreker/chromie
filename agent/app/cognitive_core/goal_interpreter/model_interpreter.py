@@ -335,24 +335,64 @@ def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
 
 
 
-FAST_SPEECH_REPAIR_ROUTES = {"tool"}
+FAST_SPEECH_REPAIR_ROUTES = {
+    "tool",
+    "robot_action",
+    "deep_thought",
+    "memory",
+}
+
+FAST_SPEECH_ROUTE_CONTRACTS = {
+    "tool": ("acknowledge_and_check", "checking_only"),
+    "robot_action": ("safety_prelude", "needs_confirmation"),
+    "deep_thought": ("thinking", "prelude_only"),
+    "memory": ("acknowledge", "prelude_only"),
+}
 
 
-def _decision_has_fast_speech(decision: RouteDecision) -> bool:
-    if decision.fast_speech and str(decision.fast_speech.text or "").strip():
+def _fast_speech_matches_route_contract(
+    route: str,
+    fast_speech: FastSpeech | None,
+) -> bool:
+    expected = FAST_SPEECH_ROUTE_CONTRACTS.get(route)
+    if expected is None or fast_speech is None:
+        return False
+    purpose, commitment = expected
+    return bool(str(fast_speech.text or "").strip()) and (
+        fast_speech.purpose == purpose
+        and fast_speech.commitment == commitment
+        and fast_speech.must_not_claim_completion is True
+    )
+
+
+def _decision_has_route_valid_fast_speech(decision: RouteDecision) -> bool:
+    if _fast_speech_matches_route_contract(decision.route, decision.fast_speech):
         return True
     return any(
-        item.fast_speech and str(item.fast_speech.text or "").strip()
+        _fast_speech_matches_route_contract(item.route, item.fast_speech)
         for item in (decision.routes or [])
     )
 
 
 def _decision_needs_goal_interpretation_fast_speech(decision: RouteDecision) -> bool:
-    if _decision_has_fast_speech(decision):
+    if _decision_has_route_valid_fast_speech(decision):
         return False
     if decision.route in FAST_SPEECH_REPAIR_ROUTES:
         return True
     return any(item.route in FAST_SPEECH_REPAIR_ROUTES for item in (decision.routes or []))
+
+
+def _pending_work_fast_speech_target_route(decision: RouteDecision) -> str:
+    if decision.route in FAST_SPEECH_ROUTE_CONTRACTS:
+        return decision.route
+    return next(
+        (
+            item.route
+            for item in (decision.routes or [])
+            if item.route in FAST_SPEECH_ROUTE_CONTRACTS
+        ),
+        "deep_thought",
+    )
 
 
 def _decision_with_goal_interpretation_fast_speech(
@@ -368,7 +408,10 @@ def _decision_with_goal_interpretation_fast_speech(
         if (
             not attached_to_item
             and item.route in FAST_SPEECH_REPAIR_ROUTES
-            and not item.fast_speech
+            and not _fast_speech_matches_route_contract(
+                item.route,
+                item.fast_speech,
+            )
         ):
             item = item.model_copy(update={"fast_speech": fast_speech})
             attached_to_item = True
@@ -994,7 +1037,7 @@ class OllamaGoalInterpreter:
         confidence_threshold: float,
         slow_review_recovery_enabled: bool = True,
         generic_chat_review_enabled: bool = True,
-        tool_fast_speech_repair_enabled: bool = False,
+        pending_work_fast_speech_repair_enabled: bool = False,
         num_ctx: int = 4096,
         num_predict: int = 512,
         keep_alive: str | None = None,
@@ -1011,7 +1054,9 @@ class OllamaGoalInterpreter:
         self.confidence_threshold = confidence_threshold
         self.slow_review_recovery_enabled = slow_review_recovery_enabled
         self.generic_chat_review_enabled = bool(generic_chat_review_enabled)
-        self.tool_fast_speech_repair_enabled = bool(tool_fast_speech_repair_enabled)
+        self.pending_work_fast_speech_repair_enabled = bool(
+            pending_work_fast_speech_repair_enabled
+        )
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
         self.prompt_chars_per_token_estimate = max(
@@ -1088,7 +1133,7 @@ class OllamaGoalInterpreter:
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. For route=memory, memory_update is required and must contain scope=session, kind, text, optional key, persistence_policy=ephemeral, and confidence. routes[] split independent responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker) only for explicit capabilities. metadata.semantic_task_operations may contain advisory operations with operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, and reason_summary. create requires goal.description and source_text; later operations use exact supplied task IDs. fast_speech/speak_first and metadata.response_plan.immediate are process acknowledgement only, with human-like social warmth, not a program, programme, backend, software process, or language model; they must not claim completion. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. For route=memory, memory_update requires scope=session, kind, text, optional key, persistence_policy=ephemeral, confidence. routes[] split responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marks unknown) only for explicit capabilities. metadata.semantic_task_operations may contain operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, reason_summary. create requires goal.description and source_text; later operations use supplied task IDs. Pending work requires structured fast_speech as a process acknowledgement with exact pairs: tool=acknowledge_and_check/checking_only; robot_action=safety_prelude/needs_confirmation; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Never claim result, motion, memory commit, or completion. fast_speech/speak_first and metadata.response_plan.immediate use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
 
     def build_fast_speech_repair_payload(
@@ -1096,6 +1141,10 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> dict[str, Any]:
+        target_route = _pending_work_fast_speech_target_route(decision)
+        expected_purpose, expected_commitment = FAST_SPEECH_ROUTE_CONTRACTS[
+            target_route
+        ]
         decision_json = _bounded_json(
             decision.model_dump(mode="json", exclude_none=True),
             max_chars=2400,
@@ -1109,15 +1158,47 @@ class OllamaGoalInterpreter:
             "model": self.model,
             "stream": False,
             "think": False,
-            "format": "json",
+            "format": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["fast_speech"],
+                "properties": {
+                    "fast_speech": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "text",
+                            "purpose",
+                            "commitment",
+                            "must_not_claim_completion",
+                        ],
+                        "properties": {
+                            "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120,
+                            },
+                            "purpose": {
+                                "type": "string",
+                                "enum": [expected_purpose],
+                            },
+                            "commitment": {
+                                "type": "string",
+                                "enum": [expected_commitment],
+                            },
+                            "must_not_claim_completion": {"const": True},
+                        },
+                    }
+                },
+            },
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
                     "content": (
                         "Current Job:\n"
-                        "- You are the legacy routing path's fast-speech repairer.\n"
-                        "- A previous interpretation decision selected a route that will use a downstream Agent/Tool and needs a short immediate user-facing prelude.\n"
+                        "- You are Chromie's bounded fast-speech repairer.\n"
+                        f"- A previous interpretation decision selected route={target_route}, which needs a short immediate user-facing prelude.\n"
                         "- Generate only the missing fast_speech. Do not change route, intent, metadata, tool arguments, skills, or safety policy.\n"
                         "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
                         "Safety Contract:\n"
@@ -1125,11 +1206,14 @@ class OllamaGoalInterpreter:
                         "- It must be a process acknowledgement only, not a final answer.\n"
                         "- Never claim an external result, memory commit, physical movement, execution, or completion.\n"
                         "- For a pending read-only Capability, acknowledge only that Chromie will check the exact model-authored bindings.\n"
+                        "- For physical work, say only that Chromie will check or confirm safety; never say motion has started.\n"
+                        "- For memory work, acknowledge evaluating the request; never say it was saved.\n"
                         "- If location or date is unclear, ask a brief clarification instead of guessing.\n\n"
                         "Output Contract:\n"
                         "- Return compact JSON only.\n"
                         "- Return exactly one key fast_speech.\n"
-                        "- Shape: {\"fast_speech\":{\"text\":\"...\",\"purpose\":\"acknowledge_and_check|clarify|thinking\",\"commitment\":\"checking_only|needs_confirmation|prelude_only\",\"must_not_claim_completion\":true}}\n"
+                        f"- Use exactly purpose={expected_purpose} and commitment={expected_commitment}; these values are route contract metadata, not spoken text.\n"
+                        f"- Shape: {{\"fast_speech\":{{\"text\":\"...\",\"purpose\":\"{expected_purpose}\",\"commitment\":\"{expected_commitment}\",\"must_not_claim_completion\":true}}}}\n"
                         "- Do not output markdown, analysis, scratchpad, or any text outside JSON."
                     ),
                 },
@@ -2065,9 +2149,9 @@ class OllamaGoalInterpreter:
     ) -> RouteDecision:
         if not _decision_needs_goal_interpretation_fast_speech(decision):
             return decision
-        if decision.route == "tool" and not self.tool_fast_speech_repair_enabled:
+        if not self.pending_work_fast_speech_repair_enabled:
             logger.info(
-                "goal_interpreter_fast_speech_missing route=%s intent=%s repair=tool_disabled",
+                "goal_interpreter_fast_speech_missing route=%s intent=%s repair=pending_work_disabled",
                 decision.route,
                 decision.intent,
             )
@@ -2106,6 +2190,18 @@ class OllamaGoalInterpreter:
                     "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=false reason=empty_text",
                     decision.route,
                     decision.intent,
+                )
+                return decision
+            if not _fast_speech_matches_route_contract(
+                _pending_work_fast_speech_target_route(decision),
+                fast_speech,
+            ):
+                logger.warning(
+                    "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=false reason=route_contract_mismatch purpose=%s commitment=%s",
+                    decision.route,
+                    decision.intent,
+                    fast_speech.purpose,
+                    fast_speech.commitment,
                 )
                 return decision
         except Exception as exc:

@@ -96,8 +96,8 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    tool_fast_speech_repair_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED", "0").strip().lower()
+    pending_work_fast_speech_repair_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
@@ -158,7 +158,9 @@ goal_interpreter = OllamaGoalInterpreter(
     confidence_threshold=settings.confidence_threshold,
     slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
     generic_chat_review_enabled=settings.generic_chat_review_enabled,
-    tool_fast_speech_repair_enabled=settings.tool_fast_speech_repair_enabled,
+    pending_work_fast_speech_repair_enabled=(
+        settings.pending_work_fast_speech_repair_enabled
+    ),
     num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,
     keep_alive=settings.llm_keep_alive,

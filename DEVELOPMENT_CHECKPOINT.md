@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-08-01,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,720 primary tests, and 20 legacy Agent tests.
+1,723 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -54,7 +54,7 @@ identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
 installation or model warm-up. The latest 2026-08-01 canonical run passes
-1,720 primary tests plus 20 legacy Agent tests.
+1,723 primary tests plus 20 legacy Agent tests.
 
 The managed `Chromie` environment is Python 3.11.15. A microphone is visible, but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
 short VAD segments and ASR finals `I.`/`.` rather than the required Moon request.
@@ -118,7 +118,7 @@ Root `20260731T121727Z` remains diagnostic; its corrected ambient/weather Level 
 Retained case `weather_then_chinese_walk_blink_song` in the composable-action class reproduces the later user-reported weather-then-walk/blink/song episode.
 Automatic C-preview `20260801T034330Z-live-text` scored 100 with no hard failures, three typed action-turn Goals/outcomes, no stale weather Skill, authored song content, and a confirmation-bound sequential adjustment.
 It used injected text, discarded output audio, and no effectful Soridormi execution, so it makes no microphone, speaker, simulator-motion, physical-robot, or source-bound target claim.
-Future defects must follow [Scenario-Driven Development](docs/SCENARIO_DRIVEN_DEVELOPMENT.md) without requiring the user to collect and paste integration output; after commit, initialize a fresh clean `source_bound_development` root.
+Future defects must follow [Scenario-Driven Development](docs/SCENARIO_DRIVEN_DEVELOPMENT.md) without requiring the user to collect and paste integration output. The reported startup/tool-silence trace is retained across time-grounded, identity-safe generated greetings and typed non-terminal Core `fast_speech` for pending tool, planning, memory, and embodied work; one bounded Core repair fills an omitted field, the Host schedules it on a cache miss before slow work without authoring semantics, and physical speech remains only a safety prelude/confirmation. The first exact Beijing rain replay scored 96 and exposed a generic-purpose mismatch; route-specific schema and Host validation corrected it, and the second headless C-preview passed 1/1. This is not microphone, speaker, simulator, or robot evidence. After commit, initialize a fresh clean `source_bound_development` root.
 
 ## Work after evidence closure
 

@@ -71,6 +71,8 @@ class TextScenarioCase:
     forbidden_skills: tuple[str, ...] = field(default_factory=tuple)
     allow_expressive_cues: bool = True
     require_speech: bool = True
+    require_fast_speech: bool = False
+    expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
     expect_deep_planner_invoked: bool | None = None
@@ -413,6 +415,29 @@ def validate_live_text_result(
         else:
             internal_diagnostics.append(message)
 
+    fast_speech = route.get("fast_speech") if isinstance(route, dict) else None
+    if case.require_fast_speech:
+        if not isinstance(fast_speech, dict) or not str(
+            fast_speech.get("text") or ""
+        ).strip():
+            errors.append(
+                "Core route omitted the required pending-work fast_speech"
+            )
+        else:
+            purpose = str(fast_speech.get("purpose") or "").strip()
+            if (
+                case.expected_fast_speech_purposes
+                and purpose not in case.expected_fast_speech_purposes
+            ):
+                errors.append(
+                    "fast_speech purpose mismatch: expected one of "
+                    f"{list(case.expected_fast_speech_purposes)!r}, got {purpose!r}"
+                )
+            if fast_speech.get("must_not_claim_completion") is not True:
+                errors.append(
+                    "fast_speech did not retain must_not_claim_completion=true"
+                )
+
     speech = _speech_text(summary)
     speech_lower = speech.lower()
     for phrase in case.expected_speech_all:
@@ -631,6 +656,10 @@ def _text_scenario_case(
         forbidden_skills=_tuple_of_strings(raw.get("forbidden_skills")),
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
+        require_fast_speech=bool(raw.get("require_fast_speech", False)),
+        expected_fast_speech_purposes=_tuple_of_strings(
+            raw.get("expected_fast_speech_purposes")
+        ),
         expected_terminal_planner_tier=str(
             raw.get("expected_terminal_planner_tier") or ""
         ).strip(),

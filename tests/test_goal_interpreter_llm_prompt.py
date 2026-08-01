@@ -2199,7 +2199,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     model="test-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
-                    tool_fast_speech_repair_enabled=True,
+                    pending_work_fast_speech_repair_enabled=True,
                 )
                 self.stages: list[str] = []
 
@@ -2370,6 +2370,14 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Do not change route", rendered)
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("Never claim an external result", rendered)
+        self.assertIn("purpose=acknowledge_and_check", rendered)
+        self.assertIn("commitment=checking_only", rendered)
+        self.assertEqual(
+            payload["format"]["properties"]["fast_speech"]["properties"][
+                "purpose"
+            ]["enum"],
+            ["acknowledge_and_check"],
+        )
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
 

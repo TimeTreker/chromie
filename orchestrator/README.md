@@ -221,28 +221,27 @@ checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
 The Orchestrator has a true fast-first audio path for slow tool, planning,
-memory, and embodied turns. At startup it primes a small speaker-specific
+memory, and embodied turns. At startup it may prime a small speaker-specific
 English/Chinese acknowledgement cache through the configured TTS service and
-loads the PCM into host memory. During a turn, an adaptive hedge timer waits
+load the PCM into host memory. During a turn, an adaptive hedge timer waits
 `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` (750 ms by default): if the final Agent/tool
-response is ready first, no acknowledgement plays; otherwise the cached audio
+response is ready first, no acknowledgement plays; otherwise valid cached audio
 is queued directly without another LLM or TTS request. A cue that is queued but
 has not started is cancelled when the final response wins the race.
 
-These cues are intentionally generic low-commitment states such as “One
+Cached cues are intentionally generic low-commitment states such as “One
 moment” or “我先确认一下”. They are presentation mappings after semantic routing,
 not phrase-based intent decisions, and they never claim a tool result, memory
-commit, physical execution, or completion. The older Core-generated dynamic
-`fast_speech`/`speak_first` path is retained for wire compatibility but is
-default-off behind `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=0`. Bare strings
-and partial FastSpeech objects are parseable but not playable. An operator who
-enables the gate still gets immediate audio only from a structured object with
-an allowed `purpose`, a non-terminal `commitment`,
-`must_not_claim_completion=true`, and text that passes the completion-claim
-guard. `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED=0` independently keeps tool-route
-fast-first scheduling off. Startup-cached cues and host-validated
-`metadata.response_plan` immediate speech remain available without enabling
-Core-generated dynamic wording.
+commit, physical execution, or completion. When no cache hedge is available,
+the Core's Goal Interpreter emits typed dynamic `fast_speech`; one bounded Core
+repair fills that field if a pending-work decision omitted it. The Host schedules
+the validated speech before slow planning and execution. It never authors the
+semantic sentence. Bare strings and partial FastSpeech objects remain parseable
+but not playable: immediate audio requires an allowed `purpose`, a non-terminal
+`commitment`, `must_not_claim_completion=true`, and text that passes the
+completion-claim guard. Physical work is limited to a safety prelude or
+confirmation, never an execution claim. Final Response Composer speech remains
+authoritative and ordered after the acknowledgement.
 
 Manual development start:
 

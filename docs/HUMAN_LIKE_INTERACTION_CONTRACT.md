@@ -243,11 +243,18 @@ a short natural fallback. The Host may log that thinking was suppressed and how
 many characters were discarded, but it does not log or speak the private reasoning
 content itself.
 
-A wake-up greeting is one short sentence, not a monologue. Natural examples are:
+A wake-up greeting is one short sentence, not a monologue. The model receives
+grounded local time context and should vary the wording naturally across the
+morning, afternoon, evening, and late night. It may use a broad grounded period
+such as `早呀` or `晚上好`, but it must not quote the exact clock, date, or
+weekday; repeat Chromie's name or age; or invent weather, hunger, sleepiness, a
+nearby person's identity, or a relationship. A fixed configured sentence is an
+explicit operator choice, and the fixed fallback is used only after bounded
+generation attempts fail. Natural examples at different times are:
 
 ```text
 早呀，我醒啦！
-嗨，我醒啦！
+晚上好呀！
 ```
 
 Task analysis such as `First, the user wants me to...` is internal failure evidence,
@@ -255,13 +262,25 @@ never a candidate spoken response.
 
 ## Tool behavior
 
+The Cognitive Gateway admits a turn but does not author semantic speech. Once
+Goal Interpretation chooses pending tool, planning, memory, or embodied work,
+the Core should emit one typed, non-terminal `fast_speech` process
+acknowledgement. If the first interpretation omits that field, one bounded Core
+repair may add it without changing the chosen route, bindings, or safety policy.
+The Host validates and schedules that Core-authored speech before the slow
+runtime when no valid cached acknowledgement already owns the fast-first slot.
+It does not invent or rewrite the sentence.
+
 Chromie may say she is checking something only when a real tool call will be made
-with validated arguments. For safe reads, Response Composer may choose silence or
-one tiny everyday acknowledgement. The acknowledgement and the read start in the
-same parallel runtime batch; the tool does not wait for TTS synthesis or playback.
-Host code validates capability safety, arguments, truth state, concurrency, and
-evidence binding; it does not supply a fixed sentence. Physical or externally
-effectful work keeps its confirmation and delivery barriers.
+with validated arguments. For safe reads, the acknowledgement and the read start
+without serializing the read behind TTS synthesis or playback. A valid cached cue
+remains the lowest-latency presentation path; on a cache miss, the typed Core
+speech prevents a long silent wait for planning, lookup, and final composition.
+Final speech still comes from Response Composer and must not duplicate the
+acknowledgement. Host code validates capability safety, arguments, truth state,
+concurrency, and evidence binding. Physical or externally effectful work uses
+only a safety prelude or confirmation request before execution and keeps its
+confirmation and delivery barriers.
 
 Natural:
 

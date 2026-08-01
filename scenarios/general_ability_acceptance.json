@@ -418,6 +418,10 @@
         {
           "key": "interaction/social_attention_model_can_choose_none",
           "rationale": "Natural attention remains optional; the model can choose speech-only behavior instead of a repetitive fixed gesture."
+        },
+        {
+          "key": "goal_interpretation/physical_pending_work_gets_safety_prelude",
+          "rationale": "Physical work gets a truthful safety prelude without claiming motion has started or completed."
         }
       ],
       "live_text_cases": []
@@ -465,9 +469,29 @@
         {
           "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
           "rationale": "A chat route cannot inherit physical authority from a stale active projection of earlier motion goals, even if a model tries to replay them."
+        },
+        {
+          "key": "goal_interpretation/weather_pending_work_gets_fast_speech",
+          "rationale": "A safe-read route cannot leave the user silent merely because the first Core interpretation omitted its acknowledgement."
         }
       ],
-      "live_text_cases": []
+      "live_text_cases": [
+        {
+          "id": "beijing_rain_pending_acknowledgement",
+          "text": "今天北京下雨了没有？",
+          "language": "zh-CN",
+          "expected_routes": [
+            "tool"
+          ],
+          "expect_no_skills": true,
+          "require_speech": true,
+          "require_fast_speech": true,
+          "expected_fast_speech_purposes": [
+            "acknowledge_and_check"
+          ],
+          "description": "The reported Beijing rain question must leave the Core with a truthful immediate process acknowledgement before slower planning and lookup work."
+        }
+      ]
     },
     {
       "id": "deterministic_safety_controls",

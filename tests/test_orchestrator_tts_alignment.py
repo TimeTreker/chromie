@@ -5,6 +5,7 @@ import json
 import sys
 import types
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import MethodType
 from typing import Any
 
@@ -41,16 +42,51 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             assistant,
         )
 
-        prompt = assistant._runtime_ready_greeting_prompt()
+        prompt = assistant._runtime_ready_greeting_prompt(
+            local_now=datetime(
+                2026,
+                8,
+                1,
+                7,
+                30,
+                tzinfo=timezone(timedelta(hours=8)),
+            )
+        )
 
         self.assertIn("has just woken up", prompt)
         self.assertIn("naturally says after waking up", prompt)
-        self.assertNotIn("Local time:", prompt)
-        self.assertIn("Do not mention clock time", prompt)
+        self.assertIn('"local_period":"morning"', prompt)
+        self.assertIn('"utc_offset":"+08:00"', prompt)
+        self.assertIn("Do not quote the exact clock time", prompt)
+        self.assertIn("vary the greeting naturally", prompt)
         self.assertIn("Speak only in zh-CN", prompt)
         self.assertIn("not a device or an adult professional", prompt)
         self.assertIn("Return only a JSON object", prompt)
         self.assertIn("Do not explain the task", prompt)
+
+    def test_runtime_ready_greeting_prompt_changes_with_grounded_local_period(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.runtime_ready_greeting_language = "zh-CN"
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}',
+            assistant,
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "warm, curious, and natural",
+            assistant,
+        )
+        local_tz = timezone(timedelta(hours=8))
+
+        morning = assistant._runtime_ready_greeting_prompt(
+            local_now=datetime(2026, 8, 1, 8, 0, tzinfo=local_tz)
+        )
+        evening = assistant._runtime_ready_greeting_prompt(
+            local_now=datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
+        )
+
+        self.assertIn('"local_period":"morning"', morning)
+        self.assertIn('"local_period":"evening"', evening)
+        self.assertNotEqual(morning, evening)
 
     async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -997,6 +1033,21 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
+                RouteDecision(
+                    route="tool",
+                    intent="weather_query",
+                    language="zh-CN",
+                    fast_speech={
+                        "text": "好的，我马上查北京今天的天气。",
+                        "purpose": "acknowledge",
+                        "commitment": "checking_only",
+                    },
+                ),
+                "今天北京下雨了没有？",
+            )
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
                 RouteDecision(route="robot_action", intent="robot_action", language="en-US"),
                 "Walk forward for 15 seconds.",
             )
@@ -1016,6 +1067,21 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "Walk forward for 15 seconds.",
             ),
             "I’ll check whether I can do that safely.",
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="robot_action",
+                    intent="robot_action",
+                    language="en-US",
+                    fast_speech={
+                        "text": "I will handle that.",
+                        "purpose": "acknowledge_and_check",
+                        "commitment": "checking_only",
+                    },
+                ),
+                "Walk forward for 15 seconds.",
+            )
         )
         self.assertIsNone(
             assistant._fast_first_response_text(

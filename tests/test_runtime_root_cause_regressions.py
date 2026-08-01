@@ -637,17 +637,26 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ),
             "嗨，我醒啦！",
         )
+        with self.assertRaisesRegex(RuntimeError, "introduced the speaker"):
+            VoiceAssistant._validate_runtime_ready_greeting_semantics(
+                "你好，我是Chromie。"
+            )
+        with self.assertRaisesRegex(RuntimeError, "speaker age"):
+            VoiceAssistant._validate_runtime_ready_greeting_semantics(
+                "嗨，我六岁啦！"
+            )
 
-    def test_wake_up_prompt_has_no_ungrounded_time_or_state_seed(self) -> None:
+    def test_wake_up_prompt_uses_grounded_time_without_unverified_state(self) -> None:
         assistant = object.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant._direct_llm_identity_json = lambda: "{}"  # type: ignore[method-assign]
         assistant._direct_llm_mind_summary = lambda: "{}"  # type: ignore[method-assign]
         prompt = assistant._runtime_ready_greeting_prompt()
 
-        self.assertNotIn("Local time:", prompt)
-        self.assertNotIn("Timezone:", prompt)
-        self.assertIn("Do not mention clock time", prompt)
+        self.assertIn("Grounded local temporal context JSON", prompt)
+        self.assertIn("local_period", prompt)
+        self.assertIn("Do not quote the exact clock time", prompt)
+        self.assertIn("Do not invent meals, hunger, sleepiness, weather", prompt)
         self.assertIn("Do not ask a question or end mid-clause", prompt)
 
     async def test_vad_segment_started_during_playback_keeps_barge_in_threshold(self) -> None:

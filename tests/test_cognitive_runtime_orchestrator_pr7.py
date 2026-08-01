@@ -135,6 +135,69 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             "sid",
         )
 
+    def test_core_authored_tool_acknowledgement_is_scheduled_before_slow_runtime(self):
+        response = InteractionResponse(
+            speech=[{"text": "北京今天没有雨。", "timing": "after_skills"}],
+            metadata={"source": "goal_driven_cognitive_runtime"},
+        )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            lane="tool",
+            interaction_response=response,
+            timings_ms={"total": 68000.0},
+        )
+        assistant = self._assistant(resolution)
+        assistant.cognitive_apply_lanes = frozenset({"tool"})
+        events = []
+
+        async def schedule_fast_first(*args, **kwargs):
+            del args, kwargs
+            events.append("acknowledgement_scheduled")
+            return True
+
+        async def run_pipeline(*args, **kwargs):
+            del args, kwargs
+            events.append("runtime_started")
+            return resolution
+
+        assistant._schedule_fast_first_response = schedule_fast_first
+        assistant._run_cognitive_runtime_pipeline = run_pipeline
+        decision = RouteDecision(
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            confidence=0.95,
+            source="llm",
+            language="zh-CN",
+            fast_speech={
+                "text": "我看看北京今天会不会下雨。",
+                "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
+                "must_not_claim_completion": True,
+            },
+        )
+
+        async def run():
+            handled, _ = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="今天北京下雨了没有？",
+                session_id="sid-weather",
+                context={"history": []},
+                decision=decision,
+                core_interpretation_latency_ms=1400.0,
+            )
+            self.assertTrue(handled)
+
+        asyncio.run(run())
+
+        self.assertEqual(
+            events,
+            ["acknowledgement_scheduled", "runtime_started"],
+        )
+        self.assertFalse(
+            assistant._launch_interaction_calls[0][1]["reset_playback"]
+        )
+
     def test_active_named_goal_cancel_fails_closed_before_state_mutation(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 

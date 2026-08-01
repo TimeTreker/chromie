@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "physical_pending_work_gets_safety_prelude",
+  "suite": "goal_interpretation",
+  "level": "integration",
+  "description": "A physical request whose first Core interpretation omits fast speech receives a model-authored safety prelude without claiming that motion has started or completed.",
+  "tags": [
+    "pending-work",
+    "fast-first",
+    "physical-safety",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "往前走十五秒。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "pending_work_fast_speech_repair_enabled": true,
+    "catalog": {
+      "catalog_version": 82,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_forward",
+          "agent_id": "soridormi.skill",
+          "description": "Walk forward for a bounded duration after confirmation and safety validation.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "physical_motion"
+          ],
+          "safety_class": "physical_motion",
+          "requires_confirmation": true
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "robot_action",
+          "intent": "capability:soridormi.walk_forward",
+          "confidence": 0.96,
+          "language": "zh-CN"
+        }
+      },
+      {
+        "stage": "fast_speech_repair",
+        "decision": {
+          "fast_speech": {
+            "text": "我先确认一下能不能安全地往前走。",
+            "purpose": "safety_prelude",
+            "commitment": "needs_confirmation",
+            "must_not_claim_completion": true
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "robot_action",
+    "intent": "capability:soridormi.walk_forward",
+    "source": "llm",
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "fast_speech_repair"
+    ],
+    "fast_speech_present": true,
+    "fast_speech_purpose": "safety_prelude",
+    "fast_speech_commitment": "needs_confirmation",
+    "fast_speech_must_not_claim_completion": true,
+    "task_types_include": [
+      "task.execute_skill"
+    ]
+  }
+}

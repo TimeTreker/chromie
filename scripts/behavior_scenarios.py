@@ -132,7 +132,12 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
     replaced by a file-backed script.
     """
 
-    def __init__(self, script: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        script: list[dict[str, Any]],
+        *,
+        pending_work_fast_speech_repair_enabled: bool = False,
+    ) -> None:
         super().__init__(
             ollama_url="http://scenario.invalid",
             model="scenario-fast-goal-interpreter",
@@ -141,6 +146,9 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
             review_timeout_ms=1000,
             confidence_threshold=0.55,
             slow_review_recovery_enabled=True,
+            pending_work_fast_speech_repair_enabled=(
+                pending_work_fast_speech_repair_enabled
+            ),
             num_predict=160,
         )
         self.script = [dict(item) for item in script]
@@ -903,6 +911,33 @@ def _evaluate_goal_interpretation_expectations(
         )
     _expect_equal(errors, "interrupt_current", decision.interrupt_current, expect.get("interrupt_current"))
     _expect_equal(errors, "should_speak", decision.should_speak, expect.get("should_speak"))
+    fast_speech = decision.fast_speech
+    if "fast_speech_present" in expect:
+        _expect_equal(
+            errors,
+            "fast_speech_present",
+            fast_speech is not None and bool(fast_speech.text.strip()),
+            bool(expect.get("fast_speech_present")),
+        )
+    if fast_speech is not None:
+        _expect_equal(
+            errors,
+            "fast_speech.purpose",
+            fast_speech.purpose,
+            expect.get("fast_speech_purpose"),
+        )
+        _expect_equal(
+            errors,
+            "fast_speech.commitment",
+            fast_speech.commitment,
+            expect.get("fast_speech_commitment"),
+        )
+        _expect_equal(
+            errors,
+            "fast_speech.must_not_claim_completion",
+            fast_speech.must_not_claim_completion,
+            expect.get("fast_speech_must_not_claim_completion"),
+        )
 
     task_types = _task_types_from_decision(decision)
     for item in _tuple_of_strings(expect.get("task_types_include")):
@@ -969,7 +1004,12 @@ def _scenario_goal_interpreter_from_stub(
 ) -> _GoalInterpretationLlm | _ScriptedGoalInterpreter:
     script = _goal_interpretation_script_from_stub(scenario_key, stub)
     if script is not None:
-        return _ScriptedGoalInterpreter(script)
+        return _ScriptedGoalInterpreter(
+            script,
+            pending_work_fast_speech_repair_enabled=bool(
+                stub.get("pending_work_fast_speech_repair_enabled", False)
+            ),
+        )
     raw_decision = stub.get("llm_decision")
     if raw_decision is None:
         return _GoalInterpretationLlm(fallback_decision)
@@ -1053,6 +1093,11 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
             "confidence": decision.confidence,
             "interrupt_current": decision.interrupt_current,
             "should_speak": decision.should_speak,
+            "fast_speech": (
+                decision.fast_speech.model_dump(mode="json")
+                if decision.fast_speech is not None
+                else None
+            ),
             "llm_calls": interpreter.calls,
             "llm_stages": list(interpreter.stages),
             "actions": list(decision.actions or []),

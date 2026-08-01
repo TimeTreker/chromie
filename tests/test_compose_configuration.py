@@ -111,7 +111,7 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
         self.assertIn(
-            "AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED: ${AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED:-0}",
+            "AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED: ${AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED:-1}",
             agent_block,
         )
 
