@@ -175,6 +175,86 @@ For one simple conversational act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
 must not answer the same act again.
 
+## Responsive speech and planning depth
+
+The routing and independently scheduled response-stage changes in this section
+are queued design requirements, not current implementation claims. Current
+behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+
+Responsiveness is the time until Chromie produces the first truthful,
+user-observable response, not merely the time until an internal model or HTTP
+request finishes. Cognitive effort should be proportional to semantic
+uncertainty, required effects, dependencies, novelty, and risk.
+
+Every admitted turn retains one Core-owned semantic and conversational
+authority. Speech composition and user-task execution may be prepared or
+scheduled independently, including with bounded parallel model calls, but both
+consume the applicable immutable authoritative state: the same turn, plus Goal
+versions, a Canonical Plan, and evidence when each exists. Neither a response
+composer nor an execution specialist may reinterpret the Goal, widen effects,
+authorize work, or become a second conversation authority. Physical TaskGraph
+execution remains sequential.
+
+After Goal Association, a complete non-effectful `spoken_response` Goal that
+needs no external read, tool, memory mutation, or embodied effect may move
+directly to response composition without invoking Fast or Deep Planner. This is
+a model-authored semantic decision validated against the typed Goal; it must
+never be selected by a greeting phrase table. Complete bounded capability work
+belongs on the Fast path. Deep Planner is exceptional and is justified by
+semantic uncertainty, incomplete or compound coverage, nontrivial dependencies,
+material alternatives, novelty or broader context, or safety/resource reasoning
+that requires the wider planning boundary. A structured semantic or plan
+validation rejection may justify Deep only when its failure contract explicitly
+requires broader reasoning. Technical schema/model-contract failure receives
+bounded same-tier repair. Any later Deep recovery is explicitly classified as
+recovery, retains the Fast failure evidence, and fails closed unless it produces
+a valid plan; it is not semantic escalation. A confidence number alone neither
+permits a bypass nor requires escalation, and it never authorizes an effect.
+
+Streaming changes delivery timing, not semantic authority. Raw model-token
+deltas, partial JSON, private reasoning, and incomplete sentences are not speech
+contracts and must never reach TTS. The Host may schedule a complete,
+independently schema-valid `fast_speech` or `ResponseStage` only after Host
+validation authorizes it against the applicable turn/Goal correlation,
+commitment or evidence state, claim guards, and cancellation generation. It
+need not wait for unrelated later response fields. The stages have distinct
+truth requirements:
+
+- an immediate acknowledgement may claim only hearing or evaluation;
+- a proposal or confirmation requires a validated plan and the applicable
+  confirmation state;
+- speech such as "I'm starting" requires committed execution;
+- a progress update requires correlated runtime evidence;
+- a final result or completion claim requires reconciled terminal evidence.
+
+Result arrival is evidence, not automatic permission to interrupt whatever
+Chromie is saying. The queued response work must reuse `ResponseStage` and Host
+delivery validation to support three outcomes without adding another semantic
+owner: dedicated safety/control evidence may pre-empt audible output under its
+deterministic policy; ordinary progress or results wait for an appropriate
+ordered speech opening; internal-only evidence updates state without creating a
+user-facing stage. The Core authors normal speech intent, while the Host
+enforces ordering, urgency, and required user-facing confirmation, failure,
+cancellation, and terminal obligations.
+
+A barge-in or newer ordinary turn may invalidate speech that is already playing
+or queued for an obsolete conversational act. It does not by itself cancel an
+independent Goal, erase its evidence, or discard the truthful result response
+that becomes eligible later. Task cancellation still requires an explicit
+deterministic scope or a Core-authorized semantic interruption.
+
+Provider PCM chunks may be played incrementally only while preserving ordered
+delivery, cancellation generations, stale-output suppression, barge-in, output
+device rollover, and delivery evidence. A transport `start` event is not audible
+playback evidence. Incremental audio playback can reduce TTS-to-first-audio
+latency, but it cannot make an unvalidated model fragment safe to speak.
+
+Latency work must not bypass schema validation, source-effect bounds,
+capability and resource validation, confirmation, semantic-completeness review,
+speech-claim validation, or evidence reconciliation. Optimize avoidable model
+generations, serial dependencies, and repair calls before weakening a validator
+that correctly rejected an invalid result.
+
 ## ASR uncertainty and ambiguity
 
 ASR output is a hypothesis, not truth.

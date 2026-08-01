@@ -22,7 +22,7 @@ experience artifacts. See
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
 > The canonical local gate is reproducible again: repository policy,
-> test-ownership, Ruff, Mypy, documentation, 1,726 primary tests, and 20 legacy
+> test-ownership, Ruff, Mypy, documentation, 1,727 primary tests, and 20 legacy
 > Agent tests pass from the documented setup. A strict source-bound verifier for
 > the current-revision microphone-to-audible-response loop is implemented. The
 > current input reaches VAD/ASR but has not produced an intelligible required
@@ -192,9 +192,11 @@ documented in
 - normal robot thinking, including body-goal interpretation, capability choice,
   and planning, belongs to LLM reasoning over bounded contracts, not hardcoded
   phrase, regex, or regression-case matches;
-- normal natural-language routing goes through the quick intent model, while
-  low-confidence or complex requests go to deepthought instead of deterministic
-  guessing;
+- normal natural-language routing goes through model-authored typed meaning;
+  the queued grounded-response contract will let complete non-effectful
+  conversation avoid a planner used merely to transport speech, keep bounded
+  work on Fast Planner, and use Deep only when wider semantic or safety/resource
+  reasoning is required instead of deterministic guessing;
 - simulation exemptions never authorize hardware;
 - physical execution stays default-off and Soridormi-owned;
 - implementation, automated verification, target validation, and release

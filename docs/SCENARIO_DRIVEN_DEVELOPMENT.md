@@ -113,7 +113,32 @@ Each scenario should define:
 - forbidden skills or claims;
 - expected speech properties;
 - expected retained state after each turn;
+- expected direct, Fast, or Deep path and the specific reason when Deep is
+  required;
+- latency checkpoints when responsiveness is part of the requirement: first
+  valid speech commitment, `tts_request_start`, first PCM chunk, first audible
+  playback, plan ready, execution start, terminal evidence, and final playback;
+- model-call, queue/evaluation, and contract-repair counts and durations for a
+  diagnosed cognitive delay;
 - evidence level.
+
+Latency scenarios must keep request classes separate: direct non-effectful
+conversation, complete bounded capability work, and uncertain, complex, or
+work whose safety/resource reasoning needs the wider planner. Compare warm and
+cold p50/p95 within a class; never average a fast greeting together with a
+compound physical plan to hide either failure. Goal omission, unsafe execution,
+ungrounded speech, critical schema or LLM integrity failure, service failure,
+or unsafe-idle failure is a hard failure and cannot be traded for a better
+latency score.
+
+When asynchronous work can finish during other speech or another ordinary turn,
+retain cases for urgent safety/control pre-emption, ordered ordinary-result
+delivery, internal-only evidence with no speech, and a slow earlier Goal whose
+result is delivered exactly once after the newer conversational act. A barge-in
+case must distinguish invalidating current/queued audio from cancelling the
+underlying Goal; only explicit cancellation or supersession may discard its
+future result response, with any broader semantic interruption requiring the
+Core-authorized scope recorded by the scenario.
 
 ## 5. Multi-turn scenario example
 
@@ -178,10 +203,13 @@ For a reported behavioral defect:
 2. Remove private or irrelevant data.
 3. Create the smallest scenario that reproduces the failure across the earliest
    incorrect boundary.
-4. Verify that the scenario fails on the current evaluated revision.
-5. Implement the architectural fix.
-6. Verify the new scenario and all existing scenarios.
-7. Record the evidence level honestly.
+4. When the report is "slow," retain and score the complete stage timeline so
+   model generation, validation, repair, TTS synthesis, and playback are not
+   conflated.
+5. Verify that the scenario fails on the current evaluated revision.
+6. Implement the architectural fix.
+7. Verify the new scenario and all existing scenarios.
+8. Record the evidence level honestly.
 
 A patch should not claim to fix a live behavior if only an unrelated unit test
 was added.
@@ -261,6 +289,8 @@ Target-specific work must also run the corresponding live evidence workflow.
 - Does it distinguish model proposal from runtime commitment?
 - Does it check natural clarification without internal IDs or schema language?
 - Does it check evidence before completion claims?
+- If latency is in scope, does it measure first truthful audible response and
+  identify the earliest slow boundary rather than only total runtime?
 - Could the implementation pass only because the fixture wording was hardcoded?
 - Is the evidence level explicit?
 - Are the resulting files and revisions reproducible?

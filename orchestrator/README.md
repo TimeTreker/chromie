@@ -20,7 +20,9 @@ For authoritative architecture, status, and configuration, see:
 - Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
   Response Composition, plus compatibility `AgentResult`/`InteractionResponse`
   surfaces.
-- TTS streams PCM synthesis; the Orchestrator plays and interrupts it.
+- TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
+  complete request through the provider `end` event before ordered playback and
+  interruption handling.
 - The Trusted Capability Runtime resolves and schedules trusted named capabilities.
 - Soridormi plans and executes embodied skills and owns physical safety.
 - `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
@@ -246,6 +248,12 @@ completion-claim guard. Physical work is limited to a safety prelude or
 confirmation, never an execution claim. Final Response Composer speech remains
 authoritative and ordered after the acknowledgement.
 
+The queued grounded-response latency Issue will preserve this single semantic
+authority while allowing independently valid speech stages to be scheduled
+earlier. True incremental PCM playback is separate queued playback-lifecycle
+work; a `tts_stream_start` transport event is not currently audible playback
+evidence.
+
 Manual development start:
 
 ```bash
@@ -288,6 +296,13 @@ control scope or a Core-authorized semantic interruption cancels routed work.
 targets all eligible ordinary turns. Audible playback remains a shared ordered
 resource, so a barge-in can silence stale audio without erasing the underlying
 work.
+
+Current limitation: final outcome-response staleness still compares the
+originating turn with global playback-generation and session state. Independent
+work and evidence survive, but a newer ordinary turn can suppress that earlier
+Goal's eventual result speech. The queued grounded-response and playback-
+delivery Issues own the required separation between invalidating obsolete audio
+and retaining a future result-delivery obligation.
 
 The Interaction Coordinator validates the response and submits speech and capability
 requests to the Trusted Capability Runtime. Scheduling is bounded by

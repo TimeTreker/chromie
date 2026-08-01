@@ -5,6 +5,24 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ## Unreleased
 
+### Grounded response latency contract
+
+- Recorded the reproduced serial-cognition delay as the first queued
+  post-evidence behavior Issue without changing the active target-evidence
+  closure.
+- Defined the intended direct conversational, terminal Fast, and exceptional
+  Deep paths while preserving one Core semantic authority and every existing
+  validator, confirmation, and evidence boundary.
+- Required independently valid commitment/evidence-bound speech stages instead
+  of raw token-to-TTS delivery, and distinguished provider transport streaming
+  from the separately queued incremental PCM playback work.
+- Mapped realtime, nonblocking-tool, durable-task, multi-agent, memory, and
+  embodied-control ideas onto existing Chromie contracts without adding a new
+  lane, event bus, ledger, framework dependency, or execution authority.
+- Recorded the current global playback-generation/session staleness boundary
+  that can suppress an earlier independent Goal's eventual result speech, plus
+  the queued ordered/urgent/internal-only delivery scenarios that must close it.
+
 ### Multi-turn continuity
 
 - Preserve independent ordinary routed turns when another request arrives,

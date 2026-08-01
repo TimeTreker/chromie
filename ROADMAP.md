@@ -56,6 +56,8 @@ require physical voice or robot evidence.
 
 Only after that evidence closes, work one semantic Issue at a time:
 
+- reduce time to first grounded response without weakening validation or
+  evidence authority;
 - classify all broad runtime exception boundaries;
 - establish typed Host configuration snapshots;
 - extract playback delivery lifecycle;
@@ -67,6 +69,38 @@ Only after that evidence closes, work one semantic Issue at a time:
 Arbitrary file, method, boolean, or document counts are not substitute exit
 criteria. Every Issue refreshes its baseline, preserves public behavior and
 safety ownership, and proves a measurable reduction at its own boundary.
+
+## Queued behavior Issue — Reduce Time to First Grounded Response
+
+The first post-evidence behavior Issue is the reproduced response-latency
+problem. Complete non-effectful `spoken_response` Goals should not invoke Fast
+or Deep Planner merely to transport speech. Complete bounded capability work
+should terminate at Fast Planner when valid. Deep Planner should run only for a
+recorded semantic, dependency, context, or safety/resource reason that requires
+the wider planning boundary, or a structured semantic/plan validation rejection
+whose failure contract explicitly requires broader reasoning. Technical Fast
+failure remains visible through bounded repair or explicitly classified
+recovery. Confidence alone neither authorizes a bypass nor forces escalation.
+
+The existing response-composition owner must accept the explicitly planless
+branch without a dummy Plan or second authority. Complete `fast_speech` and
+`ResponseStage` values may run early only after Host validation. Result arrival
+first updates evidence: dedicated safety/control may interrupt output, ordinary
+results wait for ordered delivery, and internal-only evidence needs no speech.
+A newer ordinary turn or barge-in must not cancel independent work or erase its
+later result obligation.
+
+The comparative review reinforces existing Chromie owners rather than adding
+speech/action lanes, event planes, ledgers, fixed model slots, or framework
+dependencies. Goal/task state, `ExecutionOutcomeBundle`, Runtime Trace,
+Soridormi task events, reviewed Agent Skill promotion, and the Chromie/Soridormi
+feasibility boundary already own those meanings. Semantic end-of-turn and
+speculative generation remain evidence-gated later input work; bounded
+two-request model concurrency requires shared-GPU proof; incremental PCM remains
+with the playback-delivery lifecycle Issue.
+
+Detailed problem evidence, scope, non-goals, and exit criteria are in
+[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 ## Completed architecture correction — Router removal
 

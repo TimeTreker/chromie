@@ -13,6 +13,11 @@ commit, and a validated speech-only outcome response. Automated contract
 evidence exists; retained provider-backed and live robot evidence remains open
 and is owned by [STATUS.md](STATUS.md).
 
+The direct no-planner `spoken_response` transition and independently scheduled
+validated response stages described below are accepted post-evidence contract
+work, not implementation claims created by this documentation update. Current
+behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+
 ## 1. Decision
 
 Chromie uses a **manager-owned, evidence-driven cognitive turn loop**:
@@ -21,11 +26,12 @@ Chromie uses a **manager-owned, evidence-driven cognitive turn loop**:
 receive
   -> admit or protect
   -> understand goals
-  -> plan complete goal coverage
-  -> validate and authorize
-  -> delegate bounded work
-  -> observe structured results
-  -> reconcile every goal against evidence
+  -> select a direct grounded response for a complete non-effectful speech Goal
+     or plan complete goal coverage
+        -> validate and authorize
+        -> delegate bounded work
+        -> observe structured results
+        -> reconcile every goal against evidence
   -> compose one final response
   -> close, wait, or replan
 ```
@@ -96,6 +102,13 @@ authority to a specialist. Soridormi remains the authority for embodied
 planning, execution, resource safety, stop/emergency behavior, and hardware
 commissioning.
 
+Speech composition and user-task execution may be prepared or scheduled
+independently, including with bounded parallel model calls, but they consume
+the applicable immutable authoritative state: the same Core-owned turn, plus
+Goal versions, a Canonical Plan, and evidence when each exists. This output
+scheduling does not transfer semantic or conversation authority to a response
+composer or execution specialist.
+
 ## 3. Turn state machine
 
 Every received input has one stable `turn_id`. The normal path is:
@@ -104,10 +117,12 @@ Every received input has one stable `turn_id`. The normal path is:
 RECEIVED
   -> ADMITTED
   -> GOALS_RESOLVED
-  -> PLAN_VALIDATED
-  -> WAITING_FOR_CONFIRMATION | EXECUTING | READY_TO_RESPOND
-  -> OUTCOMES_RECONCILED
-  -> RESPONSE_COMPOSED
+     -> READY_TO_RESPOND -> RESPONSE_COMPOSED
+     or
+     -> PLAN_VALIDATED
+        -> WAITING_FOR_CONFIRMATION | EXECUTING | READY_TO_RESPOND
+        -> OUTCOMES_RECONCILED
+        -> RESPONSE_COMPOSED
   -> CLOSED | WAITING_FOR_USER | REPLAN_REQUIRED
 ```
 
@@ -161,10 +176,14 @@ ordinary Core cognition.
 ## 5. Goal understanding and planning
 
 The Core first associates the admitted turn with active goals. It then creates
-only genuinely independent new goals and produces one canonical plan that
-covers every goal.
+only genuinely independent new goals. A complete non-effectful
+`spoken_response` Goal that needs no external read, tool, memory mutation, or
+embodied effect may move directly from `GOALS_RESOLVED` to
+`READY_TO_RESPOND`; it does not invoke Fast or Deep Planner merely to transport
+speech. This is a model-authored semantic result validated against the typed
+Goal, never a Host greeting phrase table.
 
-The planning path is:
+When capability work or broader planning is required, the planning path is:
 
 ```text
 UserTurnEnvelope
@@ -182,6 +201,18 @@ prospective outcomes. Deterministic code checks schemas, capability
 availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
 rewrite the plan into a nearby action.
+
+Fast Planner owns complete bounded capability work. Deep Planner is invoked
+only for a recorded semantic escalation, unresolved ambiguity or coverage,
+nontrivial dependency, material alternative, novelty or broader context, or
+safety/resource reasoning that requires wider planning. A structured semantic
+or plan validation rejection may justify Deep only when its failure contract
+explicitly requires broader reasoning. Technical schema/model-contract failure
+receives bounded same-tier repair. Any later Deep recovery is explicitly
+classified as recovery, retains the Fast failure evidence, and fails closed
+unless it produces a valid plan; it is not semantic escalation. A confidence
+number alone neither permits a bypass nor requires escalation, and it never
+authorizes an effect.
 
 ## 6. Delegation model
 
@@ -313,6 +344,24 @@ Outcome reconciliation is a Core stage after execution. It:
    cancelled, or needs a bounded replan;
 5. exposes one immutable result bundle to the final response composer.
 
+Streaming changes scheduling, not authority. Raw model-token deltas, partial
+JSON, private reasoning, and incomplete sentences are not speech contracts and
+must never reach TTS. The Host may schedule a complete, independently
+schema-valid `fast_speech` or `ResponseStage` only after Host validation
+authorizes it against the applicable correlation, commitment/evidence state,
+claim guards, and cancellation generation. It need not wait for unrelated later
+response fields.
+
+The queued grounded-response Issue must also distinguish result evidence from
+speech scheduling. Dedicated safety/control evidence may deterministically
+pre-empt current output; an ordinary progress or result stage remains ordered
+until an appropriate speech opening; internal-only evidence updates Goal/task
+state without creating a speech stage. A newer ordinary turn or output-only
+barge-in may invalidate already-playing or obsolete queued audio, but it cannot
+make an independent Goal's later evidence-bound result stale. Only explicit
+scoped cancellation, supersession, or a Core-authorized semantic interruption
+may suppress that future result obligation.
+
 ### 8.1 Pre-execution speech
 
 For effectful work, the pre-execution response contract is prospective. It may
@@ -328,6 +377,12 @@ goal. A non-effectful conversational turn may move directly to
 `READY_TO_RESPOND`; its Core-owned answer is final for that turn and is grounded
 in the admitted input and any validated context or retrieval evidence, not in a
 fictional execution result.
+
+An immediate acknowledgement may claim only hearing or evaluation. A proposal
+or confirmation requires a validated plan and the applicable confirmation
+state. Speech such as "I'm starting" requires committed execution, and a
+progress update requires correlated runtime evidence. Cancellation invalidates
+stages that have not begun; speech already heard remains delivery evidence.
 
 ### 8.2 Evidence-bound post-execution speech
 
@@ -554,6 +609,12 @@ The loop records contracts and decisions, not hidden model reasoning:
 - final response claims and delivery result;
 - cancellation and provider postconditions.
 
+The queued grounded-response latency Issue must add direct/Fast/Deep path
+classification and its reason, first-valid-speech-commitment, TTS-request,
+first-PCM, and first-audible-playback timing, plus model queue/evaluation and
+contract-repair count/duration. These are future trace requirements, not claims
+about events emitted by the current runtime.
+
 One trace should answer: what entered, what Chromie understood, what it planned,
 what was authorized, what actually ran, what evidence returned, how each goal
 ended, and why Chromie said the final words.
@@ -618,6 +679,13 @@ Required Level A cases include:
   generic cancellation cannot support an E-stop or safe-idle claim;
 - dedicated E-stop and safe-idle claims require explicit correlated Soridormi
   evidence.
+
+The queued grounded-response latency Issue adds future Level A requirements: a
+grounded greeting or direct speech-only answer invokes neither planner and emits
+one answer; complete bounded capability work terminates at Fast when validation
+accepts it; and work whose semantic complexity or safety/resource reasoning
+requires the wider boundary records a specific Deep reason. These requirements
+do not apply as current gates before that Issue is implemented.
 
 Level A and unit tests prove contract behavior only. Provider-backed live-text,
 simulator, microphone, and physical-robot claims require their corresponding

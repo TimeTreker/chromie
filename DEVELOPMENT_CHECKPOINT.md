@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-08-01,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,726 primary tests, and 20 legacy Agent tests.
+1,727 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -54,7 +54,7 @@ identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
 installation or model warm-up. The latest 2026-08-01 canonical run passes
-1,726 primary tests plus 20 legacy Agent tests.
+1,727 primary tests plus 20 legacy Agent tests.
 
 The managed `Chromie` environment is Python 3.11.15. A microphone is visible, but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
 short VAD segments and ASR finals `I.`/`.` rather than the required Moon request.
@@ -125,6 +125,7 @@ Future defects must follow [Scenario-Driven Development](docs/SCENARIO_DRIVEN_DE
 After the default source-bound profile is retained and reviewed, continue one
 semantic Issue at a time:
 
+- reduce time to first grounded response by adapting existing typed owners and contracts;
 - classify and narrow broad runtime exception boundaries;
 - establish typed Host configuration snapshots;
 - extract playback delivery, then input/session lifecycle owners around seams
@@ -134,8 +135,7 @@ semantic Issue at a time:
 - merge duplicated documentation and remove stale vocabulary and archives;
 - rerun the source-bound evidence profile after structural changes.
 
-Detailed scope and exit criteria are in
-[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+Detailed scope and exit criteria are in [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
 
 ## Required local gates
 

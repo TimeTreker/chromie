@@ -13,6 +13,11 @@ complete admission before ordinary Goal Interpretation, the frozen version 1
 result isolates the digest-bound compatibility route projection. Retained
 source-bound live-text and MuJoCo evidence remains open.
 
+The direct no-planner `spoken_response` branch and independently scheduled
+validated response stages described below are accepted post-evidence contract
+work, not implementation claims created by this documentation update. Current
+behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
+
 ## 1. Purpose
 
 Chromie has migrated its maintained semantic-planning path from a skill-routed
@@ -138,10 +143,12 @@ scripts. See [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
 ### 3.5 Single-direction cognition
 
-The normal planning path is monotonic:
+The normal cognitive path is monotonic, with a direct response branch for a
+complete non-effectful spoken-response Goal:
 
 ```text
-associate → segment → fast plan → deep plan if needed → validate → commit → execute
+associate → segment → direct grounded response
+                    ↘ fast plan → deep plan if needed → validate → commit → execute
 ```
 
 The Deep Planner never sends a goal back to the Fast Planner for another
@@ -204,6 +211,16 @@ reasoning with action-specific rules.
 
 Speech, social attention, and user-task execution are separate plans that may be
 coordinated but must not be conflated.
+
+Every admitted turn still has one Core-owned semantic and conversational
+authority. Speech composition and user-task execution may be prepared or
+scheduled independently, including through bounded parallel model calls, only
+from the applicable immutable authoritative state: the same turn, plus Goal
+versions, a Canonical Plan, and evidence when each exists. A response composer
+cannot reinterpret the Goal or authorize an effect, and an execution specialist
+cannot become the conversation authority. Every emitted request remains
+correlated to its owning turn and, when they exist, Goal and Plan identities;
+physical TaskGraph execution remains sequential.
 
 A blink selected to express attention is not automatically part of the user’s
 goal. An explicit user request to blink is.
@@ -386,6 +403,10 @@ Goal Association
 Goal Segmentation
   ├─ update existing goals
   └─ create independent new goals
+  ↓
+Complete non-effectful spoken-response Goal
+  └─ direct grounded response composition, with no Fast or Deep Planner
+  or
   ↓
 Model-authored Agent Skill selection and bounded projection loading
   ├─ zero, one, or several owner-approved methods
@@ -677,7 +698,8 @@ The Fast Planner is a low-latency semantic planner over:
 
 It may:
 
-- answer simple chat;
+- plan a bounded conversational Goal that actually requires planning; a
+  complete non-effectful `spoken_response` Goal uses the direct response path;
 - produce a complete direct common-skill plan;
 - propose a low-consequence bounded default;
 - produce a social attention plan;
@@ -722,6 +744,18 @@ The Deep Planner receives:
 - provider, environment, resource, and safety context;
 - memory and trusted services;
 - current information gaps and confirmations.
+
+Deep Planner is exceptional. It is invoked when semantic uncertainty,
+incomplete or compound coverage, nontrivial dependencies, material
+alternatives, novelty or broader context, or safety/resource reasoning requires
+the wider planning boundary. A structured semantic or plan validation rejection
+may justify Deep only when its failure contract explicitly requires broader
+reasoning. Technical schema/model-contract failure receives bounded same-tier
+repair. Any later Deep recovery is explicitly classified as recovery, retains
+the Fast failure evidence, and fails closed unless it produces a valid plan; it
+is not semantic escalation. Model confidence alone neither grants a direct/Fast
+bypass nor forces escalation, and it never replaces deterministic effect and
+safety validation.
 
 It may produce:
 
@@ -1125,6 +1159,17 @@ Before effectful execution, a response plan may contain:
 
 Prospective planning output cannot contain a final completion claim.
 
+The Host may schedule a complete, independently schema-valid `fast_speech` or
+`ResponseStage` only after Host validation authorizes it against the applicable
+turn/Goal correlation, commitment or evidence state, claim guards, and
+cancellation generation; it need not wait for unrelated later response fields.
+Raw model-token deltas, partial JSON, private reasoning, and incomplete
+sentences are not response contracts. An immediate acknowledgement may claim
+only hearing or evaluation, a proposal or confirmation requires a validated
+plan, starting speech requires committed execution, progress requires
+correlated runtime evidence, and final speech requires reconciled terminal
+evidence.
+
 ### 15.2 Post-execution response
 
 After execution, the host's deterministic closure reconciles every executable
@@ -1229,6 +1274,14 @@ The following are merge-blocking invariants:
 17. A failed optional subsystem cannot corrupt the primary task.
 18. Runtime never silently fills semantic parameters through action-specific
     rules.
+
+After the queued grounded-response latency Issue is implemented, its acceptance
+boundary must additionally require that a complete non-effectful
+spoken-response Goal not invoke a planner merely to transport speech, that
+every Deep invocation have a recorded reason requiring the wider semantic
+boundary, and that concurrent output preparation neither create a second
+semantic authority nor permit raw model fragments to reach TTS. These are
+future Issue exit requirements, not current merge-blocking invariants.
 
 ## 18. Prohibited anti-patterns
 
@@ -1508,6 +1561,12 @@ The cognitive pipeline should record, without exposing private model reasoning:
 - execution evidence;
 - response claims;
 - optional attention status.
+
+The queued grounded-response latency Issue must extend those records with
+direct/Fast/Deep path classification and its reason, first-valid-speech-
+commitment, TTS-request, first-PCM, and first-audible-playback timing, plus model
+queue/evaluation and contract-repair count/duration. These are future
+instrumentation requirements, not current trace claims.
 
 Logs should show decisions and contracts, not hidden chain-of-thought.
 

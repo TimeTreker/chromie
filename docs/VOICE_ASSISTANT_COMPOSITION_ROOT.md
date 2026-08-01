@@ -58,9 +58,10 @@ delegation/state methods from the composition root.
 These counts are structural evidence, not semantic quality measures. They show that
 calling all remaining responsibilities “intentionally composed” is not a
 sufficient closure criterion. The canonical gate prerequisite is complete.
-Further extraction begins only after the current-revision live proof and default
-target-evidence profile close, then uses live traces and failure evidence to
-select one independently tested owner at a time.
+Further extraction begins only after the current-revision live-proof
+implementation, default target-evidence profile, and queued grounded-response
+latency Issue close, then uses live traces and failure evidence to select one
+independently tested owner at a time.
 
 ## Queued ownership seams
 
@@ -70,7 +71,7 @@ Further work is ordered by
 | Responsibility | Required ownership direction |
 |---|---|
 | Host configuration | immutable typed audio, cognition, playback, session, and evidence settings composed before `VoiceAssistant` |
-| playback delivery | one owner for TTS chunking, synthesis order, playback barriers, echo handling, cancellation, and delivery evidence |
+| playback delivery | one owner for TTS chunking, synthesis order, transport-versus-audible streaming, incremental PCM playback, playback barriers, echo handling, cancellation, output-generation versus future-result eligibility, and delivery evidence |
 | input turn/session lifecycle | one owner for microphone/VAD/ASR tasks, injected audio, session registry, and deterministic shutdown |
 | direct-LLM compatibility path | prove maintained-profile reachability; remove it when unreachable or confine it to an explicit rollback contract |
 | Cognitive Gateway/Core turn dispatch | one turn-execution owner that delegates semantic work without gaining semantic authority |

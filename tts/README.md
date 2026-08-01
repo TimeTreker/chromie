@@ -51,7 +51,10 @@ voice commit is pushed, a clean clone has no `.chromie` voice dependency.
 CosyVoice currently uses one resident model worker. The supported host
 concurrency is therefore `ORCH_TTS_CONCURRENCY=1`; increasing host concurrency
 would only add hidden queueing. CosyVoice emits native streamed audio chunks,
-but its upstream inference call remains synchronous inside the worker.
+but its upstream inference call remains synchronous inside the worker. The
+current Host also accumulates every PCM chunk for one request and enqueues
+playback only after the provider `end` event, so provider transport streaming is
+not yet end-to-end audible incremental playback.
 
 CosyVoice lazily initializes language- and reference-specific inference paths.
 Normal startup therefore performs one no-playback synthesis for each committed

@@ -28,6 +28,13 @@ Its hard-cancellation recovery remains slower because synchronous inference may
 require a worker restart. Qwen3-TTS remains an explicit alternative and OuteTTS
 remains a low-resource GGUF fallback.
 
+Native provider chunking is not yet end-to-end audible streaming. The current
+Host receives the WebSocket `start` event and PCM chunks, accumulates the entire
+requested text chunk, and enqueues playback only after the provider `end`
+event. Transport streaming and `tts_stream_start` therefore do not prove that
+the user has heard audio. Incremental Host playback remains queued work under
+the existing playback-delivery lifecycle Issue.
+
 ## Ownership boundary
 
 The provider owns:
@@ -73,6 +80,15 @@ Contract version 1 records native text streaming, but Chromie's current
 WebSocket request carries one complete text chunk. Therefore native input
 streaming remains capability metadata until an incremental token-to-audio input
 transport is implemented and measured end to end.
+
+Raw model tokens, partial JSON, and incomplete response contracts are not valid
+TTS input. Future latency work may submit independently schema-valid
+`fast_speech` or `ResponseStage` text earlier only after Host authorization
+against the applicable correlation, commitment/evidence, claim, and
+cancellation state, and it may play provider PCM chunks incrementally. Those
+are separate semantic and transport changes. Both must preserve ordered
+playback, cancellation generations, stale-output suppression, barge-in, device
+rollover, and delivery evidence.
 
 ## Built-in voice catalog
 

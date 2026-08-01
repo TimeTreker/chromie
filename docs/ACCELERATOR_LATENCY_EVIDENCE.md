@@ -134,6 +134,58 @@ Distributions include count, mean, minimum, p50, p90, p95, p99, and maximum.
 Abandoned traces are excluded by default and can be included explicitly for
 reliability analysis.
 
+## Interaction-response latency slices
+
+This section defines instrumentation and qualification requirements for the
+queued grounded-response latency Issue. First-valid-speech-commitment and
+first-PCM trace events do not exist in the current runtime and must be added
+before these slices can support a claim.
+
+That future response-latency qualification keeps semantically different request
+classes separate:
+
+- direct non-effectful conversation, classified as a direct path with no
+  planner invocation or planner-tier value;
+- complete bounded capability work, with a terminal Fast plan;
+- uncertain, complex, or dependency-heavy work, and work whose safety/resource
+  reasoning requires the wider planning boundary, with a recorded Deep Planner
+  reason.
+
+For each class, retained traces must distinguish:
+
+- admitted input to the first complete, schema-valid, Host-authorized speech
+  commitment;
+- speech commitment to `tts_request_start`;
+- TTS request to first PCM chunk;
+- first PCM chunk to `first_audio_playback`;
+- total `first_user_observable_latency_ms`;
+- Goal Association, Fast/Deep Planner, Response Composer, validation, execution
+  start, terminal evidence, and final playback timing where applicable;
+- model queue/evaluation time and contract-repair count and duration;
+- request purpose, queue wait, resident model/resource state, and any compute
+  priority or pre-emption decision without treating that decision as Goal
+  cancellation.
+
+`tts_stream_start` is a transport event, not proof of audible output. Once the
+required instrumentation is implemented, a trace that lacks the applicable
+commitment, PCM, playback, planner-path, or repair events is incomplete for the
+corresponding latency claim. Compare warm and cold p50 and p95 only within the
+same request class and declared environment. Goal omission, unsafe execution,
+ungrounded speech, critical LLM/schema integrity failure, service failure, or
+unsafe idle is a hard failure; it cannot be averaged into a latency pass.
+
+Concurrency qualification compares the maintained single-request setting with
+at most one bounded two-request candidate per hardware profile under shared
+LLM/TTS load. It must show that user-observable response and TTS work are not
+starved by deliberative or optional background work, and must retain the current
+setting when p95 latency, hard-failure rate, or recovery worsens. These are
+measured scheduling requirements, not fixed realtime/deliberative/background
+model slots.
+
+Thresholds must come from a retained representative baseline and an explicitly
+reviewed policy. This document does not invent a universal first-response
+budget, and automated or simulator traces cannot support a target-audio claim.
+
 ## Evidence-based latency gate
 
 The gate compares two retained reports:

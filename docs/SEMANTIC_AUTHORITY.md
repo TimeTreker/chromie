@@ -32,6 +32,12 @@ authoritative ownership, any planning, composition, host-validation, or
 state-commit failure is fail-closed. The same turn cannot re-enter the legacy
 CapabilityAgent planner.
 
+Speech composition and user-task execution may be prepared or scheduled
+independently from immutable projections of that authoritative turn. Parallel
+output preparation does not create another semantic owner: a response composer
+cannot reinterpret Goals or authorize effects, and an execution specialist
+cannot become the conversation authority.
+
 ## Current compatibility boundary
 
 The service currently named Goal Interpreter has not yet been reduced to the narrow
@@ -54,6 +60,11 @@ complete.
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 | Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
 | Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
+
+The queued grounded-response latency Issue may add a direct speech-only branch
+after Goal Association. That branch is not implemented by this documentation
+change and does not change the semantic owner shown above: the same Core owns
+Goal meaning, response composition, and all effect boundaries.
 
 When Goal Association explicitly binds one Goal with `entity_type=action_list`,
 Fast and Deep Planning require a bounded model-authored semantic completeness

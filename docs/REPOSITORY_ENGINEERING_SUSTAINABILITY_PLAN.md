@@ -130,8 +130,9 @@ The following recommendations are not part of the current program:
 ## Delivery rules
 
 - Work one Issue at a time. Only one Issue from this program may be active.
-- Retain the current-revision live proof, then close the default target-evidence
-  profile before starting the queued structural Issues. If either exposes a
+- Retain the current-revision live-proof implementation, close the default
+  target-evidence profile, then close the queued grounded-response latency Issue
+  before starting the structural Issues. If an evidence workflow exposes a
   defect, fix the earliest responsible boundary and rerun the same evidence
   before continuing.
 - Use the semantic Issue names below; do not introduce numbered Step, Stage,
@@ -184,7 +185,8 @@ Issue must refresh its own baseline because counts may change.
 | Restore Canonical Local Gate Reproducibility | implemented and automatically verified | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
 | Retain a Current-Revision Live Voice Loop | implementation verified; physical target validation deferred | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on a microphone-equipped host. |
 | Close Current-Revision Target Evidence | **active** | canonical gate and live-voice verifier implementation, satisfied; physical voice is optional for this profile | Retain and review the complete default source-bound evidence profile before structural work. |
-| Classify Broad Runtime Exception Boundaries | queued | target-evidence closure | Ensure every broad handler has an explicit failure contract and regression boundary. |
+| Reduce Time to First Grounded Response | queued | target-evidence closure | Remove unnecessary planner/model waits and permit independently valid speech stages without weakening semantic, validation, confirmation, or evidence authority. |
+| Classify Broad Runtime Exception Boundaries | queued | grounded-response latency Issue | Ensure every broad handler has an explicit failure contract and regression boundary. |
 | Establish Typed Host Configuration Snapshots | queued | broad-exception classification | Stop `VoiceAssistant` from parsing its operating environment across a 615-line constructor. |
 | Extract Playback Delivery Lifecycle | queued | typed Host settings | Isolate ordered TTS generation, playback, echo, cancellation, and delivery evidence. |
 | Extract Input Turn and Session Lifecycle | queued | playback lifecycle | Isolate microphone/VAD/ASR/session ownership without moving deterministic reflexes or authority. |
@@ -215,12 +217,12 @@ is still the correct priority.
 ## Program status
 
 The first-intake implementation Issues and the canonical local-gate repair are
-closed with automatic verification. The active second-intake Issue retains
-current-revision live voice proof; closing the default source-bound
-target-evidence profile follows it before structural work. This program does not
-imply release readiness or physical support; Gateway/Core, Social Attention,
-provider, audio, simulator, LAN, and physical claims remain owned by their
-qualification documents.
+closed with automatic verification. The active Issue is the default
+source-bound target-evidence closure. The user-visible grounded-response latency
+Issue is queued immediately after that closure and before structural work. This
+program does not imply release readiness or physical support; Gateway/Core,
+Social Attention, provider, audio, simulator, LAN, and physical claims remain
+owned by their qualification documents.
 
 ## Issue: Restore Canonical Local Gate Reproducibility
 
@@ -401,9 +403,149 @@ Status: **active**; the default profile does not require physical voice evidence
 - every blocker fix is regression-tested and the closure restarts from the
   fixed revision.
 
-## Issue: Classify Broad Runtime Exception Boundaries
+## Issue: Reduce Time to First Grounded Response
 
 Status: queued; depends on **Close Current-Revision Target Evidence**
+
+### Problem
+
+Chromie can acknowledge slow work early, but meaningful conversational,
+proposal, and confirmation speech still often waits for a serial chain of
+complete model generations. A reviewed 2026-08-01 diagnostic compound turn
+reached Core-authored `fast_speech` at 3.58 seconds and audible playback at 7.19
+seconds, while the terminal cognitive response was not ready until 50.32
+seconds. Goal Association, Fast/Deep planning, model contract repairs/review,
+and Response Composition accounted for almost all of that delay; final Host
+preparation and TTS scheduling took milliseconds. Ordinary chat diagnostics
+also reached first audio only after roughly 35–40 seconds, with TTS synthesis
+accounting for about 1.6–2.5 seconds.
+
+Those logs predate the latest natural-confirmation wording correction and are
+diagnostic evidence only, not clean current-revision target validation. They
+nonetheless reproduce the architectural problem: the important delay is late
+semantic commitment after avoidable serial model work, not the deterministic
+validator itself. The validator correctly caught invalid structured output and
+must not be bypassed.
+
+Source review also found a related result-delivery defect: ordinary overlapping
+turns retain their work, but the current final-response staleness check compares
+an earlier outcome with global playback-generation and session identity. A
+newer ordinary turn can therefore make a valid earlier result response
+ineligible even though its Goal completed and its evidence remains. The current
+overlap scenario proves task completion but not eventual delivery of both
+results; the stale-final scenario models broad generation suppression rather
+than distinguishing explicit cancellation or supersession from ordinary
+overlap.
+
+### Scope
+
+- retain and score representative direct-conversation, bounded capability,
+  ambiguous, compound, and safety-relevant scenarios before implementation;
+- record admitted input, first complete valid speech commitment,
+  `tts_request_start`, first PCM, first audible playback, plan readiness,
+  execution start, terminal evidence, final playback, model queue/evaluation,
+  and contract-repair timing;
+- let a complete non-effectful `spoken_response` Goal proceed from Goal
+  Association to response composition without Fast or Deep Planner merely to
+  transport speech;
+- adapt the existing response-composition owner and typed contract to accept
+  that explicitly planless direct branch; do not synthesize a dummy Canonical
+  Plan or add a second response authority;
+- keep complete bounded capability work on Fast Planner and invoke Deep Planner
+  only for a recorded semantic escalation, unresolved ambiguity/coverage,
+  nontrivial dependency, material alternative, novelty or broader context,
+  safety/resource reasoning that requires wider planning, or a structured
+  semantic/plan validation rejection whose failure contract explicitly requires
+  broader reasoning; technical schema/model-contract failure receives bounded
+  same-tier repair, and any later Deep recovery remains explicitly classified,
+  retains the Fast failure, and fails closed unless it produces a valid plan;
+- treat confidence as one semantic observation, never as execution authority or
+  permission to bypass effect and safety validation;
+- schedule complete independently schema-valid `fast_speech` or `ResponseStage`
+  values without waiting for unrelated later fields only after Host validation
+  authorizes them against the applicable correlation, commitment/evidence
+  state, claim guards, and cancellation generation;
+- extend the existing response-stage and Host delivery owners so dedicated
+  safety/control evidence may pre-empt output, ordinary progress/results remain
+  ordered until an appropriate speech opening, and internal-only evidence
+  updates state without creating a speech stage; result arrival alone never
+  grants permission to interrupt;
+- separate cancellation of already-playing or obsolete queued audio from
+  eligibility of an independent Goal's later evidence-bound result, preserving
+  that result across newer ordinary turns unless explicit scoped cancellation,
+  supersession, or Core-authorized semantic interruption applies;
+- consume correlated capability and Soridormi progress/terminal evidence through
+  existing Goal, task-context, response, outcome, and trace contracts rather
+  than waiting for unrelated work or introducing a generic live event bus;
+- reduce repeated Agent Skill selection, oversized serial prompts, avoidable
+  model calls, and contract-repair loops from trace evidence rather than
+  weakening the checks that expose them;
+- evaluate bounded two-request model concurrency only after independent work
+  exists and compare it under shared LLM/TTS GPU load; measure queueing and
+  starvation while prioritizing user-observable response and TTS work over
+  deliberative or optional background work, without treating compute
+  pre-emption as Goal cancellation; retain the current setting when concurrency
+  worsens first-audio or reliability;
+- overlap only work whose independence and provider/resource compatibility are
+  established by existing contracts; physical TaskGraph nodes remain
+  sequential;
+- preserve one Core semantic authority, exact correlation, ordered speech,
+  confirmation, cancellation, source-effect bounds, speech-claim validation,
+  outcome reconciliation, and sequential physical TaskGraph execution.
+
+True incremental PCM playback remains owned by **Extract Playback Delivery
+Lifecycle** below. It is measured in the same end-to-end scenarios but is not a
+substitute for reducing cognition before a valid speech stage exists.
+
+### Non-goals
+
+- no raw model tokens, partial JSON, private reasoning, or incomplete sentences
+  sent to TTS;
+- no independent speech model that can reinterpret Goals, promise effects, or
+  claim outcomes;
+- no second response-composition owner or dummy Plan used only to satisfy the
+  current plan-bound response contract;
+- no greeting/action phrase table or confidence-only route switch;
+- no bypass of schema, completeness, capability, resource, confirmation,
+  safety, claim, or evidence validation;
+- no premature action, progress, result, or safe-state claim;
+- no fixed realtime/deliberative/background model-slot architecture, two- or
+  three-request default, or unmeasured GPU oversubscription;
+- no new generic Frame/event plane, orchestration-framework dependency, or MCP
+  Resource/Notification/Task surface in this Issue;
+- no speculative partial-ASR effect or speech and no assumption that semantic
+  end-of-turn or pre-emptive generation helps before retained traces prove it;
+- no physical TaskGraph parallelism or TTS provider replacement.
+
+### Exit criteria
+
+- retained scenarios distinguish direct, Fast, and Deep paths and record the
+  exact reason for every Deep invocation;
+- a grounded greeting/direct answer uses no Fast or Deep Planner and emits one
+  response, complete bounded work terminates at Fast when valid, and complex or
+  safety/resource reasoning that genuinely needs the wider planning boundary
+  escalates without semantic loss;
+- independently scheduled speech passes the existing commitment/evidence
+  validators and interruption/delivery contracts, with no duplicate act;
+- retained overlap cases prove that a slow first task completing during a newer
+  ordinary conversation delivers its evidence-bound result exactly once, while
+  explicit cancellation/supersession still suppresses invalid late speech;
+- retained result-arrival cases prove deterministic urgent-output pre-emption,
+  ordered ordinary delivery, and no speech for internal-only evidence without
+  suppressing a required user-facing obligation;
+- warm and cold p50/p95 reports show a reviewed improvement in first truthful
+  audible response for each affected request class without hiding hard failures
+  or weakening terminal-response correctness;
+- model-call and repair reductions are visible in retained traces, and any
+  concurrency or priority change is justified by shared-load evidence without
+  starvation or semantic cancellation;
+- focused General Ability, interaction, latency, and speech-truth tests plus the
+  maintained full gates pass; target claims remain limited to the retained
+  evidence class.
+
+## Issue: Classify Broad Runtime Exception Boundaries
+
+Status: queued; depends on **Reduce Time to First Grounded Response**
 
 ### Problem
 
@@ -500,6 +642,12 @@ ordering contract but no independent owner.
 
 - extract one playback-delivery collaborator with explicit queues, policy,
   session/evidence callbacks, and lifecycle methods;
+- distinguish provider transport streaming from audible incremental playback,
+  and begin ordered playback from provider PCM chunks when the declared
+  provider and Host cancellation/device contracts permit it;
+- separate invalidation of already-playing or obsolete queued audio from an
+  independent Goal's future result-delivery eligibility, retaining exact
+  turn/Goal/evidence correlation across output generations;
 - preserve ordered audible playback, bounded service-worker concurrency,
   generation cancellation, stale-output suppression, barge-in, echo handling,
   and playback start/end evidence;
@@ -518,6 +666,9 @@ ordering contract but no independent owner.
 ### Exit criteria
 
 - playback ownership, inputs, outputs, cancellation, and cleanup are explicit;
+- retained warm/cold p50/p95 evidence distinguishes `tts_request_start`, first
+  PCM, `first_audio_playback`, and stream completion without calling a transport
+  `start` event audible evidence;
 - black-box alignment, interruption, stale-output, and evidence tests run
   against the collaborator through the public Host path;
 - `VoiceAssistant` method and initialized-state counts decrease and cannot grow
