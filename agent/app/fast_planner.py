@@ -27,11 +27,14 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    parallel_plan_contract_errors,
+    planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
+    validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
 from .schema import AgentRunRequest
@@ -141,7 +144,9 @@ class FastPlannerResolver:
                 "input_schema": item.input_schema,
                 "requires_confirmation": item.requires_confirmation,
                 "can_run_parallel": item.can_run_parallel,
+                "parallel_metadata_declared": item.parallel_metadata_declared,
                 "exclusive_group": item.exclusive_group,
+                "resource_claims": list(item.resource_claims),
                 "effects": list(item.effects),
                 "safety_class": item.safety_class,
                 "hints": dict(item.hints),
@@ -150,6 +155,8 @@ class FastPlannerResolver:
         ]
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
+        authoritative_goals = canonical_goal_grounding(context)
+        response_goal_ids = sorted(planner_response_goal_ids(authoritative_goals))
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (
             "FastPlannerMultiGoalPlanOutput"
@@ -164,6 +171,7 @@ class FastPlannerResolver:
                 ],
                 response_only=response_only,
                 requires_execution=requires_execution,
+                response_goal_ids=response_goal_ids,
             )
             if multi_goal_contract
             else canonical_plan_response_schema(
@@ -174,6 +182,7 @@ class FastPlannerResolver:
                 ],
                 response_only=response_only,
                 requires_execution=requires_execution,
+                response_goal_ids=response_goal_ids,
             )
         )
         options = {
@@ -576,7 +585,7 @@ class FastPlannerResolver:
             )
         )
         semantic_scope_contract = (
-            "Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+            "Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "
@@ -693,6 +702,10 @@ class FastPlannerResolver:
             planner_tier="fast",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
         )
+        validate_goal_responsibility_outcomes(
+            model_output,
+            authoritative_goals=canonical_goal_grounding(request.context),
+        )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)
         out.pop("user_confirmation_required", None)
@@ -731,6 +744,10 @@ class FastPlannerResolver:
             raw,
             planner_tier="fast",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        validate_goal_responsibility_outcomes(
+            model_output,
+            authoritative_goals=canonical_goal_grounding(request.context),
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)
@@ -880,6 +897,22 @@ class FastPlannerResolver:
                     unresolved=[step.capability_id],
                     metadata={**counts},
                 )
+        parallel_errors = parallel_plan_contract_errors(
+            plan,
+            capability_payload,
+        )
+        if parallel_errors:
+            return self._escalation(
+                plan.plan_id,
+                request,
+                "parallel_execution_contract_unavailable",
+                unresolved=[str(item["type"]) for item in parallel_errors],
+                metadata={
+                    "parallel_contract_errors": parallel_errors,
+                    "execution_allowed": False,
+                    **counts,
+                },
+            )
         metadata = dict(plan.metadata)
         metadata.update(
             {

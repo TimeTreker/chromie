@@ -600,7 +600,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0},
-                    "timing": "parallel",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                     "reason_summary": "Walk for the requested duration.",
                 }
@@ -657,6 +657,58 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.unresolved, ["blinking", "singing"])
         self.assertFalse(plan.metadata["execution_allowed"])
         self.assertIn("spoken performance", ollama.prompts[1][0])
+
+    def test_parallel_plan_without_declared_provider_support_escalates(self):
+        goal_ids = ["goal-walk", "goal-blink"]
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk while blinking.",
+            steps=[
+                {
+                    **execute_step(
+                        "walk",
+                        "soridormi.walk_forward",
+                        {"duration_s": 15.0},
+                        ["goal-walk"],
+                        "Walk for 15 seconds.",
+                    ),
+                    "timing": "parallel",
+                },
+                {
+                    **execute_step(
+                        "blink",
+                        "soridormi.blink_eyes",
+                        {"count": 2},
+                        ["goal-blink"],
+                        "Blink twice.",
+                    ),
+                    "timing": "parallel",
+                },
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome("goal-walk", ["walk"], "Walk."),
+                "goal-blink": execute_outcome("goal-blink", ["blink"], "Blink."),
+            },
+            goal_satisfaction=exact_satisfaction(goal_ids),
+        )
+
+        plan = asyncio.run(
+            FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(
+                request(
+                    "Walk for 15 seconds while blinking.",
+                    goal_ids=goal_ids,
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.escalation_reason,
+            "parallel_execution_contract_unavailable",
+        )
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertEqual(len(plan.metadata["parallel_contract_errors"]), 2)
 
     def test_multi_goal_fast_schema_requires_complete_model_authored_plan(self):
         raw = multi_goal_plan(

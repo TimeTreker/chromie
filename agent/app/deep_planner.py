@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -33,10 +34,13 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    parallel_plan_contract_errors,
+    planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
+    validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
 
@@ -60,7 +64,7 @@ class DeepPlannerResolver:
 
     def __init__(self, ollama: OllamaClient, catalog: CapabilityCatalog, *, min_confidence: float = 0.65,
                  num_ctx: int = 8192, num_predict: int = 1024, max_capabilities: int = 96,
-                 max_replans: int = 1, min_goal_satisfaction: float = 0.75) -> None:
+                 max_replans: int = 2, min_goal_satisfaction: float = 0.75) -> None:
         self.ollama = ollama
         self.catalog = catalog
         self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
@@ -126,11 +130,13 @@ class DeepPlannerResolver:
         expected_goal_ids_for_turn = expected_goal_ids(
             request.context if isinstance(request.context, dict) else {}
         )
+        authoritative_goals = canonical_goal_grounding(request.context)
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
             allowed_skill_ids=[item["capability_id"] for item in payload],
             response_only=response_only,
             requires_execution=requires_execution,
+            response_goal_ids=sorted(planner_response_goal_ids(authoritative_goals)),
         )
         generation_options = {
             "temperature": 0,
@@ -138,7 +144,10 @@ class DeepPlannerResolver:
             "num_ctx": self.num_ctx,
             "num_predict": self.num_predict,
         }
-        feedback: list[dict[str, Any]] = []
+        persistent_safety_feedback = self._initial_safety_feedback(
+            request.context if isinstance(request.context, dict) else {}
+        )
+        feedback: list[dict[str, Any]] = list(persistent_safety_feedback)
         previous_raw: Any = None
         initial_raw_output: Any = None
         contract_repair_attempted = False
@@ -146,12 +155,17 @@ class DeepPlannerResolver:
         for attempt in range(self.max_replans + 1):
             raw: Any = None
             try:
+                active_response_schema = (
+                    self._safety_revision_response_schema(response_schema)
+                    if self._requires_safety_revision(feedback)
+                    else response_schema
+                )
                 raw = await self.ollama.generate(
                     self._prompt(
                         request,
                         payload,
                         feedback=feedback,
-                        response_schema=response_schema,
+                        response_schema=active_response_schema,
                         previous_raw=previous_raw,
                         expected_goal_ids=expected_goal_ids_for_turn,
                     ),
@@ -161,7 +175,7 @@ class DeepPlannerResolver:
                         else self._system_prompt()
                     ),
                     options=generation_options,
-                    response_format=response_schema,
+                    response_format=active_response_schema,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
@@ -214,13 +228,14 @@ class DeepPlannerResolver:
                         initial_validation_errors,
                         self._bounded(initial_raw_output, 5000),
                     )
-                    feedback = [
-                        {
+                    feedback = self._merge_feedback(
+                        persistent_safety_feedback,
+                        [{
                             "type": "canonical_plan_contract_validation_failure",
                             "error_type": type(exc).__name__,
                             "validation_errors": initial_validation_errors,
-                        }
-                    ]
+                        }],
+                    )
                     continue
                 integrity_metadata = cognitive_integrity_metadata(stage="deep_planner", exc=exc, request=request)
                 return self._clarify(
@@ -252,6 +267,10 @@ class DeepPlannerResolver:
                 expected_goal_ids=expected_goal_ids_for_turn,
                 request=request,
             )
+            errors = [
+                *self._safety_revision_contract_errors(plan, feedback),
+                *errors,
+            ]
             if not errors:
                 coverage_review_metadata: dict[str, Any] = {}
                 coordinated_goal_ids = coordinated_action_goal_ids(
@@ -316,7 +335,10 @@ class DeepPlannerResolver:
                             coverage_review.reason,
                         )
                         if attempt < self.max_replans:
-                            feedback = [review_error]
+                            feedback = self._merge_feedback(
+                                persistent_safety_feedback,
+                                [review_error],
+                            )
                             previous_raw = raw
                             continue
                         return self._clarify(
@@ -361,7 +383,10 @@ class DeepPlannerResolver:
                     )
                 return plan.model_copy(update={"metadata": metadata})
             if attempt < self.max_replans:
-                feedback = errors
+                feedback = self._merge_feedback(
+                    persistent_safety_feedback,
+                    errors,
+                )
                 previous_raw = raw
                 continue
             return self._clarify(
@@ -463,6 +488,7 @@ class DeepPlannerResolver:
         allowed_skill_ids: list[str] | None = None,
         response_only: bool = False,
         requires_execution: bool = False,
+        response_goal_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
@@ -470,7 +496,178 @@ class DeepPlannerResolver:
             allowed_skill_ids=list(allowed_skill_ids or []),
             response_only=response_only,
             requires_execution=requires_execution,
+            response_goal_ids=response_goal_ids,
         )
+
+    @staticmethod
+    def _requires_safety_revision(feedback: list[dict[str, Any]]) -> bool:
+        safety_types = {
+            "parallel_capability_not_declared_safe",
+            "parallel_exclusive_group_conflict",
+            "parallel_resource_claim_conflict",
+            "coordinated_action_coverage_incomplete",
+            "safety_revision_contract_not_satisfied",
+        }
+        return any(
+            isinstance(item, dict) and item.get("type") in safety_types
+            for item in feedback
+        )
+
+    @classmethod
+    def _initial_safety_feedback(
+        cls,
+        context: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Carry upstream deterministic safety findings into Deep attempt one."""
+
+        candidates: list[dict[str, Any]] = []
+        fast_plan = context.get("fast_plan_resolution") or context.get(
+            "fast_planner_resolution"
+        )
+        if isinstance(fast_plan, dict):
+            metadata = fast_plan.get("metadata")
+            if isinstance(metadata, dict):
+                parallel_errors = metadata.get("parallel_contract_errors")
+                # A lone step labeled parallel has no overlap relation to
+                # revise.  Carry this finding only when Fast actually proposed
+                # a multi-step concurrency plan; otherwise Deep may safely
+                # regenerate the single step as sequential.
+                if (
+                    isinstance(parallel_errors, list)
+                    and int(metadata.get("executable_step_count") or 0) > 1
+                ):
+                    candidates.extend(
+                        item for item in parallel_errors if isinstance(item, dict)
+                    )
+        runtime_feedback = context.get("runtime_validator_feedback")
+        if isinstance(runtime_feedback, list):
+            candidates.extend(
+                item for item in runtime_feedback if isinstance(item, dict)
+            )
+        return [
+            dict(item)
+            for item in cls._merge_feedback(candidates)
+            if cls._requires_safety_revision([item])
+        ]
+
+    @staticmethod
+    def _merge_feedback(
+        *groups: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        merged: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for group in groups:
+            for item in group:
+                if not isinstance(item, dict):
+                    continue
+                key = json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(item)
+        return merged
+
+    @staticmethod
+    def _safety_revision_response_schema(
+        base_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Forbid exact execution after deterministic concurrency rejection."""
+
+        schema = copy.deepcopy(base_schema)
+        schema.setdefault("allOf", []).append(
+            {
+                "anyOf": [
+                    {
+                        "properties": {
+                            "disposition": {
+                                "type": "string",
+                                "enum": ["execute", "mixed"],
+                            },
+                            "plan_relation": {
+                                "type": "string",
+                                "enum": ["safe_adjustment", "alternative"],
+                            },
+                            "user_confirmation_required": {
+                                "type": "boolean",
+                                "enum": [True],
+                            },
+                            "response_text": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                        }
+                    },
+                    {
+                        "properties": {
+                            "disposition": {
+                                "type": "string",
+                                "enum": ["clarify", "unavailable", "refused"],
+                            },
+                            "steps": {
+                                "type": "array",
+                                "maxItems": 0,
+                            },
+                            "plan_relation": {
+                                "type": "string",
+                                "enum": ["exact"],
+                            },
+                            "user_confirmation_required": {
+                                "type": "boolean",
+                                "enum": [False],
+                            },
+                        }
+                    },
+                ]
+            }
+        )
+        return schema
+
+    @classmethod
+    def _safety_revision_contract_errors(
+        cls,
+        plan: CanonicalPlan,
+        feedback: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Enforce the decoder's safety-revision grammar at runtime too."""
+
+        if not cls._requires_safety_revision(feedback):
+            return []
+        if plan.disposition in {"clarify", "unavailable", "refused"}:
+            return [] if not plan.steps else [
+                {
+                    "type": "safety_revision_contract_not_satisfied",
+                    "reason": "non-executable safety revision retained plan steps",
+                }
+            ]
+        relation = str(plan.metadata.get("plan_relation") or "exact")
+        confirmation = plan.metadata.get("user_confirmation_required") is True
+        if (
+            plan.disposition in {"execute", "mixed"}
+            and relation in {"safe_adjustment", "alternative"}
+            and confirmation
+            and bool(plan.response_text.strip())
+        ):
+            return []
+        return [
+            {
+                "type": "safety_revision_contract_not_satisfied",
+                "disposition": plan.disposition,
+                "plan_relation": relation,
+                "user_confirmation_required": confirmation,
+                "response_text_present": bool(plan.response_text.strip()),
+                "reason": (
+                    "after concurrency safety rejection, execution requires an "
+                    "explicit safe_adjustment or alternative, explanatory "
+                    "response_text, and user confirmation"
+                ),
+            }
+        ]
 
     @staticmethod
     def _validate_parallel_timing_preservation(
@@ -593,16 +790,17 @@ class DeepPlannerResolver:
             f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
+            "When validation feedback says parallel execution is not affirmatively safe, never silently change parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
             f"{route_effect_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together and every selected capability declares can_run_parallel=true, assign timing=parallel to those steps. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
+            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material step argument, including location, date, target, person, and entity identity, must equal the matching binding; do not replace a binding with a value from older memory or re-resolve the original reference. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "User-facing speech is owned by Response Composer and is never an executable plan step. A conversational answer, joke, explanation, or greeting uses a respond outcome with non-empty response_text and zero step_ids. Combine that outcome with physical execution as disposition=mixed; do not create a speech transport step. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "User-facing speech is owned by Response Composer and is never an executable plan step. A conversational answer, joke, explanation, greeting, or spoken performance uses a respond outcome with non-empty response_text and zero step_ids. When a Goal has responsibility_kind=spoken_response, response_text is the completion surface itself: include the requested authored content now, such as the actual answer, joke, or song verse, rather than willingness, a promise to perform later, a title alone, or a stage direction. Combine that outcome with physical execution as disposition=mixed; do not create a speech transport step. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
@@ -645,6 +843,10 @@ class DeepPlannerResolver:
             raw,
             planner_tier="deep",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        validate_goal_responsibility_outcomes(
+            model_output,
+            authoritative_goals=canonical_goal_grounding(request.context),
         )
         validate_goal_binding_argument_grounding(
             model_output,
@@ -736,15 +938,15 @@ class DeepPlannerResolver:
             for outcome in plan.goal_outcomes:
                 if outcome.disposition not in {"execute", "respond"}:
                     continue
-                if outcome.satisfaction is None:
-                    errors.append(
-                        {
-                            "type": "missing_goal_outcome_satisfaction",
-                            "goal_id": outcome.goal_id,
-                            "disposition": outcome.disposition,
-                        }
-                    )
-                elif outcome.satisfaction.score < self.min_goal_satisfaction:
+                # The complete aggregate satisfaction object and exact keyed
+                # outcome map already express prospective adequacy. Per-outcome
+                # satisfaction is useful when the model supplies it, but is not
+                # a second mandatory copy of the same judgment. Treat a supplied
+                # low score as authoritative without failing solely on omission.
+                if (
+                    outcome.satisfaction is not None
+                    and outcome.satisfaction.score < self.min_goal_satisfaction
+                ):
                     errors.append(
                         {
                             "type": "goal_outcome_satisfaction_below_threshold",
@@ -772,6 +974,7 @@ class DeepPlannerResolver:
             if schema_errors:
                 errors.append({"type": "invalid_args", "step_id": step.step_id, "capability_id": step.capability_id,
                                "errors": schema_errors[:8]})
+        errors.extend(parallel_plan_contract_errors(plan, capabilities))
         return errors
 
     def _clarify(self, plan_id: str, request: AgentRunRequest, reason: str, *, unresolved: list[str] | None = None,

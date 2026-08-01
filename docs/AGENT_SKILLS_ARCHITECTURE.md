@@ -22,6 +22,12 @@ metadata informs model-authored composition; the Host does not automatically
 select a parent or domain Skill. Neither package registers or executes a
 Capability.
 
+Both packages also declare `applicable_routes`. The selection service filters
+bounded summaries by the current structured route before the model chooses
+zero or more methods. This is package-owned applicability disclosure, not Host
+semantic selection: empty metadata remains unrestricted for compatibility,
+while an out-of-scope Skill is never disclosed as a candidate.
+
 ## Purpose
 
 Chromie needs reusable task knowledge without creating a second planner, a
@@ -398,6 +404,10 @@ required_capabilities:
   - chromie.weather.lookup
 optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
+applicable_routes:
+  - tool
+  - chat
+  - tool_result
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md

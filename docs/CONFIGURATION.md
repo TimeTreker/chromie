@@ -306,7 +306,7 @@ relationship synonym, phrase mapping, or word-form normalization fallback.
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
-| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `1`; maximum validator-feedback revisions within the Deep Planner. |
+| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `2`; maximum validator-feedback revisions within the Deep Planner, allowing one safety correction and one subsequent semantic-coverage/contract correction. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
 | `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |

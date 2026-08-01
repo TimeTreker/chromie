@@ -169,7 +169,13 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertNotIn("auto-confirm" + "-sim", source)
 
     def test_configure_environment_uses_isolated_conversation_id(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=True):
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "orchestrator.orchestrator.load_runtime_environment"
+            ) as load_runtime_environment,
+        ):
             args = argparse.Namespace(
                 agent_url="http://127.0.0.1:8092",
                 grant_confirmation=True,
@@ -183,9 +189,39 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
             _configure_environment(args, Path(temp_dir))
 
+            load_runtime_environment.assert_called_once_with()
             self.assertEqual(os.environ["ORCH_CONVERSATION_ID"], "ga-live-case-one")
             self.assertEqual(os.environ["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
             self.assertEqual(os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"], "1")
+
+    def test_configure_environment_retains_loaded_qualification_budgets(self) -> None:
+        def load_profile() -> None:
+            os.environ.setdefault("ORCH_GOAL_ASSOCIATION_TIMEOUT_MS", "150000")
+            os.environ.setdefault("ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS", "600000")
+
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "orchestrator.orchestrator.load_runtime_environment",
+                side_effect=load_profile,
+            ),
+        ):
+            args = argparse.Namespace(
+                agent_url="http://127.0.0.1:8092",
+                grant_confirmation=True,
+                speaker=False,
+                manifest=Path("capabilities/soridormi.json"),
+                cognitive_runtime=True,
+                cognitive_apply_lanes="chat,robot_action",
+                soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+                conversation_id="ga-live-budget-check",
+            )
+
+            _configure_environment(args, Path(temp_dir))
+
+            self.assertEqual(os.environ["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
+            self.assertEqual(os.environ["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "600000")
 
     def test_parse_expected_arg_accepts_json_scalars(self) -> None:
         self.assertEqual(parse_expected_arg("0:vx_mps=0.2"), (0, "vx_mps", 0.2))

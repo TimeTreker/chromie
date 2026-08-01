@@ -89,7 +89,9 @@ def collect_observations(
     for planned_sequence, skill in enumerate(response.get("skills") or []):
         if not isinstance(skill, dict):
             continue
-        skill_id = str(skill.get("skill_id") or "")
+        skill_id = str(
+            skill.get("capability_id") or skill.get("skill_id") or ""
+        )
         if not skill_id.startswith("soridormi."):
             continue
         definition = behavior_map.get(skill_id, {})

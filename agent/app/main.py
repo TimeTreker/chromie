@@ -532,7 +532,7 @@ class Settings(BaseModel):
     )
     deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
     deep_planner_max_replans: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "1")), ge=0, le=2
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "2")), ge=0, le=2
     )
     response_composer_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()

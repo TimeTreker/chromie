@@ -254,6 +254,15 @@ class AgentSkillSelectionService:
             for item in self.registry.list_summaries()
         }
         requested_ids = request.candidate_agent_skill_ids
+        current_route = self._current_route(request)
+
+        def route_applies(summary: AgentSkillSummary) -> bool:
+            return bool(
+                not current_route
+                or not summary.applicable_routes
+                or current_route in summary.applicable_routes
+            )
+
         if requested_ids:
             ordered: list[AgentSkillSummary] = []
             for agent_skill_id in requested_ids:
@@ -268,18 +277,34 @@ class AgentSkillSelectionService:
                         f"Agent Skill {agent_skill_id!r} does not expose projection "
                         f"{request.agent_role!r}"
                     )
+                if not route_applies(summary):
+                    raise ValueError(
+                        f"Agent Skill {agent_skill_id!r} is not applicable to "
+                        f"route {current_route!r}"
+                    )
                 ordered.append(summary)
         else:
             ordered = [
                 summary
                 for summary in summaries.values()
                 if request.agent_role in summary.available_projections
+                and route_applies(summary)
             ]
             ordered.sort(key=lambda item: item.agent_skill_id)
 
         candidate_total = len(ordered)
         bounded = tuple(ordered[: self.max_candidates])
         return bounded, candidate_total, candidate_total > len(bounded)
+
+    @staticmethod
+    def _current_route(request: AgentSkillSelectionRequest) -> str:
+        for item in request.context_summary:
+            key, separator, value = item.partition("=")
+            if separator and key.strip().casefold() == "route":
+                return "_".join(
+                    value.strip().casefold().replace("-", "_").split()
+                )
+        return ""
 
     def _validate_output(
         self,
@@ -425,7 +450,17 @@ class AgentSkillSelectionService:
             "correct. The extends field is dependency metadata, not automatic "
             "selection: when both a reusable base method and its domain "
             "specialization are useful, select both explicitly and order the base "
-            "method before the specialization. Whenever supplied Goals exist, "
+            "method before the specialization. Judge applicability from the current "
+            "Goal meanings, not from an older Goal, generic context, or a shared "
+            "field such as a number, duration, date, or location. External-information "
+            "methods apply only when the current Goal asks to obtain or interpret "
+            "facts from an outside information source. They do not validate physical "
+            "execution, action duration, gestures, singing, conversation, or plan "
+            "correctness. A physical-action parameter is not external information "
+            "merely because it contains a time or quantity. Never select a Skill in "
+            "order to explain that it is "
+            "irrelevant or not applicable; use no_skill when no supplied method is "
+            "actually useful. Whenever supplied Goals exist, "
             "every selected item must include relevant_goal_ids copied exactly from "
             "those Goal IDs; planner roles must never omit them. Return only the "
             "required JSON object."

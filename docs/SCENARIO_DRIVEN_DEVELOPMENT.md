@@ -1,6 +1,6 @@
 # Scenario-Driven Development
 
-Status: Proposed development policy
+Status: Required development policy
 Applies to: interaction, planning, memory, tools, embodiment, audio, and safety
 
 ## 1. Purpose
@@ -288,3 +288,18 @@ A behavioral change is not complete until:
 - documentation and status claims are updated;
 - the target evidence level is stated;
 - clean patch application or revision reproduction is verified.
+
+For a user-reported defect, the responsible coding agent must also run and
+inspect the originating scenario rather than delegating log collection back to
+the user. The retained report must include deterministic hard-gate results, an
+acceptance-only diagnostic score, the earliest suspect boundary, and the exact
+evidence ceiling. Scoring is diagnostic: Goal omission, stale provenance,
+unsafe or unwanted execution, service failure, critical LLM-integrity failure,
+or failure to return safe idle always fails the scenario regardless of the
+average score.
+
+The maintained general-ability live runner supports ordered `turns` in one
+bounded conversation. This is the required form for failures caused by stale
+Goals, earlier tools, clarification state, confirmation state, or dialogue
+continuity. Use `--only-case` to rerun the originating episode while debugging;
+then run its complete ability class before the canonical repository gate.

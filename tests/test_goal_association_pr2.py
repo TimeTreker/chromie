@@ -89,6 +89,147 @@ def active_goal(goal_id: str, description: str):
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+    def test_capability_result_delivery_is_not_a_duplicate_spoken_goal(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Look up today's weather.",
+                            "responsibility_kind": "capability_dependent",
+                            "bindings": [
+                                {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "Neixiang County",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        },
+                        {
+                            "description": "Say the weather naturally.",
+                            "responsibility_kind": "spoken_response",
+                            "bindings": [
+                                {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "Neixiang County",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        },
+                    ],
+                    "confidence": 1.0,
+                },
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Look up and answer with today's weather.",
+                            "responsibility_kind": "capability_dependent",
+                            "bindings": [
+                                {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "Neixiang County",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        }
+                    ],
+                    "confidence": 1.0,
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("How is today's weather in Neixiang County?", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "capability_dependent",
+        )
+        self.assertIn("separate spoken delivery Goal", ollama.prompts[1][0])
+
+    def test_action_collection_review_repairs_merged_and_duplicated_goals(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Walk while blinking and singing.",
+                            "bindings": [
+                                {
+                                    "name": "actions",
+                                    "entity_type": "physical_action_set",
+                                    "value": "walking, blinking, singing",
+                                    "confidence": 1.0,
+                                }
+                            ],
+                        },
+                        {"description": "Sing a song.", "bindings": []},
+                    ],
+                    "confidence": 1.0,
+                },
+                {
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Walk forward for 15 seconds.",
+                            "responsibility_kind": "executable_action",
+                            "bindings": [],
+                        },
+                        {
+                            "description": "Blink eyes.",
+                            "responsibility_kind": "executable_action",
+                            "bindings": [],
+                        },
+                        {
+                            "description": "Sing a song.",
+                            "responsibility_kind": "spoken_response",
+                            "bindings": [],
+                        },
+                    ],
+                    "confidence": 1.0,
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Walk for 15 seconds while blinking and singing.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            [
+                "Walk forward for 15 seconds.",
+                "Blink eyes.",
+                "Sing a song.",
+            ],
+        )
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn("physical_action_set", ollama.prompts[1][0])
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["executable_action", "executable_action", "spoken_response"],
+        )
+        goal_schema = ollama.prompts[0][1]["response_format"]["$defs"][
+            "GoalAssociationModelGoal"
+        ]
+        self.assertIn("responsibility_kind", goal_schema["required"])
+
     def test_associates_followup_before_creating_new_goal(self):
         ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal."}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
@@ -183,7 +324,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description and bindings only",
+            "Each new_goals item contains description, responsibility_kind, and bindings only",
             ollama.prompts[1][0],
         )
 
@@ -646,7 +787,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "bindings"},
+            {"description", "responsibility_kind", "bindings"},
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(

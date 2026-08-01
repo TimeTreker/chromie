@@ -512,6 +512,16 @@ def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> An
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
+    # Imported Orchestrator use intentionally does not load generated runtime
+    # configuration by itself. This live qualification runner is an explicit
+    # bootstrap, so load the owned profile before applying its diagnostic-only
+    # I/O, conversation, and evidence overrides. Without this call the runner
+    # silently falls back to short production defaults (for example the 3.5s
+    # Goal Association wait) even when .env.runtime contains the reviewed
+    # architecture-validation budgets.
+    from orchestrator.orchestrator import load_runtime_environment  # noqa: PLC0415
+
+    load_runtime_environment()
     os.environ["AGENT_URL"] = args.agent_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
@@ -644,19 +654,26 @@ def record_execution_bindings(
     )
 
 
-async def run_check(args: argparse.Namespace) -> dict[str, Any]:
+async def run_check(
+    args: argparse.Namespace,
+    *,
+    assistant: Any | None = None,
+    configure_environment: bool = True,
+) -> dict[str, Any]:
     evidence_dir = Path(args.evidence_dir or DEFAULT_EVIDENCE_ROOT / acceptance_id())
     evidence_dir = evidence_dir.expanduser().resolve()
     evidence_dir.mkdir(parents=True, exist_ok=True)
-    _configure_environment(args, evidence_dir)
+    if configure_environment:
+        _configure_environment(args, evidence_dir)
     raw_soridormi_repo = str(getattr(args, "soridormi_repo", "") or "").strip()
 
-    # Import after environment defaults are set; the Orchestrator module loads
-    # .env.runtime on import but does not override already-exported values.
+    # Import after the explicit environment bootstrap and harness overrides.
     from orchestrator.orchestrator import VoiceAssistant  # noqa: PLC0415
     from orchestrator.schemas.route import RouteDecision  # noqa: PLC0415
 
-    assistant = VoiceAssistant()
+    owns_assistant = assistant is None
+    if assistant is None:
+        assistant = VoiceAssistant()
     errors: list[str] = []
     timings_ms: dict[str, float] = {}
     total_start = time.perf_counter()
@@ -883,6 +900,24 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         confirmation_request_ids = (
             await assistant.interaction_runtime.confirmation_request_ids(response)
         )
+        assistant.conversation_state.record_user_turn(
+            sid,
+            args.text,
+            route=route.route,
+            intent=route.intent,
+            metadata={
+                "source": "interaction_text_mujoco_check",
+                "semantic_task_resolution_authoritative": bool(
+                    cognitive_runtime_selected
+                ),
+                "turn_envelope": turn_envelope.model_dump(
+                    mode="json",
+                    exclude_none=True,
+                ),
+            },
+        )
+        if args.preview_only or errors:
+            assistant.conversation_state.record_agent_result(sid, response)
         if confirmation_request_ids and not args.grant_confirmation:
             errors.append(
                 "The provider/Host contract requires confirmation, but this text "
@@ -1076,7 +1111,47 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         _write_json(evidence_dir / "summary.json", summary)
         return summary
     finally:
+        if owns_assistant:
+            await assistant.cleanup()
+
+
+async def run_check_sequence(
+    turn_args: list[argparse.Namespace],
+    *,
+    evidence_dir: Path,
+) -> list[dict[str, Any]]:
+    """Run multiple retained turns through one live conversation state.
+
+    The first turn configures and owns the shared Host runtime. Each later turn
+    gets a fresh SID and artifact directory while reusing the same bounded
+    conversation, Goal snapshots, tool evidence, and deployed service clients.
+    A basic runner failure stops the episode so later turns cannot disguise the
+    earliest failed boundary.
+    """
+
+    if not turn_args:
+        raise ValueError("live text sequence requires at least one turn")
+    root = evidence_dir.expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    _configure_environment(turn_args[0], root)
+
+    from orchestrator.orchestrator import VoiceAssistant  # noqa: PLC0415
+
+    assistant = VoiceAssistant()
+    summaries: list[dict[str, Any]] = []
+    try:
+        for args in turn_args:
+            summary = await run_check(
+                args,
+                assistant=assistant,
+                configure_environment=False,
+            )
+            summaries.append(summary)
+            if not summary.get("ok"):
+                break
+    finally:
         await assistant.cleanup()
+    return summaries
 
 
 def build_parser() -> argparse.ArgumentParser:

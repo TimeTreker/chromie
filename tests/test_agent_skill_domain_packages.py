@@ -90,6 +90,33 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             candidate_agent_skill_ids=list(candidate_ids),
         )
 
+    def test_external_information_skills_are_not_candidates_for_robot_action(self):
+        model = ScriptedModel([])
+        service = AgentSkillSelectionService(model, self.registry)
+
+        selection = asyncio.run(
+            service.select(
+                AgentSkillSelectionRequest(
+                    sid="sid-physical",
+                    turn_id="turn-physical",
+                    agent_role="deep_planner",
+                    text="Walk while blinking.",
+                    language="en-US",
+                    goals=[
+                        {
+                            "goal_id": "goal-walk",
+                            "description": "Walk forward.",
+                        }
+                    ],
+                    context_summary=["route=robot_action"],
+                )
+            )
+        )
+
+        self.assertEqual(selection.status, "no_candidates")
+        self.assertEqual(selection.selected_agent_skills, ())
+        self.assertEqual(model.calls, [])
+
     def _both_skill_output(self, role: str) -> dict:
         return {
             "decision": "select_skills",

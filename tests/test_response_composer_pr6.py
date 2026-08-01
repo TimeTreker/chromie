@@ -344,7 +344,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.status, "resolved")
         self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("does not cover all plan goals", ollama.prompts[1][0])
+        self.assertIn(
+            "execute pre-execution response must not include a final stage",
+            ollama.prompts[1][0],
+        )
 
     def test_clarification_decoder_schema_matches_runtime_coordination_contract(self):
         canonical = CanonicalPlan(
@@ -431,6 +434,135 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     },
                 },
             ],
+        )
+
+    def test_confirmation_bound_mixed_schema_requires_pending_approval_stage(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-adjustment",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.93,
+            goal_ids=["goal-walk", "goal-song"],
+            response_text="动作需要改为先走再唱，请用户确认。",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-song",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "我可以唱歌。",
+                },
+            ],
+            metadata={
+                "plan_relation": "safe_adjustment",
+                "user_confirmation_required": True,
+            },
+        )
+
+        schema = ResponseComposerResolver._response_schema(canonical)
+        response_plan = schema["$defs"]["ResponsePlan"]
+        stage = schema["$defs"]["ResponseStage"]
+
+        self.assertEqual(response_plan["properties"]["final"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["progress"]["maxItems"], 0)
+        self.assertIn("anyOf", response_plan)
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["waiting_for_user"],
+        )
+        self.assertEqual(
+            stage["properties"]["speech_act"]["enum"],
+            ["ask_confirmation"],
+        )
+        self.assertTrue(stage["properties"]["must_not_claim_completion"]["const"])
+
+    def test_confirmation_bound_mixed_completion_claim_repairs_before_language_check(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-adjustment-repair",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.93,
+            goal_ids=["goal-walk", "goal-song"],
+            response_text="不能安全并行，建议先走再唱并等待确认。",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-song",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "唱一段歌。",
+                },
+            ],
+            metadata={
+                "plan_relation": "safe_adjustment",
+                "user_confirmation_required": True,
+            },
+        )
+        invalid = {
+            "response_plan": {
+                "final": {
+                    "text": "(Chromie starts walking.) 已经开始了。",
+                    "speech_act": "inform",
+                    "commitment_state": "completed",
+                    "must_not_claim_completion": False,
+                    "covers_goal_ids": ["goal-walk", "goal-song"],
+                }
+            }
+        }
+        repaired = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "我不能确认边走边眨眼是安全的，可以改为依次完成再给你唱一段吗？",
+                    "speech_act": "ask_confirmation",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-walk", "goal-song"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(request(canonical))
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "mixed pre-execution response must not include a final stage",
+            ollama.prompts[1][0],
+        )
+        self.assertEqual(
+            result.composition.response_plan.pre_action.commitment_state,  # type: ignore[union-attr]
+            "waiting_for_user",
         )
 
     def test_response_composer_prompt_preserves_user_language(self):

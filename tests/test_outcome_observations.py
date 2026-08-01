@@ -16,7 +16,7 @@ class OutcomeObservationTests(unittest.TestCase):
                 "skills": [
                     {
                         "request_id": "req-blink",
-                        "skill_id": "soridormi.blink_eyes",
+                        "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2, "open_duration_s": 0.18},
                         "metadata": {
                             "source_goal_ids": ["goal-blink"],

@@ -45,7 +45,7 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 The canonical local gate is restored. On 2026-08-01,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,698 primary tests, and 20 legacy Agent tests.
+1,720 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -54,7 +54,7 @@ identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
 installation or model warm-up. The latest 2026-08-01 canonical run passes
-1,698 primary tests plus 20 legacy Agent tests.
+1,720 primary tests plus 20 legacy Agent tests.
 
 The managed `Chromie` environment is Python 3.11.15. A microphone is visible, but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
 short VAD segments and ASR finals `I.`/`.` rather than the required Moon request.
@@ -114,11 +114,11 @@ profile. Select `supervised_physical_pilot` only when supervised physical voice
 and robot evidence will also be attached. Human review remains explicit and
 fingerprint-bound.
 
-Root `20260731T121727Z` remains diagnostic: its ambient and weather failures were corrected at their earliest semantic boundaries, and the relevant Level A classes pass 18/18.
-Rebuilt-Agent dirty-source headless diagnostics suppress the ambient turn and perform one Beijing lookup; the follow-up references the terminal Goal, repeats no capability, and preserves the delivered 28°C/current, 33°C/apparent, thunderstorm result.
-The correction keeps attached social framing subordinate, preserves terminal lifecycle, and rejects a provenance-only index as answer evidence.
-This is not clean source-bound, microphone, speaker, or target evidence; do not approve or resume the old root.
-After commit, initialize a fresh clean `source_bound_development` root for Gateway/Core and Agent Skill/weather.
+Root `20260731T121727Z` remains diagnostic; its corrected ambient/weather Level A classes pass 18/18, but it is not clean source-bound, microphone, speaker, or target evidence and must not be approved or resumed.
+Retained case `weather_then_chinese_walk_blink_song` in the composable-action class reproduces the later user-reported weather-then-walk/blink/song episode.
+Automatic C-preview `20260801T034330Z-live-text` scored 100 with no hard failures, three typed action-turn Goals/outcomes, no stale weather Skill, authored song content, and a confirmation-bound sequential adjustment.
+It used injected text, discarded output audio, and no effectful Soridormi execution, so it makes no microphone, speaker, simulator-motion, physical-robot, or source-bound target claim.
+Future defects must follow [Scenario-Driven Development](docs/SCENARIO_DRIVEN_DEVELOPMENT.md) without requiring the user to collect and paste integration output; after commit, initialize a fresh clean `source_bound_development` root.
 
 ## Work after evidence closure
 

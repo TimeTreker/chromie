@@ -62,6 +62,19 @@ semantics become clearer.
   Agent Skills, Capabilities, memory content, deep-thinking delegation, or
   social behavior. Semantic uncertainty must use model repair, clarification,
   or fail-closed behavior rather than a phrase fallback.
+- For every user-reported behavior defect, follow the executable
+  scenario-driven loop without waiting for the user to request it again:
+  retain the originating single- or multi-turn episode, reproduce the earliest
+  wrong boundary, implement the general fix, rerun the focused scenario until
+  it passes, run its general-ability class, then run the canonical gates. When
+  deployed services are available, rebuild or verify the current revision and
+  run the same scenario through the highest safe automated live profile. Score
+  and inspect the retained output yourself; do not ask the user to copy logs or
+  act as the integration-test harness. A hard safety, provenance, Goal omission,
+  HTTP/service, LLM-integrity, or safe-idle failure cannot be averaged into a
+  pass. Physical microphone, speaker, or robot evidence remains supervised;
+  report that evidence gap explicitly instead of claiming it from text,
+  virtual-audio, or simulator results.
 - Keep microphone, VAD, playback, interruption, conversation state, and Trusted
   Capability Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,

@@ -13,6 +13,10 @@ required_capabilities:
   - chromie.weather.lookup
 optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
+applicable_routes:
+  - tool
+  - chat
+  - tool_result
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md

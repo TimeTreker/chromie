@@ -73,10 +73,11 @@ The maintained repository root is mounted read-only and contains the approved
 packages. Startup validates safe YAML, explicit
 `authority=agent_method_only`, explicit `execution_authority=none`, owner
 approval, semantic version, deterministic package digest, projection paths,
-duplicate IDs, parent references, and inheritance cycles. The endpoint exposes
-only immutable bounded summaries. The two packages expose projections for all
-five maintained Agent roles; the weather package declares the grounded method as
-its parent and remains passive despite referencing required/optional Capabilities.
+duplicate IDs, parent references, inheritance cycles, and normalized
+`applicable_routes`. The endpoint exposes only immutable bounded summaries. The
+two packages expose projections for all five maintained Agent roles; the
+weather package declares the grounded method as its parent and remains passive
+despite referencing required/optional Capabilities.
 
 `POST /agent-skills/select` accepts the responsible Agent projection name, the
 current user text, bounded Goal context, optional bounded context summaries, and
@@ -89,8 +90,12 @@ and registry digest. One invalid result may receive one same-boundary repair;
 model or contract failure returns an optional no-Skill resolution rather than
 fabricating method provenance. No `SKILL.md` or projection text is loaded, no
 Canonical Plan is changed, and no Capability is registered, authorized, or
-executed. `/health` reports whether this independent selection boundary is
-enabled plus its model and candidate limits.
+executed. Before disclosure, a non-empty package-owned `applicable_routes`
+list removes that package from the candidate set when the current structured
+route does not match; an empty list remains unrestricted. This is a structural
+applicability boundary, not Host semantic selection. `/health` reports whether
+this independent selection boundary is enabled plus its model and candidate
+limits.
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -155,7 +160,7 @@ provenance from the advisory Plan and append Deep Planner provenance. This field
 is included in Plan fingerprints and replay serialization but is ignored by
 Capability authorization and execution.
 
-`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. Typed `plan_relation` and `user_confirmation_required` fields enforce confirmation for safe adjustments and alternatives before the host transfers those judgments to canonical metadata. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
+`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. `spoken_response` Goals must use a response outcome containing the requested authored content and cannot own executable transport steps. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
 
 `POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.
 
@@ -169,8 +174,12 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. The endpoint itself does not mutate task state, authorize side
-effects, alter Cognitive Core interpretation output, or execute plans. The unified host uses its result
+are rejected. Every new Goal also declares the completion modality
+`responsibility_kind`: `executable_action`, `spoken_response`,
+`capability_dependent`, or `other`. The eventual spoken delivery of a capability
+result remains part of that capability-dependent Goal rather than becoming a
+duplicate response Goal. The endpoint itself does not mutate task state,
+authorize side effects, alter Cognitive Core interpretation output, or execute plans. The unified host uses its result
 in `report_only` observation or authoritative `apply`, and only the host may
 atomically commit the validated association.
 

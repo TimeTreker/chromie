@@ -61,6 +61,12 @@ logger = logging.getLogger("chromie.agent.goal_association")
 
 GoalSegmentationDecision = Literal["create_goals", "clarify"]
 GoalAssociationDecision = Literal["associate", "create_goals", "clarify"]
+GoalResponsibilityKind = Literal[
+    "executable_action",
+    "spoken_response",
+    "capability_dependent",
+    "other",
+]
 
 
 GoalAssociationModelRelationship = Literal[
@@ -246,6 +252,14 @@ class GoalAssociationModelGoal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     description: str = Field(min_length=1)
+    responsibility_kind: GoalResponsibilityKind = Field(
+        default="other",
+        description=(
+            "How this user-visible responsibility can be completed: an "
+            "effectful action, a direct spoken response, work whose completion "
+            "depends on capability planning, or another semantic mode."
+        ),
+    )
     bindings: list[GoalAssociationModelBinding] = Field(
         default_factory=list,
         max_length=12,
@@ -477,7 +491,7 @@ class GoalAssociationResolver:
                 raise ValueError("goal-association response is not a JSON object")
             initial_raw = raw
             try:
-                resolution = self._validate_contract_output(
+                resolution = await self._validate_contract_output(
                     raw,
                     request=request,
                     turn_id=turn_id,
@@ -509,7 +523,7 @@ class GoalAssociationResolver:
                 if not isinstance(repaired, dict):
                     raise ValueError("goal-association repair response is not a JSON object")
                 repair_raw = repaired
-                resolution = self._validate_contract_output(
+                resolution = await self._validate_contract_output(
                     repaired,
                     request=request,
                     turn_id=turn_id,
@@ -590,7 +604,7 @@ class GoalAssociationResolver:
             request=request,
         )
 
-    def _validate_contract_output(
+    async def _validate_contract_output(
         self,
         raw: dict[str, Any],
         *,
@@ -606,11 +620,86 @@ class GoalAssociationResolver:
                 "an admitted clarify route requires a clarification-only Goal "
                 "Association result"
             )
+        collection_bindings = self._action_collection_bindings(model_output)
+        if collection_bindings:
+            raise ValueError(
+                "new Goal bindings cannot contain action collections; emit one "
+                "new_goals item for every independently observable responsibility: "
+                + ", ".join(collection_bindings)
+            )
+        redundant_delivery_bindings = self._redundant_capability_delivery_bindings(
+            model_output
+        )
+        if redundant_delivery_bindings:
+            raise ValueError(
+                "a capability-dependent Goal already owns evidence acquisition, "
+                "interpretation, and delivery; do not create a separate spoken "
+                "delivery Goal with the same material bindings: "
+                + ", ".join(redundant_delivery_bindings)
+            )
         return self._expand_model_output(
             model_output,
             request=request,
             turn_id=turn_id,
         )
+
+    @staticmethod
+    def _action_collection_bindings(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> list[str]:
+        rejected: list[str] = []
+        for goal_index, goal in enumerate(model_output.new_goals):
+            for binding in goal.bindings:
+                entity_type = "_".join(
+                    binding.entity_type.strip().casefold().replace("-", "_").split()
+                )
+                if "action" in entity_type and (
+                    "list" in entity_type
+                    or "set" in entity_type
+                    or "group" in entity_type
+                    or "collection" in entity_type
+                ):
+                    rejected.append(
+                        f"new_goals[{goal_index}].bindings[{binding.name}]="
+                        f"{binding.entity_type}"
+                    )
+        return rejected
+
+    @staticmethod
+    def _redundant_capability_delivery_bindings(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> list[str]:
+        """Reject a duplicated delivery Goal using typed semantic bindings.
+
+        A lookup and the evidence-grounded answer are one responsibility. This
+        check never reads user phrases: it compares the model-authored
+        completion modality and non-empty material binding identity.
+        """
+
+        def signature(goal: GoalAssociationModelGoal) -> tuple[tuple[str, str, str], ...]:
+            return tuple(
+                sorted(
+                    (
+                        binding.name.casefold(),
+                        binding.entity_type.casefold(),
+                        binding.value.casefold(),
+                    )
+                    for binding in goal.bindings
+                )
+            )
+
+        capability_signatures = {
+            signature(goal)
+            for goal in model_output.new_goals
+            if goal.responsibility_kind == "capability_dependent" and signature(goal)
+        }
+        return [
+            f"new_goals[{index}]"
+            for index, goal in enumerate(model_output.new_goals)
+            if goal.responsibility_kind == "spoken_response"
+            and signature(goal)
+            and signature(goal) in capability_signatures
+        ]
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -661,6 +750,10 @@ class GoalAssociationResolver:
             if isinstance(node, dict):
                 node_properties = node.get("properties")
                 if isinstance(node_properties, dict):
+                    if "responsibility_kind" in node_properties:
+                        node_required = node.setdefault("required", [])
+                        if "responsibility_kind" not in node_required:
+                            node_required.append("responsibility_kind")
                     target_ids = node_properties.get("target_goal_ids")
                     if isinstance(target_ids, dict):
                         target_ids["items"] = {
@@ -868,10 +961,11 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description and typed bindings for each responsibility. "
+            "Every new Goal must also declare responsibility_kind. Use executable_action for a user-visible physical or other effectful action; spoken_response only when the responsibility is completed directly from Chromie's authored speech or text without external evidence, including singing, telling a joke, or a social reply; capability_dependent when lookup, retrieval, computation, or another capability must determine completion; and other only when none of those meanings is accurate. This is the Goal's completion modality, not a capability choice. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, or casual check-in is itself one satisfiable conversational Goal: respond naturally to that social act. Do not treat it as an empty turn. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
-            "A physical action and a conversational answer or spoken performance are independent goals. Physical actions are independent goals whenever either can succeed or fail separately, including actions requested simultaneously, with shared duration, or in one coordinated sentence. Do not collapse walking, gestures, speech, or other independently observable responsibilities into one Goal merely because they share timing. "
+            "A physical action and a conversational answer or spoken performance are independent goals. Physical actions are independent goals whenever either can succeed or fail separately, including actions requested simultaneously, with shared duration, or in one coordinated sentence. Do not collapse walking, gestures, speech, or other independently observable responsibilities into one Goal merely because they share timing. Before returning, verify that every independently observable responsibility appears in exactly one new_goals item: no merged action-collection Goal and no duplicated responsibility across Goals. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
@@ -885,7 +979,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description and bindings only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, responsibility_kind, and bindings only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -984,7 +1078,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description and bindings only. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, and bindings only. executable_action is effectful work; spoken_response is direct authored speech or text, including spoken performance; capability_dependent requires capability planning; other is only for a genuinely different modality. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1279,6 +1373,7 @@ class GoalAssociationResolver:
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,
+                        "responsibility_kind": item.responsibility_kind,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)
                             for reference in resolved_references

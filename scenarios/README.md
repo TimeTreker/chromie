@@ -233,6 +233,14 @@ completes through the trusted runtime, and the retained run ends safe-idle.
 The declared Soridormi checkout is recorded for diagnostic provenance only and
 does not identify the source executing behind the MCP endpoint.
 
+Manifest live cases may contain an ordered `turns` array. Those turns run with
+one bounded conversation ID and fresh per-turn SIDs, allowing the same retained
+episode to test stale Goal, tool, confirmation, and dialogue-state failures.
+The episode summary reports deterministic hard-gate failures, an objective
+diagnostic score, and the earliest suspect boundary. A score cannot turn Goal
+omission, stale provenance, unsafe execution, service failure, LLM-integrity
+failure, or unsafe final state into a pass.
+
 That runner reports the evidence level and claim scope for each run. A passing
 Level A general-ability run is deterministic regression evidence only; it does
 not prove live Cognitive Core/Agent services, microphone/speaker behavior, simulator

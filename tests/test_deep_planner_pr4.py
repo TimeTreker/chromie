@@ -108,6 +108,210 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_fast_parallel_safety_feedback_specializes_first_deep_attempt(self):
+        adjusted = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Walk safely after user approval.",
+            "response_text": "I cannot verify overlap safety; may I walk first?",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            "plan_relation": "safe_adjustment",
+            "user_confirmation_required": True,
+        }
+        run_request = request("Walk while blinking.")
+        context = dict(run_request.context)
+        context["fast_plan_resolution"] = {
+            "disposition": "escalate",
+            "coverage": "uncertain",
+            "steps": [],
+            "metadata": {
+                "executable_step_count": 2,
+                "parallel_contract_errors": [
+                    {
+                        "type": "parallel_capability_not_declared_safe",
+                        "capability_id": "soridormi.walk_forward",
+                    }
+                ]
+            },
+        }
+        ollama = SequencedOllama([adjusted])
+
+        result = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(result.metadata["plan_relation"], "safe_adjustment")
+        self.assertTrue(result.metadata["user_confirmation_required"])
+        schema = ollama.prompts[0][1]["response_format"]
+        adjustment = schema["allOf"][-1]["anyOf"][0]
+        self.assertEqual(
+            adjustment["properties"]["plan_relation"]["enum"],
+            ["safe_adjustment", "alternative"],
+        )
+        self.assertIn(
+            "parallel_capability_not_declared_safe",
+            ollama.prompts[0][0],
+        )
+
+    def test_single_parallel_labeled_step_does_not_force_adjustment(self):
+        feedback = DeepPlannerResolver._initial_safety_feedback(
+            {
+                "fast_plan_resolution": {
+                    "metadata": {
+                        "executable_step_count": 1,
+                        "parallel_contract_errors": [
+                            {
+                                "type": "parallel_capability_not_declared_safe",
+                                "capability_id": "chromie.weather.lookup",
+                            }
+                        ],
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(feedback, [])
+
+    def test_mixed_plan_does_not_require_duplicate_per_goal_satisfaction(self):
+        goal_ids = ["goal-blink", "goal-song"]
+        raw = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "step-blink",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step-blink"],
+                },
+                "goal-song": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "啦啦啦。",
+                    "step_ids": [],
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+
+        plan = asyncio.run(
+            DeepPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
+                request("Blink and sing.", goal_ids=goal_ids)
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.metadata["attempt_count"], 1)
+        self.assertTrue(
+            all(outcome.satisfaction is None for outcome in plan.goal_outcomes)
+        )
+
+    def test_coverage_review_receives_safe_adjustment_confirmation_contract(self):
+        from agent.app.planner_contract import review_coordinated_action_plan_coverage
+
+        goal_ids = ["goal-walk", "goal-blink", "goal-song"]
+        plan = CanonicalPlan(
+            plan_id="safe-adjustment",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=goal_ids,
+            response_text="I can do those actions one after the other. Is that okay?",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "unavailable",
+                    "coverage": "uncertain",
+                },
+                {
+                    "goal_id": "goal-song",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "La la la.",
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.75,
+                "status": "substantial",
+                "satisfied_goal_ids": ["goal-walk", "goal-song"],
+                "unmet_goal_ids": ["goal-blink"],
+            },
+            metadata={
+                "plan_relation": "safe_adjustment",
+                "user_confirmation_required": True,
+            },
+        )
+        ollama = SequencedOllama(
+            [
+                {
+                    "decision": "accept",
+                    "confidence": 1.0,
+                    "uncovered_requirements": [],
+                    "reason": "The adjustment is explicit and confirmation-bound.",
+                }
+            ]
+        )
+
+        review = asyncio.run(
+            review_coordinated_action_plan_coverage(
+                ollama,
+                request_text="Walk and blink together, and sing.",
+                language="en-US",
+                authoritative_goals=[{"goal_id": item} for item in goal_ids],
+                plan=plan,
+                capabilities=[],
+                num_ctx=4096,
+            )
+        )
+
+        self.assertEqual(review.decision, "accept")
+        prompt = ollama.prompts[0][0]
+        self.assertIn('"plan_relation":"safe_adjustment"', prompt)
+        self.assertIn('"user_confirmation_required":true', prompt)
+        self.assertIn("requires no executable speech-transport step", prompt)
+        self.assertIn("do not reject solely", prompt)
+
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
             {"step_id":"walk","capability_id":"soridormi.walk_forward","args":{"duration_s":15},"source_goal_ids":["goal-action"]},
@@ -132,7 +336,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0},
-                    "timing": "parallel",
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-action"],
                 }
             ],
@@ -143,6 +347,12 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "confidence": 1.0,
             "uncovered_requirements": ["blinking", "singing"],
             "reason": "The proposed Plan contains only walking.",
+        }
+        adjusted_partial = {
+            **partial,
+            "response_text": "I cannot verify parallel safety; may I walk first?",
+            "plan_relation": "safe_adjustment",
+            "user_confirmation_required": True,
         }
         run_request = request("Walk while blinking and singing.")
         context = dict(run_request.context)
@@ -164,7 +374,9 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 }
             ],
         }
-        ollama = SequencedOllama([partial, rejected, partial, rejected])
+        ollama = SequencedOllama(
+            [partial, rejected, adjusted_partial, rejected]
+        )
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
@@ -195,6 +407,53 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["attempt_count"], 2)
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
+
+    def test_parallel_plan_is_revised_when_provider_forbids_overlap(self):
+        parallel = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "goal_ids": ["goal-action"],
+            "goal_summary": "Walk while blinking.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-action"],
+                },
+                {
+                    "step_id": "blink",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-action"],
+                },
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        revised = {
+            **parallel,
+            "steps": [
+                {**parallel["steps"][0], "timing": "sequential"},
+                {**parallel["steps"][1], "timing": "sequential"},
+            ],
+            "plan_relation": "alternative",
+            "user_confirmation_required": True,
+            "response_text": "I can do those safely one after the other.",
+        }
+        ollama = SequencedOllama([parallel, revised])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("Walk while blinking.")
+            )
+        )
+
+        self.assertEqual([step.timing for step in plan.steps], ["sequential", "sequential"])
+        self.assertEqual(plan.metadata["plan_relation"], "alternative")
+        self.assertIn("parallel_capability_not_declared_safe", ollama.prompts[1][0])
 
     def test_contract_repair_reports_hidden_multi_goal_defects_together(self):
         goal_ids = ["goal-walk", "goal-blink"]

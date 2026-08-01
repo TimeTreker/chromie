@@ -19,7 +19,7 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,698 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,720 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
 | Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Open: current physical input reaches VAD/ASR but has not produced an intelligible required utterance; no physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
@@ -228,6 +228,15 @@ microphone, speaker, or physical hardware evidence.
 `--soridormi-repo` records a declared paired checkout for diagnostic
 provenance; it does not prove which source revision is executing behind the MCP
 endpoint.
+
+A live case may declare ordered `turns`. The runner reuses one Host conversation
+state while giving every turn a fresh SID and artifact directory, so retained
+Goals, tool evidence, and dialogue state reach the next turn exactly where the
+live Runtime would expose them. Each turn and the episode rollup contain an
+acceptance-only score, hard-gate failures, objective Goal/provenance/integrity
+metrics, and the earliest suspect boundary. The score never overrides a hard
+failure. Use `--only-case CASE_ID` for the originating defect, then run the full
+ability class after the fix.
 
 ### Fast Planner multi-goal qualification
 

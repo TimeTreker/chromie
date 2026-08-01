@@ -7,9 +7,13 @@ from types import MethodType
 from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
+from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_contract import (
+    PlannerModelOutput,
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
+    planner_coverage_review_response_schema,
+    validate_goal_responsibility_outcomes,
 )
 from agent.app.response_composer import ResponseComposerResolver
 from agent.app.schema import AgentRunRequest
@@ -60,6 +64,259 @@ def _allows_null(node: Any) -> bool:
 
 
 class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
+    def test_coverage_review_schema_requires_branch_complete_output(self) -> None:
+        schema = planner_coverage_review_response_schema()
+
+        self.assertEqual(
+            set(schema["required"]),
+            {"decision", "confidence", "uncovered_requirements", "reason"},
+        )
+        branches = schema["allOf"][0]["anyOf"]
+        self.assertEqual(
+            branches[0]["properties"]["uncovered_requirements"]["maxItems"],
+            0,
+        )
+        self.assertEqual(
+            branches[1]["properties"]["uncovered_requirements"]["minItems"],
+            1,
+        )
+
+    def test_planner_schema_requires_confirmation_for_material_adjustment(self) -> None:
+        schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-walk"],
+            allowed_skill_ids=["soridormi.walk_forward"],
+        )
+        relation_constraint = next(
+            item
+            for item in schema["allOf"]
+            if any(
+                "plan_relation" in branch.get("properties", {})
+                for branch in item.get("anyOf", [])
+            )
+        )
+        exact, adjusted = relation_constraint["anyOf"]
+
+        self.assertEqual(
+            exact["properties"]["user_confirmation_required"]["enum"],
+            [False],
+        )
+        self.assertEqual(
+            adjusted["properties"]["user_confirmation_required"]["enum"],
+            [True],
+        )
+        self.assertEqual(
+            adjusted["properties"]["response_text"]["minLength"], 1
+        )
+
+    def test_deep_safety_revision_schema_forbids_exact_sequential_execution(self) -> None:
+        base = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-walk", "goal-blink"],
+            allowed_skill_ids=[
+                "soridormi.walk_forward",
+                "soridormi.blink_eyes",
+            ],
+        )
+        schema = DeepPlannerResolver._safety_revision_response_schema(base)
+        branches = schema["allOf"][-1]["anyOf"]
+        adjustment, non_execution = branches
+
+        self.assertEqual(
+            adjustment["properties"]["plan_relation"]["enum"],
+            ["safe_adjustment", "alternative"],
+        )
+        self.assertEqual(
+            adjustment["properties"]["user_confirmation_required"]["enum"],
+            [True],
+        )
+        self.assertEqual(
+            non_execution["properties"]["steps"]["maxItems"], 0
+        )
+        self.assertTrue(
+            DeepPlannerResolver._requires_safety_revision(
+                [{"type": "parallel_capability_not_declared_safe"}]
+            )
+        )
+
+    def test_deep_safety_revision_is_enforced_after_decoder_output(self) -> None:
+        feedback = [{"type": "parallel_capability_not_declared_safe"}]
+        exact = CanonicalPlan(
+            plan_id="unsafe-exact-revision",
+            planner_tier="deep",
+            disposition="execute",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-walk"],
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            metadata={
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            },
+        )
+        adjusted = exact.model_copy(
+            update={
+                "plan_id": "safe-adjusted-revision",
+                "response_text": "I cannot verify overlap safety; may I run the actions sequentially?",
+                "metadata": {
+                    "plan_relation": "safe_adjustment",
+                    "user_confirmation_required": True,
+                },
+            }
+        )
+
+        errors = DeepPlannerResolver._safety_revision_contract_errors(
+            exact,
+            feedback,
+        )
+
+        self.assertEqual(
+            errors[0]["type"],
+            "safety_revision_contract_not_satisfied",
+        )
+        self.assertEqual(
+            DeepPlannerResolver._safety_revision_contract_errors(
+                adjusted,
+                feedback,
+            ),
+            [],
+        )
+
+    def test_execute_outcome_null_response_normalizes_only_to_semantic_empty(self) -> None:
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "mixed",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "response_text": None,
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15},
+                        "source_goal_ids": ["goal-walk"],
+                    }
+                ],
+                "goal_outcomes": {
+                    "goal-walk": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": None,
+                        "step_ids": ["walk"],
+                    },
+                    "goal-song": {
+                        "disposition": "respond",
+                        "coverage": "complete",
+                        "response_text": "我给你唱一段。",
+                        "step_ids": [],
+                    },
+                },
+                "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            }
+        )
+
+        self.assertEqual(output.response_text, "")
+        self.assertEqual(output.goal_outcomes["goal-walk"].response_text, "")
+        self.assertEqual(
+            output.goal_outcomes["goal-song"].response_text,
+            "我给你唱一段。",
+        )
+
+    def test_spoken_goal_schema_and_validator_forbid_executable_ownership(self) -> None:
+        for schema in (
+            fast_multi_goal_response_schema(
+                expected_goal_ids=["goal-walk", "goal-song"],
+                allowed_skill_ids=["soridormi.walk_forward"],
+                response_goal_ids=["goal-song"],
+            ),
+            canonical_plan_response_schema(
+                planner_tier="deep",
+                expected_goal_ids=["goal-walk", "goal-song"],
+                allowed_skill_ids=["soridormi.walk_forward"],
+                response_goal_ids=["goal-song"],
+            ),
+        ):
+            outcome = schema["properties"]["goal_outcomes"]["properties"][
+                "goal-song"
+            ]
+            self.assertEqual(
+                outcome["properties"]["disposition"]["enum"], ["respond"]
+            )
+            self.assertEqual(outcome["properties"]["step_ids"]["maxItems"], 0)
+            self.assertEqual(
+                outcome["properties"]["response_text"]["minLength"], 1
+            )
+
+        satisfaction = {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": ["goal-song"],
+            "unmet_goal_ids": [],
+            "unmet_requirements": [],
+            "rationale": "The proposed capability would complete the goal.",
+        }
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "steps": [
+                    {
+                        "step_id": "wrong-song-step",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15},
+                        "timing": "sequential",
+                        "source_goal_ids": ["goal-song"],
+                    }
+                ],
+                "goal_outcomes": {
+                    "goal-song": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["wrong-song-step"],
+                        "satisfaction": satisfaction,
+                        "rationale": "Incorrectly assigns motion to speech.",
+                    }
+                },
+                "goal_satisfaction": satisfaction,
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "spoken_response goal must use"):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": "goal-song",
+                        "metadata": {"responsibility_kind": "spoken_response"},
+                    }
+                ],
+            )
+
+        tool_schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-lookup", "goal-joke"],
+            allowed_skill_ids=["chromie.weather.lookup"],
+            requires_execution=True,
+            response_goal_ids=["goal-joke"],
+        )
+        self.assertIn("mixed", tool_schema["properties"]["disposition"]["enum"])
+        joke_outcome = tool_schema["properties"]["goal_outcomes"]["properties"][
+            "goal-joke"
+        ]
+        self.assertEqual(
+            joke_outcome["properties"]["disposition"]["enum"], ["respond"]
+        )
+        self.assertTrue(joke_outcome["oneOf"])
+
     async def test_core_clarify_authority_cannot_become_a_new_goal(self) -> None:
         ollama = _SequenceOllama(
             [

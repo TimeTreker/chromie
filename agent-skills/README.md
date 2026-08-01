@@ -24,6 +24,7 @@ content_digest: sha256:<generated digest>
 extends: []
 required_capabilities: []
 optional_capabilities: []
+applicable_routes: []
 projections:
   goal_association: projections/goal_association.md
   fast_planner: projections/fast_planner.md
@@ -62,3 +63,6 @@ The selection model may choose zero, one, or both packages for a responsible
 Agent. `extends` is dependency metadata, not automatic Host selection; when both
 methods are useful, the model selects the base method before the specialization.
 Package presence still grants no Capability registration or execution authority.
+`applicable_routes` is a package-owned candidate-disclosure boundary. An empty
+list permits every structured route for compatibility; a non-empty list keeps
+the Skill out of the model's candidate set on other current-turn routes.

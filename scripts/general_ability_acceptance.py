@@ -23,8 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.behavior_scenarios import load_scenarios, run_scenarios_sync  # noqa: E402
-from scripts.interaction_text_mujoco_check import parse_expected_arg, run_check  # noqa: E402
+from scripts.interaction_text_mujoco_check import (  # noqa: E402
+    parse_expected_arg,
+    run_check,
+    run_check_sequence,
+)
 from scripts.outcome_observations import (  # noqa: E402
     collect_llm_integrity_violations,
     collect_observations,
@@ -57,6 +60,7 @@ LIVE_TEXT_EXECUTE_CLAIM = (
 class TextScenarioCase:
     case_id: str
     text: str
+    language: str = ""
     expected_routes: tuple[str, ...] = field(default_factory=tuple)
     expected_skills: tuple[str, ...] = field(default_factory=tuple)
     expected_args: tuple[tuple[int, str, Any], ...] = field(default_factory=tuple)
@@ -74,8 +78,12 @@ class TextScenarioCase:
     forbid_pending_action_stage_directions: bool = False
     expected_observations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     expected_observation_sequence: tuple[str, ...] = field(default_factory=tuple)
+    min_new_goal_count: int = 0
+    min_goal_outcome_count: int = 0
+    forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
     description: str = ""
+    turns: tuple["TextScenarioCase", ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -148,7 +156,9 @@ def _skill_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
         item
         for item in skills
         if isinstance(item, dict)
-        and str(item.get("skill_id") or "").startswith("soridormi.")
+        and str(
+            item.get("capability_id") or item.get("skill_id") or ""
+        ).startswith("soridormi.")
     ]
 
 
@@ -165,10 +175,205 @@ def _is_expressive_cue_skill(item: dict[str, Any]) -> bool:
 
 def _task_skill_ids(summary: dict[str, Any], *, allow_expressive_cues: bool) -> list[str]:
     return [
-        str(item.get("skill_id") or "")
+        str(item.get("capability_id") or item.get("skill_id") or "")
         for item in _skill_items(summary)
         if not (allow_expressive_cues and _is_expressive_cue_skill(item))
     ]
+
+
+def _plan_agent_skill_ids(cognitive: dict[str, Any]) -> set[str]:
+    selected: set[str] = set()
+    for key in ("fast_plan", "terminal_plan"):
+        plan = cognitive.get(key)
+        if not isinstance(plan, dict):
+            continue
+        for item in plan.get("selected_agent_skills") or []:
+            if not isinstance(item, dict):
+                continue
+            skill_id = str(item.get("agent_skill_id") or "").strip()
+            if skill_id:
+                selected.add(skill_id)
+    return selected
+
+
+def _provenance_attachment_rejected(cognitive: dict[str, Any]) -> bool:
+    for key in ("fast_plan", "terminal_plan"):
+        plan = cognitive.get(key)
+        if not isinstance(plan, dict):
+            continue
+        metadata = plan.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        attachment = metadata.get("agent_skill_provenance_attachment")
+        if isinstance(attachment, dict) and attachment.get("status") == "rejected":
+            return True
+    return False
+
+
+def _structured_case_metrics(
+    case: TextScenarioCase,
+    summary: dict[str, Any],
+) -> dict[str, Any]:
+    cognitive = summary.get("cognitive_runtime")
+    if not isinstance(cognitive, dict):
+        cognitive = {}
+    association = cognitive.get("goal_association")
+    if not isinstance(association, dict):
+        association = {}
+    terminal_plan = cognitive.get("terminal_plan")
+    if not isinstance(terminal_plan, dict):
+        terminal_plan = {}
+    new_goals = association.get("new_goals")
+    if not isinstance(new_goals, list):
+        new_goals = []
+    goal_outcomes = terminal_plan.get("goal_outcomes")
+    if not isinstance(goal_outcomes, list):
+        goal_outcomes = []
+    selected_agent_skills = _plan_agent_skill_ids(cognitive)
+    forbidden_selected = sorted(
+        selected_agent_skills.intersection(case.forbidden_plan_agent_skills)
+    )
+    user_outcome = summary.get("user_outcome")
+    if not isinstance(user_outcome, dict):
+        user_outcome = {}
+    llm_integrity = user_outcome.get("llm_integrity")
+    if not isinstance(llm_integrity, dict):
+        llm_integrity = {}
+    violations = llm_integrity.get("violations")
+    if not isinstance(violations, list):
+        violations = []
+    status_after = summary.get("status_after")
+    safe_idle = (
+        None
+        if bool(summary.get("preview_only"))
+        else bool(
+            isinstance(status_after, dict)
+            and status_after.get("safe_idle") is True
+            and status_after.get("active_task") is None
+            and status_after.get("emergency_stop") is False
+            and status_after.get("fallen") is False
+        )
+    )
+    omission_rates: list[float] = []
+    if case.min_new_goal_count:
+        omission_rates.append(
+            max(
+                0.0,
+                (case.min_new_goal_count - len(new_goals))
+                / case.min_new_goal_count,
+            )
+        )
+    if case.min_goal_outcome_count:
+        omission_rates.append(
+            max(
+                0.0,
+                (case.min_goal_outcome_count - len(goal_outcomes))
+                / case.min_goal_outcome_count,
+            )
+        )
+    goal_omission_rate = max(omission_rates, default=0.0)
+    runtime_metadata = cognitive.get("metadata")
+    if not isinstance(runtime_metadata, dict):
+        runtime_metadata = {}
+    runtime_status = str(cognitive.get("status") or "").strip()
+    runtime_failure_stage = str(
+        runtime_metadata.get("failure_stage")
+        or runtime_metadata.get("stage")
+        or ""
+    ).strip()
+    runtime_failure_class = str(
+        runtime_metadata.get("failure_class") or ""
+    ).strip()
+    runtime_integrity_failed = runtime_status in {"error", "failed"}
+    return {
+        "new_goal_count": len(new_goals),
+        "required_new_goal_count": case.min_new_goal_count,
+        "goal_outcome_count": len(goal_outcomes),
+        "required_goal_outcome_count": case.min_goal_outcome_count,
+        "goal_omission_rate": round(goal_omission_rate, 4),
+        "selected_plan_agent_skills": sorted(selected_agent_skills),
+        "forbidden_plan_agent_skills": list(case.forbidden_plan_agent_skills),
+        "forbidden_plan_agent_skill_count": len(forbidden_selected),
+        "forbidden_plan_agent_skills_selected": forbidden_selected,
+        "provenance_attachment_rejected": _provenance_attachment_rejected(
+            cognitive
+        ),
+        "llm_integrity_failure_count": len(violations),
+        "runtime_status": runtime_status,
+        "runtime_failure_stage": runtime_failure_stage,
+        "runtime_failure_class": runtime_failure_class,
+        "runtime_integrity_failed": runtime_integrity_failed,
+        "safe_idle": safe_idle,
+    }
+
+
+def diagnostic_evaluation(
+    case: TextScenarioCase,
+    summary: dict[str, Any],
+    errors: list[str],
+) -> dict[str, Any]:
+    """Build an objective scorecard without granting scoring runtime authority."""
+
+    metrics = _structured_case_metrics(case, summary)
+    user_outcome = summary.get("user_outcome")
+    user_outcome_ok = bool(
+        isinstance(user_outcome, dict) and user_outcome.get("ok") is True
+    )
+    axes = {
+        "user_outcome": 100 if user_outcome_ok and not errors else max(0, 100 - 25 * len(errors)),
+        "goal_coverage": (
+            100
+            if metrics["goal_omission_rate"] == 0.0
+            else round(100 * (1.0 - metrics["goal_omission_rate"]))
+        ),
+        "stale_state_isolation": (
+            0
+            if metrics["forbidden_plan_agent_skill_count"]
+            or metrics["provenance_attachment_rejected"]
+            else 100
+        ),
+        "llm_integrity": (
+            0 if metrics["llm_integrity_failure_count"] else 100
+        ),
+        "runtime_integrity": (
+            0 if metrics["runtime_integrity_failed"] else 100
+        ),
+        "execution_safety": (
+            100 if metrics["safe_idle"] in {None, True} else 0
+        ),
+    }
+    earliest_boundary = "none_observed"
+    if metrics["runtime_integrity_failed"]:
+        stage = metrics["runtime_failure_stage"] or "unknown_stage"
+        earliest_boundary = f"cognitive_runtime:{stage}"
+    elif metrics["llm_integrity_failure_count"]:
+        earliest_boundary = "cognitive_model_stage"
+    elif metrics["new_goal_count"] < metrics["required_new_goal_count"]:
+        earliest_boundary = "goal_association"
+    elif (
+        metrics["forbidden_plan_agent_skill_count"]
+        or metrics["provenance_attachment_rejected"]
+    ):
+        earliest_boundary = "agent_skill_selection_or_provenance"
+    elif metrics["goal_outcome_count"] < metrics["required_goal_outcome_count"]:
+        earliest_boundary = "planner_contract"
+    elif metrics["safe_idle"] is False:
+        earliest_boundary = "skill_runtime_or_provider"
+    elif errors:
+        earliest_boundary = "response_or_user_outcome_boundary"
+    overall_score = round(sum(axes.values()) / len(axes))
+    if metrics["runtime_integrity_failed"] or metrics["llm_integrity_failure_count"]:
+        overall_score = min(overall_score, 40)
+    return {
+        "passed": not errors,
+        "overall_score": overall_score,
+        "hard_gate_failures": list(errors),
+        "axes": axes,
+        "metrics": metrics,
+        "earliest_suspect_boundary": earliest_boundary,
+        "root_cause_report_required": bool(errors),
+        "scoring_authority": "acceptance_only_not_runtime_policy",
+    }
 
 
 def validate_live_text_result(
@@ -230,7 +435,7 @@ def validate_live_text_result(
         errors.append("speech contained forbidden phrase(s): " + ", ".join(forbidden))
 
     skills = {
-        str(item.get("skill_id") or "")
+        str(item.get("capability_id") or item.get("skill_id") or "")
         for item in _skill_items(summary)
     }
     task_skills = sorted(
@@ -284,6 +489,41 @@ def validate_live_text_result(
     timings = cognitive.get("timings_ms")
     if not isinstance(timings, dict):
         timings = {}
+    structured_metrics = _structured_case_metrics(case, summary)
+    if structured_metrics["runtime_integrity_failed"]:
+        detail = ":".join(
+            item
+            for item in (
+                structured_metrics["runtime_failure_stage"],
+                structured_metrics["runtime_failure_class"],
+            )
+            if item
+        )
+        errors.append(
+            "cognitive runtime reported a hard failure"
+            + (f": {detail}" if detail else "")
+        )
+    if structured_metrics["new_goal_count"] < case.min_new_goal_count:
+        errors.append(
+            "Goal Association omitted independent responsibilities: "
+            f"expected at least {case.min_new_goal_count} new Goals, got "
+            f"{structured_metrics['new_goal_count']}"
+        )
+    if structured_metrics["goal_outcome_count"] < case.min_goal_outcome_count:
+        errors.append(
+            "terminal Plan omitted per-Goal outcomes: "
+            f"expected at least {case.min_goal_outcome_count}, got "
+            f"{structured_metrics['goal_outcome_count']}"
+        )
+    if structured_metrics["forbidden_plan_agent_skills_selected"]:
+        errors.append(
+            "stale or unrelated Agent Skill provenance selected: "
+            + ", ".join(
+                structured_metrics["forbidden_plan_agent_skills_selected"]
+            )
+        )
+    if structured_metrics["provenance_attachment_rejected"]:
+        errors.append("planner Agent Skill provenance attachment was rejected")
 
     def record_internal(message: str) -> None:
         if assertion_scope == "full":
@@ -337,6 +577,11 @@ def validate_live_text_result(
             )
     summary["user_outcome"]["internal_diagnostics"] = internal_diagnostics
     summary["user_outcome"]["ok"] = not errors
+    summary["diagnostic_evaluation"] = diagnostic_evaluation(
+        case,
+        summary,
+        errors,
+    )
     return errors
 
 
@@ -351,20 +596,27 @@ def _scenario_ref(raw: Any) -> ScenarioRef:
     return ScenarioRef(key=key, rationale=str(raw.get("rationale") or ""))
 
 
-def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
-    case_id = str(raw.get("id") or raw.get("case_id") or "").strip()
+def _text_scenario_case(
+    raw: dict[str, Any],
+    *,
+    fallback_case_id: str = "",
+) -> TextScenarioCase:
+    case_id = str(
+        raw.get("id") or raw.get("case_id") or fallback_case_id
+    ).strip()
     text = str(raw.get("text") or "").strip()
     if not case_id:
-        raise ValueError("live_text_cases entry is missing id")
+        raise ValueError("live text turn is missing id")
     if not text:
-        raise ValueError(f"live_text_cases entry {case_id!r} is missing text")
+        raise ValueError(f"live text turn {case_id!r} is missing text")
     expected_args = tuple(
         item if isinstance(item, tuple) else parse_expected_arg(str(item))
         for item in raw.get("expected_args", raw.get("expect_arg", []))
     )
-    case = TextScenarioCase(
+    return TextScenarioCase(
         case_id=case_id,
         text=text,
+        language=str(raw.get("language") or "").strip(),
         expected_routes=_tuple_of_strings(
             raw.get("expected_routes", raw.get("expected_route"))
         ),
@@ -404,9 +656,50 @@ def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
         expected_observation_sequence=_tuple_of_strings(
             raw.get("expected_observation_sequence")
         ),
+        min_new_goal_count=max(0, int(raw.get("min_new_goal_count", 0))),
+        min_goal_outcome_count=max(
+            0,
+            int(raw.get("min_goal_outcome_count", 0)),
+        ),
+        forbidden_plan_agent_skills=_tuple_of_strings(
+            raw.get("forbidden_plan_agent_skills")
+        ),
         require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
         description=str(raw.get("description") or ""),
     )
+
+
+def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
+    case_id = str(raw.get("id") or raw.get("case_id") or "").strip()
+    if not case_id:
+        raise ValueError("live_text_cases entry is missing id")
+    raw_turns = raw.get("turns")
+    if raw_turns is not None:
+        if not isinstance(raw_turns, list) or not raw_turns:
+            raise ValueError(
+                f"live_text_cases entry {case_id!r} turns must be a non-empty array"
+            )
+        turns = tuple(
+            _text_scenario_case(
+                item,
+                fallback_case_id=f"{case_id}_turn_{index}",
+            )
+            for index, item in enumerate(raw_turns, 1)
+            if isinstance(item, dict)
+        )
+        if len(turns) != len(raw_turns):
+            raise ValueError(
+                f"live_text_cases entry {case_id!r} contains a non-object turn"
+            )
+        case = TextScenarioCase(
+            case_id=case_id,
+            text="",
+            language=str(raw.get("language") or "").strip(),
+            description=str(raw.get("description") or ""),
+            turns=turns,
+        )
+    else:
+        case = _text_scenario_case(raw)
     return LiveCaseRef(case=case, rationale=str(raw.get("rationale") or ""))
 
 
@@ -486,7 +779,11 @@ def select_ability_classes(
     return out
 
 
-def validate_manifest(manifest: GeneralAbilityManifest) -> list[str]:
+def validate_manifest(
+    manifest: GeneralAbilityManifest,
+    *,
+    validate_level_a_sources: bool = True,
+) -> list[str]:
     errors: list[str] = []
     seen: set[str] = set()
     for ability in manifest.ability_classes:
@@ -504,8 +801,10 @@ def validate_manifest(manifest: GeneralAbilityManifest) -> list[str]:
             errors.append(f"{ability.ability_id}: no acceptance cases declared")
 
     keys = level_a_keys(manifest.ability_classes)
-    if keys:
+    if keys and validate_level_a_sources:
         try:
+            from scripts.behavior_scenarios import load_scenarios  # noqa: PLC0415
+
             load_scenarios(only=set(keys))
         except Exception as exc:
             errors.append(f"Level A scenario reference check failed: {exc}")
@@ -610,6 +909,11 @@ def manifest_summary(manifest: GeneralAbilityManifest) -> dict[str, Any]:
 
 
 def run_level_a(args: argparse.Namespace) -> dict[str, Any]:
+    from scripts.behavior_scenarios import (  # noqa: PLC0415
+        load_scenarios,
+        run_scenarios_sync,
+    )
+
     manifest = load_manifest(args.ability_manifest)
     manifest_errors = validate_manifest(manifest)
     selected_classes = select_ability_classes(manifest, args.ability_class)
@@ -714,6 +1018,8 @@ def _live_case_namespace(
     args: argparse.Namespace,
     case: TextScenarioCase,
     evidence_dir: Path,
+    *,
+    conversation_id: str | None = None,
 ) -> argparse.Namespace:
     expected_route = case.expected_routes[0] if len(case.expected_routes) == 1 else None
     return argparse.Namespace(
@@ -722,10 +1028,10 @@ def _live_case_namespace(
         soridormi_mcp_url=args.soridormi_mcp_url,
         soridormi_repo=args.soridormi_repo,
         manifest=args.soridormi_manifest,
-        language=args.language,
+        language=case.language or args.language,
         evidence_dir=str(evidence_dir),
         runtime_identity=args.runtime_identity,
-        conversation_id=f"ga-live-{case.case_id}",
+        conversation_id=conversation_id or f"ga-live-{case.case_id}",
         speaker=args.speaker,
         preview_only=not args.execute,
         allow_non_sim=args.allow_non_sim,
@@ -749,9 +1055,164 @@ def _live_case_namespace(
     )
 
 
+def _validated_live_turn(
+    case: TextScenarioCase,
+    result: dict[str, Any],
+    *,
+    assertion_scope: str,
+) -> dict[str, Any]:
+    scenario_errors = validate_live_text_result(
+        case,
+        result,
+        assertion_scope=assertion_scope,
+    )
+    combined_errors = list(result.get("errors") or [])
+    combined_errors.extend(
+        error for error in scenario_errors if error not in combined_errors
+    )
+    result["errors"] = combined_errors
+    result["ok"] = not combined_errors
+    user_outcome = result.get("user_outcome")
+    if isinstance(user_outcome, dict):
+        user_outcome["ok"] = not combined_errors
+    result["diagnostic_evaluation"] = diagnostic_evaluation(
+        case,
+        result,
+        combined_errors,
+    )
+    result["turn_id"] = case.case_id
+    result["description"] = case.description
+    return result
+
+
+def _episode_diagnostic_evaluation(
+    turn_results: list[dict[str, Any]],
+    errors: list[str],
+) -> dict[str, Any]:
+    evaluations = [
+        item.get("diagnostic_evaluation")
+        for item in turn_results
+        if isinstance(item.get("diagnostic_evaluation"), dict)
+    ]
+    scores = [int(item.get("overall_score", 0)) for item in evaluations]
+    earliest = "none_observed"
+    for item in evaluations:
+        boundary = str(item.get("earliest_suspect_boundary") or "")
+        if boundary and boundary != "none_observed":
+            earliest = boundary
+            break
+    return {
+        "passed": not errors,
+        "overall_score": round(sum(scores) / len(scores)) if scores else 0,
+        "hard_gate_failures": list(errors),
+        "metrics": {
+            "turn_count": len(turn_results),
+            "passed_turn_count": sum(1 for item in turn_results if item.get("ok")),
+            "failed_turn_count": sum(1 for item in turn_results if not item.get("ok")),
+            "user_outcome_accuracy": round(
+                sum(1 for item in turn_results if item.get("ok"))
+                / len(turn_results),
+                4,
+            )
+            if turn_results
+            else 0.0,
+        },
+        "turn_scores": [
+            {
+                "turn_id": result.get("turn_id"),
+                "score": evaluation.get("overall_score"),
+                "passed": evaluation.get("passed"),
+                "earliest_suspect_boundary": evaluation.get(
+                    "earliest_suspect_boundary"
+                ),
+            }
+            for result, evaluation in zip(turn_results, evaluations)
+        ],
+        "earliest_suspect_boundary": earliest,
+        "root_cause_report_required": bool(errors),
+        "scoring_authority": "acceptance_only_not_runtime_policy",
+    }
+
+
+async def _run_live_case(
+    args: argparse.Namespace,
+    case: TextScenarioCase,
+    case_dir: Path,
+) -> dict[str, Any]:
+    if not case.turns:
+        result = await run_check(_live_case_namespace(args, case, case_dir))
+        return _validated_live_turn(
+            case,
+            result,
+            assertion_scope=args.assertion_scope,
+        )
+
+    conversation_id = f"ga-live-{case.case_id}"
+    namespaces = [
+        _live_case_namespace(
+            args,
+            turn,
+            case_dir / f"{index:02d}-{turn.case_id}",
+            conversation_id=conversation_id,
+        )
+        for index, turn in enumerate(case.turns, 1)
+    ]
+    raw_results = await run_check_sequence(namespaces, evidence_dir=case_dir)
+    turn_results: list[dict[str, Any]] = []
+    episode_errors: list[str] = []
+    for index, turn in enumerate(case.turns):
+        if index >= len(raw_results):
+            message = (
+                f"{turn.case_id}: not run because an earlier live turn failed"
+            )
+            episode_errors.append(message)
+            turn_results.append(
+                {
+                    "ok": False,
+                    "turn_id": turn.case_id,
+                    "text": turn.text,
+                    "errors": [message],
+                    "diagnostic_evaluation": {
+                        "passed": False,
+                        "overall_score": 0,
+                        "hard_gate_failures": [message],
+                        "earliest_suspect_boundary": "earlier_turn_failure",
+                        "root_cause_report_required": True,
+                        "scoring_authority": "acceptance_only_not_runtime_policy",
+                    },
+                }
+            )
+            continue
+        result = _validated_live_turn(
+            turn,
+            raw_results[index],
+            assertion_scope=args.assertion_scope,
+        )
+        turn_results.append(result)
+        episode_errors.extend(
+            f"{turn.case_id}: {error}" for error in result.get("errors") or []
+        )
+    return {
+        "ok": not episode_errors,
+        "case_id": case.case_id,
+        "text": [turn.text for turn in case.turns],
+        "evidence_dir": str(case_dir),
+        "conversation_id": conversation_id,
+        "errors": episode_errors,
+        "turns": turn_results,
+        "diagnostic_evaluation": _episode_diagnostic_evaluation(
+            turn_results,
+            episode_errors,
+        ),
+    }
+
+
 async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     manifest = load_manifest(args.ability_manifest)
-    manifest_errors = validate_manifest(manifest)
+    manifest_errors = validate_manifest(
+        manifest,
+        validate_level_a_sources=False,
+    )
     selected_classes = select_ability_classes(manifest, args.ability_class)
     selected_refs = _selected_live_refs(selected_classes, set(args.only_case))
     if not selected_refs:
@@ -773,22 +1234,30 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         )
         try:
             result = await asyncio.wait_for(
-                run_check(_live_case_namespace(args, case, case_dir)),
+                _run_live_case(args, case, case_dir),
                 timeout=args.case_timeout_s,
             )
-            scenario_errors = validate_live_text_result(
-                case, result, assertion_scope=args.assertion_scope
-            )
-            if scenario_errors:
-                result["errors"] = list(result.get("errors") or []) + scenario_errors
-                result["ok"] = False
         except Exception as exc:
             result = {
                 "ok": False,
                 "case_id": case.case_id,
-                "text": case.text,
+                "text": (
+                    [turn.text for turn in case.turns]
+                    if case.turns
+                    else case.text
+                ),
                 "evidence_dir": str(case_dir),
                 "errors": [f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"],
+                "diagnostic_evaluation": {
+                    "passed": False,
+                    "overall_score": 0,
+                    "hard_gate_failures": [
+                        f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"
+                    ],
+                    "earliest_suspect_boundary": "live_acceptance_harness",
+                    "root_cause_report_required": True,
+                    "scoring_authority": "acceptance_only_not_runtime_policy",
+                },
             }
         result["ability_class"] = ability.ability_id
         result["general_rule"] = ability.general_rule
@@ -808,6 +1277,12 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 "ok": bool(item.get("ok")),
                 "errors": list(item.get("errors") or []),
                 "evidence_dir": item.get("evidence_dir"),
+                "score": (
+                    item.get("diagnostic_evaluation") or {}
+                ).get("overall_score"),
+                "earliest_suspect_boundary": (
+                    item.get("diagnostic_evaluation") or {}
+                ).get("earliest_suspect_boundary"),
             }
             for item in case_results
             if item.get("ability_class") == ability.ability_id
