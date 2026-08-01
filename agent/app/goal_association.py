@@ -96,7 +96,15 @@ class GoalAssociationModelAssociation(BaseModel):
     # transport noise such as model-authored IDs; the host never trusts or copies it.
     model_config = ConfigDict(extra="ignore")
 
-    relationship: GoalAssociationModelRelationship
+    relationship: GoalAssociationModelRelationship = Field(
+        description=(
+            "Model-owned semantic relationship to the targeted Goal. continue "
+            "advances unchanged work; reference discusses or answers from a "
+            "retained Goal without changing it; clarify means the current user "
+            "turn supplies missing information for that Goal, not that the user "
+            "is asking for more explanation."
+        )
+    )
     target_goal_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
@@ -135,6 +143,13 @@ class GoalAssociationModelAssociation(BaseModel):
             raise ValueError(f"relationship={self.relationship} requires target_goal_ids")
         if self.relationship == "merge" and len(self.target_goal_ids) < 2:
             raise ValueError("relationship=merge requires at least two target goals")
+        if self.relationship in {"modify", "clarify", "replace"} and not (
+            self.updated_description or self.resolved_gap_ids
+        ):
+            raise ValueError(
+                f"relationship={self.relationship} requires updated_description "
+                "or resolved_gap_ids"
+            )
         return self
 
 
@@ -758,7 +773,7 @@ class GoalAssociationResolver:
         }.issubset(responsibility_kinds):
             triggers.append("mixed_capability_and_spoken_responsibilities")
         if isinstance(model_output, GoalAssociationModelOutput) and any(
-            association.relationship in {"modify", "replace"}
+            association.relationship in {"modify", "clarify", "replace"}
             for association in model_output.associations
         ):
             triggers.append("existing_goal_semantic_update")
@@ -1008,8 +1023,9 @@ class GoalAssociationResolver:
         else:
             state_instructions = (
                 "Resolve continuity before creation using semantic reasoning. "
-                "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
+                "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and the applicable updated_description, resolved_gap_ids, and requires_replan fields. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
+                "Use continue when the current turn advances unchanged active or recoverable work. Use reference when the turn discusses, follows up on, or answers from a retained Goal without changing its meaning or lifecycle. Use modify or replace only when the user meaning actually changes and include updated_description or resolved_gap_ids. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
             )

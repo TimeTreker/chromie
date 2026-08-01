@@ -116,6 +116,12 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
   corrections to retained Goals. Existing typed bindings remain
   provenance-stable; when user meaning changes one, the model creates a fully
   bound replacement Goal instead of relabeling the old Goal and its evidence.
+- Defined `continue`, `reference`, and association-level `clarify` in the
+  Goal Association schema and model prompt. The model still owns which semantic
+  relationship applies; typed validation only rejects `modify`, `replace`, or
+  association-level `clarify` outputs that claim a Goal mutation without an
+  updated description or resolved gap, then permits one model repair. The exact
+  Beijing weather follow-up diagnostic passes both turns without another lookup.
 - Added an independent Response Composer model review for pending safe reads.
   It receives the immutable Plan and candidate DTO without prior result
   contents, preserves natural acknowledgements, and removes unsupported

@@ -66,11 +66,11 @@ def request(
     )
 
 
-def active_goal(goal_id: str, description: str, *, bindings=None):
+def active_goal(goal_id: str, description: str, *, bindings=None, status="open"):
     return {
         "goal_id": goal_id,
         "goal_version": 1,
-        "status": "open",
+        "status": status,
         "goal": {
             "goal_id": goal_id,
             "version": 1,
@@ -469,7 +469,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("responsibility_kind", goal_schema["required"])
 
     def test_associates_followup_before_creating_new_goal(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal."}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})
+        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal.", "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
         self.assertEqual([item.relationship for item in result.associations], ["modify"])
         self.assertEqual(result.associations[0].target_goal_ids, ["goal-coffee"])
@@ -477,7 +477,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["authority"], "advisory")
 
     def test_can_update_existing_goal_and_create_independent_new_goal(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.91}], "new_goals": [{"description": "Report the current weather.", "source_text": "顺便查一下天气。", "beneficiary": "user", "constraints": {}, "success_criteria": ["Current weather is reported."], "metadata": {}}], "confidence": 0.91})
+        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.91, "updated_description": "Get iced coffee"}], "new_goals": [{"description": "Report the current weather.", "source_text": "顺便查一下天气。", "beneficiary": "user", "constraints": {}, "success_criteria": ["Current weather is reported."], "metadata": {}}], "confidence": 0.91})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("咖啡要冰的，顺便查一下天气。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
         self.assertEqual(len(result.associations), 1)
         self.assertEqual(len(result.new_goals), 1)
@@ -992,7 +992,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("goal-coffee", result.clarification)
 
     def test_unknown_goal_target_is_rejected_and_falls_back_to_clarification(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-invented"], "confidence": 0.99}], "new_goals": [], "confidence": 0.99})
+        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-invented"], "confidence": 0.99, "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.99})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
         self.assertEqual(result.associations, [])
         self.assertTrue(result.clarification)
@@ -1010,6 +1010,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("Do not split implementation steps into goals", prompt)
         self.assertIn("host owns all IDs", prompt)
         self.assertIn('relationship must be copied exactly from ["continue","modify","clarify"', prompt)
+        self.assertIn("clarify means the current user turn supplies missing information", prompt)
+        self.assertIn("Use reference when the turn discusses, follows up on", prompt)
         self.assertNotIn("continues, modifies", prompt)
         schema = kwargs["response_format"]
         self.assertIsInstance(schema, dict)
@@ -1098,6 +1100,76 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("literal_error", repair_prompt)
         self.assertIn("GoalAssociationModelOutput JSON Schema", repair_prompt)
         self.assertIsInstance(repair_kwargs["response_format"], dict)
+
+    def test_explanation_followup_repairs_delta_free_clarify_to_reference(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "decision": "associate",
+                    "associations": [
+                        {
+                            "relationship": "clarify",
+                            "target_goal_ids": ["goal-weather"],
+                            "confidence": 1.0,
+                            "reason_summary": (
+                                "The user asks for a definitive judgment from the "
+                                "weather evidence already delivered."
+                            ),
+                        }
+                    ],
+                    "new_goals": [],
+                    "referent_updates": [],
+                    "resolved_references": [],
+                    "clarification": "",
+                    "confidence": 1.0,
+                    "reason_summary": "The turn follows up on the retained Goal.",
+                },
+                {
+                    "decision": "associate",
+                    "associations": [
+                        {
+                            "relationship": "reference",
+                            "target_goal_ids": ["goal-weather"],
+                            "confidence": 1.0,
+                            "reason_summary": (
+                                "The user asks for an interpretation of evidence "
+                                "already delivered for this Goal."
+                            ),
+                        }
+                    ],
+                    "new_goals": [],
+                    "referent_updates": [],
+                    "resolved_references": [],
+                    "clarification": "",
+                    "confidence": 1.0,
+                    "reason_summary": "Reference the retained Goal without changing it.",
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "So is it hot or not?",
+                    recent_goals=[
+                        active_goal(
+                            "goal-weather",
+                            "Check whether today's weather in Beijing is hot.",
+                            status="done",
+                        )
+                    ],
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.associations[0].relationship, "reference")
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn(
+            "relationship=clarify requires updated_description or resolved_gap_ids",
+            ollama.prompts[1][0],
+        )
 
     def test_failed_model_repair_fails_closed_without_a_third_call(self):
         invalid = {
