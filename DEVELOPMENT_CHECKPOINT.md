@@ -1,7 +1,7 @@
 # Development Checkpoint
 
 **Development identity:** `development`
-**Status refresh date:** 2026-07-31
+**Status refresh date:** 2026-08-01
 **Deferred physical validation:** **Retain a Current-Revision Live Voice Loop**
 **Active evidence Issue:** **Close Current-Revision Target Evidence**
 
@@ -42,10 +42,10 @@ Delivery and exit criteria are owned by [Roadmap](ROADMAP.md).
 
 ## Immediate resume point
 
-The canonical local gate is restored. On 2026-07-31,
+The canonical local gate is restored. On 2026-08-01,
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` passed repository policy,
 test-ownership, Ruff, the unchanged four-file Mypy ratchet, documentation,
-1,686 primary tests, and 20 legacy Agent tests.
+1,693 primary tests, and 20 legacy Agent tests.
 
 The `current-revision-live-voice` verifier profile is implemented and preserves
 the default full seven-case verifier. Focused coverage rejects synthetic input,
@@ -53,15 +53,16 @@ partial events, dirty or mismatched source, missing or incomplete runtime
 identity, executable skills, timeout/truncation/fallback, stale playback,
 artifact tampering, and absent operator review. Python 3.11+ is now checked by
 both the supervised preflight and the Orchestrator launcher before dependency
-installation or model warm-up. The latest 2026-07-31 attention-contract run
-passes 1,686 primary tests plus 20 legacy Agent tests.
+installation or model warm-up. The latest 2026-08-01 canonical run passes
+1,693 primary tests plus 20 legacy Agent tests.
 
-The managed `Chromie` environment is Python 3.11.15. A microphone is now visible,
-but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
+The managed `Chromie` environment is Python 3.11.15. A microphone is visible, but supervised attempts `20260731T134457Z` and `20260731T134946Z` produced only
 short VAD segments and ASR finals `I.`/`.` rather than the required Moon request.
-They correctly stopped before cognition and are not live-loop evidence. Startup
-now follows and validates OS-default devices unless an explicit device is pinned;
-rerun after the selected microphone produces intelligible speech:
+They correctly stopped before cognition and are not live-loop evidence. Empty,
+`default`, and `auto` audio selections now follow validated OS-default changes
+while the Orchestrator is running; explicit devices remain pinned. Runtime
+hot-plug behavior has automatic coverage; supervised physical switch review is
+open. Rerun after the selected microphone produces intelligible speech:
 
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"

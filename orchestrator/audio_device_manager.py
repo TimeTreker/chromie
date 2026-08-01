@@ -1,7 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import os
+import re
+from collections.abc import AsyncIterator
 from typing import Any
+
+
+_PIPEWIRE_DEFAULT_DIRECTIONS = {
+    "default.audio.source": "input",
+    "default.configured.audio.source": "input",
+    "default.audio.sink": "output",
+    "default.configured.audio.sink": "output",
+}
+_PIPEWIRE_KEY_RE = re.compile(r"\bkey:'([^']+)'")
+_PIPEWIRE_VALUE_RE = re.compile(r"\bvalue:'(.*?)'(?:\s+type:|$)")
 
 
 def _sounddevice() -> Any:
@@ -45,6 +58,124 @@ class AudioDeviceManager:
     def __init__(self):
         self.input_device = _parse_device(os.getenv("ORCH_INPUT_DEVICE"))
         self.output_device = _parse_device(os.getenv("ORCH_OUTPUT_DEVICE"))
+
+    def follows_system_default(self, kind: str) -> bool:
+        if kind == "input":
+            return self.input_device is None
+        if kind == "output":
+            return self.output_device is None
+        raise ValueError(f"Unknown audio direction: {kind!r}")
+
+    @staticmethod
+    def device_params_changed(
+        current: dict[str, Any],
+        candidate: dict[str, Any],
+    ) -> bool:
+        """Compare the stream-relevant identity of two resolved devices."""
+
+        keys = (
+            "device",
+            "name",
+            "rate",
+            "channels",
+            "blocksize",
+            "latency",
+        )
+        return any(current.get(key) != candidate.get(key) for key in keys)
+
+    @staticmethod
+    def parse_pipewire_default_update(
+        line: str,
+    ) -> tuple[str, str, str | None] | None:
+        """Parse one read-only ``pw-metadata`` default-device update."""
+
+        key_match = _PIPEWIRE_KEY_RE.search(line)
+        if key_match is None:
+            return None
+        key = key_match.group(1)
+        kind = _PIPEWIRE_DEFAULT_DIRECTIONS.get(key)
+        if kind is None:
+            return None
+        value_match = _PIPEWIRE_VALUE_RE.search(line)
+        value = value_match.group(1) if value_match is not None else None
+        return kind, key, value
+
+    async def watch_system_default_changes(self) -> AsyncIterator[str]:
+        """Yield input/output when PipeWire reports an OS-default change.
+
+        PortAudio default polling remains the portable fallback. PipeWire
+        metadata is also observed because its stable ``default`` PortAudio
+        device can conceal a USB/Bluetooth node change behind the same index.
+        This command is read-only and never changes a route or device setting.
+        """
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "pw-metadata",
+                "-m",
+                "-n",
+                "default",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+        except (FileNotFoundError, OSError):
+            return
+        stdout = process.stdout
+        if stdout is None:
+            if process.returncode is None:
+                process.terminate()
+                await process.wait()
+            return
+
+        observed: dict[str, str | None] = {}
+        try:
+            # ``pw-metadata --monitor`` emits the current state first. Consume
+            # that initial burst so startup does not look like a device change.
+            while True:
+                try:
+                    raw_line = await asyncio.wait_for(
+                        stdout.readline(),
+                        timeout=0.25,
+                    )
+                except asyncio.TimeoutError:
+                    break
+                if not raw_line:
+                    return
+                parsed = self.parse_pipewire_default_update(
+                    raw_line.decode("utf-8", errors="replace")
+                )
+                if parsed is not None:
+                    _, key, value = parsed
+                    observed[key] = value
+
+            while True:
+                raw_line = await stdout.readline()
+                if not raw_line:
+                    return
+                parsed = self.parse_pipewire_default_update(
+                    raw_line.decode("utf-8", errors="replace")
+                )
+                if parsed is None:
+                    continue
+                kind, key, value = parsed
+                previous = observed.get(key)
+                observed[key] = value
+                if previous != value:
+                    yield kind
+        finally:
+            if process.returncode is None:
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+                    await process.wait()
 
     def _resolve(
         self,

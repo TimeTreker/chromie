@@ -31,8 +31,10 @@ The canonical local gate is restored: repository policy, test ownership, Ruff,
 Mypy, documentation, and the full canonical test suites pass. The strict narrow
 verifier is implemented. A physical input is now visible but has produced only
 unusable ASR transcripts, so physical target validation remains open without a
-claim. The active Issue is **Close Current-Revision Target Evidence** using the
-non-physical default profile.
+claim. OS-default input/output selections now follow runtime device changes;
+explicit device selections remain pinned. This has automatic coverage but no
+supervised physical hot-plug claim. The active Issue is **Close Current-Revision
+Target Evidence** using the non-physical default profile.
 
 ## What to do now
 

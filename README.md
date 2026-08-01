@@ -22,11 +22,14 @@ experience artifacts. See
 > widens authority to simulator robot actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
 > The canonical local gate is reproducible again: repository policy,
-> test-ownership, Ruff, Mypy, documentation, 1,664 primary tests, and 20 legacy
+> test-ownership, Ruff, Mypy, documentation, 1,693 primary tests, and 20 legacy
 > Agent tests pass from the documented setup. A strict source-bound verifier for
-> the current-revision microphone-to-audible-response loop is implemented. This
-> host has no microphone, so its physical target validation is explicitly
-> deferred without a claim. The active Issue is the non-physical default
+> the current-revision microphone-to-audible-response loop is implemented. The
+> current input reaches VAD/ASR but has not produced an intelligible required
+> utterance, so physical target validation remains open without a claim. Default
+> audio selections now follow OS device changes during runtime, while explicit
+> selections remain pinned; supervised physical hot-plug evidence is still open.
+> The active Issue is the non-physical default
 > source-bound evidence closure. No release version
 > or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).

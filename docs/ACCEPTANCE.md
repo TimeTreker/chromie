@@ -19,7 +19,7 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,686 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,693 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
 | Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Open: current physical input reaches VAD/ASR but has not produced an intelligible required utterance; no physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
@@ -27,7 +27,7 @@ A higher level does not replace lower-level regression tests.
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider; corrected local Oute `chromie_mixed` passed 10/10 smoke plus two repeated 6/6 full matrices at 8192; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; physical listening and comparative shared-resource target evidence open |
-| Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
+| Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, and barge-in contracts pass | Manual host default resolution; live default-change observation open | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker and live hot-plug review open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
 

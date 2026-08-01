@@ -36,8 +36,10 @@ weakening the default seven-case voice/MuJoCo matrix. It requires clean source,
 digest-bound running runtime identity, physical input/output recordings,
 admitted and applied speech-only chat with zero executable work, complete
 playback, artifact hashes, and an operator audible-output verdict. The current
-host has no microphone, so a real attempt correctly retained no input claim and
-physical target validation is deferred to a host with input hardware.
+host now exposes a physical input, but supervised attempts retained only
+unusable ASR transcripts and no live-loop claim. Default audio selections now
+follow OS device changes at runtime; supervised physical hot-plug and
+intelligible microphone validation remain open.
 
 This claim excludes Soridormi, simulator execution, physical robots, broad
 voice-device support, and release readiness. The unfulfilled physical exit
@@ -281,7 +283,9 @@ live proof and target-evidence closure. See
 
 The first engineering-sustainability intake and canonical local-gate repair are
 complete. The live-voice verifier is implemented while physical validation is
-deferred because the current host has no microphone. The active named Issue is
+open because the current microphone has not produced an intelligible required
+utterance. Runtime OS-default device following is implemented, while supervised
+physical hot-plug evidence remains open. The active named Issue is
 **Close Current-Revision Target Evidence**; later
 simplification Issues are queued behind the evidence work in the same plan.
 

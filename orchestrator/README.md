@@ -168,11 +168,14 @@ treated as partial runtime evidence.
 
 For normal plug-and-use operation, select the preferred microphone/headphones in
 the operating system and leave `ORCH_INPUT_DEVICE`/`ORCH_OUTPUT_DEVICE` empty or
-set to `default`/`auto`. Startup resolves and validates those OS defaults before
-opening streams. Explicit device names or indices remain authoritative and now
-fail clearly when unavailable rather than silently falling back. Chromie never
-changes the OS route, default, mute, or volume. Relative `RECORDINGS_DIR` paths
-are resolved from the repository root.
+set to `default`/`auto`. The Host resolves and validates those OS defaults before
+opening streams, then follows later OS-default changes while it is running.
+PortAudio defaults are polled and PipeWire metadata is observed read-only when
+available. An affected input stream is reopened with its unfinished VAD segment
+discarded; output rolls over between ordered playback items. Explicit device
+names or indices remain pinned and fail clearly when unavailable rather than
+silently falling back. Chromie never changes the OS route, default, mute, or
+volume. Relative `RECORDINGS_DIR` paths are resolved from the repository root.
 
 Conversation settings have both current `ORCH_CONVERSATION_*` names and legacy
 `ORCH_CONTEXT_*` aliases. New deployments should use the conversation-prefixed

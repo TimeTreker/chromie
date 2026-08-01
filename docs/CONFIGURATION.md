@@ -647,7 +647,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 
 | Variable | Default |
 |---|---:|
-| `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE` | Empty, `default`, or `auto` follows the operating system's current default for that direction; an explicit index/name pins the operator-selected device. Startup resolves the choice, validates channels/rate, and fails clearly instead of silently switching away from an invalid explicit device. |
+| `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE` | Empty, `default`, or `auto` follows the operating system's current default for that direction at startup and while Chromie is running; an explicit index/name pins the operator-selected device. Every selected device is validated for channels/rate, and an invalid explicit device fails clearly instead of silently switching. |
 | `ORCH_INPUT_RATE`, `ORCH_OUTPUT_RATE` | Device default or `48000` in the example file. |
 | `ORCH_INPUT_CHANNELS`, `ORCH_OUTPUT_CHANNELS` | `1`, `2`. |
 | `ORCH_INPUT_BLOCK_MS`, `ORCH_OUTPUT_BLOCK_MS` | `30`, `30`. |
@@ -673,9 +673,14 @@ Audio jack, USB, Bluetooth, and other external-device detection remains owned by
 the operating system. Chromie does not guess that a device is external from its
 name and does not change the system default, route, mute, or volume. Select the
 preferred plugged-in device in the OS and leave the corresponding variable
-empty/`default`/`auto`, or set an explicit device when the OS default must not be
-followed. The startup log records `selection=system_default` or
-`selection=configured` plus the resolved stream device.
+empty/`default`/`auto`. The Host polls the portable PortAudio default and, when
+available, observes PipeWire default metadata read-only so a default node change
+hidden behind the same PortAudio `default` index is still detected. It closes and
+reopens only the affected stream. An input switch discards an unfinished
+cross-device VAD segment; an output switch takes effect between ordered playback
+items without replaying completed audio. Set an explicit device only when the OS
+default must not be followed. Startup logs record `selection=system_default` or
+`selection=configured`; later changes record the old and new resolved streams.
 
 The Orchestrator always resamples captured audio to 16 kHz before ASR. For
 speech output, complete Agent/interaction text is split into ordered chunks. The

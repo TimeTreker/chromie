@@ -127,9 +127,11 @@ python orchestrator/list_devices.py
 
 Select the preferred plugged-in microphone and headphones in the operating
 system. Leave `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` empty or set them to
-`default`/`auto` to follow those OS defaults. Set an explicit device name or
-index only when Chromie must pin one device; an unavailable explicit device now
-fails startup instead of silently switching. Then start:
+`default`/`auto` to follow those OS defaults at startup and after a default-device
+change while Chromie is running. The affected stream is reopened automatically;
+Chromie does not alter system routing, mute, or volume. Set an explicit device
+name or index only when Chromie must pin one device; an unavailable explicit
+device fails instead of silently switching. Then start:
 
 ```bash
 ./scripts/start_orchestrator.sh

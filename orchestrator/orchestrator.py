@@ -750,6 +750,15 @@ class VoiceAssistant:
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
         self.output_write_lock = asyncio.Lock()
+        self._audio_device_refresh_lock = asyncio.Lock()
+        self._input_device_change_event = asyncio.Event()
+        self._pending_input_params: dict[str, Any] | None = None
+        self._pending_output_params: dict[str, Any] | None = None
+        self._audio_device_errors: dict[str, str] = {}
+        self._audio_default_change_queue: asyncio.Queue[str] = asyncio.Queue(
+            maxsize=8
+        )
+        self.audio_device_monitor_task: asyncio.Task | None = None
         recordings_dir = Path(os.getenv("RECORDINGS_DIR", "recordings")).expanduser()
         if not recordings_dir.is_absolute():
             recordings_dir = PROJECT_ROOT / recordings_dir
@@ -1542,6 +1551,211 @@ class VoiceAssistant:
         pcm = (arr * 32767.0).astype(np.int16).tobytes()
         return self.resample_int16_bytes(pcm, self.input_rate, self.target_asr_rate)
 
+    def _set_input_device_params(self, params: dict[str, Any]) -> None:
+        self.input_params = params
+        self.input_rate = params["rate"]
+        self.input_channels = params["channels"]
+        self.input_device = params["device"]
+        self.input_block_size = params["blocksize"]
+        self.input_latency = params["latency"]
+
+    def _set_output_device_params(self, params: dict[str, Any]) -> None:
+        self.output_params = params
+        self.output_rate = params["rate"]
+        self.output_channels = params["channels"]
+        self.output_device = params["device"]
+        self.output_latency = params["latency"]
+
+    def _uses_followed_system_default(self, kind: str) -> bool:
+        mode = self.audio_input_mode if kind == "input" else self.audio_output_mode
+        return mode == "device" and self.audio_mgr.follows_system_default(kind)
+
+    async def _refresh_system_default_audio_devices(
+        self,
+        *,
+        force_kinds: set[str] | None = None,
+    ) -> set[str]:
+        """Queue validated stream changes for OS-default-following directions."""
+
+        forced = force_kinds or set()
+        queued: set[str] = set()
+        async with self._audio_device_refresh_lock:
+            for kind in ("input", "output"):
+                if not self._uses_followed_system_default(kind):
+                    continue
+                getter = (
+                    self.audio_mgr.get_input_params
+                    if kind == "input"
+                    else self.audio_mgr.get_output_params
+                )
+                try:
+                    candidate = await asyncio.to_thread(getter)
+                except Exception as exc:
+                    error = f"{type(exc).__name__}: {exc}"
+                    if self._audio_device_errors.get(kind) != error:
+                        logger.warning(
+                            "Could not refresh OS-default %s device; keeping "
+                            "the current stream until a valid default appears: %s",
+                            kind,
+                            error,
+                        )
+                    self._audio_device_errors[kind] = error
+                    continue
+
+                previous_error = self._audio_device_errors.pop(kind, None)
+                if previous_error is not None:
+                    logger.info("OS-default %s device is available again", kind)
+                current = self.input_params if kind == "input" else self.output_params
+                pending = (
+                    self._pending_input_params
+                    if kind == "input"
+                    else self._pending_output_params
+                )
+                if pending is not None and not self.audio_mgr.device_params_changed(
+                    pending,
+                    candidate,
+                ):
+                    continue
+                changed = self.audio_mgr.device_params_changed(current, candidate)
+                if kind not in forced and not changed:
+                    continue
+                logger.info(
+                    "OS-default %s device change detected: old=%s(%r) new=%s(%r) "
+                    "signal=%s",
+                    kind,
+                    current.get("name", "unknown"),
+                    current.get("device"),
+                    candidate.get("name", "unknown"),
+                    candidate.get("device"),
+                    "os_metadata" if kind in forced else "portaudio_default",
+                )
+                if kind == "input":
+                    self._pending_input_params = candidate
+                    self._input_device_change_event.set()
+                else:
+                    self._pending_output_params = candidate
+                queued.add(kind)
+        return queued
+
+    async def _audio_device_monitor(self) -> None:
+        """Poll portable defaults and consume read-only PipeWire change events."""
+
+        async def collect_pipewire_changes() -> None:
+            try:
+                async for kind in self.audio_mgr.watch_system_default_changes():
+                    try:
+                        self._audio_default_change_queue.put_nowait(kind)
+                    except asyncio.QueueFull:
+                        # Polling still detects a concrete PortAudio identity
+                        # change. A full queue already contains refresh work.
+                        pass
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "PipeWire default-device notifications stopped; portable "
+                    "PortAudio polling remains active: %s",
+                    exc,
+                )
+
+        pipewire_task = asyncio.create_task(collect_pipewire_changes())
+        try:
+            await self._refresh_system_default_audio_devices()
+            while True:
+                forced: set[str] = set()
+                try:
+                    kind = await asyncio.wait_for(
+                        self._audio_default_change_queue.get(),
+                        timeout=1.0,
+                    )
+                    forced.add(kind)
+                    while not self._audio_default_change_queue.empty():
+                        forced.add(self._audio_default_change_queue.get_nowait())
+                except asyncio.TimeoutError:
+                    pass
+                await self._refresh_system_default_audio_devices(
+                    force_kinds=forced,
+                )
+        finally:
+            pipewire_task.cancel()
+            await asyncio.gather(pipewire_task, return_exceptions=True)
+
+    async def _apply_pending_input_device_change(self) -> bool:
+        """Activate a queued input device after the old stream has closed."""
+
+        async with self._audio_device_refresh_lock:
+            params = self._pending_input_params
+            self._pending_input_params = None
+            self._input_device_change_event.clear()
+        if params is None:
+            return False
+
+        dropped_frames = 0
+        while not self.mic_queue.empty():
+            try:
+                self.mic_queue.get_nowait()
+                dropped_frames += 1
+            except asyncio.QueueEmpty:
+                break
+        self.vad.reset()
+        self._vad_leftover = b""
+        self._vad_segment_started_during_playback = False
+        self._vad_segment_playback_generation = None
+        self._set_input_device_params(params)
+        logger.info(
+            "Audio input switched to OS default: name=%s device=%r rate=%s "
+            "channels=%s discarded_old_frames=%s",
+            params.get("name", "unknown"),
+            params.get("device"),
+            params.get("rate"),
+            params.get("channels"),
+            dropped_frames,
+        )
+        return True
+
+    async def _apply_pending_output_device_change(self) -> bool:
+        """Close the old output so the next ordered audio uses the new default."""
+
+        async with self._audio_device_refresh_lock:
+            params = self._pending_output_params
+            self._pending_output_params = None
+        if params is None:
+            return False
+
+        async with self.output_write_lock:
+            async with self.output_stream_lock:
+                stream = self.output_stream
+                if stream is not None:
+                    def stop_and_close() -> None:
+                        try:
+                            stream.stop()
+                        except Exception as exc:
+                            logger.debug(
+                                "Old output stream stop failed during device switch: %s",
+                                exc,
+                            )
+                        try:
+                            stream.close()
+                        except Exception as exc:
+                            logger.debug(
+                                "Old output stream close failed during device switch: %s",
+                                exc,
+                            )
+
+                    await asyncio.to_thread(stop_and_close)
+                    if self.output_stream is stream:
+                        self.output_stream = None
+                self._set_output_device_params(params)
+        logger.info(
+            "Audio output switched to OS default: name=%s device=%r rate=%s "
+            "channels=%s",
+            params.get("name", "unknown"),
+            params.get("device"),
+            params.get("rate"),
+            params.get("channels"),
+        )
+        return True
+
     def mono_to_output_channels(self, samples: np.ndarray) -> np.ndarray:
         if self.output_channels == 1:
             return samples
@@ -1627,6 +1841,8 @@ class VoiceAssistant:
         return generation != self.playback_generation or session_id != self.session_id
 
     async def play_audio(self, audio_bytes: bytes, source_rate: Optional[int], generation: int, session_id: Optional[str]):
+        if self.audio_output_mode == "device":
+            await self._apply_pending_output_device_change()
         pcm = self.resample_int16_bytes(audio_bytes, source_rate or self.default_tts_rate, self.output_rate)
         samples = np.frombuffer(pcm, dtype=np.int16)
         if samples.size == 0:
@@ -1664,6 +1880,9 @@ class VoiceAssistant:
                 if self.is_stale_playback(generation, session_id):
                     raise asyncio.CancelledError("Playback interrupted by newer session")
                 await asyncio.to_thread(stream.write, chunk)
+        # If the OS changed output while this ordered item was playing, close
+        # the old stream now. The next item will open on the new default.
+        await self._apply_pending_output_device_change()
 
     async def enqueue_playback_skip(self, generation: int, order: int, session_id: Optional[str], reason: str):
         if self.is_stale_playback(generation, session_id):
@@ -8450,22 +8669,51 @@ class VoiceAssistant:
     async def mic_stream(self):
         logger.info("Opening microphone with sounddevice")
         self.loop = asyncio.get_running_loop()
-        sd = _sounddevice()
-        with sd.InputStream(
-            samplerate=self.input_rate,
-            channels=self.input_channels,
-            dtype="float32",
-            blocksize=self.input_block_size,
-            device=self.input_device,
-            latency=self.input_latency,
-            callback=self.mic_callback,
-        ):
-            logger.info("Microphone started")
-            logger.info("Audio input started: mode=device")
-            while True:
-                audio = await self.mic_queue.get()
-                pcm_16k = self.prepare_mic_chunk_for_asr(audio)
-                await self._feed_vad_pcm16(pcm_16k)
+        while True:
+            await self._apply_pending_input_device_change()
+            sd = _sounddevice()
+            try:
+                with sd.InputStream(
+                    samplerate=self.input_rate,
+                    channels=self.input_channels,
+                    dtype="float32",
+                    blocksize=self.input_block_size,
+                    device=self.input_device,
+                    latency=self.input_latency,
+                    callback=self.mic_callback,
+                ):
+                    logger.info(
+                        "Microphone started: name=%s device=%r rate=%s channels=%s",
+                        self.input_params.get("name", "unknown"),
+                        self.input_device,
+                        self.input_rate,
+                        self.input_channels,
+                    )
+                    logger.info("Audio input started: mode=device")
+                    while not self._input_device_change_event.is_set():
+                        try:
+                            audio = await asyncio.wait_for(
+                                self.mic_queue.get(),
+                                timeout=0.5,
+                            )
+                        except asyncio.TimeoutError:
+                            continue
+                        pcm_16k = self.prepare_mic_chunk_for_asr(audio)
+                        await self._feed_vad_pcm16(pcm_16k)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if not self.audio_mgr.follows_system_default("input"):
+                    raise
+                logger.warning(
+                    "OS-default microphone stream failed; waiting for the "
+                    "current valid system default: %s",
+                    exc,
+                )
+                await self._refresh_system_default_audio_devices(
+                    force_kinds={"input"},
+                )
+                await asyncio.sleep(1.0)
 
     async def injected_audio_stream(self):
         """Consume framed PCM16 utterances from stdin for acceptance testing.
@@ -8822,6 +9070,13 @@ class VoiceAssistant:
         self.asr_ws = await gate.wait_until_ready()
         await self._prime_fast_first_audio()
         self.playback_task = asyncio.create_task(self.playback_worker())
+        if any(
+            self._uses_followed_system_default(kind)
+            for kind in ("input", "output")
+        ):
+            self.audio_device_monitor_task = asyncio.create_task(
+                self._audio_device_monitor()
+            )
         await self._announce_runtime_ready()
         if self.audio_input_mode == "stdin":
             await self.injected_audio_stream()
@@ -8843,6 +9098,13 @@ class VoiceAssistant:
             started=False,
             reason="cleanup",
         )
+        audio_device_monitor = getattr(self, "audio_device_monitor_task", None)
+        if audio_device_monitor is not None and not audio_device_monitor.done():
+            audio_device_monitor.cancel()
+            await asyncio.gather(
+                audio_device_monitor,
+                return_exceptions=True,
+            )
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
         for task in list(self.active_synthesis_tasks):

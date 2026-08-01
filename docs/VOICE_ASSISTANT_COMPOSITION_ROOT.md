@@ -37,17 +37,25 @@ preserved.
 
 ## Current structural baseline
 
-The 2026-07-31 re-audit found that the first extraction did not close the
-maintenance risk:
+The 2026-08-01 runtime OS-default device correction repaired a reproduced Host
+audio-lifecycle gap before target-evidence closure. Because stream ownership is
+still in `VoiceAssistant`, the change necessarily grew that existing root:
 
-| Measure | Current value |
-|---|---|
-| `orchestrator/orchestrator.py` | 8,886 lines |
-| `VoiceAssistant` methods | 167 |
-| `VoiceAssistant.__init__` | 615 lines |
-| distinct `self` attributes initialized by `__init__` | 160 |
+| Measure | Before runtime following | Current | Delta |
+|---|---:|---:|---:|
+| `orchestrator/orchestrator.py` | 8,902 lines | 9,164 lines | +262 |
+| `VoiceAssistant` methods | 167 | 174 | +7 |
+| `VoiceAssistant.__init__` | 617 lines | 626 lines | +9 |
+| distinct `self` attributes referenced by `__init__` | 160 | 167 | +7 |
 
-These counts are baselines, not semantic quality measures. They show that
+The existing `AudioDeviceManager` grew from 162 to 293 lines; no new document,
+environment variable, compatibility path, or architectural term was added. The
+consolidation opportunity is the already queued playback-delivery and input-turn
+lifecycle work: after evidence closure, those owners should absorb default-device
+monitoring, stream rollover, and switch state, then remove the seven temporary
+delegation/state methods from the composition root.
+
+These counts are structural evidence, not semantic quality measures. They show that
 calling all remaining responsibilities “intentionally composed” is not a
 sufficient closure criterion. The canonical gate prerequisite is complete.
 Further extraction begins only after the current-revision live proof and default
