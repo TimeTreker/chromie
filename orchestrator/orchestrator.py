@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from difflib import SequenceMatcher
 import json
 import logging
@@ -725,10 +726,12 @@ class VoiceAssistant:
         # to be dropped while the Agent or TTS was still working.
         self.active_asr_task: asyncio.Task | None = None
         self.active_turn_task: asyncio.Task | None = None
+        self.active_turn_tasks: dict[asyncio.Task, str] = {}
+        self._turn_cancellation_reasons: dict[asyncio.Task, str] = {}
         self.active_reflex_task: asyncio.Task | None = None
         self.concurrent_protective_reflex_tasks: set[asyncio.Task] = set()
         self._protective_reflex_failure = False
-        self._pending_turn_after_reflex: tuple[str, str] | None = None
+        self._pending_turn_after_reflex: deque[tuple[str, str]] = deque()
         self._pending_vad_audio: (
             bytes | tuple[bytes, bool, int | None] | None
         ) = None
@@ -2827,7 +2830,8 @@ class VoiceAssistant:
             "session_id": session_id,
             "conversation_id": conversation.get("conversation_id"),
             "interaction_engagement": self._interaction_engagement_context(
-                conversation
+                conversation,
+                session_id=session_id,
             ),
             "conversation": conversation,
             "session_memory": conversation.get("session_memory", {}),
@@ -2861,6 +2865,8 @@ class VoiceAssistant:
     def _interaction_engagement_context(
         self,
         conversation: dict[str, Any],
+        *,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         history = conversation.get("history")
         if not isinstance(history, list):
@@ -2872,6 +2878,16 @@ class VoiceAssistant:
             and active_pending
             or isinstance(active_tasks, list)
             and active_tasks
+        )
+        active_routed_turns = getattr(self, "active_turn_tasks", None)
+        has_other_in_flight_turn = bool(
+            isinstance(active_routed_turns, dict)
+            and any(
+                not task.done()
+                and str(candidate_session_id or "")
+                != str(session_id or "")
+                for task, candidate_session_id in active_routed_turns.items()
+            )
         )
         last_exchange_ms = 0.0
         for turn in history:
@@ -2898,10 +2914,16 @@ class VoiceAssistant:
             idle_ms is not None
             and idle_ms <= self.addressedness_engagement_timeout_s * 1000.0
         )
-        active = bool(has_active_work or recent_exchange)
+        active = bool(
+            has_active_work
+            or has_other_in_flight_turn
+            or recent_exchange
+        )
         evidence = (
             "active_task"
             if has_active_work
+            else "in_flight_turn"
+            if has_other_in_flight_turn
             else "recent_exchange"
             if recent_exchange
             else "none"
@@ -7777,17 +7799,12 @@ class VoiceAssistant:
         # Skill Runtime work.
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
-        current_task = asyncio.current_task()
-        active_turn_task = getattr(self, "active_turn_task", None)
-        active_reflex_task = getattr(self, "active_reflex_task", None)
-        if (
-            cancel_cognitive_work
-            and active_turn_task is not None
-            and active_turn_task is not current_task
-            and active_turn_task is not active_reflex_task
-            and not active_turn_task.done()
-        ):
-            active_turn_task.cancel()
+        if cancel_cognitive_work:
+            self._cancel_active_routed_turns(
+                excluding=asyncio.current_task(),
+                cancel_all=False,
+                reason="foreground_interaction_interrupted",
+            )
         for task in list(self.active_synthesis_tasks):
             if not task.done():
                 task.cancel()
@@ -7869,6 +7886,12 @@ class VoiceAssistant:
             raise ValueError(
                 "specific_goal cancellation requires the Core's exact "
                 "committed plan binding and cannot originate from ReflexOutcome"
+            )
+        if scope in {"current_interaction", "global_emergency"}:
+            self._cancel_active_routed_turns(
+                excluding=asyncio.current_task(),
+                cancel_all=(scope == "global_emergency"),
+                reason=f"protective_reflex:{scope}",
             )
         active_interaction_id = ""
         active_tasks = getattr(self, "active_interaction_tasks", None)
@@ -8024,7 +8047,7 @@ class VoiceAssistant:
         }:
             try:
                 self._invalidate_output_state(
-                    cancel_cognitive_work=(scope != "output_only"),
+                    cancel_cognitive_work=False,
                 )
                 self._schedule_output_abort(
                     new_session_id=source_turn_id,
@@ -8148,7 +8171,7 @@ class VoiceAssistant:
         }:
             try:
                 self._invalidate_output_state(
-                    cancel_cognitive_work=(scope != "output_only"),
+                    cancel_cognitive_work=False,
                 )
             except Exception as exc:
                 receipt = receipt.model_copy(
@@ -8244,21 +8267,26 @@ class VoiceAssistant:
 
     async def interrupt(self, new_session_id: Optional[str] = None):
         await self.interrupt_output(new_session_id, log_event=False)
-        tasks = set(
-            task
-            for task in getattr(
-                self,
-                "active_interaction_tasks",
-                {},
-            )
-            if not task.done()
-        )
         active = getattr(self, "active_interaction_task", None)
+        active_interaction_id = str(
+            getattr(self, "active_interaction_id", None) or ""
+        ).strip()
+        cancel_scope = getattr(self.interaction_runtime, "cancel_scope", None)
+        if callable(cancel_scope) and active_interaction_id:
+            await cancel_scope(
+                CancellationDirective(
+                    source_turn_id=str(new_session_id or "semantic_interrupt"),
+                    requested_scope="current_interaction",
+                    foreground_interaction_id=active_interaction_id,
+                    reason="Core authorized interruption of foreground work",
+                )
+            )
+        elif active is not None and not active.done():
+            cancel_all = getattr(self.interaction_runtime, "cancel_all", None)
+            if callable(cancel_all):
+                await cancel_all()
         if active is not None and not active.done():
-            tasks.add(active)
-        for task in tasks:
-            task.cancel()
-        await self.interaction_runtime.cancel_all()
+            active.cancel()
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
@@ -8442,16 +8470,74 @@ class VoiceAssistant:
         excluding: asyncio.Task | None = None,
     ) -> bool:
         primary = getattr(self, "active_reflex_task", None)
-        if primary is not None and primary is not excluding:
+        if (
+            primary is not None
+            and primary is not excluding
+            and not primary.done()
+        ):
             return True
         return any(
-            task is not excluding
+            task is not excluding and not task.done()
             for task in getattr(
                 self,
                 "concurrent_protective_reflex_tasks",
                 set(),
             )
         )
+
+    def _cancel_active_routed_turns(
+        self,
+        *,
+        excluding: asyncio.Task | None,
+        cancel_all: bool,
+        reason: str,
+    ) -> tuple[str, ...]:
+        """Cancel routed work only after an explicit scoped decision.
+
+        Ordinary turn launch never calls this method. Deterministic controls
+        and a Core-authorized semantic interruption do, with global emergency
+        selecting all eligible ordinary work and narrower scopes selecting the
+        foreground (most recently launched) turn.
+        """
+
+        active_turns = getattr(self, "active_turn_tasks", None)
+        if not isinstance(active_turns, dict):
+            active_turns = {}
+            self.active_turn_tasks = active_turns
+
+        protected = {
+            task
+            for task in {
+                getattr(self, "active_reflex_task", None),
+                *getattr(self, "concurrent_protective_reflex_tasks", set()),
+            }
+            if task is not None
+        }
+        candidates = [
+            (task, session_id)
+            for task, session_id in active_turns.items()
+            if task is not excluding
+            and task not in protected
+            and not task.done()
+        ]
+        if not cancel_all and candidates:
+            candidates = candidates[-1:]
+        reasons = getattr(self, "_turn_cancellation_reasons", None)
+        if not isinstance(reasons, dict):
+            reasons = {}
+            self._turn_cancellation_reasons = reasons
+        cancelled_session_ids: list[str] = []
+        for task, session_id in candidates:
+            reasons[task] = reason
+            task.cancel()
+            cancelled_session_ids.append(session_id)
+            self.session_log(
+                session_id or None,
+                "routed_turn_cancellation_requested: reason=%s scope=%s",
+                reason,
+                "all" if cancel_all else "foreground",
+            )
+        return tuple(cancelled_session_ids)
 
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
         reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
@@ -8489,30 +8575,21 @@ class VoiceAssistant:
                     reflex_candidate.cancellation_scope,
                 )
                 return
-            replaced = getattr(self, "_pending_turn_after_reflex", None)
-            if replaced is not None:
-                _, replaced_session_id = replaced
-                self.session_log(
-                    replaced_session_id,
-                    "turn_replaced_while_reflex_active: replacement_sid=%s",
-                    session_id,
-                )
-                state = self.sessions.state.get(replaced_session_id)
-                if state is not None:
-                    state["llm_done"] = True
-                self.maybe_session_done(replaced_session_id)
-            self._pending_turn_after_reflex = (user_text, session_id)
+            pending = self._pending_turn_after_reflex
+            pending.append((user_text, session_id))
             self.session_log(
                 session_id,
-                "turn_queued_behind_cognitive_gateway_reflex: replaced=%s",
-                replaced is not None,
+                "turn_queued_behind_cognitive_gateway_reflex: queue_depth=%s",
+                len(pending),
             )
             return
 
-        previous = getattr(self, "active_turn_task", None)
-        if previous is not None and not previous.done():
-            previous.cancel()
         task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
+        active_turns = getattr(self, "active_turn_tasks", None)
+        if not isinstance(active_turns, dict):
+            active_turns = {}
+            self.active_turn_tasks = active_turns
+        active_turns[task] = session_id
         self.active_turn_task = task
         if reflex_candidate.action == "interrupt":
             # Mark the task at launch time so a following utterance cannot
@@ -8542,11 +8619,31 @@ class VoiceAssistant:
             set(),
         )
         was_reflex = was_primary_reflex or was_concurrent_reflex
+        active_turns = getattr(self, "active_turn_tasks", None)
+        if isinstance(active_turns, dict):
+            active_turns.pop(task, None)
+        reasons = getattr(self, "_turn_cancellation_reasons", None)
+        cancellation_reason = (
+            reasons.pop(task, None)
+            if isinstance(reasons, dict)
+            else None
+        )
         if getattr(self, "active_turn_task", None) is task:
-            self.active_turn_task = None
+            self.active_turn_task = next(
+                (
+                    candidate
+                    for candidate in reversed(list((active_turns or {}).keys()))
+                    if not candidate.done()
+                ),
+                None,
+            )
         completed_ok = False
         if task.cancelled():
-            self.session_log(session_id, "turn_cancelled_by_new_session")
+            self.session_log(
+                session_id,
+                "turn_cancelled: reason=%s",
+                cancellation_reason or "external_or_cleanup",
+            )
             state = self.sessions.state.get(session_id)
             if state is not None:
                 state["llm_done"] = True
@@ -8571,30 +8668,31 @@ class VoiceAssistant:
             self.active_reflex_task = None
         if self._has_active_protective_reflex():
             return
-        pending = getattr(self, "_pending_turn_after_reflex", None)
-        self._pending_turn_after_reflex = None
+        pending = list(self._pending_turn_after_reflex)
+        self._pending_turn_after_reflex = deque()
         protective_failed = bool(
             getattr(self, "_protective_reflex_failure", False)
         )
         self._protective_reflex_failure = False
-        if pending is None:
+        if not pending:
             return
-        pending_text, pending_session_id = pending
         if not protective_failed:
+            for pending_text, pending_session_id in pending:
+                self.session_log(
+                    pending_session_id,
+                    "turn_released_after_cognitive_gateway_reflex",
+                )
+                self._launch_routed_turn(pending_text, pending_session_id)
+            return
+        for _, pending_session_id in pending:
             self.session_log(
                 pending_session_id,
-                "turn_released_after_cognitive_gateway_reflex",
+                "turn_dropped_after_failed_cognitive_gateway_reflex",
             )
-            self._launch_routed_turn(pending_text, pending_session_id)
-            return
-        self.session_log(
-            pending_session_id,
-            "turn_dropped_after_failed_cognitive_gateway_reflex",
-        )
-        state = self.sessions.state.get(pending_session_id)
-        if state is not None:
-            state["llm_done"] = True
-        self.maybe_session_done(pending_session_id)
+            state = self.sessions.state.get(pending_session_id)
+            if state is not None:
+                state["llm_done"] = True
+            self.maybe_session_done(pending_session_id)
 
     def _queue_vad_utterance(
         self,
@@ -9237,8 +9335,15 @@ class VoiceAssistant:
             task.cancel()
         if self.active_asr_task and not self.active_asr_task.done():
             self.active_asr_task.cancel()
-        if self.active_turn_task and not self.active_turn_task.done():
-            self.active_turn_task.cancel()
+        active_turn_tasks = set(
+            getattr(self, "active_turn_tasks", {}).keys()
+        )
+        active_turn_task = getattr(self, "active_turn_task", None)
+        if active_turn_task is not None:
+            active_turn_tasks.add(active_turn_task)
+        for task in active_turn_tasks:
+            if not task.done():
+                task.cancel()
         for task in list(
             getattr(self, "concurrent_protective_reflex_tasks", set())
         ):
@@ -9256,7 +9361,7 @@ class VoiceAssistant:
                 return_exceptions=True,
             )
         self.active_reflex_task = None
-        self._pending_turn_after_reflex = None
+        self._pending_turn_after_reflex = deque()
         self._pending_vad_audio = None
         sweeper = getattr(self, "session_idle_sweeper_task", None)
         if sweeper is not None and not sweeper.done():

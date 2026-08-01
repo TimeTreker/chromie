@@ -105,6 +105,8 @@ class SessionTracker:
         "fast_first_audio_suppressed",
         "playback_cancel_before_start",
         "playback_skip_cancelled",
+        "routed_turn_cancellation_requested",
+        "turn_cancelled",
         "agent_start",
         "interaction_done",
         "cognitive_interaction_ready",

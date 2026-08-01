@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import unittest
+from collections import deque
 from contextlib import nullcontext
 from types import MethodType
 from typing import Any
@@ -247,7 +248,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         assistant.active_turn_task = None
         assistant.active_reflex_task = None
-        assistant._pending_turn_after_reflex = None
+        assistant._pending_turn_after_reflex = deque()
         assistant.concurrent_protective_reflex_tasks = set()
         assistant.active_interaction_task = None
         assistant.active_interaction_id = "foreground-interaction"
@@ -1121,8 +1122,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(output_reflex.done())
         self.assertEqual(
-            assistant._pending_turn_after_reflex,
-            None,
+            list(assistant._pending_turn_after_reflex),
+            [],
         )
         emergency_tasks = set(
             assistant.concurrent_protective_reflex_tasks
@@ -1136,8 +1137,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
 
         self.assertEqual(
-            assistant._pending_turn_after_reflex,
-            ("What time is it?", "sid-ordinary"),
+            list(assistant._pending_turn_after_reflex),
+            [("What time is it?", "sid-ordinary")],
         )
         self.assertFalse(controls["ordinary_started"].is_set())
         self.assertTrue(
@@ -1385,12 +1386,14 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         events: list[str] = []
         reflex_started = asyncio.Event()
         release_reflex = asyncio.Event()
-        following_completed = asyncio.Event()
+        all_following_completed = asyncio.Event()
+        following_texts: list[str] = []
 
         class _Sessions:
             state = {
                 "sid-stop": {"llm_done": False},
                 "sid-next": {"llm_done": False},
+                "sid-another": {"llm_done": False},
             }
 
         async def handle(self: VoiceAssistant, text: str, session_id: str) -> None:
@@ -1401,7 +1404,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 events.append("reflex_completed")
                 return
             events.append(f"following_started:{text}")
-            following_completed.set()
+            following_texts.append(text)
+            if len(following_texts) == 2:
+                all_following_completed.set()
 
         async def abort_output_stream(self: VoiceAssistant) -> None:
             events.append("abort_output_stream")
@@ -1419,7 +1424,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         assistant.active_turn_task = None
         assistant.active_reflex_task = None
-        assistant._pending_turn_after_reflex = None
+        assistant._pending_turn_after_reflex = deque()
         assistant.playback_generation = 0
         assistant.active_llm_task = None
         assistant.active_synthesis_tasks = set()
@@ -1447,21 +1452,29 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(reflex_task.cancelled())
 
         assistant._launch_routed_turn("Hello after stop.", "sid-next")
+        assistant._launch_routed_turn("Keep the other request too.", "sid-another")
         await asyncio.sleep(0)
 
         self.assertIs(assistant.active_turn_task, reflex_task)
         self.assertFalse(reflex_task.cancelled())
-        self.assertFalse(following_completed.is_set())
+        self.assertFalse(all_following_completed.is_set())
         self.assertEqual(
-            assistant._pending_turn_after_reflex,
-            ("Hello after stop.", "sid-next"),
+            list(assistant._pending_turn_after_reflex),
+            [
+                ("Hello after stop.", "sid-next"),
+                ("Keep the other request too.", "sid-another"),
+            ],
         )
 
         release_reflex.set()
-        await asyncio.wait_for(following_completed.wait(), timeout=1.0)
+        await asyncio.wait_for(all_following_completed.wait(), timeout=1.0)
         await asyncio.sleep(0)
 
         self.assertFalse(reflex_task.cancelled())
+        self.assertEqual(
+            following_texts,
+            ["Hello after stop.", "Keep the other request too."],
+        )
         self.assertLess(
             events.index("reflex_completed"),
             events.index("following_started:Hello after stop."),

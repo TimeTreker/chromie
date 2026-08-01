@@ -521,8 +521,10 @@ The loop is bounded:
 - no unlimited Agent handoff or tool-call loop;
 - no automatic retry of material physical work;
 - no final completion claim from prospective planning output;
-- no stale final response after a newer turn or protective reflex preempts the
-  interaction.
+- ordinary newer turns preserve independent in-flight work rather than
+  preempting it;
+- no stale final response after explicit control or a Core-authorized decision
+  preempts an interaction.
 
 Failures remain attributed to their earliest responsible boundary:
 
@@ -571,8 +573,9 @@ The contract-first loop baseline is implemented:
    retains exact per-goal states, and commits them to goal state;
 6. bounded schema-validated `ModelObservation` values are the only provider
    payloads visible to outcome response composition;
-7. stale, cancelled, superseded, or recovery-waiting turns retain their
-   evidence while suppressing late final speech;
+7. ordinary overlapping turns retain independent lifecycle identity, while
+   explicitly cancelled, superseded, stale-output, or recovery-waiting turns
+   retain their evidence and suppress only invalid late final speech;
 8. recoverable embodied failures use a separately fingerprinted,
    confirmation-bound child plan.
 
@@ -606,7 +609,9 @@ Required Level A cases include:
 - an unknown goal, step, request, evidence ID, or stale fingerprint fails
   closed;
 - final response composition emits no skill or action;
-- a newer turn or protective reflex suppresses stale final speech;
+- an independent ordinary newer turn does not cancel earlier work;
+- explicit deterministic or Core-authorized interruption suppresses stale final
+  speech only within its effective scope;
 - an undelivered confirmation, recovery, or final response does not enter
   model-visible history;
 - an embodied emergency dispatches Soridormi's dedicated E-stop contract;

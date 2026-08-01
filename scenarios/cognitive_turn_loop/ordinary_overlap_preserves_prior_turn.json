@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "ordinary_overlap_preserves_prior_turn",
+  "suite": "cognitive_turn_loop",
+  "level": "integration",
+  "description": "A second ordinary request starts without cancelling an independent earlier routed turn; only an explicit protective control or Core-authorized interruption may cancel prior work.",
+  "tags": ["level-a", "multi-turn", "overlap", "goal-preservation"],
+  "input": {
+    "text": "One person asks for a check, then another person makes an independent request while the first is still running.",
+    "language": "en-US"
+  },
+  "stub": {
+    "execution_mode": "overlapping_turns"
+  },
+  "expect": {
+    "first_started": true,
+    "second_started": true,
+    "first_cancelled": false,
+    "first_completed": true,
+    "second_completed": true,
+    "active_turn_count": 0
+  }
+}

@@ -208,8 +208,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(summary["ok"], summary["errors"])
         self.assertEqual(summary["evidence_level"], "A")
-        self.assertEqual(summary["case_count"], 5)
-        self.assertEqual(summary["passed"], 5)
+        self.assertEqual(summary["case_count"], 6)
+        self.assertEqual(summary["passed"], 6)
         self.assertIn(
             "deterministic file-backed evidence",
             summary["claim_scope"],

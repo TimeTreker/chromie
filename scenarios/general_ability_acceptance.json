@@ -776,8 +776,8 @@
     {
       "id": "evidence_bound_cognitive_turn_closure",
       "title": "Evidence-Bound Cognitive Turn Closure",
-      "general_rule": "Every admitted effectful turn should preserve its identity through execution, retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
-      "minimum_level_a_cases": 5,
+      "general_rule": "Every admitted turn should preserve its identity and independent work across overlapping ordinary requests; only explicit protective control or Core-authorized interruption may cancel it. Effectful turns retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
+      "minimum_level_a_cases": 6,
       "root_cause_boundaries": [
         "Cognitive Gateway/ingress",
         "Goal-Driven Cognitive Core",
@@ -805,6 +805,10 @@
         {
           "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
           "rationale": "A deterministic current-interaction stop cancels the active provider request, closes its selected queued sibling as cancelled-before-start, retains both outcomes, and emits no late final."
+        },
+        {
+          "key": "cognitive_turn_loop/ordinary_overlap_preserves_prior_turn",
+          "rationale": "An independent ordinary request must not implicitly cancel an earlier in-flight turn; cancellation remains explicit and attributable."
         }
       ],
       "live_text_cases": []

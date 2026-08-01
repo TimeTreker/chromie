@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1944,6 +1945,88 @@ async def evaluate_cognitive_turn_loop_scenario(
     """Exercise the deterministic post-execution loop without live services."""
 
     stub = scenario.stub
+    if str(stub.get("execution_mode") or "") == "overlapping_turns":
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        first_started = asyncio.Event()
+        second_started = asyncio.Event()
+        release_first = asyncio.Event()
+        events: list[str] = []
+
+        class _Sessions:
+            state = {"sid-first": {}, "sid-second": {}}
+
+        async def handle(
+            self: VoiceAssistant,
+            text: str,
+            session_id: str,
+        ) -> None:
+            del self, text
+            events.append(f"started:{session_id}")
+            if session_id == "sid-first":
+                first_started.set()
+                try:
+                    await release_first.wait()
+                except asyncio.CancelledError:
+                    events.append("cancelled:sid-first")
+                    raise
+            else:
+                second_started.set()
+            events.append(f"completed:{session_id}")
+
+        assistant.active_turn_task = None
+        assistant.active_turn_tasks = {}
+        assistant.active_reflex_task = None
+        assistant.concurrent_protective_reflex_tasks = set()
+        assistant._protective_reflex_failure = False
+        assistant._pending_turn_after_reflex = deque()
+        assistant.sessions = _Sessions()
+        assistant.handle_routed_text = MethodType(handle, assistant)
+        assistant.session_log = lambda *args, **kwargs: None
+        assistant.maybe_session_done = lambda *args, **kwargs: None
+
+        assistant._launch_routed_turn(
+            "Check the first person's request.",
+            "sid-first",
+        )
+        first_task = assistant.active_turn_task
+        if first_task is None:
+            raise AssertionError("first routed turn was not launched")
+        await asyncio.wait_for(first_started.wait(), timeout=1.0)
+
+        assistant._launch_routed_turn(
+            "Handle the second person's independent request.",
+            "sid-second",
+        )
+        second_task = assistant.active_turn_task
+        if second_task is None or second_task is first_task:
+            raise AssertionError("second routed turn was not launched independently")
+        await asyncio.wait_for(second_started.wait(), timeout=1.0)
+        await asyncio.wait_for(asyncio.shield(second_task), timeout=1.0)
+        await asyncio.sleep(0)
+
+        first_cancelled_before_release = first_task.cancelled()
+        release_first.set()
+        await asyncio.gather(first_task, return_exceptions=True)
+        await asyncio.sleep(0)
+        active_turns = getattr(assistant, "active_turn_tasks", {})
+        actual = {
+            "first_started": first_started.is_set(),
+            "second_started": second_started.is_set(),
+            "first_cancelled": (
+                first_cancelled_before_release
+                or "cancelled:sid-first" in events
+            ),
+            "first_completed": "completed:sid-first" in events,
+            "second_completed": "completed:sid-second" in events,
+            "active_turn_count": len(active_turns),
+        }
+        errors = [
+            f"{key}={actual.get(key)!r}, expected {expected!r}"
+            for key, expected in scenario.expect.items()
+            if actual.get(key) != expected
+        ]
+        return {"ok": not errors, "errors": errors, "actual": actual}
+
     plan = CanonicalPlan.model_validate(stub["plan"])
     runtime = _CognitiveTurnScenarioRuntime(stub)
     sessions = SessionTracker(enabled=True)

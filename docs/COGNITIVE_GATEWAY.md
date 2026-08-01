@@ -389,6 +389,9 @@ out of Soridormi.
 11. Physical TaskGraph work remains sequential and validated; admission cannot
     relax execution safety or resource policy.
 12. Historical compatibility names are evidence-only and must not re-enter current topology or authority.
+13. An ordinary admitted turn never implies cancellation of another turn;
+    interruption requires an explicit protective scope or an unambiguous Core
+    decision and retains auditable cancellation evidence.
 
 ## 10. Acceptance cases
 
@@ -399,6 +402,7 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 |---|---|---|
 | Direct Chinese or English question | Admit original input without choosing route or capability | Core understands the goal, uses evidence when needed, and answers once |
 | Mixed-language compound request | Preserve the complete utterance without narrowing it | Core segments independent goals and plans complete coverage |
+| Independent request while another turn is in flight | Admit and preserve both turn identities; do not synthesize a cancellation reflex | Both turns remain eligible for closure unless explicit control or the Core authorizes scoped interruption |
 | `Stop now.` / `停止` during speech | Record input and trigger deterministic cancellation before model work | No stale audio resumes; affected speech goal receives cancellation evidence |
 | Emergency stop during simulated motion | Trigger trusted stop and retain `ReflexOutcome` | Provider evidence closes affected goals and proves safe idle |
 | `Explain what “stop” means` | Do not trigger reflex; admit the contextual question | Core answers without treating it as an operational stop |

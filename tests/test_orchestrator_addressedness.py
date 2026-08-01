@@ -55,6 +55,27 @@ class OrchestratorAddressednessTests(unittest.TestCase):
         self.assertTrue(context["active"])
         self.assertEqual(context["evidence"], "active_task")
 
+    def test_other_in_flight_turn_keeps_overlapping_request_engaged(self) -> None:
+        class _InFlightTask:
+            @staticmethod
+            def done() -> bool:
+                return False
+
+        assistant = self._assistant()
+        assistant.active_turn_tasks = {_InFlightTask(): "sid-first"}
+
+        context = assistant._interaction_engagement_context(
+            {
+                "history": [],
+                "active_pending_tasks": [],
+                "active_task_contexts": [],
+            },
+            session_id="sid-second",
+        )
+
+        self.assertTrue(context["active"])
+        self.assertEqual(context["evidence"], "in_flight_turn")
+
     def test_ignored_ambient_turn_does_not_open_engagement_window(self) -> None:
         context = self._assistant()._interaction_engagement_context(
             {

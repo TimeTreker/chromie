@@ -5,6 +5,16 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ## Unreleased
 
+### Multi-turn continuity
+
+- Preserve independent ordinary routed turns when another request arrives,
+  including every ordinary turn waiting behind an active protective reflex.
+- Keep cancellation explicit and scoped: deterministic control or a
+  Core-authorized interruption may cancel foreground work, while ordinary
+  speech no longer acts as an implicit cancel command.
+- Retain a fail-first Level A overlap scenario plus focused lifecycle,
+  addressedness, reflex-queue, and scoped-cancellation regression coverage.
+
 ### Shared-GPU startup reliability
 
 - Reset stale Ollama runners before the CosyVoice synthesis readiness probe so

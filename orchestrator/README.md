@@ -84,8 +84,11 @@ when plan ID/fingerprint, step, capability, arguments, timing, goal ownership, a
 output-schema identity match. Terminal `CapabilityResult` and `CapabilityTrace` records
 then produce an immutable `ExecutionOutcomeBundle`; missing results become
 `not_run`, and only bounded schema-validated observations may appear in the
-final result speech. Cancellation or a newer turn suppresses stale final audio
-without discarding outcome evidence. A recoverable Soridormi failure can
+final result speech. Barge-in may invalidate stale audible output, but an
+ordinary newer turn does not cancel the earlier routed turn or discard its Goal
+and outcome evidence. Explicit deterministic control or a Core-authorized
+foreground interruption may cancel only its bound scope. A recoverable
+Soridormi failure can
 propose only a fresh-confirmed child plan containing the failed recoverable
 subset; it cannot replay or mutate completed parent work.
 
@@ -275,6 +278,16 @@ for the transcript before choosing a cognitive or runtime cancellation scope.
 If another VAD utterance closes while ASR is still decoding, the Orchestrator
 retains the newest pending audio instead of dropping it; at most one pending
 utterance is kept to bound memory and latency.
+
+After transcription, independent ordinary routed turns are retained together;
+launching a newer turn is not a cancellation operation. If protective reflex
+work is active, every later ordinary transcript waits in FIFO order and is
+released when the reflex closes successfully. Only an explicit deterministic
+control scope or a Core-authorized semantic interruption cancels routed work.
+`current_interaction` targets the foreground turn, while `global_emergency`
+targets all eligible ordinary turns. Audible playback remains a shared ordered
+resource, so a barge-in can silence stale audio without erasing the underlying
+work.
 
 The Interaction Coordinator validates the response and submits speech and capability
 requests to the Trusted Capability Runtime. Scheduling is bounded by

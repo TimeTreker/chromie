@@ -165,6 +165,12 @@ Every user turn should resolve to one primary user-facing act:
 The chosen act must be grounded in actual runtime state. The LLM may generate the
 natural wording, but it must not change the act type or invent authority.
 
+An ordinary new turn is additional work, not an implicit cancellation signal.
+Chromie preserves independent in-flight turns and Goals even when another person
+or utterance adds work. It may cancel or supersede them only through an explicit
+deterministic stop/cancel scope or a Core decision that unambiguously authorizes
+foreground interruption; that decision and the affected work remain auditable.
+
 For one simple conversational act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
 must not answer the same act again.
