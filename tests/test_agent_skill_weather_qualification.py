@@ -52,7 +52,24 @@ def _runtime(
     goal_ids: list[str],
     targets: list[str] | None = None,
     skills: list[str] | None = None,
+    binding_location: str | None = None,
 ) -> dict:
+    new_goals = []
+    if not targets:
+        for item in goal_ids:
+            goal = {"goal_id": item}
+            if binding_location is not None:
+                goal["object"] = {
+                    "bindings": {
+                        "location": {
+                            "name": "location",
+                            "entity_type": "place",
+                            "value": binding_location,
+                            "confidence": 1.0,
+                        }
+                    }
+                }
+            new_goals.append(goal)
     return {
         "schema_version": 2,
         "event": "cognitive_runtime_resolution",
@@ -69,6 +86,18 @@ def _runtime(
                 _provenance(item) for item in (skills or [])
             ],
         },
+        "composition": {
+            "status": "resolved",
+            "safe_read_semantic_review": (
+                {
+                    "attempted": True,
+                    "succeeded": True,
+                    "strategy": "model_owned_pre_evidence_speech_review",
+                }
+                if "chromie.weather.lookup" in capabilities
+                else None
+            ),
+        },
         "goal_association": {
             "associations": (
                 [
@@ -81,9 +110,7 @@ def _runtime(
                 if targets
                 else []
             ),
-            "new_goals": (
-                [{"goal_id": item} for item in goal_ids] if not targets else []
-            ),
+            "new_goals": new_goals,
         },
     }
 
@@ -154,6 +181,7 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
         omit_base: bool = False,
         bad_provider_query: bool = False,
         bad_canonical_location: bool = False,
+        evidence_on_correction: bool = False,
     ):
         identity_path = root / "runtime-identity.json"
         identity = {
@@ -246,25 +274,52 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             _runtime(
                 "sid-correction-2",
                 "identity-digest",
-                lane="chat",
-                capabilities=[],
+                lane="tool" if evidence_on_correction else "chat",
+                capabilities=(
+                    ["chromie.weather.lookup"] if evidence_on_correction else []
+                ),
                 goal_ids=["goal-neixiang-correction"],
+                skills=skills if evidence_on_correction else None,
+                binding_location="内乡",
+            ),
+            *(
+                [
+                    _outcome(
+                        "sid-correction-2",
+                        "identity-digest",
+                        "河南省内乡县",
+                        request_location="内乡",
+                    )
+                ]
+                if evidence_on_correction
+                else []
             ),
             _gateway("sid-correction-3", "identity-digest"),
             _runtime(
                 "sid-correction-3",
                 "identity-digest",
-                lane="tool",
-                capabilities=["chromie.weather.lookup"],
-                goal_ids=["goal-neixiang-weather"],
+                lane="chat" if evidence_on_correction else "tool",
+                capabilities=(
+                    [] if evidence_on_correction else ["chromie.weather.lookup"]
+                ),
+                goal_ids=["goal-neixiang-correction"],
+                targets=["goal-neixiang-correction"],
                 skills=skills,
             ),
-            _outcome(
-                "sid-correction-3",
-                "identity-digest",
-                "重庆" if bad_location else "河南省内乡县",
-                request_location="内乡",
-                provider_query=("henan neixiang" if bad_provider_query else "neixiang"),
+            *(
+                []
+                if evidence_on_correction
+                else [
+                    _outcome(
+                        "sid-correction-3",
+                        "identity-digest",
+                        "重庆" if bad_location else "河南省内乡县",
+                        request_location="内乡",
+                        provider_query=(
+                            "henan neixiang" if bad_provider_query else "neixiang"
+                        ),
+                    )
+                ]
             ),
         ]
         events_path = root / "cognitive-events.jsonl"
@@ -366,6 +421,56 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
         )
         self.assertIn("forbidden locality", "\n".join(report["errors"]))
 
+    def test_correction_turn_weather_can_ground_reference_followup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(
+                root, evidence_on_correction=True
+            )
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+        self.assertTrue(
+            report["qualification"]["live_agent_skill_selection_validated"]
+        )
+        self.assertTrue(
+            report["qualification"]["provider_backed_weather_validated"]
+        )
+
+    def test_stale_chongqing_fast_speech_fails_reference_qualification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(root)
+            summary_payload = json.loads(summary.read_text(encoding="utf-8"))
+            reference_turn = summary_payload["scenarios"][1]["turns"][2]
+            reference_turn["session_state"] = {
+                "workflow_events": [
+                    {
+                        "event": "tts_schedule",
+                        "message": (
+                            "tts_schedule: order=0 chars=19 text='好的，我马上查一下"
+                            "今天重庆的天气情况。'"
+                        ),
+                    }
+                ]
+            }
+            summary.write_text(json.dumps(summary_payload), encoding="utf-8")
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+        self.assertFalse(
+            report["qualification"]["live_agent_skill_selection_validated"]
+        )
+        self.assertIn("user-visible speech", "\n".join(report["errors"]))
+
     def test_provider_query_must_be_the_provider_native_neixiang_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -381,6 +486,37 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
             report["qualification"]["provider_backed_weather_validated"]
         )
         self.assertIn("provider weather query", "\n".join(report["errors"]))
+
+    def test_weather_turn_requires_model_owned_safe_read_review_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(root)
+            payloads = [
+                json.loads(line)
+                for line in events.read_text(encoding="utf-8").splitlines()
+            ]
+            for payload in payloads:
+                if (
+                    payload.get("sid") == "sid-weather-1"
+                    and payload.get("event") == "cognitive_runtime_resolution"
+                ):
+                    payload["composition"]["safe_read_semantic_review"] = None
+                    break
+            events.write_text(
+                "".join(json.dumps(item) + "\n" for item in payloads),
+                encoding="utf-8",
+            )
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+        self.assertFalse(
+            report["qualification"]["live_agent_skill_selection_validated"]
+        )
+        self.assertIn("semantic review evidence is missing", "\n".join(report["errors"]))
 
     def test_canonical_location_is_not_rewritten_to_provider_syntax(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

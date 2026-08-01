@@ -60,8 +60,10 @@ package digest before returning immutable text/provenance DTOs.
   canonical location preservation, and weather-result interpretation.
 
 The selection model may choose zero, one, or both packages for a responsible
-Agent. `extends` is dependency metadata, not automatic Host selection; when both
-methods are useful, the model selects the base method before the specialization.
+Agent. `extends` is dependency metadata, not automatic Host selection or
+inherited projection content. Selecting a specialization does not load its
+parent; when both methods are useful, the model explicitly selects the base
+method before the specialization.
 Package presence still grants no Capability registration or execution authority.
 `applicable_routes` is a package-owned candidate-disclosure boundary. An empty
 list permits every structured route for compatibility; a non-empty list keeps

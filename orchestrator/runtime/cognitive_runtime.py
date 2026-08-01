@@ -367,6 +367,15 @@ class CognitiveEvidenceRecorder:
                 if composition and composition.social_attention_plan
                 else None
             ),
+            "safe_read_semantic_review": (
+                dict(composition.metadata.get("safe_read_semantic_review") or {})
+                if composition
+                and isinstance(composition.metadata, dict)
+                and isinstance(
+                    composition.metadata.get("safe_read_semantic_review"), dict
+                )
+                else None
+            ),
         }
 
     @staticmethod

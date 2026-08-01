@@ -469,7 +469,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         context = {
             "execution_capabilities": [
                 {
-                    "skill_id": "chromie.weather.lookup",
+                    "capability_id": "chromie.weather.lookup",
                     "safety_class": "safe_read",
                 }
             ]

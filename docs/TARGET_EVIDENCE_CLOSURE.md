@@ -154,7 +154,10 @@ python scripts/run_target_evidence_closure.py finalize-skill-weather \
 The verifier rejects missing Skill provenance, digest drift, stale/mismatched
 Goal bindings, canonical-location rewriting, an unexpected provider lookup key,
 a wrong administrative match, repeated lookup on the exact-memory follow-up,
-or a Chongqing observation used to answer the corrected Neixiang request.
+or a Chongqing observation used to answer the corrected Neixiang request. Every
+fresh weather read must also retain a successful model-owned pre-evidence speech
+review. This is evidence that the semantic boundary ran, not a Host wording
+classifier; the fingerprint-bound human review still judges the actual speech.
 
 ## Social Attention baseline
 

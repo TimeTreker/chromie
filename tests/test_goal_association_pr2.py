@@ -66,7 +66,7 @@ def request(
     )
 
 
-def active_goal(goal_id: str, description: str):
+def active_goal(goal_id: str, description: str, *, bindings=None):
     return {
         "goal_id": goal_id,
         "goal_version": 1,
@@ -77,6 +77,7 @@ def active_goal(goal_id: str, description: str):
             "description": description,
             "source_text": description,
             "beneficiary": "user",
+            "object": {"bindings": bindings or {}},
             "constraints": {},
             "success_criteria": [],
             "metadata": {},
@@ -114,7 +115,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                                 {
                                     "name": "location",
                                     "entity_type": "location",
-                                    "value": "Neixiang County",
+                                    "value": "Neixiang County1432567890",
                                     "confidence": 1.0,
                                 }
                             ],
@@ -154,7 +155,244 @@ class GoalAssociationResolverTests(unittest.TestCase):
             result.new_goals[0].metadata["responsibility_kind"],
             "capability_dependent",
         )
-        self.assertIn("separate spoken delivery Goal", ollama.prompts[1][0])
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn("A trigger is not proof", ollama.prompts[1][0])
+        self.assertIn("Do not use phrase matching", ollama.prompts[1][0])
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_goal_association_review",
+        )
+
+    def test_independent_spoken_performance_survives_model_semantic_review(self):
+        mixed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Look up today's weather in Neixiang County.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "Neixiang County",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Sing a short song.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([mixed, mixed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Check today's weather in Neixiang County and sing a short song.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["capability_dependent", "spoken_response"],
+        )
+        self.assertIn("such as a song, joke", ollama.prompts[1][0])
+
+    def test_failed_model_semantic_review_fails_closed(self):
+        mixed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Look up today's weather.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [],
+                },
+                {
+                    "description": "Say the result.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([mixed, "not-json"])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Check the weather and tell me the result.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.metadata["status"], "model_contract_failed")
+        self.assertTrue(result.metadata["semantic_review_attempted"])
+        self.assertFalse(result.metadata["semantic_review_succeeded"])
+        self.assertEqual(result.new_goals, [])
+        self.assertTrue(result.clarification)
+
+    def test_material_correction_after_contract_repair_gets_bound_replacement_goal(self):
+        initial = {
+            "decision": "associate",
+            "associations": [
+                {
+                    "relationship": "replace",
+                    "target_goal_ids": ["goal-weather"],
+                    "updated_description": "Check today's weather in Neixiang.",
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [],
+            "referent_updates": [
+                {
+                    "operation": "correct",
+                    "target_referent_ids": [],
+                    "confidence": 1.0,
+                }
+            ],
+            "resolved_references": [],
+            "confidence": 1.0,
+        }
+        repaired = {
+            "decision": "associate",
+            "associations": [
+                {
+                    "relationship": "replace",
+                    "target_goal_ids": ["goal-weather"],
+                    "updated_description": "Check today's weather in Neixiang.",
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "Check today's weather in Neixiang.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "place",
+                            "value": "内乡",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "date",
+                            "entity_type": "date",
+                            "value": "today",
+                            "confidence": 1.0,
+                        },
+                    ],
+                }
+            ],
+            "referent_updates": [
+                {
+                    "operation": "introduce",
+                    "entity_type": "place",
+                    "canonical_value": "内乡",
+                    "scope_kind": "goal",
+                    "confidence": 1.0,
+                }
+            ],
+            "resolved_references": [],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([initial, repaired, reviewed])
+        existing_bindings = {
+            "location": {
+                "name": "location",
+                "entity_type": "place",
+                "value": "重庆",
+                "confidence": 1.0,
+            },
+            "date": {
+                "name": "date",
+                "entity_type": "date",
+                "value": "today",
+                "confidence": 1.0,
+            },
+        }
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "不是重庆，我说的是内乡。",
+                    active_goals=[
+                        active_goal(
+                            "goal-weather",
+                            "Check today's weather in Chongqing.",
+                            bindings=existing_bindings,
+                        )
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(result.associations, [])
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["value"],
+            "内乡",
+        )
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertEqual(
+            result.metadata["semantic_review"]["triggers"],
+            ["existing_goal_semantic_update"],
+        )
+        self.assertIn("provenance-stable", ollama.prompts[2][0])
+        self.assertIn("Do not infer a correction from words", ollama.prompts[2][0])
+
+    def test_failed_semantic_review_preserves_successful_repair_evidence(self):
+        repaired = {
+            "decision": "associate",
+            "associations": [
+                {
+                    "relationship": "modify",
+                    "target_goal_ids": ["goal-weather"],
+                    "updated_description": "Check today's weather in Neixiang.",
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([{}, repaired, "not-json"])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "不是重庆，我说的是内乡。",
+                    active_goals=[
+                        active_goal(
+                            "goal-weather",
+                            "Check today's weather in Chongqing.",
+                        )
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertTrue(result.metadata["contract_repair_attempted"])
+        self.assertTrue(result.metadata["contract_repair_succeeded"])
+        self.assertTrue(result.metadata["semantic_review_attempted"])
+        self.assertFalse(result.metadata["semantic_review_succeeded"])
+        self.assertIn("semantic review", result.reason_summary.lower())
+        self.assertEqual(result.new_goals, [])
 
     def test_action_collection_review_repairs_merged_and_duplicated_goals(self):
         ollama = ScriptedOllama(

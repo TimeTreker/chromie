@@ -679,7 +679,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     context={
                         "execution_capabilities": [
                             {
-                                "skill_id": "chromie.weather.lookup",
+                                "capability_id": "chromie.weather.lookup",
                                 "safety_class": "safe_read",
                             }
                         ]
@@ -718,7 +718,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             }
         }
-        ollama = ScriptedOllama([long_output])
+        ollama = ScriptedOllama([long_output, long_output])
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
                 request(
@@ -726,7 +726,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     context={
                         "execution_capabilities": [
                             {
-                                "skill_id": "chromie.weather.lookup",
+                                "capability_id": "chromie.weather.lookup",
                                 "safety_class": "safe_read",
                             }
                         ]
@@ -739,7 +739,77 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.response_plan.immediate.text,
             "我现在就去帮你仔细看看上海今天的天气怎么样。",
         )
-        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(len(ollama.prompts), 2)
+
+    def test_safe_read_semantic_review_removes_pre_evidence_weather_claims(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "内乡", "date": "today"},
+                }
+            ],
+        )
+        unsafe = {
+            "response_plan": {
+                "immediate": {
+                    "text": "内乡今天大概32℃，还有雷雨和冰雹。",
+                    "speech_act": "none",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "A result was inferred from prior dialogue.",
+        }
+        reviewed = {
+            "response_plan": {
+                "immediate": {
+                    "text": "对不起，我刚才弄错了地点。我现在查一下内乡。",
+                    "speech_act": "acknowledge",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "Only a pre-evidence acknowledgement is truthful.",
+        }
+        ollama = ScriptedOllama([unsafe, reviewed])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.composition.response_plan.immediate.text,
+            "对不起，我刚才弄错了地点。我现在查一下内乡。",
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn("independent pre-evidence speech semantic reviewer", ollama.prompts[1][1]["system"])
+        self.assertIn("rather than keyword", ollama.prompts[1][0])
+        self.assertTrue(
+            result.metadata["safe_read_semantic_review_succeeded"]
+        )
 
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])

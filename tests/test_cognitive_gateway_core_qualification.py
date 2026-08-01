@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import os
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 from orchestrator.runtime.evidence_identity import canonical_json_sha256
+from scripts.cognitive_gateway_core_live_text import _configure_environment
 from scripts.verify_cognitive_gateway_core_qualification import verify
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +155,39 @@ def runtime_event(
 
 
 class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
+    def test_live_text_runner_bootstraps_generated_runtime_profile(self) -> None:
+        def load_profile() -> None:
+            os.environ.setdefault("ORCH_GOAL_ASSOCIATION_TIMEOUT_MS", "150000")
+            os.environ.setdefault("ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS", "900000")
+            os.environ.setdefault("OLLAMA_MODEL", "gemma4:12b")
+
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "orchestrator.orchestrator.load_runtime_environment",
+                side_effect=load_profile,
+            ) as load_runtime_environment,
+        ):
+            args = argparse.Namespace(
+                agent_url="http://127.0.0.1:8092",
+                runtime_identity=Path(temp_dir) / "runtime-identity.json",
+                speaker=False,
+            )
+
+            _configure_environment(args, Path(temp_dir))
+
+            load_runtime_environment.assert_called_once_with()
+            self.assertEqual(
+                os.environ["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000"
+            )
+            self.assertEqual(
+                os.environ["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "900000"
+            )
+            self.assertEqual(os.environ["OLLAMA_MODEL"], "gemma4:12b")
+            self.assertEqual(os.environ["ORCH_AUDIO_INPUT_MODE"], "stdin")
+            self.assertEqual(os.environ["ORCH_AUDIO_OUTPUT_MODE"], "discard")
+
     def build_fixture(self, root: Path) -> tuple[Path, Path, Path]:
         identity_path = root / "runtime-identity.json"
         identity = write_identity(identity_path)

@@ -2335,7 +2335,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
-            model="test-model",
+            model="quick-model",
+            review_model="quality-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
@@ -2370,6 +2371,9 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Do not change route", rendered)
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("Never claim an external result", rendered)
+        self.assertIn("before authoritative Goal Association", rendered)
+        self.assertIn("keep the acknowledgement generic", rendered)
+        self.assertIn("never phrase matching", rendered)
         self.assertIn("purpose=acknowledge_and_check", rendered)
         self.assertIn("commitment=checking_only", rendered)
         self.assertEqual(
@@ -2378,10 +2382,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             ]["enum"],
             ["acknowledge_and_check"],
         )
+        self.assertEqual(payload["model"], "quality-model")
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
 
-    async def test_social_framing_chat_is_rechecked_on_fast_model(self) -> None:
+    async def test_social_framing_chat_is_rechecked_on_review_model(self) -> None:
         class FramingInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2443,7 +2448,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             [payload["model"] for payload in interpreter.payloads],
-            ["quick-model", "quick-model"],
+            ["quick-model", "slow-review-model"],
         )
 
     def test_social_framing_review_keeps_trailing_tool_affordance(self) -> None:

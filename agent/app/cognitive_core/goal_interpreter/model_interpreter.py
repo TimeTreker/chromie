@@ -1155,7 +1155,7 @@ class OllamaGoalInterpreter:
         )
         session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=1200)
         return {
-            "model": self.model,
+            "model": self.review_model or self.model,
             "stream": False,
             "think": False,
             "format": {
@@ -1203,12 +1203,18 @@ class OllamaGoalInterpreter:
                         "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
                         "Safety Contract:\n"
                         "- fast_speech is emitted before downstream work finishes.\n"
+                        "- This boundary runs before authoritative Goal Association. It must not settle an indirect reference, correction, or ellipsis from history or recency.\n"
                         "- It must be a process acknowledgement only, not a final answer.\n"
                         "- Never claim an external result, memory commit, physical movement, execution, or completion.\n"
                         "- For a pending read-only Capability, acknowledge only that Chromie will check the exact model-authored bindings.\n"
                         "- For physical work, say only that Chromie will check or confirm safety; never say motion has started.\n"
                         "- For memory work, acknowledge evaluating the request; never say it was saved.\n"
                         "- If location or date is unclear, ask a brief clarification instead of guessing.\n\n"
+                        "Grounding Contract:\n"
+                        "- Use semantic reasoning, never phrase matching, lexical overlap, or recency alone.\n"
+                        "- Mention a material entity or parameter only when the latest user turn states it explicitly and unambiguously.\n"
+                        "- When the latest turn refers indirectly to a target that downstream Goal Association must resolve, keep the acknowledgement generic and do not name any candidate from history.\n"
+                        "- A generic acknowledgement such as saying Chromie will check is preferable to inventing or prematurely selecting a binding.\n\n"
                         "Output Contract:\n"
                         "- Return compact JSON only.\n"
                         "- Return exactly one key fast_speech.\n"
@@ -2083,7 +2089,7 @@ class OllamaGoalInterpreter:
                     request,
                     decision,
                     reason="chat_or_social_framing_requires_capability_grounding_review",
-                    model=self.model,
+                    model=self.review_model or self.model,
                 ),
                 stage="capability_grounding_review",
                 request=request,

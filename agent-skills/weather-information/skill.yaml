@@ -2,7 +2,7 @@ schema_version: "1.0"
 agent_skill_id: chromie.weather-information
 version: 1.0.0
 title: Weather Information
-description: Select for weather Goals involving location and time scope, rain, precipitation, temperature, apparent temperature, snow, wind, condition, or forecast interpretation; apply with the grounded external-information method.
+description: Select for weather Goals involving location and time scope, rain, precipitation, temperature, apparent temperature, snow, wind, condition, or forecast interpretation. This specialization is additive and does not contain its parent projection; when selecting it, also select the grounded external-information base method first.
 authority: agent_method_only
 execution_authority: none
 owner_approved: true

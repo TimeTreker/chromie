@@ -142,6 +142,31 @@ def _capability_ids(plan: Any) -> list[str]:
     return [str(item).strip() for item in values if str(item).strip()]
 
 
+def _validate_safe_read_semantic_review(
+    runtime_event: dict[str, Any],
+    *,
+    errors: list[str],
+    label: str,
+) -> None:
+    """Require retained proof of the model-owned pre-evidence speech review."""
+
+    composition = runtime_event.get("composition")
+    review = (
+        composition.get("safe_read_semantic_review")
+        if isinstance(composition, dict)
+        else None
+    )
+    if not isinstance(review, dict):
+        errors.append(f"{label}: safe-read semantic review evidence is missing")
+        return
+    if review.get("attempted") is not True or review.get("succeeded") is not True:
+        errors.append(
+            f"{label}: safe-read semantic review did not complete successfully"
+        )
+    if review.get("strategy") != "model_owned_pre_evidence_speech_review":
+        errors.append(f"{label}: safe-read semantic review strategy is not model-owned")
+
+
 def _goal_ids(plan: Any) -> set[str]:
     if not isinstance(plan, dict):
         return set()
@@ -166,6 +191,153 @@ def _target_goal_ids(runtime_event: dict[str, Any]) -> set[str]:
         if isinstance(targets, list):
             values.update(str(value).strip() for value in targets if str(value).strip())
     return values
+
+
+def _new_goal_binding_values(
+    runtime_event: dict[str, Any], binding_name: str
+) -> list[str]:
+    association = runtime_event.get("goal_association")
+    if not isinstance(association, dict):
+        return []
+    new_goals = association.get("new_goals")
+    if not isinstance(new_goals, list):
+        return []
+    values: list[str] = []
+    for goal in new_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_object = goal.get("object")
+        if not isinstance(goal_object, dict):
+            continue
+        bindings = goal_object.get("bindings")
+        if isinstance(bindings, dict):
+            binding = bindings.get(binding_name)
+            if isinstance(binding, dict):
+                value = str(binding.get("value") or "").strip()
+                if value:
+                    values.append(value)
+        elif isinstance(bindings, list):
+            for binding in bindings:
+                if not isinstance(binding, dict):
+                    continue
+                if str(binding.get("name") or "").strip() != binding_name:
+                    continue
+                value = str(binding.get("value") or "").strip()
+                if value:
+                    values.append(value)
+    return values
+
+
+def _record_new_goal_bindings(
+    runtime_event: dict[str, Any],
+    registry: dict[str, dict[str, list[str]]],
+) -> None:
+    association = runtime_event.get("goal_association")
+    if not isinstance(association, dict):
+        return
+    new_goals = association.get("new_goals")
+    if not isinstance(new_goals, list):
+        return
+    for goal in new_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = str(goal.get("goal_id") or "").strip()
+        goal_object = goal.get("object")
+        if not goal_id or not isinstance(goal_object, dict):
+            continue
+        bindings = goal_object.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        recorded: dict[str, list[str]] = {}
+        for name, binding in bindings.items():
+            if not isinstance(binding, dict):
+                continue
+            value = str(binding.get("value") or "").strip()
+            if value:
+                recorded.setdefault(str(name), []).append(value)
+        if recorded:
+            registry[goal_id] = recorded
+
+
+def _validate_required_goal_binding(
+    runtime_event: dict[str, Any],
+    expectation: dict[str, Any],
+    *,
+    goal_binding_registry: dict[str, dict[str, list[str]]],
+    errors: list[str],
+    label: str,
+) -> None:
+    name = str(expectation.get("name") or "").strip()
+    if not name:
+        errors.append(f"{label}: required Goal binding has no name")
+        return
+    values = _new_goal_binding_values(runtime_event, name)
+    if not values:
+        for goal_id in sorted(_target_goal_ids(runtime_event)):
+            values.extend(goal_binding_registry.get(goal_id, {}).get(name, []))
+    if not values:
+        errors.append(
+            f"{label}: no new or explicitly associated Goal contains binding {name!r}"
+        )
+        return
+    required_terms = expectation.get("value_contains_any")
+    if isinstance(required_terms, list) and not any(
+        _contains_any(value, required_terms) for value in values
+    ):
+        errors.append(
+            f"{label}: Goal binding {name!r} values {values!r} do not contain any required locality"
+        )
+    for value in values:
+        forbidden = _contains_forbidden(
+            value, expectation.get("forbid_value_contains")
+        )
+        if forbidden:
+            errors.append(
+                f"{label}: Goal binding {name!r} value {value!r} contains forbidden locality {forbidden!r}"
+            )
+
+
+def _validate_forbidden_spoken_terms(
+    retained_turn: dict[str, Any],
+    terms: Any,
+    *,
+    errors: list[str],
+    label: str,
+) -> None:
+    if not isinstance(terms, list) or not terms:
+        return
+    sid = str(retained_turn.get("sid") or "").strip()
+    spoken_texts: list[str] = []
+    history = retained_turn.get("history_tail")
+    if isinstance(history, list):
+        for item in history:
+            if not isinstance(item, dict) or item.get("role") != "assistant":
+                continue
+            if sid and str(item.get("sid") or "").strip() not in {"", sid}:
+                continue
+            text = str(item.get("text") or "")
+            if text:
+                spoken_texts.append(text)
+    session_state = retained_turn.get("session_state")
+    workflow_events = (
+        session_state.get("workflow_events")
+        if isinstance(session_state, dict)
+        else None
+    )
+    if isinstance(workflow_events, list):
+        for item in workflow_events:
+            if not isinstance(item, dict) or item.get("event") != "tts_schedule":
+                continue
+            message = str(item.get("message") or "")
+            if message:
+                spoken_texts.append(message)
+    for text in spoken_texts:
+        forbidden = _contains_forbidden(text, terms)
+        if forbidden:
+            errors.append(
+                f"{label}: retained user-visible speech contains forbidden locality "
+                f"{forbidden!r}: {text!r}"
+            )
 
 
 def _contains_any(value: Any, terms: Any) -> bool:
@@ -443,6 +615,7 @@ def verify(
         if not scenario_id or not isinstance(manifest_turns, list):
             errors.append("qualification scenario is malformed")
             continue
+        goal_binding_registry: dict[str, dict[str, list[str]]] = {}
         for turn_spec in manifest_turns:
             if not isinstance(turn_spec, dict):
                 continue
@@ -470,6 +643,12 @@ def verify(
                 gateway_event = gateway[0]
             expectation = turn_spec.get("expect")
             expectation = expectation if isinstance(expectation, dict) else {}
+            _validate_forbidden_spoken_terms(
+                retained,
+                expectation.get("forbid_spoken_contains"),
+                errors=errors,
+                label=label,
+            )
             admission = expectation.get("admission")
             if admission and gateway_event.get("admission") != admission:
                 errors.append(
@@ -483,6 +662,7 @@ def verify(
                     "required_capability_ids",
                     "forbidden_capability_ids",
                     "must_target_prior_goal_from_turn",
+                    "required_goal_binding",
                     "weather_observation",
                 )
             )
@@ -492,6 +672,7 @@ def verify(
             if not runtime:
                 continue
             runtime_event = runtime[0]
+            _record_new_goal_bindings(runtime_event, goal_binding_registry)
             if runtime_event.get("run_identity", {}).get("identity_sha256") != identity_digest:
                 errors.append(f"{label}: runtime event identity does not match")
             expected_lane = expectation.get("runtime_lane")
@@ -510,6 +691,12 @@ def verify(
                         f"{label}: selected Agent Skills {actual_skills!r} do not contain {normalized!r} in order"
                     )
             actual_capabilities = _capability_ids(plan)
+            if weather_capability and weather_capability in actual_capabilities:
+                _validate_safe_read_semantic_review(
+                    runtime_event,
+                    errors=errors,
+                    label=label,
+                )
             required_capabilities = expectation.get("required_capability_ids")
             if isinstance(required_capabilities, list):
                 missing = [str(item) for item in required_capabilities if str(item) not in actual_capabilities]
@@ -536,15 +723,66 @@ def verify(
                     errors.append(
                         f"{label}: Goal Association does not target the prior weather Goal"
                     )
-            weather_expectation = expectation.get("weather_observation")
-            if isinstance(weather_expectation, dict):
-                _validate_weather_observation(
-                    outcome[-1] if outcome else None,
-                    weather_expectation,
-                    capability_id=weather_capability,
+            required_binding = expectation.get("required_goal_binding")
+            if isinstance(required_binding, dict):
+                _validate_required_goal_binding(
+                    runtime_event,
+                    required_binding,
+                    goal_binding_registry=goal_binding_registry,
                     errors=errors,
                     label=label,
                 )
+            weather_expectation = expectation.get("weather_observation")
+            if isinstance(weather_expectation, dict):
+                source_turn_keys = weather_expectation.get("source_turn_keys")
+                if isinstance(source_turn_keys, list) and source_turn_keys:
+                    candidates: list[tuple[str, dict[str, Any]]] = []
+                    for source_turn_key in source_turn_keys:
+                        source_key = str(source_turn_key or "").strip()
+                        retained_source = turns.get((scenario_id, source_key))
+                        source_sid = (
+                            str(retained_source.get("sid") or "")
+                            if isinstance(retained_source, dict)
+                            else ""
+                        )
+                        if not source_sid:
+                            continue
+                        for source_outcome in _events_for(
+                            events,
+                            sid=source_sid,
+                            event_type="cognitive_execution_outcome",
+                        ):
+                            candidates.append((source_key, source_outcome))
+                    if not candidates:
+                        errors.append(
+                            f"{label}: no weather execution outcome exists in allowed source turns {source_turn_keys!r}"
+                        )
+                    else:
+                        candidate_errors: list[str] = []
+                        matched = False
+                        for source_key, source_outcome in candidates:
+                            trial_errors: list[str] = []
+                            _validate_weather_observation(
+                                source_outcome,
+                                weather_expectation,
+                                capability_id=weather_capability,
+                                errors=trial_errors,
+                                label=f"{scenario_id}/{source_key}",
+                            )
+                            if not trial_errors:
+                                matched = True
+                                break
+                            candidate_errors.extend(trial_errors)
+                        if not matched:
+                            errors.extend(candidate_errors)
+                else:
+                    _validate_weather_observation(
+                        outcome[-1] if outcome else None,
+                        weather_expectation,
+                        capability_id=weather_capability,
+                        errors=errors,
+                        label=label,
+                    )
 
     automated_errors = list(errors)
     automated_validated = not automated_errors

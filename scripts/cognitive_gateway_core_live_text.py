@@ -68,6 +68,13 @@ async def _wait_for_session_done(assistant: Any, sid: str, *, timeout_s: float) 
 
 
 def _configure_environment(args: argparse.Namespace, output_dir: Path) -> None:
+    # Directly importing VoiceAssistant does not load the generated runtime
+    # profile. Live source-bound collection must use the same reviewed models
+    # and cognitive budgets as the deployed composition before applying its
+    # text-injection and evidence-path overrides.
+    from orchestrator.orchestrator import load_runtime_environment  # noqa: PLC0415
+
+    load_runtime_environment()
     os.environ["AGENT_URL"] = args.agent_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"

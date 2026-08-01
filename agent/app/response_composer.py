@@ -154,7 +154,10 @@ class ResponseComposerResolver:
         previous_raw: Any = None
         initial_validation_errors = ""
         contract_repair_attempted = False
+        safe_read_semantic_review_attempted = False
+        safe_read_semantic_review_succeeded = False
         for attempt in range(2):
+            safe_read_semantic_review_succeeded = False
             raw: Any = None
             try:
                 raw = await self.ollama.generate(
@@ -180,6 +183,39 @@ class ResponseComposerResolver:
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
                 model_output = ResponseComposerModelOutput.model_validate(raw)
+                if self._is_safe_read_plan(plan, request.context):
+                    safe_read_semantic_review_attempted = True
+                    logger.info(
+                        "response_composer_safe_read_semantic_review_start sid=%s",
+                        request.sid,
+                    )
+                    reviewed = await self.ollama.generate(
+                        self._safe_read_semantic_review_prompt(
+                            request=request,
+                            plan=plan,
+                            candidate=model_output,
+                        ),
+                        system=self._safe_read_semantic_review_system_prompt(),
+                        options={
+                            "temperature": 0,
+                            "top_p": 0.9,
+                            "num_ctx": self.num_ctx,
+                            "num_predict": self.num_predict,
+                        },
+                        response_format=response_schema,
+                    )
+                    if not isinstance(reviewed, dict):
+                        raise ValueError(
+                            "safe-read semantic review output is not a JSON object"
+                        )
+                    raw = reviewed
+                    model_output = ResponseComposerModelOutput.model_validate(reviewed)
+                    safe_read_semantic_review_succeeded = True
+                    logger.info(
+                        "response_composer_safe_read_semantic_review_done sid=%s "
+                        "status=success",
+                        request.sid,
+                    )
                 self._validate_social_attention_decision(
                     model_output.social_attention_plan,
                     context=request.context,
@@ -277,6 +313,11 @@ class ResponseComposerResolver:
                         ),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
+                        "safe_read_semantic_review": {
+                            "attempted": safe_read_semantic_review_attempted,
+                            "succeeded": safe_read_semantic_review_succeeded,
+                            "strategy": "model_owned_pre_evidence_speech_review",
+                        },
                     },
                 )
                 return ResponseCompositionResolution(
@@ -299,6 +340,12 @@ class ResponseComposerResolver:
                         ),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
+                        "safe_read_semantic_review_attempted": (
+                            safe_read_semantic_review_attempted
+                        ),
+                        "safe_read_semantic_review_succeeded": (
+                            safe_read_semantic_review_succeeded
+                        ),
                     },
                 )
             except Exception as exc:
@@ -335,6 +382,10 @@ class ResponseComposerResolver:
                         "contract_schema": "ResponseComposerModelOutput",
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
+                        "safe_read_semantic_review_attempted": (
+                            safe_read_semantic_review_attempted
+                        ),
+                        "safe_read_semantic_review_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
                         "initial_raw_output": self._bounded(previous_raw, 5000)
                         if contract_repair_attempted and previous_raw is not None
@@ -379,15 +430,15 @@ class ResponseComposerResolver:
         raw = context.get("execution_capabilities")
         if not isinstance(raw, list):
             return False
-        safety_by_skill = {
-            str(item.get("skill_id") or "").strip(): str(
+        safety_by_capability = {
+            str(item.get("capability_id") or "").strip(): str(
                 item.get("safety_class") or ""
             ).strip()
             for item in raw
             if isinstance(item, dict)
         }
         return all(
-            safety_by_skill.get(step.skill_id) == "safe_read"
+            safety_by_capability.get(step.capability_id) == "safe_read"
             for step in plan.steps
         )
 
@@ -1068,6 +1119,52 @@ class ResponseComposerResolver:
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, social_attention_plan, confidence, and rationale only."
+        )
+
+    def _safe_read_semantic_review_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        candidate: ResponseComposerModelOutput,
+    ) -> str:
+        return (
+            "Independently review the candidate Response Composer DTO and return "
+            "the complete final DTO as JSON. The immutable CanonicalPlan still "
+            "contains a pending safe read, and no result from that pending read "
+            "exists at this composition boundary. This review trigger is "
+            "mechanical; the semantic judgment and revised wording belong to you.\n\n"
+            "Review the meaning of every immediate spoken sentence. It may "
+            "naturally acknowledge the request, a correction, or that Chromie is "
+            "checking. It must not state or imply any measurement, observed "
+            "condition, recommendation, conclusion, or completed lookup. Prior "
+            "dialogue and another Goal's delivered result are not factual evidence "
+            "for the pending Goal, even when the current Goal changes only one "
+            "binding. Do not infer that a result exists from a location correction "
+            "or from the presence of a verified-memory index.\n\n"
+            "Use semantic reasoning rather than keyword, number, punctuation, "
+            "phrase, or lexical-overlap tests. If the candidate already contains "
+            "only truthful pre-evidence acknowledgement, preserve its natural "
+            "wording. Otherwise revise it to a concise, human acknowledgement. "
+            "Preserve the immutable Goal coverage and return a valid explicit "
+            "social-attention decision under the supplied DTO schema. Do not add "
+            "facts or task steps.\n\n"
+            f"Authoritative user turn:\n{request.text}\n\n"
+            "Immutable CanonicalPlan JSON:\n"
+            f"{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
+            "Candidate Response Composer DTO JSON:\n"
+            f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
+            "Return only the complete ResponseComposerModelOutput JSON object."
+        )
+
+    @staticmethod
+    def _safe_read_semantic_review_system_prompt() -> str:
+        return (
+            "You are Chromie's independent pre-evidence speech semantic reviewer. "
+            "A pending safe read has no current result yet. Use model reasoning to "
+            "keep only truthful acknowledgement while preserving the typed "
+            "Response Composer contract. Host code does not inspect words or make "
+            "this semantic choice. Return JSON only."
         )
 
     @staticmethod

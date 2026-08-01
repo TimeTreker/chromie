@@ -8,7 +8,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .clients.ollama_client import (
+    OllamaClient,
+    OllamaGenerationError,
+    llm_failure_metadata,
+)
 from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
@@ -477,8 +481,11 @@ class GoalAssociationResolver:
         }
         initial_raw: dict[str, Any] | None = None
         repair_raw: dict[str, Any] | None = None
+        semantic_review_raw: dict[str, Any] | None = None
         initial_validation_error = ""
         repair_attempted = False
+        contract_repair_succeeded = False
+        semantic_review_attempted = False
 
         try:
             raw = await self.ollama.generate(
@@ -529,6 +536,7 @@ class GoalAssociationResolver:
                     turn_id=turn_id,
                     output_type=output_type,
                 )
+                contract_repair_succeeded = True
                 repair_metadata = dict(resolution.metadata)
                 repair_metadata["contract_repair"] = {
                     "attempted": True,
@@ -541,6 +549,68 @@ class GoalAssociationResolver:
                     "goal_association_contract_repair_done sid=%s status=success",
                     request.sid,
                 )
+            review_candidate = repair_raw or initial_raw
+            if review_candidate is None:
+                raise ValueError("goal-association review candidate is missing")
+            model_output = output_type.model_validate(review_candidate)
+            review_triggers = self._semantic_review_triggers(model_output)
+            if review_triggers:
+                semantic_review_attempted = True
+                logger.info(
+                    "goal_association_semantic_review_start sid=%s triggers=%s",
+                    request.sid,
+                    ",".join(review_triggers),
+                )
+                reviewed = await self.ollama.generate(
+                    self._build_semantic_review_prompt(
+                        request=request,
+                        candidate_goals=candidate_goals,
+                        output_type=output_type,
+                        raw=review_candidate,
+                        triggers=review_triggers,
+                    ),
+                    system=self._semantic_review_system_prompt(output_type),
+                    options=generation_options,
+                    response_format=response_schema,
+                )
+                if not isinstance(reviewed, dict):
+                    raise OllamaGenerationError(
+                        "goal-association semantic review response is not a JSON "
+                        "object",
+                        failure_class="structured_output_invalid",
+                        failure_domain="model_contract",
+                        architecture_attribution="not_evaluated",
+                        retryable=True,
+                    )
+                semantic_review_raw = reviewed
+                resolution = await self._validate_contract_output(
+                    reviewed,
+                    request=request,
+                    turn_id=turn_id,
+                    output_type=output_type,
+                )
+                review_metadata = dict(resolution.metadata)
+                if repair_attempted:
+                    review_metadata["contract_repair"] = {
+                        "attempted": True,
+                        "succeeded": True,
+                        "strategy": "schema_constrained_model_revision",
+                        "attempt_count": 1,
+                    }
+                review_metadata["semantic_review"] = {
+                    "attempted": True,
+                    "succeeded": True,
+                    "strategy": "model_owned_goal_association_review",
+                    "triggers": review_triggers,
+                    "attempt_count": 1,
+                }
+                resolution = resolution.model_copy(
+                    update={"metadata": review_metadata}
+                )
+                logger.info(
+                    "goal_association_semantic_review_done sid=%s status=success",
+                    request.sid,
+                )
         except Exception as exc:
             failure = llm_failure_metadata(exc)
             status = (
@@ -551,7 +621,9 @@ class GoalAssociationResolver:
             logger.exception(
                 "goal_association_inference_failed sid=%s error_type=%s error=%s "
                 "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s "
-                "repair_attempted=%s initial_validation_errors=%s initial_raw=%s repair_raw=%s",
+                "repair_attempted=%s semantic_review_attempted=%s "
+                "initial_validation_errors=%s initial_raw=%s repair_raw=%s "
+                "semantic_review_raw=%s",
                 request.sid,
                 type(exc).__name__,
                 exc,
@@ -560,9 +632,15 @@ class GoalAssociationResolver:
                 failure["architecture_attribution"],
                 failure["retryable"],
                 repair_attempted,
+                semantic_review_attempted,
                 initial_validation_error,
                 self._bounded_json(initial_raw, 4000) if initial_raw is not None else "",
                 self._bounded_json(repair_raw, 4000) if repair_raw is not None else "",
+                (
+                    self._bounded_json(semantic_review_raw, 4000)
+                    if semantic_review_raw is not None
+                    else ""
+                ),
             )
             integrity_metadata = cognitive_integrity_metadata(stage="goal_association", exc=exc, request=request)
             metadata: dict[str, Any] = {
@@ -575,7 +653,9 @@ class GoalAssociationResolver:
                 "sid": request.sid,
                 "contract_schema": output_type.__name__,
                 "contract_repair_attempted": repair_attempted,
-                "contract_repair_succeeded": False,
+                "contract_repair_succeeded": contract_repair_succeeded,
+                "semantic_review_attempted": semantic_review_attempted,
+                "semantic_review_succeeded": False,
                 **integrity_metadata,
             }
             if initial_validation_error:
@@ -584,6 +664,11 @@ class GoalAssociationResolver:
                 metadata["initial_raw_output"] = self._bounded_json(initial_raw, 4000)
             if repair_raw is not None:
                 metadata["repair_raw_output"] = self._bounded_json(repair_raw, 4000)
+            if semantic_review_raw is not None:
+                metadata["semantic_review_raw_output"] = self._bounded_json(
+                    semantic_review_raw,
+                    4000,
+                )
             return GoalAssociationResolution(
                 turn_id=turn_id,
                 clarification=self._safe_clarification(
@@ -592,7 +677,9 @@ class GoalAssociationResolver:
                 ),
                 confidence=0.0,
                 reason_summary=(
-                    "Goal association output did not satisfy the schema after one model repair attempt; no goal operation was accepted."
+                    "Goal semantic review did not complete successfully; no goal operation was accepted."
+                    if semantic_review_attempted
+                    else "Goal association output did not satisfy the schema after one model repair attempt; no goal operation was accepted."
                     if repair_attempted
                     else "Goal association model was unavailable; no goal operation was accepted."
                 ),
@@ -627,16 +714,6 @@ class GoalAssociationResolver:
                 "new_goals item for every independently observable responsibility: "
                 + ", ".join(collection_bindings)
             )
-        redundant_delivery_bindings = self._redundant_capability_delivery_bindings(
-            model_output
-        )
-        if redundant_delivery_bindings:
-            raise ValueError(
-                "a capability-dependent Goal already owns evidence acquisition, "
-                "interpretation, and delivery; do not create a separate spoken "
-                "delivery Goal with the same material bindings: "
-                + ", ".join(redundant_delivery_bindings)
-            )
         return self._expand_model_output(
             model_output,
             request=request,
@@ -666,40 +743,26 @@ class GoalAssociationResolver:
         return rejected
 
     @staticmethod
-    def _redundant_capability_delivery_bindings(
+    def _semantic_review_triggers(
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
     ) -> list[str]:
-        """Reject a duplicated delivery Goal using typed semantic bindings.
+        """Return typed review triggers without making a semantic judgment."""
 
-        A lookup and the evidence-grounded answer are one responsibility. This
-        check never reads user phrases: it compares the model-authored
-        completion modality and non-empty material binding identity.
-        """
-
-        def signature(goal: GoalAssociationModelGoal) -> tuple[tuple[str, str, str], ...]:
-            return tuple(
-                sorted(
-                    (
-                        binding.name.casefold(),
-                        binding.entity_type.casefold(),
-                        binding.value.casefold(),
-                    )
-                    for binding in goal.bindings
-                )
-            )
-
-        capability_signatures = {
-            signature(goal)
-            for goal in model_output.new_goals
-            if goal.responsibility_kind == "capability_dependent" and signature(goal)
+        triggers: list[str] = []
+        responsibility_kinds = {
+            goal.responsibility_kind for goal in model_output.new_goals
         }
-        return [
-            f"new_goals[{index}]"
-            for index, goal in enumerate(model_output.new_goals)
-            if goal.responsibility_kind == "spoken_response"
-            and signature(goal)
-            and signature(goal) in capability_signatures
-        ]
+        if {
+            "capability_dependent",
+            "spoken_response",
+        }.issubset(responsibility_kinds):
+            triggers.append("mixed_capability_and_spoken_responsibilities")
+        if isinstance(model_output, GoalAssociationModelOutput) and any(
+            association.relationship in {"modify", "replace"}
+            for association in model_output.associations
+        ):
+            triggers.append("existing_goal_semantic_update")
+        return triggers
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -948,6 +1011,7 @@ class GoalAssociationResolver:
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
+                "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
             )
             output_instructions = (
                 "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
@@ -1044,6 +1108,7 @@ class GoalAssociationResolver:
             revision_action = "Re-evaluate the semantic associations"
             state_instructions = (
                 "Re-evaluate continuity against only the supplied bounded candidate Goal IDs. "
+                "Existing Goal bindings are provenance-stable and cannot be changed by an association. If current user meaning changes a material binding, use decision=create_goals with one fully bound replacement Goal rather than a description-only association. "
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
@@ -1081,6 +1146,98 @@ class GoalAssociationResolver:
             + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, and bindings only. executable_action is effectful work; spoken_response is direct authored speech or text, including spoken performance; capability_dependent requires capability planning; other is only for a genuinely different modality. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_semantic_review_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        raw: dict[str, Any],
+        triggers: list[str],
+    ) -> str:
+        context = request.context if isinstance(request.context, dict) else {}
+        contract_name = (
+            "Goal Segmentation"
+            if output_type is GoalSegmentationModelOutput
+            else "Goal Association"
+        )
+        output_fields = (
+            "decision, new_goals, referent_updates, resolved_references, "
+            "clarification, confidence, and reason_summary"
+            if output_type is GoalSegmentationModelOutput
+            else "decision, associations, new_goals, referent_updates, "
+            "resolved_references, clarification, confidence, and reason_summary"
+        )
+        return (
+            f"Independently review this model-authored {contract_name} DTO and "
+            "return the complete final JSON object. The Host supplied only typed "
+            f"review triggers {self._bounded_json(triggers, 800)}. A trigger is "
+            "not proof that any semantic choice is wrong. "
+            "Use semantic reasoning over the authoritative user turn and bounded "
+            "dialogue context. Do not use phrase matching, binding equality, "
+            "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
+            "Keep separate Goals when the user truly requested an independently "
+            "satisfiable direct spoken or text response in addition to capability "
+            "work, such as a song, joke, or unrelated social answer. When a "
+            "spoken_response item merely phrases, reports, explains, or interprets "
+            "the evidence acquired by a capability_dependent item, the capability "
+            "Goal owns that delivery: remove the redundant spoken Goal and preserve "
+            "the complete requested outcome and correct semantic bindings in the "
+            "capability Goal. Never invent, copy, or repair an entity by character "
+            "pattern; resolve it from the user meaning and supplied discourse. "
+            "Persona and wording are expression concerns, not extra Goals.\n\n"
+            "Existing Goal bindings are provenance-stable at this contract. An "
+            "association may update only its description and lifecycle relation; "
+            "it cannot rewrite typed material bindings. If the current user meaning "
+            "changes a material entity or parameter, preserve the earlier Goal and "
+            "its evidence, then return decision=create_goals with one fully bound "
+            "replacement Goal for the corrected responsibility. The model decides "
+            "whether meaning actually changed. Do not infer a correction from words, "
+            "syntax, or binding inequality alone. If the newly salient entity has a "
+            "supplied referent ID, emit a valid correct update targeting it; otherwise "
+            "use introduce rather than fabricating a referent ID or emitting an "
+            "invalid correction.\n\n"
+            "The Host is asking for a semantic judgment, not prescribing merge or "
+            "separation. Preserve every genuinely independent responsibility, all "
+            "valid associations, and all valid discourse updates. Return only JSON "
+            f"with {output_fields}. The exact schema is enforced out-of-band.\n\n"
+            "Bounded active goals JSON:\n"
+            f"{self._bounded_json(candidate_goals, 6500)}\n\n"
+            "Scoped discourse referents JSON:\n"
+            f"{self._bounded_json(self._discourse_referents(request), 6500)}\n\n"
+            "Discourse focus stack JSON:\n"
+            f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
+            "Recent conversation JSON:\n"
+            f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
+            "DTO to review JSON:\n"
+            f"{self._bounded_json(raw, 6000)}\n\n"
+            "Tool-result contents are intentionally absent. Do not use remembered "
+            "capability results to decide Goal structure or claim completion.\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @staticmethod
+    def _semantic_review_system_prompt(
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+    ) -> str:
+        contract_name = (
+            "Goal Segmentation"
+            if output_type is GoalSegmentationModelOutput
+            else "Goal Association"
+        )
+        return (
+            f"You are Chromie's independent semantic reviewer for the "
+            f"{contract_name} boundary. Decide with model reasoning whether "
+            "responsibilities are genuinely independent and whether an existing "
+            "Goal relation preserves authoritative material bindings. "
+            "Return only the complete final DTO as JSON. The Host owns validation, "
+            "IDs, lifecycle, and persistence and does not make this semantic choice."
         )
 
     @staticmethod

@@ -105,6 +105,25 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ### Live Agent weather and planning reliability
 
+- Made the live text qualification runner load the generated runtime profile
+  before applying its diagnostic I/O overrides, so deployed model and timeout
+  ownership matches normal startup.
+- Kept additive Agent Skill selection model-owned: the weather specialization
+  declares its grounded-information dependency, but the Host neither inserts
+  that parent nor treats `extends` as inherited prompt content.
+- Consolidated Goal Association's model-owned semantic review so it handles
+  both genuinely independent spoken/capability responsibilities and material
+  corrections to retained Goals. Existing typed bindings remain
+  provenance-stable; when user meaning changes one, the model creates a fully
+  bound replacement Goal instead of relabeling the old Goal and its evidence.
+- Added an independent Response Composer model review for pending safe reads.
+  It receives the immutable Plan and candidate DTO without prior result
+  contents, preserves natural acknowledgements, and removes unsupported
+  pre-evidence claims. Host code triggers this only from typed safety metadata,
+  validates the DTO, fails closed, and never inspects wording.
+- Retained the review result in cognitive runtime evidence and require a
+  successful `model_owned_pre_evidence_speech_review` for every fresh weather
+  read in the qualification verifier.
 - Aligned Agent Skill selection schema, validation, repair prompts, context, and
   timeout budgets so single-Goal provenance no longer enters an impossible repair
   loop under the maintained local models.

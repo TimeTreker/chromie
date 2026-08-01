@@ -182,6 +182,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                 )
                 system_prompt = model.calls[0][1]["system"]
                 self.assertIn("extends field is dependency metadata", system_prompt)
+                self.assertIn("selecting a specialization never loads", system_prompt)
                 self.assertIn("base method before the specialization", system_prompt)
 
                 disclosure = AgentSkillDisclosureService(self.registry).disclose(

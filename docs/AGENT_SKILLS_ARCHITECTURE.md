@@ -514,14 +514,18 @@ User: 不是重庆，我说的是内乡。
 User: 今天那边下雨了吗？
 Goal Association:
 - resolves 那边 to the scoped Neixiang referent
-- creates Goal binding location=Neixiang
+- preserves the earlier Chongqing Goal and its evidence
+- creates a replacement Goal binding location=Neixiang when the model judges
+  that the explicit correction changes the material location
 Planner:
 - applies weather methods only after the binding is authoritative
 - never uses old Chongqing evidence to resolve the reference
 ```
 
 The Skill does not implement `那边 -> 内乡`. Goal Association remains the
-semantic authority.
+semantic authority. The Host observes only typed association relationships and
+validates the returned Goal/referent DTO; it does not infer a correction from
+phrases, place names, binding differences, or recency.
 
 ## Security and trust model
 

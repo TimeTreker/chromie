@@ -77,15 +77,30 @@
           "text": "今天那边下雨了吗？",
           "expect": {
             "admission": "admit",
-            "runtime_lane": "tool",
             "required_agent_skill_ids": [
               "chromie.grounded-external-information",
               "chromie.weather-information"
             ],
-            "required_capability_ids": [
-              "chromie.weather.lookup"
+            "forbid_spoken_contains": [
+              "重庆",
+              "Chongqing"
             ],
+            "required_goal_binding": {
+              "name": "location",
+              "value_contains_any": [
+                "内乡",
+                "Neixiang"
+              ],
+              "forbid_value_contains": [
+                "重庆",
+                "Chongqing"
+              ]
+            },
             "weather_observation": {
+              "source_turn_keys": [
+                "location_correction",
+                "resolved_reference_weather"
+              ],
               "location_contains_any": [
                 "内乡",
                 "Neixiang"

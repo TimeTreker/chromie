@@ -364,6 +364,10 @@ Implementation status:
   exact verified-memory retrieval or a fresh read, distinguish clarification and
   unavailable outcomes, prevent pre-evidence factual speech, and interpret typed
   failure stages without a Host Workflow or phrase rule;
+- the pending-safe-read Response Composer boundary now performs one independent
+  model-owned semantic review without prior result contents; retained runtime
+  evidence proves that this review ran, while the Host only validates the typed
+  result and never classifies words or facts;
 - package digest, role disclosure, no-Skill behavior, prompt budgets, Plan
   provenance, and unchanged Capability Registry authority are automatically
   verified; positive live-model selection has been observed in a dirty-source
@@ -408,6 +412,10 @@ Implementation status:
 - provider-compatible geocoding remains exclusively in the Weather Capability
   adapter; maintained Neixiang/Chongqing discourse, memory, hierarchical-location,
   result-interpretation, and response-composition regressions pass;
+- existing Goal bindings remain attached to their original evidence. Goal
+  Association's model-owned semantic review creates a fully bound replacement
+  Goal when current user meaning materially corrects one, rather than changing
+  only the old Goal description;
 - automated evidence does not substitute for live model selection or live
   provider acceptance.
 
