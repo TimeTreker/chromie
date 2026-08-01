@@ -251,7 +251,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                     },
                     {
                         "capability_id": "soridormi.turn_in_place",
-                        "args": {"yaw_radps": -0.12},
+                        "args": {"yaw_radps": 0.12},
                     },
                 ],
             }
@@ -276,7 +276,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                     },
                     {
                         "skill_id": "soridormi.turn_in_place",
-                        "args": {"yaw_radps": -0.12},
+                        "args": {"yaw_radps": 0.12},
                         "timing": "sequential",
                     },
                 ]
@@ -297,7 +297,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 (0, "vx_mps", 0.2),
                 (0, "duration_s", 10.0),
                 (1, "count", 2),
-                (2, "yaw_radps", -0.12),
+                (2, "yaw_radps", 0.12),
             ],
             arg_tolerance=1e-6,
         )

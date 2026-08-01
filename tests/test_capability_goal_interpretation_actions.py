@@ -81,7 +81,7 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
                     "source": "catalog",
                     "actions": [
                         {"capability_id": "soridormi.walk_velocity", "args": {"vx_mps": 0.15, "duration_s": 10.0}, "sequence": 0},
-                        {"capability_id": "soridormi.turn_in_place", "args": {"yaw_radps": -0.12}, "sequence": 1},
+                        {"capability_id": "soridormi.turn_in_place", "args": {"yaw_radps": 0.12}, "sequence": 1},
                         {
                             "capability_id": "soridormi.nod_yes",
                             "args": {"count": 2, "amplitude": "small", "duration_s": 1.4},

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 import time
 from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
@@ -822,34 +821,22 @@ class InteractionRuntimeCoordinator:
             "deepthinking_valid_effect_task_count",
             fallback_key="deepthinking_valid_action_count",
         )
-        unsafe_speech_without_effect = (
-            bool(response.speech)
-            and not self._has_effectful_runtime_skill(response)
-            and any(
-                self._speech_claims_unverified_effect(
-                    " ".join(str(speech.text or "").strip().split())
-                )
-                for speech in response.speech
-            )
-        )
-        if (proposed <= 0 or valid > 0) and not unsafe_speech_without_effect:
+        if proposed <= 0 or valid > 0:
             return response
         if self._has_effectful_runtime_skill(response):
             return response
         reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
         if not reason:
-            reason = (
-                "speech_claimed_effect_without_runtime_skill"
-                if unsafe_speech_without_effect
-                else "deepthinking_effect_task_without_valid_skill"
-            )
+            reason = "deepthinking_effect_task_without_valid_skill"
         metadata = {
             **response.metadata,
             "truth_reconciled": True,
             "truth_reconciliation_reason": reason,
         }
-        if self._safe_existing_truth_reconciliation_speech(response):
-            metadata["truth_reconciliation_speech_source"] = "llm_safe_existing_speech"
+        if self._has_typed_supersession_evidence(response):
+            metadata["truth_reconciliation_speech_source"] = (
+                "typed_superseded_proposal"
+            )
             return response.model_copy(deep=True, update={"metadata": metadata})
 
         metadata.update(
@@ -870,29 +857,22 @@ class InteractionRuntimeCoordinator:
             },
         )
 
-    def _safe_existing_truth_reconciliation_speech(
-        self,
+    @staticmethod
+    def _has_typed_supersession_evidence(
         response: InteractionResponse,
     ) -> bool:
         if not response.speech:
             return False
-        for speech in response.speech:
-            text = " ".join(str(speech.text or "").strip().split())
-            if not text:
-                return False
-            if self._speech_claims_unverified_effect(text):
-                return False
-        return True
-
-    @staticmethod
-    def _speech_claims_unverified_effect(text: str) -> bool:
-        return bool(
-            re.search(
-                r"(?:执行(?:指令|命令)|已经执行|正在执行|我(?:会|将|要|这就|马上|现在)(?:[^。！？,.，]*)(?:向前|往前|移动|走|转|执行)|"
-                r"I(?:'ll| will) (?:walk|move|turn|execute|perform)|\b(?:moving|walking|turning|executing|performing)\b|soridormi\.|chromie\.)",
-                text,
-                flags=re.IGNORECASE,
-            )
+        reason = str(
+            response.metadata.get("truth_reconciliation_reason") or ""
+        ).strip()
+        superseded = response.metadata.get("superseded_task_proposals")
+        if not reason or not isinstance(superseded, list) or not superseded:
+            return False
+        return all(
+            isinstance(item, dict)
+            and bool(str(item.get("superseded_by") or "").strip())
+            for item in superseded
         )
 
     @staticmethod

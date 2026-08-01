@@ -64,22 +64,38 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.turn_id, "turn-1")
         self.assertEqual(result.session_id, "turn-1")
         self.assertEqual(result.context_digest, "1" * 64)
-        self.assertEqual(client.calls, 1)
+        self.assertEqual(
+            result.source,
+            "cognitive_gateway.attention_review_model_confirmed",
+        )
+        self.assertEqual(client.calls, 2)
 
-    async def test_direct_question_fails_open_even_if_model_says_unaddressed(self) -> None:
+    async def test_false_question_suppression_is_reconsidered_by_model(self) -> None:
         client = _Client(
-            {
-                "addressed": False,
-                "speech_act": "reply",
-                "confidence": 0.98,
-            }
+            results=[
+                {
+                    "addressed": False,
+                    "speech_act": "reply",
+                    "confidence": 0.98,
+                },
+                {
+                    "addressed": True,
+                    "speech_act": "question",
+                    "confidence": 0.99,
+                },
+            ]
         )
         reviewer = AttentionReviewer(client)
 
         result = await reviewer.review(self.request("Is it hot today?"))
 
         self.assertEqual(result.disposition, "admit")
-        self.assertIn("direct_question_form", result.reason)
+        self.assertEqual(result.speech_act, "question")
+        self.assertEqual(
+            result.source,
+            "cognitive_gateway.attention_review_model_reconsidered",
+        )
+        self.assertEqual(client.calls, 2)
 
     async def test_inconsistent_unaddressed_unclear_output_is_repaired(self) -> None:
         client = _Client(
@@ -94,6 +110,11 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
                     "speech_act": "ambient_report",
                     "confidence": 0.94,
                 },
+                {
+                    "addressed": False,
+                    "speech_act": "ambient_report",
+                    "confidence": 0.93,
+                },
             ]
         )
         reviewer = AttentionReviewer(client)
@@ -106,8 +127,68 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speech_act, "ambient_report")
         self.assertEqual(
             result.source,
-            "cognitive_gateway.attention_review_model_repaired",
+            "cognitive_gateway.attention_review_model_confirmed",
         )
+        self.assertEqual(client.calls, 3)
+
+    async def test_false_dictation_suppression_is_reconsidered_by_model(self) -> None:
+        client = _Client(
+            results=[
+                {
+                    "addressed": False,
+                    "speech_act": "dictation",
+                    "confidence": 0.95,
+                },
+                {
+                    "addressed": True,
+                    "speech_act": "imperative",
+                    "confidence": 0.99,
+                },
+            ]
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(
+            self.request("Open the door, wave twice, then come back.")
+        )
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "imperative")
+        self.assertEqual(
+            result.source,
+            "cognitive_gateway.attention_review_model_reconsidered",
+        )
+        self.assertIn("suppression review admitted", result.reason)
+        self.assertEqual(client.calls, 2)
+
+    async def test_invalid_suppression_reconsideration_fails_open(self) -> None:
+        client = _Client(
+            results=[
+                {
+                    "addressed": False,
+                    "speech_act": "dictation",
+                    "confidence": 0.95,
+                },
+                {
+                    "addressed": False,
+                    "speech_act": "imperative",
+                    "confidence": 0.99,
+                },
+            ]
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(
+            self.request("Open the door, wave twice, then come back.")
+        )
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "unclear")
+        self.assertEqual(
+            result.source,
+            "cognitive_gateway.attention_review_fail_open",
+        )
+        self.assertIn("suppression review failed open", result.reason)
         self.assertEqual(client.calls, 2)
 
     async def test_failed_semantic_repair_still_admits_uncertain_input(self) -> None:

@@ -137,7 +137,7 @@ conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   --expect-arg 0:vx_mps=0.2 \
   --expect-arg 0:duration_s=10 \
   --expect-arg 1:count=2 \
-  --expect-arg 2:yaw_radps=-0.12
+  --expect-arg 2:yaw_radps=0.12
 ```
 
 Add `--no-speaker` for headless automation. Evidence is written under:
@@ -247,7 +247,8 @@ not require the supervised real-microphone run.
   forward speeds above the current Soridormi runtime limit of `0.20 m/s` are
   changed back to normal speed and Chromie tells you.
 - `turn left` or `turn right` means body yaw in place, not only looking with the
-  head.
+  head. The current Soridormi named-Skill convention uses positive yaw for left
+  and negative yaw for right.
 - `turn your head left/right` and `look left/right` mean the head-only
   `soridormi.look_direction` skill.
 - `nod` and `shake head` are head gestures.

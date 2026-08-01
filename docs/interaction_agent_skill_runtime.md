@@ -399,7 +399,7 @@ python scripts/interaction_text_mujoco_check.py \
   --expect-arg 0:vx_mps=0.2 \
   --expect-arg 0:duration_s=10 \
   --expect-arg 1:count=2 \
-  --expect-arg 2:yaw_radps=-0.12
+  --expect-arg 2:yaw_radps=0.12
 ```
 
 This command creates a text-MuJoCo evidence directory and fails closed on route,

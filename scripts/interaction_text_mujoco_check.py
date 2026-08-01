@@ -734,9 +734,20 @@ async def run_check(
             channel="text",
         )
         context_snapshot = gateway.assemble_context(turn_capture, context)
+        attention_request = gateway.attention_request(
+            turn_capture,
+            context_snapshot,
+        )
         attention_review = await assistant.agent_client.review_attention(
             session,
-            request=gateway.attention_request(turn_capture, context_snapshot),
+            request=attention_request,
+        )
+        _write_json(
+            evidence_dir / "attention_review.json",
+            {
+                "request": attention_request.model_dump(mode="json"),
+                "result": attention_review.model_dump(mode="json"),
+            },
         )
         turn_envelope = gateway.admit_attention(
             turn_capture,

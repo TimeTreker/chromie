@@ -84,21 +84,33 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertEqual(guarded.intent, "clarify_insufficient_information")
         self.assertFalse(any(item.route == "robot_action" for item in guarded.routes))
 
-    def test_uncommitted_walk_speech_becomes_confirmation_not_execution_claim(self) -> None:
+    def test_uncommitted_effect_requires_model_repair_independent_of_wording(self) -> None:
         coordinator = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
-        response = InteractionResponse(
-            speech=[{"text": "好的，我这就往前走十五秒。"}],
-            skills=[],
-            metadata={"language": "zh-CN", "route_final": "deep_thought"},
-        )
+        for text in ("好的，我这就往前走十五秒。", "I cannot do that safely."):
+            with self.subTest(text=text):
+                response = InteractionResponse(
+                    speech=[{"text": text}],
+                    skills=[],
+                    metadata={
+                        "language": "zh-CN",
+                        "route_final": "deep_thought",
+                        "deepthinking_proposed_effect_task_count": 1,
+                        "deepthinking_valid_effect_task_count": 0,
+                    },
+                )
 
-        prepared = coordinator.prepare_response(response, session_id="sid-walk")
-        spoken = " ".join(item.text for item in prepared.speech)
+                prepared = coordinator.prepare_response(
+                    response,
+                    session_id="sid-walk",
+                )
 
-        self.assertNotIn("我这就往前走", spoken)
-        self.assertEqual(spoken, "")
-        self.assertTrue(prepared.metadata.get("truth_reconciled"))
-        self.assertTrue(prepared.metadata.get("truth_reconciliation_requires_model_repair"))
+                self.assertEqual(prepared.speech, [])
+                self.assertTrue(prepared.metadata.get("truth_reconciled"))
+                self.assertTrue(
+                    prepared.metadata.get(
+                        "truth_reconciliation_requires_model_repair"
+                    )
+                )
 
     def test_gratitude_is_not_resolved_by_deterministic_phrase_routing(self) -> None:
         decision = route_by_priority_rules(

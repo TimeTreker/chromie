@@ -245,17 +245,39 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    async def test_failed_status_text_is_not_misread_as_execution_claim(self) -> None:
-        self.assertFalse(
-            InteractionRuntimeCoordinator._speech_claims_unverified_effect(
-                "这个查询未能完成。"
-            )
-        )
-        self.assertFalse(
-            InteractionRuntimeCoordinator._speech_claims_unverified_effect(
-                "第一个目标执行失败。"
-            )
-        )
+    async def test_post_execution_speech_is_not_classified_from_wording(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
+
+        for text in (
+            "I walked forward and finished the turn.",
+            "I've finished walking forward and turning.",
+            "第一个目标执行失败。",
+        ):
+            with self.subTest(text=text):
+                prepared = coordinator.prepare_response(
+                    InteractionResponse(
+                        speech=[
+                            {
+                                "text": text,
+                                "metadata": {
+                                    "source": (
+                                        "evidence_bound_tool_result_interpretation"
+                                    ),
+                                    "phase": "post_execution",
+                                },
+                            }
+                        ],
+                        metadata={
+                            "source": "evidence_bound_tool_result_interpretation",
+                            "phase": "post_execution",
+                        },
+                    ),
+                    session_id="sid-post-execution",
+                )
+
+                self.assertEqual(prepared.status, "ok")
+                self.assertEqual(prepared.speech[0].text, text)
+                self.assertFalse(prepared.metadata.get("truth_reconciled", False))
 
     async def test_read_only_chromie_tool_is_not_classified_as_effectful_motion(self) -> None:
         response = InteractionResponse(
@@ -368,6 +390,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             prepared.metadata["truth_reconciliation_reason"],
             "quick_intent_misread_warning",
+        )
+        self.assertEqual(
+            prepared.metadata["truth_reconciliation_speech_source"],
+            "typed_superseded_proposal",
         )
         ledger = prepared.metadata["task_proposal_ledger"]
         self.assertEqual(ledger["summary"]["superseded_count"], 1)

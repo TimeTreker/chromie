@@ -1,5 +1,23 @@
 # Changelog
 
+- Reproduced the source-bound compound MuJoCo request being discarded before
+  Core entry because Attention Review mislabeled a direct imperative as
+  dictation. Suppression candidates now receive one independent schema-bound
+  model reconsideration and fail open on disagreement or review failure; no
+  Host phrase rule selects addressedness. The MuJoCo evidence runner now retains
+  the exact attention request and result before admission.
+- Removed the Host regular expression that inferred physical-action claims from
+  spoken words. Truth reconciliation now enforces only typed effect-proposal
+  counts and explicit proposal-supersession links. Evidence-bound completion
+  speech therefore remains valid independent of whether the model says
+  “walked” or “finished walking,” while an uncommitted effect proposal still
+  fails closed for model repair independent of its wording.
+- Corrected the compound-turn acceptance expectation to the paired Soridormi
+  named-Skill convention: positive yaw is left and negative yaw is right. The
+  earlier negative-left assertion contradicted the provider contract and could
+  reject a correct plan or accept motion in the wrong direction; no runtime
+  phrase-to-direction rule was added.
+
 This file records notable current changes. Detailed earlier development history is
 preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-07-30.md).
 

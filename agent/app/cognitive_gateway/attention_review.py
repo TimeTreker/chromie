@@ -149,18 +149,7 @@ class AttentionReviewer:
                 reason=f"attention review failed open: {type(exc).__name__}",
             )
 
-        direct_question_form = request.text.rstrip().endswith(("?", "？"))
-        fail_open_reason = ""
-        if result.addressed or result.confidence < self.min_suppression_confidence:
-            fail_open_reason = "addressed_or_low_confidence"
-        elif result.speech_act in DIRECTED_SPEECH_ACTS:
-            fail_open_reason = "direct_speech_act"
-        elif result.speech_act == "unclear":
-            fail_open_reason = "unclear_speech_act"
-        elif direct_question_form:
-            fail_open_reason = "direct_question_form"
-        elif result.speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
-            fail_open_reason = "unsupported_speech_act"
+        fail_open_reason = self._admission_reason(result)
 
         if fail_open_reason:
             return AttentionReviewResult(
@@ -173,16 +162,92 @@ class AttentionReviewer:
                 source=source,
                 reason=f"attention review admitted: {fail_open_reason}",
             )
+
+        # Suppression discards the turn before ordinary Core semantics.  A
+        # schema-valid first answer is therefore not sufficient authority: ask
+        # the model to reconsider the semantic distinction independently and
+        # fail open on disagreement or an invalid review.  This stays inside
+        # the existing model-owned Attention Review instead of asking Host
+        # phrase rules to recognize questions, requests, or imperatives.
+        try:
+            reconsidered_raw = await self.client.generate(
+                self._suppression_review_prompt(
+                    request,
+                    initial_output=result.model_dump(mode="json"),
+                ),
+                system=self._system_prompt(),
+                options=options,
+                response_format=self._response_schema(),
+            )
+            if not isinstance(reconsidered_raw, dict):
+                raise ValueError(
+                    "attention suppression review did not return a JSON object"
+                )
+            reconsidered = self._validate_model_output(reconsidered_raw)
+        except Exception as exc:
+            logger.warning(
+                "attention_suppression_review_failed turn_id=%s "
+                "error_type=%s error=%s",
+                request.turn_id,
+                type(exc).__name__,
+                exc,
+            )
+            return self._admit(
+                request=request,
+                confidence=0.0,
+                source="cognitive_gateway.attention_review_fail_open",
+                reason=(
+                    "attention suppression review failed open: "
+                    f"{type(exc).__name__}"
+                ),
+            )
+
+        reconsidered_reason = self._admission_reason(reconsidered)
+        if reconsidered_reason:
+            logger.info(
+                "attention_suppression_review_disagreed turn_id=%s "
+                "initial_speech_act=%s reconsidered_speech_act=%s reason=%s",
+                request.turn_id,
+                result.speech_act,
+                reconsidered.speech_act,
+                reconsidered_reason,
+            )
+            return AttentionReviewResult(
+                turn_id=request.turn_id,
+                session_id=request.session_id,
+                context_digest=request.context_digest,
+                disposition="admit",
+                speech_act=reconsidered.speech_act,
+                confidence=reconsidered.confidence,
+                source="cognitive_gateway.attention_review_model_reconsidered",
+                reason=(
+                    "attention suppression review admitted: "
+                    f"{reconsidered_reason}"
+                ),
+            )
         return AttentionReviewResult(
             turn_id=request.turn_id,
             session_id=request.session_id,
             context_digest=request.context_digest,
             disposition="suppress",
-            speech_act=result.speech_act,
-            confidence=result.confidence,
-            source=source,
-            reason="inactive turn reviewed as unaddressed ambient speech",
+            speech_act=reconsidered.speech_act,
+            confidence=min(result.confidence, reconsidered.confidence),
+            source="cognitive_gateway.attention_review_model_confirmed",
+            reason=(
+                "inactive turn independently confirmed as unaddressed ambient speech"
+            ),
         )
+
+    def _admission_reason(self, result: _AttentionModelOutput) -> str:
+        if result.addressed or result.confidence < self.min_suppression_confidence:
+            return "addressed_or_low_confidence"
+        if result.speech_act in DIRECTED_SPEECH_ACTS:
+            return "direct_speech_act"
+        if result.speech_act == "unclear":
+            return "unclear_speech_act"
+        if result.speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
+            return "unsupported_speech_act"
+        return ""
 
     @staticmethod
     def _validate_model_output(raw: dict[str, Any]) -> _AttentionModelOutput:
@@ -267,7 +332,10 @@ class AttentionReviewer:
             "addressed question. 'She said the model runs locally.' is "
             "unaddressed narration; 'Tell me whether the model runs locally.' is "
             "an addressed request. With no active exchange, isolated 'Yeah.' is "
-            "an unaddressed reply. If the linguistic function or addressee is "
+            "an unaddressed reply. A bare sequence such as 'Open the door, wave "
+            "twice, then come back' is an addressed imperative, not dictation; "
+            "dictation requires clear transcription, quotation, or wording-for-"
+            "another-recipient context. If the linguistic function or addressee is "
             "genuinely ambiguous, use addressed=true and speech_act=unclear. "
             "addressed=false is valid only with reply, ambient_report, dictation, "
             "or narration. Return only the schema-valid JSON object."
@@ -296,6 +364,29 @@ class AttentionReviewer:
             "Use addressed=true with unclear when ambiguity remains.\n"
             f"Validation error: {validation_error[:500]}\n"
             f"Previous output: {initial_output}\n"
+            f"Host engagement evidence: {request.engagement}\n"
+            f"Language hint: {request.language}\n"
+            f"Latest transcript: {request.text}"
+        )
+
+    @staticmethod
+    def _suppression_review_prompt(
+        request: AttentionReviewRequest,
+        *,
+        initial_output: dict[str, Any],
+    ) -> str:
+        return (
+            "Independently reconsider whether suppressing this transcript before "
+            "Chromie's Cognitive Core is definitely justified. The previous "
+            "classification is an untrusted proposal and may be semantically "
+            "wrong. Direct questions, requests, imperatives, greetings, and bare "
+            "sequences of requested actions are addressed even without Chromie's "
+            "name or the pronoun 'you'. Dictation requires clear transcription, "
+            "quotation, or wording-for-another-recipient context; do not call a "
+            "bare action command dictation. If the speech function or addressee "
+            "is genuinely uncertain, return addressed=true and "
+            "speech_act=unclear. Return a fresh schema-valid judgment only.\n"
+            f"Previous proposal: {initial_output}\n"
             f"Host engagement evidence: {request.engagement}\n"
             f"Language hint: {request.language}\n"
             f"Latest transcript: {request.text}"

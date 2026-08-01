@@ -97,7 +97,7 @@ class OutcomeObservationTests(unittest.TestCase):
         observations = [
             {
                 "type": "locomotion.turn",
-                "args": {"yaw_radps": -0.15, "duration_s": 2.0},
+                "args": {"yaw_radps": 0.15, "duration_s": 2.0},
             }
         ]
 
@@ -106,7 +106,7 @@ class OutcomeObservationTests(unittest.TestCase):
             [
                 {
                     "type": "locomotion.turn",
-                    "arg_ranges": {"yaw_radps": {"max": -0.000001}},
+                    "arg_ranges": {"yaw_radps": {"min": 0.000001}},
                 }
             ],
         )
@@ -116,13 +116,13 @@ class OutcomeObservationTests(unittest.TestCase):
             [
                 {
                     "type": "locomotion.turn",
-                    "args": {"yaw_radps": 0.15},
+                    "args": {"yaw_radps": -0.15},
                 }
             ],
             [
                 {
                     "type": "locomotion.turn",
-                    "arg_ranges": {"yaw_radps": {"max": -0.000001}},
+                    "arg_ranges": {"yaw_radps": {"min": 0.000001}},
                 }
             ],
         )

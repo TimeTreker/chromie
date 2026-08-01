@@ -68,6 +68,22 @@ The retained set covers:
 - an elliptical follow-up that reuses recent trusted tool evidence, targets the
   prior semantic Goal, and does not repeat the lookup.
 
+The paired MuJoCo runner retains its exact `AttentionReviewRequest` and
+`AttentionReviewResult` before Core admission. A suppression candidate must be
+independently reconsidered inside the existing model-owned Attention Review;
+only two agreeing, schema-valid, high-confidence ambient judgments may discard
+an inactive turn. Disagreement, invalid reconsideration, or review failure
+admits the turn for ordinary Core semantics. The Host does not recognize action
+phrases, question punctuation, or otherwise replace the model's addressedness
+judgment.
+
+The Host also does not inspect response wording to decide whether speech claims
+an embodied effect. It validates the existing typed effect-proposal counts and
+explicit supersession links. A proposed effect with no valid executable Skill
+fails closed for model repair unless a typed replacement supersedes it; a
+post-execution response remains governed by its evidence-bound response
+contract, so equivalent completion wording cannot change runtime admission.
+
 No scenario ID, expected lane, expected skill, or expected answer is passed to
 Chromie's cognitive models.
 
