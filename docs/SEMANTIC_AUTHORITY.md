@@ -55,6 +55,15 @@ complete.
 | Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
 | Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
 
+When Goal Association explicitly binds one Goal with `entity_type=action_list`,
+Fast and Deep Planning require a bounded model-authored semantic completeness
+audit before accepting an effectful Plan. The audit can only accept or reject;
+it cannot add steps, choose a Capability, revise the Plan, or authorize
+execution. Fast rejection escalates to Deep Planning. Deep rejection or audit
+unavailability removes every executable step and returns clarification. This is
+a fail-closed validation of the current Planner's coverage claim, not another
+planning authority or a Host phrase-to-action rule.
+
 `GET /semantic-authority` exposes the same machine-readable route matrix from
 the Agent service.
 

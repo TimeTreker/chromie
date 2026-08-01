@@ -377,6 +377,48 @@ class _FakePipeWireProcess:
         return 0
 
 
+class _FakeLatePipeWireStdout:
+    def __init__(self) -> None:
+        self._lines = [
+            b'Found "default" metadata 41\n',
+            (
+                b"update: id:0 key:'default.audio.source' "
+                b"value:'{\"name\":\"built-in-mic\"}' "
+                b"type:'Spa:String:JSON'\n"
+            ),
+        ]
+        self._initial_gap_seen = False
+        self._updates = [
+            (
+                b"update: id:0 key:'default.audio.sink' "
+                b"value:'{\"name\":\"built-in-output\"}' "
+                b"type:'Spa:String:JSON'\n"
+            ),
+            (
+                b"update: id:0 key:'default.audio.sink' "
+                b"value:'{\"name\":\"usb-headphones\"}' "
+                b"type:'Spa:String:JSON'\n"
+            ),
+        ]
+
+    async def readline(self) -> bytes:
+        if self._lines:
+            return self._lines.pop(0)
+        if not self._initial_gap_seen:
+            self._initial_gap_seen = True
+            await asyncio.sleep(10)
+        if self._updates:
+            return self._updates.pop(0)
+        await asyncio.sleep(10)
+        return b""
+
+
+class _FakeLatePipeWireProcess(_FakePipeWireProcess):
+    def __init__(self) -> None:
+        super().__init__()
+        self.stdout = _FakeLatePipeWireStdout()
+
+
 class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
     @staticmethod
     def _params(
@@ -450,6 +492,23 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         ):
             changes = manager.watch_system_default_changes()
             self.assertEqual(await anext(changes), "input")
+            self.assertEqual(await anext(changes), "output")
+            await changes.aclose()
+
+        self.assertTrue(process.terminated)
+
+    async def test_pipewire_monitor_treats_late_first_key_as_baseline(self) -> None:
+        process = _FakeLatePipeWireProcess()
+
+        async def create_process(*args, **kwargs):
+            return process
+
+        manager = AudioDeviceManager()
+        with mock.patch(
+            "orchestrator.audio_device_manager.asyncio.create_subprocess_exec",
+            new=create_process,
+        ):
+            changes = manager.watch_system_default_changes()
             self.assertEqual(await anext(changes), "output")
             await changes.aclose()
 

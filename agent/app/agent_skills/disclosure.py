@@ -293,7 +293,35 @@ def _bounded_items(value: Any) -> tuple[str, ...]:
     return tuple(item[:500] for item in items if item.strip())[:32]
 
 
-def _goal_contexts(context: dict[str, Any]) -> tuple[AgentSkillSelectionGoalContext, ...]:
+def _association_goal_ids(context: dict[str, Any]) -> set[str]:
+    """Return only the Goals accepted for the current planning turn."""
+
+    association = context.get("goal_association_resolution")
+    if not isinstance(association, dict):
+        return set()
+    goal_ids: set[str] = set()
+    for item in association.get("associations") or []:
+        if not isinstance(item, dict):
+            continue
+        goal_ids.update(
+            goal_id
+            for raw_goal_id in item.get("target_goal_ids") or []
+            if (goal_id := " ".join(str(raw_goal_id or "").strip().split()))
+        )
+    for item in association.get("new_goals") or []:
+        if not isinstance(item, dict):
+            continue
+        goal_id = " ".join(str(item.get("goal_id") or "").strip().split())
+        if goal_id:
+            goal_ids.add(goal_id)
+    return goal_ids
+
+
+def _goal_contexts(
+    context: dict[str, Any],
+    *,
+    allowed_goal_ids: set[str] | None = None,
+) -> tuple[AgentSkillSelectionGoalContext, ...]:
     candidates: list[Any] = []
     for key in ("active_goal_snapshots", "recent_goal_snapshots", "goals"):
         value = context.get(key)
@@ -324,6 +352,8 @@ def _goal_contexts(context: dict[str, Any]) -> tuple[AgentSkillSelectionGoalCont
             raw.get("description") or raw.get("summary") or ""
         ).strip()
         if not goal_id or not description or goal_id in seen:
+            continue
+        if allowed_goal_ids is not None and goal_id not in allowed_goal_ids:
             continue
         try:
             out.append(
@@ -377,13 +407,19 @@ def build_agent_skill_selection_request(
     summary = [f"route={request.route_decision.route}"]
     if request.route_decision.intent:
         summary.append(f"intent={request.route_decision.intent}")
+    current_goal_ids = _association_goal_ids(context)
+    allowed_goal_ids = (
+        current_goal_ids
+        if current_goal_ids and agent_role != "goal_association"
+        else None
+    )
     return AgentSkillSelectionRequest(
         sid=sid,
         turn_id=_turn_id(sid=sid, text=request.text, context=context),
         agent_role=agent_role,
         text=request.text,
         language=str(request.language or "und"),
-        goals=_goal_contexts(context),
+        goals=_goal_contexts(context, allowed_goal_ids=allowed_goal_ids),
         context_summary=tuple(summary),
     )
 
@@ -575,6 +611,67 @@ def bind_agent_skill_provenance_to_plan(
             }
         ).model_dump(mode="python")
     )
+
+
+def attach_planner_disclosure_metadata_fail_closed(
+    plan: CanonicalPlan,
+    resolution: AgentSkillDisclosureResolution,
+    *,
+    inherited_plan_provenance: tuple[PlanAgentSkillProvenance, ...] = (),
+) -> CanonicalPlan:
+    """Attach planner provenance or return a non-executable structured Plan.
+
+    Exact provenance validation remains strict in
+    :func:`bind_agent_skill_provenance_to_plan`.  HTTP planner boundaries use
+    this wrapper so a rejected provenance join cannot become an unhandled 500
+    or leave executable steps in the response.
+    """
+
+    try:
+        return bind_agent_skill_provenance_to_plan(
+            plan,
+            resolution,
+            inherited=inherited_plan_provenance,
+        )
+    except ValueError as exc:
+        logger.error(
+            "agent_skill_plan_provenance_rejected sid=%s turn_id=%s "
+            "planner_tier=%s error_type=%s error=%s",
+            resolution.sid,
+            resolution.turn_id,
+            plan.planner_tier,
+            type(exc).__name__,
+            exc,
+        )
+        metadata = dict(plan.metadata)
+        metadata[_CONTEXT_KEY] = trace_disclosure_metadata(resolution)
+        metadata["agent_skill_provenance_attachment"] = {
+            "status": "rejected",
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:500],
+            "execution_allowed": False,
+        }
+        common = {
+            "plan_id": plan.plan_id,
+            "planner_tier": plan.planner_tier,
+            "coverage": "uncertain",
+            "confidence": 0.0,
+            "goal_ids": list(plan.goal_ids),
+            "goal_summary": plan.goal_summary,
+            "steps": [],
+            "unresolved": ["agent_skill_provenance_invalid"],
+            "metadata": metadata,
+        }
+        if plan.planner_tier == "fast":
+            return CanonicalPlan(
+                disposition="escalate",
+                escalation_reason="agent_skill_provenance_invalid",
+                **common,
+            )
+        return CanonicalPlan(
+            disposition="unavailable",
+            **common,
+        )
 
 
 def attach_disclosure_metadata(

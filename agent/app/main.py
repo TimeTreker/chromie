@@ -18,6 +18,7 @@ from .agent_skills import (
     AgentSkillProgressiveDisclosureCoordinator,
     AgentSkillSelectionService,
     attach_disclosure_metadata,
+    attach_planner_disclosure_metadata_fail_closed,
     inherited_plan_agent_skill_provenance,
     build_configured_agent_skill_registry,
 )
@@ -1118,7 +1119,7 @@ async def resolve_fast_plan(request: AgentRunRequest):
         "fast_planner",
     )
     result = await fast_planner_resolver.resolve(prepared)
-    return attach_disclosure_metadata(result, disclosure)
+    return attach_planner_disclosure_metadata_fail_closed(result, disclosure)
 
 
 @app.post("/deep-plan")
@@ -1130,7 +1131,7 @@ async def resolve_deep_plan(request: AgentRunRequest):
         "deep_planner",
     )
     result = await deep_planner_resolver.resolve(prepared)
-    return attach_disclosure_metadata(
+    return attach_planner_disclosure_metadata_fail_closed(
         result,
         disclosure,
         inherited_plan_provenance=inherited_plan_agent_skill_provenance(

@@ -20,6 +20,7 @@ from .cognitive_identity import (
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
+    coordinated_action_goal_ids,
     evidence_bound_dialogue,
     expected_goal_ids,
     fast_multi_goal_response_schema,
@@ -27,6 +28,7 @@ from .planner_contract import (
     materialize_goal_outcomes,
     materialize_planner_metadata,
     planner_contract_diagnostics,
+    review_coordinated_action_plan_coverage,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -317,6 +319,71 @@ class FastPlannerResolver:
                 request=request,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
             )
+            coordinated_goal_ids = coordinated_action_goal_ids(
+                canonical_goal_grounding(request.context)
+            )
+            if (
+                coordinated_goal_ids.intersection(validated.goal_ids)
+                and validated.disposition in {"execute", "mixed"}
+                and validated.steps
+            ):
+                try:
+                    coverage_review = await review_coordinated_action_plan_coverage(
+                        self.ollama,
+                        request_text=request.text,
+                        language=str(request.language or "und"),
+                        authoritative_goals=canonical_goal_grounding(request.context),
+                        plan=validated,
+                        capabilities=capability_payload,
+                        num_ctx=self.num_ctx,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "fast_planner_coverage_review_unavailable sid=%s "
+                        "error_type=%s error=%s",
+                        request.sid,
+                        type(exc).__name__,
+                        exc,
+                    )
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "coordinated_action_coverage_review_unavailable",
+                        error=exc,
+                        path_classification="coverage_review_failure",
+                        metadata={
+                            "coordinated_goal_ids": sorted(coordinated_goal_ids),
+                            "execution_allowed": False,
+                        },
+                    )
+                if coverage_review.decision != "accept":
+                    logger.warning(
+                        "fast_planner_coverage_review_rejected sid=%s "
+                        "uncovered=%s reason=%s",
+                        request.sid,
+                        coverage_review.uncovered_requirements,
+                        coverage_review.reason,
+                    )
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "coordinated_action_coverage_incomplete",
+                        unresolved=coverage_review.uncovered_requirements,
+                        path_classification="semantic_escalation",
+                        metadata={
+                            "coordinated_goal_ids": sorted(coordinated_goal_ids),
+                            "coverage_review": coverage_review.model_dump(mode="json"),
+                            "execution_allowed": False,
+                        },
+                    )
+                metadata = dict(validated.metadata)
+                metadata["coverage_review"] = {
+                    "status": "accepted",
+                    "confidence": coverage_review.confidence,
+                    "reason": coverage_review.reason,
+                    "execution_authority": "none",
+                }
+                validated = validated.model_copy(update={"metadata": metadata})
             if contract_repair_attempted:
                 metadata = dict(validated.metadata)
                 metadata.update(

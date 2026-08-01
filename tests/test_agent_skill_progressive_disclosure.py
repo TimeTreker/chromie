@@ -352,6 +352,61 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
         )
         self.assertIn("location", selection_request.goals[0].bindings[0])
 
+    def test_planner_selection_excludes_unrelated_retained_goal(self) -> None:
+        request = self._request()
+        context = {
+            "recent_goal_snapshots": [
+                {
+                    "status": "done",
+                    "goal": {
+                        "goal_id": "goal-weather-complete",
+                        "description": "Interpret the completed weather result.",
+                        "bindings": [
+                            {"name": "location", "value": "Chongqing"}
+                        ],
+                    },
+                }
+            ],
+            "goal_association_resolution": {
+                "associations": [],
+                "new_goals": [
+                    {
+                        "goal_id": "goal-current-action",
+                        "description": "Walk while blinking.",
+                        "bindings": [
+                            {
+                                "name": "actions",
+                                "entity_type": "action_list",
+                                "value": "walking, blinking",
+                            }
+                        ],
+                    }
+                ],
+            },
+        }
+        action_request = request.model_copy(
+            update={
+                "text": "Walk while blinking.",
+                "route_decision": RouteDecision(
+                    route="robot_action",
+                    intent="compound_action",
+                    confidence=0.95,
+                    source="llm",
+                ),
+                "context": context,
+            }
+        )
+
+        selection_request = build_agent_skill_selection_request(
+            action_request,
+            agent_role="fast_planner",
+        )
+
+        self.assertEqual(
+            [goal.goal_id for goal in selection_request.goals],
+            ["goal-current-action"],
+        )
+
     def test_selected_projection_loads_with_exact_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

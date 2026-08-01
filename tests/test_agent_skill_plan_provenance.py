@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from agent.app.agent_skills import (
     attach_disclosure_metadata,
+    attach_planner_disclosure_metadata_fail_closed,
     inherited_plan_agent_skill_provenance,
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
@@ -170,6 +171,31 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValidationError, "unknown goal IDs"):
             attach_disclosure_metadata(self._plan(), disclosure)
+
+    def test_planner_boundary_fails_closed_for_unknown_provenance_goal(self) -> None:
+        disclosure = self._disclosure(
+            "fast_planner",
+            skill_id="chromie.stale-weather-method",
+            goal_ids=("goal-weather-complete",),
+        )
+
+        plan = attach_planner_disclosure_metadata_fail_closed(
+            self._plan(),
+            disclosure,
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.coverage, "uncertain")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(
+            plan.escalation_reason,
+            "agent_skill_provenance_invalid",
+        )
+        self.assertFalse(
+            plan.metadata["agent_skill_provenance_attachment"][
+                "execution_allowed"
+            ]
+        )
 
     def test_plan_fingerprint_includes_skill_provenance(self) -> None:
         plain = self._plan()

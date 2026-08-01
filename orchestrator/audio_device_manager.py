@@ -158,6 +158,13 @@ class AudioDeviceManager:
                 if parsed is None:
                     continue
                 kind, key, value = parsed
+                if key not in observed:
+                    # PipeWire may publish one member of the default/configured
+                    # key pair after the initial monitor burst. Its first value
+                    # is baseline state, not evidence that the user changed the
+                    # selected device.
+                    observed[key] = value
+                    continue
                 previous = observed.get(key)
                 observed[key] = value
                 if previous != value:

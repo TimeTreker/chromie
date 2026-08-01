@@ -588,6 +588,76 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
 
+    def test_coordinated_action_review_blocks_single_step_overclaim(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_ids": ["goal-action"],
+            "goal_summary": "Walk while blinking and singing.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-action"],
+                    "reason_summary": "Walk for the requested duration.",
+                }
+            ],
+            "goal_satisfaction": exact_satisfaction(["goal-action"]),
+        }
+        run_request = request(
+            "Walk for 15 seconds while blinking and singing.",
+            goal_ids=["goal-action"],
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-action",
+                    "description": "Walk while blinking and singing.",
+                    "object": {
+                        "bindings": {
+                            "actions": {
+                                "name": "actions",
+                                "entity_type": "action_list",
+                                "value": "walking, blinking, singing",
+                            }
+                        }
+                    },
+                }
+            ],
+        }
+        ollama = ScriptedOllama(
+            [
+                raw,
+                {
+                    "decision": "reject",
+                    "confidence": 1.0,
+                    "uncovered_requirements": ["blinking", "singing"],
+                    "reason": "The proposed Plan contains only walking.",
+                },
+            ]
+        )
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(
+            plan.escalation_reason,
+            "coordinated_action_coverage_incomplete",
+        )
+        self.assertEqual(plan.unresolved, ["blinking", "singing"])
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertIn("spoken performance", ollama.prompts[1][0])
+
     def test_multi_goal_fast_schema_requires_complete_model_authored_plan(self):
         raw = multi_goal_plan(
             disposition="escalate",

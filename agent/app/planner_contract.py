@@ -3,10 +3,11 @@ from __future__ import annotations
 import copy
 from decimal import Decimal, InvalidOperation
 from itertools import product
+import json
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 try:
     from chromie_contracts.interaction import CapabilityIdentityModel
@@ -42,6 +43,40 @@ PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)"
 )
+
+
+class PlannerCoverageReview(BaseModel):
+    """Model-authored audit of a coordinated action Plan's completeness."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accept", "reject"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    uncovered_requirements: list[str] = Field(default_factory=list, max_length=12)
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("uncovered_requirements", mode="before")
+    @classmethod
+    def normalize_uncovered_requirements(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("uncovered_requirements must be an array")
+        return [
+            text
+            for item in value
+            if (text := " ".join(str(item or "").strip().split()))
+        ]
+
+    @model_validator(mode="after")
+    def validate_decision(self) -> "PlannerCoverageReview":
+        if self.decision == "accept" and self.uncovered_requirements:
+            raise ValueError("accepted coverage cannot list uncovered requirements")
+        if self.decision == "reject" and not self.uncovered_requirements:
+            raise ValueError("rejected coverage requires uncovered requirements")
+        return self
 
 # Response Composer owns user-facing speech in the goal-driven pipeline.  These
 # runtime transport skills are valid in legacy/native InteractionResponse task
@@ -418,6 +453,118 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                 }
             )
     return result
+
+
+def coordinated_action_goal_ids(
+    authoritative_goals: list[dict[str, Any]],
+) -> set[str]:
+    """Return Goals explicitly bound as coordinated action collections.
+
+    Goal Association, rather than the Host, authors the ``action_list`` type.
+    The Host uses that structured semantic evidence only to require a bounded
+    model completeness audit; it does not infer actions or select Capabilities.
+    """
+
+    goal_ids: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        goal_object = goal.get("object")
+        if not goal_id or not isinstance(goal_object, dict):
+            continue
+        bindings = goal_object.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        if any(
+            isinstance(binding, dict)
+            and "_".join(
+                str(binding.get("entity_type") or "")
+                .strip()
+                .casefold()
+                .replace("-", "_")
+                .split()
+            )
+            == "action_list"
+            for binding in bindings.values()
+        ):
+            goal_ids.add(goal_id)
+    return goal_ids
+
+
+async def review_coordinated_action_plan_coverage(
+    client: Any,
+    *,
+    request_text: str,
+    language: str,
+    authoritative_goals: list[dict[str, Any]],
+    plan: CanonicalPlan,
+    capabilities: list[dict[str, Any]],
+    num_ctx: int,
+) -> PlannerCoverageReview:
+    """Ask the planner model to audit a structured coordinated-action Plan.
+
+    The review can only accept or reject. It cannot add steps, choose a
+    Capability, authorize execution, or rewrite the Plan. A rejection therefore
+    sends Fast Planning to Deep Planning, or makes Deep Planning fail closed.
+    """
+
+    prompt = json.dumps(
+        {
+            "responsibility": (
+                "Audit whether the proposed Plan completely represents every "
+                "material responsibility in the authoritative coordinated-action "
+                "Goals. Judge semantics, not words. A requested action, spoken "
+                "performance, duration, ordering, or concurrency relation that can "
+                "succeed or fail separately must be accounted for. Reject a Plan "
+                "that claims complete or exact coverage while omitting any such "
+                "responsibility. Do not propose or authorize replacement steps."
+            ),
+            "user_text": request_text,
+            "language": language,
+            "authoritative_goals": authoritative_goals,
+            "proposed_plan": plan.model_dump(
+                mode="json",
+                exclude={"metadata", "selected_agent_skills"},
+            ),
+            "executable_capabilities": capabilities,
+            "output_contract": {
+                "decision": "accept or reject",
+                "accept": (
+                    "Only when every material responsibility is represented; "
+                    "uncovered_requirements must be empty."
+                ),
+                "reject": (
+                    "List each omitted or contradicted responsibility in "
+                    "uncovered_requirements."
+                ),
+                "execution_authority": "none",
+            },
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    raw = await client.generate(
+        prompt,
+        system=(
+            "You are the current Planner's bounded semantic completeness auditor. "
+            "Use the authoritative Goals, proposed Plan, and supplied Capability "
+            "semantics. Do not use phrase rules, invent Capabilities, revise the "
+            "Plan, or authorize execution. Return only the required JSON object."
+        ),
+        options={
+            "temperature": 0,
+            "top_p": 0.8,
+            "num_ctx": max(4096, int(num_ctx)),
+            "num_predict": 384,
+        },
+        response_format=PlannerCoverageReview.model_json_schema(),
+    )
+    if not isinstance(raw, dict):
+        raise ValueError("planner coverage review response is not a JSON object")
+    return PlannerCoverageReview.model_validate(raw)
 
 
 def _normalized_material_value(value: Any) -> Any:

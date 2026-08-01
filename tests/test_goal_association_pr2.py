@@ -778,7 +778,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("contract intentionally has no associations field", prompt)
         self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
         self.assertIn("standalone social interaction", prompt)
-        self.assertIn("physical action and a conversational answer are independent goals", prompt)
+        self.assertIn(
+            "physical action and a conversational answer or spoken performance are independent goals",
+            prompt,
+        )
+        self.assertIn("including actions requested simultaneously", prompt)
         self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
         self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
         self.assertIn(

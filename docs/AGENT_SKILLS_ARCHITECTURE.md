@@ -311,10 +311,14 @@ load references/examples only when requested within budget
 This keeps prompts small, makes selection observable, and avoids turning the
 entire Skill library into permanent system-prompt text.
 
-Current implementation stops after the second line: `/agent-skills/select` shows
-only bounded approved summaries and returns a digest-bound typed selection. It
-does not yet load the selected projection or place it into any Agent prompt; that
-is owned by the progressive-disclosure Issue.
+The current implementation completes this flow for the five responsible Agent
+roles. Planner selection is narrowed to the Goal IDs accepted by the current
+Goal Association result; retained Goals remain available to Goal Association
+for model-authored continuity, but an unrelated terminal Goal cannot contribute
+planner Skill provenance to a new Plan. Exact provenance validation remains
+strict. If the HTTP planner boundary cannot attach a disclosure to the returned
+Plan, it returns a structured non-executable escalation or unavailable Plan
+instead of an unhandled service error.
 
 ### Evidence and provenance
 

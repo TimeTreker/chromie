@@ -28,11 +28,13 @@ except ImportError:  # pragma: no cover
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
+    coordinated_action_goal_ids,
     expected_goal_ids,
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
     planner_contract_diagnostics,
+    review_coordinated_action_plan_coverage,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_planner_model_output,
@@ -251,6 +253,92 @@ class DeepPlannerResolver:
                 request=request,
             )
             if not errors:
+                coverage_review_metadata: dict[str, Any] = {}
+                coordinated_goal_ids = coordinated_action_goal_ids(
+                    canonical_goal_grounding(request.context)
+                )
+                if (
+                    coordinated_goal_ids.intersection(plan.goal_ids)
+                    and plan.disposition in {"execute", "mixed"}
+                    and plan.steps
+                ):
+                    try:
+                        coverage_review = (
+                            await review_coordinated_action_plan_coverage(
+                                self.ollama,
+                                request_text=request.text,
+                                language=str(request.language or "und"),
+                                authoritative_goals=canonical_goal_grounding(
+                                    request.context
+                                ),
+                                plan=plan,
+                                capabilities=payload,
+                                num_ctx=self.num_ctx,
+                            )
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "deep_planner_coverage_review_unavailable sid=%s "
+                            "error_type=%s error=%s",
+                            request.sid,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        return self._clarify(
+                            plan_id,
+                            request,
+                            "coordinated_action_coverage_review_unavailable",
+                            unresolved=["coordinated_action_coverage"],
+                            error=exc,
+                            attempts=attempt + 1,
+                            metadata={
+                                "coordinated_goal_ids": sorted(
+                                    coordinated_goal_ids
+                                ),
+                                "execution_allowed": False,
+                            },
+                        )
+                    if coverage_review.decision != "accept":
+                        review_error = {
+                            "type": "coordinated_action_coverage_incomplete",
+                            "uncovered_requirements": list(
+                                coverage_review.uncovered_requirements
+                            ),
+                            "reason": coverage_review.reason,
+                            "confidence": coverage_review.confidence,
+                        }
+                        logger.warning(
+                            "deep_planner_coverage_review_rejected sid=%s "
+                            "attempt=%s uncovered=%s reason=%s",
+                            request.sid,
+                            attempt + 1,
+                            coverage_review.uncovered_requirements,
+                            coverage_review.reason,
+                        )
+                        if attempt < self.max_replans:
+                            feedback = [review_error]
+                            previous_raw = raw
+                            continue
+                        return self._clarify(
+                            plan_id,
+                            request,
+                            "coordinated_action_coverage_incomplete",
+                            unresolved=coverage_review.uncovered_requirements,
+                            metadata={
+                                "validation_feedback": [review_error],
+                                "coordinated_goal_ids": sorted(
+                                    coordinated_goal_ids
+                                ),
+                                "execution_allowed": False,
+                            },
+                            attempts=attempt + 1,
+                        )
+                    coverage_review_metadata["coverage_review"] = {
+                        "status": "accepted",
+                        "confidence": coverage_review.confidence,
+                        "reason": coverage_review.reason,
+                        "execution_authority": "none",
+                    }
                 metadata = dict(plan.metadata)
                 metadata.update({"resolver": "deep_planner", "status": "complete" if plan.coverage == "complete" else plan.disposition,
                                  "authority": "advisory", "attempt_count": attempt + 1,
@@ -259,6 +347,7 @@ class DeepPlannerResolver:
                                  "canonical_contract": "CanonicalPlan",
                                  "contract_repair_attempted": contract_repair_attempted,
                                  "contract_repair_succeeded": contract_repair_attempted})
+                metadata.update(coverage_review_metadata)
                 if contract_repair_attempted:
                     metadata["contract_repair"] = {
                         "attempted": True,

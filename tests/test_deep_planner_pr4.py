@@ -120,6 +120,68 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(catalog.scopes, ["all"])
         self.assertEqual(plan.metadata["attempt_count"], 1)
 
+    def test_coordinated_action_review_rejects_partial_plan_after_replan(self):
+        partial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_ids": ["goal-action"],
+            "goal_summary": "Walk while blinking and singing.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        rejected = {
+            "decision": "reject",
+            "confidence": 1.0,
+            "uncovered_requirements": ["blinking", "singing"],
+            "reason": "The proposed Plan contains only walking.",
+        }
+        run_request = request("Walk while blinking and singing.")
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-action",
+                    "description": "Walk while blinking and singing.",
+                    "object": {
+                        "bindings": {
+                            "actions": {
+                                "name": "actions",
+                                "entity_type": "action_list",
+                                "value": "walking, blinking, singing",
+                            }
+                        }
+                    },
+                }
+            ],
+        }
+        ollama = SequencedOllama([partial, rejected, partial, rejected])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertIn("blinking", plan.unresolved)
+        self.assertIn("singing", plan.unresolved)
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertIn(
+            "coordinated_action_coverage_incomplete",
+            ollama.prompts[2][0],
+        )
+
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
             {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":99},"source_goal_ids":["goal-action"]}
