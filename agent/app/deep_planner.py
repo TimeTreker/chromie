@@ -156,7 +156,10 @@ class DeepPlannerResolver:
             raw: Any = None
             try:
                 active_response_schema = (
-                    self._safety_revision_response_schema(response_schema)
+                    self._safety_revision_response_schema(
+                        response_schema,
+                        feedback=feedback,
+                    )
                     if self._requires_safety_revision(feedback)
                     else response_schema
                 )
@@ -513,6 +516,20 @@ class DeepPlannerResolver:
             for item in feedback
         )
 
+    @staticmethod
+    def _requires_sequential_safety_revision(
+        feedback: list[dict[str, Any]],
+    ) -> bool:
+        concurrency_types = {
+            "parallel_capability_not_declared_safe",
+            "parallel_exclusive_group_conflict",
+            "parallel_resource_claim_conflict",
+        }
+        return any(
+            isinstance(item, dict) and item.get("type") in concurrency_types
+            for item in feedback
+        )
+
     @classmethod
     def _initial_safety_feedback(
         cls,
@@ -573,13 +590,34 @@ class DeepPlannerResolver:
                 merged.append(item)
         return merged
 
-    @staticmethod
+    @classmethod
     def _safety_revision_response_schema(
+        cls,
         base_schema: dict[str, Any],
+        *,
+        feedback: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Forbid exact execution after deterministic concurrency rejection."""
 
         schema = copy.deepcopy(base_schema)
+        if cls._requires_sequential_safety_revision(list(feedback or [])):
+            # The deployed structured decoder does not reliably enforce a
+            # nested step constraint added only through a top-level allOf.
+            # Specialize the referenced step DTO itself so a concurrency
+            # rejection cannot be relabeled as a safe adjustment while the
+            # rejected parallel timing remains unchanged.  This conservative
+            # revision may still clarify or propose a confirmation-bound
+            # sequential alternative; it cannot authorize overlap.
+            step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+            if isinstance(step_schema, dict):
+                timing = step_schema.get("properties", {}).get("timing")
+                if isinstance(timing, dict):
+                    timing["enum"] = ["sequential"]
+                    timing["default"] = "sequential"
+                    timing["description"] = (
+                        "Concurrency was rejected by deterministic provider/resource "
+                        "validation; retained executable steps must be sequential."
+                    )
         schema.setdefault("allOf", []).append(
             {
                 "anyOf": [
@@ -647,6 +685,24 @@ class DeepPlannerResolver:
             ]
         relation = str(plan.metadata.get("plan_relation") or "exact")
         confirmation = plan.metadata.get("user_confirmation_required") is True
+        retained_parallel_steps = [
+            step.step_id for step in plan.steps if step.timing == "parallel"
+        ]
+        if (
+            cls._requires_sequential_safety_revision(feedback)
+            and retained_parallel_steps
+        ):
+            return [
+                {
+                    "type": "safety_revision_contract_not_satisfied",
+                    "plan_relation": relation,
+                    "parallel_step_ids": retained_parallel_steps,
+                    "reason": (
+                        "concurrency was rejected, so a safe revision cannot "
+                        "retain parallel step timing"
+                    ),
+                }
+            ]
         if (
             plan.disposition in {"execute", "mixed"}
             and relation in {"safe_adjustment", "alternative"}

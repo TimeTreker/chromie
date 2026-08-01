@@ -118,7 +118,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "soridormi.blink_eyes",
             ],
         )
-        schema = DeepPlannerResolver._safety_revision_response_schema(base)
+        feedback = [{"type": "parallel_capability_not_declared_safe"}]
+        schema = DeepPlannerResolver._safety_revision_response_schema(
+            base,
+            feedback=feedback,
+        )
         branches = schema["allOf"][-1]["anyOf"]
         adjustment, non_execution = branches
 
@@ -133,10 +137,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             non_execution["properties"]["steps"]["maxItems"], 0
         )
+        self.assertEqual(
+            schema["$defs"]["PlannerModelStep"]["properties"]["timing"]["enum"],
+            ["sequential"],
+        )
         self.assertTrue(
-            DeepPlannerResolver._requires_safety_revision(
-                [{"type": "parallel_capability_not_declared_safe"}]
-            )
+            DeepPlannerResolver._requires_safety_revision(feedback)
         )
 
     def test_deep_safety_revision_is_enforced_after_decoder_output(self) -> None:
@@ -171,6 +177,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 },
             }
         )
+        relabeled_parallel = adjusted.model_copy(
+            update={
+                "steps": [
+                    adjusted.steps[0].model_copy(update={"timing": "parallel"})
+                ]
+            }
+        )
 
         errors = DeepPlannerResolver._safety_revision_contract_errors(
             exact,
@@ -187,6 +200,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 feedback,
             ),
             [],
+        )
+        self.assertEqual(
+            DeepPlannerResolver._safety_revision_contract_errors(
+                relabeled_parallel,
+                feedback,
+            )[0]["parallel_step_ids"],
+            ["walk"],
         )
 
     def test_execute_outcome_null_response_normalizes_only_to_semantic_empty(self) -> None:
