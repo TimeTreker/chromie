@@ -151,7 +151,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
 
         self.assertEqual(dialogue.resolve("yes").decision, "ambiguous")
 
-    def test_prompt_is_action_specific_and_omits_sensitive_arguments(self) -> None:
+    def test_fallback_prompt_is_natural_and_omits_runtime_internals(self) -> None:
         response = _response()
         response.skills[0].args["access_token"] = "do-not-speak"
         response.skills[0].args["nested"] = {
@@ -166,8 +166,12 @@ class ConfirmationDialogueTests(unittest.TestCase):
             conversation_id="conversation-1",
         )
 
-        self.assertIn("nod yes", pending.prompt)
-        self.assertIn('"count": 2', pending.prompt)
+        self.assertEqual(
+            pending.prompt,
+            "Would you like me to do that? Say “yes” and I’ll get started!",
+        )
+        self.assertNotIn("nod_yes", pending.prompt)
+        self.assertNotIn("count", pending.prompt)
         self.assertNotIn("do-not-speak", pending.prompt)
         self.assertNotIn("also-do-not-speak", pending.prompt)
         self.assertEqual(ConfirmationDialogue(ttl_s=999).ttl_s, 300.0)

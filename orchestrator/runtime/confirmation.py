@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import uuid4
 
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import InteractionResponse
 
 ConfirmationDecision = Literal[
     "approved",
@@ -71,9 +71,6 @@ _OPERATIONAL_INTERRUPT_PHRASES = frozenset(
         "紧急停止",
     }
 )
-_SENSITIVE_ARGUMENT_PARTS = ("password", "secret", "token", "credential", "key")
-
-
 @dataclass(frozen=True)
 class PendingConfirmation:
     confirmation_id: str
@@ -319,47 +316,7 @@ def _confirmation_prompt(
     *,
     language: str | None,
 ) -> str:
-    requests = [
-        request
-        for request in response.skills
-        if request.request_id in request_ids
-    ]
-    descriptions = [_describe_request(request) for request in requests]
-    joined = "; ".join(descriptions)
+    del response, request_ids
     if (language or "").lower().startswith("zh"):
-        return f"请确认：要执行{joined}吗？请只回答是或否。"
-    return f"Please confirm: should I {joined}? Please answer yes or no."
-
-
-def _describe_request(request: SkillRequest) -> str:
-    skill_name = request.skill_id.removeprefix("soridormi.")
-    skill_name = re.sub(r"[._-]+", " ", skill_name).strip() or "requested action"
-    adjustments = request.metadata.get("proposal_adjustments")
-    adjusted = isinstance(adjustments, list) and bool(adjustments)
-    safe_args = _redact_prompt_value(request.args)
-    if not safe_args:
-        return f"run {skill_name} with adjusted safe parameters" if adjusted else f"run {skill_name}"
-    rendered = json.dumps(
-        safe_args,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(", ", ": "),
-    )
-    if len(rendered) > 120:
-        rendered = "the requested parameters"
-    if adjusted:
-        return f"run {skill_name} with adjusted safe parameters {rendered}"
-    return f"run {skill_name} with {rendered}"
-
-
-def _redact_prompt_value(value: object, *, key: str | None = None) -> object:
-    if key and any(part in key.casefold() for part in _SENSITIVE_ARGUMENT_PARTS):
-        return "<redacted>"
-    if isinstance(value, dict):
-        return {
-            str(item_key): _redact_prompt_value(item, key=str(item_key))
-            for item_key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_prompt_value(item) for item in value]
-    return value
+        return "要我做刚才说的动作吗？你说“好”，我就开始啦！"
+    return "Would you like me to do that? Say “yes” and I’ll get started!"

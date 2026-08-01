@@ -256,8 +256,15 @@
       "早上好",
       "走一秒",
       "眨两下",
-      "确认"
+      "你说“好”，我就开始啦"
     ],
+    "speech_forbids_all": [
+      "soridormi",
+      "duration_s",
+      "count",
+      "只回答是或否"
+    ],
+    "confirmation_prompt_matches_speech": true,
     "requires_confirmation": true,
     "calls": [
       "goal_association",

@@ -579,6 +579,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.interaction_runtime = _Runtime()
         assistant.session_log = MethodType(session_log, assistant)
         assistant._launch_interaction = MethodType(launch_interaction, assistant)
+        natural_prompt = (
+            "I can't do those actions together yet, but I can walk first and "
+            "blink next. Is that okay? Say “yes” and I’ll get started!"
+        )
         response = InteractionResponse(
             interaction_id="interaction-confirm-denied",
             skills=[
@@ -596,6 +600,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             metadata={
                 "planning_result": "composed_plan",
                 "semantic_plan_confirmation_required": True,
+                "confirmation_prompt": natural_prompt,
             },
         )
 
@@ -606,6 +611,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 language="en-US",
             )
         )
+        pending = assistant.confirmation_dialogue.pending
+        assert pending is not None
+        self.assertEqual(pending.prompt, natural_prompt)
+        self.assertEqual(launched[0][0].speech[0].text, natural_prompt)
         self.assertEqual(
             [
                 item["status"]

@@ -976,6 +976,9 @@ def is_confirmation_prompt_text(text: str) -> bool:
             or "yes or no" in normalized
             or "确认" in normalized
             or "是否" in normalized
+            or "可以吗" in normalized
+            or "is that okay" in normalized
+            or "would you like me" in normalized
         )
     )
 

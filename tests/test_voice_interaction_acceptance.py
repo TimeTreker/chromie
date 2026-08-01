@@ -27,6 +27,7 @@ from scripts.voice_acceptance import (
     extract_asr_text,
     friendly_event_line,
     guide_spoken_step,
+    is_confirmation_prompt_text,
     missing_required_terms,
     parse_case_list,
     prompt_verdict,
@@ -120,6 +121,20 @@ def confirmation_prompt_playback_events(
             sid,
         ),
     ]
+
+
+class NaturalConfirmationPromptDetectionTests(unittest.TestCase):
+    def test_childlike_confirmation_wording_is_detected(self) -> None:
+        self.assertTrue(
+            is_confirmation_prompt_text(
+                "我可以先往前走十五秒，再眨四下眼睛。这样可以吗？"
+            )
+        )
+        self.assertTrue(
+            is_confirmation_prompt_text(
+                "I can walk first and blink next. Is that okay?"
+            )
+        )
 
 
 def speech_skill_runtime_events(

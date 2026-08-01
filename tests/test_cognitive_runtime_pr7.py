@@ -1230,7 +1230,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.interaction_response.speech[0].text,
-            "请确认是否要我眨四下眼睛。",
+            "要我眨四下眼睛吗？你说“好”，我就开始啦！",
+        )
+        self.assertEqual(
+            result.interaction_response.metadata["confirmation_prompt"],
+            result.interaction_response.speech[0].text,
         )
         self.assertTrue(
             result.interaction_response.speech[0].metadata[

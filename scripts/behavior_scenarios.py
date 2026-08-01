@@ -1865,6 +1865,11 @@ async def evaluate_cognitive_runtime_scenario(
         ] if interaction else [],
         "interaction_status": interaction.status if interaction else None,
         "speech_texts": [item.text for item in speech_items],
+        "confirmation_prompt": (
+            str(interaction.metadata.get("confirmation_prompt") or "")
+            if interaction
+            else ""
+        ),
         "speech_covers_goal_ids": speech_covers_goal_ids,
         "requires_confirmation": interaction.requires_confirmation if interaction else False,
         "calls": list(client.calls),
@@ -1915,6 +1920,9 @@ async def evaluate_cognitive_runtime_scenario(
     for phrase in expect.get("speech_contains_all") or []:
         if str(phrase).casefold() not in speech_text.casefold():
             errors.append(f"speech missing required phrase {phrase!r}: {speech_text!r}")
+    for phrase in expect.get("speech_forbids_all") or []:
+        if str(phrase).casefold() in speech_text.casefold():
+            errors.append(f"speech contains forbidden phrase {phrase!r}: {speech_text!r}")
     speech_any = list(expect.get("speech_contains_any") or [])
     if speech_any and not any(
         str(phrase).casefold() in speech_text.casefold() for phrase in speech_any
@@ -1927,6 +1935,15 @@ async def evaluate_cognitive_runtime_scenario(
             "requires_confirmation="
             f"{actual['requires_confirmation']!r}, expected {bool(expect['requires_confirmation'])!r}"
         )
+    if expect.get("confirmation_prompt_matches_speech") is True:
+        if (
+            not actual["confirmation_prompt"]
+            or actual["confirmation_prompt"] not in actual["speech_texts"]
+        ):
+            errors.append(
+                "confirmation_prompt is not one of the authoritative speech stages: "
+                f"{actual['confirmation_prompt']!r} not in {actual['speech_texts']!r}"
+            )
     if "runtime_replan_count" in expect and actual["runtime_replan_count"] != int(expect["runtime_replan_count"]):
         errors.append(
             f"runtime_replan_count={actual['runtime_replan_count']}, "

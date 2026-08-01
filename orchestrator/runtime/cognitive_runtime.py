@@ -801,10 +801,15 @@ class CanonicalPlanRuntimeAdapter:
         numeric = float(value)
         if numeric.is_integer():
             integer = int(numeric)
-            if zh and 0 <= integer <= 10:
+            if zh and 0 <= integer <= 99:
                 if repetitions and integer == 2:
                     return "两"
-                return "零一二三四五六七八九十"[integer]
+                digits = "零一二三四五六七八九"
+                if integer <= 10:
+                    return f"{digits[integer]}" if integer < 10 else "十"
+                tens, ones = divmod(integer, 10)
+                prefix = "十" if tens == 1 else f"{digits[tens]}十"
+                return prefix if ones == 0 else f"{prefix}{digits[ones]}"
             if not zh and 0 <= integer <= 10:
                 words = (
                     "zero",
@@ -971,7 +976,15 @@ class CanonicalPlanRuntimeAdapter:
             else:
                 action_text = "先" + actions[0] + "，再" + "，再".join(actions[1:])
             if confirmation_required:
-                return f"请确认是否要我{action_text}。"
+                if str(plan.metadata.get("plan_relation") or "") in {
+                    "alternative",
+                    "safe_adjustment",
+                } or bool(plan.metadata.get("user_confirmation_required")):
+                    return (
+                        "我还不能完全照你刚才说的方式做，不过我可以"
+                        f"{action_text}。这样可以吗？你说“好”，我就开始啦！"
+                    )
+                return f"要我{action_text}吗？你说“好”，我就开始啦！"
             return f"我会{action_text}。"
 
         if len(actions) == 1:
@@ -979,7 +992,18 @@ class CanonicalPlanRuntimeAdapter:
         else:
             action_text = ", then ".join(actions)
         if confirmation_required:
-            return f"Please confirm whether you'd like me to {action_text}."
+            if str(plan.metadata.get("plan_relation") or "") in {
+                "alternative",
+                "safe_adjustment",
+            } or bool(plan.metadata.get("user_confirmation_required")):
+                return (
+                    "I can't do it quite the way you first asked, but I can "
+                    f"{action_text}. Is that okay? Say “yes” and I’ll get started!"
+                )
+            return (
+                f"Would you like me to {action_text}? "
+                "Say “yes” and I’ll get started!"
+            )
         return f"I'll {action_text}."
 
     async def build_response(
@@ -1633,6 +1657,17 @@ class CanonicalPlanRuntimeAdapter:
             ]
         if alternative:
             metadata["material_plan_change_requires_confirmation"] = True
+        confirmation_prompt = next(
+            (
+                item.text
+                for item in speech
+                if item.metadata.get("runtime_confirmation_required") is True
+            ),
+            "",
+        )
+        if confirmation_prompt:
+            metadata["confirmation_prompt"] = confirmation_prompt
+            metadata["confirmation_prompt_source"] = "runtime_authoritative_state"
         return InteractionResponse(
             status=status_map.get(plan.disposition, "error"),
             speech=speech,

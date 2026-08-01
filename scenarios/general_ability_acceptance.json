@@ -422,6 +422,10 @@
         {
           "key": "goal_interpretation/physical_pending_work_gets_safety_prelude",
           "rationale": "Physical work gets a truthful safety prelude without claiming motion has started or completed."
+        },
+        {
+          "key": "cognitive_runtime/compound_walk_blink_runtime_replan",
+          "rationale": "A confirmation-bound safe adjustment explains the changed plan in Chromie's natural voice and binds that exact speech to the Host confirmation instead of exposing capability IDs or arguments."
         }
       ],
       "live_text_cases": []
