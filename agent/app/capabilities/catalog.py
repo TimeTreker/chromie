@@ -975,7 +975,7 @@ class CapabilityCatalog:
             "commissioning_no_motion",
         }:
             return "robot_action"
-        if "memory_write" in effects or tool.agent_id.startswith("chromie.memory"):
+        if "memory_write" in effects:
             return "memory"
         if effects <= {"user_interaction", "audio_input", "audio_output", "read_only"} and tool.agent_id == "chromie.speech":
             return "chat"

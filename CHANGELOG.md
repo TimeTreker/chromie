@@ -105,6 +105,12 @@ preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-0
 
 ### Live Agent weather and planning reliability
 
+- Route verified memory retrieval by its declared `read_only` effect as a trusted
+  tool capability; only a declared `memory_write` effect enters the model-authored
+  memory-update lane. The model still decides whether a turn calls for verified
+  prior evidence or a fresh lookup. This corrects an executor mismatch that sent
+  a valid model-selected read capability around the Goal-driven runtime and into
+  the legacy memory writer.
 - Made the live text qualification runner load the generated runtime profile
   before applying its diagnostic I/O overrides, so deployed model and timeout
   ownership matches normal startup.

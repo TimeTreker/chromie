@@ -435,6 +435,55 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.prompt_tier, "common")
         self.assertEqual(weather.hints.get("tool_name"), "weather")
 
+    async def test_verified_memory_read_is_a_tool_not_a_memory_write_route(self) -> None:
+        registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+
+        common = await catalog.prompt_entries(scope="common")
+        retrieval = next(
+            item
+            for item in common
+            if item.capability_id == "chromie.memory.retrieve_verified_tool_result"
+        )
+
+        self.assertEqual(retrieval.route, "tool")
+        self.assertEqual(retrieval.agent_id, "chromie.memory")
+        self.assertEqual(retrieval.safety_class, "safe_read")
+        self.assertIn("read_only", retrieval.effects)
+        self.assertNotIn("memory_write", retrieval.effects)
+
+    async def test_declared_memory_write_keeps_the_memory_route(self) -> None:
+        registry = CapabilityRegistry.from_bundles(
+            [
+                CapabilityBundle(
+                    source="memory-write-test",
+                    agents=[
+                        AgentManifest(
+                            agent_id="chromie.preference-memory",
+                            tools=[
+                                ToolCapability(
+                                    name="chromie.preference-memory.remember",
+                                    agent_id="chromie.preference-memory",
+                                    effects=["memory_write"],
+                                    safety_class="low_risk_action",
+                                )
+                            ],
+                        )
+                    ],
+                )
+            ]
+        )
+        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+
+        snapshot = await catalog.snapshot()
+        writer = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "chromie.preference-memory.remember"
+        )
+
+        self.assertEqual(writer["route"], "memory")
+
     async def test_chinese_weather_query_matches_weather_lookup_tool(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
