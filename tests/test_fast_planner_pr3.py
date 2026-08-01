@@ -943,6 +943,236 @@ class FastPlannerResolverTests(unittest.TestCase):
             ollama.prompts[1][0],
         )
 
+    def test_numeric_grounding_accepts_matching_goal_qualified_verbatim_span(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk forward for two seconds.",
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    ["goal-walk"],
+                    "Walk forward for the requested duration.",
+                )
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk", ["walk"], "The walk is covered."
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-walk"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative goal.",
+                    "source_ref": "goal-walk:2 seconds",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        ollama = FakeOllama(raw)
+        run_request = request(
+            "Walk forward for 2 seconds.",
+            goal_ids=["goal-walk"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward for 2 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].args["duration_s"], 2.0)
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_numeric_grounding_rejects_mismatched_goal_qualifier(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk forward for two seconds.",
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    ["goal-walk"],
+                    "Walk forward for the requested duration.",
+                )
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk", ["walk"], "The walk is covered."
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-walk"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative goal.",
+                    "source_ref": "goal-other:2 seconds",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        run_request = request(
+            "Walk forward for 2 seconds.",
+            goal_ids=["goal-walk"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward for 2 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(raw),
+                FakeCatalog(),
+                max_contract_repairs=0,
+            ).resolve(run_request)
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertIn("not an exact span", plan.metadata["error"])
+
+    def test_dotted_step_id_is_unambiguous_in_parameter_repair_feedback(self):
+        invalid = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk forward for two seconds.",
+            steps=[
+                {
+                    **execute_step(
+                        "soridormi.walk_velocity",
+                        "soridormi.walk_forward",
+                        {"duration_s": 2.0},
+                        ["goal-walk"],
+                        "Walk forward for the requested duration.",
+                    ),
+                    "timing": "parallel",
+                }
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk",
+                    ["soridormi.walk_velocity"],
+                    "The walk is covered.",
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-walk"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "soridormi.walk_velocity",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative goal.",
+                    "source_ref": "2 seconds plus unsupported annotation",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        repaired = {
+            **invalid,
+            "parameter_resolutions": [
+                {
+                    **invalid["parameter_resolutions"][0],
+                    "source_ref": "goal-walk:2 seconds",
+                }
+            ],
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+        run_request = request(
+            "Walk forward for 2 seconds.",
+            goal_ids=["goal-walk"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward for 2 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
+        )
+
+        repair_prompt = ollama.prompts[1][0]
+        self.assertEqual(plan.disposition, "execute")
+        self.assertIn(
+            "step_id='soridormi.walk_velocity', parameter='duration_s'",
+            repair_prompt,
+        )
+        self.assertNotIn(
+            "soridormi.walk_velocity.duration_s",
+            repair_prompt,
+        )
+
+    def test_single_parallel_labeled_step_needs_no_concurrency_metadata(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk forward.",
+            steps=[
+                {
+                    **execute_step(
+                        "walk",
+                        "soridormi.walk_forward",
+                        {"duration_s": 2.0},
+                        ["goal-walk"],
+                        "Walk forward.",
+                    ),
+                    "timing": "parallel",
+                }
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk", ["walk"], "The walk is covered."
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-walk"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative goal.",
+                    "source_ref": "2 seconds",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        run_request = request(
+            "Walk forward for 2 seconds.",
+            goal_ids=["goal-walk"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward for 2 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(
+                run_request
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].timing, "parallel")
+
     def test_multi_goal_fast_execute_terminates_without_repair(self):
         raw = multi_goal_plan(
             disposition="execute",

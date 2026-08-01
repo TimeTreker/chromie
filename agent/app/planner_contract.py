@@ -593,6 +593,13 @@ def parallel_plan_contract_errors(
     author an explicit safe adjustment, alternative, or clarification.
     """
 
+    # One step has no peer with which to overlap. Treating its redundant
+    # ``parallel`` label as a concurrency request contradicts the runtime
+    # contract, which already admits a single-step batch without provider
+    # parallel metadata. This is arity validation, not a Host timing choice.
+    if len(plan.steps) < 2:
+        return []
+
     by_id = {
         str(item.get("capability_id") or ""): item
         for item in capabilities
@@ -1102,6 +1109,33 @@ def validate_explicit_numeric_parameter_grounding(
                 found.append(number)
         return found
 
+    def cited_span(
+        source_ref: str,
+        source_goal_ids: list[str],
+    ) -> tuple[str, str | None]:
+        """Return the span and optional Goal qualifier of a provenance citation.
+
+        This parses representation only. It does not infer which Goal supplied
+        a value, select a parameter, or repair model-authored semantics. The
+        model remains responsible for both ``source_goal_ids`` and the cited
+        text; the validator verifies that they agree below.
+        """
+
+        citation = source_ref.strip()
+        for goal_id in sorted(source_goal_ids, key=len, reverse=True):
+            prefix = f"{goal_id}:"
+            if citation.startswith(prefix):
+                return citation[len(prefix) :].strip(), goal_id
+        return citation, None
+
+    def resolution_location(resolution: PlanParameterResolution) -> str:
+        """Render an unambiguous typed location for model repair feedback."""
+
+        return (
+            f"step_id={resolution.step_id!r}, "
+            f"parameter={resolution.parameter!r}"
+        )
+
     goal_text: dict[str, str] = {}
     goal_citation_text: dict[str, str] = {}
     for goal in authoritative_goals:
@@ -1135,12 +1169,12 @@ def validate_explicit_numeric_parameter_grounding(
         if step is None:
             raise ValueError(
                 "parameter resolution references unknown executable step "
-                f"{resolution.step_id!r}"
+                f"({resolution_location(resolution)})"
             )
         if resolution.parameter not in step.args:
             raise ValueError(
                 "parameter resolution references an argument absent from its step: "
-                f"{resolution.step_id}.{resolution.parameter}"
+                f"{resolution_location(resolution)}"
             )
         resolved_number = numeric(resolution.value)
         argument_number = numeric(step.args[resolution.parameter])
@@ -1148,13 +1182,13 @@ def validate_explicit_numeric_parameter_grounding(
             if resolved_number != argument_number:
                 raise ValueError(
                     "parameter resolution value must equal the executable step argument: "
-                    f"{resolution.step_id}.{resolution.parameter} has "
+                    f"{resolution_location(resolution)} has "
                     f"resolution={resolution.value!r}, step={step.args[resolution.parameter]!r}"
                 )
         elif resolution.value != step.args[resolution.parameter]:
             raise ValueError(
                 "parameter resolution value must equal the executable step argument: "
-                f"{resolution.step_id}.{resolution.parameter}"
+                f"{resolution_location(resolution)}"
             )
 
         if resolution.strategy != "user_supplied" or resolved_number is None:
@@ -1163,7 +1197,7 @@ def validate_explicit_numeric_parameter_grounding(
         if not source_goal_ids:
             raise ValueError(
                 "numeric user_supplied parameter resolution requires source_goal_ids: "
-                f"{resolution.step_id}.{resolution.parameter}"
+                f"{resolution_location(resolution)}"
             )
         texts_with_literals = [
             goal_citation_text[goal_id]
@@ -1175,17 +1209,30 @@ def validate_explicit_numeric_parameter_grounding(
             if not source_ref:
                 raise ValueError(
                     "numeric user_supplied parameter resolution requires an exact "
-                    f"source_ref citation: {resolution.step_id}.{resolution.parameter}"
+                    f"source_ref citation: {resolution_location(resolution)}"
                 )
-            if not any(source_ref.casefold() in text.casefold() for text in texts_with_literals):
+            source_span, qualified_goal_id = cited_span(
+                source_ref,
+                source_goal_ids,
+            )
+            citation_texts = (
+                [goal_citation_text[qualified_goal_id]]
+                if qualified_goal_id in goal_citation_text
+                else texts_with_literals
+            )
+            if not source_span or not any(
+                source_span.casefold() in text.casefold()
+                for text in citation_texts
+            ):
                 raise ValueError(
-                    "numeric user_supplied parameter source_ref is not an exact span "
-                    f"of its authoritative goal: {resolution.step_id}.{resolution.parameter}"
+                    "numeric user_supplied parameter source_ref is not an exact "
+                    "span or matching goal-qualified span of its authoritative "
+                    f"goal: {resolution_location(resolution)}"
                 )
-            if resolved_number not in literals(source_ref):
+            if resolved_number not in literals(source_span):
                 raise ValueError(
                     "numeric user_supplied parameter source_ref does not cite its "
-                    f"resolved value: {resolution.step_id}.{resolution.parameter}"
+                    f"resolved value: {resolution_location(resolution)}"
                 )
         user_numeric_resolutions.append((resolution, resolved_number))
 
@@ -1863,6 +1910,21 @@ def fast_multi_goal_response_schema(
         resolution_properties = resolution_schema.get("properties", {})
         bound_text(resolution_properties, "rationale", 160)
         bound_text(resolution_properties, "source_ref", 160)
+        parameter = resolution_properties.get("parameter")
+        if isinstance(parameter, dict):
+            parameter["description"] = (
+                "Copy exactly one argument key from the referenced step's args "
+                "object, such as speed_mps or duration_s. Do not prefix it "
+                "with a step ID or capability ID."
+            )
+        source_ref = resolution_properties.get("source_ref")
+        if isinstance(source_ref, dict):
+            source_ref["description"] = (
+                "Copy a verbatim authoritative Goal text span containing the "
+                "resolved numeric value. Either return the bare span or "
+                "<one source_goal_ids value>:<verbatim span>. Add no other "
+                "prefix, suffix, paraphrase, or annotation."
+            )
 
     goal_list_fields = {
         "goal_ids",

@@ -82,6 +82,22 @@ whose follow-up repeats no capability and preserves the delivered values. These
 runs used dirty diagnostic source and are not target evidence; the original root
 must not be approved or resumed.
 
+Clean source-bound root `20260801T085124Z` then passed its retained live-text
+and compound MuJoCo stages on revision `0243bc6`, including evidence-bound
+completion speech and safe idle, but failed active cancellation before Provider
+start. The Fast Planner's correct action intent crossed an ambiguous typed
+provenance/repair representation boundary, and the unnecessary Deep fallback
+later exhausted its 8,192-token output budget. The correction accepts a
+matching Goal-qualified verbatim provenance citation, emits unambiguous
+step/parameter repair locations, and does not classify a lone step as a
+concurrency request. A dirty rebuilt-image diagnostic subsequently started the
+exact `soridormi.walk_velocity` request, dispatched deterministic `Stop.` only
+after Provider start, received trusted cancellation, and returned to reported
+safe idle. That diagnostic still used Deep Planning after a separate invalid
+Fast-model argument shape, so it proves the cancellation path but not Fast
+Planner reliability and is not clean target evidence. A fresh clean root is
+required after commit.
+
 ## Target-evidence closure
 
 The remaining evidence tracks are coordinated by

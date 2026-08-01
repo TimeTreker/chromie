@@ -1,5 +1,14 @@
 # Changelog
 
+- Reproduced the clean source-bound active-cancellation case failing before
+  Provider start after a valid Fast Planner meaning was rejected at ambiguous
+  provenance/repair representation boundaries and a later Deep attempt
+  exhausted its output budget. Numeric provenance now accepts either a bare
+  verbatim Goal span or the same span qualified by its declared Goal ID;
+  repair feedback renders step and parameter fields separately; and a lone
+  step is no longer treated as a concurrency request. These are typed
+  representation and arity checks only: the Host still does not select the
+  capability, argument mapping, timing among multiple steps, or Goal meaning.
 - Reproduced the source-bound compound MuJoCo request being discarded before
   Core entry because Attention Review mislabeled a direct imperative as
   dictation. Suppression candidates now receive one independent schema-bound

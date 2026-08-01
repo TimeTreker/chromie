@@ -106,6 +106,18 @@ Gateway. Qualification requires:
 - endpoint-reported source identity and the same runtime-identity digest;
 - explicit safe idle before the request and after cancellation.
 
+The retained case does not require a particular planner tier. A model-authored
+Fast escalation may use Deep Planning, but a malformed Fast object cannot be
+silently compiled into an action by the Host. Numeric parameter provenance is
+validated as either a verbatim authoritative Goal span or that same span
+qualified by one declared source Goal ID. Repair diagnostics keep `step_id` and
+`parameter` structurally distinct, so dotted capability-style step identifiers
+cannot be mistaken for argument names. A single executable step has no
+concurrency peer and therefore does not require provider parallel-safety
+metadata; two or more model-authored steps retain the full parallel contract.
+None of these mechanical checks selects a capability, maps user wording to an
+argument, or chooses timing among multiple actions.
+
 The interrupt session must complete normally. The superseded command session is
 terminal when the Host marks it interrupted after model work is complete; it
 must not be required to emit the mutually exclusive normal `session_done` event.

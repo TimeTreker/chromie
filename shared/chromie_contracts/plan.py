@@ -60,13 +60,26 @@ class PlanParameterResolution(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     step_id: str = Field(min_length=1)
-    parameter: str = Field(min_length=1)
+    parameter: str = Field(
+        min_length=1,
+        description=(
+            "Exact argument key from the referenced plan step's args object. "
+            "Do not prefix it with a step ID or capability ID."
+        ),
+    )
     strategy: ParameterResolutionStrategy
     value: Any = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     blocking: bool = False
     rationale: str = ""
-    source_ref: str = ""
+    source_ref: str = Field(
+        default="",
+        description=(
+            "Verbatim source-goal text span, optionally qualified as "
+            "<source_goal_id>:<verbatim span>. The qualifier is provenance "
+            "syntax only and does not replace source_goal_ids."
+        ),
+    )
     source_goal_ids: list[str] = Field(default_factory=list)
 
     @field_validator("step_id", "parameter", "rationale", "source_ref", mode="before")

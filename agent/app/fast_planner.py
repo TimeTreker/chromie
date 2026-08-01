@@ -562,9 +562,12 @@ class FastPlannerResolver:
             "confirmation, and explain the change. "
             "For each numeric literal in an executable authoritative goal, "
             "include a user_supplied parameter_resolution tied to the owned "
-            "step and goal. Its value must equal the step argument and its "
-            "source_ref must be an exact goal-text span containing that same "
-            "number. "
+            "step and goal. The parameter field must be the exact bare key in "
+            "that step's args object, never a step- or capability-qualified "
+            "name. Its value must equal the step argument and its "
+            "source_ref must contain an exact goal-text span containing that "
+            "same number. Return either the bare span or qualify it exactly as "
+            "<one source_goal_ids value>:<verbatim span>; add no other text. "
         )
         source_route = str(request.route_decision.route or "").strip()
         route_effect_contract = (
