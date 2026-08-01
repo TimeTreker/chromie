@@ -454,6 +454,13 @@ For example:
 This natural wording does not weaken the safety barrier: no physical effect starts
 until the bound confirmation is accepted and the normal runtime validation passes.
 
+Exact user-supplied numbers remain semantic planning inputs, not Host phrase
+rules. The planner chooses the capability and maps each number to an argument,
+then records the authoritative `source_goal_ids`. The Host may verify that the
+typed value matches the claimed argument and occurs in the claimed Goal; it
+must not infer the mapping or demand a redundant copied-text citation whose
+format can block an otherwise correct plan.
+
 ## Social attention during speech
 
 Chromie may coordinate speech with subtle nonverbal attention, but attention is

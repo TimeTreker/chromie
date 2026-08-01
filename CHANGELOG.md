@@ -1,5 +1,13 @@
 # Changelog
 
+- Reproduced clean source-bound active cancellation failing before Provider
+  start on revision `1849bb5` after Fast Planner had already selected the exact
+  velocity capability, `0.2` speed, `20`-second duration, and correct Goal
+  ownership. Removed the redundant free-text `source_ref` copying field from
+  parameter provenance. The model still authors the capability, arguments,
+  parameter mapping, and `source_goal_ids`; deterministic validation still
+  requires every explicit numeric Goal value to match the claimed step argument
+  and source Goal. This removes a brittle representation ritual without adding a Host semantic rule or weakening provenance.
 - Reproduced clean source-bound compound execution preserving a specific,
   natural Response Composer sentence until the Host replaced two unfamiliar
   actions with “perform the requested action.” Removed the Host capability
@@ -10,12 +18,11 @@
 - Reproduced the clean source-bound active-cancellation case failing before
   Provider start after a valid Fast Planner meaning was rejected at ambiguous
   provenance/repair representation boundaries and a later Deep attempt
-  exhausted its output budget. Numeric provenance now accepts either a bare
-  verbatim Goal span or the same span qualified by its declared Goal ID;
-  repair feedback renders step and parameter fields separately; and a lone
-  step is no longer treated as a concurrency request. These are typed
-  representation and arity checks only: the Host still does not select the
-  capability, argument mapping, timing among multiple steps, or Goal meaning.
+  exhausted its output budget. The initial correction accepted a bare or
+  Goal-qualified verbatim span, rendered step and parameter feedback
+  separately, and stopped treating one step as a concurrency request. The
+  later clean replay above proved that free-text copying remained an
+  unnecessary failure surface, so stable Goal IDs now carry that provenance.
 - Reproduced the source-bound compound MuJoCo request being discarded before
   Core entry because Attention Review mislabeled a direct imperative as
   dictation. Suppression candidates now receive one independent schema-bound

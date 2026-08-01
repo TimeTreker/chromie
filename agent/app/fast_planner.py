@@ -565,9 +565,9 @@ class FastPlannerResolver:
             "step and goal. The parameter field must be the exact bare key in "
             "that step's args object, never a step- or capability-qualified "
             "name. Its value must equal the step argument and its "
-            "source_ref must contain an exact goal-text span containing that "
-            "same number. Return either the bare span or qualify it exactly as "
-            "<one source_goal_ids value>:<verbatim span>; add no other text. "
+            "source_goal_ids must identify the authoritative Goal containing "
+            "that same number. Use those stable Goal IDs as provenance; do not "
+            "copy, paraphrase, or annotate Goal text into another field. "
         )
         source_route = str(request.route_decision.route or "").strip()
         route_effect_contract = (

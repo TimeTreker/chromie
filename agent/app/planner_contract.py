@@ -1080,9 +1080,12 @@ def validate_explicit_numeric_parameter_grounding(
     The planner remains the semantic authority for mapping a user value to a
     skill parameter.  This check only enforces provenance after that judgment:
     a value labelled ``user_supplied`` must agree with its executable step and
-    an exact cited span, and every numeric literal in an executable goal must
-    be accounted for.  It therefore catches silent default substitution
-    without introducing phrase-to-action or parameter-name rules.
+    identify an authoritative source Goal containing that value, and every
+    numeric literal in an executable goal must be accounted for.  It therefore
+    catches silent default substitution without introducing phrase-to-action
+    or parameter-name rules.  Stable Goal IDs carry provenance; requiring the
+    model to copy a second free-text citation adds no evidence and is not part
+    of this contract.
     """
 
     if output.disposition not in {"execute", "mixed"}:
@@ -1109,25 +1112,6 @@ def validate_explicit_numeric_parameter_grounding(
                 found.append(number)
         return found
 
-    def cited_span(
-        source_ref: str,
-        source_goal_ids: list[str],
-    ) -> tuple[str, str | None]:
-        """Return the span and optional Goal qualifier of a provenance citation.
-
-        This parses representation only. It does not infer which Goal supplied
-        a value, select a parameter, or repair model-authored semantics. The
-        model remains responsible for both ``source_goal_ids`` and the cited
-        text; the validator verifies that they agree below.
-        """
-
-        citation = source_ref.strip()
-        for goal_id in sorted(source_goal_ids, key=len, reverse=True):
-            prefix = f"{goal_id}:"
-            if citation.startswith(prefix):
-                return citation[len(prefix) :].strip(), goal_id
-        return citation, None
-
     def resolution_location(resolution: PlanParameterResolution) -> str:
         """Render an unambiguous typed location for model repair feedback."""
 
@@ -1137,7 +1121,6 @@ def validate_explicit_numeric_parameter_grounding(
         )
 
     goal_text: dict[str, str] = {}
-    goal_citation_text: dict[str, str] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
@@ -1155,10 +1138,6 @@ def validate_explicit_numeric_parameter_grounding(
         if not parts and source_text:
             parts.append(source_text)
         goal_text[goal_id] = " ".join(dict.fromkeys(parts))
-        citation_parts = [*parts]
-        if source_text:
-            citation_parts.append(source_text)
-        goal_citation_text[goal_id] = " ".join(dict.fromkeys(citation_parts))
 
     steps = {step.step_id: step for step in output.steps}
     user_numeric_resolutions: list[tuple[PlanParameterResolution, Decimal]] = []
@@ -1199,41 +1178,6 @@ def validate_explicit_numeric_parameter_grounding(
                 "numeric user_supplied parameter resolution requires source_goal_ids: "
                 f"{resolution_location(resolution)}"
             )
-        texts_with_literals = [
-            goal_citation_text[goal_id]
-            for goal_id in source_goal_ids
-            if goal_id in goal_citation_text and literals(goal_citation_text[goal_id])
-        ]
-        if texts_with_literals:
-            source_ref = resolution.source_ref.strip()
-            if not source_ref:
-                raise ValueError(
-                    "numeric user_supplied parameter resolution requires an exact "
-                    f"source_ref citation: {resolution_location(resolution)}"
-                )
-            source_span, qualified_goal_id = cited_span(
-                source_ref,
-                source_goal_ids,
-            )
-            citation_texts = (
-                [goal_citation_text[qualified_goal_id]]
-                if qualified_goal_id in goal_citation_text
-                else texts_with_literals
-            )
-            if not source_span or not any(
-                source_span.casefold() in text.casefold()
-                for text in citation_texts
-            ):
-                raise ValueError(
-                    "numeric user_supplied parameter source_ref is not an exact "
-                    "span or matching goal-qualified span of its authoritative "
-                    f"goal: {resolution_location(resolution)}"
-                )
-            if resolved_number not in literals(source_span):
-                raise ValueError(
-                    "numeric user_supplied parameter source_ref does not cite its "
-                    f"resolved value: {resolution_location(resolution)}"
-                )
         user_numeric_resolutions.append((resolution, resolved_number))
 
     executable_goal_ids = {
@@ -1902,14 +1846,12 @@ def fast_multi_goal_response_schema(
             "confidence",
             "blocking",
             "rationale",
-            "source_ref",
             "source_goal_ids",
         ):
             if field_name not in resolution_required:
                 resolution_required.append(field_name)
         resolution_properties = resolution_schema.get("properties", {})
         bound_text(resolution_properties, "rationale", 160)
-        bound_text(resolution_properties, "source_ref", 160)
         parameter = resolution_properties.get("parameter")
         if isinstance(parameter, dict):
             parameter["description"] = (
@@ -1917,15 +1859,6 @@ def fast_multi_goal_response_schema(
                 "object, such as speed_mps or duration_s. Do not prefix it "
                 "with a step ID or capability ID."
             )
-        source_ref = resolution_properties.get("source_ref")
-        if isinstance(source_ref, dict):
-            source_ref["description"] = (
-                "Copy a verbatim authoritative Goal text span containing the "
-                "resolved numeric value. Either return the bare span or "
-                "<one source_goal_ids value>:<verbatim span>. Add no other "
-                "prefix, suffix, paraphrase, or annotation."
-            )
-
     goal_list_fields = {
         "goal_ids",
         "source_goal_ids",

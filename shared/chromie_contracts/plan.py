@@ -72,17 +72,9 @@ class PlanParameterResolution(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     blocking: bool = False
     rationale: str = ""
-    source_ref: str = Field(
-        default="",
-        description=(
-            "Verbatim source-goal text span, optionally qualified as "
-            "<source_goal_id>:<verbatim span>. The qualifier is provenance "
-            "syntax only and does not replace source_goal_ids."
-        ),
-    )
     source_goal_ids: list[str] = Field(default_factory=list)
 
-    @field_validator("step_id", "parameter", "rationale", "source_ref", mode="before")
+    @field_validator("step_id", "parameter", "rationale", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value

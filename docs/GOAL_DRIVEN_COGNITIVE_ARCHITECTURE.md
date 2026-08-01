@@ -719,6 +719,14 @@ envelope. Plan identity, schema version, planner tier, and authoritative
 top-level Goal IDs are host-owned. Model-authored steps must name the exact
 Goal IDs they serve through `source_goal_ids`.
 
+For an explicit numeric parameter, the planner also authors the step ID,
+argument key, resolved value, strategy, and `source_goal_ids`. Deterministic
+validation checks that the value equals the claimed step argument and that
+every explicit numeric value in an executable Goal is accounted for by a
+resolution owned by that Goal. Provenance does not require the model to copy a
+second free-text excerpt: the immutable Goal ID is the stable reference. The
+Host neither infers the argument mapping nor substitutes a default.
+
 For a Fast Planner request containing multiple authoritative goals, the model
 emits one required decision record per Goal ID rather than a CanonicalPlan-shaped
 step/outcome graph. Each decision selects exactly one common-catalog skill, a

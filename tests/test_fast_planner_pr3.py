@@ -46,6 +46,25 @@ class FakeCatalog:
         self.items = [
             CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
             CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(
+                capability_id="soridormi.walk_velocity",
+                agent_id="capability_agent",
+                description="Walk at an exact velocity",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {"type": "number"},
+                        "vy_mps": {"type": "number"},
+                        "yaw_radps": {"type": "number"},
+                        "duration_s": {"type": "number", "minimum": 0.1},
+                    },
+                    "required": ["vx_mps", "duration_s"],
+                },
+                route="robot_action",
+                available=True,
+                interaction_executable=True,
+                prompt_tier="common",
+            ),
             CatalogCapability(capability_id="chromie.speak", agent_id="capability_agent", description="Speak text", input_schema={"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}, route="chat", available=True, interaction_executable=True, prompt_tier="common"),
         ]
 
@@ -836,10 +855,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["rationale"]["maxLength"],
             200,
         )
-        self.assertEqual(
-            schema["$defs"]["PlanParameterResolution"]["properties"]
-            ["source_ref"]["maxLength"],
-            160,
+        self.assertNotIn(
+            "source_ref",
+            schema["$defs"]["PlanParameterResolution"]["properties"],
         )
         self.assertEqual(
             set(schema["$defs"]["PlanParameterResolution"]["required"]),
@@ -851,7 +869,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "confidence",
                 "blocking",
                 "rationale",
-                "source_ref",
                 "source_goal_ids",
             },
         )
@@ -898,7 +915,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.99,
                     "blocking": False,
                     "rationale": "Copied from the goal.",
-                    "source_ref": "2 seconds",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -939,11 +955,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
         self.assertEqual(len(ollama.prompts), 2)
         self.assertIn(
-            "source_ref does not cite its resolved value",
+            "explicit numeric goal value has no matching user_supplied",
             ollama.prompts[1][0],
         )
 
-    def test_numeric_grounding_accepts_matching_goal_qualified_verbatim_span(self):
+    def test_numeric_grounding_accepts_stable_source_goal_provenance(self):
         raw = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -972,7 +988,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 1.0,
                     "blocking": False,
                     "rationale": "Copied from the authoritative goal.",
-                    "source_ref": "goal-walk:2 seconds",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -994,7 +1009,81 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].args["duration_s"], 2.0)
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_numeric_grounding_rejects_mismatched_goal_qualifier(self):
+    def test_exact_velocity_and_duration_use_goal_ids_without_text_copy(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk at the requested velocity and duration.",
+            steps=[
+                execute_step(
+                    "soridormi.walk_velocity",
+                    "soridormi.walk_velocity",
+                    {
+                        "vx_mps": 0.2,
+                        "vy_mps": 0.0,
+                        "yaw_radps": 0.0,
+                        "duration_s": 20.0,
+                    },
+                    ["goal-walk"],
+                    "Use the exact requested speed and duration.",
+                )
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk",
+                    ["soridormi.walk_velocity"],
+                    "The exact movement is covered.",
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-walk"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "soridormi.walk_velocity",
+                    "parameter": "vx_mps",
+                    "strategy": "user_supplied",
+                    "value": 0.2,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "The Goal supplies the velocity.",
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "soridormi.walk_velocity",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 20.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "The Goal supplies the duration.",
+                    "source_goal_ids": ["goal-walk"],
+                },
+            ],
+        )
+        ollama = FakeOllama(raw)
+        run_request = request(
+            "Walk forward at 0.2 meters per second for 20 seconds.",
+            goal_ids=["goal-walk"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward at 0.2 meters per second for 20 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].capability_id, "soridormi.walk_velocity")
+        self.assertEqual(plan.steps[0].args["vx_mps"], 0.2)
+        self.assertEqual(plan.steps[0].args["duration_s"], 20.0)
+        self.assertEqual(len(ollama.prompts), 1)
+        response_schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotIn(
+            "source_ref",
+            response_schema["$defs"]["PlanParameterResolution"]["properties"],
+        )
+
+    def test_numeric_grounding_rejects_wrong_source_goal(self):
         raw = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -1023,8 +1112,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 1.0,
                     "blocking": False,
                     "rationale": "Copied from the authoritative goal.",
-                    "source_ref": "goal-other:2 seconds",
-                    "source_goal_ids": ["goal-walk"],
+                    "source_goal_ids": ["goal-other"],
                 }
             ],
         )
@@ -1045,7 +1133,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "escalate")
-        self.assertIn("not an exact span", plan.metadata["error"])
+        self.assertIn(
+            "parameter resolution references unknown goal IDs",
+            plan.metadata["error"],
+        )
 
     def test_dotted_step_id_is_unambiguous_in_parameter_repair_feedback(self):
         invalid = multi_goal_plan(
@@ -1077,11 +1168,10 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "soridormi.walk_velocity",
                     "parameter": "duration_s",
                     "strategy": "user_supplied",
-                    "value": 2.0,
+                    "value": "2 seconds",
                     "confidence": 1.0,
                     "blocking": False,
                     "rationale": "Copied from the authoritative goal.",
-                    "source_ref": "2 seconds plus unsupported annotation",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -1091,7 +1181,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "parameter_resolutions": [
                 {
                     **invalid["parameter_resolutions"][0],
-                    "source_ref": "goal-walk:2 seconds",
+                    "value": 2.0,
                 }
             ],
         }
@@ -1151,7 +1241,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 1.0,
                     "blocking": False,
                     "rationale": "Copied from the authoritative goal.",
-                    "source_ref": "2 seconds",
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -1455,7 +1544,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("source_goal_ids", step_schema["required"])
         self.assertEqual(
             step_schema["properties"]["capability_id"]["enum"],
-            ["soridormi.blink_eyes", "soridormi.walk_forward"],
+            [
+                "soridormi.blink_eyes",
+                "soridormi.walk_forward",
+                "soridormi.walk_velocity",
+            ],
         )
         prompt = ollama.prompts[0][0]
         self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
