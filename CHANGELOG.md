@@ -1,5 +1,12 @@
 # Changelog
 
+- Reproduced clean source-bound compound execution preserving a specific,
+  natural Response Composer sentence until the Host replaced two unfamiliar
+  actions with “perform the requested action.” Removed the Host capability
+  phrase renderer and preserved fingerprint-bound model wording instead.
+  Confirmation, goal coverage, commitment state, playback barriers, schemas,
+  and effect authorization remain typed and fail closed; the model now also
+  receives each execution capability's declared confirmation requirement.
 - Reproduced the clean source-bound active-cancellation case failing before
   Provider start after a valid Fast Planner meaning was rejected at ambiguous
   provenance/repair representation boundaries and a later Deep attempt

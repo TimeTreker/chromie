@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
-import pytest
-
 from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
 from agent.app.schema import AgentRunRequest, RouteDecision
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 
 
 def test_weather_capability_declares_bounded_temporal_scope() -> None:
@@ -27,28 +22,15 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
 
 
 def test_safe_read_step_uses_model_owned_specific_language() -> None:
-    step = SimpleNamespace(skill_id="chromie.weather.lookup", args={})
-    definition = SimpleNamespace(
-        metadata={
-            "effects": ["read_only", "external_read", "weather_lookup"],
-            "safety_class": "safe_read",
-            "pre_execution_speech_guidance": (
-                "Generate natural model-owned wording for the specific lookup."
-            ),
-        }
+    bundle = chromie_capability_bundle()
+    tool = next(
+        tool
+        for agent in bundle.agents
+        for tool in agent.tools
+        if tool.name == "chromie.weather.lookup"
     )
-    for language in ("zh-CN", "en-US"):
-        with pytest.raises(
-            ValueError,
-            match="read-only pre-execution wording must come from Response Composer",
-        ):
-            CanonicalPlanRuntimeAdapter._authoritative_step_text(
-                step,
-                language=language,
-                definition=definition,
-            )
-    assert "pre_execution_acknowledgement" not in definition.metadata
-    assert "pre_execution_speech_guidance" in definition.metadata
+    assert "pre_execution_acknowledgement" not in tool.llm_hints
+    assert "pre_execution_speech_guidance" in tool.llm_hints
 
 
 def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:

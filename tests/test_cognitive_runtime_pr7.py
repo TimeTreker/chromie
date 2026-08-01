@@ -101,11 +101,27 @@ class ScriptedClient:
             kwargs["context"]["canonical_plan_resolution"]
         )
         if plan.disposition == "execute":
+            confirmation_required = bool(
+                plan.metadata.get("user_confirmation_required")
+            ) or any(
+                item.get("requires_confirmation") is True
+                for item in kwargs["context"].get("execution_capabilities", [])
+            )
             response_plan = ResponsePlan(
                 pre_action=ResponseStage(
-                    text="好的，我先执行这个计划。",
-                    speech_act="inform",
-                    commitment_state="evaluating",
+                    text=(
+                        "你愿意让我眨四下眼睛吗？如果可以，我就开始。"
+                        if confirmation_required
+                        else "好的，我先执行这个计划。"
+                    ),
+                    speech_act=(
+                        "ask_confirmation" if confirmation_required else "inform"
+                    ),
+                    commitment_state=(
+                        "waiting_for_user"
+                        if confirmation_required
+                        else "evaluating"
+                    ),
                     must_not_claim_completion=True,
                     covers_goal_ids=plan.goal_ids,
                 )
@@ -832,7 +848,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(response.skills[0].metadata["retryable_safe_read"])
         self.assertTrue(response.metadata["safe_read_parallel_execution"])
 
-    def test_effectful_pre_execution_keeps_one_grounded_speech_with_barrier(self):
+    def test_effectful_pre_execution_preserves_model_speech_with_barrier(self):
         plan = execute_plan()
         composition = CoordinatedResponsePlan(
             composition_id="composition-pre-action-projection",
@@ -874,12 +890,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(len(response.speech), 1)
         self.assertEqual(
             response.speech[0].text,
-            "I'll blink four times.",
+            "I heard the request and will blink next.",
         )
-        self.assertEqual(response.speech[0].metadata["phase"], "pre_action")
+        self.assertEqual(response.speech[0].metadata["phase"], "immediate")
         self.assertEqual(
             response.speech[0].metadata["operational_text_source"],
-            "runtime_authoritative_state",
+            "llm_wording_runtime_validated",
         )
         self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
         self.assertTrue(
@@ -893,7 +909,110 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ["progress"],
         )
 
-    def test_exact_execute_normalizes_untrusted_progress_and_confirmation_prose(self):
+    def test_compound_action_preserves_exact_composer_sentence(self):
+        goal_ids = ["goal-walk", "goal-nod", "goal-turn"]
+        plan = CanonicalPlan(
+            plan_id="plan-walk-nod-turn",
+            planner_tier="deep",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.95,
+            goal_ids=goal_ids,
+            goal_summary="Walk, nod twice, and turn left.",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_velocity",
+                    "args": {"duration_s": 10.0, "speed": "0.2"},
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-nod"],
+                },
+                {
+                    "step_id": "turn",
+                    "skill_id": "soridormi.turn_in_place",
+                    "args": {"yaw_radps": -0.12},
+                    "source_goal_ids": ["goal-turn"],
+                },
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": goal_id,
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": [step_id],
+                }
+                for goal_id, step_id in zip(
+                    goal_ids,
+                    ("walk", "nod", "turn"),
+                    strict=True,
+                )
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        )
+        composer_text = (
+            "Okay! I'll walk forward for a bit, give you two nods, and then "
+            "turn left."
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-walk-nod-turn",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                pre_action=ResponseStage(
+                    text=composer_text,
+                    speech_act="acknowledge",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=goal_ids,
+                )
+            ),
+            confidence=0.95,
+        )
+        definitions = [
+            SkillDefinition(
+                skill_id=skill_id,
+                provider_id="soridormi.mcp",
+                input_schema={"type": "object"},
+                output_schema=TEST_SKILL_OUTPUT_SCHEMA,
+                available=True,
+                requires_confirmation=False,
+            )
+            for skill_id in (
+                "soridormi.walk_velocity",
+                "soridormi.nod_yes",
+                "soridormi.turn_in_place",
+            )
+        ]
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(FakeRuntime(definitions)).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-walk-nod-turn",
+                language="en-US",
+            )
+        )
+
+        self.assertEqual([item.text for item in response.speech], [composer_text])
+        self.assertEqual(
+            response.speech[0].metadata["operational_text_source"],
+            "llm_wording_runtime_validated",
+        )
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_effects"]
+        )
+
+    def test_exact_execute_rejects_structurally_unrequired_confirmation(self):
         plan = execute_plan()
         composition = CoordinatedResponsePlan(
             composition_id="composition-false-confirmation",
@@ -902,9 +1021,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             canonical_plan=plan,
             response_plan=ResponsePlan(
                 immediate=ResponseStage(
-                    text="正在眨眼睛，请确认是否需要调整。",
-                    speech_act="inform",
-                    commitment_state="evaluating",
+                    text="你愿意让我眨眼睛吗？",
+                    speech_act="ask_confirmation",
+                    commitment_state="waiting_for_user",
                     must_not_claim_completion=True,
                     covers_goal_ids=plan.goal_ids,
                 )
@@ -912,33 +1031,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.9,
         )
 
-        response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                FakeRuntime([blink_definition()])
-            ).build_response(
-                plan=plan,
-                composition=composition,
-                session_id="sid-false-confirmation",
-                language="zh-CN",
+        with self.assertRaisesRegex(
+            ValueError,
+            "requests confirmation without a runtime confirmation requirement",
+        ):
+            asyncio.run(
+                CanonicalPlanRuntimeAdapter(
+                    FakeRuntime([blink_definition()])
+                ).build_response(
+                    plan=plan,
+                    composition=composition,
+                    session_id="sid-false-confirmation",
+                    language="zh-CN",
+                )
             )
-        )
 
-        self.assertEqual(len(response.speech), 1)
-        self.assertEqual(
-            response.speech[0].text,
-            "我会眨四下眼睛。",
-        )
-        self.assertNotIn("正在眨眼睛", response.speech[0].text)
-        self.assertNotIn("请确认", response.speech[0].text)
-        self.assertFalse(
-            response.speech[0].metadata["runtime_confirmation_required"]
-        )
-        self.assertEqual(
-            response.speech[0].metadata["operational_text_source"],
-            "runtime_authoritative_state",
-        )
-
-    def test_mixed_execute_and_clarify_splits_waiting_from_action_authority(self):
+    def test_mixed_execute_and_clarify_preserves_coordinated_model_speech(self):
         plan = CanonicalPlan(
             plan_id="plan-mixed-execute-clarify",
             planner_tier="deep",
@@ -1024,20 +1132,20 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(response.speech), 2)
-        clarification, operational = response.speech
-        self.assertEqual(clarification.text, "你希望我往前走多久？")
+        self.assertEqual(len(response.speech), 1)
+        coordinated = response.speech[0]
         self.assertEqual(
-            clarification.metadata["covers_goal_ids"], ["goal-walk"]
+            coordinated.text,
+            "我先点头两次。你希望我往前走多久？",
         )
         self.assertEqual(
-            clarification.metadata["commitment_state"], "waiting_for_user"
+            coordinated.metadata["covers_goal_ids"],
+            ["goal-nod", "goal-walk"],
         )
         self.assertEqual(
-            operational.metadata["covers_goal_ids"], ["goal-nod"]
+            coordinated.metadata["commitment_state"], "waiting_for_user"
         )
-        self.assertEqual(operational.metadata["commitment_state"], "accepted")
-        self.assertFalse(operational.metadata["runtime_confirmation_required"])
+        self.assertFalse(coordinated.metadata["runtime_confirmation_required"])
         self.assertFalse(response.requires_confirmation)
 
     def test_fast_terminal_multi_goal_mixed_plan_skips_deep_planner(self):
@@ -1230,7 +1338,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.interaction_response.speech[0].text,
-            "要我眨四下眼睛吗？你说“好”，我就开始啦！",
+            "你愿意让我眨四下眼睛吗？如果可以，我就开始。",
         )
         self.assertEqual(
             result.interaction_response.metadata["confirmation_prompt"],
@@ -1240,6 +1348,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             result.interaction_response.speech[0].metadata[
                 "runtime_confirmation_required"
             ]
+        )
+        self.assertEqual(
+            result.interaction_response.metadata["confirmation_prompt_source"],
+            "llm_wording_runtime_validated",
         )
         self.assertTrue(
             result.interaction_response.speech[0].metadata[
@@ -1492,7 +1604,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                         "source": "live_perception",
                         "target": {
                             "target_ref": "active_user",
-                            "relative_direction": "right",
                             "relative_direction": "right",
                         },
                     }
@@ -1764,7 +1875,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             [item.text for item in response.speech],
             [
                 "A short joke.",
-                "I'll blink twice.",
+                "I will also blink twice.",
             ],
         )
         self.assertTrue(

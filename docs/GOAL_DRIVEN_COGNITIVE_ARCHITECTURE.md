@@ -991,12 +991,15 @@ stops at the authority boundary before Response Composition, capability
 validation, or any SkillRequest is emitted.
 
 For an accepted effectful plan, executable wording from the Response Composer
-is not treated as execution evidence. The trusted adapter derives a short
-prospective cue from the canonical plan and actual confirmation state, excludes
-pre-execution progress/final claims, and requires playback to start before a
+is not treated as execution evidence. The trusted adapter preserves that
+model-authored wording while validating the immutable plan fingerprint, goal
+coverage, structured speech act, commitment state, actual confirmation
+requirement, and absence of premature completion authority. It excludes
+pre-execution progress/final stages and requires playback to start before a
 dependent physical request may begin. If that delivery barrier fails or times
-out, all queued chunks from the cue are invalidated so delayed synthesis cannot
-announce an action after the runtime has stopped it.
+out, all queued chunks from the response are invalidated so delayed synthesis
+cannot announce an action after the runtime has stopped it. The Host never
+reconstructs action meaning from capability-specific phrase templates.
 
 ## 12. Social interaction layer
 

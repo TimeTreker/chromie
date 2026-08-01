@@ -82,8 +82,8 @@
     "response_composition": {
       "response_plan": {
         "pre_action": {
-          "text": "我不能确认这两个动作能安全同时进行，但可以先走十五秒，再眨四下眼睛。可以吗？",
-          "speech_act": "inform",
+          "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
+          "speech_act": "ask_confirmation",
           "commitment_state": "waiting_for_user",
           "must_not_claim_completion": true,
           "covers_goal_ids": ["goal-compound"]
@@ -100,7 +100,7 @@
     "capability_ids": ["soridormi.walk_forward", "soridormi.blink_eyes"],
     "requires_confirmation": true,
     "speech_contains_all": [
-      "我还不能完全照你刚才说的方式做",
+      "我还不能边走边眨眼",
       "先往前走十五秒",
       "再眨四下眼睛",
       "你说“好”，我就开始啦"

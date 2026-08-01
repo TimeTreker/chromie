@@ -188,8 +188,8 @@
           ]
         },
         "pre_action": {
-          "text": "我会先往前走一秒，再眨两下眼睛；移动需要你确认。",
-          "speech_act": "inform",
+          "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
+          "speech_act": "ask_confirmation",
           "commitment_state": "waiting_for_user",
           "must_not_claim_completion": true,
           "covers_goal_ids": [

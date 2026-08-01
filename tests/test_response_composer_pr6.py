@@ -490,6 +490,62 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         self.assertTrue(stage["properties"]["must_not_claim_completion"]["const"])
 
+    def test_runtime_capability_confirmation_is_a_typed_composer_input(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-walk"],
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2},
+                }
+            ],
+        )
+        context = {
+            "execution_capabilities": [
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "safety_class": "physical_motion",
+                    "requires_confirmation": True,
+                }
+            ]
+        }
+        output = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "我可以往前走两秒。你愿意让我开始吗？",
+                    "speech_act": "ask_confirmation",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-walk"],
+                }
+            }
+        }
+        ollama = FakeOllama(output)
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(canonical, context=context)
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        schema = ollama.prompts[0][1]["response_format"]
+        stage = schema["$defs"]["ResponseStage"]
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["waiting_for_user"],
+        )
+        self.assertEqual(
+            stage["properties"]["speech_act"]["enum"],
+            ["ask_confirmation"],
+        )
+        self.assertEqual(
+            result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
+            output["response_plan"]["pre_action"]["text"],
+        )
+
     def test_confirmation_bound_mixed_completion_claim_repairs_before_language_check(self):
         canonical = CanonicalPlan(
             plan_id="plan-mixed-adjustment-repair",

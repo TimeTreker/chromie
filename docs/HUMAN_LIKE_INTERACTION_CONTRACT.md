@@ -439,11 +439,13 @@ expose internal fallback text such as:
 
 A required confirmation remains exact-request-bound and single-use, but it must
 sound like Chromie rather than an operator console. The prospective wording is
-rendered from the same validated high-level action plan that will execute. It
-names the user-facing actions, explains a material safe adjustment before asking,
-and says naturally how to approve it. The Host confirmation stage must reuse that
-exact wording; capability IDs, argument keys, JSON, and state-machine instructions
-must never replace it. For example:
+authored by Response Composer from the same immutable high-level action plan
+that will execute and the typed runtime confirmation requirement. It names the
+user-facing actions, explains a material safe adjustment before asking, and says
+naturally how to approve it. The Host validates the structured confirmation
+act and must reuse that exact wording; capability IDs, argument keys, JSON,
+state-machine instructions, and Host phrase templates must never replace it.
+For example:
 
 ```text
 我还不能完全照你刚才说的方式做，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！
