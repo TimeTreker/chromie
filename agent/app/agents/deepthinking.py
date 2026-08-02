@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from typing import Any, Literal, cast
 
@@ -14,6 +13,8 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import CapabilityIdentityModel, CapabilityRequest
     from shared.chromie_contracts.task_proposal import TaskProposal
+
+from ..settings import agent_service_settings
 
 from ..capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from ..schema import AgentResult, AgentRunRequest
@@ -267,8 +268,8 @@ class DeepThinkingAgent(BaseAgent):
         options = {
             "temperature": 0.25,
             "top_p": 0.9,
-            "num_ctx": int(os.getenv("AGENT_DEEPTHINKING_NUM_CTX", "8192")),
-            "num_predict": int(os.getenv("AGENT_DEEPTHINKING_NUM_PREDICT", "384")),
+            "num_ctx": agent_service_settings.deepthinking_num_ctx,
+            "num_predict": agent_service_settings.deepthinking_num_predict,
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
         raw = await ollama.generate(

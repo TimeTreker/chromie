@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import os
+
+from ..settings import agent_service_settings
 
 from .models import (
     AgentManifest,
@@ -14,19 +15,13 @@ from .models import (
 
 
 def _weather_tool_availability() -> ToolAvailability:
-    enabled = os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    enabled = agent_service_settings.weather_enabled
     return ToolAvailability(
         available=enabled,
         modes=["runtime", "read_only"],
         requires=["network", "open_meteo"],
         reason=None if enabled else "AGENT_WEATHER_ENABLED is disabled",
     )
-
 
 def chromie_manifests() -> list[AgentManifest]:
     speech = AgentManifest(

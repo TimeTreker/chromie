@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import time
 from typing import Any, Literal
+
+
+from ..settings import AgentServiceSettings
 
 import httpx
 
@@ -110,25 +112,6 @@ def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
     }
 
 
-def _env_int(name: str, default: int = 0) -> int:
-    value = os.getenv(name)
-    if value is None or value.strip() == "":
-        return int(default)
-    try:
-        return int(float(value))
-    except ValueError:
-        return int(default)
-
-
-def _env_float(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None or value.strip() == "":
-        return float(default)
-    try:
-        return float(value)
-    except ValueError:
-        return float(default)
-
 
 class OllamaClient:
     TRACE_MODULE = TraceModule(
@@ -145,46 +128,20 @@ class OllamaClient:
         *,
         timeout_ms: int | None = None,
         purpose: str | None = None,
+        service_settings: AgentServiceSettings | None = None,
     ):
-        self.base_url = (
-            base_url
-            or os.getenv("AGENT_OLLAMA_URL")
-            or os.getenv("OLLAMA_URL")
-            or "http://chromie-llm:11434"
-        ).rstrip("/")
-
-        self.model = (
-            model
-            or os.getenv("AGENT_MODEL")
-            or os.getenv("OLLAMA_MODEL")
-            or "qwen3:4b"
-        )
-
-        self.timeout_ms = int(
-            timeout_ms
-            or os.getenv("AGENT_TIMEOUT_MS")
-            or os.getenv("OLLAMA_TIMEOUT_MS")
-            or "3000"
-        )
+        configured = service_settings or AgentServiceSettings()
+        self.base_url = (base_url or configured.ollama_url).rstrip("/")
+        self.model = model or configured.model
+        self.timeout_ms = int(timeout_ms or configured.timeout_ms)
         self.purpose = str(purpose or "unspecified").strip() or "unspecified"
-        self.default_num_ctx = _env_int(
-            "OLLAMA_NUM_CTX",
-            _env_int("OLLAMA_CONTEXT_LENGTH", 0),
+        self.default_num_ctx = configured.ollama_num_ctx
+        self.default_num_predict = configured.ollama_num_predict
+        self.prompt_chars_per_token_estimate = (
+            configured.llm_prompt_chars_per_token_estimate
         )
-        self.default_num_predict = _env_int("OLLAMA_NUM_PREDICT", 0)
-        self.prompt_chars_per_token_estimate = max(
-            0.1,
-            _env_float(
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
-                2.0,
-            ),
-        )
-        self.context_safety_margin_tokens = max(
-            0,
-            _env_int(
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
-                0,
-            ),
+        self.context_safety_margin_tokens = (
+            configured.llm_context_safety_margin_tokens
         )
 
         logger.info(

@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -12,6 +11,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ...clients.ollama_client import OllamaGenerationError
+from ...settings import agent_service_settings
 
 try:
     from chromie_runtime.llm_diagnostics import (
@@ -594,12 +594,6 @@ def _bounded_json_array(value: list[Any], *, max_chars: int = 4000) -> str:
     )
 
 
-def _env_flag(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() not in {"", "0", "false", "no", "off"}
-
 
 def _short_hash(value: Any) -> str:
     try:
@@ -1059,18 +1053,16 @@ class OllamaGoalInterpreter:
         )
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
-        self.prompt_chars_per_token_estimate = max(
-            0.1,
-            float(os.getenv("AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE", "2.0")),
+        self.prompt_chars_per_token_estimate = (
+            agent_service_settings.llm_prompt_chars_per_token_estimate
         )
-        self.context_safety_margin_tokens = max(
-            0,
-            int(os.getenv("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", "0")),
+        self.context_safety_margin_tokens = (
+            agent_service_settings.llm_context_safety_margin_tokens
         )
         self.keep_alive = (keep_alive or "").strip() or None
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "goal_interpreter_system.txt"
-        self.debug_raw_output = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_RAW")
-        self.debug_prompt = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_PROMPT")
+        self.debug_raw_output = agent_service_settings.goal_interpreter_debug_raw
+        self.debug_prompt = agent_service_settings.goal_interpreter_debug_prompt
 
     def load_system_prompt(self) -> str:
         try:

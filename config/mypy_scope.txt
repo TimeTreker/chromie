@@ -1,4 +1,5 @@
 # Owned packages expand recursively so new modules enter the gate automatically.
+agent/app/settings.py
 orchestrator/runtime/cognitive_gateway_modules
 orchestrator/runtime/host_components.py
 orchestrator/runtime/host_settings.py

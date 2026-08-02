@@ -24,7 +24,7 @@ environment variable independently. This boundary does not change hardware
 profile precedence and does not move owner-editable identity or personality into
 Python defaults.
 
-## Migrated boundaries: ASR and TTS
+## Migrated boundaries: Agent, ASR, and TTS
 
 `asr.settings.ASRServiceSettings` owns the complete maintained ASR service
 environment surface. It provides:
@@ -48,17 +48,24 @@ model-source environment surface. `tts/server.py`, `tts/candidate_server.py`,
 instead of reparsing environment values independently. Invalid ports, ranges,
 booleans, and missing immutable model references fail with the owning key.
 
+`agent.app.settings` now owns the Agent service and Goal Interpreter startup
+surfaces. Main composition, model clients, weather, capability planning,
+conversation, deep thinking, Goal Interpreter diagnostics, and manifest
+expansion consume typed snapshots or explicitly supplied standalone settings.
+Maintained startup passes the same Agent snapshot into every model and provider
+client; compatibility factories remain only for isolated callers and tests.
+
 
 ## Continuation objective
 
-The ASR and TTS migrations are proven slices, not closure of the configuration
+The Agent, ASR, and TTS migrations are proven slices, not closure of the configuration
 problem. The current archive still contains about 276 distinct environment keys
 read directly by maintained runtime sources. Before changing names, inventory
 each key as profile authority, service setting, operator override, diagnostics,
 experiment, or stale compatibility. Ordinary behavior should be composed from a
 small set of orthogonal profile axes rather than freely combined Boolean flags.
 
-Agent and shared-runtime migrations remain source work. Each migrated service
+Shared-runtime policy migration remains source work. Each migrated service
 must delete duplicate parsing and obsolete keys instead of adding another
 compatibility layer indefinitely. Live startup proof remains target evidence.
 
@@ -75,10 +82,9 @@ The remaining services keep their current behavior and are future ratchet work:
 
 | Boundary | Current concentration | Recommended next seam |
 |---|---|---|
-| Agent service | `agent/app/main.py` | extract Agent startup settings by functional groups, preserving generated profile authority |
 | Shared runtime | trace/resource modules | inject narrow typed policy values where repeated reads remain |
 
 Each future migration must be independently tested and must not become one global
-cross-service settings object. The source sequence now continues with Agent and shared-runtime ownership.
+cross-service settings object. The source sequence now continues with narrow shared-runtime policy ownership.
 Physical startup and device proof remain in the target-evidence track. See
 [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

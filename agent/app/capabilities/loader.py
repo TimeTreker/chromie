@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
+
+from ..settings import AgentServiceSettings, agent_service_settings
 
 from .local import build_chromie_registry
 from .models import CapabilityBundle, CapabilityRegistry
@@ -27,35 +29,38 @@ def parse_manifest_paths(raw: str | None) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _expand_environment(value: Any, *, source: Path) -> Any:
+def _expand_environment(value: Any, *, source: Path, environment: Mapping[str, str]) -> Any:
     if isinstance(value, dict):
         return {
-            key: _expand_environment(item, source=source)
+            key: _expand_environment(item, source=source, environment=environment)
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_expand_environment(item, source=source) for item in value]
+        return [_expand_environment(item, source=source, environment=environment) for item in value]
     if not isinstance(value, str):
         return value
 
     def replace(match: re.Match[str]) -> str:
         name = match.group(1)
-        if not os.environ.get(name):
+        if not environment.get(name):
             raise ValueError(
                 f"capability manifest {source} requires non-empty environment variable {name}"
             )
-        return os.environ[name]
+        return environment[name]
 
     return _ENV_REFERENCE.sub(replace, value)
 
 
-def load_capability_bundle(path: str | Path) -> CapabilityBundle:
+def load_capability_bundle(path: str | Path, *, environment: Mapping[str, str] | None = None) -> CapabilityBundle:
     source = Path(path)
     data = CapabilityBundle.load_file(source).model_dump(mode="json")
-    return CapabilityBundle.model_validate(_expand_environment(data, source=source))
+    values = environment if environment is not None else AgentServiceSettings().environment
+    return CapabilityBundle.model_validate(
+        _expand_environment(data, source=source, environment=values)
+    )
 
 
-def load_capability_bundles(paths: list[str]) -> tuple[list[CapabilityBundle], list[str]]:
+def load_capability_bundles(paths: list[str], *, environment: Mapping[str, str] | None = None) -> tuple[list[CapabilityBundle], list[str]]:
     bundles: list[CapabilityBundle] = []
     loaded_files: list[str] = []
 
@@ -71,14 +76,14 @@ def load_capability_bundles(paths: list[str]) -> tuple[list[CapabilityBundle], l
         for candidate in candidates:
             if not candidate.is_file():
                 raise ValueError(f"capability manifest is not a file: {candidate}")
-            bundles.append(load_capability_bundle(candidate))
+            bundles.append(load_capability_bundle(candidate, environment=environment))
             loaded_files.append(str(candidate))
 
     return bundles, loaded_files
 
 
-def build_configured_registry(paths: list[str]) -> ConfiguredRegistry:
-    bundles, loaded_files = load_capability_bundles(paths)
+def build_configured_registry(paths: list[str], *, environment: Mapping[str, str] | None = None) -> ConfiguredRegistry:
+    bundles, loaded_files = load_capability_bundles(paths, environment=environment)
     registry = build_chromie_registry(bundles)
     return ConfiguredRegistry(
         registry=registry,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -23,6 +22,8 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_contracts.semantic_authority import semantic_authority_from_context
     from shared.chromie_contracts.semantic_task import InformationGap
+
+from ..settings import agent_service_settings
 
 from ..capabilities.validator import (
     normalize_args_for_schema,
@@ -762,7 +763,7 @@ class CapabilityAgent(BaseAgent):
                 options={
                     "temperature": 0,
                     "top_p": 0.8,
-                    "num_predict": int(os.getenv("AGENT_CAPABILITY_REVIEW_NUM_PREDICT", "160")),
+                    "num_predict": agent_service_settings.capability_review_num_predict,
                 },
             )
         except Exception as exc:
@@ -906,8 +907,8 @@ class CapabilityAgent(BaseAgent):
                     options={
                         "temperature": 0,
                         "top_p": 0.8,
-                        "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "24576")),
-                        "num_predict": int(os.getenv("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", "384")),
+                        "num_ctx": agent_service_settings.capability_num_ctx,
+                        "num_predict": agent_service_settings.capability_parameter_repair_num_predict,
                     },
                 )
                 repaired = _CapabilityPlan.model_validate(raw)
@@ -1002,8 +1003,8 @@ class CapabilityAgent(BaseAgent):
                     options={
                         "temperature": 0,
                         "top_p": 0.8,
-                        "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "24576")),
-                        "num_predict": int(os.getenv("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", "384")),
+                        "num_ctx": agent_service_settings.capability_num_ctx,
+                        "num_predict": agent_service_settings.capability_parameter_repair_num_predict,
                     },
                 )
                 repaired = _CapabilityPlan.model_validate(raw)
@@ -1514,8 +1515,8 @@ class CapabilityAgent(BaseAgent):
                 options={
                     "temperature": 0,
                     "top_p": 0.8,
-                    "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "24576")),
-                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "512")),
+                    "num_ctx": agent_service_settings.capability_num_ctx,
+                    "num_predict": agent_service_settings.capability_num_predict,
                 },
             )
         except Exception as exc:

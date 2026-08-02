@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 import json
-import os
 import re
 import time
 from typing import Any, cast
+
+from ..settings import agent_service_settings
 
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
@@ -191,8 +192,8 @@ class ConversationAgent(BaseAgent):
         options = {
             "temperature": 0.35,
             "top_p": 0.9,
-            "num_ctx": int(os.getenv("AGENT_CONVERSATION_NUM_CTX", "2048")),
-            "num_predict": int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "64")),
+            "num_ctx": agent_service_settings.conversation_num_ctx,
+            "num_predict": agent_service_settings.conversation_num_predict,
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
         raw = await ollama.generate(

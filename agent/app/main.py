@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 import time
-from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel, Field
 
+from .settings import Settings, agent_service_settings as settings
 from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
@@ -47,10 +45,6 @@ try:
         AttentionReviewResult,
         CoreTurnRequest,
     )
-    from chromie_contracts.social_attention import (
-        SocialAttentionMode,
-        normalize_social_attention_mode,
-    )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.agent_skill import (
         AgentSkillDisclosureRequest,
@@ -70,10 +64,6 @@ except ImportError:  # pragma: no cover
         AttentionReviewRequest,
         AttentionReviewResult,
         CoreTurnRequest,
-    )
-    from shared.chromie_contracts.social_attention import (
-        SocialAttentionMode,
-        normalize_social_attention_mode,
     )
 from .interaction import (
     AgentResultInteractionAdapter,
@@ -120,471 +110,8 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 
 
-class Settings(BaseModel):
-    host: str = Field(default_factory=lambda: os.getenv("AGENT_HOST", "0.0.0.0"))
-    port: int = Field(default_factory=lambda: int(os.getenv("AGENT_PORT", "8092")))
-    ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL", "http://chromie-llm:11434"))
-    model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL", "gemma4:e2b"))
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS", "30000")))
-    response_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_ENABLED", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    response_review_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODEL", "gemma4:e2b")
-    )
-    response_review_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_REVIEW_TIMEOUT_MS", "4000"))
-    )
-    response_review_mode: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODE", "auto")
-    )
-    use_llm: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "140")))
-    expressive_body_cues: Literal["off", "on"] = Field(
-        default_factory=lambda: (
-            "on"
-            if normalize_social_attention_mode(
-                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off"),
-                default="off",
-            )
-            == "on"
-            else "off"
-        )
-    )
-    social_attention_mode: SocialAttentionMode = Field(
-        default_factory=lambda: normalize_social_attention_mode(
-            os.getenv(
-                "AGENT_SOCIAL_ATTENTION_MODE",
-                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "on"),
-            ),
-            default="on",
-        )
-    )
-    social_attention_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SOCIAL_ATTENTION_MODEL",
-            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
-        )
-    )
-    social_attention_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS", "2500")),
-        ge=100,
-        le=120000,
-    )
-    social_attention_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_CTX", "4096")),
-        ge=512,
-    )
-    social_attention_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_PREDICT", "160")),
-        ge=32,
-        le=4096,
-    )
-    social_attention_wait_after_response_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "0")),
-        ge=0,
-        le=120000,
-    )
-    social_attention_max_behaviors: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS", "2")),
-        ge=1,
-        le=3,
-    )
-    social_attention_capability_ids: tuple[str, ...] = Field(
-        default_factory=lambda: tuple(
-            item.strip()
-            for item in os.getenv(
-                "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
-                "",
-            ).split(",")
-            if item.strip()
-        )
-    )
-    require_capability_plan_review: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    interaction_output_mode: Literal["native", "legacy-adapter"] = Field(
-        default_factory=lambda: os.getenv("AGENT_INTERACTION_OUTPUT_MODE", "native")
-    )
-    native_interaction_fallback: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_NATIVE_INTERACTION_FALLBACK",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    legacy_capability_fallback_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    enable_task_graph_planning: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    enable_read_only_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    enable_planning_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    enable_parallel_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    task_graph_max_concurrency: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_MAX_CONCURRENCY", "4")
-        ),
-        ge=1,
-        le=64,
-    )
-    enable_guarded_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    enable_physical_task_graph_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    task_graph_execution_token: str = Field(
-        default_factory=lambda: os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "")
-    )
-    task_graph_diagnostics_token: str = Field(
-        default_factory=lambda: (
-            os.getenv("AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN", "").strip()
-            or os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
-        )
-    )
-    task_graph_trace_max_entries: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES", "128")
-        ),
-        ge=1,
-        le=10000,
-    )
-    task_graph_trace_ttl_sec: float = Field(
-        default_factory=lambda: float(
-            os.getenv("AGENT_TASK_GRAPH_TRACE_TTL_SEC", "900")
-        ),
-        gt=0,
-        le=86400,
-    )
-    task_graph_grant_max_entries: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES", "128")
-        ),
-        ge=1,
-        le=10000,
-    )
-    capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
-    agent_skill_roots: str = Field(
-        default_factory=lambda: os.getenv("AGENT_SKILL_ROOTS", "agent-skills")
-    )
-    agent_skill_selection_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SKILL_SELECTION_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
-    )
-    agent_skill_selection_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SKILL_SELECTION_MODEL",
-            os.getenv("AGENT_GOAL_ASSOCIATION_MODEL", "qwen3:4b"),
-        )
-    )
-    agent_skill_selection_timeout_ms: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_TIMEOUT_MS", "10000")
-        ),
-        ge=100,
-        le=120000,
-    )
-    agent_skill_selection_max_candidates: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_MAX_CANDIDATES", "12")
-        ),
-        ge=1,
-        le=64,
-    )
-    agent_skill_selection_max_selected: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_MAX_SELECTED", "4")
-        ),
-        ge=1,
-        le=8,
-    )
-    agent_skill_selection_min_confidence: float = Field(
-        default_factory=lambda: float(
-            os.getenv("AGENT_SKILL_SELECTION_MIN_CONFIDENCE", "0.55")
-        ),
-        ge=0.0,
-        le=1.0,
-    )
-    agent_skill_selection_num_ctx: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_NUM_CTX", "8192")
-        ),
-        ge=512,
-    )
-    agent_skill_selection_num_predict: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_SELECTION_NUM_PREDICT", "512")
-        ),
-        ge=32,
-        le=4096,
-    )
-    agent_skill_progressive_disclosure_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
-    )
-    agent_skill_projection_max_chars: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_PROJECTION_MAX_CHARS", "3000")
-        ),
-        ge=128,
-        le=50000,
-    )
-    agent_skill_projection_total_max_chars: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS", "6000")
-        ),
-        ge=128,
-        le=100000,
-    )
-    agent_skill_projection_count_limit: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_SKILL_PROJECTION_COUNT_LIMIT", "4")
-        ),
-        ge=1,
-        le=8,
-    )
-    capability_catalog_refresh_sec: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_CATALOG_REFRESH_SEC", "30")),
-        ge=1.0,
-        le=3600.0,
-    )
-    capability_match_min_score: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_MATCH_MIN_SCORE", "0.16")),
-        ge=0.0,
-        le=1.0,
-    )
-    capability_match_limit: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_MATCH_LIMIT", "8")),
-        ge=1,
-        le=32,
-    )
-    weather_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    capability_prompt_tier_preset: str = Field(
-        default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_PRESET", "")
-    )
-    capability_prompt_tier_overrides: str = Field(
-        default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES", "")
-    )
-    cognitive_gateway_attention_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
-    )
-    cognitive_gateway_attention_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
-            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
-        )
-    )
-    cognitive_gateway_attention_timeout_ms: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS", "2500")
-        ),
-        ge=100,
-        le=120000,
-    )
-    cognitive_gateway_attention_min_suppression_confidence: float = Field(
-        default_factory=lambda: float(
-            os.getenv(
-                "AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE",
-                "0.72",
-            )
-        ),
-        ge=0.0,
-        le=1.0,
-    )
-    cognitive_gateway_attention_num_ctx: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX", "2048")
-        ),
-        ge=512,
-        le=131072,
-    )
-    cognitive_gateway_attention_num_predict: int = Field(
-        default_factory=lambda: int(
-            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT", "96")
-        ),
-        ge=32,
-        le=1024,
-    )
-    task_continuity_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_TASK_CONTINUITY_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    task_continuity_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_TASK_CONTINUITY_MODEL", "qwen3:4b")
-    )
-    task_continuity_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_TIMEOUT_MS", "3000")),
-        ge=100,
-        le=120000,
-    )
-    task_continuity_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_TASK_CONTINUITY_MIN_CONFIDENCE", "0.65")),
-        ge=0.0,
-        le=1.0,
-    )
-    task_continuity_max_active_tasks: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS", "8")),
-        ge=1,
-        le=32,
-    )
-    task_continuity_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_CTX", "4096")),
-        ge=2048,
-        le=131072,
-    )
-    goal_association_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    goal_association_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_MODEL", "qwen3:4b")
-    )
-    goal_association_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_TIMEOUT_MS", "3000")), ge=100, le=120000
-    )
-    goal_association_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE", "0.65")), ge=0.0, le=1.0
-    )
-    goal_association_max_active_goals: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS", "8")), ge=1, le=32
-    )
-    goal_association_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_CTX", "4096")), ge=2048, le=131072
-    )
-    goal_association_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_PREDICT", "512")), ge=128, le=4096
-    )
-    fast_planner_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    fast_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"))
-    fast_planner_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
-    )
-    fast_planner_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_FAST_PLANNER_MIN_CONFIDENCE", "0.80")), ge=0.0, le=1.0
-    )
-    fast_planner_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
-    )
-    fast_planner_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_PREDICT", "2048")), ge=128, le=4096
-    )
-    fast_planner_max_capabilities: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
-    )
-    deep_planner_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    deep_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_MODEL", "gemma4:e2b"))
-    deep_planner_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_TIMEOUT_MS", "9000")), ge=100, le=120000
-    )
-    deep_planner_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_CONFIDENCE", "0.65")), ge=0.0, le=1.0
-    )
-    deep_planner_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_CTX", "8192")), ge=4096, le=131072
-    )
-    deep_planner_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_PREDICT", "1024")), ge=256, le=8192
-    )
-    deep_planner_max_capabilities: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_CAPABILITIES", "96")), ge=1, le=256
-    )
-    deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
-    deep_planner_max_replans: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "2")), ge=0, le=2
-    )
-    response_composer_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    response_composer_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b")
-    )
-    response_composer_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_TIMEOUT_MS", "4500")), ge=100, le=120000
-    )
-    response_composer_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_CTX", "8192")), ge=2048, le=131072
-    )
-    response_composer_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "1024")), ge=128, le=4096
-    )
-    tool_result_interpreter_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_TOOL_RESULT_INTERPRETER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    tool_result_interpreter_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_TOOL_RESULT_INTERPRETER_MODEL",
-            os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b"),
-        )
-    )
-    tool_result_interpreter_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS", "4500")),
-        ge=100,
-        le=120000,
-    )
-    tool_result_interpreter_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", "4096")),
-        ge=2048,
-        le=131072,
-    )
-    tool_result_interpreter_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT", "256")),
-        ge=128,
-        le=4096,
-    )
-    task_continuity_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
-        ge=128,
-        le=4096,
-    )
-    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
-    mode: Literal["runtime"] = "runtime"
 
 
-settings = Settings()
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -597,8 +124,9 @@ ollama_client = OllamaClient(
     settings.model,
     timeout_ms=settings.timeout_ms,
     purpose="agent_default",
+        service_settings=settings,
 )
-weather_client = OpenMeteoWeatherClient() if settings.weather_enabled else None
+weather_client = OpenMeteoWeatherClient(service_settings=settings) if settings.weather_enabled else None
 
 response_reviewer_client = (
     OllamaClient(
@@ -606,6 +134,7 @@ response_reviewer_client = (
         settings.response_review_model,
         timeout_ms=settings.response_review_timeout_ms,
         purpose="response_review",
+        service_settings=settings,
     )
     if settings.use_llm and settings.response_review_enabled
     else None
@@ -616,6 +145,7 @@ social_attention_client = (
         settings.social_attention_model,
         timeout_ms=settings.social_attention_timeout_ms,
         purpose="social_attention",
+        service_settings=settings,
     )
     if settings.use_llm and settings.social_attention_mode != "off"
     else None
@@ -626,6 +156,7 @@ cognitive_gateway_attention_client = (
         settings.cognitive_gateway_attention_model,
         timeout_ms=settings.cognitive_gateway_attention_timeout_ms,
         purpose="cognitive_gateway_attention_review",
+        service_settings=settings,
     )
     if settings.use_llm and settings.cognitive_gateway_attention_enabled
     else None
@@ -645,6 +176,7 @@ task_continuity_client = (
         settings.task_continuity_model,
         timeout_ms=settings.task_continuity_timeout_ms,
         purpose="task_continuity",
+        service_settings=settings,
     )
     if settings.use_llm and settings.task_continuity_enabled
     else None
@@ -660,7 +192,10 @@ task_continuity_resolver = (
     if task_continuity_client is not None
     else None
 )
-configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
+configured_registry = build_configured_registry(
+    parse_manifest_paths(settings.capability_manifests),
+    environment=settings.environment,
+)
 capability_registry = configured_registry.registry
 configured_agent_skill_registry = build_configured_agent_skill_registry(
     settings.agent_skill_roots
@@ -672,6 +207,7 @@ agent_skill_selection_client = (
         settings.agent_skill_selection_model,
         timeout_ms=settings.agent_skill_selection_timeout_ms,
         purpose="agent_skill_selection",
+        service_settings=settings,
     )
     if settings.use_llm and settings.agent_skill_selection_enabled
     else None
@@ -733,6 +269,7 @@ tool_result_interpreter_client = (
         settings.tool_result_interpreter_model,
         timeout_ms=settings.tool_result_interpreter_timeout_ms,
         purpose="tool_result_interpreter",
+        service_settings=settings,
     )
     if settings.use_llm and settings.tool_result_interpreter_enabled
     else None
@@ -849,6 +386,7 @@ goal_association_client = (
         settings.goal_association_model,
         timeout_ms=settings.goal_association_timeout_ms,
         purpose="goal_association",
+        service_settings=settings,
     )
     if settings.use_llm and settings.goal_association_enabled
     else None
@@ -871,6 +409,7 @@ fast_planner_client = (
         settings.fast_planner_model,
         timeout_ms=settings.fast_planner_timeout_ms,
         purpose="fast_planner",
+        service_settings=settings,
     )
     if settings.use_llm and settings.fast_planner_enabled
     else None
@@ -893,6 +432,7 @@ deep_planner_client = (
         settings.deep_planner_model,
         timeout_ms=settings.deep_planner_timeout_ms,
         purpose="deep_planner",
+        service_settings=settings,
     )
     if settings.use_llm and settings.deep_planner_enabled
     else None
@@ -916,6 +456,7 @@ response_composer_client = (
         settings.response_composer_model,
         timeout_ms=settings.response_composer_timeout_ms,
         purpose="response_composer",
+        service_settings=settings,
     )
     if settings.use_llm and settings.response_composer_enabled
     else None

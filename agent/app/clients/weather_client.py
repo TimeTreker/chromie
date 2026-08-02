@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from ..settings import AgentServiceSettings
 
 import httpx
 from unidecode import unidecode
@@ -491,21 +492,13 @@ class OpenMeteoWeatherClient:
         forecast_url: str | None = None,
         timeout_s: float | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        service_settings: AgentServiceSettings | None = None,
     ) -> None:
-        self.geocoding_url = (
-            geocoding_url
-            or os.getenv("AGENT_WEATHER_GEOCODING_URL")
-            or "https://geocoding-api.open-meteo.com/v1/search"
-        )
-        self.forecast_url = (
-            forecast_url
-            or os.getenv("AGENT_WEATHER_FORECAST_URL")
-            or "https://api.open-meteo.com/v1/forecast"
-        )
+        configured = service_settings or AgentServiceSettings()
+        self.geocoding_url = geocoding_url or configured.weather_geocoding_url
+        self.forecast_url = forecast_url or configured.weather_forecast_url
         self.timeout_s = float(
-            timeout_s
-            if timeout_s is not None
-            else os.getenv("AGENT_WEATHER_TIMEOUT_S", "8")
+            timeout_s if timeout_s is not None else configured.weather_timeout_s
         )
         self.transport = transport
 

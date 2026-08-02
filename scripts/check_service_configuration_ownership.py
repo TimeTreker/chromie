@@ -9,8 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OWNERS = {
-    "asr": "asr/settings.py",
-    "tts": "tts/settings.py",
+    "asr": ("asr", "asr/settings.py"),
+    "tts": ("tts", "tts/settings.py"),
+    "agent": ("agent/app", "agent/app/settings.py"),
 }
 
 
@@ -42,8 +43,8 @@ def _is_environment_read(node: ast.Call) -> bool:
 
 def check(root: Path = ROOT) -> list[Finding]:
     findings: list[Finding] = []
-    for service, owner in OWNERS.items():
-        service_root = root / service
+    for service, (service_directory, owner) in OWNERS.items():
+        service_root = root / service_directory
         owner_path = root / owner
         if not owner_path.is_file():
             findings.append(Finding(owner, 0, "typed settings owner is missing"))
@@ -70,7 +71,7 @@ def main() -> int:
         for finding in findings:
             print(f"[service-config][error] {finding.path}:{finding.line}: {finding.message}")
         return 1
-    print("Service configuration ownership passed: ASR and TTS parse environment once")
+    print("Service configuration ownership passed: Agent, ASR, and TTS own environment parsing")
     return 0
 
 

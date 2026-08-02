@@ -21,6 +21,13 @@ class ServiceConfigurationOwnershipTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 (root / service / "worker.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / "agent" / "app").mkdir(parents=True)
+            (root / "agent" / "app" / "settings.py").write_text(
+                "import os\nVALUE = os.getenv('VALUE')\n", encoding="utf-8"
+            )
+            (root / "agent" / "app" / "worker.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
             (root / "tts" / "worker.py").write_text(
                 "import os\nVALUE = os.getenv('TTS_PORT')\n",
                 encoding="utf-8",
