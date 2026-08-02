@@ -477,6 +477,16 @@ extra `id` is not semantic interpretation; semantic descriptions and
 relationships still come only from the model and remain subject to schema and
 host validation.
 
+Typed entity provenance is part of that validation. When the model declares a
+new directly named location binding without a supplied referent, its value must
+remain a contiguous verbatim span of the authoritative current user turn in the
+user's language. A translated, transliterated, or otherwise ungrounded value is
+rejected and may receive the same single schema-constrained model repair as
+other invalid Goal Association output. Indirect references instead retain the
+canonical value and referent ID selected by Goal Association from the supplied
+bounded discourse state. The Host checks provenance shape; it does not extract a
+place name, choose a referent, or decide the user's meaning.
+
 ## 6. Goal continuity
 
 ### 6.1 Association precedes segmentation

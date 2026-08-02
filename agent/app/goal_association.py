@@ -729,6 +729,17 @@ class GoalAssociationResolver:
                 "new_goals item for every independently observable responsibility: "
                 + ", ".join(collection_bindings)
             )
+        location_bindings = self._non_verbatim_explicit_location_bindings(
+            model_output,
+            request=request,
+        )
+        if location_bindings:
+            raise ValueError(
+                "a directly named location binding must preserve a verbatim "
+                "contiguous span from the authoritative user turn; do not "
+                "translate, transliterate, or expand it outside the turn: "
+                + ", ".join(location_bindings)
+            )
         return self._expand_model_output(
             model_output,
             request=request,
@@ -754,6 +765,58 @@ class GoalAssociationResolver:
                     rejected.append(
                         f"new_goals[{goal_index}].bindings[{binding.name}]="
                         f"{binding.entity_type}"
+                    )
+        return rejected
+
+    @staticmethod
+    def _non_verbatim_explicit_location_bindings(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+        *,
+        request: AgentRunRequest,
+    ) -> list[str]:
+        """Reject ungrounded rewrites of directly named locations.
+
+        Indirect references keep their resolved canonical value and provenance.
+        A new location without referent provenance, however, came from the current
+        explicit user turn and must remain source-grounded user language after
+        whitespace normalization.  This prevents a model translation or
+        transliteration from silently changing which real place a provider sees.
+        """
+
+        authoritative_turn = " ".join(request.text.strip().split()).casefold()
+        resolved_values = {
+            (item.entity_type.casefold(), item.resolved_value.casefold())
+            for item in model_output.resolved_references
+        }
+        rejected: list[str] = []
+        for goal_index, goal in enumerate(model_output.new_goals):
+            for binding in goal.bindings:
+                name = "_".join(
+                    binding.name.strip().casefold().replace("-", "_").split()
+                )
+                entity_type = "_".join(
+                    binding.entity_type.strip().casefold().replace("-", "_").split()
+                )
+                if name != "location" and entity_type not in {
+                    "address",
+                    "city",
+                    "country",
+                    "county",
+                    "location",
+                    "place",
+                    "region",
+                }:
+                    continue
+                if binding.referent_id or (
+                    binding.entity_type.casefold(),
+                    binding.value.casefold(),
+                ) in resolved_values:
+                    continue
+                value = " ".join(binding.value.strip().split()).casefold()
+                if value not in authoritative_turn:
+                    rejected.append(
+                        f"new_goals[{goal_index}].bindings[{binding.name}]="
+                        f"{binding.value!r}"
                     )
         return rejected
 
@@ -1052,6 +1115,7 @@ class GoalAssociationResolver:
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
+            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
@@ -1146,6 +1210,7 @@ class GoalAssociationResolver:
             + "\n\n"
             + skill_section
             + f"Latest user turn:\n{request.text}\n\n"
+            "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"
@@ -1206,6 +1271,7 @@ class GoalAssociationResolver:
             "capability Goal. Never invent, copy, or repair an entity by character "
             "pattern; resolve it from the user meaning and supplied discourse. "
             "Persona and wording are expression concerns, not extra Goals.\n\n"
+            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. Indirect references may retain the supplied referent's canonical value.\n\n"
             "Existing Goal bindings are provenance-stable at this contract. An "
             "association may update only its description and lifecycle relation; "
             "it cannot rewrite typed material bindings. If the current user meaning "

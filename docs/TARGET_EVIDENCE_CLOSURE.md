@@ -164,6 +164,11 @@ or a Chongqing observation used to answer the corrected Neixiang request. Every
 fresh weather read must also retain a successful model-owned pre-evidence speech
 review. This is evidence that the semantic boundary ran, not a Host wording
 classifier; the fingerprint-bound human review still judges the actual speech.
+Before planning, Goal Association also rejects a new direct location binding
+that is not grounded as a contiguous verbatim span of the authoritative current
+turn; indirect references remain eligible only through their supplied referent
+provenance. One bounded model repair may correct the DTO, otherwise the turn
+fails closed. Provider aliases never repair this semantic boundary.
 
 ## Social Attention baseline
 

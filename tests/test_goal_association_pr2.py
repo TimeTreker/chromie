@@ -90,6 +90,59 @@ def active_goal(goal_id: str, description: str, *, bindings=None, status="open")
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+    def test_explicit_location_binding_repairs_non_verbatim_model_value(self):
+        mistranslated = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Check whether it is raining in Xiang County.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "place",
+                            "value": "Xiang County, Henan Province",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        repaired = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Check whether it is raining in 河南省内乡县.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "place",
+                            "value": "河南省内乡县",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([mistranslated, repaired])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("河南省内乡县现在下雨了吗？")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["value"],
+            "河南省内乡县",
+        )
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn("verbatim", ollama.prompts[1][0])
+
     def test_capability_result_delivery_is_not_a_duplicate_spoken_goal(self):
         ollama = ScriptedOllama(
             [
@@ -115,7 +168,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                                 {
                                     "name": "location",
                                     "entity_type": "location",
-                                    "value": "Neixiang County1432567890",
+                                    "value": "Neixiang County",
                                     "confidence": 1.0,
                                 }
                             ],
