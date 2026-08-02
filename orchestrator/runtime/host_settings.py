@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 
 class HostConfigurationError(ValueError):
@@ -90,6 +90,65 @@ def _float(
     return value
 
 
+
+def _optional_int(
+    values: Mapping[str, str],
+    name: str,
+    *,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int | None:
+    if name not in values or not str(values.get(name) or "").strip():
+        return None
+    return _int(
+        values,
+        name,
+        0,
+        minimum=minimum,
+        maximum=maximum,
+    )
+
+
+def _optional_path(
+    values: Mapping[str, str],
+    name: str,
+    *,
+    project_root: Path,
+) -> Path | None:
+    raw = _text(values, name, "")
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = project_root / path
+    return path.resolve()
+
+
+def _device(values: Mapping[str, str], name: str) -> int | str | None:
+    raw = _text(values, name, "")
+    if not raw or raw.casefold() in {"default", "system", "system_default", "none"}:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
+def _phrases(
+    values: Mapping[str, str],
+    name: str,
+    defaults: tuple[str, ...],
+) -> tuple[str, ...]:
+    raw = _text(values, name, "")
+    if not raw:
+        return defaults
+    return tuple(
+        phrase
+        for item in raw.split("|")
+        if (phrase := " ".join(item.strip().split()))
+    ) or defaults
+
+
 def _choice(
     values: Mapping[str, str],
     name: str,
@@ -134,6 +193,81 @@ class AudioInputSettings:
 
 
 @dataclass(frozen=True)
+class AudioDeviceSettings:
+    input_device: int | str | None
+    output_device: int | str | None
+    input_rate: int | None
+    input_channels: int
+    input_block_ms: int
+    input_blocksize: int
+    input_latency: str
+    output_rate: int | None
+    output_channels: int
+    output_block_ms: int
+    output_blocksize: int
+    output_latency: str
+
+
+@dataclass(frozen=True)
+class ConversationSettings:
+    base_conversation_id: str
+    enabled: bool
+    max_turns: int
+    soft_idle_timeout_sec: int
+    hard_idle_timeout_sec: int
+    turn_max_text_chars: int
+    max_context_chars: int
+    max_pending_tasks: int
+    max_tool_evidence: int
+    max_memory_entries: int
+    max_discourse_referents: int
+    max_discourse_focus: int
+    completed_task_retention_sec: int
+    task_store_enabled: bool
+    task_store_path: Path
+    reset_phrases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MindSettings:
+    profile_path: Path
+    social_style_preset: str
+    context_max_chars: int
+
+
+@dataclass(frozen=True)
+class ExperienceSettings:
+    enabled: bool
+    log_path: Path
+    proposal_path: Path
+
+
+@dataclass(frozen=True)
+class EpisodeSettings:
+    enabled: bool
+    log_path: Path
+    max_turns: int
+    emit_runtime_events: bool
+    event_root: Path | None
+    trigger_root: Path | None
+
+
+@dataclass(frozen=True)
+class InteractionRuntimeSettings:
+    skill_max_concurrency: int
+    catalog_refresh_ttl_s: float
+
+
+@dataclass(frozen=True)
+class TelemetrySettings:
+    system_resource_mode: str
+    accelerator_mode: str
+    accelerator_provider: str
+    accelerator_timeout_ms: int
+    accelerator_min_interval_s: float
+
+
+@dataclass(frozen=True)
 class CognitionSettings:
     llm_url: str
     ollama_model: str
@@ -169,6 +303,7 @@ class CognitionSettings:
     social_attention_mode: str
     capability_manifest_paths: str
     soridormi_manifest: Path
+    task_graph_execution_token: str
 
 
 @dataclass(frozen=True)
@@ -234,6 +369,7 @@ class PlaybackSettings:
 @dataclass(frozen=True)
 class SessionLifecycleSettings:
     timing_logs_enabled: bool
+    event_log_path: Path | None
     addressedness_gate_enabled: bool
     addressedness_engagement_timeout_s: float
     confirmation_ttl_s: float
@@ -255,7 +391,14 @@ class EvidenceSettings:
 @dataclass(frozen=True)
 class HostSettingsSnapshot:
     audio_input: AudioInputSettings
+    audio_device: AudioDeviceSettings
     cognition: CognitionSettings
+    conversation: ConversationSettings
+    mind: MindSettings
+    experience: ExperienceSettings
+    episode: EpisodeSettings
+    interaction: InteractionRuntimeSettings
+    telemetry: TelemetrySettings
     model_generation: ModelGenerationSettings
     playback: PlaybackSettings
     session: SessionLifecycleSettings
@@ -304,6 +447,18 @@ class HostSettingsSnapshot:
                 "CHROMIE_SOCIAL_ATTENTION_MODE/AGENT_SOCIAL_ATTENTION_MODE "
                 f"must be off, report_only, or on; got {social_mode!r}"
             )
+        default_reset_phrases = (
+            "new conversation",
+            "start a new conversation",
+            "reset conversation",
+            "clear conversation",
+            "新对话",
+            "重新开始对话",
+            "清空对话",
+        )
+        mind_profile_path = _optional_path(
+            values, "ORCH_MIND_PROFILE_PATH", project_root=project_root
+        ) or (project_root / "config" / "mind" / "chromie_default.json").resolve()
         playback = PlaybackSettings(
             tts_url=_text(values, "TTS_URL", "ws://localhost:5000"),
             output_mode=_choice(
@@ -478,6 +633,20 @@ class HostSettingsSnapshot:
                     minimum=1000,
                 ),
             ),
+            audio_device=AudioDeviceSettings(
+                input_device=_device(values, "ORCH_INPUT_DEVICE"),
+                output_device=_device(values, "ORCH_OUTPUT_DEVICE"),
+                input_rate=_optional_int(values, "ORCH_INPUT_RATE", minimum=1),
+                input_channels=_int(values, "ORCH_INPUT_CHANNELS", 1, minimum=1),
+                input_block_ms=_int(values, "ORCH_INPUT_BLOCK_MS", 30, minimum=1),
+                input_blocksize=_int(values, "ORCH_INPUT_BLOCKSIZE", 0, minimum=0),
+                input_latency=_text(values, "ORCH_INPUT_LATENCY", "low") or "low",
+                output_rate=_optional_int(values, "ORCH_OUTPUT_RATE", minimum=1),
+                output_channels=_int(values, "ORCH_OUTPUT_CHANNELS", 2, minimum=1),
+                output_block_ms=_int(values, "ORCH_OUTPUT_BLOCK_MS", 30, minimum=1),
+                output_blocksize=_int(values, "ORCH_OUTPUT_BLOCKSIZE", 0, minimum=0),
+                output_latency=_text(values, "ORCH_OUTPUT_LATENCY", "low") or "low",
+            ),
             cognition=CognitionSettings(
                 llm_url=_text(
                     values, "LLM_URL", "http://localhost:11434/api/generate"
@@ -611,6 +780,161 @@ class HostSettingsSnapshot:
                     "capabilities/soridormi.json",
                     project_root=project_root,
                 ),
+                task_graph_execution_token=_text(
+                    values, "AGENT_TASK_GRAPH_EXECUTION_TOKEN", ""
+                ),
+            ),
+            conversation=ConversationSettings(
+                base_conversation_id=_text(
+                    values, "ORCH_CONVERSATION_ID", "local_default"
+                ) or "local_default",
+                enabled=_bool(values, "ORCH_ENABLE_CONVERSATION_STATE", True),
+                max_turns=_int(
+                    values,
+                    "ORCH_CONVERSATION_MAX_TURNS",
+                    _int(values, "ORCH_CONTEXT_MAX_TURNS", 12, minimum=0),
+                    minimum=0,
+                ),
+                soft_idle_timeout_sec=_int(
+                    values,
+                    "ORCH_CONVERSATION_IDLE_TIMEOUT_SEC",
+                    _int(values, "ORCH_CONTEXT_IDLE_TIMEOUT_SEC", 180, minimum=1),
+                    minimum=1,
+                ),
+                hard_idle_timeout_sec=_int(
+                    values,
+                    "ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC",
+                    _int(values, "ORCH_CONTEXT_MAX_AGE_SECONDS", 900, minimum=1),
+                    minimum=1,
+                ),
+                turn_max_text_chars=_int(
+                    values,
+                    "ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS",
+                    _int(values, "ORCH_CONTEXT_MAX_TEXT_CHARS", 260, minimum=20),
+                    minimum=20,
+                ),
+                max_context_chars=_int(
+                    values, "ORCH_CONVERSATION_MAX_CONTEXT_CHARS", 2200, minimum=200
+                ),
+                max_pending_tasks=_int(
+                    values,
+                    "ORCH_CONVERSATION_MAX_PENDING_TASKS",
+                    _int(values, "ORCH_CONTEXT_MAX_PENDING_TASKS", 8, minimum=0),
+                    minimum=0,
+                ),
+                max_tool_evidence=_int(
+                    values, "ORCH_CONVERSATION_MAX_TOOL_EVIDENCE", 8, minimum=1
+                ),
+                max_memory_entries=_int(
+                    values, "ORCH_CONVERSATION_MAX_MEMORY_ENTRIES", 24, minimum=1
+                ),
+                max_discourse_referents=_int(
+                    values, "ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS", 24, minimum=1
+                ),
+                max_discourse_focus=_int(
+                    values, "ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS", 8, minimum=1
+                ),
+                completed_task_retention_sec=_int(
+                    values,
+                    "ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC",
+                    180,
+                    minimum=0,
+                ),
+                task_store_enabled=_bool(values, "ORCH_ENABLE_TASK_CONTEXT_STORE", False),
+                task_store_path=_path(
+                    values,
+                    "ORCH_TASK_CONTEXT_STORE_PATH",
+                    ".chromie/conversation/task_contexts.json",
+                    project_root=project_root,
+                ),
+                reset_phrases=_phrases(
+                    values, "ORCH_CONVERSATION_RESET_PHRASES", default_reset_phrases
+                ),
+            ),
+            mind=MindSettings(
+                profile_path=mind_profile_path,
+                social_style_preset=_text(
+                    values, "ORCH_SOCIAL_INTERACTION_STYLE_PRESET", ""
+                ).casefold(),
+                context_max_chars=_int(
+                    values, "ORCH_MIND_CONTEXT_MAX_CHARS", 1600, minimum=400
+                ),
+            ),
+            experience=ExperienceSettings(
+                enabled=_bool(values, "ORCH_ENABLE_EXPERIENCE_JOURNAL", True),
+                log_path=_path(
+                    values,
+                    "ORCH_EXPERIENCE_LOG_PATH",
+                    ".chromie/experience/experience.jsonl",
+                    project_root=project_root,
+                ),
+                proposal_path=_path(
+                    values,
+                    "ORCH_MIND_PROPOSAL_LOG_PATH",
+                    ".chromie/experience/mind_update_proposals.jsonl",
+                    project_root=project_root,
+                ),
+            ),
+            episode=EpisodeSettings(
+                enabled=_bool(values, "ORCH_ENABLE_EPISODE_RECORDING", True),
+                log_path=_path(
+                    values,
+                    "ORCH_EPISODE_LOG_PATH",
+                    ".chromie/experience/episodes.jsonl",
+                    project_root=project_root,
+                ),
+                max_turns=_int(values, "ORCH_EPISODE_MAX_TURNS", 12, minimum=1),
+                emit_runtime_events=_bool(
+                    values, "ORCH_EMIT_EPISODE_RUNTIME_EVENTS", False
+                ),
+                event_root=_optional_path(
+                    values, "CHROMIE_RUNTIME_EVENT_ROOT", project_root=project_root
+                ),
+                trigger_root=_optional_path(
+                    values, "CHROMIE_DATA_LOOP_TRIGGER_ROOT", project_root=project_root
+                ),
+            ),
+            interaction=InteractionRuntimeSettings(
+                skill_max_concurrency=_int(
+                    values, "ORCH_SKILL_MAX_CONCURRENCY", 8, minimum=1
+                ),
+                catalog_refresh_ttl_s=_float(
+                    values, "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S", 30.0, minimum=0.0
+                ),
+            ),
+            telemetry=TelemetrySettings(
+                system_resource_mode=_choice(
+                    values,
+                    "CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING",
+                    "off",
+                    {"off", "session", "periodic"},
+                ),
+                accelerator_mode=_choice(
+                    values,
+                    "CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING",
+                    "off",
+                    {"off", "session", "periodic"},
+                ),
+                accelerator_provider=_choice(
+                    values,
+                    "CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER",
+                    "auto",
+                    {"auto", "nvidia_smi", "off"},
+                ),
+                accelerator_timeout_ms=_int(
+                    values,
+                    "CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS",
+                    1000,
+                    minimum=50,
+                    maximum=30000,
+                ),
+                accelerator_min_interval_s=_float(
+                    values,
+                    "CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S",
+                    5.0,
+                    minimum=0.0,
+                    maximum=3600.0,
+                ),
             ),
             model_generation=ModelGenerationSettings(
                 keep_alive=_text(values, "OLLAMA_KEEP_ALIVE", "24h") or "24h",
@@ -673,6 +997,9 @@ class HostSettingsSnapshot:
             session=SessionLifecycleSettings(
                 timing_logs_enabled=_bool(
                     values, "ORCH_SESSION_TIMING_LOGS", True
+                ),
+                event_log_path=_optional_path(
+                    values, "ORCH_EVENT_LOG_PATH", project_root=project_root
                 ),
                 addressedness_gate_enabled=_bool(
                     values, "ORCH_ADDRESSEDNESS_GATE_ENABLED", True

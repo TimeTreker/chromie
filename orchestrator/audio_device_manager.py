@@ -4,7 +4,10 @@ import asyncio
 import os
 import re
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orchestrator.runtime.host_settings import AudioDeviceSettings
 
 
 _PIPEWIRE_DEFAULT_DIRECTIONS = {
@@ -55,9 +58,18 @@ class AudioDeviceManager:
     inside Docker.
     """
 
-    def __init__(self):
-        self.input_device = _parse_device(os.getenv("ORCH_INPUT_DEVICE"))
-        self.output_device = _parse_device(os.getenv("ORCH_OUTPUT_DEVICE"))
+    def __init__(self, settings: "AudioDeviceSettings | None" = None):
+        self.settings = settings
+        self.input_device = (
+            settings.input_device
+            if settings is not None
+            else _parse_device(os.getenv("ORCH_INPUT_DEVICE"))
+        )
+        self.output_device = (
+            settings.output_device
+            if settings is not None
+            else _parse_device(os.getenv("ORCH_OUTPUT_DEVICE"))
+        )
 
     def follows_system_default(self, kind: str) -> bool:
         if kind == "input":
@@ -243,8 +255,22 @@ class AudioDeviceManager:
     def get_input_params(self) -> dict[str, Any]:
         sd = _sounddevice()
         device, info, selection_source = self._resolve(self.input_device, "input")
-        rate = int(float(os.getenv("ORCH_INPUT_RATE") or info.get("default_samplerate") or 48000))
-        channels = int(os.getenv("ORCH_INPUT_CHANNELS", "1"))
+        if self.settings is not None:
+            rate = int(
+                self.settings.input_rate
+                or info.get("default_samplerate")
+                or 48000
+            )
+            channels = self.settings.input_channels
+        else:
+            rate = int(
+                float(
+                    os.getenv("ORCH_INPUT_RATE")
+                    or info.get("default_samplerate")
+                    or 48000
+                )
+            )
+            channels = int(os.getenv("ORCH_INPUT_CHANNELS", "1"))
         self._validate(
             sd,
             device=device,
@@ -253,8 +279,16 @@ class AudioDeviceManager:
             rate=rate,
             channels=channels,
         )
-        block_ms = int(os.getenv("ORCH_INPUT_BLOCK_MS", "30"))
-        blocksize = int(os.getenv("ORCH_INPUT_BLOCKSIZE", "0"))
+        block_ms = (
+            self.settings.input_block_ms
+            if self.settings is not None
+            else int(os.getenv("ORCH_INPUT_BLOCK_MS", "30"))
+        )
+        blocksize = (
+            self.settings.input_blocksize
+            if self.settings is not None
+            else int(os.getenv("ORCH_INPUT_BLOCKSIZE", "0"))
+        )
         if blocksize <= 0:
             blocksize = max(1, int(rate * block_ms / 1000))
         return {
@@ -265,14 +299,32 @@ class AudioDeviceManager:
             "channels": channels,
             "blocksize": blocksize,
             "block_ms": block_ms,
-            "latency": os.getenv("ORCH_INPUT_LATENCY", "low"),
+            "latency": (
+                self.settings.input_latency
+                if self.settings is not None
+                else os.getenv("ORCH_INPUT_LATENCY", "low")
+            ),
         }
 
     def get_output_params(self) -> dict[str, Any]:
         sd = _sounddevice()
         device, info, selection_source = self._resolve(self.output_device, "output")
-        rate = int(float(os.getenv("ORCH_OUTPUT_RATE") or info.get("default_samplerate") or 48000))
-        channels = int(os.getenv("ORCH_OUTPUT_CHANNELS", "2"))
+        if self.settings is not None:
+            rate = int(
+                self.settings.output_rate
+                or info.get("default_samplerate")
+                or 48000
+            )
+            channels = self.settings.output_channels
+        else:
+            rate = int(
+                float(
+                    os.getenv("ORCH_OUTPUT_RATE")
+                    or info.get("default_samplerate")
+                    or 48000
+                )
+            )
+            channels = int(os.getenv("ORCH_OUTPUT_CHANNELS", "2"))
         self._validate(
             sd,
             device=device,
@@ -281,8 +333,16 @@ class AudioDeviceManager:
             rate=rate,
             channels=channels,
         )
-        block_ms = int(os.getenv("ORCH_OUTPUT_BLOCK_MS", "30"))
-        blocksize = int(os.getenv("ORCH_OUTPUT_BLOCKSIZE", "0"))
+        block_ms = (
+            self.settings.output_block_ms
+            if self.settings is not None
+            else int(os.getenv("ORCH_OUTPUT_BLOCK_MS", "30"))
+        )
+        blocksize = (
+            self.settings.output_blocksize
+            if self.settings is not None
+            else int(os.getenv("ORCH_OUTPUT_BLOCKSIZE", "0"))
+        )
         if blocksize <= 0:
             blocksize = 0
         return {
@@ -293,7 +353,11 @@ class AudioDeviceManager:
             "channels": channels,
             "blocksize": blocksize,
             "block_ms": block_ms,
-            "latency": os.getenv("ORCH_OUTPUT_LATENCY", "low"),
+            "latency": (
+                self.settings.output_latency
+                if self.settings is not None
+                else os.getenv("ORCH_OUTPUT_LATENCY", "low")
+            ),
         }
 
     def close(self) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from shared.chromie_contracts.mind import (
     MindProfile,
@@ -11,6 +11,9 @@ from shared.chromie_contracts.mind import (
     default_mind_profile_path,
     load_mind_profile,
 )
+
+if TYPE_CHECKING:
+    from orchestrator.runtime.host_settings import MindSettings
 
 
 class MindManager:
@@ -26,6 +29,23 @@ class MindManager:
         self.profile = profile or default_mind_profile()
         self.profile_path = profile_path
         self.context_max_chars = max(400, int(context_max_chars))
+
+    @classmethod
+    def from_settings(cls, settings: "MindSettings") -> "MindManager":
+        profile = cls._load_profile(settings.profile_path)
+        if settings.social_style_preset:
+            profile = profile.model_copy(
+                update={
+                    "social_interaction_style": SocialInteractionStyle(
+                        preset=settings.social_style_preset
+                    )
+                }
+            )
+        return cls(
+            profile,
+            profile_path=settings.profile_path,
+            context_max_chars=settings.context_max_chars,
+        )
 
     @classmethod
     def from_env(cls, *, project_root: Path | None = None) -> "MindManager":

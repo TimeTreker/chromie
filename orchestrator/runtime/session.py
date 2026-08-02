@@ -135,12 +135,17 @@ class SessionTracker:
         enabled: bool = True,
         *,
         event_log_path: str | os.PathLike[str] | None = None,
+        resource_sampling_mode: str | None = None,
     ):
         self.enabled = enabled
         self.current_sid: str | None = None
         self.state: dict[str, dict[str, Any]] = {}
         self.event_writer = SessionEventWriter(event_log_path)
-        self.resource_sampler = SystemResourceSampler.from_env()
+        self.resource_sampler = (
+            SystemResourceSampler(resource_sampling_mode)
+            if resource_sampling_mode is not None
+            else SystemResourceSampler.from_env()
+        )
         self.external_resource_snapshot_providers: list[
             tuple[TraceModule, str, Callable[..., dict[str, Any]]]
         ] = []

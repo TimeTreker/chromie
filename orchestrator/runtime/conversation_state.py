@@ -8,11 +8,14 @@ import re
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any, Callable, Deque
+from typing import TYPE_CHECKING, Any, Callable, Deque
 
 from pydantic import ValidationError
 
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
+
+if TYPE_CHECKING:
+    from orchestrator.runtime.host_settings import ConversationSettings
 
 try:
     from chromie_contracts.discourse import (
@@ -184,6 +187,29 @@ class ConversationStateManager:
         self.last_split_reason: str | None = None
         if self.task_store_enabled:
             self._restore_task_contexts()
+
+    @classmethod
+    def from_settings(
+        cls, settings: "ConversationSettings"
+    ) -> "ConversationStateManager":
+        return cls(
+            base_conversation_id=settings.base_conversation_id,
+            enabled=settings.enabled,
+            max_turns=settings.max_turns,
+            soft_idle_timeout_sec=settings.soft_idle_timeout_sec,
+            hard_idle_timeout_sec=settings.hard_idle_timeout_sec,
+            turn_max_text_chars=settings.turn_max_text_chars,
+            max_context_chars=settings.max_context_chars,
+            max_pending_tasks=settings.max_pending_tasks,
+            max_tool_evidence=settings.max_tool_evidence,
+            max_memory_entries=settings.max_memory_entries,
+            max_discourse_referents=settings.max_discourse_referents,
+            max_discourse_focus=settings.max_discourse_focus,
+            completed_task_retention_sec=settings.completed_task_retention_sec,
+            task_store_enabled=settings.task_store_enabled,
+            task_store_path=settings.task_store_path,
+            reset_phrases=settings.reset_phrases,
+        )
 
     @classmethod
     def from_env(cls) -> "ConversationStateManager":

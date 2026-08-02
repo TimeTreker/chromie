@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.mind import (
@@ -13,6 +13,9 @@ from shared.chromie_contracts.mind import (
 )
 
 from .skill_runtime import SkillRuntimeResult
+
+if TYPE_CHECKING:
+    from .host_settings import ExperienceSettings
 
 
 class ExperienceManager:
@@ -28,6 +31,14 @@ class ExperienceManager:
         self.enabled = enabled
         self.log_path = log_path
         self.proposal_path = proposal_path
+
+    @classmethod
+    def from_settings(cls, settings: "ExperienceSettings") -> "ExperienceManager":
+        return cls(
+            enabled=settings.enabled,
+            log_path=settings.log_path,
+            proposal_path=settings.proposal_path,
+        )
 
     @classmethod
     def from_env(cls, project_root: Path) -> "ExperienceManager":

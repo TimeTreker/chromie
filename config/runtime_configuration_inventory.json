@@ -1504,7 +1504,8 @@
         ".env.common",
         "agent/app/main.py",
         "docker-compose.yml",
-        "orchestrator/clients/agent_client.py"
+        "orchestrator/clients/agent_client.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -1935,6 +1936,14 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_DATA_LOOP_TRIGGER_ROOT",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
       "boolean": true,
       "category": "public_choice",
       "key": "CHROMIE_ENV_STRICT",
@@ -2040,8 +2049,25 @@
     {
       "boolean": false,
       "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_EVENT_ROOT",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER",
       "owners": [
+        "orchestrator/runtime/host_settings.py",
         "shared/chromie_runtime/accelerator_telemetry.py"
       ]
     },
@@ -2050,7 +2076,16 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING",
       "owners": [
+        "orchestrator/runtime/host_settings.py",
         "shared/chromie_runtime/accelerator_telemetry.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2082,6 +2117,7 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING",
       "owners": [
+        "orchestrator/runtime/host_settings.py",
         "shared/chromie_runtime/resource_sampling.py"
       ]
     },
@@ -2809,7 +2845,8 @@
       "category": "service_internal",
       "key": "ORCH_CONTEXT_IDLE_TIMEOUT_SEC",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2817,7 +2854,8 @@
       "category": "service_internal",
       "key": "ORCH_CONTEXT_MAX_AGE_SECONDS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2825,7 +2863,8 @@
       "category": "service_internal",
       "key": "ORCH_CONTEXT_MAX_PENDING_TASKS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2833,7 +2872,8 @@
       "category": "service_internal",
       "key": "ORCH_CONTEXT_MAX_TEXT_CHARS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2841,7 +2881,8 @@
       "category": "service_internal",
       "key": "ORCH_CONTEXT_MAX_TURNS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2849,7 +2890,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2858,7 +2900,8 @@
       "key": "ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2868,6 +2911,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -2878,7 +2922,8 @@
       "key": "ORCH_CONVERSATION_IDLE_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2887,7 +2932,8 @@
       "key": "ORCH_CONVERSATION_MAX_CONTEXT_CHARS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2895,7 +2941,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2903,7 +2950,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2911,7 +2959,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_MAX_MEMORY_ENTRIES",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2920,7 +2969,8 @@
       "key": "ORCH_CONVERSATION_MAX_PENDING_TASKS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2928,7 +2978,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_MAX_TOOL_EVIDENCE",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2937,7 +2988,8 @@
       "key": "ORCH_CONVERSATION_MAX_TURNS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2945,7 +2997,8 @@
       "category": "service_internal",
       "key": "ORCH_CONVERSATION_RESET_PHRASES",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2954,7 +3007,8 @@
       "key": "ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3000,7 +3054,8 @@
       "category": "service_internal",
       "key": "ORCH_EMIT_EPISODE_RUNTIME_EVENTS",
       "owners": [
-        "orchestrator/runtime/episode.py"
+        "orchestrator/runtime/episode.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3024,7 +3079,8 @@
       "category": "profile_constant",
       "key": "ORCH_ENABLE_CONVERSATION_STATE",
       "owners": [
-        ".env.common"
+        ".env.common",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3033,7 +3089,8 @@
       "key": "ORCH_ENABLE_EPISODE_RECORDING",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py"
+        "orchestrator/runtime/episode.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3041,7 +3098,8 @@
       "category": "service_internal",
       "key": "ORCH_ENABLE_EXPERIENCE_JOURNAL",
       "owners": [
-        "orchestrator/runtime/experience.py"
+        "orchestrator/runtime/experience.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3083,6 +3141,7 @@
       "category": "service_internal",
       "key": "ORCH_ENABLE_TASK_CONTEXT_STORE",
       "owners": [
+        "orchestrator/runtime/host_settings.py",
         "scripts/cognitive_gateway_core_live_text.py"
       ]
     },
@@ -3092,7 +3151,8 @@
       "key": "ORCH_EPISODE_LOG_PATH",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py"
+        "orchestrator/runtime/episode.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3101,7 +3161,8 @@
       "key": "ORCH_EPISODE_MAX_TURNS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py"
+        "orchestrator/runtime/episode.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3110,10 +3171,19 @@
       "key": "ORCH_EVENT_LOG_PATH",
       "owners": [
         ".env.common",
+        "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/session.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_EXPERIENCE_LOG_PATH",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3270,7 +3340,8 @@
       "category": "service_internal",
       "key": "ORCH_INPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3279,7 +3350,8 @@
       "key": "ORCH_INPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3298,7 +3370,8 @@
       "key": "ORCH_INPUT_DEVICE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3315,7 +3388,8 @@
       "key": "ORCH_INPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3348,6 +3422,7 @@
       "category": "service_internal",
       "key": "ORCH_MIND_CONTEXT_MAX_CHARS",
       "owners": [
+        "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/mind.py"
       ]
     },
@@ -3357,7 +3432,16 @@
       "key": "ORCH_MIND_PROFILE_PATH",
       "owners": [
         ".env.common",
+        "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/mind.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_MIND_PROPOSAL_LOG_PATH",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3383,7 +3467,8 @@
       "category": "service_internal",
       "key": "ORCH_OUTPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3392,7 +3477,8 @@
       "key": "ORCH_OUTPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3402,6 +3488,7 @@
       "owners": [
         "orchestrator/.env.local.example",
         "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
     },
@@ -3412,6 +3499,7 @@
       "owners": [
         "orchestrator/.env.local.example",
         "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
     },
@@ -3421,7 +3509,8 @@
       "key": "ORCH_OUTPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py"
+        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3580,6 +3669,7 @@
       "key": "ORCH_SKILL_MAX_CONCURRENCY",
       "owners": [
         ".env.common",
+        "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/interaction_coordinator.py"
       ]
     },
@@ -3589,7 +3679,16 @@
       "key": "ORCH_SOCIAL_INTERACTION_STYLE_PRESET",
       "owners": [
         ".env.common",
+        "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/mind.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3609,7 +3708,8 @@
       "category": "service_internal",
       "key": "ORCH_TASK_CONTEXT_STORE_PATH",
       "owners": [
-        "orchestrator/runtime/conversation_state.py"
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -4585,10 +4685,10 @@
       "bounded_compatibility_alias": 1,
       "profile_constant": 155,
       "public_choice": 9,
-      "service_internal": 212
+      "service_internal": 219
     },
     "compatibility_aliases": 1,
     "public_boolean_choices": 1,
-    "total_keys": 433
+    "total_keys": 440
   }
 }

@@ -5,7 +5,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -29,6 +29,9 @@ def _compact_text(value: str, *, limit: int = 800) -> str:
     if len(text) > limit:
         return text[:limit].rstrip() + "..."
     return text
+
+if TYPE_CHECKING:
+    from .host_settings import EpisodeSettings
 
 
 class EpisodeGoalInterpretationRecord(BaseModel):
@@ -211,6 +214,17 @@ class EpisodeRecorder:
         self.event_root = event_root
         self.trigger_root = trigger_root
         self._episodes: dict[str, EpisodeRecord] = {}
+
+    @classmethod
+    def from_settings(cls, settings: "EpisodeSettings") -> "EpisodeRecorder":
+        return cls(
+            enabled=settings.enabled,
+            log_path=settings.log_path,
+            max_turns=settings.max_turns,
+            emit_runtime_events=settings.emit_runtime_events,
+            event_root=settings.event_root,
+            trigger_root=settings.trigger_root,
+        )
 
     @classmethod
     def from_env(cls, project_root: Path) -> "EpisodeRecorder":

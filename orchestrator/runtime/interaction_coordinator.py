@@ -102,6 +102,10 @@ class InteractionRuntimeCoordinator:
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
         capability_manifest_paths: str | None = None,
+        max_concurrency: int | None = None,
+        catalog_refresh_ttl_s: float | None = None,
+        body_recovery_max_attempts: int | None = None,
+        body_recovery_confirmation_ttl_s: float | None = None,
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
@@ -111,7 +115,11 @@ class InteractionRuntimeCoordinator:
             self.registry,
             max_concurrency=max(
                 1,
-                int(os.getenv("ORCH_SKILL_MAX_CONCURRENCY", "8")),
+                int(
+                    max_concurrency
+                    if max_concurrency is not None
+                    else os.getenv("ORCH_SKILL_MAX_CONCURRENCY", "8")
+                ),
             ),
         )
         self.runtime.register_provider(
@@ -148,18 +156,27 @@ class InteractionRuntimeCoordinator:
         self.soridormi_invoker = soridormi_invoker
         self._catalog_loaded = False
         self._catalog_last_loaded_at: float | None = None
-        self._catalog_refresh_ttl_s = _float_env(
-            "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
-            30.0,
+        self._catalog_refresh_ttl_s = (
+            max(0.0, float(catalog_refresh_ttl_s))
+            if catalog_refresh_ttl_s is not None
+            else _float_env(
+                "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
+                30.0,
+            )
         )
-        self.body_recovery_max_attempts = _int_env(
-            "ORCH_BODY_RECOVERY_MAX_ATTEMPTS",
-            1,
+        self.body_recovery_max_attempts = (
+            max(0, int(body_recovery_max_attempts))
+            if body_recovery_max_attempts is not None
+            else _int_env("ORCH_BODY_RECOVERY_MAX_ATTEMPTS", 1)
         )
-        self.body_recovery_confirmation_ttl_s = _float_env(
-            "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
-            10.0,
-            minimum=1.0,
+        self.body_recovery_confirmation_ttl_s = (
+            max(1.0, float(body_recovery_confirmation_ttl_s))
+            if body_recovery_confirmation_ttl_s is not None
+            else _float_env(
+                "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
+                10.0,
+                minimum=1.0,
+            )
         )
         self._catalog_lock = asyncio.Lock()
 

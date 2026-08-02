@@ -46,7 +46,6 @@ from orchestrator.audio_injection import read_audio_packet
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
-from orchestrator.clients.agent_client import AgentClient
 from orchestrator.runtime.abilities import (
     AbilityRegistry,
     build_default_ability_registry,
@@ -76,22 +75,19 @@ from orchestrator.runtime.cognitive_gateway import (
 from orchestrator.runtime.evidence_identity import (
     load_runtime_evidence_identity,
 )
-from orchestrator.runtime.conversation_state import ConversationStateManager
-from orchestrator.runtime.episode import EpisodeRecorder
-from orchestrator.runtime.experience import ExperienceManager
 from orchestrator.runtime.fast_first_audio import (
     CachedFastFirstAudio,
     FastFirstAudioCache,
+)
+from orchestrator.runtime.host_components import (
+    build_agent_client,
+    build_host_support,
+    build_interaction_runtime,
 )
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
-from orchestrator.runtime.interaction_coordinator import (
-    InteractionRuntimeCoordinator,
-    build_soridormi_invoker,
-)
-from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.outcome_response import compose_outcome_response
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
@@ -99,10 +95,9 @@ from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingCoordinator,
     RuntimeReadyGreetingPolicy,
 )
-from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.runtime.session import now_ms
 from shared.chromie_runtime.accelerator_telemetry import (
     ACCELERATOR_SAMPLE_MODULE,
-    AcceleratorTelemetrySampler,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
@@ -329,10 +324,7 @@ class VoiceAssistant:
         self.abilities = build_default_ability_registry(
             enable_agent=self.enable_agent,
         )
-        self.agent_client = AgentClient(
-            self.agent_url,
-            cognition_settings.agent_timeout_ms,
-        )
+        self.agent_client = build_agent_client(self.host_settings)
         self.action_client = ActionClient(
             self.action_executor_url,
             cognition_settings.action_timeout_ms,
@@ -363,17 +355,15 @@ class VoiceAssistant:
 
         self.asr_ws = None
         self.http_session: aiohttp.ClientSession | None = None
-        self.accelerator_sampler = AcceleratorTelemetrySampler.from_env()
-        self.sessions = SessionTracker(enabled=self.enable_session_timing)
-        self.sessions.register_resource_snapshot_provider(
-            module=ACCELERATOR_SAMPLE_MODULE,
-            name="accelerator_resource_sample",
-            provider=self.accelerator_sampler.cached_sample,
+        host_support = build_host_support(
+            self.host_settings, timing_enabled=self.enable_session_timing
         )
-        self.conversation_state = ConversationStateManager.from_env()
-        self.mind = MindManager.from_env(project_root=PROJECT_ROOT)
-        self.experience = ExperienceManager.from_env(PROJECT_ROOT)
-        self.episode_recorder = EpisodeRecorder.from_env(PROJECT_ROOT)
+        self.accelerator_sampler = host_support.accelerator_sampler
+        self.sessions = host_support.sessions
+        self.conversation_state = host_support.conversation_state
+        self.mind = host_support.mind
+        self.experience = host_support.experience
+        self.episode_recorder = host_support.episode_recorder
         self.confirmation_dialogue = ConfirmationDialogue(
             ttl_s=session_settings.confirmation_ttl_s,
         )
@@ -445,7 +435,7 @@ class VoiceAssistant:
             playback_settings.ready_greeting_timeout_ms
         )
 
-        self.audio_mgr = AudioDeviceManager()
+        self.audio_mgr = AudioDeviceManager(self.host_settings.audio_device)
         if self.audio_input_mode == "device":
             self.input_params = self.audio_mgr.get_input_params()
         else:
@@ -570,24 +560,7 @@ class VoiceAssistant:
         self.recordings_dir = str(recordings_dir)
         recordings_dir.mkdir(parents=True, exist_ok=True)
 
-        soridormi_invoker = None
-        if self.enable_soridormi_skills:
-            manifest_path = cognition_settings.soridormi_manifest
-            soridormi_invoker = build_soridormi_invoker(
-                manifest_path=manifest_path,
-            )
-        self.interaction_runtime = InteractionRuntimeCoordinator(
-            self._schedule_interaction_speech,
-            speech_cancel_scheduler=self._cancel_interaction_speech,
-            soridormi_invoker=soridormi_invoker,
-            task_graph_handler=self._execute_planning_task_graph,
-            task_graph_cancel_handler=self._cancel_planning_task_graph,
-            agent_tool_handler=self._execute_agent_tool,
-            conversation_memory_handler=(
-                self.conversation_state.retrieve_verified_tool_memory
-            ),
-            capability_manifest_paths=cognition_settings.capability_manifest_paths,
-        )
+        self.interaction_runtime = build_interaction_runtime(self, self.host_settings)
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             apply_lanes=self.cognitive_apply_lanes,

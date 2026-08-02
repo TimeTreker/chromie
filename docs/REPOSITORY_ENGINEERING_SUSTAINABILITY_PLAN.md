@@ -608,17 +608,20 @@ that each one has a reviewed failure contract.
 
 ## Issue: Establish Typed Host Configuration Snapshots
 
-Status: implementation slice landed; inventory completion and retained proof open
+Status: source implementation and checked ownership inventory complete; retained live proof remains open
 
 Implementation note (2026-08-02): immutable typed startup groups now parse and
-validate the principal Host audio-input, cognition, playback/TTS, session,
-evidence, and model-generation settings before `VoiceAssistant` composition.
-Existing attributes are projected from those groups for compatibility, and
-invalid migrated values name the owning variable and expected bound. Direct
-response, bounded failure speech, and runtime-ready greeting paths no longer
-reparse model budgets during turns. Remaining Host environment reads, the
-complete checked inventory, and generated configuration documentation remain
-open.
+validate the maintained Host audio devices, audio input, cognition, conversation
+state, mind-profile path, experience/episode storage, interaction runtime,
+telemetry, playback/TTS, session, evidence, and model-generation settings before
+`VoiceAssistant` composition. Maintained collaborators receive those settings
+directly; legacy `from_env` factories remain only for standalone compatibility
+and tests. A checked ownership gate discovers every direct Orchestrator
+environment read, requires it in `HostSettingsSnapshot`, and rejects migrated
+`from_env` factories from the maintained composition root. Invalid values name
+the owning variable and expected bound, and the generated runtime configuration
+inventory is checked in the canonical gate. Retained live startup evidence is
+still required before operational requalification.
 
 ### Problem
 
