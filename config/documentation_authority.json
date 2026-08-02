@@ -1,26 +1,76 @@
 {
-  "schema_version": "1.0",
   "authorities": [
-    {"role": "mission_architecture", "path": "docs/PROJECT_CHARTER.md"},
-    {"role": "delivery_order", "path": "ROADMAP.md"},
-    {"role": "implementation_and_evidence_status", "path": "docs/STATUS.md"},
-    {"role": "target_evidence_closure", "path": "docs/TARGET_EVIDENCE_CLOSURE.md"},
-    {"role": "resume_point", "path": "DEVELOPMENT_CHECKPOINT.md"},
-    {"role": "operations", "path": "CHROMIE_RUNBOOK.md"},
-    {"role": "configuration", "path": "docs/CONFIGURATION.md"},
-    {"role": "api_contracts", "path": "docs/API_REFERENCE.md"},
-    {"role": "security", "path": "SECURITY.md"},
-    {"role": "documentation_index", "path": "docs/README.md"},
-    {"role": "notable_changes", "path": "CHANGELOG.md"}
-  ],
-  "historical_archives": [
-    "CHANGELOG_ARCHIVE_2026-07-30.md",
-    "DEVELOPMENT_CHECKPOINT_ARCHIVE_2026-07-30.md",
-    "docs/STATUS_ARCHIVE_2026-07-30.md"
+    {
+      "path": "docs/PROJECT_CHARTER.md",
+      "role": "mission_architecture"
+    },
+    {
+      "path": "ROADMAP.md",
+      "role": "delivery_order"
+    },
+    {
+      "path": "docs/STATUS.md",
+      "role": "implementation_and_evidence_status"
+    },
+    {
+      "path": "docs/TARGET_EVIDENCE_CLOSURE.md",
+      "role": "target_evidence_closure"
+    },
+    {
+      "path": "DEVELOPMENT_CHECKPOINT.md",
+      "role": "resume_point"
+    },
+    {
+      "path": "CHROMIE_RUNBOOK.md",
+      "role": "operations"
+    },
+    {
+      "path": "docs/CONFIGURATION.md",
+      "role": "configuration"
+    },
+    {
+      "path": "docs/API_REFERENCE.md",
+      "role": "api_contracts"
+    },
+    {
+      "path": "SECURITY.md",
+      "role": "security"
+    },
+    {
+      "path": "docs/README.md",
+      "role": "documentation_index"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "role": "notable_changes"
+    }
   ],
   "concise_line_limits": {
     "CHANGELOG.md": 220,
     "DEVELOPMENT_CHECKPOINT.md": 160,
     "docs/STATUS.md": 260
+  },
+  "core_reading_path": [
+    "README.md",
+    "docs/PROJECT_GUIDE.zh-CN.md",
+    "docs/PROJECT_CHARTER.md",
+    "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md",
+    "docs/STATUS.md",
+    "ROADMAP.md",
+    "DEVELOPMENT_CHECKPOINT.md",
+    "docs/COGNITIVE_GATEWAY.md",
+    "docs/COGNITIVE_TURN_LOOP.md",
+    "docs/AGENT_SKILLS_ARCHITECTURE.md",
+    "docs/ACCEPTANCE.md",
+    "docs/TARGET_EVIDENCE_CLOSURE.md",
+    "CHROMIE_RUNBOOK.md",
+    "docs/DOCUMENTATION_AUTHORITY.md"
+  ],
+  "historical_archives": [],
+  "schema_version": "1.0",
+  "surface_ratchets": {
+    "max_core_reading_path": 15,
+    "max_docs_root_markdown_files": 73,
+    "max_markdown_files": 116
   }
 }

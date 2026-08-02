@@ -534,6 +534,66 @@ def check_documentation_authority(errors: list[str]) -> None:
             if "Status: historical archive; not current authority" not in text:
                 errors.append(f"historical archive lacks authority marker: {raw_path}")
 
+    core_path = payload.get("core_reading_path")
+    if not isinstance(core_path, list) or not core_path:
+        errors.append("core_reading_path must be a non-empty list")
+    else:
+        if len(core_path) != len(set(core_path)):
+            errors.append("core_reading_path contains duplicate documents")
+        ratchets = payload.get("surface_ratchets") or {}
+        try:
+            max_core = int(ratchets.get("max_core_reading_path", 15))
+        except (TypeError, ValueError):
+            errors.append("surface_ratchets.max_core_reading_path must be an integer")
+            max_core = 15
+        if len(core_path) > max_core:
+            errors.append(
+                f"core_reading_path has {len(core_path)} documents; maximum is {max_core}"
+            )
+        index_text = DOC_INDEX.read_text(encoding="utf-8") if DOC_INDEX.is_file() else ""
+        for raw_path in core_path:
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                errors.append("core_reading_path entries must be non-empty strings")
+                continue
+            path = (ROOT / raw_path).resolve()
+            try:
+                path.relative_to(ROOT.resolve())
+            except ValueError:
+                errors.append(f"core reading path escapes repository: {raw_path}")
+                continue
+            if not path.is_file():
+                errors.append(f"core reading document does not exist: {raw_path}")
+                continue
+            relative_from_index = Path(raw_path)
+            try:
+                link_target = path.relative_to(DOC_INDEX.parent).as_posix()
+            except ValueError:
+                link_target = "../" + relative_from_index.as_posix()
+            if link_target not in index_text and raw_path not in index_text:
+                errors.append(
+                    f"core reading document is not linked from docs/README.md: {raw_path}"
+                )
+
+    surface_ratchets = payload.get("surface_ratchets")
+    if not isinstance(surface_ratchets, dict):
+        errors.append("surface_ratchets must be an object")
+    else:
+        markdown_count = len(markdown_files())
+        docs_root_count = len(list((ROOT / "docs").glob("*.md")))
+        for key, actual in (
+            ("max_markdown_files", markdown_count),
+            ("max_docs_root_markdown_files", docs_root_count),
+        ):
+            try:
+                maximum = int(surface_ratchets[key])
+            except (KeyError, TypeError, ValueError):
+                errors.append(f"surface_ratchets.{key} must be an integer")
+                continue
+            if actual > maximum:
+                errors.append(
+                    f"documentation surface grew: {key}={actual}, ratchet={maximum}"
+                )
+
     limits = payload.get("concise_line_limits")
     if not isinstance(limits, dict):
         errors.append("concise_line_limits must be an object")
@@ -562,7 +622,7 @@ def check_documentation_authority(errors: list[str]) -> None:
         for phrase in (
             "One owner per current fact",
             "Four-axis",
-            "historical archive; not current authority",
+            "In-tree historical archives",
             "config/documentation_authority.json",
         ):
             if phrase not in text:

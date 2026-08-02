@@ -65,6 +65,86 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
         self.assertEqual(response.skills, [])
 
 
+    def test_chat_agent_disconnect_fails_closed_without_direct_answer(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        decision = RouteDecision(
+            route="chat",
+            intent="user_question",
+            confidence=0.95,
+            metadata={},
+        )
+
+        response = assistant._agent_exception_safe_response(
+            decision,
+            user_text="你觉得怎么样？",
+        )
+
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertIn("不想乱答", spoken)
+        self.assertNotIn("我觉得", spoken)
+        self.assertEqual(response.skills, [])
+
+    def test_direct_llm_compatibility_is_blocked_in_apply_lane(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.legacy_semantic_fallback_enabled = True
+        assistant.cognitive_runtime_mode = "apply"
+        assistant.cognitive_apply_lanes = {"chat", "tool", "robot_action"}
+
+        self.assertFalse(
+            assistant._direct_llm_compatibility_allowed(
+                RouteDecision(route="chat", intent="user_question")
+            )
+        )
+        self.assertTrue(
+            assistant._direct_llm_compatibility_allowed(
+                RouteDecision(route="memory", intent="compatibility_read")
+            )
+        )
+
+    def test_blocked_direct_llm_uses_bounded_failure_interaction(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.legacy_semantic_fallback_enabled = False
+        assistant.cognitive_runtime_mode = "apply"
+        assistant.cognitive_apply_lanes = {"chat"}
+        recorded: list[Any] = []
+        launched: list[tuple[Any, str, bool]] = []
+        assistant.session_log = lambda *args, **kwargs: None
+        assistant.conversation_state = type(
+            "ConversationState",
+            (),
+            {"record_agent_result": lambda self, sid, response: recorded.append(response)},
+        )()
+        assistant._launch_interaction = lambda response, sid, reset_playback=True: launched.append(
+            (response, sid, reset_playback)
+        )
+
+        assistant._launch_direct_llm_compatibility_or_fail_closed(
+            decision=RouteDecision(route="chat", intent="user_question"),
+            user_text="你觉得呢？",
+            session_id="sid-chat",
+            fallback_reason="agent_exception",
+            reset_playback=False,
+        )
+
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(len(launched), 1)
+        self.assertEqual(launched[0][1:], ("sid-chat", False))
+        self.assertTrue(recorded[0].metadata["direct_llm_compatibility_blocked"])
+        spoken = " ".join(item.text for item in recorded[0].speech)
+        self.assertIn("不想乱答", spoken)
+
+    def test_direct_llm_compatibility_requires_explicit_rollback_flag(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.legacy_semantic_fallback_enabled = False
+        assistant.cognitive_runtime_mode = "off"
+        assistant.cognitive_apply_lanes = set()
+
+        self.assertFalse(
+            assistant._direct_llm_compatibility_allowed(
+                RouteDecision(route="chat", intent="user_question")
+            )
+        )
+
     def test_tool_route_with_capability_task_does_not_use_action_fallback(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         decision = RouteDecision(

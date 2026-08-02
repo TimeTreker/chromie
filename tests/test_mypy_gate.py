@@ -34,22 +34,40 @@ class MypyGateTests(unittest.TestCase):
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
         return path
 
-    def test_scope_is_sorted_unique_and_existing(self) -> None:
+    def test_scope_expands_owned_package_and_is_sorted_unique(self) -> None:
         entries = run_mypy.load_scope(ROOT / "config" / "mypy_scope.txt")
         self.assertEqual(entries, tuple(sorted(set(entries))))
-        self.assertGreaterEqual(len(entries), 4)
+        contract_files = tuple(
+            sorted(
+                path.relative_to(ROOT).as_posix()
+                for path in (ROOT / "shared" / "chromie_contracts").rglob("*.py")
+            )
+        )
+        self.assertGreaterEqual(len(contract_files), 23)
+        self.assertTrue(set(contract_files).issubset(entries))
+        for runtime_boundary in (
+            "orchestrator/runtime/host_settings.py",
+            "orchestrator/runtime/input_turn_lifecycle.py",
+            "orchestrator/runtime/playback_delivery.py",
+        ):
+            self.assertIn(runtime_boundary, entries)
 
-    def test_scope_rejects_directory_and_escape(self) -> None:
+    def test_scope_accepts_python_package_and_rejects_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             scope = root / "scope.txt"
             scope.write_text("../escape.py\n", encoding="utf-8")
             with self.assertRaises(run_mypy.MypyGateError):
                 run_mypy.load_scope(scope, root=root)
-            (root / "package").mkdir()
+            package = root / "package"
+            package.mkdir()
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            (package / "new_module.py").write_text("VALUE: int = 1\n", encoding="utf-8")
             scope.write_text("package\n", encoding="utf-8")
-            with self.assertRaises(run_mypy.MypyGateError):
-                run_mypy.load_scope(scope, root=root)
+            self.assertEqual(
+                run_mypy.load_scope(scope, root=root),
+                ("package/__init__.py", "package/new_module.py"),
+            )
 
     def test_pinned_version_is_required(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

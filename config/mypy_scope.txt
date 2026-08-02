@@ -1,4 +1,7 @@
+# Owned packages expand recursively so new modules enter the gate automatically.
+orchestrator/runtime/host_settings.py
+orchestrator/runtime/input_turn_lifecycle.py
+orchestrator/runtime/playback_delivery.py
 scripts/check_local_runtime_exposure.py
 scripts/run_ruff.py
-shared/chromie_contracts/errors.py
-shared/chromie_contracts/semantic_authority.py
+shared/chromie_contracts

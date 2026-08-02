@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+export CHROMIE_OPERATOR_MODE="${CHROMIE_OPERATOR_MODE:-services}"
+
 echo "[start] Project root: $ROOT_DIR"
 echo "[start] Preparing hardware/runtime environment..."
 

@@ -1,20 +1,15 @@
 # Current Implementation Status
 
-**Status authority:** this file owns current implementation, automatic
-verification, target-validation, and deployment claims.
+**Status authority:** this file owns current implementation, automatic verification, target-validation, and deployment claims.
 **Development identity:** `development`; no release version or publication target is planned.
 **Status refresh date:** 2026-08-02
-**Active Issue:** **Close Current-Revision Target Evidence**. The canonical
-local gate and live-voice verifier implementation are complete; physical voice
-validation remains open because the current microphone has not produced an
-intelligible utterance for the narrow retained live-voice claim. Structural
-refactors and repository-surface growth are queued
-behind the remaining evidence work
-unless they close a demonstrated safety or provenance blocker.
+**Active Issue:** **Close Current-Revision Target Evidence**. The canonical local gate and live-voice verifier are implemented; physical validation remains open because the current microphone has not produced an intelligible utterance for the narrow retained claim. Archive-based source-verifiable sustainability slices do not change that evidence owner or create target claims.
 
 Chromie’s current runtime is Goal-driven and has one semantic authority. The Host
 validates and executes; it does not replace LLM reasoning with phrase rules.
 Soridormi remains the physical safety and embodiment authority.
+
+Bounded sustainability slices now include four operator modes and a generated configuration inventory, package-scoped shared-contract Mypy selection, two consolidated observability documents, no dated in-tree archives, `VoiceAssistant` structure ratchets, and an explicit direct-LLM rollback boundary disabled in maintained modes. These are source implementation/test claims, not requalification evidence.
 
 A final core-principle audit removed Host-owned semantic delegation, phrase/
 regex motion and pose agents, catalog phrase-action boosts, weather-specific
@@ -256,5 +251,4 @@ design document, or first-class term. The post-evidence order is owned by
 - Default-off experiments and compatibility paths are not release support.
 - The repository remains a development snapshot.
 
-Detailed narrative retained before consolidation is available in
-[Implementation Status Archive — 2026-07-30](STATUS_ARCHIVE_2026-07-30.md).
+Detailed pre-consolidation narrative remains available in Git history.

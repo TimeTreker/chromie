@@ -4,6 +4,8 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+export CHROMIE_OPERATOR_MODE="${CHROMIE_OPERATOR_MODE:-voice_mujoco}"
+
 MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:8000/mcp}"
 BUILD_IMAGES=0
 REBUILD_NO_CACHE=0

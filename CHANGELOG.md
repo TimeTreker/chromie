@@ -1,20 +1,7 @@
 # Changelog
 
-- Reproduced clean source-bound active cancellation failing before Provider
-  start on revision `1849bb5` after Fast Planner had already selected the exact
-  velocity capability, `0.2` speed, `20`-second duration, and correct Goal
-  ownership. Removed the redundant free-text `source_ref` copying field from
-  parameter provenance. The model still authors the capability, arguments,
-  parameter mapping, and `source_goal_ids`; deterministic validation still
-  requires every explicit numeric Goal value to match the claimed step argument
-  and source Goal. This removes a brittle representation ritual without adding a Host semantic rule or weakening provenance.
-- Reproduced clean source-bound compound execution preserving a specific,
-  natural Response Composer sentence until the Host replaced two unfamiliar
-  actions with “perform the requested action.” Removed the Host capability
-  phrase renderer and preserved fingerprint-bound model wording instead.
-  Confirmation, goal coverage, commitment state, playback barriers, schemas,
-  and effect authorization remain typed and fail closed; the model now also
-  receives each execution capability's declared confirmation requirement.
+- Reproduced clean source-bound active cancellation failing before Provider start on revision `1849bb5` after Fast Planner selected the exact velocity capability, `0.2` speed, `20`-second duration, and Goal ownership. Removed redundant free-text `source_ref`; the model still authors capability, arguments, mapping, and `source_goal_ids`, while deterministic validation requires explicit numeric Goal values to match the claimed step and source Goal without adding a Host semantic rule.
+- Reproduced clean source-bound compound execution preserving a specific Response Composer sentence until the Host replaced unfamiliar actions with “perform the requested action.” Removed the Host phrase renderer and preserved fingerprint-bound model wording; confirmation, goal coverage, commitment state, playback barriers, schemas, and effect authorization remain typed and fail closed.
 - Reproduced the clean source-bound active-cancellation case failing before
   Provider start after a valid Fast Planner meaning was rejected at ambiguous
   provenance/repair representation boundaries and a later Deep attempt
@@ -41,10 +28,18 @@
   reject a correct plan or accept motion in the wrong direction; no runtime
   phrase-to-direction rule was added.
 
-This file records notable current changes. Detailed earlier development history is
-preserved in [Changelog Archive — through 2026-07-30](CHANGELOG_ARCHIVE_2026-07-30.md).
+This file records notable current changes. Detailed earlier development history remains available in Git history.
 
 ## Unreleased
+
+### Runtime sustainability follow-up
+
+- Added four complete operator modes with generated manifest identity, contradiction checks, and legacy direct-LLM fallback disabled.
+- Added a generated 434-key ownership inventory: nine public choices, one public Boolean, two bounded aliases, and ratchets.
+- Made `shared/chromie_contracts` package-scoped in Mypy so new modules enter automatically.
+- Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
+- Replaced 37 lifecycle property methods with delegated state aliases, reducing `VoiceAssistant` from 221 to 187 methods and 19 to one property.
+- Confined the direct-LLM call to one rollback owner; maintained apply lanes use bounded fail-closed speech after Agent failure.
 
 ### Grounded response latency contract
 

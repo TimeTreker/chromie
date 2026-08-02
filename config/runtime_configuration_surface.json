@@ -1,0 +1,49 @@
+{
+  "acceptance_override_prefixes": [
+    "CHROMIE_ACCEPTANCE_",
+    "CHROMIE_EVIDENCE_",
+    "ORCH_EVENT_LOG_",
+    "ORCH_RUNTIME_OVERRIDE_"
+  ],
+  "compatibility_aliases": {
+    "AGENT_SOCIAL_ATTENTION_MODE": "CHROMIE_SOCIAL_ATTENTION_MODE",
+    "CONDA_ENV_NAME": "CHROMIE_CONDA_ENV"
+  },
+  "maintained_modes": {
+    "qualification": {
+      "file": "env/modes/qualification.env",
+      "launcher": "scripts/run_target_evidence_closure.py"
+    },
+    "services": {
+      "file": "env/modes/services.env",
+      "launcher": "scripts/start_services.sh"
+    },
+    "speech": {
+      "file": "env/modes/speech.env",
+      "launcher": "scripts/start_orchestrator.sh"
+    },
+    "voice_mujoco": {
+      "file": "env/modes/voice_mujoco.env",
+      "launcher": "scripts/start_chromie.sh"
+    }
+  },
+  "public_boolean_choices": [
+    "CHROMIE_ENV_STRICT"
+  ],
+  "public_choices": [
+    "CHROMIE_COMPOSE_OVERRIDE_FILES",
+    "CHROMIE_CONDA_ENV",
+    "CHROMIE_ENV_STRICT",
+    "CHROMIE_OPERATOR_MODE",
+    "CHROMIE_TTS_BACKEND",
+    "CHROMIE_VALIDATION_PROFILE",
+    "ORCH_INPUT_DEVICE",
+    "ORCH_OUTPUT_DEVICE",
+    "SORIDORMI_MCP_URL"
+  ],
+  "ratchets": {
+    "max_compatibility_aliases": 2,
+    "max_public_boolean_choices": 1
+  },
+  "schema_version": "1.0"
+}

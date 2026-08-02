@@ -42,19 +42,38 @@ class DocumentationAuthorityTests(unittest.TestCase):
             )
             self.assertLessEqual(line_count, int(limit), raw_path)
 
-    def test_historical_archives_are_explicitly_non_authoritative(self) -> None:
+    def test_historical_archives_are_removed_from_current_tree(self) -> None:
         payload = json.loads(
             (ROOT / "config" / "documentation_authority.json").read_text(
                 encoding="utf-8"
             )
         )
-        for raw_path in payload["historical_archives"]:
-            text = (ROOT / raw_path).read_text(encoding="utf-8")
-            self.assertIn(
-                "Status: historical archive; not current authority",
-                text,
-                raw_path,
+        self.assertEqual(payload["historical_archives"], [])
+        for raw_path in (
+            "CHANGELOG_ARCHIVE_2026-07-30.md",
+            "DEVELOPMENT_CHECKPOINT_ARCHIVE_2026-07-30.md",
+            "docs/STATUS_ARCHIVE_2026-07-30.md",
+        ):
+            self.assertFalse((ROOT / raw_path).exists(), raw_path)
+
+    def test_core_reading_path_and_surface_ratchets_are_bounded(self) -> None:
+        payload = json.loads(
+            (ROOT / "config" / "documentation_authority.json").read_text(
+                encoding="utf-8"
             )
+        )
+        core = payload["core_reading_path"]
+        ratchets = payload["surface_ratchets"]
+        self.assertLessEqual(len(core), ratchets["max_core_reading_path"])
+        self.assertEqual(len(core), len(set(core)))
+        self.assertLessEqual(
+            len(list(ROOT.rglob("*.md"))),
+            ratchets["max_markdown_files"],
+        )
+        self.assertLessEqual(
+            len(list((ROOT / "docs").glob("*.md"))),
+            ratchets["max_docs_root_markdown_files"],
+        )
 
 
     def test_retired_target_runner_is_not_current_authority(self) -> None:

@@ -56,7 +56,8 @@ require physical voice or robot evidence.
 
 Only after that evidence closes, qualify and finish one semantic Issue at a time.
 The 2026-08-02 archive implementation lands bounded, automatically tested slices
-for the first five items below, but it does not close the active evidence Issue or
+for the first five items below and the next source-verifiable sustainability
+batch. It does not close the active evidence Issue, requalify the target, or
 claim the later Issues' full exit criteria:
 
 - reduce time to first grounded response without weakening validation or
@@ -68,6 +69,14 @@ claim the later Issues' full exit criteria:
 - reduce supported configuration combinations around maintained profiles;
 - expand Mypy by owned package;
 - reduce the current documentation surface.
+
+Current source-verifiable progress also includes four complete operator modes
+with a generated configuration inventory, package-scoped shared-contract Mypy
+selection, observability-document consolidation, dated-archive removal,
+composition-root structure ratchets, and an explicit direct-LLM rollback gate.
+Redundant-switch removal, the next complete runtime type-check package, remaining
+lifecycle transport/session extraction, specialized-document ownership review,
+and source-bound requalification remain open.
 
 Arbitrary file, method, boolean, or document counts are not substitute exit
 criteria. Every Issue refreshes its baseline, preserves public behavior and
@@ -1144,7 +1153,7 @@ and release boundaries.
 
 ### Objective
 
-Establish [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
+Establish [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md)
 as the common contract for architecture-independent execution timing, incident
 scene reconstruction, and data-loop evidence correlation.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the pinned incremental Mypy ratchet over its explicit module scope."""
+"""Run the pinned incremental Mypy ratchet over owned files and packages."""
 
 from __future__ import annotations
 
@@ -39,6 +39,7 @@ def load_scope(path: Path, *, root: Path = ROOT) -> tuple[str, ...]:
     if len(entries) != len(set(entries)):
         raise MypyGateError("Mypy scope contains duplicate paths")
 
+    expanded: list[str] = []
     for entry in entries:
         candidate = Path(entry)
         if candidate.is_absolute() or ".." in candidate.parts:
@@ -48,9 +49,32 @@ def load_scope(path: Path, *, root: Path = ROOT) -> tuple[str, ...]:
             resolved.relative_to(root.resolve())
         except ValueError as exc:
             raise MypyGateError(f"Mypy scope escapes repository root: {entry}") from exc
-        if not resolved.is_file() or resolved.suffix != ".py":
-            raise MypyGateError(f"Mypy scope entry must be an existing Python file: {entry}")
-    return entries
+        if resolved.is_file():
+            if resolved.suffix != ".py":
+                raise MypyGateError(
+                    f"Mypy scope file entry must be Python source: {entry}"
+                )
+            expanded.append(candidate.as_posix())
+            continue
+        if not resolved.is_dir() or not (resolved / "__init__.py").is_file():
+            raise MypyGateError(
+                f"Mypy scope entry must be a Python file or package: {entry}"
+            )
+        package_files = sorted(
+            path.relative_to(root).as_posix()
+            for path in resolved.rglob("*.py")
+            if "__pycache__" not in path.parts
+        )
+        if not package_files:
+            raise MypyGateError(f"Mypy package scope is empty: {entry}")
+        expanded.extend(package_files)
+
+    if len(expanded) != len(set(expanded)):
+        raise MypyGateError(
+            "Mypy scope entries overlap; package and file entries must not select "
+            "the same module twice"
+        )
+    return tuple(sorted(expanded))
 
 
 def _run(command: Sequence[str], *, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:

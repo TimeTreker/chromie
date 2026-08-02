@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+from scripts.runtime_configuration_inventory import build_inventory
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class RuntimeConfigurationInventoryTests(unittest.TestCase):
+    def test_inventory_covers_discovered_keys_with_declared_categories(self) -> None:
+        inventory = build_inventory(ROOT)
+        entries = inventory["entries"]
+        keys = [entry["key"] for entry in entries]
+        self.assertEqual(keys, sorted(set(keys)))
+        self.assertGreaterEqual(len(entries), 400)
+        self.assertEqual(
+            {entry["category"] for entry in entries},
+            {
+                "acceptance_override",
+                "bounded_compatibility_alias",
+                "profile_constant",
+                "public_choice",
+                "service_internal",
+            },
+        )
+        self.assertEqual(inventory["maintained_modes"], [
+            "qualification",
+            "services",
+            "speech",
+            "voice_mujoco",
+        ])
+
+    def test_committed_inventory_is_current(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, "scripts/runtime_configuration_inventory.py", "--check"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("modes=4", completed.stdout)
+
+    def test_public_switch_and_alias_ratchets_are_bounded(self) -> None:
+        payload = json.loads(
+            (ROOT / "config" / "runtime_configuration_inventory.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        summary = payload["summary"]
+        self.assertLessEqual(summary["public_boolean_choices"], 1)
+        self.assertLessEqual(summary["compatibility_aliases"], 2)
+        public = {
+            entry["key"]
+            for entry in payload["entries"]
+            if entry["category"] == "public_choice"
+        }
+        self.assertIn("CHROMIE_OPERATOR_MODE", public)
+        self.assertIn("ORCH_INPUT_DEVICE", public)
+        self.assertNotIn("ORCH_ENABLE_SORIDORMI_SKILLS", public)
+
+    def test_maintained_gate_checks_configuration_inventory(self) -> None:
+        script = (ROOT / "scripts" / "run_tests.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            "python scripts/runtime_configuration_inventory.py --check",
+            script,
+        )
+
+    def test_launchers_select_owned_operator_modes(self) -> None:
+        expected = {
+            "scripts/start_services.sh": "services",
+            "scripts/start_orchestrator.sh": "speech",
+            "scripts/start_chromie.sh": "voice_mujoco",
+            "scripts/run_target_evidence_closure.py": "qualification",
+        }
+        for raw_path, mode in expected.items():
+            with self.subTest(path=raw_path):
+                text = (ROOT / raw_path).read_text(encoding="utf-8")
+                self.assertIn("CHROMIE_OPERATOR_MODE", text)
+                self.assertIn(mode, text)
+
+
+if __name__ == "__main__":
+    unittest.main()

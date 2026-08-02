@@ -693,149 +693,58 @@ class VoiceAssistant:
             self.__dict__["input_turn_lifecycle"] = state
         return state
 
-    @property
-    def next_playback_order(self) -> int:
-        return self._playback_state().next_playback_order
+    _PLAYBACK_STATE_ALIASES = {
+        "next_playback_order": "next_playback_order",
+        "pending_audio": "pending_audio",
+        "synthesis_order": "synthesis_order",
+        "playback_generation": "playback_generation",
+        "_tts_text_by_generation": "tts_text_by_generation",
+        "playback_start_waiters": "playback_start_waiters",
+        "cancelled_playback_orders": "cancelled_playback_orders",
+        "_turn_speech_events": "turn_speech_events",
+        "_turn_speech_event_by_playback_key": "turn_speech_event_by_playback_key",
+        "order_lock": "order_lock",
+    }
+    _PLAYBACK_STATE_COERCERS = {
+        "next_playback_order": int,
+        "synthesis_order": int,
+        "playback_generation": int,
+    }
+    _INPUT_TURN_STATE_ALIASES = {
+        "active_asr_task": "active_asr_task",
+        "active_turn_task": "active_turn_task",
+        "active_turn_tasks": "active_turn_tasks",
+        "_turn_cancellation_reasons": "turn_cancellation_reasons",
+        "active_reflex_task": "active_reflex_task",
+        "concurrent_protective_reflex_tasks": "concurrent_protective_reflex_tasks",
+        "_pending_turn_after_reflex": "pending_turn_after_reflex",
+        "_pending_vad_audio": "pending_vad_audio",
+    }
 
-    @next_playback_order.setter
-    def next_playback_order(self, value: int) -> None:
-        self._playback_state().next_playback_order = int(value)
+    def __getattr__(self, name: str) -> Any:
+        playback_field = self._PLAYBACK_STATE_ALIASES.get(name)
+        if playback_field is not None:
+            return getattr(self._playback_state(), playback_field)
+        input_field = self._INPUT_TURN_STATE_ALIASES.get(name)
+        if input_field is not None:
+            return getattr(self._input_turn_state(), input_field)
+        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
 
-    @property
-    def pending_audio(self) -> dict[int, tuple[int, bytes, int, str | None, str | None]]:
-        return self._playback_state().pending_audio
-
-    @pending_audio.setter
-    def pending_audio(self, value: dict[int, tuple[int, bytes, int, str | None, str | None]]) -> None:
-        self._playback_state().pending_audio = value
-
-    @property
-    def synthesis_order(self) -> int:
-        return self._playback_state().synthesis_order
-
-    @synthesis_order.setter
-    def synthesis_order(self, value: int) -> None:
-        self._playback_state().synthesis_order = int(value)
-
-    @property
-    def playback_generation(self) -> int:
-        return self._playback_state().playback_generation
-
-    @playback_generation.setter
-    def playback_generation(self, value: int) -> None:
-        self._playback_state().playback_generation = int(value)
-
-    @property
-    def _tts_text_by_generation(self) -> dict[int, list[str]]:
-        return self._playback_state().tts_text_by_generation
-
-    @_tts_text_by_generation.setter
-    def _tts_text_by_generation(self, value: dict[int, list[str]]) -> None:
-        self._playback_state().tts_text_by_generation = value
-
-    @property
-    def playback_start_waiters(self) -> dict[tuple[int, int, str | None], asyncio.Future[bool]]:
-        return self._playback_state().playback_start_waiters
-
-    @playback_start_waiters.setter
-    def playback_start_waiters(self, value: dict[tuple[int, int, str | None], asyncio.Future[bool]]) -> None:
-        self._playback_state().playback_start_waiters = value
-
-    @property
-    def cancelled_playback_orders(self) -> set[tuple[int, int, str | None]]:
-        return self._playback_state().cancelled_playback_orders
-
-    @cancelled_playback_orders.setter
-    def cancelled_playback_orders(self, value: set[tuple[int, int, str | None]]) -> None:
-        self._playback_state().cancelled_playback_orders = value
-
-    @property
-    def _turn_speech_events(self) -> dict[str, list[dict[str, Any]]]:
-        return self._playback_state().turn_speech_events
-
-    @_turn_speech_events.setter
-    def _turn_speech_events(self, value: dict[str, list[dict[str, Any]]]) -> None:
-        self._playback_state().turn_speech_events = value
-
-    @property
-    def _turn_speech_event_by_playback_key(self) -> dict[tuple[int, int, str | None], str]:
-        return self._playback_state().turn_speech_event_by_playback_key
-
-    @_turn_speech_event_by_playback_key.setter
-    def _turn_speech_event_by_playback_key(self, value: dict[tuple[int, int, str | None], str]) -> None:
-        self._playback_state().turn_speech_event_by_playback_key = value
-
-    @property
-    def order_lock(self) -> asyncio.Lock:
-        return self._playback_state().order_lock
-
-    @order_lock.setter
-    def order_lock(self, value: asyncio.Lock) -> None:
-        self._playback_state().order_lock = value
-
-    @property
-    def active_asr_task(self) -> asyncio.Task | None:
-        return self._input_turn_state().active_asr_task
-
-    @active_asr_task.setter
-    def active_asr_task(self, value: asyncio.Task | None) -> None:
-        self._input_turn_state().active_asr_task = value
-
-    @property
-    def active_turn_task(self) -> asyncio.Task | None:
-        return self._input_turn_state().active_turn_task
-
-    @active_turn_task.setter
-    def active_turn_task(self, value: asyncio.Task | None) -> None:
-        self._input_turn_state().active_turn_task = value
-
-    @property
-    def active_turn_tasks(self) -> dict[asyncio.Task, str]:
-        return self._input_turn_state().active_turn_tasks
-
-    @active_turn_tasks.setter
-    def active_turn_tasks(self, value: dict[asyncio.Task, str]) -> None:
-        self._input_turn_state().active_turn_tasks = value
-
-    @property
-    def _turn_cancellation_reasons(self) -> dict[asyncio.Task, str]:
-        return self._input_turn_state().turn_cancellation_reasons
-
-    @_turn_cancellation_reasons.setter
-    def _turn_cancellation_reasons(self, value: dict[asyncio.Task, str]) -> None:
-        self._input_turn_state().turn_cancellation_reasons = value
-
-    @property
-    def active_reflex_task(self) -> asyncio.Task | None:
-        return self._input_turn_state().active_reflex_task
-
-    @active_reflex_task.setter
-    def active_reflex_task(self, value: asyncio.Task | None) -> None:
-        self._input_turn_state().active_reflex_task = value
-
-    @property
-    def concurrent_protective_reflex_tasks(self) -> set[asyncio.Task]:
-        return self._input_turn_state().concurrent_protective_reflex_tasks
-
-    @concurrent_protective_reflex_tasks.setter
-    def concurrent_protective_reflex_tasks(self, value: set[asyncio.Task]) -> None:
-        self._input_turn_state().concurrent_protective_reflex_tasks = value
-
-    @property
-    def _pending_turn_after_reflex(self) -> deque[tuple[str, str]]:
-        return self._input_turn_state().pending_turn_after_reflex
-
-    @_pending_turn_after_reflex.setter
-    def _pending_turn_after_reflex(self, value: deque[tuple[str, str]]) -> None:
-        self._input_turn_state().pending_turn_after_reflex = value
-
-    @property
-    def _pending_vad_audio(self) -> bytes | tuple[bytes, bool, int | None] | None:
-        return self._input_turn_state().pending_vad_audio
-
-    @_pending_vad_audio.setter
-    def _pending_vad_audio(self, value: bytes | tuple[bytes, bool, int | None] | None) -> None:
-        self._input_turn_state().pending_vad_audio = value
+    def __setattr__(self, name: str, value: Any) -> None:
+        playback_field = self._PLAYBACK_STATE_ALIASES.get(name)
+        if playback_field is not None:
+            coercer = self._PLAYBACK_STATE_COERCERS.get(name)
+            setattr(
+                self._playback_state(),
+                playback_field,
+                coercer(value) if coercer is not None else value,
+            )
+            return
+        input_field = self._INPUT_TURN_STATE_ALIASES.get(name)
+        if input_field is not None:
+            setattr(self._input_turn_state(), input_field, value)
+            return
+        object.__setattr__(self, name, value)
 
     def playback_start_key(
         self,
@@ -5380,13 +5289,11 @@ class VoiceAssistant:
             return
 
         if not self.enable_agent or not decision.needs_agent:
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    fallback_reason="agent_disabled_or_not_needed",
-                    route=decision.route,
-                )
+            self._launch_direct_llm_compatibility_or_fail_closed(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                fallback_reason="agent_disabled_or_not_needed",
             )
             return
 
@@ -5552,14 +5459,12 @@ class VoiceAssistant:
                     reset_playback=not fast_first_scheduled,
                 )
                 return
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    reset_playback=not fast_first_scheduled,
-                    fallback_reason="agent_exception",
-                    route=decision.route,
-                )
+            self._launch_direct_llm_compatibility_or_fail_closed(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                fallback_reason="agent_exception",
+                reset_playback=not fast_first_scheduled,
             )
 
     def _post_interrupt_corrected_decision(
@@ -5736,14 +5641,12 @@ class VoiceAssistant:
                 exc,
                 exc_info=True,
             )
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    reset_playback=not fast_first_scheduled,
-                    fallback_reason="post_interrupt_agent_exception",
-                    route=decision.route,
-                )
+            self._launch_direct_llm_compatibility_or_fail_closed(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                fallback_reason="post_interrupt_agent_exception",
+                reset_playback=not fast_first_scheduled,
             )
 
     async def _stage_interaction_confirmation(
@@ -6413,13 +6316,88 @@ class VoiceAssistant:
                 )
             return None
 
+    def _direct_llm_compatibility_allowed(
+        self,
+        decision: RouteDecision,
+    ) -> bool:
+        """Return whether the explicit legacy direct-LLM rollback is allowed.
+
+        Maintained Goal-driven apply lanes never transfer semantic authority to
+        the legacy direct model. The compatibility path is available only when
+        the operator explicitly enables it and the current route has not entered
+        an authoritative apply lane.
+        """
+
+        if not bool(getattr(self, "legacy_semantic_fallback_enabled", False)):
+            return False
+        runtime_mode = str(getattr(self, "cognitive_runtime_mode", "apply") or "apply")
+        apply_lanes = set(getattr(self, "cognitive_apply_lanes", set()) or set())
+        return runtime_mode != "apply" or decision.route not in apply_lanes
+
+    def _launch_direct_llm_compatibility_or_fail_closed(
+        self,
+        *,
+        decision: RouteDecision,
+        user_text: str,
+        session_id: str,
+        fallback_reason: str,
+        reset_playback: bool = True,
+    ) -> None:
+        """Use the explicit rollback path or emit a bounded failure response."""
+
+        if self._direct_llm_compatibility_allowed(decision):
+            self.session_log(
+                session_id,
+                "direct_llm_compatibility_start: reason=%s route=%s",
+                fallback_reason,
+                decision.route,
+            )
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    reset_playback=reset_playback,
+                    fallback_reason=fallback_reason,
+                    route=decision.route,
+                )
+            )
+            return
+
+        self.session_log(
+            session_id,
+            "direct_llm_compatibility_blocked: reason=%s route=%s runtime_mode=%s",
+            fallback_reason,
+            decision.route,
+            getattr(self, "cognitive_runtime_mode", "apply"),
+        )
+        safe_response = self._agent_exception_safe_response(
+            decision,
+            user_text=user_text,
+        )
+        safe_response = safe_response.model_copy(
+            deep=True,
+            update={
+                "metadata": {
+                    **safe_response.metadata,
+                    "fallback_reason": fallback_reason,
+                    "direct_llm_compatibility_blocked": True,
+                }
+            },
+        )
+        self.conversation_state.record_agent_result(session_id, safe_response)
+        self._launch_interaction(
+            safe_response,
+            session_id,
+            reset_playback=reset_playback,
+        )
+
     def _agent_exception_safe_response(
         self,
         decision: RouteDecision,
         *,
         user_text: str,
-    ) -> InteractionResponse | None:
-        """Fail closed when an effectful Agent path becomes unavailable.
+    ) -> InteractionResponse:
+        """Fail closed when an Agent path becomes unavailable.
 
         This guard uses the already-selected route and structured action
         proposals.  It does not reinterpret user language or select a skill.
@@ -6437,9 +6415,6 @@ class VoiceAssistant:
                 )
                 for item in task_list
             )
-        if decision.route not in {"robot_action", "tool", "memory"} and not has_effectful_task:
-            return None
-
         zh = self._looks_zh(user_text)
         if decision.route == "robot_action" or (
             has_effectful_task and decision.route not in {"tool", "memory"}
@@ -6455,11 +6430,17 @@ class VoiceAssistant:
                 if zh
                 else "I couldn\'t complete that lookup, so I won\'t guess. Please ask me again."
             )
-        else:
+        elif decision.route == "memory":
             text = (
                 "我刚才没记好，所以这次没有保存。你再说一次吧。"
                 if zh
                 else "I couldn\'t save that properly, so nothing changed. Please try again."
+            )
+        else:
+            text = (
+                "我刚才没想明白，不想乱答。你再说一次吧。"
+                if zh
+                else "I couldn\'t make sense of that just now, so I won\'t guess. Please try again."
             )
         return self._host_speech_response(
             text,

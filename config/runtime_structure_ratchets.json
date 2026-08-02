@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "voice_assistant": {
+    "path": "orchestrator/orchestrator.py",
+    "class_name": "VoiceAssistant",
+    "max_method_count": 187,
+    "max_property_count": 1,
+    "max_init_lines": 444,
+    "max_init_self_attributes": 151,
+    "required_collaborators": [
+      "input_turn_lifecycle",
+      "playback_delivery"
+    ],
+    "forbidden_init_state_attributes": [
+      "next_playback_order",
+      "pending_audio",
+      "synthesis_order",
+      "playback_generation",
+      "_tts_text_by_generation",
+      "playback_start_waiters",
+      "cancelled_playback_orders",
+      "_turn_speech_events",
+      "_turn_speech_event_by_playback_key",
+      "order_lock",
+      "active_asr_task",
+      "active_turn_task",
+      "active_turn_tasks",
+      "_turn_cancellation_reasons",
+      "active_reflex_task",
+      "concurrent_protective_reflex_tasks",
+      "_pending_turn_after_reflex",
+      "_pending_vad_audio"
+    ],
+    "direct_llm_compatibility_owner": "_launch_direct_llm_compatibility_or_fail_closed"
+  }
+}

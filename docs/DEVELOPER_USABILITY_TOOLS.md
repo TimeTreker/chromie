@@ -44,7 +44,7 @@ PR0 through PR6 are implemented and automatically verified at Level A:
 - `trace view` reads retained local JSONL and JSON artifacts, filters by
   session, interaction, graph, or trace id, and summarizes session events,
   interaction responses, Skill Runtime executions, TaskGraph traces, and
-  acceptance summaries according to [Trace Schema](TRACE_SCHEMA.md);
+  acceptance summaries according to [Trace Schema](RUNTIME_OBSERVABILITY.md);
 - plain text and JSON output are both supported.
 
 `trace explain` remains future work.
@@ -248,7 +248,7 @@ Exit criteria:
 
 Implemented at Level A.
 
-Document [Trace Schema](TRACE_SCHEMA.md) and implement:
+Document [Trace Schema](RUNTIME_OBSERVABILITY.md) and implement:
 
 ```bash
 python -m tools.chromie_cli trace view

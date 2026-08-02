@@ -4,6 +4,20 @@ This runbook contains commands and recovery procedures. Use
 [Current Implementation Status](docs/STATUS.md) for claims about completion and
 [Configuration Reference](docs/CONFIGURATION.md) for variable semantics.
 
+## Operator modes
+
+Supported launchers select complete source-controlled modes automatically:
+
+- `start_services.sh` selects `services`;
+- `start_orchestrator.sh` selects `speech`;
+- `start_chromie.sh` and `start_voice_mujoco.sh` select `voice_mujoco`;
+- target-evidence closure selects `qualification`.
+
+Do not recreate these combinations with ad-hoc booleans. The generated
+`.chromie/runtime_profile.json` must show the expected `active_operator_mode`.
+All maintained modes disable the legacy direct-LLM compatibility path; enabling
+that path is an explicit rollback state, not normal operation.
+
 Run commands from the repository root unless stated otherwise.
 
 ## 1. Inspect configuration

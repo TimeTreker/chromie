@@ -50,6 +50,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         (root / "env").mkdir()
         shutil.copy2(ROOT / ".env.common", root / ".env.common")
         shutil.copytree(ROOT / "env" / "profiles", root / "env" / "profiles")
+        shutil.copytree(ROOT / "env" / "modes", root / "env" / "modes")
         shutil.copytree(ROOT / "env" / "validation", root / "env" / "validation")
         shutil.copy2(ROOT / "scripts" / "detect_hardware_profile.sh", root / "scripts")
         return root
@@ -107,6 +108,125 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             text=True,
         )
 
+
+    def test_operator_modes_own_complete_supported_combinations(self) -> None:
+        required = {
+            "CHROMIE_OPERATOR_MODE",
+            "ORCH_ENABLE_AGENT",
+            "ORCH_ENABLE_INTERACTION_RESPONSE",
+            "ORCH_ENABLE_SORIDORMI_SKILLS",
+            "ORCH_COGNITIVE_RUNTIME_MODE",
+            "ORCH_COGNITIVE_APPLY_LANES",
+            "ORCH_ACTION_DRY_RUN",
+            "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
+        }
+        modes = {}
+        for path in sorted((ROOT / "env" / "modes").glob("*.env")):
+            values = {}
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    values[key] = value
+            modes[path.stem] = values
+            with self.subTest(mode=path.stem):
+                self.assertEqual(required - values.keys(), set())
+                self.assertEqual(values["CHROMIE_OPERATOR_MODE"], path.stem)
+                self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
+                self.assertEqual(
+                    values["ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED"], "0"
+                )
+                lanes = set(values["ORCH_COGNITIVE_APPLY_LANES"].split(","))
+                self.assertTrue({"chat", "tool"}.issubset(lanes))
+                self.assertEqual(
+                    "robot_action" in lanes,
+                    values["ORCH_ENABLE_SORIDORMI_SKILLS"] == "1",
+                )
+        self.assertEqual(
+            set(modes),
+            {"qualification", "services", "speech", "voice_mujoco"},
+        )
+
+    def test_operator_mode_rejects_legacy_direct_llm_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._minimal_root(directory)
+            mode_path = root / "env" / "modes" / "speech.env"
+            mode_path.write_text(
+                mode_path.read_text(encoding="utf-8").replace(
+                    "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0",
+                    "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1",
+                ),
+                encoding="utf-8",
+            )
+            system_info = root / "system.env"
+            self._system_info(
+                system_info,
+                gpu="NVIDIA GeForce RTX 5090",
+                compute="12.0",
+                memory="32607",
+                cuda_arch="120",
+            )
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(GENERATOR),
+                    "--root",
+                    str(root),
+                    "--system-info-file",
+                    str(system_info),
+                ],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn(
+            "cannot enable legacy direct-LLM fallback",
+            completed.stderr + completed.stdout,
+        )
+
+    def test_process_selected_operator_mode_is_applied_and_protected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._minimal_root(directory)
+            system_info = root / "system.env"
+            self._system_info(
+                system_info,
+                gpu="NVIDIA GeForce RTX 5090",
+                compute="12.0",
+                memory="32607",
+                cuda_arch="120",
+            )
+            env = dict(os.environ)
+            env["CHROMIE_OPERATOR_MODE"] = "voice_mujoco"
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(GENERATOR),
+                    "--root",
+                    str(root),
+                    "--system-info-file",
+                    str(system_info),
+                ],
+                cwd=root,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            values = parse_env(root / ".env.runtime")
+            manifest = json.loads(
+                (root / ".chromie" / "runtime_profile.json").read_text()
+            )
+
+        self.assertIn("Operator mode: voice_mujoco", completed.stdout)
+        self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "voice_mujoco")
+        self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "1")
+        self.assertIn("robot_action", values["ORCH_COGNITIVE_APPLY_LANES"]
+        )
+        self.assertEqual(manifest["active_operator_mode"], "voice_mujoco")
+
     def test_every_profile_owns_the_complete_model_plan(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):
             values = {}
@@ -163,6 +283,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
+        self.assertEqual(manifest["active_operator_mode"], "speech")
+        self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "speech")
+        self.assertEqual(manifest["mode_file"], "env/modes/speech.env")
         self.assertEqual(
             manifest["active_ollama_models"],
             ["qwen3:4b", "gemma4:12b"],

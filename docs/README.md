@@ -47,10 +47,10 @@ When documents disagree, correct the lower-authority document.
 | How do I install, run, inspect, or recover it? | `CHROMIE_RUNBOOK.md` |
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
-| What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
-| How do Runtime Trace, Runtime Events, Episodes, and Scenario Candidates relate? | `docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md` |
-| What common contract must runtime trace items obey? | `docs/RUNTIME_TRACE.md` |
-| How should a module add trace instrumentation? | `docs/RUNTIME_TRACE_INSTRUMENTATION.md` |
+| What retained trace artifacts can the CLI inspect? | `docs/RUNTIME_OBSERVABILITY.md` |
+| How do Runtime Trace, Runtime Events, Episodes, and Scenario Candidates relate? | `docs/RUNTIME_OBSERVABILITY.md` |
+| What common contract must runtime trace items obey? | `docs/RUNTIME_OBSERVABILITY.md` |
+| How should a module add trace instrumentation? | `docs/RUNTIME_OBSERVABILITY_OPERATIONS.md` |
 | How are accelerator observations, retained latency reports, and regression gates produced? | `docs/ACCELERATOR_LATENCY_EVIDENCE.md` |
 | What contract and evidence govern TTS backend selection? | `docs/TTS_PROVIDER_EVALUATION.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
@@ -114,14 +114,10 @@ mechanical-contract owner.
 
 ## Architecture and runtime
 
-- [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
-- [Runtime Trace Contract](RUNTIME_TRACE.md)
-- [Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md)
-- [Session, Execution, and Audio Runtime Trace](SESSION_EXECUTION_AUDIO_TRACE.md)
-- [Input, Action, and Idle Trace Coverage](INPUT_ACTION_IDLE_TRACE.md)
-- [Resource, Recovery, and Trace Retention](RESOURCE_RECOVERY_TRACE_RETENTION.md)
+- [Runtime Observability Contract](RUNTIME_OBSERVABILITY.md)
+- [Runtime Observability Operations](RUNTIME_OBSERVABILITY_OPERATIONS.md)
+
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
-- [Runtime Event Architecture](RUNTIME_EVENT_ARCHITECTURE.md)
 - [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
 - [Scenario Candidate Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
@@ -196,7 +192,7 @@ mechanical-contract owner.
 - [Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md)
 - [Semantic Task Continuity and Situational Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md)
 - [TaskGraph](agent_task_graph.md)
-- [Trace Schema](TRACE_SCHEMA.md)
+- [Trace Schema](RUNTIME_OBSERVABILITY.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
 - [Chromie/Soridormi Proposal Boundary Plan](CHROMIE_SORIDORMI_PROPOSAL_BOUNDARY_PLAN.md)
 - [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
@@ -261,12 +257,3 @@ Run:
 python scripts/check_docs.py
 ./scripts/run_tests.sh
 ```
-
-
-## Historical archives
-
-These files preserve detailed narrative and are not current authority:
-
-- [Changelog Archive — through 2026-07-30](../CHANGELOG_ARCHIVE_2026-07-30.md)
-- [Development Checkpoint Archive — 2026-07-30](../DEVELOPMENT_CHECKPOINT_ARCHIVE_2026-07-30.md)
-- [Implementation Status Archive — 2026-07-30](STATUS_ARCHIVE_2026-07-30.md)

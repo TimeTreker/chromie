@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+export CHROMIE_OPERATOR_MODE="${CHROMIE_OPERATOR_MODE:-speech}"
+
 echo "[orchestrator] Project root: $ROOT_DIR"
 
 # Build and load the hardware-aware runtime environment before selecting conda/env/model settings.

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
+os.environ.setdefault("CHROMIE_OPERATOR_MODE", "qualification")
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "target_evidence_closure_v1.json"
 )

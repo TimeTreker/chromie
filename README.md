@@ -10,7 +10,7 @@ The long-term goal and ownership boundaries are defined in the
 
 Chromie can retain correlated traces, events, resource samples, and reviewed
 experience artifacts. See
-[Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md).
+[Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->
@@ -113,6 +113,20 @@ a demonstrated blocker.
 
 Requirements: Linux, Docker Compose, an NVIDIA runtime for GPU deployment,
 Python 3.11, and host audio dependencies.
+
+Chromie launchers select one maintained operator mode rather than asking the
+operator to assemble many feature booleans:
+
+| Launcher | Mode |
+|---|---|
+| `scripts/start_services.sh` | `services` |
+| `scripts/start_orchestrator.sh` | `speech` |
+| `scripts/start_chromie.sh` / `scripts/start_voice_mujoco.sh` | `voice_mujoco` |
+| target-evidence closure | `qualification` |
+
+The generated runtime manifest records the selected mode. Maintained modes use
+Goal-driven apply lanes and keep legacy direct-LLM fallback disabled. See the
+[Configuration Reference](docs/CONFIGURATION.md#maintained-operator-modes).
 
 For the complete microphone -> Chromie -> Soridormi -> MuJoCo path, keep the
 Chromie and Soridormi repositories next to each other and run:

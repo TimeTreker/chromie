@@ -188,11 +188,11 @@ Issue must refresh its own baseline because counts may change.
 | Reduce Time to First Grounded Response | implementation slice landed; qualification and remaining scope open | target-evidence closure | Planless direct spoken-response composition now bypasses Fast/Deep Planner under a typed contract; retained latency/result-delivery evidence and the remaining scope are still open. |
 | Classify Broad Runtime Exception Boundaries | implementation slice landed; classification review open | grounded-response latency Issue | A symbol-level checked inventory now rejects new, missing, or stale broad handlers; deeper narrowing and retained failure evidence remain open. |
 | Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
-| Extract Playback Delivery Lifecycle | implementation slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; PCM/output transport and structural ratchets remain open. |
-| Extract Input Turn and Session Lifecycle | implementation slice landed; full ownership audit open | playback lifecycle | ASR, routed-turn, reflex, and pending-VAD task lifecycle now has one collaborator; microphone/session-registry extraction and conversation-state audit remain open. |
-| Reduce Supported Configuration Combinations | queued | typed Host settings and live proof | Make maintained deployment profiles own supported combinations and retire redundant public switches. |
-| Expand Mypy by Owned Package | queued | stable extracted boundaries | Cover all shared contracts, then independently owned runtime packages. |
-| Reduce the Current Documentation Surface | queued | structural Issues complete | Shrink the core reading path, merge duplicated trace material, and remove superseded archives safely. |
+| Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
+| Extract Input Turn and Session Lifecycle | direct-LLM audit and structural ratchet slice landed; full ownership audit open | playback lifecycle | ASR, routed-turn, reflex, and pending-VAD task lifecycle have one collaborator. Maintained apply modes block the direct-LLM path; microphone/session-registry extraction and conversation-state audit remain open. |
+| Reduce Supported Configuration Combinations | implementation slice landed; deprecation/removal work open | typed Host settings and live proof | Four source-controlled operator modes, a generated 434-key ownership inventory, and public/alias ratchets define maintained combinations. Redundant-switch migration/removal remains open. |
+| Expand Mypy by Owned Package | contract-package slice landed; runtime-package expansion open | stable extracted boundaries | `shared/chromie_contracts` is package-scoped and new modules enter automatically; lifecycle seams remain individually scoped until a complete owned runtime package is clean. |
+| Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
 | Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
 
 ### Completed first-intake Issues
@@ -652,15 +652,18 @@ Host still lacks equivalent narrow configuration ownership.
 
 ## Issue: Extract Playback Delivery Lifecycle
 
-Status: implementation slice landed; provider/output transport and structural exit criteria open
+Status: structural ratchet slice landed; provider/output transport and live exit criteria open
 
 Implementation note (2026-08-02): a playback-delivery collaborator now owns
 playback/synthesis ordering, generations, start waiters, cancellation
 bookkeeping, pending audio, and current-turn delivered-speech events.
 `VoiceAssistant` delegates those state transitions while preserving its public
-path and evidence logging. Provider PCM transport, output-stream ownership,
-echo/chunk processing, incremental audible playback, and structural ratchets
-remain open.
+path and evidence logging. Eighteen lifecycle state aliases no longer require
+37 composition-root property methods; the class decreased from 221 to 187
+methods and from 19 to one property, and method/property/initializer counts are
+now protected by `scripts/check_runtime_structure.py`. Provider PCM transport,
+output-stream ownership, echo/chunk processing, incremental audible playback,
+and current live proof remain open.
 
 ### Problem
 
@@ -708,14 +711,20 @@ ordering contract but no independent owner.
 
 ## Issue: Extract Input Turn and Session Lifecycle
 
-Status: implementation slice landed; microphone/session-registry extraction and ownership audit open
+Status: direct-LLM audit and structural ratchet slice landed; microphone/session-registry extraction and ownership audit open
 
 Implementation note (2026-08-02): an input-turn lifecycle collaborator now owns
 active ASR work, routed-turn registration/cancellation, protective-reflex
 queues, pending turns behind reflexes, and pending VAD audio. Gateway/Core
 meaning and deterministic reflex authority remain outside this collaborator.
-Microphone callback ownership, full session-registry mechanics, direct-LLM
-reachability, `conversation_state.py` audit, and structural ratchets remain open.
+The remaining direct-LLM call has one checked owner and is reachable only when
+`ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1` and the route has not entered a
+maintained Goal-driven apply lane. All four maintained operator modes set that
+rollback gate to `0`; apply-lane Agent failures now use a bounded Host-owned
+failure response rather than transferring semantic authority. Composition-root
+counts and direct-call ownership are monotonic repository gates. Microphone
+callback ownership, full session-registry mechanics, and the
+`conversation_state.py` ownership audit remain open.
 
 ### Problem
 
@@ -754,7 +763,18 @@ need an ownership audit.
 
 ## Issue: Reduce Supported Configuration Combinations
 
-Status: queued
+Status: implementation slice landed; redundant-switch migration and removal criteria open
+
+Implementation note (2026-08-02): four source-controlled operator modes now
+own complete maintained combinations for services, speech, voice plus MuJoCo,
+and qualification. The generated runtime manifest records the active mode and
+source file; mode contradictions fail before startup. A machine-generated
+inventory currently classifies 434 discovered keys into public choice, profile
+constant, service internal, acceptance override, or bounded compatibility
+alias. The maintained public surface contains nine choices, one public Boolean,
+and two compatibility aliases, with ratchets and launcher/profile tests. This
+refreshes the old raw-read baseline but does not yet close the required
+deprecation warnings, migrations, or removals for redundant switches.
 
 ### Problem
 
@@ -795,7 +815,17 @@ larger than the tested profile set.
 
 ## Issue: Expand Mypy by Owned Package
 
-Status: queued
+Status: contract-package slice landed; next complete runtime package and canonical Mypy execution open
+
+Implementation note (2026-08-02): `config/mypy_scope.txt` now accepts owned
+package directories and expands every Python module recursively, rejects
+overlapping entries, and automatically includes newly added modules. All of
+`shared/chromie_contracts/` is selected as one package; the stable Host settings
+and playback/input lifecycle boundaries remain independently selected files.
+Focused tests prove package expansion and automatic inclusion. The restricted
+archive environment does not contain the pinned Mypy executable, so this note
+does not claim the strict package gate ran here; the canonical dependency
+environment and the next complete runtime package remain open.
 
 ### Problem
 
@@ -828,7 +858,17 @@ runtime seams created by decomposition.
 
 ## Issue: Reduce the Current Documentation Surface
 
-Status: queued
+Status: consolidation slice landed; remaining specialized-document ownership audit open
+
+Implementation note (2026-08-02): eight overlapping trace, event, lifecycle,
+and recovery documents were consolidated into `RUNTIME_OBSERVABILITY.md` and
+`RUNTIME_OBSERVABILITY_OPERATIONS.md`. Three dated in-tree archives were removed
+after current facts and references were retained; Git history remains the
+historical authority. The tree decreased from 125 to 116 Markdown files and
+from 80 to 73 files directly under `docs/`; the core reading path is 14
+documents. File/core-path ratchets and authority/link checks are now enforced.
+The remaining specialized-document entrypoint/mechanical-contract audit and
+further prose reduction remain open.
 
 ### Problem
 

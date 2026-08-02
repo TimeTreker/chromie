@@ -282,6 +282,73 @@ def validate_profile(
         )
 
 
+def resolve_operator_mode(local: Mapping[str, str]) -> str:
+    process_value = os.environ.get("CHROMIE_OPERATOR_MODE", "").strip()
+    local_value = local.get("CHROMIE_OPERATOR_MODE", "").strip()
+    if process_value and local_value and process_value != local_value:
+        raise ConfigurationError(
+            "CHROMIE_OPERATOR_MODE differs between the process environment and .env.local"
+        )
+    value = process_value or local_value or "speech"
+    if not re.fullmatch(r"[a-z0-9_]+", value):
+        raise ConfigurationError(f"invalid operator mode name: {value!r}")
+    return value
+
+
+def validate_operator_mode(
+    mode_name: str,
+    mode_path: Path,
+    mode: Mapping[str, str],
+) -> None:
+    declared = mode.get("CHROMIE_OPERATOR_MODE", "")
+    if declared != mode_name:
+        raise ConfigurationError(
+            f"{mode_path} declares CHROMIE_OPERATOR_MODE={declared!r}; "
+            f"expected {mode_name!r}"
+        )
+    required = {
+        "ORCH_ENABLE_AGENT",
+        "ORCH_ENABLE_INTERACTION_RESPONSE",
+        "ORCH_ENABLE_SORIDORMI_SKILLS",
+        "ORCH_COGNITIVE_RUNTIME_MODE",
+        "ORCH_COGNITIVE_APPLY_LANES",
+        "ORCH_ACTION_DRY_RUN",
+        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
+    }
+    missing = sorted(required - set(mode))
+    if missing:
+        raise ConfigurationError(
+            f"operator mode {mode_path} is incomplete; missing: {', '.join(missing)}"
+        )
+    if mode["ORCH_COGNITIVE_RUNTIME_MODE"] != "apply":
+        raise ConfigurationError(
+            f"operator mode {mode_name} must use ORCH_COGNITIVE_RUNTIME_MODE=apply"
+        )
+    if enabled(mode.get("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED")):
+        raise ConfigurationError(
+            f"operator mode {mode_name} cannot enable legacy direct-LLM fallback"
+        )
+    lanes = {
+        item.strip()
+        for item in mode["ORCH_COGNITIVE_APPLY_LANES"].split(",")
+        if item.strip()
+    }
+    if not {"chat", "tool"}.issubset(lanes):
+        raise ConfigurationError(
+            f"operator mode {mode_name} must retain chat and tool apply lanes"
+        )
+    soridormi_enabled = enabled(mode.get("ORCH_ENABLE_SORIDORMI_SKILLS"))
+    if "robot_action" in lanes and not soridormi_enabled:
+        raise ConfigurationError(
+            f"operator mode {mode_name} cannot enable robot_action without "
+            "ORCH_ENABLE_SORIDORMI_SKILLS=1"
+        )
+    if soridormi_enabled and "robot_action" not in lanes:
+        raise ConfigurationError(
+            f"operator mode {mode_name} enables Soridormi but omits robot_action"
+        )
+
+
 def resolve_validation_profile(local: Mapping[str, str]) -> str:
     process_value = os.environ.get("CHROMIE_VALIDATION_PROFILE", "").strip()
     local_value = local.get("CHROMIE_VALIDATION_PROFILE", "").strip()
@@ -300,15 +367,20 @@ def merge_runtime_environment(
     system_info: Mapping[str, str],
     common: Mapping[str, str],
     profile: Mapping[str, str],
+    mode: Mapping[str, str],
     validation: Mapping[str, str],
     local: Mapping[str, str],
     profile_name: str,
+    operator_mode: str,
     validation_profile: str,
     system_info_path: Path,
     strict_local_conflicts: bool,
 ) -> tuple[OrderedDict[str, str], dict[str, str], list[str]]:
-    profile_owned_local = (set(profile) | set(validation) | IDENTITY_KEYS) & set(local)
+    profile_owned_local = (
+        set(profile) | set(mode) | set(validation) | IDENTITY_KEYS
+    ) & set(local)
     profile_owned_local.discard("CHROMIE_VALIDATION_PROFILE")
+    profile_owned_local.discard("CHROMIE_OPERATOR_MODE")
     ignored_local_overrides = sorted(profile_owned_local)
     if ignored_local_overrides and strict_local_conflicts:
         keys = ", ".join(ignored_local_overrides)
@@ -335,12 +407,15 @@ def merge_runtime_environment(
     apply("system_info", system_info)
     apply("common", common)
     apply(f"profile:{profile_name}", profile)
+    apply(f"mode:{operator_mode}", mode)
     if validation:
         apply(f"validation:{validation_profile}", validation)
     apply("local", allowed_local)
 
     resolved["CHROMIE_ACTIVE_PROFILE"] = profile_name
     provenance["CHROMIE_ACTIVE_PROFILE"] = "generator"
+    resolved["CHROMIE_OPERATOR_MODE"] = operator_mode
+    provenance["CHROMIE_OPERATOR_MODE"] = f"mode:{operator_mode}"
     resolved["CHROMIE_ACTIVE_VALIDATION_PROFILE"] = validation_profile or "none"
     provenance["CHROMIE_ACTIVE_VALIDATION_PROFILE"] = "generator"
     resolved["CHROMIE_SYSTEM_INFO_FILE"] = str(system_info_path)
@@ -354,10 +429,12 @@ def runtime_fingerprint(
     resolved: Mapping[str, str],
     *,
     profile_name: str,
+    operator_mode: str,
     validation_profile: str,
 ) -> str:
     payload = {
         "profile": profile_name,
+        "operator_mode": operator_mode,
         "validation_profile": validation_profile or "none",
         "values": dict(sorted(resolved.items())),
     }
@@ -414,7 +491,7 @@ def render_env(values: Mapping[str, str], provenance: Mapping[str, str]) -> str:
     lines = [
         "# Generated by scripts/generate_runtime_env.py",
         "# Do not edit. Hardware is detected automatically on every supported build/start.",
-        "# Edit .env.common, env/profiles/*.env, env/validation/*.env, or allowed .env.local keys.",
+        "# Edit .env.common, env/profiles/*.env, env/modes/*.env, env/validation/*.env, or allowed .env.local keys.",
         "",
     ]
     grouped: OrderedDict[str, list[str]] = OrderedDict()
@@ -445,19 +522,25 @@ def generate(root: Path, *, supplied_system_info: Path | None = None) -> dict[st
     common = parse_env_file(common_path)
     profile = parse_env_file(profile_path)
     local = parse_env_file(local_path, required=False)
+    operator_mode = resolve_operator_mode(local)
+    mode_path = root / "env" / "modes" / f"{operator_mode}.env"
+    mode = parse_env_file(mode_path)
     validation_profile = resolve_validation_profile(local)
     validation_path = root / "env" / "validation" / f"{validation_profile}.env"
     validation = parse_env_file(validation_path) if validation_profile else OrderedDict()
 
     validate_profile(profile_name, profile_path, profile, system_info)
+    validate_operator_mode(operator_mode, mode_path, mode)
     strict_local_conflicts = enabled(os.environ.get("CHROMIE_ENV_STRICT"))
     resolved, provenance, ignored_local_overrides = merge_runtime_environment(
         system_info=system_info,
         common=common,
         profile=profile,
+        mode=mode,
         validation=validation,
         local=local,
         profile_name=profile_name,
+        operator_mode=operator_mode,
         validation_profile=validation_profile,
         system_info_path=Path(".chromie/system_info.env"),
         strict_local_conflicts=strict_local_conflicts,
@@ -465,6 +548,7 @@ def generate(root: Path, *, supplied_system_info: Path | None = None) -> dict[st
     fingerprint = runtime_fingerprint(
         resolved,
         profile_name=profile_name,
+        operator_mode=operator_mode,
         validation_profile=validation_profile,
     )
     resolved["CHROMIE_RUNTIME_ENV_FINGERPRINT"] = fingerprint
@@ -488,11 +572,13 @@ def generate(root: Path, *, supplied_system_info: Path | None = None) -> dict[st
 
     models = active_models(resolved)
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "active_profile": profile_name,
+        "active_operator_mode": operator_mode,
         "active_validation_profile": validation_profile or "none",
         "fingerprint": fingerprint,
         "profile_file": str(profile_path.relative_to(root)),
+        "mode_file": str(mode_path.relative_to(root)),
         "system_info_file": ".chromie/system_info.env",
         "hardware": {key: system_info.get(key, "") for key in system_info},
         "models": {key: resolved[key] for key in MODEL_PLAN_KEYS},
@@ -548,6 +634,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(models, dict):
         raise ConfigurationError("generated manifest models must be an object")
     print(f"[env] Auto-detected hardware profile: {manifest['active_profile']}")
+    print(f"[env] Operator mode: {manifest['active_operator_mode']}")
     print(
         "[env] Model plan: "
         f"gateway_attention={models['AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL']} "

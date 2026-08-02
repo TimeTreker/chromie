@@ -103,6 +103,13 @@ and keep both emergency gates off during normal operation.
 
 The maintained launcher and common profiles set both gates to `0`.
 
+The Host's older direct-LLM response path is governed by the Orchestrator gate
+as the same rollback class, but it is additionally blocked for any route already
+inside a maintained Goal-driven `apply` lane. Repository structure policy permits
+only one caller, `_launch_direct_llm_compatibility_or_fail_closed`; normal Agent
+failure uses bounded Host-owned failure facts and does not create a second
+semantic answer authority.
+
 ## Disabled lanes versus failed authoritative turns
 
 In the current compatibility topology, the Orchestrator first maps Goal Interpreter

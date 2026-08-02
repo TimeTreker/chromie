@@ -40,21 +40,10 @@ A passing unit test does not establish target validation or release readiness.
 
 ## Historical material
 
-Historical archives are preserved for investigation and provenance, but every
-archive must state:
-
-```text
-Status: historical archive; not current authority
-```
-
-Current archives are indexed from [Documentation Index](README.md). They must not
-be cited as the owner of current architecture, status, or delivery order.
-
-The current registry still contains three 2026-07-30 archives. Their removal
-from the working tree is queued under
-[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
-after current facts and Git-history provenance are verified. Until then they
-remain explicitly non-authoritative.
+Detailed historical narrative belongs in Git history after current facts have
+been consolidated into their owners. In-tree historical archives are not part
+of the maintained documentation surface and must not be cited as current
+authority.
 
 ## Mechanical governance
 
@@ -63,7 +52,7 @@ remain explicitly non-authoritative.
 
 - required authority roles are present once;
 - paths are repository-local and exist;
-- historical archives carry the non-authoritative marker;
+- historical narrative is removed from the working tree after consolidation;
 - concise owner documents remain within reviewed line limits;
 - every maintained Markdown file is indexed;
 - current-focus, link, API, configuration, and reproducibility checks still pass.

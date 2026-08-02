@@ -12,6 +12,7 @@ Docker/runtime configuration is generated as:
 fresh system snapshot
   + .env.common
   + env/profiles/<auto-detected-profile>.env
+  + env/modes/<selected-operator-mode>.env
   + optional env/validation/<selected-validation>.env
   + allowed keys from .env.local
   -> .env.runtime
@@ -47,6 +48,28 @@ runtime environment is always loaded:
 Plain `docker compose ...` also works after `scripts/build_runtime_env.sh` has
 generated the root `.env`, but the wrapper is still preferred because it always
 uses the intended Compose file and runtime env explicitly.
+
+## Maintained operator modes
+
+`CHROMIE_OPERATOR_MODE` selects one complete, source-controlled operator
+combination. Launchers choose the normal mode automatically; setting the variable
+is mainly useful for diagnostics and supervised automation. Mode-owned values
+cannot be replaced from `.env.local`.
+
+| Mode | Default launcher | Scope |
+|---|---|---|
+| `services` | `scripts/start_services.sh` | Docker services and non-embodied chat/tool apply lanes; no Soridormi skills. |
+| `speech` | `scripts/start_orchestrator.sh` | Microphone, conversation, and safe-read tools without embodied skills. |
+| `voice_mujoco` | `scripts/start_chromie.sh` and the voice-to-MuJoCo wrapper | Full maintained voice plus Soridormi/MuJoCo apply lanes; action execution remains dry-run unless an acceptance profile explicitly owns otherwise. |
+| `qualification` | `scripts/run_target_evidence_closure.py` | Source-bound acceptance with timing and cognitive evidence enabled. |
+
+Every maintained mode keeps Goal-driven `apply`, disables the legacy direct-LLM
+semantic fallback, and declares its complete chat/tool/robot-action lane set.
+Contradictory mode files fail during runtime-environment generation. The generated
+`.chromie/runtime_profile.json` records `active_operator_mode` and `mode_file`.
+The machine-readable public/configuration classification is owned by
+[`config/runtime_configuration_surface.json`](../config/runtime_configuration_surface.json)
+and its generated inventory.
 
 ## Reproducible build and model identity
 
@@ -351,7 +374,7 @@ canonical plan copy, and its fingerprint remain host-owned.
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
 | `ORCH_COGNITIVE_APPLY_LANES` | `chat,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,robot_action,tool`. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the Goal Interpreter effect envelope, and every executable step still requires a trusted provider. Disabled-lane and route-effect escalation fail closed without entering the legacy planner. |
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
-| `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; host-side emergency compatibility gate. It can create a legacy CapabilityAgent authority claim only on a turn that has not entered authoritative Goal-driven processing. |
+| `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; explicit rollback-only direct-LLM/legacy CapabilityAgent compatibility gate. Every maintained operator mode sets `0`. Even when manually enabled, it cannot take authority for a route already inside a Goal-driven `apply` lane. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
 | `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
@@ -525,8 +548,8 @@ active-trace checkpoint recovery, latency/sampling retention policy, and
 retained-trace latency report/gate tooling. Coverage remains partial until real
 simulator/hardware baselines and approved environment-specific thresholds are
 retained. See
-[Runtime Trace Contract](RUNTIME_TRACE.md),
-[Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md), and
+[Runtime Trace Contract](RUNTIME_OBSERVABILITY.md),
+[Runtime Trace Instrumentation Guide](RUNTIME_OBSERVABILITY_OPERATIONS.md), and
 [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).
 
 ## Agent and TaskGraph
