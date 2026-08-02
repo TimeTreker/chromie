@@ -185,10 +185,10 @@ Issue must refresh its own baseline because counts may change.
 | Restore Canonical Local Gate Reproducibility | implemented and automatically verified | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
 | Retain a Current-Revision Live Voice Loop | implementation verified; physical target validation deferred | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on a microphone-equipped host. |
 | Close Current-Revision Target Evidence | **active** | canonical gate and live-voice verifier implementation, satisfied; physical voice is optional for this profile | Retain and review the complete default source-bound evidence profile before structural work. |
-| Reduce Time to First Grounded Response | implementation slice landed; qualification and remaining scope open | target-evidence closure | Planless direct spoken-response composition now bypasses Fast/Deep Planner under a typed contract; retained latency/result-delivery evidence and the remaining scope are still open. |
-| Classify Broad Runtime Exception Boundaries | implementation slice landed; classification review open | grounded-response latency Issue | A symbol-level checked inventory now rejects new, missing, or stale broad handlers; deeper narrowing and retained failure evidence remain open. |
-| Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
-| Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
+| Reduce Time to First Grounded Response | source implementation complete; target latency/shared-load qualification deferred | target-evidence closure | Direct spoken-response composition bypasses unnecessary planners, planner Skill choices are reused downstream, and ordinary overlapping results deliver exactly once without weakening cancellation. |
+| Classify Broad Runtime Exception Boundaries | source classification complete; retained live failure evidence deferred | grounded-response latency Issue | Every maintained broad handler is bound to a symbol, ordinal, normalized-body digest, owner, failure contract, and reviewed class; drift fails closed. |
+| Establish Typed Host Configuration Snapshots | source implementation complete; live startup proof deferred | broad-exception classification | Immutable Host settings own all maintained Orchestrator environment parsing, and generated ownership checks reject new direct reads. |
+| Extract Playback Delivery Lifecycle | source extraction complete; live first-PCM/audible evidence deferred | typed Host settings | Playback state, provider WebSocket I/O, ordered queue consumption, resampling, output writes, and stream lifecycle have one collaborator behind ratcheted Host delegation. |
 | Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
 | Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 450 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
 | Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
@@ -216,13 +216,13 @@ is still the correct priority.
 
 ## Program status
 
-The first-intake implementation Issues and the canonical local-gate repair are
-closed with automatic verification. The active Issue is the default
-source-bound target-evidence closure. The user-visible grounded-response latency
-Issue is queued immediately after that closure and before structural work. This
-program does not imply release readiness or physical support; Gateway/Core,
-Social Attention, provider, audio, simulator, LAN, and physical claims remain
-owned by their qualification documents.
+The first-intake implementation Issues, canonical local-gate repair, and all
+source-verifiable sustainability implementation are complete. The active Issue
+remains the default source-bound target-evidence closure. A clean maintained
+environment must still execute the pinned Ruff/Mypy/full-suite gate, and target
+qualification still owns latency, Gateway/Core, Social Attention, provider,
+audio, simulator, LAN, and physical claims. This program does not imply release
+readiness or physical support.
 
 ## Issue: Restore Canonical Local Gate Reproducibility
 

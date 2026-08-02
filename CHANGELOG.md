@@ -37,6 +37,7 @@ This file records notable current changes. Detailed earlier development history 
 - Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
 - Closed specialized-document ownership: the index no longer counts as an owner, component entrypoints form a checked reachability graph, and package documents require declared mechanical contracts.
 - Added revision-bound source qualification reports that fail closed on dirty source, failed gates, or unavailable pinned static tools and explicitly exclude all target/hardware claims.
+- Closed the source-only sustainability backlog; remaining gates are clean dependency-environment execution and explicit target/hardware qualification, never inferred from source checks.
 - Replaced 37 lifecycle property methods with delegated state aliases, reducing `VoiceAssistant` from 221 to 187 methods and 19 to one property.
 - Confined the direct-LLM call to one rollback owner; maintained apply lanes use bounded fail-closed speech after Agent failure.
 

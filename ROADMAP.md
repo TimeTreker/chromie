@@ -57,29 +57,16 @@ require physical voice or robot evidence.
 Only after that evidence closes, qualify and finish one semantic Issue at a time.
 The 2026-08-02 archive implementation lands bounded, automatically tested slices
 for the first five items below and the next source-verifiable sustainability
-batch. It does not close the active evidence Issue, requalify the target, or
-claim the later Issues' full exit criteria:
+batch. All source-verifiable sustainability implementation is now complete:
+grounded direct responses, overlapping result delivery, exact exception review,
+typed Host/service configuration, playback/input extraction, maintained modes,
+package-owned typing scope, specialized documentation ownership, and
+revision-bound source qualification reporting are implemented and ratcheted.
 
-- reduce time to first grounded response without weakening validation or
-  evidence authority;
-- classify all broad runtime exception boundaries;
-- establish typed Host configuration snapshots;
-- extract playback delivery lifecycle;
-- extract input-turn and session lifecycle;
-- reduce supported configuration combinations around maintained profiles;
-- expand Mypy by owned package;
-- reduce the current documentation surface.
-
-Current source-verifiable progress also includes four complete operator modes
-with a generated configuration inventory, package-scoped shared-contract Mypy
-selection, observability-document consolidation, dated-archive removal,
-composition-root structure ratchets, and an explicit direct-LLM rollback gate.
-The maintained configuration aliases are removed, playback/input transport is
-extracted, and specialized-document ownership is mechanically closed. A
-revision-bound source qualification report now fails closed on dirty source,
-failed gates, or unavailable pinned static tools. Clean dependency-complete
-execution and target/hardware requalification remain under their dedicated
-closure workflows.
+The active evidence Issue is not closed. A clean maintained environment must
+still execute the pinned Ruff/Mypy/full-suite gate, and target qualification
+still owns response latency, shared-GPU load, Gateway/Core, Social Attention,
+provider, audio, simulator, LAN, robot, and release claims.
 
 Arbitrary file, method, boolean, or document counts are not substitute exit
 criteria. Every Issue refreshes its baseline, preserves public behavior and

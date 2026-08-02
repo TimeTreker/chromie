@@ -30,7 +30,7 @@ feasibility, collision safety, stop, and recovery.
 - Grounded external-information and weather Skill packages.
 - Loopback-only local service publication and repository policy gates.
 - Ruff, Mypy, test-ownership ratchets, and revision-bound source qualification reporting.
-- Typed ASR service settings and the first `VoiceAssistant` collaborator extraction.
+- Typed Agent/ASR/TTS/Host/shared-runtime settings and extracted playback/input lifecycle collaborators.
 - Consolidated documentation authority with mechanically checked specialized-document ownership.
 - Final core-principle audit closure: Host semantic delegation, phrase agents,
   catalog/action boosts, weather route repair, conversation phrase
