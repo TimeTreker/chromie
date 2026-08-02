@@ -85,6 +85,7 @@ from orchestrator.runtime.fast_first_audio import (
 )
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
+from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
@@ -6561,11 +6562,12 @@ class VoiceAssistant:
         response: InteractionResponse,
         *,
         session_id: str | None,
+        detached_delivery: bool = False,
     ) -> str:
         try:
             execution = await self.interaction_runtime.execute(
                 response,
-                session_id=session_id,
+                session_id=None if detached_delivery else session_id,
             )
         except asyncio.CancelledError:
             raise
@@ -6830,10 +6832,23 @@ class VoiceAssistant:
             len(bundle.evidence),
         )
 
-        if self._outcome_response_is_stale(
+        stale_outcome = self._outcome_response_is_stale(
             generation=generation,
             session_id=session_id,
-        ):
+        )
+        current_session_id = self.session_id
+        outcome_delivery = build_host_outcome_delivery(self)
+        defer_for_ordinary_overlap = (
+            stale_outcome
+            and outcome_delivery.is_ordinary_overlap(
+                origin_session_id=session_id,
+                current_session_id=current_session_id,
+                generation_changed=(generation != self.playback_generation),
+                execution_status=str(execution.status),
+                aggregate_status=str(bundle.aggregate_status),
+            )
+        )
+        if stale_outcome and not defer_for_ordinary_overlap:
             self.session_log(
                 session_id,
                 "cognitive_outcome_response_suppressed: reason=stale_turn",
@@ -6847,6 +6862,12 @@ class VoiceAssistant:
                 goal_state_results=goal_state_results,
             )
             return "suppressed_stale"
+        if defer_for_ordinary_overlap:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_deferred: reason=ordinary_overlap current_sid=%s",
+                current_session_id,
+            )
         if suppress_final_reason is not None:
             self._record_cognitive_outcome_evidence(
                 bundle,
@@ -6975,9 +6996,73 @@ class VoiceAssistant:
             )
             return "composition_failed"
 
+        detached_delivery = False
+        if defer_for_ordinary_overlap:
+            goal_ids = tuple(
+                str(item.goal_id)
+                for item in bundle.goal_outcomes
+                if str(item.goal_id or "").strip()
+            )
+            window = await outcome_delivery.wait_for_window(
+                origin_session_id=str(session_id),
+                source_goal_ids=goal_ids,
+                timeout_s=max(
+                    5.0,
+                    min(
+                        120.0,
+                        float(
+                            getattr(
+                                getattr(
+                                    getattr(self, "host_settings", None),
+                                    "session",
+                                    None,
+                                ),
+                                "idle_timeout_ms",
+                                120000.0,
+                            )
+                        )
+                        / 1000.0,
+                    ),
+                ),
+            )
+            if window.status != "ready":
+                suppression_reason = (
+                    "goal_invalidated_before_deferred_delivery"
+                    if window.status == "goal_invalidated"
+                    else "ordinary_overlap_delivery_timeout"
+                )
+                self.session_log(
+                    session_id,
+                    "cognitive_outcome_response_suppressed: reason=%s waited_for=%s",
+                    suppression_reason,
+                    ",".join(window.waited_for_session_ids),
+                )
+                self._record_cognitive_outcome_evidence(
+                    bundle,
+                    session_id=session_id,
+                    final_response=None,
+                    delivery_status="suppressed",
+                    suppression_reason=suppression_reason,
+                    goal_state_results=goal_state_results,
+                )
+                return f"suppressed_{window.status}"
+            detached_delivery = True
+            final_response.metadata["deferred_outcome_delivery"] = {
+                "reason": "ordinary_overlap",
+                "origin_session_id": session_id,
+                "waited_for_session_ids": list(window.waited_for_session_ids),
+                "source_goal_ids": list(goal_ids),
+            }
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_delivery_ready: reason=ordinary_overlap waited_for=%s",
+                ",".join(window.waited_for_session_ids),
+            )
+
         delivery_status = await self._execute_cognitive_outcome_response(
             final_response,
             session_id=session_id,
+            detached_delivery=detached_delivery,
         )
         response.metadata["post_execution_response"] = final_response.model_dump(
             mode="json"

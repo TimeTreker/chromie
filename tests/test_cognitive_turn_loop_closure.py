@@ -142,6 +142,7 @@ class _Runtime:
         self.first_result = first_result
         self.on_first_execute = on_first_execute
         self.calls: list[InteractionResponse] = []
+        self.session_ids: list[str | None] = []
         self.soridormi_invoker = None
         self._definitions = {
             skill_id: SkillDefinition(
@@ -162,7 +163,8 @@ class _Runtime:
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
-        del session_id, confirmed_request_ids
+        del confirmed_request_ids
+        self.session_ids.append(session_id)
         self.calls.append(response)
         if len(self.calls) == 1:
             if self.on_first_execute is not None:
@@ -281,6 +283,9 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.interaction_runtime = runtime
         assistant.playback_generation = 4
+        assistant.playback_queue = asyncio.Queue()
+        assistant.active_synthesis_tasks = set()
+        assistant.is_playing_audio = False
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.conversation_state = ConversationStateManager(
@@ -498,6 +503,66 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(evidence.outcomes[0]["delivery_status"], "suppressed")
         self.assertEqual(evidence.outcomes[0]["suppression_reason"], "stale_turn")
+
+    async def test_completed_ordinary_overlap_delivers_after_newer_turn_finishes(self) -> None:
+        plan = _plan()
+        response = _response(plan)
+        assistant_ref: dict[str, VoiceAssistant] = {}
+        newer_session: dict[str, str] = {}
+
+        def make_overlap() -> None:
+            assistant = assistant_ref["assistant"]
+            assistant.playback_generation += 1
+            sid = assistant.sessions.create()
+            newer_session["sid"] = sid
+
+            async def finish_newer_turn() -> None:
+                await asyncio.sleep(0.01)
+                assistant.sessions.state[sid]["done_logged"] = True
+
+            asyncio.create_task(finish_newer_turn())
+
+        runtime = _Runtime(
+            SkillRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+                results=[
+                    SkillResult(
+                        request_id="request-first",
+                        skill_id="chromie.test.first",
+                        status="completed",
+                    ),
+                    SkillResult(
+                        request_id="request-second",
+                        skill_id="chromie.test.second",
+                        status="completed",
+                    ),
+                ],
+            ),
+            on_first_execute=make_overlap,
+        )
+        assistant, session_id, evidence = self._assistant(runtime, response)
+        assistant_ref["assistant"] = assistant
+
+        await assistant.execute_interaction_response(
+            response,
+            session_id,
+            reset_playback=False,
+        )
+
+        self.assertEqual(len(runtime.calls), 2)
+        self.assertEqual(runtime.session_ids, [session_id, None])
+        self.assertEqual(
+            response.metadata["cognitive_turn_closure_status"],
+            "speech_runtime_completed",
+        )
+        deferred = response.metadata["post_execution_response"]["metadata"][
+            "deferred_outcome_delivery"
+        ]
+        self.assertEqual(deferred["reason"], "ordinary_overlap")
+        self.assertEqual(deferred["waited_for_session_ids"], [newer_session["sid"]])
+        self.assertEqual(evidence.outcomes[0]["delivery_status"], "speech_runtime_completed")
+        self.assertEqual(evidence.outcomes[0]["suppression_reason"], "")
 
     async def test_exception_before_results_becomes_not_run_and_gets_safe_final(self) -> None:
         plan = _plan()

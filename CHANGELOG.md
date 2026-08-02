@@ -33,7 +33,7 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
-
+- Preserved completed evidence-bound results across newer ordinary turns with a non-interrupting delivery window; explicit cancellation and supersession still suppress late speech.
 - Reused exact planner-authored Agent Skill selections for Response Composer and Tool Result Interpreter after validating Plan provenance, avoiding redundant downstream selection model calls without adding Host semantic choice.
 - Added immutable model-generation Host settings for direct response, bounded failure speech, and runtime-ready greetings; turn-time environment reparsing was removed from those paths.
 - Removed the `CONDA_ENV_NAME` compatibility alias in favor of `CHROMIE_CONDA_ENV`, reducing the generated configuration inventory to 433 keys and one bounded alias.

@@ -405,19 +405,21 @@ Status: **active**; the default profile does not require physical voice evidence
 
 ## Issue: Reduce Time to First Grounded Response
 
-Status: implementation slice landed; qualification and remaining scope open; depends on **Close Current-Revision Target Evidence**
+Status: source implementation complete; latency qualification and shared-load evidence remain open; depends on **Close Current-Revision Target Evidence**
 
 Implementation note (2026-08-02): a typed direct-response composition branch now
 lets a validated, non-effectful `spoken_response` Goal proceed from Goal
 Association to Response Composer without invoking Fast or Deep Planner. The LLM
-still authors the response and the Host still validates goal correlation,
-coverage, commitment, and completion claims. Downstream Response Composer and
-Tool Result Interpreter stages now also reuse the exact planner-authored Agent
-Skill selection after validating its immutable Plan provenance against the
-owner-approved registry, removing two repeated selection model calls without
-letting the Host choose a method. Retained warm/cold latency evidence,
-ordinary-result rescheduling, further model-call reduction, and the other exit
-criteria remain open.
+still authors the response and the Host validates goal correlation, coverage,
+commitment, and completion claims. Downstream Response Composer and Tool Result
+Interpreter stages reuse the exact planner-authored Agent Skill selection after
+validating immutable Plan provenance. Completed earlier safe-read results now
+distinguish ordinary overlap from explicit output invalidation: they wait for
+the newer foreground turn and output queue to become idle, re-check
+cancellation/supersession, and then deliver once through the normal
+evidence-bound response path. Generation-only invalidation and cancelled
+execution remain suppressive. Retained warm/cold latency and shared-load
+qualification remain open.
 
 ### Problem
 
