@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
 from .runtime_trace import TraceModule
+from .settings import RuntimePolicySettings
 
 ACCELERATOR_SAMPLE_MODULE = TraceModule(
     name="chromie.runtime.accelerator",
@@ -39,21 +40,6 @@ _NVIDIA_FIELDS = (
     "power.draw",
 )
 
-
-def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
-    try:
-        value = int(str(os.getenv(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
-
-
-def _env_float(name: str, default: float, minimum: float, maximum: float) -> float:
-    try:
-        value = float(str(os.getenv(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
 
 
 def _optional_number(value: Any, *, integer: bool = False) -> int | float | None:
@@ -227,24 +213,12 @@ class AcceleratorTelemetryConfig:
 
     @classmethod
     def from_env(cls) -> "AcceleratorTelemetryConfig":
-        mode = str(
-            os.getenv("CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING", "off")
-        ).strip().lower()
-        provider = str(
-            os.getenv("CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER", "auto")
-        ).strip().lower()
+        settings = RuntimePolicySettings.from_env()
         return cls(
-            mode=mode if mode in _VALID_MODES else "off",
-            provider=provider if provider in _VALID_PROVIDERS else "auto",
-            timeout_ms=_env_int(
-                "CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS", 1000, 50, 30000
-            ),
-            min_interval_s=_env_float(
-                "CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S",
-                5.0,
-                0.0,
-                3600.0,
-            ),
+            mode=settings.accelerator_sampling_mode,
+            provider=settings.accelerator_provider,
+            timeout_ms=settings.accelerator_timeout_ms,
+            min_interval_s=settings.accelerator_min_interval_s,
         )
 
 

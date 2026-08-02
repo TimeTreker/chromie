@@ -24,7 +24,7 @@ environment variable independently. This boundary does not change hardware
 profile precedence and does not move owner-editable identity or personality into
 Python defaults.
 
-## Migrated boundaries: Agent, ASR, and TTS
+## Source-complete typed boundaries
 
 `asr.settings.ASRServiceSettings` owns the complete maintained ASR service
 environment surface. It provides:
@@ -55,36 +55,25 @@ expansion consume typed snapshots or explicitly supplied standalone settings.
 Maintained startup passes the same Agent snapshot into every model and provider
 client; compatibility factories remain only for isolated callers and tests.
 
+`shared.chromie_runtime.settings.RuntimePolicySettings` owns narrow tracing,
+retention, checkpoint, resource, accelerator, event-path, and CLI-color policy.
+Trace, event, resource, accelerator, and logging helpers no longer parse process
+environment independently. Each call receives one typed policy snapshot; this
+does not create a global settings object spanning services.
 
-## Continuation objective
 
-The Agent, ASR, and TTS migrations are proven slices, not closure of the configuration
-problem. The current archive still contains about 276 distinct environment keys
-read directly by maintained runtime sources. Before changing names, inventory
-each key as profile authority, service setting, operator override, diagnostics,
-experiment, or stale compatibility. Ordinary behavior should be composed from a
-small set of orthogonal profile axes rather than freely combined Boolean flags.
+## Closure and remaining evidence
 
-Shared-runtime policy migration remains source work. Each migrated service
-must delete duplicate parsing and obsolete keys instead of adding another
-compatibility layer indefinitely. Live startup proof remains target evidence.
+The Agent, ASR, TTS, maintained Host, and shared-runtime policy boundaries are
+source-complete and mechanically enforced by
+`scripts/check_service_configuration_ownership.py`. The generated configuration
+inventory classifies 450 keys across profiles, validation overrides, service
+internals, and the eight public choices; no compatibility aliases remain.
 
-## Remaining migration map
+Standalone factories retained for focused tests must still instantiate their
+own typed settings objects. Maintained service composition passes one startup
+snapshot inward. Physical startup, device behavior, provider loading, and
+profile-specific operational proof remain target evidence rather than source
+configuration work.
 
-The 2026-07-31 source audit found 295 distinct literal environment keys read by
-the maintained Orchestrator, Agent, ASR, TTS, and shared runtime Python, while
-the Configuration reference documents 321 keys. These counts mix public
-choices, profile-owned constants, service internals, acceptance overrides, and
-compatibility aliases. They are a baseline for classification, not a claim that
-every key is a supported operator switch.
-
-The remaining services keep their current behavior and are future ratchet work:
-
-| Boundary | Current concentration | Recommended next seam |
-|---|---|---|
-| Shared runtime | trace/resource modules | inject narrow typed policy values where repeated reads remain |
-
-Each future migration must be independently tested and must not become one global
-cross-service settings object. The source sequence now continues with narrow shared-runtime policy ownership.
-Physical startup and device proof remain in the target-evidence track. See
-[Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+See [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

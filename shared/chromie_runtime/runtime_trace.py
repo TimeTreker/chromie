@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Sequence
 
+from .settings import RuntimePolicySettings
+
 TRACE_SCHEMA_VERSION = 1
 TRACE_SUMMARY_SCHEMA_VERSION = 1
 TRACE_CARRIER_SCHEMA_VERSION = 1
@@ -52,36 +54,6 @@ def _token(value: Any, name: str) -> str:
         raise ValueError(f"{name} must not be empty")
     return text
 
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
-    try:
-        value = int(str(os.getenv(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
-
-
-def _env_float(name: str, default: float, minimum: float, maximum: float) -> float:
-    try:
-        value = float(str(os.getenv(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
-
-
-def _csv_env(name: str) -> frozenset[str]:
-    return frozenset(
-        item.strip()
-        for item in str(os.getenv(name) or "").split(",")
-        if item.strip()
-    )
 
 
 @dataclass(frozen=True)
@@ -158,42 +130,23 @@ class TracePolicy:
 
     @classmethod
     def from_env(cls, *, mode: str | None = None) -> "TracePolicy":
-        configured_mode = str(
-            mode if mode is not None else os.getenv("CHROMIE_RUNTIME_TRACE_MODE", "off")
-        ).strip().lower()
+        settings = RuntimePolicySettings.from_env()
+        configured_mode = str(mode if mode is not None else settings.trace_mode).strip().lower()
         if configured_mode not in _TRACE_MODES:
             configured_mode = "off"
         return cls(
             mode=configured_mode,
-            module_allowlist=_csv_env("CHROMIE_RUNTIME_TRACE_MODULES"),
-            debug_modules=_csv_env("CHROMIE_RUNTIME_TRACE_DEBUG_MODULES"),
-            max_items=_env_int("CHROMIE_RUNTIME_TRACE_MAX_ITEMS", 1000, 16, 10000),
-            max_attributes=_env_int(
-                "CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES", 32, 4, 256
-            ),
-            max_attribute_chars=_env_int(
-                "CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS", 512, 64, 8192
-            ),
-            emit_events=_env_bool("CHROMIE_RUNTIME_TRACE_EMIT_EVENTS", False),
-            event_sample_rate=_env_float(
-                "CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE", 1.0, 0.0, 1.0
-            ),
-            event_min_total_ms=_env_float(
-                "CHROMIE_RUNTIME_TRACE_EVENT_MIN_TOTAL_MS", 0.0, 0.0, 86400000.0
-            ),
-            event_min_first_observable_ms=_env_float(
-                "CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS",
-                0.0,
-                0.0,
-                86400000.0,
-            ),
-            event_always_emit_abandoned=_env_bool(
-                "CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED", True
-            ),
-            coverage=str(
-                os.getenv("CHROMIE_RUNTIME_TRACE_COVERAGE", "partial")
-            ).strip()
-            or "partial",
+            module_allowlist=settings.trace_modules,
+            debug_modules=settings.trace_debug_modules,
+            max_items=settings.trace_max_items,
+            max_attributes=settings.trace_max_attributes,
+            max_attribute_chars=settings.trace_max_attribute_chars,
+            emit_events=settings.trace_emit_events,
+            event_sample_rate=settings.trace_event_sample_rate,
+            event_min_total_ms=settings.trace_event_min_total_ms,
+            event_min_first_observable_ms=settings.trace_event_min_first_observable_ms,
+            event_always_emit_abandoned=settings.trace_event_always_emit_abandoned,
+            coverage=settings.trace_coverage,
         )
 
     def mode_for(self, module: TraceModule) -> str:
@@ -261,7 +214,7 @@ class TraceCheckpointStore:
     """Atomic active-trace checkpoints for process-restart recovery."""
 
     def __init__(self, root: str | Path | None = None) -> None:
-        raw = str(root or os.getenv("CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR") or "").strip()
+        raw = str(root or RuntimePolicySettings.from_env().trace_checkpoint_dir or "").strip()
         self.root = Path(raw).expanduser().resolve() if raw else None
         if self.root is not None:
             (self.root / "active").mkdir(parents=True, exist_ok=True)

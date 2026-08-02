@@ -70,7 +70,7 @@ def python_env_keys(path: Path) -> set[str]:
     except (OSError, SyntaxError):
         return set()
     keys: set[str] = set()
-    host_parsers = {"_raw", "_text", "_bool", "_int", "_float", "_choice", "_path", "_optional_int", "_optional_path", "_device", "_phrases"}
+    host_parsers = {"_raw", "_text", "_bool", "_boolean", "_int", "_integer", "_float", "_floating", "_csv", "_choice", "_path", "_optional_int", "_optional_path", "_device", "_phrases"}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
+
+from .settings import RuntimePolicySettings
 
 
 def colorize_for_cli(
@@ -20,17 +21,16 @@ def colorize_for_cli(
     selected env var is forced on.
     """
 
-    raw_mode = os.getenv(env_var)
-    if raw_mode is None and fallback_env_var:
-        raw_mode = os.getenv(fallback_env_var)
+    settings = RuntimePolicySettings.from_env()
+    raw_mode = settings.color_value(env_var, fallback_env_var)
     color_mode = (raw_mode or "auto").strip().lower()
     if color_mode in {"0", "false", "no", "off", "never"}:
         return line
     color_forced = color_mode in {"1", "true", "yes", "on", "always"}
-    if not color_forced and os.getenv("NO_COLOR"):
+    if not color_forced and settings.environment.get("NO_COLOR"):
         return line
     if not color_forced:
-        if not sys.stderr.isatty() or os.getenv("TERM", "").lower() == "dumb":
+        if not sys.stderr.isatty() or str(settings.environment.get("TERM", "")).lower() == "dumb":
             return line
     if level >= logging.ERROR:
         return f"\033[31m{line}\033[0m"

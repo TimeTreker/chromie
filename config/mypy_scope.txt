@@ -13,4 +13,5 @@ scripts/check_local_runtime_exposure.py
 scripts/check_service_configuration_ownership.py
 scripts/run_ruff.py
 shared/chromie_contracts
+shared/chromie_runtime/settings.py
 tts/settings.py

@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from .settings import RuntimePolicySettings
+
 RUNTIME_EVENT_SCHEMA_VERSION = 1
 RUNTIME_EVENT_TRIGGER_SCHEMA_VERSION = 1
 
@@ -41,7 +43,10 @@ def persist_runtime_event(
     normalized_subtype = _required_token(event_subtype, "event_subtype")
     normalized_severity = _required_token(severity, "severity")
     normalized_producer = _required_token(producer, "producer")
-    root = _configured_path(event_root, "CHROMIE_RUNTIME_EVENT_ROOT", "CHROMIE_EVENT_ROOT")
+    settings = RuntimePolicySettings.from_env()
+    root = settings.configured_path(
+        event_root, "runtime_event_root", "legacy_event_root"
+    )
     resolved_id = event_id or _event_id()
     timestamp = occurred_at or datetime.now(timezone.utc).isoformat()
     if root is None:
@@ -97,9 +102,9 @@ def persist_runtime_event(
         trigger_status = _notify_data_loop(
             ready=ready,
             manifest=manifest,
-            trigger_root=_configured_path(
+            trigger_root=settings.configured_path(
                 trigger_root,
-                "CHROMIE_DATA_LOOP_TRIGGER_ROOT",
+                "data_loop_trigger_root",
             ),
         )
         return _result(
@@ -195,15 +200,6 @@ def _event_id() -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     return f"evt_{stamp}_{uuid.uuid4().hex[:12]}"
 
-
-def _configured_path(value: str | Path | None, *env_names: str) -> Path | None:
-    raw = str(value or "").strip()
-    if not raw:
-        for env_name in env_names:
-            raw = str(os.getenv(env_name) or "").strip()
-            if raw:
-                break
-    return Path(raw).expanduser().resolve() if raw else None
 
 
 def _json_safe(value: Any) -> Any:

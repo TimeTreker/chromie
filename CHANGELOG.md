@@ -32,15 +32,14 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
-- Centralized Agent and Goal Interpreter configuration in `agent.app.settings`; model clients, weather, capability/conversation planners, manifest expansion, and diagnostics no longer parse environment values independently.
+- Centralized Agent, Goal Interpreter, and shared-runtime observability policy configuration; internal model, weather, capability, trace, event, resource, accelerator, and CLI-color helpers no longer parse environment values independently.
 - Added immutable TTS service settings for transport, provider, generation, worker, speaker, alignment, and immutable model-source configuration; maintained TTS modules no longer parse environment values independently.
 - Preserved completed evidence-bound results across newer ordinary turns with a non-interrupting delivery window; explicit cancellation and supersession still suppress late speech.
 - Reused exact planner-authored Agent Skill selections for Response Composer and Tool Result Interpreter after validating Plan provenance, avoiding redundant downstream selection model calls without adding Host semantic choice.
 - Added immutable model-generation Host settings for direct response, bounded failure speech, and runtime-ready greetings; turn-time environment reparsing was removed from those paths.
-- Removed the `CONDA_ENV_NAME` compatibility alias in favor of `CHROMIE_CONDA_ENV`, reducing the generated configuration inventory to 433 keys and one bounded alias.
 - Expanded package-owned Mypy scope to `orchestrator/runtime/cognitive_gateway_modules`; actual Mypy execution remains an environment gate.
 - Added four complete operator modes with generated manifest identity, contradiction checks, and legacy direct-LLM fallback disabled.
-- Added a generated 434-key ownership inventory: nine public choices, one public Boolean, two bounded aliases, and ratchets.
+- Ratcheted the generated ownership inventory at 450 keys, eight public choices, one public Boolean, and zero compatibility aliases.
 - Made `shared/chromie_contracts` package-scoped in Mypy so new modules enter automatically.
 - Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
 - Replaced 37 lifecycle property methods with delegated state aliases, reducing `VoiceAssistant` from 221 to 187 methods and 19 to one property.

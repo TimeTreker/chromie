@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .runtime_trace import TraceModule
+from .settings import RuntimePolicySettings
 
 RESOURCE_SAMPLE_MODULE = TraceModule(
     name="chromie.runtime.resources",
@@ -40,7 +41,7 @@ class SystemResourceSampler:
 
     @classmethod
     def from_env(cls) -> "SystemResourceSampler":
-        return cls(os.getenv("CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING", "off"))
+        return cls(RuntimePolicySettings.from_env().resource_sampling_mode)
 
     @property
     def enabled(self) -> bool:

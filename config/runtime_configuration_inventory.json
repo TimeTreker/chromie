@@ -1953,7 +1953,8 @@
       "category": "service_internal",
       "key": "CHROMIE_DATA_LOOP_TRIGGER_ROOT",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -1962,6 +1963,14 @@
       "key": "CHROMIE_ENV_STRICT",
       "owners": [
         "scripts/generate_runtime_env.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_EVENT_ROOT",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2064,7 +2073,8 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_EVENT_ROOT",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2072,7 +2082,8 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2081,7 +2092,7 @@
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER",
       "owners": [
         "orchestrator/runtime/host_settings.py",
-        "shared/chromie_runtime/accelerator_telemetry.py"
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2090,7 +2101,7 @@
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING",
       "owners": [
         "orchestrator/runtime/host_settings.py",
-        "shared/chromie_runtime/accelerator_telemetry.py"
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2098,7 +2109,8 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2106,7 +2118,7 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR",
       "owners": [
-        "shared/chromie_runtime/runtime_trace.py"
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2114,7 +2126,79 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_COVERAGE",
       "owners": [
-        "shared/chromie_runtime/runtime_trace.py"
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_DEBUG_MODULES",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_EMIT_EVENTS",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_EVENT_MIN_TOTAL_MS",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_MAX_ITEMS",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2122,7 +2206,15 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_TRACE_MODE",
       "owners": [
-        "shared/chromie_runtime/runtime_trace.py"
+        "shared/chromie_runtime/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "CHROMIE_RUNTIME_TRACE_MODULES",
+      "owners": [
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2131,7 +2223,7 @@
       "key": "CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING",
       "owners": [
         "orchestrator/runtime/host_settings.py",
-        "shared/chromie_runtime/resource_sampling.py"
+        "shared/chromie_runtime/settings.py"
       ]
     },
     {
@@ -2310,7 +2402,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "MIN_TTS_GENERATION_LENGTH",
       "owners": [
         "env/profiles/default.env",
@@ -2321,15 +2413,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "NO_COLOR",
-      "owners": [
-        "shared/chromie_runtime/log_colors.py"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
@@ -4078,14 +4163,6 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "TERM",
-      "owners": [
-        "shared/chromie_runtime/log_colors.py"
-      ]
-    },
-    {
       "boolean": true,
       "category": "profile_constant",
       "key": "TRANSFORMERS_OFFLINE",
@@ -4167,16 +4244,17 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CHUNK_MS",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CONTEXT_SIZE",
       "owners": [
         "docker-compose.yml",
@@ -4188,7 +4266,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
@@ -4289,11 +4368,12 @@
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_DETAILED_TIMING",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
@@ -4308,11 +4388,12 @@
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_GENERATION_RETRIES",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
@@ -4345,18 +4426,19 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_MAX_CONCURRENT_SYNTHESIS",
       "owners": [
         ".env.common",
         "docker-compose.yml",
         "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_MAX_LENGTH",
       "owners": [
         "docker-compose.yml",
@@ -4368,7 +4450,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
@@ -4387,25 +4470,28 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_METRICS_WINDOW",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_MIN_TEXT_CHARS",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
@@ -4428,7 +4514,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_N_BATCH",
       "owners": [
         "docker-compose.yml",
@@ -4440,16 +4526,26 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_N_GPU_LAYERS",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "TTS_PORT",
+      "owners": [
+        "tts/settings.py"
       ]
     },
     {
@@ -4483,21 +4579,23 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_REPETITION_PENALTY",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_RESET_LLAMA_STATE",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
@@ -4508,7 +4606,8 @@
         ".env.common",
         "docker-compose.yml",
         "orchestrator/runtime/host_settings.py",
-        "scripts/voice_acceptance.py"
+        "scripts/voice_acceptance.py",
+        "tts/settings.py"
       ]
     },
     {
@@ -4536,25 +4635,27 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_TEMPERATURE",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_THREADS",
       "owners": [
         "docker-compose.yml",
@@ -4566,7 +4667,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
@@ -4612,21 +4714,23 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_WORKER_COUNT",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_WORKER_STARTUP_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts/settings.py"
       ]
     },
     {
@@ -4667,12 +4771,12 @@
     "category_counts": {
       "acceptance_override": 57,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 163,
+      "profile_constant": 145,
       "public_choice": 9,
-      "service_internal": 211
+      "service_internal": 239
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 440
+    "total_keys": 450
   }
 }

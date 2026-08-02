@@ -28,6 +28,13 @@ class ServiceConfigurationOwnershipTests(unittest.TestCase):
             (root / "agent" / "app" / "worker.py").write_text(
                 "VALUE = 1\n", encoding="utf-8"
             )
+            (root / "shared" / "chromie_runtime").mkdir(parents=True)
+            (root / "shared" / "chromie_runtime" / "settings.py").write_text(
+                "import os\nVALUE = os.getenv('VALUE')\n", encoding="utf-8"
+            )
+            (root / "shared" / "chromie_runtime" / "worker.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
             (root / "tts" / "worker.py").write_text(
                 "import os\nVALUE = os.getenv('TTS_PORT')\n",
                 encoding="utf-8",

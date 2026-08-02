@@ -12,6 +12,7 @@ OWNERS = {
     "asr": ("asr", "asr/settings.py"),
     "tts": ("tts", "tts/settings.py"),
     "agent": ("agent/app", "agent/app/settings.py"),
+    "shared-runtime": ("shared/chromie_runtime", "shared/chromie_runtime/settings.py"),
 }
 
 
@@ -71,7 +72,7 @@ def main() -> int:
         for finding in findings:
             print(f"[service-config][error] {finding.path}:{finding.line}: {finding.message}")
         return 1
-    print("Service configuration ownership passed: Agent, ASR, and TTS own environment parsing")
+    print("Service configuration ownership passed: Agent, ASR, TTS, and shared runtime own environment parsing")
     return 0
 
 
