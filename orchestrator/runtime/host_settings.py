@@ -172,6 +172,23 @@ class CognitionSettings:
 
 
 @dataclass(frozen=True)
+class ModelGenerationSettings:
+    keep_alive: str
+    direct_num_ctx: int
+    direct_num_predict: int
+    direct_temperature: float
+    direct_top_p: float
+    prompt_chars_per_token_estimate: float
+    context_safety_margin_tokens: int
+    direct_require_complete_output: bool
+    failure_response_num_ctx: int
+    failure_response_num_predict: int
+    failure_response_timeout_ms: int
+    ready_greeting_fallback_model: str
+    ready_greeting_num_ctx: int
+
+
+@dataclass(frozen=True)
 class PlaybackSettings:
     tts_url: str
     output_mode: str
@@ -239,6 +256,7 @@ class EvidenceSettings:
 class HostSettingsSnapshot:
     audio_input: AudioInputSettings
     cognition: CognitionSettings
+    model_generation: ModelGenerationSettings
     playback: PlaybackSettings
     session: SessionLifecycleSettings
     evidence: EvidenceSettings
@@ -254,6 +272,12 @@ class HostSettingsSnapshot:
         ollama_model = _text(values, "OLLAMA_MODEL", "gemma4:e2b") or "gemma4:e2b"
         failure_model = (
             _text(values, "AGENT_RESPONSE_COMPOSER_MODEL", ollama_model)
+            or ollama_model
+        )
+        ollama_num_ctx = _int(values, "OLLAMA_NUM_CTX", 2048, minimum=512)
+        ready_greeting_fallback_model = (
+            _text(values, "AGENT_FAST_PLANNER_MODEL")
+            or _text(values, "AGENT_GOAL_INTERPRETER_MODEL")
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
@@ -586,6 +610,63 @@ class HostSettingsSnapshot:
                     "ORCH_SORIDORMI_MANIFEST",
                     "capabilities/soridormi.json",
                     project_root=project_root,
+                ),
+            ),
+            model_generation=ModelGenerationSettings(
+                keep_alive=_text(values, "OLLAMA_KEEP_ALIVE", "24h") or "24h",
+                direct_num_ctx=ollama_num_ctx,
+                direct_num_predict=_int(
+                    values, "OLLAMA_NUM_PREDICT", 96, minimum=1
+                ),
+                direct_temperature=_float(
+                    values,
+                    "OLLAMA_TEMPERATURE",
+                    0.4,
+                    minimum=0.0,
+                    maximum=2.0,
+                ),
+                direct_top_p=_float(
+                    values, "OLLAMA_TOP_P", 0.9, minimum=0.0, maximum=1.0
+                ),
+                prompt_chars_per_token_estimate=_float(
+                    values,
+                    "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
+                    2.0,
+                    minimum=0.1,
+                ),
+                context_safety_margin_tokens=_int(
+                    values,
+                    "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
+                    512,
+                    minimum=0,
+                ),
+                direct_require_complete_output=_bool(
+                    values, "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT", True
+                ),
+                failure_response_num_ctx=_int(
+                    values,
+                    "AGENT_RESPONSE_COMPOSER_NUM_CTX",
+                    8192,
+                    minimum=2048,
+                ),
+                failure_response_num_predict=_int(
+                    values,
+                    "AGENT_RESPONSE_COMPOSER_NUM_PREDICT",
+                    256,
+                    minimum=64,
+                ),
+                failure_response_timeout_ms=_int(
+                    values,
+                    "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
+                    4500,
+                    minimum=500,
+                ),
+                ready_greeting_fallback_model=ready_greeting_fallback_model,
+                ready_greeting_num_ctx=_int(
+                    values,
+                    "AGENT_FAST_PLANNER_NUM_CTX",
+                    ollama_num_ctx,
+                    minimum=512,
                 ),
             ),
             playback=playback,

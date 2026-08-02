@@ -6,8 +6,7 @@
     "ORCH_RUNTIME_OVERRIDE_"
   ],
   "compatibility_aliases": {
-    "AGENT_SOCIAL_ATTENTION_MODE": "CHROMIE_SOCIAL_ATTENTION_MODE",
-    "CONDA_ENV_NAME": "CHROMIE_CONDA_ENV"
+    "AGENT_SOCIAL_ATTENTION_MODE": "CHROMIE_SOCIAL_ATTENTION_MODE"
   },
   "maintained_modes": {
     "qualification": {
@@ -42,7 +41,7 @@
     "SORIDORMI_MCP_URL"
   ],
   "ratchets": {
-    "max_compatibility_aliases": 2,
+    "max_compatibility_aliases": 1,
     "max_public_boolean_choices": 1
   },
   "schema_version": "1.0"

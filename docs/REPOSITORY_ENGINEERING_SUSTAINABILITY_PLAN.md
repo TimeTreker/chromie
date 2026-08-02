@@ -190,8 +190,8 @@ Issue must refresh its own baseline because counts may change.
 | Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
 | Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
 | Extract Input Turn and Session Lifecycle | direct-LLM audit and structural ratchet slice landed; full ownership audit open | playback lifecycle | ASR, routed-turn, reflex, and pending-VAD task lifecycle have one collaborator. Maintained apply modes block the direct-LLM path; microphone/session-registry extraction and conversation-state audit remain open. |
-| Reduce Supported Configuration Combinations | implementation slice landed; deprecation/removal work open | typed Host settings and live proof | Four source-controlled operator modes, a generated 434-key ownership inventory, and public/alias ratchets define maintained combinations. Redundant-switch migration/removal remains open. |
-| Expand Mypy by Owned Package | contract-package slice landed; runtime-package expansion open | stable extracted boundaries | `shared/chromie_contracts` is package-scoped and new modules enter automatically; lifecycle seams remain individually scoped until a complete owned runtime package is clean. |
+| Reduce Supported Configuration Combinations | implementation slice landed; deprecation/removal work open | typed Host settings and live proof | Four source-controlled operator modes, a generated 433-key ownership inventory, and public/alias ratchets define maintained combinations. `CONDA_ENV_NAME` has been removed in favor of the single `CHROMIE_CONDA_ENV` owner, leaving one bounded compatibility alias. Further redundant-switch migration/removal remains open. |
+| Expand Mypy by Owned Package | contract-package slice landed; runtime-package expansion open | stable extracted boundaries | `shared/chromie_contracts` and `orchestrator/runtime/cognitive_gateway_modules` are package-scoped and new modules enter automatically; remaining runtime seams stay individually scoped until another complete owned package is clean. |
 | Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
 | Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
 
@@ -411,9 +411,13 @@ Implementation note (2026-08-02): a typed direct-response composition branch now
 lets a validated, non-effectful `spoken_response` Goal proceed from Goal
 Association to Response Composer without invoking Fast or Deep Planner. The LLM
 still authors the response and the Host still validates goal correlation,
-coverage, commitment, and completion claims. This lands the planless-direct
-slice only; retained warm/cold latency evidence, ordinary-result rescheduling,
-model-call reduction, and the other exit criteria remain open.
+coverage, commitment, and completion claims. Downstream Response Composer and
+Tool Result Interpreter stages now also reuse the exact planner-authored Agent
+Skill selection after validating its immutable Plan provenance against the
+owner-approved registry, removing two repeated selection model calls without
+letting the Host choose a method. Retained warm/cold latency evidence,
+ordinary-result rescheduling, further model-call reduction, and the other exit
+criteria remain open.
 
 ### Problem
 
@@ -604,12 +608,14 @@ that each one has a reviewed failure contract.
 Status: implementation slice landed; inventory completion and retained proof open
 
 Implementation note (2026-08-02): immutable typed startup groups now parse and
-validate the principal Host audio-input, cognition, playback/TTS, session, and
-evidence settings before `VoiceAssistant` composition. Existing attributes are
-projected from those groups for compatibility, and invalid migrated values name
-the owning variable and expected bound. Remaining dynamic/model-specific Host
-environment reads, the complete checked inventory, and generated configuration
-documentation remain open.
+validate the principal Host audio-input, cognition, playback/TTS, session,
+evidence, and model-generation settings before `VoiceAssistant` composition.
+Existing attributes are projected from those groups for compatibility, and
+invalid migrated values name the owning variable and expected bound. Direct
+response, bounded failure speech, and runtime-ready greeting paths no longer
+reparse model budgets during turns. Remaining Host environment reads, the
+complete checked inventory, and generated configuration documentation remain
+open.
 
 ### Problem
 
@@ -769,12 +775,14 @@ Implementation note (2026-08-02): four source-controlled operator modes now
 own complete maintained combinations for services, speech, voice plus MuJoCo,
 and qualification. The generated runtime manifest records the active mode and
 source file; mode contradictions fail before startup. A machine-generated
-inventory currently classifies 434 discovered keys into public choice, profile
+inventory currently classifies 433 discovered keys into public choice, profile
 constant, service internal, acceptance override, or bounded compatibility
 alias. The maintained public surface contains nine choices, one public Boolean,
-and two compatibility aliases, with ratchets and launcher/profile tests. This
-refreshes the old raw-read baseline but does not yet close the required
-deprecation warnings, migrations, or removals for redundant switches.
+and one compatibility alias, with ratchets and launcher/profile tests.
+`CONDA_ENV_NAME` has been removed; launchers and acceptance tools now use the
+single `CHROMIE_CONDA_ENV` owner. This refreshes the old raw-read baseline but
+does not yet close all required deprecation warnings, migrations, or removals
+for redundant switches.
 
 ### Problem
 
@@ -820,12 +828,14 @@ Status: contract-package slice landed; next complete runtime package and canonic
 Implementation note (2026-08-02): `config/mypy_scope.txt` now accepts owned
 package directories and expands every Python module recursively, rejects
 overlapping entries, and automatically includes newly added modules. All of
-`shared/chromie_contracts/` is selected as one package; the stable Host settings
-and playback/input lifecycle boundaries remain independently selected files.
-Focused tests prove package expansion and automatic inclusion. The restricted
-archive environment does not contain the pinned Mypy executable, so this note
-does not claim the strict package gate ran here; the canonical dependency
-environment and the next complete runtime package remain open.
+`shared/chromie_contracts/` and
+`orchestrator/runtime/cognitive_gateway_modules/` are selected as owned
+packages; the stable Host settings and playback/input lifecycle boundaries
+remain independently selected files. Focused tests prove package expansion and
+automatic inclusion. The restricted archive environment does not contain the
+pinned Mypy executable, so this note does not claim the strict package gate ran
+here; the canonical dependency environment and the next complete runtime
+package remain open.
 
 ### Problem
 

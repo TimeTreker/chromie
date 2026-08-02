@@ -112,7 +112,7 @@ mkdir -p "$EVIDENCE_ROOT"
 
 PYTHON_BIN="${CHROMIE_PYTHON:-}"
 if [ -z "$PYTHON_BIN" ]; then
-  CONDA_ENV_NAME="${CONDA_ENV_NAME:-${CHROMIE_CONDA_ENV:-Chromie}}"
+  CHROMIE_CONDA_ENV="${CHROMIE_CONDA_ENV:-Chromie}"
   if command -v conda >/dev/null 2>&1; then
     CONDA_BASE="$(conda info --base)"
   elif [ -x "$HOME/miniconda3/bin/conda" ]; then
@@ -125,7 +125,7 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
   # shellcheck disable=SC1091
   source "$CONDA_BASE/etc/profile.d/conda.sh"
-  conda activate "$CONDA_ENV_NAME"
+  conda activate "$CHROMIE_CONDA_ENV"
   PYTHON_BIN="$(command -v python)"
 fi
 

@@ -231,6 +231,11 @@ voice and robot evidence remain optional and supervised; they are required only
 for the stricter physical-pilot profile. No current retained bundle closes these
 tracks yet, and no automatic workflow grants release qualification.
 
+The latest source-only batch reuses validated planner Skill choices downstream,
+types model-generation budgets, removes `CONDA_ENV_NAME`, and expands owned
+typing to the Cognitive Gateway modules. Latency evidence, overlapping-result
+delivery, full configuration migration, and static-tool execution remain open.
+
 The canonical local gate is restored. The live-voice verifier remains available
 for a future microphone-equipped host, but physical voice is optional for the
 active default closure and cannot substitute for Gateway/Core MuJoCo, Social

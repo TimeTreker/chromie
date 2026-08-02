@@ -55,7 +55,7 @@ class RuntimeConfigurationInventoryTests(unittest.TestCase):
         )
         summary = payload["summary"]
         self.assertLessEqual(summary["public_boolean_choices"], 1)
-        self.assertLessEqual(summary["compatibility_aliases"], 2)
+        self.assertLessEqual(summary["compatibility_aliases"], 1)
         public = {
             entry["key"]
             for entry in payload["entries"]

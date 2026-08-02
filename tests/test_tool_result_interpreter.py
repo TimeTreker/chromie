@@ -383,6 +383,12 @@ class ToolResultHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
             3,
         )
         self.assertTrue(response.metadata["full_tool_result_retained"])
+        self.assertEqual(
+            assistant.agent_client.request.context["canonical_plan_resolution"][
+                "plan_id"
+            ],
+            plan.plan_id,
+        )
         self.assertIn(
             "smart",
             assistant.agent_client.request.context["personality_expression"][

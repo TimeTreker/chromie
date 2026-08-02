@@ -196,33 +196,6 @@ def _sounddevice() -> Any:
     return sd
 
 
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.lower() in {"1", "true", "yes", "on"}
-
-
-def env_int(name: str, default: int, *, minimum: int = 0) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return max(minimum, int(value))
-    except ValueError:
-        return default
-
-
-def env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return max(minimum, float(value))
-    except ValueError:
-        return default
-
-
 class VoiceAssistant:
     def __init__(self):
         # Parse the maintained Host configuration surface exactly once. Runtime
@@ -2409,12 +2382,12 @@ class VoiceAssistant:
             "format": self._spoken_text_response_schema(
                 max_chars=direct_spoken_max_chars
             ),
-            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+            "keep_alive": self.host_settings.model_generation.keep_alive,
             "options": {
-                "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
-                "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "96")),
-                "temperature": float(os.getenv("OLLAMA_TEMPERATURE", "0.4")),
-                "top_p": float(os.getenv("OLLAMA_TOP_P", "0.9")),
+                "num_ctx": self.host_settings.model_generation.direct_num_ctx,
+                "num_predict": self.host_settings.model_generation.direct_num_predict,
+                "temperature": self.host_settings.model_generation.direct_temperature,
+                "top_p": self.host_settings.model_generation.direct_top_p,
             },
         }
         logger.info("[%s] LLM processing: %s", session_id, user_text)
@@ -2440,16 +2413,8 @@ class VoiceAssistant:
         preflight = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(prompt),
             options=payload.get("options"),
-            chars_per_token=env_float(
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
-                2.0,
-                minimum=0.1,
-            ),
-            safety_margin_tokens=env_int(
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
-                512,
-                minimum=0,
-            ),
+            chars_per_token=self.host_settings.model_generation.prompt_chars_per_token_estimate,
+            safety_margin_tokens=self.host_settings.model_generation.context_safety_margin_tokens,
         )
         for diagnostic in preflight:
             self.session_log(session_id, "%s", diagnostic.render())
@@ -2475,7 +2440,7 @@ class VoiceAssistant:
             self.maybe_session_done(session_id)
             return
 
-        if not env_bool("ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT", True):
+        if not self.host_settings.model_generation.direct_require_complete_output:
             self.session_log(
                 session_id,
                 "llm_unbuffered_speech_disabled: reason=spoken_json_contract",
@@ -6218,25 +6183,17 @@ class VoiceAssistant:
             "stream": False,
             "think": False,
             "format": self._spoken_text_response_schema(max_chars=72),
-            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+            "keep_alive": self.host_settings.model_generation.keep_alive,
             "options": {
-                "num_ctx": env_int(
-                    "AGENT_RESPONSE_COMPOSER_NUM_CTX", 8192, minimum=2048
-                ),
-                "num_predict": env_int(
-                    "AGENT_RESPONSE_COMPOSER_NUM_PREDICT", 256, minimum=64
-                ),
+                "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
+                "num_predict": self.host_settings.model_generation.failure_response_num_predict,
                 "temperature": 0.35,
                 "top_p": 0.9,
             },
         }
         try:
             session = await self.get_http_session()
-            timeout_ms = env_int(
-                "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
-                4500,
-                minimum=500,
-            )
+            timeout_ms = self.host_settings.model_generation.failure_response_timeout_ms
 
             async def request_text() -> dict[str, Any]:
                 async with session.post(llm_url, json=payload) as response:
@@ -7194,6 +7151,9 @@ class VoiceAssistant:
                     "social_interaction_style"
                 )
                 or {},
+                "canonical_plan_resolution": plan.model_dump(
+                    mode="json", exclude_none=True
+                ),
             },
         )
         try:
@@ -9261,8 +9221,7 @@ class VoiceAssistant:
 
         model = (
             self.runtime_ready_greeting_model
-            or os.getenv("AGENT_FAST_PLANNER_MODEL", "").strip()
-            or os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "").strip()
+            or self.host_settings.model_generation.ready_greeting_fallback_model
             or self.ollama_model
         )
         payload = {
@@ -9271,14 +9230,9 @@ class VoiceAssistant:
             "stream": False,
             "think": False,
             "format": self._spoken_text_response_schema(max_chars=24),
-            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+            "keep_alive": self.host_settings.model_generation.keep_alive,
             "options": {
-                "num_ctx": int(
-                    os.getenv(
-                        "AGENT_FAST_PLANNER_NUM_CTX",
-                        os.getenv("OLLAMA_NUM_CTX", "2048"),
-                    )
-                ),
+                "num_ctx": self.host_settings.model_generation.ready_greeting_num_ctx,
                 "num_predict": self.runtime_ready_greeting_num_predict,
                 "temperature": 0.55,
                 "top_p": 0.9,

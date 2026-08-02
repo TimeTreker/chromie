@@ -73,7 +73,7 @@ python scripts/voice_acceptance.py \
 ```
 
 Before it starts services or creates an evidence bundle, the supervised
-preflight checks the selected `CONDA_ENV_NAME`/`CHROMIE_CONDA_ENV` (default
+preflight checks the selected `CHROMIE_CONDA_ENV` (default
 `Chromie`) against the repository's Python 3.11+ requirement. The Orchestrator
 launcher repeats the same check before installing dependencies or warming
 models. An incompatible environment is an operational blocker, not evidence;

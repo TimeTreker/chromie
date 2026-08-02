@@ -51,6 +51,16 @@ class MypyGateTests(unittest.TestCase):
             "orchestrator/runtime/playback_delivery.py",
         ):
             self.assertIn(runtime_boundary, entries)
+        gateway_files = tuple(
+            sorted(
+                path.relative_to(ROOT).as_posix()
+                for path in (
+                    ROOT / "orchestrator" / "runtime" / "cognitive_gateway_modules"
+                ).rglob("*.py")
+            )
+        )
+        self.assertGreaterEqual(len(gateway_files), 5)
+        self.assertTrue(set(gateway_files).issubset(entries))
 
     def test_scope_accepts_python_package_and_rejects_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

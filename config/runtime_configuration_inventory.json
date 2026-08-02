@@ -510,7 +510,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -524,7 +524,7 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -793,7 +793,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -951,7 +951,8 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
+        "env/validation/architecture.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -964,7 +965,8 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
+        "env/validation/architecture.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -1081,7 +1083,8 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
+        "env/validation/architecture.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -1094,7 +1097,8 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
+        "env/validation/architecture.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -1107,7 +1111,8 @@
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
+        "env/validation/architecture.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2114,14 +2119,6 @@
     },
     {
       "boolean": false,
-      "category": "bounded_compatibility_alias",
-      "key": "CONDA_ENV_NAME",
-      "owners": [
-        "scripts/voice_acceptance.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "COSYVOICE3_FP16",
       "owners": [
@@ -2379,7 +2376,7 @@
         "env/profiles/jetson_orin_nano_super.env",
         "env/profiles/jetson_thor.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2441,7 +2438,7 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2476,7 +2473,7 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2493,7 +2490,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2518,7 +2515,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "orchestrator/orchestrator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2986,7 +2983,8 @@
       "category": "profile_constant",
       "key": "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT",
       "owners": [
-        ".env.common"
+        ".env.common",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -4584,13 +4582,13 @@
   "summary": {
     "category_counts": {
       "acceptance_override": 56,
-      "bounded_compatibility_alias": 2,
+      "bounded_compatibility_alias": 1,
       "profile_constant": 155,
       "public_choice": 9,
       "service_internal": 212
     },
-    "compatibility_aliases": 2,
+    "compatibility_aliases": 1,
     "public_boolean_choices": 1,
-    "total_keys": 434
+    "total_keys": 433
   }
 }

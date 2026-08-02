@@ -88,6 +88,14 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
             deep_content + "\n",
             encoding="utf-8",
         )
+        (package / "projections" / "response_composer.md").write_text(
+            "Compose one concise grounded response.\n",
+            encoding="utf-8",
+        )
+        (package / "projections" / "tool_result_interpreter.md").write_text(
+            "Interpret only trusted result evidence.\n",
+            encoding="utf-8",
+        )
         digest = compute_agent_skill_content_digest(package)
         metadata = {
             "schema_version": "1.0",
@@ -105,6 +113,8 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
             "projections": {
                 "fast_planner": "projections/fast_planner.md",
                 "deep_planner": "projections/deep_planner.md",
+                "response_composer": "projections/response_composer.md",
+                "tool_result_interpreter": "projections/tool_result_interpreter.md",
             },
         }
         (package / "skill.yaml").write_text(
@@ -470,6 +480,124 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
                 prepared.context,
                 agent_role="deep_planner",
             )
+        )
+
+    def test_planner_selection_is_reused_for_response_composer_without_model_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            registry = load_agent_skill_registry([root]).registry
+            model = self._selection_model()
+            coordinator = AgentSkillProgressiveDisclosureCoordinator(
+                AgentSkillSelectionService(model, registry),
+                AgentSkillDisclosureService(registry),
+            )
+            request = self._request()
+            _, planner_disclosure = asyncio.run(
+                coordinator.prepare_agent_request(request, "fast_planner")
+            )
+            plan = attach_disclosure_metadata(
+                CanonicalPlan(
+                    plan_id="plan-reuse-composer",
+                    planner_tier="fast",
+                    disposition="respond",
+                    coverage="complete",
+                    confidence=1.0,
+                    goal_ids=["goal-weather"],
+                    response_text="Grounded response.",
+                ),
+                planner_disclosure,
+            )
+            context = dict(request.context)
+            context["canonical_plan_resolution"] = plan.model_dump(
+                mode="json", exclude_none=True
+            )
+            prepared, disclosure = asyncio.run(
+                coordinator.prepare_agent_request(
+                    request.model_copy(update={"context": context}),
+                    "response_composer",
+                )
+            )
+
+        self.assertEqual(len(model.calls), 1)
+        self.assertEqual(disclosure.status, "loaded")
+        self.assertEqual(disclosure.agent_role, "response_composer")
+        self.assertEqual(disclosure.projections[0].projection, "response_composer")
+        self.assertIn(
+            "Compose one concise grounded response.",
+            prompt_agent_skill_context(
+                prepared.context, agent_role="response_composer"
+            )["projections"][0]["content"],
+        )
+
+    def test_planner_selection_is_reused_for_tool_result_without_model_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            registry = load_agent_skill_registry([root]).registry
+            model = self._selection_model()
+            coordinator = AgentSkillProgressiveDisclosureCoordinator(
+                AgentSkillSelectionService(model, registry),
+                AgentSkillDisclosureService(registry),
+            )
+            request = self._request()
+            _, planner_disclosure = asyncio.run(
+                coordinator.prepare_agent_request(request, "fast_planner")
+            )
+            plan = attach_disclosure_metadata(
+                CanonicalPlan(
+                    plan_id="plan-reuse-tool-result",
+                    planner_tier="fast",
+                    disposition="execute",
+                    coverage="complete",
+                    confidence=1.0,
+                    goal_ids=["goal-weather"],
+                    steps=[
+                        {
+                            "step_id": "weather-step",
+                            "capability_id": "chromie.weather.lookup",
+                            "args": {"location": "Neixiang", "date": "today"},
+                            "source_goal_ids": ["goal-weather"],
+                        }
+                    ],
+                ),
+                planner_disclosure,
+            )
+            tool_data = {"temperature_c": 23.5}
+            tool_request = ToolResultInterpretationRequest(
+                sid="sid-disclosure",
+                user_request=request.text,
+                language=request.language,
+                evidence=[
+                    ToolResultEvidence(
+                        evidence_id="evidence-reuse",
+                        tool_id="chromie.weather.lookup",
+                        status="completed",
+                        data=tool_data,
+                        output_sha256=canonical_value_sha256(tool_data),
+                    )
+                ],
+                context={
+                    "canonical_plan_resolution": plan.model_dump(
+                        mode="json", exclude_none=True
+                    )
+                },
+            )
+            prepared, disclosure = asyncio.run(
+                coordinator.prepare_tool_result_request(tool_request)
+            )
+
+        self.assertEqual(len(model.calls), 1)
+        self.assertEqual(disclosure.status, "loaded")
+        self.assertEqual(disclosure.agent_role, "tool_result_interpreter")
+        self.assertEqual(
+            disclosure.projections[0].projection, "tool_result_interpreter"
+        )
+        self.assertIn(
+            "Interpret only trusted result evidence.",
+            prompt_agent_skill_context(
+                prepared.context, agent_role="tool_result_interpreter"
+            )["projections"][0]["content"],
         )
 
     def test_empty_registry_remains_behavior_neutral_and_skips_model(self) -> None:

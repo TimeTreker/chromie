@@ -6,6 +6,7 @@ import sys
 import types
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import MethodType
 from typing import Any
 
@@ -21,6 +22,7 @@ if "scipy" not in sys.modules:
 from orchestrator.orchestrator import VoiceAssistant
 import orchestrator.orchestrator as orchestrator_module
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
@@ -30,6 +32,13 @@ from shared.chromie_contracts.interaction import InteractionResponse, SkillResul
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _configure_model_generation(assistant: VoiceAssistant) -> None:
+        assistant.host_settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={},
+        )
+
     async def test_fast_first_speech_enters_current_turn_context_only_after_playback(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.playback_start_waiters = {}
@@ -199,6 +208,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
@@ -273,6 +283,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_ready_greeting_rejects_reasoning_prose_and_falls_back(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
@@ -328,6 +339,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_ready_greeting_suppresses_separate_thinking_field(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
@@ -385,6 +397,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
@@ -441,6 +454,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"

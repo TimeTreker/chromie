@@ -145,7 +145,7 @@ cancellable deployment.
 | Variable | Purpose |
 |---|---|
 | `CHROMIE_COMPOSE_OVERRIDE_FILES` | Comma-separated Compose override files. |
-| `CHROMIE_CONDA_ENV` / `CONDA_ENV_NAME` | Select the host Orchestrator Conda environment. |
+| `CHROMIE_CONDA_ENV` | Select the host Orchestrator Conda environment. The removed `CONDA_ENV_NAME` alias is no longer supported. |
 | `CHROMIE_HOST_TIMEZONE` | Host-detected IANA timezone written into generated runtime configuration and propagated to services so logs and time-aware speech use the same local clock. |
 | `TZ` | Process/container timezone derived from `CHROMIE_HOST_TIMEZONE`; host startup also calls `tzset()` where available. |
 | `BUILD=1` | Build service images before startup. |

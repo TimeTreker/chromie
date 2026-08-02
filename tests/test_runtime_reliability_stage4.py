@@ -9,6 +9,7 @@ from pathlib import Path
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.schemas.route import RouteDecision
 
 
@@ -179,8 +180,16 @@ class RuntimeReliabilityStage4Tests(unittest.TestCase):
 
 
 class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _configure_model_generation(assistant: VoiceAssistant) -> None:
+        assistant.host_settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={},
+        )
+
     async def test_quality_model_phrases_host_owned_failure_facts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.failure_response_model = "gemma4:e2b"
         assistant.llm_url = "http://localhost:11434/api/generate"
         assistant.normalize_tts_candidate = MethodType(
@@ -270,6 +279,7 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_quality_model_phrases_post_execution_failure_facts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.failure_response_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
         assistant.normalize_tts_candidate = MethodType(
@@ -368,6 +378,7 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_location_not_found_reason_reaches_grounded_failure_composer(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.failure_response_model = "gemma4:12b"
         assistant.llm_url = "http://localhost:11434/api/generate"
         assistant.normalize_tts_candidate = MethodType(
@@ -454,6 +465,7 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failure_response_composer_rejects_language_drift(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
         assistant.failure_response_model = "gemma4:e2b"
         assistant.ollama_model = "qwen3:4b"
         assistant.llm_url = "http://localhost:11434/api/generate"

@@ -60,8 +60,8 @@ if [ "${CHROMIE_TTS_BACKEND:-cosyvoice3}" = "cosyvoice3" ] && [ "${TTS_COSYVOICE
 fi
 
 
-CONDA_ENV_NAME="${CONDA_ENV_NAME:-${CHROMIE_CONDA_ENV:-Chromie}}"
-echo "[orchestrator] Using conda env: $CONDA_ENV_NAME"
+CHROMIE_CONDA_ENV="${CHROMIE_CONDA_ENV:-Chromie}"
+echo "[orchestrator] Using conda env: $CHROMIE_CONDA_ENV"
 
 # Make conda available in non-interactive shells.
 if command -v conda >/dev/null 2>&1; then
@@ -78,7 +78,7 @@ fi
 
 # shellcheck disable=SC1091
 source "$CONDA_BASE/etc/profile.d/conda.sh"
-conda activate "$CONDA_ENV_NAME"
+conda activate "$CHROMIE_CONDA_ENV"
 
 echo "[orchestrator] Python: $(which python)"
 

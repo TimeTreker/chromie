@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import unittest
+from pathlib import Path
 from types import MethodType, SimpleNamespace
-from unittest.mock import patch
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
 
 
 class _FakeContent:
@@ -50,8 +50,23 @@ class _FakeHttpSession:
 
 class DirectLlmTruncationGuardTests(unittest.TestCase):
     @staticmethod
-    def _assistant(payloads: list[dict[str, object]]):
+    def _assistant(
+        payloads: list[dict[str, object]],
+        *,
+        num_predict: int = 64,
+    ):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        host_settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={
+                "OLLAMA_NUM_CTX": "32768",
+                "OLLAMA_NUM_PREDICT": str(num_predict),
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
+                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
+            },
+        )
+        assistant.host_settings = host_settings
         assistant.ollama_model = "qwen3:4b"
         assistant.llm_url = "http://chromie-llm:11434/api/generate"
         assistant.sessions = SimpleNamespace(
@@ -120,20 +135,10 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
                     "prompt_eval_count": 20,
                     "eval_count": 4,
                 },
-            ]
+            ],
+            num_predict=4,
         )
-        with patch.dict(
-            os.environ,
-            {
-                "OLLAMA_NUM_CTX": "32768",
-                "OLLAMA_NUM_PREDICT": "4",
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
-                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
-            },
-            clear=False,
-        ):
-            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+        asyncio.run(assistant.process_llm_tts("hello", "sid"))
 
         self.assertEqual(len(http.requests), 1)
         self.assertEqual(spoken, [])
@@ -155,18 +160,7 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
                 },
             ]
         )
-        with patch.dict(
-            os.environ,
-            {
-                "OLLAMA_NUM_CTX": "32768",
-                "OLLAMA_NUM_PREDICT": "64",
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
-                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
-            },
-            clear=False,
-        ):
-            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+        asyncio.run(assistant.process_llm_tts("hello", "sid"))
 
         self.assertEqual(spoken, ["Complete answer."])
         self.assertTrue(any("llm_verified_flush_to_tts" in line for line in logs))
@@ -185,18 +179,7 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
                 }
             ]
         )
-        with patch.dict(
-            os.environ,
-            {
-                "OLLAMA_NUM_CTX": "32768",
-                "OLLAMA_NUM_PREDICT": "64",
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
-                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
-            },
-            clear=False,
-        ):
-            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+        asyncio.run(assistant.process_llm_tts("hello", "sid"))
 
         self.assertEqual(spoken, ["Hi there."])
         self.assertTrue(any("llm_thinking_suppressed" in line for line in logs))
@@ -218,18 +201,7 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
                 }
             ]
         )
-        with patch.dict(
-            os.environ,
-            {
-                "OLLAMA_NUM_CTX": "32768",
-                "OLLAMA_NUM_PREDICT": "64",
-                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.0",
-                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "0",
-                "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT": "1",
-            },
-            clear=False,
-        ):
-            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+        asyncio.run(assistant.process_llm_tts("hello", "sid"))
 
         self.assertEqual(spoken, [])
         self.assertTrue(any("llm_spoken_output_rejected" in line for line in logs))

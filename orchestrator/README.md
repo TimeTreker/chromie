@@ -167,8 +167,7 @@ python orchestrator/list_devices.py
 Python 3.11 is the minimum supported host runtime. Both supervised voice
 preflight and `scripts/start_orchestrator.sh` validate the selected Conda
 environment before evidence creation, dependency installation, or model
-warm-up. To use another conforming environment, set `CHROMIE_CONDA_ENV` (or
-`CONDA_ENV_NAME`) explicitly; an older environment is rejected rather than
+warm-up. To use another conforming environment, set `CHROMIE_CONDA_ENV` explicitly; an older environment is rejected rather than
 treated as partial runtime evidence.
 
 For normal plug-and-use operation, select the preferred microphone/headphones in

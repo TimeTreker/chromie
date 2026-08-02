@@ -38,13 +38,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(GoalInterpreterSettings().capability_catalog_timeout_ms, 400)
         asr_settings_source = (ROOT / "asr" / "settings.py").read_text(encoding="utf-8")
-        orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
-            encoding="utf-8"
-        )
         settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
-        self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
+        self.assertEqual(settings.model_generation.keep_alive, "24h")
+        self.assertEqual(settings.model_generation.direct_num_ctx, 2048)
 
     def test_asr_image_includes_every_standalone_server_module(self) -> None:
         dockerfile = (ROOT / "asr" / "Dockerfile").read_text(encoding="utf-8")

@@ -110,7 +110,7 @@ def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
         )
     environment = os.environ.copy()
     environment[RUNTIME_REEXEC_ENV] = "1"
-    env_name = os.getenv("CONDA_ENV_NAME", os.getenv("CHROMIE_CONDA_ENV", "Chromie"))
+    env_name = os.getenv("CHROMIE_CONDA_ENV", "Chromie")
     os.execvpe(
         conda,
         [
@@ -503,9 +503,7 @@ def acceptance_readiness(
             )
 
     conda = shutil.which("conda")
-    conda_env = os.getenv(
-        "CONDA_ENV_NAME", os.getenv("CHROMIE_CONDA_ENV", "Chromie")
-    )
+    conda_env = os.getenv("CHROMIE_CONDA_ENV", "Chromie")
     if conda is None:
         checks.append(
             CheckResult(
