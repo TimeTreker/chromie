@@ -1293,6 +1293,102 @@ class FastPlannerResolverTests(unittest.TestCase):
             repair_prompt,
         )
 
+    def test_verified_result_repair_keeps_bindings_nested_in_material_args(self):
+        catalog = FakeCatalog()
+        catalog.items.append(
+            CatalogCapability(
+                capability_id="chromie.memory.retrieve_verified_tool_result",
+                agent_id="chromie.memory",
+                description="Retrieve one exact verified tool result.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "evidence_id": {"type": "string"},
+                        "tool_id": {"type": "string"},
+                        "material_args": {
+                            "type": "object",
+                            "additionalProperties": True,
+                        },
+                    },
+                    "required": ["evidence_id", "tool_id", "material_args"],
+                    "additionalProperties": False,
+                },
+                route="tool",
+                available=True,
+                interaction_executable=True,
+                prompt_tier="common",
+            )
+        )
+        step = execute_step(
+            "retrieve-weather",
+            "chromie.memory.retrieve_verified_tool_result",
+            {
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "material_args": {"location": "河南省内乡县", "date": "today"},
+            },
+            ["goal-weather"],
+            "Retrieve the exact prior weather result.",
+        )
+        invalid = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Retrieve the prior weather result.",
+            steps=[step],
+            goal_outcomes={
+                "goal-weather": execute_outcome(
+                    "goal-weather",
+                    ["retrieve-weather"],
+                    "The exact result is retrievable.",
+                )
+            },
+            goal_satisfaction=exact_satisfaction(["goal-weather"]),
+            parameter_resolutions=[
+                {
+                    "step_id": "retrieve-weather",
+                    "parameter": "location",
+                    "strategy": "observed_context",
+                    "value": "河南省内乡县",
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Resolved by Goal Association.",
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+        )
+        repaired = {**invalid, "parameter_resolutions": []}
+        ollama = ScriptedOllama([invalid, repaired])
+        run_request = request(
+            "刚才那个天气结果，简单告诉我现在有没有下雨。",
+            route="tool",
+            goal_ids=["goal-weather"],
+        )
+        goal = run_request.context["goal_association_resolution"]["new_goals"][0]
+        goal["object"] = {
+            "bindings": {
+                "location": {"value": "河南省内乡县"},
+                "date": {"value": "today"},
+            }
+        }
+        run_request.context["verified_tool_memory_index"] = [
+            {
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "request_args": {"location": "河南省内乡县", "date": "today"},
+                "goal_ids": ["goal-weather"],
+            }
+        ]
+
+        plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].args["material_args"]["location"], "河南省内乡县")
+        self.assertEqual(plan.parameter_resolutions, [])
+        self.assertIn(
+            "do not emit separate location or date parameter_resolutions",
+            ollama.prompts[1][0],
+        )
+
     def test_single_parallel_labeled_step_needs_no_concurrency_metadata(self):
         raw = multi_goal_plan(
             disposition="execute",

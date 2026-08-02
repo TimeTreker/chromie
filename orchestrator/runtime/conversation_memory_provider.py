@@ -1,14 +1,29 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
-from shared.chromie_contracts.interaction import SkillRequest, SkillResult
+from shared.chromie_contracts.interaction import (
+    SkillRequest,
+    SkillResult,
+    reject_forbidden_low_level_fields,
+)
 
 from .skill_runtime import SkillDefinition, SkillExecutionContext
 
 ConversationMemoryHandler = Callable[[dict[str, Any]], dict[str, Any]]
+
+
+def _canonical_json_text(value: Any) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
 
 
 class ConversationMemorySkillProvider:
@@ -25,8 +40,48 @@ class ConversationMemorySkillProvider:
         definition: SkillDefinition,
         context: SkillExecutionContext,
     ) -> SkillResult:
-        output = self._handler(dict(request.args))
-        found = bool(output.get("found"))
+        retrieved = self._handler(dict(request.args))
+        reject_forbidden_low_level_fields(retrieved)
+        found = bool(retrieved.get("found"))
+        output = {
+            "found": found,
+            "reason": str(retrieved.get("reason") or ""),
+            "evidence_id": str(retrieved.get("evidence_id") or ""),
+            "tool_id": str(retrieved.get("tool_id") or ""),
+            "request_args_json": _canonical_json_text(
+                retrieved.get("request_args")
+                if isinstance(retrieved.get("request_args"), dict)
+                else {}
+            ),
+            "recorded_ms": (
+                float(retrieved["recorded_ms"])
+                if isinstance(retrieved.get("recorded_ms"), (int, float))
+                and not isinstance(retrieved.get("recorded_ms"), bool)
+                else None
+            ),
+            "age_ms": (
+                float(retrieved["age_ms"])
+                if isinstance(retrieved.get("age_ms"), (int, float))
+                and not isinstance(retrieved.get("age_ms"), bool)
+                else None
+            ),
+            "max_age_s": (
+                float(retrieved["max_age_s"])
+                if isinstance(retrieved.get("max_age_s"), (int, float))
+                and not isinstance(retrieved.get("max_age_s"), bool)
+                else None
+            ),
+            # The original provider output is intentionally carried as canonical
+            # JSON text. A generic memory capability cannot truthfully declare a
+            # closed object schema for every possible source tool, while the
+            # runtime must never expose an open-ended object to later models.
+            "result_json": _canonical_json_text(
+                retrieved.get("data")
+                if isinstance(retrieved.get("data"), dict)
+                else {}
+            ),
+            "source": str(retrieved.get("source") or ""),
+        }
         return SkillResult(
             request_id=request.request_id,
             skill_id=request.skill_id,

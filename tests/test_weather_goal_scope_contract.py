@@ -83,3 +83,5 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
     assert "Never silently rewrite annual" in goal_prompt
     assert "Never silently narrow a goal" in fast_prompt
     assert "Never silently narrow a canonical goal" in deep_prompt
+    assert "do not emit separate location or date parameter_resolutions" in fast_prompt
+    assert "do not emit separate location or date parameter_resolutions" in deep_prompt

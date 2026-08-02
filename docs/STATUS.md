@@ -217,14 +217,14 @@ weather, and local LAN collection with complete speech, paired MuJoCo, active
 cancellation, safe idle, and correct Neixiang continuity. Human reviews, Social
 Attention, and remote LAN remained open; a docs commit superseded the revision.
 
-Clean root `20260802T024019Z` on revision `662a1c7` passed automatic Core, then
-exposed exact `内乡` mistaken for provider ambiguity; no corrected Goal was committed and final `那边` returned to Chongqing. The model contracts now keep
-exact replacements verbatim, provider resolution downstream,
-and independently review candidate-Goal clarifications. Dirty diagnostic
-`/tmp/chromie-weather-continuity-diagnostic-4` passes all five turns with zero
-semantic/provider errors, applied runtime, and complete TTS, but its retained
-identity cannot prove the dirty image source. Human review and a clean root
-remain open.
+Root `20260802T024019Z` passed Core but exposed exact `内乡` mistaken for provider
+ambiguity; current contracts preserve exact replacements, and dirty diagnostic
+4 passes weather but cannot prove its image. Clean root `20260802T031003Z` on
+`a9f527c` passed automatic Core, paired MuJoCo, cancellation, safe idle, identity,
+and TTS pending review. Weather exposed direct `location` provenance for nested
+`material_args` and an open retrieval output schema. A closed canonical-JSON
+envelope and planner guidance now preserve nested bindings with strict runtime
+validation. Focused, Level A 17/17, and canonical 1,763+20 gates pass; a new clean root, human reviews, Social Attention, and second-machine LAN remain open.
 
 ## Target-evidence closure
 

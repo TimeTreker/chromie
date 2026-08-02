@@ -17,8 +17,8 @@ to repair a reproduced qualification blocker.
 
 The current implementation baseline includes delivered-speech evidence,
 explicit location-binding provenance, weather-correction continuity, and the
-exact-replacement-binding clarification correction below. The latest
-implementation commit subject is `fix: preserve explicit correction bindings`.
+exact-replacement and verified-result corrections below. The latest
+implementation commit subject is `fix: close verified-result retrieval schema`.
 These local commits have not been pushed; `main` is ahead of `origin/main`.
 Rebuild this exact clean revision and collect a new evidence root before
 treating the correction as target evidence.
@@ -104,6 +104,14 @@ automatic collection passed, pending human review. Preserve it as the
 originating episode for the clarification-continuity defect below, but **do not
 finalize or resume it**: the weather correction was treated as provider
 ambiguity, and the final indirect turn consequently returned to Chongqing.
+
+Clean root `20260802T031003Z` on revision `a9f527c` passed the complete
+automatic Gateway/Core collection with delivered speech, paired walk/nod/turn
+MuJoCo execution, active cancellation after Provider start, standing safe idle,
+and clean runtime identity; human review remains `pending`. Preserve it, but
+**do not finalize or resume it**. Weather collection proved the replacement
+correction and final Neixiang reference, then exposed the verified-result
+retrieval defect below on the exact follow-up.
 
 ## Reproduced blockers and current correction
 
@@ -225,6 +233,37 @@ provider errors: the exact follow-up uses no Capability, the correction and
 final indirect turn execute fresh Neixiang reads, all five runtime events are
 `applied`, and every scheduled TTS chunk is played with zero failures or skips.
 Human review remains pending and is not inferred from the automatic result.
+
+Clean root `20260802T031003Z` exposed the next mechanical boundary after correct
+Goal Association. The exact follow-up targeted the completed Neixiang Goal and
+selected `chromie.memory.retrieve_verified_tool_result`. Fast Planning attached
+a `location` parameter resolution even though the retrieval step nests exact
+bindings under `material_args`; its bounded repair repeated the invalid shape.
+Deep Planning then produced the correct retrieval responsibility, but Trusted
+Runtime rejected the capability's static open-ended output schema with
+`$ must set additionalProperties=false`.
+
+Root-cause record:
+
+```text
+Observed failure: the exact prior-weather follow-up reached the correct Goal and retrieval Capability, but Fast provenance shape failed and the Deep recovery was rejected by the retrieval Capability's unsafe open output declaration.
+Expected contract: resolved entity bindings remain nested under material_args, and every model-visible Provider result has a closed explicit schema before execution or observation.
+Earliest wrong components: Fast/Deep planner parameter guidance and the chromie.memory Host-runtime Capability output declaration.
+Fix classes: planner contract guidance plus a closed Provider interface; no phrase rule, place map, semantic Host rewrite, or relaxed runtime validation.
+Regression boundary: exact-follow-up planner repair, Provider schema declaration and output validation, focused runtime closure tests, then the complete live weather manifest.
+Evidence level: clean originating failure plus deterministic automatic tests; clean post-fix target collection still required.
+General ability protected: truthful exact-result reuse without crossing Goal or Provider evidence boundaries.
+```
+
+The Provider now emits a fixed closed envelope and carries the previously
+schema-validated source payload as canonical JSON text; it does not pretend one
+generic open object schema describes every source Capability. Planner contracts
+state that `location` and `date` stay inside `material_args` and are not separate
+direct parameter resolutions. The runtime output-schema gate remains strict.
+Focused planner/provider/runtime selections pass 228 tests plus 33 subtests;
+the two relevant Level A classes pass 17/17; the canonical gate passes 1,763
+primary tests and 20 legacy Agent tests. These are automatic checks, not a live
+Provider, speaker, simulator, physical robot, or post-fix target claim.
 
 ## Resume sequence
 

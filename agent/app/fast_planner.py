@@ -568,6 +568,13 @@ class FastPlannerResolver:
             "source_goal_ids must identify the authoritative Goal containing "
             "that same number. Use those stable Goal IDs as provenance; do not "
             "copy, paraphrase, or annotate Goal text into another field. "
+            "For chromie.memory.retrieve_verified_tool_result, resolved Goal "
+            "bindings such as location and date belong inside the single "
+            "material_args object. They are not missing direct step arguments, "
+            "so do not emit separate location or date parameter_resolutions. "
+            "If a resolution for that nested object is useful, its parameter "
+            "must be material_args and its value must equal the complete "
+            "step.args.material_args object. "
         )
         source_route = str(request.route_decision.route or "").strip()
         route_effect_contract = (
