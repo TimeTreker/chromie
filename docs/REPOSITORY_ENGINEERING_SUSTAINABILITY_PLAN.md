@@ -185,11 +185,11 @@ Issue must refresh its own baseline because counts may change.
 | Restore Canonical Local Gate Reproducibility | implemented and automatically verified | none | Make the declared dependency-light test entrypoint deterministic in a maintained working tree and environment. |
 | Retain a Current-Revision Live Voice Loop | implementation verified; physical target validation deferred | canonical local gate, satisfied | Prove clean-source microphone → ASR → Gateway/Core → chat → TTS playback on a microphone-equipped host. |
 | Close Current-Revision Target Evidence | **active** | canonical gate and live-voice verifier implementation, satisfied; physical voice is optional for this profile | Retain and review the complete default source-bound evidence profile before structural work. |
-| Reduce Time to First Grounded Response | queued | target-evidence closure | Remove unnecessary planner/model waits and permit independently valid speech stages without weakening semantic, validation, confirmation, or evidence authority. |
-| Classify Broad Runtime Exception Boundaries | queued | grounded-response latency Issue | Ensure every broad handler has an explicit failure contract and regression boundary. |
-| Establish Typed Host Configuration Snapshots | queued | broad-exception classification | Stop `VoiceAssistant` from parsing its operating environment across a 615-line constructor. |
-| Extract Playback Delivery Lifecycle | queued | typed Host settings | Isolate ordered TTS generation, playback, echo, cancellation, and delivery evidence. |
-| Extract Input Turn and Session Lifecycle | queued | playback lifecycle | Isolate microphone/VAD/ASR/session ownership without moving deterministic reflexes or authority. |
+| Reduce Time to First Grounded Response | implementation slice landed; qualification and remaining scope open | target-evidence closure | Planless direct spoken-response composition now bypasses Fast/Deep Planner under a typed contract; retained latency/result-delivery evidence and the remaining scope are still open. |
+| Classify Broad Runtime Exception Boundaries | implementation slice landed; classification review open | grounded-response latency Issue | A symbol-level checked inventory now rejects new, missing, or stale broad handlers; deeper narrowing and retained failure evidence remain open. |
+| Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
+| Extract Playback Delivery Lifecycle | implementation slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; PCM/output transport and structural ratchets remain open. |
+| Extract Input Turn and Session Lifecycle | implementation slice landed; full ownership audit open | playback lifecycle | ASR, routed-turn, reflex, and pending-VAD task lifecycle now has one collaborator; microphone/session-registry extraction and conversation-state audit remain open. |
 | Reduce Supported Configuration Combinations | queued | typed Host settings and live proof | Make maintained deployment profiles own supported combinations and retire redundant public switches. |
 | Expand Mypy by Owned Package | queued | stable extracted boundaries | Cover all shared contracts, then independently owned runtime packages. |
 | Reduce the Current Documentation Surface | queued | structural Issues complete | Shrink the core reading path, merge duplicated trace material, and remove superseded archives safely. |
@@ -405,7 +405,15 @@ Status: **active**; the default profile does not require physical voice evidence
 
 ## Issue: Reduce Time to First Grounded Response
 
-Status: queued; depends on **Close Current-Revision Target Evidence**
+Status: implementation slice landed; qualification and remaining scope open; depends on **Close Current-Revision Target Evidence**
+
+Implementation note (2026-08-02): a typed direct-response composition branch now
+lets a validated, non-effectful `spoken_response` Goal proceed from Goal
+Association to Response Composer without invoking Fast or Deep Planner. The LLM
+still authors the response and the Host still validates goal correlation,
+coverage, commitment, and completion claims. This lands the planless-direct
+slice only; retained warm/cold latency evidence, ordinary-result rescheduling,
+model-call reduction, and the other exit criteria remain open.
 
 ### Problem
 
@@ -545,7 +553,14 @@ substitute for reducing cognition before a valid speech stage exists.
 
 ## Issue: Classify Broad Runtime Exception Boundaries
 
-Status: queued; depends on **Reduce Time to First Grounded Response**
+Status: implementation slice landed; classification review and remaining scope open; depends on **Reduce Time to First Grounded Response**
+
+Implementation note (2026-08-02): a dependency-light AST inventory records each
+maintained broad handler by file, qualified symbol, and handler ordinal, with an
+owner, contract, and one of the declared failure-boundary classes. Repository
+policy now rejects new, missing, duplicate, or stale inventory entries. This is
+a checked baseline, not a claim that every broad catch has already been narrowed
+or that every classification has retained live failure evidence.
 
 ### Problem
 
@@ -586,7 +601,15 @@ that each one has a reviewed failure contract.
 
 ## Issue: Establish Typed Host Configuration Snapshots
 
-Status: queued
+Status: implementation slice landed; inventory completion and retained proof open
+
+Implementation note (2026-08-02): immutable typed startup groups now parse and
+validate the principal Host audio-input, cognition, playback/TTS, session, and
+evidence settings before `VoiceAssistant` composition. Existing attributes are
+projected from those groups for compatibility, and invalid migrated values name
+the owning variable and expected bound. Remaining dynamic/model-specific Host
+environment reads, the complete checked inventory, and generated configuration
+documentation remain open.
 
 ### Problem
 
@@ -629,7 +652,15 @@ Host still lacks equivalent narrow configuration ownership.
 
 ## Issue: Extract Playback Delivery Lifecycle
 
-Status: queued
+Status: implementation slice landed; provider/output transport and structural exit criteria open
+
+Implementation note (2026-08-02): a playback-delivery collaborator now owns
+playback/synthesis ordering, generations, start waiters, cancellation
+bookkeeping, pending audio, and current-turn delivered-speech events.
+`VoiceAssistant` delegates those state transitions while preserving its public
+path and evidence logging. Provider PCM transport, output-stream ownership,
+echo/chunk processing, incremental audible playback, and structural ratchets
+remain open.
 
 ### Problem
 
@@ -677,7 +708,14 @@ ordering contract but no independent owner.
 
 ## Issue: Extract Input Turn and Session Lifecycle
 
-Status: queued
+Status: implementation slice landed; microphone/session-registry extraction and ownership audit open
+
+Implementation note (2026-08-02): an input-turn lifecycle collaborator now owns
+active ASR work, routed-turn registration/cancellation, protective-reflex
+queues, pending turns behind reflexes, and pending VAD audio. Gateway/Core
+meaning and deterministic reflex authority remain outside this collaborator.
+Microphone callback ownership, full session-registry mechanics, direct-LLM
+reachability, `conversation_state.py` audit, and structural ratchets remain open.
 
 ### Problem
 

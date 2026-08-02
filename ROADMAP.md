@@ -54,7 +54,10 @@ current-revision Gateway/Core, Agent Skill/weather, Social Attention, paired
 MuJoCo, and second-machine LAN evidence. That profile explicitly does not
 require physical voice or robot evidence.
 
-Only after that evidence closes, work one semantic Issue at a time:
+Only after that evidence closes, qualify and finish one semantic Issue at a time.
+The 2026-08-02 archive implementation lands bounded, automatically tested slices
+for the first five items below, but it does not close the active evidence Issue or
+claim the later Issues' full exit criteria:
 
 - reduce time to first grounded response without weakening validation or
   evidence authority;
@@ -98,6 +101,14 @@ feasibility boundary already own those meanings. Semantic end-of-turn and
 speculative generation remain evidence-gated later input work; bounded
 two-request model concurrency requires shared-GPU proof; incremental PCM remains
 with the playback-delivery lifecycle Issue.
+
+Implementation status (2026-08-02): a typed planless direct-response branch is
+implemented and automatically tested, so a complete non-effectful spoken Goal
+can reach Response Composer without Fast or Deep Planner. The Issue remains open
+for retained latency qualification, result rescheduling, independently scheduled
+stages, model-call reduction, and the remaining exit criteria. The next four
+queued structural Issues also have bounded implementation slices recorded in the
+engineering sustainability plan; none is marked closed.
 
 Detailed problem evidence, scope, non-goals, and exit criteria are in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

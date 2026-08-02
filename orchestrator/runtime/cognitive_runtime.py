@@ -29,8 +29,10 @@ from shared.chromie_contracts.interaction import (
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
+    DirectResponseComposition,
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
+    goal_association_fingerprint,
 )
 from shared.chromie_contracts.social_attention import normalize_social_attention_mode
 from shared.chromie_contracts.user_turn import (
@@ -752,6 +754,191 @@ class CanonicalPlanRuntimeAdapter:
                 return True
         return False
 
+    async def build_direct_response(
+        self,
+        *,
+        composition: DirectResponseComposition,
+        session_id: str,
+        language: str,
+        context: dict[str, Any] | None = None,
+    ) -> InteractionResponse:
+        association = composition.goal_association
+        fingerprint = goal_association_fingerprint(association)
+        if composition.goal_association_fingerprint != fingerprint:
+            raise ValueError("direct response goal-association fingerprint mismatch")
+        final = composition.response_plan.final
+        if final is None:
+            raise ValueError("direct response requires a final speech stage")
+        goal_ids = [
+            str(goal.goal_id or "").strip()
+            for goal in association.new_goals
+            if str(goal.goal_id or "").strip()
+        ]
+        speech = [
+            InteractionSpeech(
+                text=final.text,
+                timing="immediate",
+                style="brief",
+                metadata={
+                    "source": "goal_driven_response_composer",
+                    "phase": "final",
+                    "speech_act": final.speech_act,
+                    "commitment_state": final.commitment_state,
+                    "must_not_claim_completion": (
+                        final.must_not_claim_completion
+                    ),
+                    "covers_goal_ids": list(final.covers_goal_ids),
+                    "source_goal_ids": list(final.covers_goal_ids),
+                    "goal_association_fingerprint": fingerprint,
+                    "claims": list(final.claims),
+                    "wait_for_playback_start": True,
+                    "playback_start_required_for_delivery": True,
+                    "planless_direct_response": True,
+                },
+            )
+        ]
+
+        runtime_context = context if isinstance(context, dict) else {}
+        attention = composition.social_attention_plan
+        policy_mode = self._effective_social_attention_mode(composition)
+        omitted_attention: list[str] = []
+        skills: list[SkillRequest] = []
+        if attention is not None and attention.decision == "express":
+            if policy_mode == "off":
+                omitted_attention.append("policy_off")
+            elif policy_mode == "report_only":
+                omitted_attention.append("policy_report_only")
+            else:
+                target_error = self._attention_target_error(
+                    attention, runtime_context
+                )
+                if target_error:
+                    omitted_attention.append(target_error)
+                else:
+                    seen: set[str] = set()
+                    for index, behavior in enumerate(attention.behaviors):
+                        try:
+                            await self.interaction_runtime.ensure_skill_definitions(
+                                [behavior.skill_id]
+                            )
+                            definition = self.interaction_runtime.skill_definition(
+                                behavior.skill_id
+                            )
+                            if behavior.skill_id in seen:
+                                omitted_attention.append(
+                                    f"duplicate_social_skill:{behavior.skill_id}"
+                                )
+                                continue
+                            if not definition.available:
+                                omitted_attention.append(
+                                    f"unavailable:{behavior.skill_id}"
+                                )
+                                continue
+                            if definition.requires_confirmation:
+                                omitted_attention.append(
+                                    f"confirmation_required:{behavior.skill_id}"
+                                )
+                                continue
+                            if behavior.timing != "parallel":
+                                omitted_attention.append(
+                                    f"auxiliary_must_be_parallel:{behavior.skill_id}"
+                                )
+                                continue
+                            schema_errors = validate_args_for_schema(
+                                behavior.args, definition.input_schema
+                            )
+                            if schema_errors:
+                                omitted_attention.append(
+                                    f"invalid_args:{behavior.skill_id}"
+                                )
+                                continue
+                            target_args_error = self._attention_target_args_error(
+                                behavior.args,
+                                definition.input_schema,
+                                runtime_context,
+                            )
+                            if target_args_error:
+                                omitted_attention.append(
+                                    f"target_error:{behavior.skill_id}:"
+                                    f"{target_args_error}"
+                                )
+                                continue
+                            digest = hashlib.sha256(
+                                (
+                                    f"{fingerprint}|direct-social|{index}|"
+                                    f"{behavior.skill_id}"
+                                ).encode("utf-8")
+                            ).hexdigest()[:20]
+                            request = SkillRequest(
+                                request_id=f"social_{digest}",
+                                skill_id=behavior.skill_id,
+                                skill_version=definition.version,
+                                args=behavior.args,
+                                timing="parallel",
+                                timeout_ms=definition.timeout_ms,
+                                cancellable=definition.interruptible,
+                                requires_confirmation=False,
+                                idempotency_key=(
+                                    f"direct:{fingerprint[:16]}:social:{index}"
+                                ),
+                                metadata={
+                                    "source": "social_attention_plan",
+                                    "auxiliary_social_attention": True,
+                                    "behavior_domain": attention.behavior_domain,
+                                    "interaction_role": attention.interaction_role,
+                                    "social_attention_purpose": attention.purpose,
+                                    "social_function": behavior.social_function,
+                                    "goal_association_fingerprint": fingerprint,
+                                    "target": attention.target.model_dump(
+                                        mode="json", exclude_none=True
+                                    ),
+                                    "reason": behavior.reason,
+                                    "social_attention_policy_mode": policy_mode,
+                                },
+                            )
+                            skills.append(request)
+                            self._record_auxiliary_behavior_request(
+                                request, session_id=session_id
+                            )
+                            seen.add(behavior.skill_id)
+                        except Exception as exc:
+                            omitted_attention.append(
+                                f"invalid:{behavior.skill_id}:"
+                                f"{type(exc).__name__}"
+                            )
+
+        metadata = {
+            "source": "goal_driven_cognitive_runtime",
+            "cognitive_runtime_apply": True,
+            "language": language,
+            "planless_direct_response": True,
+            "goal_association": association.model_dump(
+                mode="json", exclude_none=True
+            ),
+            "goal_association_fingerprint": fingerprint,
+            "response_composition": composition.model_dump(
+                mode="json", exclude_none=True
+            ),
+            "planning_result": "direct_response",
+            "capability_decision": "respond",
+            "goal_ids": goal_ids,
+            "planner_tier": "none",
+            "omitted_social_attention": omitted_attention,
+            "social_attention_policy_mode": policy_mode,
+            "operational_speech_authority": "llm_direct_response",
+        }
+        if isinstance(runtime_context.get("user_turn_envelope"), dict):
+            metadata["user_turn_envelope"] = runtime_context[
+                "user_turn_envelope"
+            ]
+        return InteractionResponse(
+            interaction_id=f"cognitive_{session_id}",
+            status="ok",
+            speech=speech,
+            skills=skills,
+            metadata=metadata,
+        )
+
     async def build_response(
         self,
         *,
@@ -1456,6 +1643,22 @@ class GoalDrivenRuntimeCoordinator:
         return ordered
 
     @staticmethod
+    def _is_direct_spoken_association(
+        association: GoalAssociationResolution,
+    ) -> bool:
+        return (
+            not association.clarification
+            and not association.associations
+            and bool(association.new_goals)
+            and all(
+                str((goal.metadata or {}).get("responsibility_kind") or "")
+                == "spoken_response"
+                and bool(str(goal.goal_id or "").strip())
+                for goal in association.new_goals
+            )
+        )
+
+    @staticmethod
     def _fast_plan_path(plan: CanonicalPlan | None) -> str:
         if plan is None:
             return ""
@@ -1729,7 +1932,7 @@ class GoalDrivenRuntimeCoordinator:
                     deep_planner_invocation_reasons
                 ),
                 "deep_planner_avoided": bool(
-                    fast_planner_path == "terminal"
+                    fast_planner_path in {"terminal", "direct_spoken_response"}
                     and not deep_planner_invocation_reasons
                 ),
                 "terminal_planner_tier": (
@@ -1886,6 +2089,148 @@ class GoalDrivenRuntimeCoordinator:
                             "retryable": True,
                             "reason": "resolved Goal Association produced no canonical goals",
                             "status": association_status,
+                        },
+                    )
+
+                if self._is_direct_spoken_association(association):
+                    fast_planner_path = "direct_spoken_response"
+                    lane = "chat"
+                    composition_context = dict(planning_context)
+                    composition_context[
+                        "direct_goal_association_resolution"
+                    ] = association.model_dump(mode="json", exclude_none=True)
+                    composition_context["execution_capabilities"] = []
+                    recent_auxiliary_evidence = getattr(
+                        self.adapter,
+                        "recent_auxiliary_behavior_evidence",
+                        None,
+                    )
+                    composition_context[
+                        "recent_auxiliary_behavior_evidence"
+                    ] = (
+                        recent_auxiliary_evidence(sid)
+                        if callable(recent_auxiliary_evidence)
+                        else []
+                    )
+                    delivered_turn_speech = (
+                        self.delivered_turn_speech_provider(sid)
+                        if callable(self.delivered_turn_speech_provider)
+                        else []
+                    )
+                    composition_context["delivered_turn_speech"] = [
+                        dict(item)
+                        for item in delivered_turn_speech
+                        if isinstance(item, dict)
+                    ]
+                    stage = time.perf_counter()
+                    composition_resolution = (
+                        await self.agent_client.compose_response_plan(
+                            session,
+                            text=text,
+                            route_decision=route_decision,
+                            sid=sid,
+                            context=composition_context,
+                            history=history,
+                            timeout_ms=(
+                                self.policy.response_composer_timeout_ms
+                            ),
+                        )
+                    )
+                    timings["response_composer"] = (
+                        time.perf_counter() - stage
+                    ) * 1000.0
+                    if (
+                        composition_resolution.status != "resolved"
+                        or not isinstance(
+                            composition_resolution.composition,
+                            DirectResponseComposition,
+                        )
+                    ):
+                        raise CognitiveStageFailure(
+                            "response_composer",
+                            self._stage_failure_metadata(
+                                "response_composer",
+                                composition_resolution.metadata,
+                                default_failure_class=(
+                                    composition_resolution.status
+                                ),
+                            ),
+                        )
+                    if self.policy.mode == "apply":
+                        if not self.policy.lane_enabled(lane):
+                            return self._finish(
+                                mode="apply",
+                                status="error",
+                                lane=lane,
+                                association=association,
+                                fast_plan=None,
+                                terminal_plan=None,
+                                composition=composition_resolution,
+                                timings=timings,
+                                started=started,
+                                fallback_reason=(
+                                    "direct_response_lane_not_enabled_for_apply"
+                                ),
+                                metadata={
+                                    "failure_stage": "authority_boundary",
+                                    "failure_class": (
+                                        "direct_response_lane_mismatch"
+                                    ),
+                                    "failure_domain": "cognitive_runtime",
+                                    "retryable": False,
+                                    **path_metadata(),
+                                },
+                            )
+                        stage = time.perf_counter()
+                        interaction = await self.adapter.build_direct_response(
+                            composition=(
+                                composition_resolution.composition
+                            ),
+                            session_id=sid,
+                            language=language,
+                            context=composition_context,
+                        )
+                        timings["runtime_adapter"] = (
+                            time.perf_counter() - stage
+                        ) * 1000.0
+                        if goal_state_commit_stage == "goal_association":
+                            interaction.metadata["goal_state_results"] = (
+                                goal_state_results
+                            )
+                        return self._finish(
+                            mode="apply",
+                            status="applied",
+                            lane=lane,
+                            association=association,
+                            fast_plan=None,
+                            terminal_plan=None,
+                            composition=composition_resolution,
+                            interaction=interaction,
+                            goal_state_results=goal_state_results,
+                            timings=timings,
+                            started=started,
+                            metadata={
+                                "runtime_replan_count": 0,
+                                "planless_direct_response": True,
+                                "stage_diagnostics": stage_diagnostics,
+                                **path_metadata(),
+                            },
+                        )
+                    return self._finish(
+                        mode="report_only",
+                        status="report_only",
+                        lane=lane,
+                        association=association,
+                        fast_plan=None,
+                        terminal_plan=None,
+                        composition=composition_resolution,
+                        timings=timings,
+                        started=started,
+                        metadata={
+                            "runtime_replan_count": 0,
+                            "planless_direct_response": True,
+                            "stage_diagnostics": stage_diagnostics,
+                            **path_metadata(),
                         },
                     )
 

@@ -83,6 +83,9 @@ from orchestrator.runtime.fast_first_audio import (
     CachedFastFirstAudio,
     FastFirstAudioCache,
 )
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
+from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
+from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
@@ -222,92 +225,64 @@ def env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
 
 class VoiceAssistant:
     def __init__(self):
-        self.asr_url = os.getenv("ASR_URL", "ws://localhost:9001")
-        self.tts_url = os.getenv("TTS_URL", "ws://localhost:5000")
-        self.llm_url = os.getenv("LLM_URL", "http://localhost:11434/api/generate")
-        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
-        self.failure_response_model = os.getenv(
-            "AGENT_RESPONSE_COMPOSER_MODEL",
-            self.ollama_model,
-        ).strip() or self.ollama_model
+        # Parse the maintained Host configuration surface exactly once. Runtime
+        # collaborators receive immutable typed groups rather than re-reading
+        # environment variables with inconsistent fallback behavior.
+        self.host_settings = HostSettingsSnapshot.from_env(
+            project_root=PROJECT_ROOT
+        )
+        audio_settings = self.host_settings.audio_input
+        cognition_settings = self.host_settings.cognition
+        playback_settings = self.host_settings.playback
+        session_settings = self.host_settings.session
+        evidence_settings = self.host_settings.evidence
 
-        self.enable_agent = env_bool("ORCH_ENABLE_AGENT", False)
-        self.enable_interaction_response = env_bool(
-            "ORCH_ENABLE_INTERACTION_RESPONSE",
-            False,
+        self.asr_url = audio_settings.asr_url
+        self.tts_url = playback_settings.tts_url
+        self.llm_url = cognition_settings.llm_url
+        self.ollama_model = cognition_settings.ollama_model
+        self.failure_response_model = cognition_settings.failure_response_model
+
+        self.enable_agent = cognition_settings.enable_agent
+        self.enable_interaction_response = (
+            cognition_settings.enable_interaction_response
         )
-        self.enable_soridormi_skills = env_bool(
-            "ORCH_ENABLE_SORIDORMI_SKILLS",
-            False,
+        self.enable_soridormi_skills = cognition_settings.enable_soridormi_skills
+        self.addressedness_gate_enabled = session_settings.addressedness_gate_enabled
+        self.addressedness_engagement_timeout_s = (
+            session_settings.addressedness_engagement_timeout_s
         )
-        self.addressedness_gate_enabled = env_bool(
-            "ORCH_ADDRESSEDNESS_GATE_ENABLED",
-            True,
+        self.fast_first_response_enabled = (
+            cognition_settings.fast_first_response_enabled
         )
-        self.addressedness_engagement_timeout_s = env_float(
-            "ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC",
-            45.0,
-            minimum=1.0,
+        self.fast_first_tool_response_enabled = (
+            cognition_settings.fast_first_tool_response_enabled
         )
-        self.fast_first_response_enabled = env_bool(
-            "ORCH_FAST_FIRST_RESPONSE_ENABLED",
-            True,
+        self.core_generated_fast_speech_enabled = (
+            cognition_settings.core_generated_fast_speech_enabled
         )
-        self.fast_first_tool_response_enabled = env_bool(
-            "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
-            True,
+        self.fast_first_audio_enabled = playback_settings.fast_audio_enabled
+        self.fast_first_audio_hedge_ms = playback_settings.fast_audio_hedge_ms
+        self.fast_first_audio_prime_on_startup = (
+            playback_settings.fast_audio_prime_on_startup
         )
-        self.core_generated_fast_speech_enabled = env_bool(
-            "ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED",
-            True,
+        self.fast_first_audio_prime_timeout_ms = (
+            playback_settings.fast_audio_prime_timeout_ms
         )
-        self.fast_first_audio_enabled = env_bool(
-            "ORCH_FAST_FIRST_AUDIO_ENABLED",
-            True,
+        self.fast_first_audio_content_gate_enabled = (
+            playback_settings.fast_audio_content_gate_enabled
         )
-        self.fast_first_audio_hedge_ms = env_int(
-            "ORCH_FAST_FIRST_AUDIO_HEDGE_MS",
-            750,
-            minimum=0,
+        self.fast_first_audio_max_cue_seconds = (
+            playback_settings.fast_audio_max_cue_seconds
         )
-        self.fast_first_audio_prime_on_startup = env_bool(
-            "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP",
-            True,
+        self.fast_first_audio_transcript_min_similarity = (
+            playback_settings.fast_audio_transcript_min_similarity
         )
-        self.fast_first_audio_prime_timeout_ms = env_int(
-            "ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS",
-            120000,
-            minimum=1000,
+        self.fast_first_audio_generation_attempts = (
+            playback_settings.fast_audio_generation_attempts
         )
-        self.fast_first_audio_content_gate_enabled = env_bool(
-            "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED",
-            True,
-        )
-        self.fast_first_audio_max_cue_seconds = env_float(
-            "ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS",
-            4.0,
-            minimum=0.25,
-        )
-        self.fast_first_audio_transcript_min_similarity = env_float(
-            "ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY",
-            0.65,
-            minimum=0.0,
-        )
-        self.fast_first_audio_generation_attempts = env_int(
-            "ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS",
-            2,
-            minimum=1,
-        )
-        fast_first_cache_dir = Path(
-            os.getenv(
-                "ORCH_FAST_FIRST_AUDIO_CACHE_DIR",
-                ".chromie/cache/fast-first-audio",
-            )
-        ).expanduser()
-        if not fast_first_cache_dir.is_absolute():
-            fast_first_cache_dir = PROJECT_ROOT / fast_first_cache_dir
         self.fast_first_audio_cache = FastFirstAudioCache(
-            fast_first_cache_dir,
+            playback_settings.fast_audio_cache_dir,
             enabled=(
                 self.fast_first_response_enabled
                 and self.fast_first_audio_enabled
@@ -324,186 +299,93 @@ class VoiceAssistant:
                 self.fast_first_audio_transcript_min_similarity,
             ),
             generation_attempts=self.fast_first_audio_generation_attempts,
-            cache_revision=os.getenv(
-                "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION",
-                "",
-            ),
+            cache_revision=playback_settings.fast_audio_cache_revision,
         )
-        self.fast_planner_mode = os.getenv("ORCH_FAST_PLANNER_MODE", "off").strip().lower()
-        if self.fast_planner_mode not in {"off", "report_only"}:
-            raise ValueError("ORCH_FAST_PLANNER_MODE must be off or report_only")
-        self.fast_planner_timeout_ms = env_int("ORCH_FAST_PLANNER_TIMEOUT_MS", 3000, minimum=100)
-        self.deep_planner_mode = os.getenv("ORCH_DEEP_PLANNER_MODE", "off").strip().lower()
-        if self.deep_planner_mode not in {"off", "report_only"}:
-            self.deep_planner_mode = "off"
-        self.deep_planner_timeout_ms = env_int("ORCH_DEEP_PLANNER_TIMEOUT_MS", 10000, minimum=100)
-        self.response_composer_mode = os.getenv(
-            "ORCH_RESPONSE_COMPOSER_MODE", "off"
-        ).strip().lower()
-        if self.response_composer_mode not in {"off", "report_only"}:
-            raise ValueError("ORCH_RESPONSE_COMPOSER_MODE must be off or report_only")
-        self.response_composer_timeout_ms = env_int(
-            "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS", 5000, minimum=100
+
+        self.fast_planner_mode = cognition_settings.fast_planner_mode
+        self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
+        self.deep_planner_mode = cognition_settings.deep_planner_mode
+        self.deep_planner_timeout_ms = cognition_settings.deep_planner_timeout_ms
+        self.response_composer_mode = cognition_settings.response_composer_mode
+        self.response_composer_timeout_ms = (
+            cognition_settings.response_composer_timeout_ms
         )
-        self.tool_result_interpreter_timeout_ms = env_int(
-            "ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS", 5500, minimum=100
+        self.tool_result_interpreter_timeout_ms = (
+            cognition_settings.tool_result_interpreter_timeout_ms
         )
-        self.goal_association_mode = os.getenv(
-            "ORCH_GOAL_ASSOCIATION_MODE",
-            "off",
-        ).strip().lower()
-        if self.goal_association_mode not in {"off", "report_only"}:
-            raise ValueError("ORCH_GOAL_ASSOCIATION_MODE must be off or report_only")
-        self.goal_association_timeout_ms = env_int(
-            "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
-            3500,
-            minimum=100,
+        self.goal_association_mode = cognition_settings.goal_association_mode
+        self.goal_association_timeout_ms = (
+            cognition_settings.goal_association_timeout_ms
         )
-        self.task_continuity_mode = os.getenv(
-            "ORCH_TASK_CONTINUITY_MODE",
-            "off",
-        ).strip().lower()
-        if self.task_continuity_mode not in {"off", "report_only", "apply"}:
-            raise ValueError(
-                "ORCH_TASK_CONTINUITY_MODE must be off, report_only, or apply"
-            )
-        self.task_continuity_timeout_ms = env_int(
-            "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
-            3500,
-            minimum=100,
+        self.task_continuity_mode = cognition_settings.task_continuity_mode
+        self.task_continuity_timeout_ms = (
+            cognition_settings.task_continuity_timeout_ms
         )
-        self.cognitive_runtime_mode = os.getenv(
-            "ORCH_COGNITIVE_RUNTIME_MODE", "apply"
-        ).strip().lower()
-        if self.cognitive_runtime_mode not in {"off", "report_only", "apply"}:
-            raise ValueError(
-                "ORCH_COGNITIVE_RUNTIME_MODE must be off, report_only, or apply"
-            )
-        raw_apply_lanes = os.getenv(
-            "ORCH_COGNITIVE_APPLY_LANES", "chat,robot_action,tool"
+        self.cognitive_runtime_mode = cognition_settings.runtime_mode
+        self.cognitive_apply_lanes = cognition_settings.apply_lanes
+        requested_cognitive_fallback_policy = (
+            cognition_settings.requested_fallback_policy
         )
-        self.cognitive_apply_lanes = frozenset(
-            item.strip()
-            for item in raw_apply_lanes.split(",")
-            if item.strip()
-        )
-        requested_cognitive_fallback_policy = os.getenv(
-            "ORCH_COGNITIVE_FALLBACK_POLICY", "fail_closed"
-        ).strip().lower()
-        if requested_cognitive_fallback_policy not in {"legacy", "fail_closed"}:
-            raise ValueError(
-                "ORCH_COGNITIVE_FALLBACK_POLICY must be legacy or fail_closed"
-            )
         # Once the goal-driven pipeline starts, it owns semantic resolution for
-        # the turn. A later legacy planner would be a second authority, so the
-        # effective post-acquisition policy is always fail-closed. The legacy
-        # value is retained only as a deprecated configuration input.
+        # the turn. A later legacy planner would be a second authority.
         self.cognitive_fallback_policy = "fail_closed"
-        self.legacy_semantic_fallback_enabled = env_bool(
-            "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", False
+        self.legacy_semantic_fallback_enabled = (
+            cognition_settings.legacy_semantic_fallback_enabled
         )
         if requested_cognitive_fallback_policy == "legacy":
             logger.warning(
                 "ORCH_COGNITIVE_FALLBACK_POLICY=legacy is deprecated; "
                 "post-acquisition semantic fallback is forced to fail_closed"
             )
-        self.cognitive_runtime_timeout_ms = env_int(
-            "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS", 25000, minimum=1000
+        self.cognitive_runtime_timeout_ms = cognition_settings.runtime_timeout_ms
+        self.cognitive_host_replan_budget = cognition_settings.host_replan_budget
+        self.cognitive_evidence_enabled = evidence_settings.cognitive_enabled
+        self.cognitive_evidence_include_text = (
+            evidence_settings.cognitive_include_text
         )
-        self.cognitive_host_replan_budget = env_int(
-            "ORCH_COGNITIVE_HOST_REPLAN_BUDGET", 1, minimum=0
-        )
-        self.cognitive_evidence_enabled = env_bool(
-            "ORCH_COGNITIVE_EVIDENCE_ENABLED", True
-        )
-        self.cognitive_evidence_include_text = env_bool(
-            "ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT", False
-        )
-        cognitive_evidence_path = Path(
-            os.getenv(
-                "ORCH_COGNITIVE_EVIDENCE_PATH",
-                ".chromie/evidence/cognitive-runtime/events.jsonl",
-            )
-        ).expanduser()
-        if not cognitive_evidence_path.is_absolute():
-            cognitive_evidence_path = PROJECT_ROOT / cognitive_evidence_path
-        self.cognitive_evidence_path = cognitive_evidence_path
-        cognitive_run_identity_path = Path(
-            os.getenv(
-                "ORCH_COGNITIVE_RUN_IDENTITY_PATH",
-                ".chromie/evidence/runtime-identity.json",
-            )
-        ).expanduser()
-        if not cognitive_run_identity_path.is_absolute():
-            cognitive_run_identity_path = PROJECT_ROOT / cognitive_run_identity_path
-        self.cognitive_run_identity_path = cognitive_run_identity_path
+        self.cognitive_evidence_path = evidence_settings.cognitive_path
+        self.cognitive_run_identity_path = evidence_settings.runtime_identity_path
         self.cognitive_run_identity = load_runtime_evidence_identity(
-            cognitive_run_identity_path
+            self.cognitive_run_identity_path
         )
-        self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
-        self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
-        self.action_dry_run = env_bool("ORCH_ACTION_DRY_RUN", True)
+
+        self.agent_url = cognition_settings.agent_url
+        self.action_executor_url = cognition_settings.action_executor_url
+        self.action_dry_run = cognition_settings.action_dry_run
         self.abilities = build_default_ability_registry(
             enable_agent=self.enable_agent,
         )
-        self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "9000")))
-        self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
-        self.asr_timeout_s = max(
-            0.001,
-            int(os.getenv("ORCH_ASR_TIMEOUT_MS", "30000")) / 1000.0,
+        self.agent_client = AgentClient(
+            self.agent_url,
+            cognition_settings.agent_timeout_ms,
         )
+        self.action_client = ActionClient(
+            self.action_executor_url,
+            cognition_settings.action_timeout_ms,
+        )
+        self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)
 
-        self.min_rms = float(os.getenv("ORCH_MIN_RMS", "120"))
-        self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
-        self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "450"))
-        self.max_vad_utterance_ms = env_int(
-            "ORCH_VAD_MAX_UTTERANCE_MS",
-            20000,
-            minimum=1000,
-        )
-        self.input_gain = max(0.0, float(os.getenv("ORCH_INPUT_GAIN", "1.0")))
-        self.tts_flush_chars = int(os.getenv("TTS_FLUSH_CHARS", "160"))
-        self.tts_max_text_chars = max(20, int(os.getenv("TTS_MAX_TEXT_CHARS", "220")))
-        self.tts_text_chunking_enabled = env_bool("ORCH_TTS_TEXT_CHUNKING", True)
-        self.tts_chunk_chars = max(
-            20,
-            min(
-                self.tts_max_text_chars,
-                int(os.getenv("ORCH_TTS_CHUNK_CHARS", "120")),
-            ),
-        )
-        self.tts_cjk_chunk_chars = max(
-            12,
-            min(
-                self.tts_max_text_chars,
-                int(os.getenv("ORCH_TTS_CJK_CHUNK_CHARS", "36")),
-            ),
-        )
-        self.tts_first_chunk_chars = max(
-            0,
-            int(os.getenv("ORCH_TTS_FIRST_CHUNK_CHARS", "16")),
-        )
-        self.tts_min_chunk_chars = max(
-            1,
-            int(os.getenv("ORCH_TTS_MIN_CHUNK_CHARS", "20")),
-        )
-        self.tts_cjk_min_chunk_chars = max(
-            1,
-            int(os.getenv("ORCH_TTS_CJK_MIN_CHUNK_CHARS", "8")),
-        )
-        self.default_tts_rate = int(os.getenv("TTS_SAMPLE_RATE", "44100"))
-        self.speaker_id = os.getenv("TTS_SPEAKER_ID", "default")
-        self.save_audio_enabled = env_bool("ORCH_SAVE_AUDIO", False)
-        self.enable_session_timing = env_bool("ORCH_SESSION_TIMING_LOGS", True)
-        self.voice_system_prompt = os.getenv(
-            "ORCH_VOICE_SYSTEM_PROMPT",
-            "You are a real-time voice assistant. Answer briefly in 1 to 3 short sentences. "
-            "Do not use markdown. Do not use numbered lists unless the user explicitly asks for a list. "
-            "Avoid long explanations unless the user asks for details.",
-        )
-        self.tts_ws_retries = int(os.getenv("ORCH_TTS_WS_RETRIES", "2"))
-        self.tts_ws_retry_delay_ms = int(os.getenv("ORCH_TTS_WS_RETRY_DELAY_MS", "300"))
-        self.playback_chunk_ms = int(os.getenv("ORCH_PLAYBACK_CHUNK_MS", "80"))
+        self.min_rms = audio_settings.min_rms
+        self.barge_in_min_rms = audio_settings.barge_in_min_rms
+        self.min_audio_ms = audio_settings.min_audio_ms
+        self.max_vad_utterance_ms = audio_settings.vad_max_utterance_ms
+        self.input_gain = audio_settings.input_gain
+        self.tts_flush_chars = playback_settings.flush_chars
+        self.tts_max_text_chars = playback_settings.max_text_chars
+        self.tts_text_chunking_enabled = playback_settings.text_chunking_enabled
+        self.tts_chunk_chars = playback_settings.chunk_chars
+        self.tts_cjk_chunk_chars = playback_settings.cjk_chunk_chars
+        self.tts_first_chunk_chars = playback_settings.first_chunk_chars
+        self.tts_min_chunk_chars = playback_settings.min_chunk_chars
+        self.tts_cjk_min_chunk_chars = playback_settings.cjk_min_chunk_chars
+        self.default_tts_rate = playback_settings.sample_rate
+        self.speaker_id = playback_settings.speaker_id
+        self.save_audio_enabled = playback_settings.save_audio_enabled
+        self.enable_session_timing = session_settings.timing_logs_enabled
+        self.voice_system_prompt = playback_settings.voice_system_prompt
+        self.tts_ws_retries = playback_settings.ws_retries
+        self.tts_ws_retry_delay_ms = playback_settings.ws_retry_delay_ms
+        self.playback_chunk_ms = playback_settings.playback_chunk_ms
 
         self.asr_ws = None
         self.http_session: aiohttp.ClientSession | None = None
@@ -519,16 +401,11 @@ class VoiceAssistant:
         self.experience = ExperienceManager.from_env(PROJECT_ROOT)
         self.episode_recorder = EpisodeRecorder.from_env(PROJECT_ROOT)
         self.confirmation_dialogue = ConfirmationDialogue(
-            ttl_s=float(os.getenv("ORCH_CONFIRMATION_TTL_SEC", "20")),
+            ttl_s=session_settings.confirmation_ttl_s,
         )
-        self.body_recovery_max_attempts = env_int(
-            "ORCH_BODY_RECOVERY_MAX_ATTEMPTS",
-            1,
-        )
-        self.body_recovery_confirmation_ttl_s = env_float(
-            "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
-            10.0,
-            minimum=1.0,
+        self.body_recovery_max_attempts = session_settings.body_recovery_max_attempts
+        self.body_recovery_confirmation_ttl_s = (
+            session_settings.body_recovery_confirmation_ttl_s
         )
         logger.info(
             "Conversation state: enabled=%s conversation_id=%s max_turns=%s idle_s=%s hard_idle_s=%s max_context_chars=%s",
@@ -568,64 +445,38 @@ class VoiceAssistant:
         self.cognitive_runtime_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
-        self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
-        self.audio_output_mode = os.getenv("ORCH_AUDIO_OUTPUT_MODE", "device").strip().lower()
-        if self.audio_input_mode not in {"device", "stdin"}:
-            raise ValueError(
-                "ORCH_AUDIO_INPUT_MODE must be 'device' or 'stdin', got "
-                f"{self.audio_input_mode!r}"
-            )
-        if self.audio_output_mode not in {"device", "discard"}:
-            raise ValueError(
-                "ORCH_AUDIO_OUTPUT_MODE must be 'device' or 'discard', got "
-                f"{self.audio_output_mode!r}"
-            )
-        self.discard_playback_realtime = env_bool(
-            "ORCH_DISCARD_PLAYBACK_REALTIME",
-            True,
+        self.audio_input_mode = audio_settings.mode
+        self.audio_output_mode = playback_settings.output_mode
+        self.discard_playback_realtime = (
+            playback_settings.discard_playback_realtime
         )
-        self.runtime_ready_greeting_enabled = env_bool(
-            "ORCH_RUNTIME_READY_GREETING_ENABLED",
-            True,
+        self.runtime_ready_greeting_enabled = (
+            playback_settings.ready_greeting_enabled
         )
-        self.runtime_ready_greeting_text = os.getenv(
-            "ORCH_RUNTIME_READY_GREETING_TEXT",
-            "",
-        ).strip()
-        self.runtime_ready_greeting_fallback_text = os.getenv(
-            "ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT",
-            "嗨，我醒啦！",
-        ).strip()
-        self.runtime_ready_greeting_language = os.getenv(
-            "ORCH_RUNTIME_READY_GREETING_LANGUAGE",
-            "zh-CN",
-        ).strip() or "zh-CN"
-        self.runtime_ready_greeting_model = os.getenv(
-            "ORCH_RUNTIME_READY_GREETING_MODEL",
-            "",
-        ).strip()
-        self.runtime_ready_greeting_num_predict = env_int(
-            "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
-            32,
-            minimum=8,
+        self.runtime_ready_greeting_text = playback_settings.ready_greeting_text
+        self.runtime_ready_greeting_fallback_text = (
+            playback_settings.ready_greeting_fallback_text
         )
-        self.runtime_ready_greeting_generation_timeout_ms = env_int(
-            "ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS",
-            15000,
-            minimum=1000,
+        self.runtime_ready_greeting_language = (
+            playback_settings.ready_greeting_language
         )
-        self.runtime_ready_greeting_timeout_ms = env_int(
-            "ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS",
-            45000,
-            minimum=1000,
+        self.runtime_ready_greeting_model = playback_settings.ready_greeting_model
+        self.runtime_ready_greeting_num_predict = (
+            playback_settings.ready_greeting_num_predict
+        )
+        self.runtime_ready_greeting_generation_timeout_ms = (
+            playback_settings.ready_greeting_generation_timeout_ms
+        )
+        self.runtime_ready_greeting_timeout_ms = (
+            playback_settings.ready_greeting_timeout_ms
         )
 
         self.audio_mgr = AudioDeviceManager()
         if self.audio_input_mode == "device":
             self.input_params = self.audio_mgr.get_input_params()
         else:
-            injected_rate = int(os.getenv("ORCH_INPUT_RATE", "16000"))
-            injected_channels = int(os.getenv("ORCH_INPUT_CHANNELS", "1"))
+            injected_rate = audio_settings.injected_rate
+            injected_channels = audio_settings.injected_channels
             self.input_params = {
                 "name": "framed PCM16 stdin injection",
                 "device": None,
@@ -638,7 +489,7 @@ class VoiceAssistant:
         if self.audio_output_mode == "device":
             self.output_params = self.audio_mgr.get_output_params()
         else:
-            discard_rate = int(os.getenv("ORCH_OUTPUT_RATE", str(self.default_tts_rate)))
+            discard_rate = playback_settings.output_rate
             self.output_params = {
                 "name": "discarded acceptance playback",
                 "device": None,
@@ -703,10 +554,10 @@ class VoiceAssistant:
         self.target_asr_rate = 16000
         self.frame_duration_ms = 30
         self.vad = VAD(
-            mode=int(os.getenv("ORCH_VAD_MODE", "3")),
+            mode=audio_settings.vad_mode,
             sample_rate=self.target_asr_rate,
             frame_duration_ms=self.frame_duration_ms,
-            silence_timeout_ms=int(os.getenv("ORCH_VAD_SILENCE_MS", "650")),
+            silence_timeout_ms=audio_settings.vad_silence_ms,
             max_utterance_ms=self.max_vad_utterance_ms,
         )
 
@@ -722,44 +573,13 @@ class VoiceAssistant:
         self.playback_queue: asyncio.Queue = asyncio.Queue()
         self.playback_task: asyncio.Task | None = None
         self.active_synthesis_tasks: set[asyncio.Task] = set()
-        # ASR and routed-turn lifecycles are intentionally separate. Keeping
-        # handle_routed_text inside active_asr_task caused barge-in utterances
-        # to be dropped while the Agent or TTS was still working.
-        self.active_asr_task: asyncio.Task | None = None
-        self.active_turn_task: asyncio.Task | None = None
-        self.active_turn_tasks: dict[asyncio.Task, str] = {}
-        self._turn_cancellation_reasons: dict[asyncio.Task, str] = {}
-        self.active_reflex_task: asyncio.Task | None = None
-        self.concurrent_protective_reflex_tasks: set[asyncio.Task] = set()
+        # Task and playback state live in focused collaborators. The Host keeps
+        # compatibility properties below while lifecycle mutation is centralized
+        # and independently testable.
+        self.input_turn_lifecycle = InputTurnLifecycle()
+        self.playback_delivery = PlaybackDeliveryLifecycle()
         self._protective_reflex_failure = False
-        self._pending_turn_after_reflex: deque[tuple[str, str]] = deque()
-        self._pending_vad_audio: (
-            bytes | tuple[bytes, bool, int | None] | None
-        ) = None
-        self.synthesis_semaphore = asyncio.Semaphore(int(os.getenv("ORCH_TTS_CONCURRENCY", "1")))
-        self.next_playback_order = 0
-        self.pending_audio: dict[int, tuple[int, bytes, int, str | None, str | None]] = {}
-        self.synthesis_order = 0
-        self.playback_generation = 0
-        # Keep a bounded transcript of text scheduled in each playback
-        # generation.  ASR segments that started while that generation was
-        # playing can then be rejected as speaker echo before they re-enter the
-        # Cognitive Gateway as fake user turns.
-        self._tts_text_by_generation: dict[int, list[str]] = {}
-        self.playback_start_waiters: dict[
-            tuple[int, int, str | None],
-            asyncio.Future[bool],
-        ] = {}
-        self.cancelled_playback_orders: set[tuple[int, int, str | None]] = set()
-        # Current-turn speech is conversational state, not merely audio state.
-        # Fast-first speech may finish long before Response Composer runs, so
-        # preserve a bounded, playback-qualified record that later model stages
-        # can reason over without Host text matching or phrase rules.
-        self._turn_speech_events: dict[str, list[dict[str, Any]]] = {}
-        self._turn_speech_event_by_playback_key: dict[
-            tuple[int, int, str | None], str
-        ] = {}
-        self.order_lock = asyncio.Lock()
+        self.synthesis_semaphore = asyncio.Semaphore(playback_settings.concurrency)
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
         self.output_write_lock = asyncio.Lock()
@@ -772,22 +592,13 @@ class VoiceAssistant:
             maxsize=8
         )
         self.audio_device_monitor_task: asyncio.Task | None = None
-        recordings_dir = Path(os.getenv("RECORDINGS_DIR", "recordings")).expanduser()
-        if not recordings_dir.is_absolute():
-            recordings_dir = PROJECT_ROOT / recordings_dir
-        self.recordings_dir = str(recordings_dir.resolve())
+        recordings_dir = evidence_settings.recordings_dir
+        self.recordings_dir = str(recordings_dir)
         recordings_dir.mkdir(parents=True, exist_ok=True)
 
         soridormi_invoker = None
         if self.enable_soridormi_skills:
-            manifest_path = Path(
-                os.getenv(
-                    "ORCH_SORIDORMI_MANIFEST",
-                    str(PROJECT_ROOT / "capabilities" / "soridormi.json"),
-                )
-            ).expanduser()
-            if not manifest_path.is_absolute():
-                manifest_path = PROJECT_ROOT / manifest_path
+            manifest_path = cognition_settings.soridormi_manifest
             soridormi_invoker = build_soridormi_invoker(
                 manifest_path=manifest_path,
             )
@@ -801,7 +612,7 @@ class VoiceAssistant:
             conversation_memory_handler=(
                 self.conversation_state.retrieve_verified_tool_memory
             ),
-            capability_manifest_paths=os.getenv("AGENT_CAPABILITY_MANIFESTS", ""),
+            capability_manifest_paths=cognition_settings.capability_manifest_paths,
         )
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
@@ -829,11 +640,7 @@ class VoiceAssistant:
             agent_client=self.agent_client,
             adapter=CanonicalPlanRuntimeAdapter(
                 self.interaction_runtime,
-                social_attention_mode=(
-                    os.getenv("CHROMIE_SOCIAL_ATTENTION_MODE")
-                    or os.getenv("AGENT_SOCIAL_ATTENTION_MODE")
-                    or "on"
-                ),
+                social_attention_mode=cognition_settings.social_attention_mode,
             ),
             policy=self.cognitive_runtime_policy,
             # Goal Association is already the validated, model-owned semantic
@@ -872,13 +679,171 @@ class VoiceAssistant:
     def maybe_session_done(self, sid: Optional[str]) -> None:
         self.sessions.maybe_done(sid)
 
+    def _playback_state(self) -> PlaybackDeliveryLifecycle:
+        state = self.__dict__.get("playback_delivery")
+        if not isinstance(state, PlaybackDeliveryLifecycle):
+            state = PlaybackDeliveryLifecycle()
+            self.__dict__["playback_delivery"] = state
+        return state
+
+    def _input_turn_state(self) -> InputTurnLifecycle:
+        state = self.__dict__.get("input_turn_lifecycle")
+        if not isinstance(state, InputTurnLifecycle):
+            state = InputTurnLifecycle()
+            self.__dict__["input_turn_lifecycle"] = state
+        return state
+
+    @property
+    def next_playback_order(self) -> int:
+        return self._playback_state().next_playback_order
+
+    @next_playback_order.setter
+    def next_playback_order(self, value: int) -> None:
+        self._playback_state().next_playback_order = int(value)
+
+    @property
+    def pending_audio(self) -> dict[int, tuple[int, bytes, int, str | None, str | None]]:
+        return self._playback_state().pending_audio
+
+    @pending_audio.setter
+    def pending_audio(self, value: dict[int, tuple[int, bytes, int, str | None, str | None]]) -> None:
+        self._playback_state().pending_audio = value
+
+    @property
+    def synthesis_order(self) -> int:
+        return self._playback_state().synthesis_order
+
+    @synthesis_order.setter
+    def synthesis_order(self, value: int) -> None:
+        self._playback_state().synthesis_order = int(value)
+
+    @property
+    def playback_generation(self) -> int:
+        return self._playback_state().playback_generation
+
+    @playback_generation.setter
+    def playback_generation(self, value: int) -> None:
+        self._playback_state().playback_generation = int(value)
+
+    @property
+    def _tts_text_by_generation(self) -> dict[int, list[str]]:
+        return self._playback_state().tts_text_by_generation
+
+    @_tts_text_by_generation.setter
+    def _tts_text_by_generation(self, value: dict[int, list[str]]) -> None:
+        self._playback_state().tts_text_by_generation = value
+
+    @property
+    def playback_start_waiters(self) -> dict[tuple[int, int, str | None], asyncio.Future[bool]]:
+        return self._playback_state().playback_start_waiters
+
+    @playback_start_waiters.setter
+    def playback_start_waiters(self, value: dict[tuple[int, int, str | None], asyncio.Future[bool]]) -> None:
+        self._playback_state().playback_start_waiters = value
+
+    @property
+    def cancelled_playback_orders(self) -> set[tuple[int, int, str | None]]:
+        return self._playback_state().cancelled_playback_orders
+
+    @cancelled_playback_orders.setter
+    def cancelled_playback_orders(self, value: set[tuple[int, int, str | None]]) -> None:
+        self._playback_state().cancelled_playback_orders = value
+
+    @property
+    def _turn_speech_events(self) -> dict[str, list[dict[str, Any]]]:
+        return self._playback_state().turn_speech_events
+
+    @_turn_speech_events.setter
+    def _turn_speech_events(self, value: dict[str, list[dict[str, Any]]]) -> None:
+        self._playback_state().turn_speech_events = value
+
+    @property
+    def _turn_speech_event_by_playback_key(self) -> dict[tuple[int, int, str | None], str]:
+        return self._playback_state().turn_speech_event_by_playback_key
+
+    @_turn_speech_event_by_playback_key.setter
+    def _turn_speech_event_by_playback_key(self, value: dict[tuple[int, int, str | None], str]) -> None:
+        self._playback_state().turn_speech_event_by_playback_key = value
+
+    @property
+    def order_lock(self) -> asyncio.Lock:
+        return self._playback_state().order_lock
+
+    @order_lock.setter
+    def order_lock(self, value: asyncio.Lock) -> None:
+        self._playback_state().order_lock = value
+
+    @property
+    def active_asr_task(self) -> asyncio.Task | None:
+        return self._input_turn_state().active_asr_task
+
+    @active_asr_task.setter
+    def active_asr_task(self, value: asyncio.Task | None) -> None:
+        self._input_turn_state().active_asr_task = value
+
+    @property
+    def active_turn_task(self) -> asyncio.Task | None:
+        return self._input_turn_state().active_turn_task
+
+    @active_turn_task.setter
+    def active_turn_task(self, value: asyncio.Task | None) -> None:
+        self._input_turn_state().active_turn_task = value
+
+    @property
+    def active_turn_tasks(self) -> dict[asyncio.Task, str]:
+        return self._input_turn_state().active_turn_tasks
+
+    @active_turn_tasks.setter
+    def active_turn_tasks(self, value: dict[asyncio.Task, str]) -> None:
+        self._input_turn_state().active_turn_tasks = value
+
+    @property
+    def _turn_cancellation_reasons(self) -> dict[asyncio.Task, str]:
+        return self._input_turn_state().turn_cancellation_reasons
+
+    @_turn_cancellation_reasons.setter
+    def _turn_cancellation_reasons(self, value: dict[asyncio.Task, str]) -> None:
+        self._input_turn_state().turn_cancellation_reasons = value
+
+    @property
+    def active_reflex_task(self) -> asyncio.Task | None:
+        return self._input_turn_state().active_reflex_task
+
+    @active_reflex_task.setter
+    def active_reflex_task(self, value: asyncio.Task | None) -> None:
+        self._input_turn_state().active_reflex_task = value
+
+    @property
+    def concurrent_protective_reflex_tasks(self) -> set[asyncio.Task]:
+        return self._input_turn_state().concurrent_protective_reflex_tasks
+
+    @concurrent_protective_reflex_tasks.setter
+    def concurrent_protective_reflex_tasks(self, value: set[asyncio.Task]) -> None:
+        self._input_turn_state().concurrent_protective_reflex_tasks = value
+
+    @property
+    def _pending_turn_after_reflex(self) -> deque[tuple[str, str]]:
+        return self._input_turn_state().pending_turn_after_reflex
+
+    @_pending_turn_after_reflex.setter
+    def _pending_turn_after_reflex(self, value: deque[tuple[str, str]]) -> None:
+        self._input_turn_state().pending_turn_after_reflex = value
+
+    @property
+    def _pending_vad_audio(self) -> bytes | tuple[bytes, bool, int | None] | None:
+        return self._input_turn_state().pending_vad_audio
+
+    @_pending_vad_audio.setter
+    def _pending_vad_audio(self, value: bytes | tuple[bytes, bool, int | None] | None) -> None:
+        self._input_turn_state().pending_vad_audio = value
+
     def playback_start_key(
         self,
         generation: int,
         order: int,
         session_id: Optional[str],
     ) -> tuple[int, int, str | None]:
-        return (generation, order, session_id)
+        return self._playback_state().key(generation, order, session_id)
 
     def _register_turn_speech_event(
         self,
@@ -893,46 +858,17 @@ class VoiceAssistant:
         intent: str = "",
         commitment: str = "",
     ) -> dict[str, Any] | None:
-        sid = str(session_id or "").strip()
-        normalized_text = self.normalize_tts_candidate(text)
-        if not sid or not orders or not normalized_text:
-            return None
-        event_seed = (
-            f"{sid}|{generation}|{orders[0]}|{stage}|{purpose}|{normalized_text}"
+        return self._playback_state().register_turn_speech_event(
+            session_id=session_id,
+            generation=generation,
+            orders=orders,
+            normalized_text=self.normalize_tts_candidate(text),
+            stage=stage,
+            purpose=purpose,
+            route=route,
+            intent=intent,
+            commitment=commitment,
         )
-        event_id = "speech_event_" + hashlib.sha256(
-            event_seed.encode("utf-8")
-        ).hexdigest()[:20]
-        event = {
-            "event_id": event_id,
-            "session_id": sid,
-            "stage": stage,
-            "purpose": purpose,
-            "status": "scheduled",
-            "text": normalized_text,
-            "route": str(route or ""),
-            "intent": str(intent or ""),
-            "commitment": str(commitment or ""),
-            "generation": int(generation),
-            "orders": [int(order) for order in orders],
-        }
-        events_by_sid = getattr(self, "_turn_speech_events", None)
-        if not isinstance(events_by_sid, dict):
-            events_by_sid = {}
-            self._turn_speech_events = events_by_sid
-        playback_index = getattr(
-            self, "_turn_speech_event_by_playback_key", None
-        )
-        if not isinstance(playback_index, dict):
-            playback_index = {}
-            self._turn_speech_event_by_playback_key = playback_index
-        events = events_by_sid.setdefault(sid, [])
-        events.append(event)
-        if len(events) > 12:
-            del events[:-12]
-        first_key = self.playback_start_key(generation, orders[0], session_id)
-        playback_index[first_key] = event_id
-        return event
 
     def _update_turn_speech_event_for_playback(
         self,
@@ -943,38 +879,19 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        key = self.playback_start_key(generation, order, session_id)
-        playback_index = getattr(
-            self, "_turn_speech_event_by_playback_key", None
+        self._playback_state().update_turn_speech_event_for_playback(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+            started=started,
+            reason=reason,
         )
-        if not isinstance(playback_index, dict):
-            return
-        event_id = playback_index.pop(key, None)
-        sid = str(session_id or "").strip()
-        if not event_id or not sid:
-            return
-        events_by_sid = getattr(self, "_turn_speech_events", None)
-        if not isinstance(events_by_sid, dict):
-            return
-        for event in reversed(events_by_sid.get(sid, [])):
-            if event.get("event_id") != event_id:
-                continue
-            event["status"] = "playback_started" if started else "not_delivered"
-            event["playback_reason"] = str(reason or "")
-            break
 
     def _delivered_turn_speech_events(
         self,
         session_id: str,
     ) -> list[dict[str, Any]]:
-        events_by_sid = getattr(self, "_turn_speech_events", None)
-        if not isinstance(events_by_sid, dict):
-            return []
-        return [
-            dict(event)
-            for event in events_by_sid.get(str(session_id or ""), [])
-            if event.get("status") in {"playback_started", "playback_completed"}
-        ]
+        return self._playback_state().delivered_turn_speech_events(session_id)
 
     def resolve_playback_start_waiter(
         self,
@@ -985,25 +902,21 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        key = self.playback_start_key(generation, order, session_id)
-        waiter = self.playback_start_waiters.pop(key, None)
-        if waiter is None or waiter.done():
-            return
-        waiter.set_result(started)
-        self._update_turn_speech_event_for_playback(
+        resolved = self._playback_state().resolve_playback_start_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
             started=started,
             reason=reason,
         )
-        self.session_log(
-            session_id,
-            "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
-            order,
-            started,
-            reason,
-        )
+        if resolved:
+            self.session_log(
+                session_id,
+                "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
+                order,
+                started,
+                reason,
+            )
 
     def resolve_all_playback_start_waiters(
         self,
@@ -1011,25 +924,17 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        waiters = list(self.playback_start_waiters.items())
-        self.playback_start_waiters.clear()
-        for (generation, order, session_id), waiter in waiters:
-            if not waiter.done():
-                waiter.set_result(started)
-                self._update_turn_speech_event_for_playback(
-                    generation=generation,
-                    order=order,
-                    session_id=session_id,
-                    started=started,
-                    reason=reason,
-                )
-                self.session_log(
-                    session_id,
-                    "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
-                    order,
-                    started,
-                    reason,
-                )
+        for _, order, session_id in self._playback_state().resolve_all_playback_start_waiters(
+            started=started,
+            reason=reason,
+        ):
+            self.session_log(
+                session_id,
+                "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
+                order,
+                started,
+                reason,
+            )
 
     async def wait_for_playback_start(
         self,
@@ -1039,24 +944,20 @@ class VoiceAssistant:
         session_id: Optional[str],
         timeout_s: float,
     ) -> bool:
-        key = self.playback_start_key(generation, order, session_id)
-        waiter = self.playback_start_waiters.get(key)
-        if waiter is None:
-            return False
-        try:
-            # Keep the waiter live on timeout so the caller can invalidate the
-            # scheduled order.  ``wait_for`` otherwise cancels the Future and
-            # a late synthesis result can slip through to audible playback
-            # after the physical-effect barrier has already failed.
-            return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
-        except TimeoutError:
+        started = await self._playback_state().wait_for_playback_start(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+            timeout_s=timeout_s,
+        )
+        if not started:
             self.session_log(
                 session_id,
                 "tts_playback_start_waiter_timeout: order=%s timeout_s=%.3f",
                 order,
                 timeout_s,
             )
-            return False
+        return started
 
     def _cancel_playback_order_before_start(
         self,
@@ -1066,20 +967,14 @@ class VoiceAssistant:
         session_id: str | None,
         reason: str,
     ) -> bool:
-        key = self.playback_start_key(generation, order, session_id)
-        if not hasattr(self, "cancelled_playback_orders"):
-            self.cancelled_playback_orders = set()
-        waiter = self.playback_start_waiters.get(key)
-        if waiter is None or waiter.done():
-            return False
-        self.cancelled_playback_orders.add(key)
-        self.resolve_playback_start_waiter(
-            generation,
-            order,
-            session_id,
-            started=False,
+        cancelled = self._playback_state().cancel_order_before_start(
+            generation=generation,
+            order=order,
+            session_id=session_id,
             reason=reason,
         )
+        if not cancelled:
+            return False
         state = self.sessions.state.get(session_id or "")
         if state is not None:
             state["skipped_tts"] = int(state.get("skipped_tts", 0)) + 1
@@ -2522,14 +2417,25 @@ class VoiceAssistant:
             and metadata.get("wait_for_playback_start") is True
             and scheduled.get("scheduled") is True
         ):
+            default_playback_timeout_ms = int(
+                getattr(
+                    getattr(
+                        getattr(self, "host_settings", None),
+                        "playback",
+                        None,
+                    ),
+                    "playback_start_timeout_ms",
+                    20000,
+                )
+            )
             raw_timeout_ms = metadata.get(
                 "playback_start_timeout_ms",
-                os.getenv("ORCH_TTS_PLAYBACK_START_TIMEOUT_MS", "20000"),
+                default_playback_timeout_ms,
             )
             try:
                 timeout_ms = int(raw_timeout_ms)
             except (TypeError, ValueError):
-                timeout_ms = 20000
+                timeout_ms = default_playback_timeout_ms
             playback_started = await self.wait_for_playback_start(
                 generation=int(scheduled["generation"]),
                 order=int(scheduled["order"]),
@@ -6361,7 +6267,6 @@ class VoiceAssistant:
         language = "zh-CN" if self._looks_zh(user_text) else "en-US"
         failure_response_model = (
             str(getattr(self, "failure_response_model", "") or "").strip()
-            or os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "").strip()
             or str(getattr(self, "ollama_model", "") or "").strip()
         )
         llm_url = str(getattr(self, "llm_url", "") or "").strip()
@@ -8731,20 +8636,8 @@ class VoiceAssistant:
         *,
         excluding: asyncio.Task | None = None,
     ) -> bool:
-        primary = getattr(self, "active_reflex_task", None)
-        if (
-            primary is not None
-            and primary is not excluding
-            and not primary.done()
-        ):
-            return True
-        return any(
-            task is not excluding and not task.done()
-            for task in getattr(
-                self,
-                "concurrent_protective_reflex_tasks",
-                set(),
-            )
+        return self._input_turn_state().has_active_protective_reflex(
+            excluding=excluding
         )
 
     def _cancel_active_routed_turns(
@@ -8754,52 +8647,21 @@ class VoiceAssistant:
         cancel_all: bool,
         reason: str,
     ) -> tuple[str, ...]:
-        """Cancel routed work only after an explicit scoped decision.
+        """Cancel routed work only after an explicit scoped decision."""
 
-        Ordinary turn launch never calls this method. Deterministic controls
-        and a Core-authorized semantic interruption do, with global emergency
-        selecting all eligible ordinary work and narrower scopes selecting the
-        foreground (most recently launched) turn.
-        """
-
-        active_turns = getattr(self, "active_turn_tasks", None)
-        if not isinstance(active_turns, dict):
-            active_turns = {}
-            self.active_turn_tasks = active_turns
-
-        protected = {
-            task
-            for task in {
-                getattr(self, "active_reflex_task", None),
-                *getattr(self, "concurrent_protective_reflex_tasks", set()),
-            }
-            if task is not None
-        }
-        candidates = [
-            (task, session_id)
-            for task, session_id in active_turns.items()
-            if task is not excluding
-            and task not in protected
-            and not task.done()
-        ]
-        if not cancel_all and candidates:
-            candidates = candidates[-1:]
-        reasons = getattr(self, "_turn_cancellation_reasons", None)
-        if not isinstance(reasons, dict):
-            reasons = {}
-            self._turn_cancellation_reasons = reasons
-        cancelled_session_ids: list[str] = []
-        for task, session_id in candidates:
-            reasons[task] = reason
-            task.cancel()
-            cancelled_session_ids.append(session_id)
+        cancelled_session_ids = self._input_turn_state().request_turn_cancellation(
+            excluding=excluding,
+            cancel_all=cancel_all,
+            reason=reason,
+        )
+        for session_id in cancelled_session_ids:
             self.session_log(
                 session_id or None,
                 "routed_turn_cancellation_requested: reason=%s scope=%s",
                 reason,
                 "all" if cancel_all else "foreground",
             )
-        return tuple(cancelled_session_ids)
+        return cancelled_session_ids
 
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
         reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
@@ -8812,18 +8674,15 @@ class VoiceAssistant:
                 task = asyncio.create_task(
                     self.handle_routed_text(user_text, session_id)
                 )
-                tasks = getattr(
-                    self,
-                    "concurrent_protective_reflex_tasks",
-                    None,
+                lifecycle = self._input_turn_state()
+                lifecycle.register_turn(
+                    task,
+                    session_id,
+                    protective_reflex=True,
+                    concurrent_reflex=True,
                 )
-                if not isinstance(tasks, set):
-                    tasks = set()
-                    self.concurrent_protective_reflex_tasks = tasks
-                tasks.add(task)
 
                 def protective_done(completed: asyncio.Task) -> None:
-                    tasks.discard(completed)
                     self._on_routed_turn_done(
                         completed,
                         session_id,
@@ -8837,26 +8696,27 @@ class VoiceAssistant:
                     reflex_candidate.cancellation_scope,
                 )
                 return
-            pending = self._pending_turn_after_reflex
-            pending.append((user_text, session_id))
+            queue_depth = self._input_turn_state().queue_turn_after_reflex(
+                user_text,
+                session_id,
+            )
             self.session_log(
                 session_id,
                 "turn_queued_behind_cognitive_gateway_reflex: queue_depth=%s",
-                len(pending),
+                queue_depth,
             )
             return
 
         task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
-        active_turns = getattr(self, "active_turn_tasks", None)
-        if not isinstance(active_turns, dict):
-            active_turns = {}
-            self.active_turn_tasks = active_turns
-        active_turns[task] = session_id
-        self.active_turn_task = task
-        if reflex_candidate.action == "interrupt":
-            # Mark the task at launch time so a following utterance cannot
-            # cancel it before the coroutine reaches its first instruction.
-            self.active_reflex_task = task
+        is_reflex = reflex_candidate.action == "interrupt"
+        self._input_turn_state().register_turn(
+            task,
+            session_id,
+            protective_reflex=is_reflex,
+        )
+        if is_reflex:
+            # Marked at launch time so a following utterance cannot cancel it
+            # before the coroutine reaches its first instruction.
             self._protective_reflex_failure = False
         task.add_done_callback(
             lambda completed, sid=session_id: self._on_routed_turn_done(
@@ -8872,33 +8732,17 @@ class VoiceAssistant:
         *,
         concurrent_reflex: bool = False,
     ) -> None:
-        was_primary_reflex = (
-            getattr(self, "active_reflex_task", None) is task
+        lifecycle = self._input_turn_state()
+        was_concurrent_hint = concurrent_reflex or task in (
+            lifecycle.concurrent_protective_reflex_tasks
         )
-        was_concurrent_reflex = concurrent_reflex or task in getattr(
-            self,
-            "concurrent_protective_reflex_tasks",
-            set(),
-        )
+        (
+            cancellation_reason,
+            was_primary_reflex,
+            was_concurrent_reflex,
+        ) = lifecycle.unregister_turn(task)
+        was_concurrent_reflex = was_concurrent_reflex or was_concurrent_hint
         was_reflex = was_primary_reflex or was_concurrent_reflex
-        active_turns = getattr(self, "active_turn_tasks", None)
-        if isinstance(active_turns, dict):
-            active_turns.pop(task, None)
-        reasons = getattr(self, "_turn_cancellation_reasons", None)
-        cancellation_reason = (
-            reasons.pop(task, None)
-            if isinstance(reasons, dict)
-            else None
-        )
-        if getattr(self, "active_turn_task", None) is task:
-            self.active_turn_task = next(
-                (
-                    candidate
-                    for candidate in reversed(list((active_turns or {}).keys()))
-                    if not candidate.done()
-                ),
-                None,
-            )
         completed_ok = False
         if task.cancelled():
             self.session_log(
@@ -8926,12 +8770,9 @@ class VoiceAssistant:
             return
         if not completed_ok:
             self._protective_reflex_failure = True
-        if was_primary_reflex:
-            self.active_reflex_task = None
         if self._has_active_protective_reflex():
             return
-        pending = list(self._pending_turn_after_reflex)
-        self._pending_turn_after_reflex = deque()
+        pending = self._input_turn_state().drain_turns_after_reflex()
         protective_failed = bool(
             getattr(self, "_protective_reflex_failure", False)
         )
@@ -8972,10 +8813,10 @@ class VoiceAssistant:
             )
         else:
             queued = audio
-        active = getattr(self, "active_asr_task", None)
+        lifecycle = self._input_turn_state()
+        active = lifecycle.active_asr_task
         if active is not None and not active.done():
-            replaced = getattr(self, "_pending_vad_audio", None) is not None
-            self._pending_vad_audio = queued
+            replaced = lifecycle.queue_pending_vad_audio(queued)
             logger.info(
                 "ASR is processing; queued latest utterance%s",
                 " and replaced older pending audio" if replaced else "",
@@ -8988,19 +8829,18 @@ class VoiceAssistant:
                 playback_generation_at_start=playback_generation_at_start,
             )
         )
-        self.active_asr_task = task
+        lifecycle.register_asr_task(task)
         task.add_done_callback(self._on_asr_task_done)
 
     def _on_asr_task_done(self, task: asyncio.Task) -> None:
-        if getattr(self, "active_asr_task", None) is task:
-            self.active_asr_task = None
+        lifecycle = self._input_turn_state()
+        lifecycle.complete_asr_task(task)
         if not task.cancelled():
             try:
                 task.result()
             except Exception as exc:  # pragma: no cover - handle_vad_audio logs normally
                 logger.error("ASR task failed: %s", exc, exc_info=True)
-        pending = getattr(self, "_pending_vad_audio", None)
-        self._pending_vad_audio = None
+        pending = lifecycle.take_pending_vad_audio()
         if pending:
             if isinstance(pending, tuple) and len(pending) == 3:
                 (
@@ -9155,18 +8995,33 @@ class VoiceAssistant:
             )
             await self._feed_vad_pcm16(pcm_16k)
             # Ensure the VAD sees enough trailing silence to close the utterance.
-            silence_ms = max(
-                900,
-                int(os.getenv("ORCH_VAD_SILENCE_MS", "650")) + 150,
+            configured_vad_silence_ms = int(
+                getattr(
+                    getattr(
+                        getattr(self, "host_settings", None),
+                        "audio_input",
+                        None,
+                    ),
+                    "vad_silence_ms",
+                    650,
+                )
             )
+            silence_ms = max(900, configured_vad_silence_ms + 150)
             silence = b"\x00\x00" * int(
                 self.target_asr_rate * silence_ms / 1000
             )
             await self._feed_vad_pcm16(silence)
 
     async def _session_idle_sweeper(self) -> None:
-        interval_s = max(1.0, float(os.getenv("ORCH_SESSION_IDLE_SWEEP_S", "5")))
-        idle_timeout_ms = max(1000.0, float(os.getenv("ORCH_SESSION_IDLE_TIMEOUT_MS", "120000")))
+        session_settings = getattr(
+            getattr(self, "host_settings", None),
+            "session",
+            None,
+        )
+        interval_s = float(getattr(session_settings, "idle_sweep_s", 5.0))
+        idle_timeout_ms = float(
+            getattr(session_settings, "idle_timeout_ms", 120000.0)
+        )
         loop = asyncio.get_running_loop()
         expected_wake = loop.time() + interval_s
         while True:

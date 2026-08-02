@@ -23,6 +23,9 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from check_local_runtime_exposure import audit_compose_sources  # noqa: E402
+from check_runtime_exception_boundaries import (  # noqa: E402
+    audit_runtime_exception_boundaries,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXCEPTIONS = Path("config/repository_policy_exceptions.json")
@@ -42,6 +45,7 @@ RULE_MEMORY_MODEL_AUTHORED = "memory.model_authored_update"
 RULE_CANONICAL_CAPABILITY_ID = "contracts.canonical_capability_identity"
 RULE_EXCEPTION_CONFIG = "policy.exception_config"
 RULE_STALE_EXCEPTION = "policy.exception_stale"
+RULE_UNCLASSIFIED_BROAD_EXCEPTION = "python.unclassified_broad_exception"
 
 EXCEPTION_TARGET_RULES = frozenset(
     {
@@ -1170,6 +1174,16 @@ def audit_repository(
     findings.extend(audit_agent_skill_selection(root))
     findings.extend(audit_semantic_authority_boundaries(root))
     findings.extend(audit_canonical_capability_identity(root))
+    findings.extend(
+        PolicyFinding(
+            rule_id=RULE_UNCLASSIFIED_BROAD_EXCEPTION,
+            path=item.path,
+            line=item.line,
+            symbol=item.symbol,
+            message=item.message,
+        )
+        for item in audit_runtime_exception_boundaries(root)
+    )
     exceptions, config_findings = load_policy_exceptions(
         configured_exception_path, root
     )

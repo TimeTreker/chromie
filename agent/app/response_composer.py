@@ -23,11 +23,14 @@ from .schema import AgentRunRequest
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
+        DirectResponseComposition,
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
+        goal_association_fingerprint,
     )
     from chromie_contracts.semantic_task import (
         ResponsePlan,
@@ -40,11 +43,14 @@ try:
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
+        DirectResponseComposition,
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
+        goal_association_fingerprint,
     )
     from shared.chromie_contracts.semantic_task import (
         ResponsePlan,
@@ -123,6 +129,10 @@ class ResponseComposerResolver:
 
     async def _resolve(self, request: AgentRunRequest) -> ResponseCompositionResolution:
         plan = self._canonical_plan(request.context)
+        if plan is None:
+            direct_association = self._direct_goal_association(request.context)
+            if direct_association is not None:
+                return await self._resolve_direct(request, direct_association)
         if plan is None or plan.disposition == "escalate":
             return ResponseCompositionResolution(
                 status="invalid_input",
@@ -908,6 +918,320 @@ class ResponseComposerResolver:
         return errors
 
     @staticmethod
+    def _direct_goal_association(
+        context: dict[str, Any],
+    ) -> GoalAssociationResolution | None:
+        value = context.get("direct_goal_association_resolution")
+        if isinstance(value, GoalAssociationResolution):
+            association = value
+        elif isinstance(value, dict):
+            try:
+                association = GoalAssociationResolution.model_validate(value)
+            except ValidationError:
+                return None
+        else:
+            return None
+        if association.clarification or association.associations or not association.new_goals:
+            return None
+        if any(
+            str((goal.metadata or {}).get("responsibility_kind") or "")
+            != "spoken_response"
+            for goal in association.new_goals
+        ):
+            return None
+        if any(not str(goal.goal_id or "").strip() for goal in association.new_goals):
+            return None
+        return association
+
+    @staticmethod
+    def _direct_goal_ids(association: GoalAssociationResolution) -> list[str]:
+        return list(
+            dict.fromkeys(
+                str(goal.goal_id or "").strip()
+                for goal in association.new_goals
+                if str(goal.goal_id or "").strip()
+            )
+        )
+
+    @staticmethod
+    def _direct_composition_id(
+        request: AgentRunRequest,
+        association: GoalAssociationResolution,
+    ) -> str:
+        digest = hashlib.sha256(
+            (
+                f"{request.sid or 'turn'}|"
+                f"{goal_association_fingerprint(association)}|direct-response"
+            ).encode()
+        ).hexdigest()[:20]
+        return f"composition_{digest}"
+
+    async def _resolve_direct(
+        self,
+        request: AgentRunRequest,
+        association: GoalAssociationResolution,
+    ) -> ResponseCompositionResolution:
+        goal_ids = self._direct_goal_ids(association)
+        response_schema = self._direct_response_schema(goal_ids, request.context)
+        previous_raw: Any = None
+        validation_errors = ""
+        repair_attempted = False
+        for attempt in range(2):
+            raw: Any = None
+            try:
+                raw = await self.ollama.generate(
+                    self._direct_prompt(
+                        request,
+                        association,
+                        previous_raw=previous_raw,
+                        validation_errors=validation_errors,
+                    ),
+                    system=(
+                        self._repair_system_prompt()
+                        if repair_attempted
+                        else self._system_prompt()
+                    ),
+                    options={
+                        "temperature": 0.2,
+                        "top_p": 0.9,
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                    },
+                    response_format=response_schema,
+                )
+                if not isinstance(raw, dict):
+                    raise ValueError("response composer output is not a JSON object")
+                output = ResponseComposerModelOutput.model_validate(raw)
+                self._validate_social_attention_decision(
+                    output.social_attention_plan,
+                    context=request.context,
+                )
+                self._validate_direct_response_plan(
+                    output.response_plan,
+                    goal_ids=goal_ids,
+                )
+                self._validate_spoken_language(output.response_plan, request=request)
+                social_plan, social_reasons = self._validated_social_plan(
+                    output.social_attention_plan,
+                    plan=None,
+                    context=request.context,
+                )
+                composition = DirectResponseComposition(
+                    composition_id=self._direct_composition_id(
+                        request, association
+                    ),
+                    goal_association_fingerprint=(
+                        goal_association_fingerprint(association)
+                    ),
+                    goal_association=association,
+                    response_plan=output.response_plan,
+                    social_attention_plan=social_plan,
+                    confidence=output.confidence,
+                    rationale=output.rationale,
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "planless_direct_response": True,
+                        "goal_association_immutable": True,
+                        "social_attention_validation_reasons": social_reasons,
+                        "contract_schema": "ResponseComposerModelOutput",
+                        "contract_repair_attempted": repair_attempted,
+                        "contract_repair_succeeded": repair_attempted,
+                    },
+                )
+                return ResponseCompositionResolution(
+                    status="resolved",
+                    composition=composition,
+                    reason_summary=(
+                        "Model-authored spoken Goals were composed without a "
+                        "planning transport stage."
+                    ),
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "planless_direct_response": True,
+                        "contract_repair_attempted": repair_attempted,
+                        "contract_repair_succeeded": repair_attempted,
+                    },
+                )
+            except Exception as exc:
+                failure = llm_failure_metadata(exc)
+                logger.warning(
+                    "response_composer_direct_inference_failed sid=%s attempt=%s "
+                    "error_type=%s error=%s failure_class=%s failure_domain=%s",
+                    request.sid,
+                    attempt + 1,
+                    type(exc).__name__,
+                    exc,
+                    failure["failure_class"],
+                    failure["failure_domain"],
+                )
+                if attempt == 0 and isinstance(
+                    exc, (ValidationError, json.JSONDecodeError, ValueError)
+                ):
+                    repair_attempted = True
+                    previous_raw = raw
+                    validation_errors = self._validation_error_json(exc)
+                    continue
+                return ResponseCompositionResolution(
+                    status=(
+                        "invalid_input"
+                        if failure["failure_domain"] == "model_contract"
+                        else "model_unavailable"
+                    ),
+                    reason_summary=(
+                        "Direct response composition did not complete successfully."
+                    ),
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "planless_direct_response": True,
+                        "contract_repair_attempted": repair_attempted,
+                        **failure,
+                    },
+                )
+        raise AssertionError("unreachable direct response composition loop")
+
+    @staticmethod
+    def _validate_direct_response_plan(
+        response_plan: ResponsePlan,
+        *,
+        goal_ids: list[str],
+    ) -> None:
+        if (
+            response_plan.immediate is not None
+            or response_plan.pre_action is not None
+            or response_plan.progress
+            or response_plan.final is None
+        ):
+            raise ValueError(
+                "direct spoken Goals require exactly one final response stage"
+            )
+        final = response_plan.final
+        if set(final.covers_goal_ids) != set(goal_ids):
+            raise ValueError("direct response must cover every spoken Goal")
+        if final.commitment_state != "completed":
+            raise ValueError("direct response must complete the spoken Goals")
+        if final.must_not_claim_completion:
+            raise ValueError(
+                "direct response must permit completion of the authored speech"
+            )
+
+    @staticmethod
+    def _direct_response_schema(
+        goal_ids: list[str],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
+        schema["title"] = "DirectResponseComposerModelOutput"
+        if ResponseComposerResolver._social_attention_decision_required(context):
+            required = schema.setdefault("required", [])
+            if "social_attention_plan" not in required:
+                required.append("social_attention_plan")
+            social_schema = schema.get("properties", {}).get(
+                "social_attention_plan"
+            )
+            if isinstance(social_schema, dict):
+                alternatives = social_schema.get("anyOf")
+                if isinstance(alternatives, list):
+                    non_null = [
+                        item
+                        for item in alternatives
+                        if not (
+                            isinstance(item, dict)
+                            and item.get("type") == "null"
+                        )
+                    ]
+                    if len(non_null) == 1:
+                        schema["properties"]["social_attention_plan"] = non_null[0]
+        stage_schema = schema.get("$defs", {}).get("ResponseStage")
+        if isinstance(stage_schema, dict):
+            required = stage_schema.setdefault("required", [])
+            for name in (
+                "text",
+                "speech_act",
+                "commitment_state",
+                "must_not_claim_completion",
+                "covers_goal_ids",
+            ):
+                if name not in required:
+                    required.append(name)
+            properties = stage_schema.get("properties", {})
+            properties["commitment_state"] = {
+                "type": "string",
+                "enum": ["completed"],
+            }
+            properties["must_not_claim_completion"] = {
+                "type": "boolean",
+                "const": False,
+            }
+            covers = properties.get("covers_goal_ids")
+            if isinstance(covers, dict):
+                covers["items"] = {"type": "string", "enum": goal_ids}
+                covers["minItems"] = len(goal_ids)
+                covers["maxItems"] = len(goal_ids)
+                covers["uniqueItems"] = True
+        response_schema = schema.get("$defs", {}).get("ResponsePlan")
+        if isinstance(response_schema, dict):
+            properties = response_schema.get("properties", {})
+            properties["immediate"] = {"type": "null"}
+            properties["pre_action"] = {"type": "null"}
+            progress = properties.get("progress")
+            if isinstance(progress, dict):
+                progress["maxItems"] = 0
+            properties["final"] = {"$ref": "#/$defs/ResponseStage"}
+            required = response_schema.setdefault("required", [])
+            if "final" not in required:
+                required.append("final")
+        return schema
+
+    def _direct_prompt(
+        self,
+        request: AgentRunRequest,
+        association: GoalAssociationResolution,
+        *,
+        previous_raw: Any = None,
+        validation_errors: str = "",
+    ) -> str:
+        repair = ""
+        if previous_raw is not None:
+            repair = (
+                "Previous invalid response JSON:\n"
+                f"{self._bounded(previous_raw, 3000)}\n\n"
+                "Validation errors:\n"
+                f"{validation_errors}\n\n"
+            )
+        return (
+            "Compose Chromie's complete direct conversational response for the "
+            "model-authored spoken Goals below. No capability planning or effect "
+            "execution is required at this boundary. The newest user turn owns "
+            "the communicative intent; prior dialogue is context, not a script to "
+            "replay.\n\n"
+            f"User turn: {request.text}\n"
+            f"Language hint: {request.language or 'auto'}\n\n"
+            "Validated Goal Association JSON:\n"
+            f"{self._bounded(association.model_dump(mode='json', exclude_none=True), 7000)}\n\n"
+            "Recent conversation JSON:\n"
+            f"{self._bounded((request.history or [])[-8:], 3600)}\n\n"
+            "Current-turn delivered speech JSON:\n"
+            f"{self._bounded(self._delivered_turn_speech(request.context), 2400)}\n\n"
+            f"{IDENTITY_SEMANTIC_CONTRACT}"
+            f"{PERSONALITY_SEMANTIC_CONTRACT}"
+            "Return exactly one final response stage covering every supplied Goal "
+            "ID. Set commitment_state=completed and "
+            "must_not_claim_completion=false because the authored speech itself "
+            "completes these Goals. Do not emit immediate, pre_action, or progress. "
+            "Do not repeat speech already delivered in this turn unless the newest "
+            "meaning requires a correction. Use the authoritative language and "
+            "natural six-year-old family-secretary perspective without reciting "
+            "identity facts. Social Attention remains optional auxiliary expression "
+            "under the supplied policy.\n\n"
+            + repair
+            + "Return JSON with response_plan, social_attention_plan, confidence, "
+            "and rationale only."
+        )
+
+    @staticmethod
     def _canonical_plan(context: dict[str, Any]) -> CanonicalPlan | None:
         for key in (
             "canonical_plan_resolution",
@@ -955,7 +1279,7 @@ class ResponseComposerResolver:
         self,
         value: Any,
         *,
-        plan: CanonicalPlan,
+        plan: CanonicalPlan | None,
         context: dict[str, Any],
     ) -> tuple[SocialAttentionPlan | None, list[str]]:
         mode = self._social_attention_mode(context)
@@ -997,7 +1321,7 @@ class ResponseComposerResolver:
             reasons.append(target_reason)
 
         candidates = self._candidate_map(context)
-        primary_ids = {step.skill_id for step in plan.steps}
+        primary_ids = {step.skill_id for step in plan.steps} if plan is not None else set()
         validated_behaviors: list[SocialAttentionBehavior] = []
         seen: set[str] = set()
         for behavior in proposed.behaviors:
@@ -1122,12 +1446,12 @@ class ResponseComposerResolver:
 
     def _conflicts_with_primary(
         self,
-        plan: CanonicalPlan,
+        plan: CanonicalPlan | None,
         social_candidate: dict[str, Any],
         candidates: dict[str, dict[str, Any]],
         timing: str,
     ) -> bool:
-        if not plan.steps:
+        if plan is None or not plan.steps:
             return False
         if timing != "parallel":
             return True
@@ -1197,7 +1521,7 @@ class ResponseComposerResolver:
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. "
             "When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative without claiming it started, ask the user to approve it, set speech_act=ask_confirmation and commitment_state=waiting_for_user, and do not imply that approval has already been granted. "
             "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. This is semantic conversational judgment, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
-            "For a pending safe_read or external_read capability, ensure the user receives one adequate natural everyday acknowledgement before the result. When current-turn delivered speech already adequately acknowledged that same pending work, set response_plan.immediate=null rather than saying it again. When no adequate acknowledgement was delivered, or the earlier one needs supplementation or correction, author one immediate stage. The Host does not impose a character, word, or sentence-count style limit. For a fresh external read, say naturally that Chromie is checking the relevant source. For chromie.memory.retrieve_verified_tool_result, say naturally that Chromie recently checked the exact subject and is retrieving that result, with certainty no stronger than the supplied index metadata. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
+            "For a pending safe_read or external_read capability, ensure the user receives one adequate natural everyday acknowledgement before the result. When current-turn delivered speech already adequately acknowledged that same pending work, set response_plan.immediate=null rather than saying it again. When no adequate acknowledgement was delivered, or the earlier one needs supplementation or correction, emit exactly one natural everyday immediate acknowledgement. The Host does not impose a character, word, or sentence-count style limit. For a fresh external read, say naturally that Chromie is checking the relevant source. For chromie.memory.retrieve_verified_tool_result, say naturally that Chromie recently checked the exact subject and is retrieving that result, with certainty no stronger than the supplied index metadata. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "

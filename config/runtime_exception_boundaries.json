@@ -1,0 +1,1317 @@
+{
+  "schema_version": "1.0",
+  "handlers": [
+    {
+      "path": "agent/app/agent_skills/selection.py",
+      "symbol": "AgentSkillSelectionService.select",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agent_skills/selection.py",
+      "symbol": "AgentSkillSelectionService.select",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/base.py",
+      "symbol": "BaseAgent.review_spoken_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/capability.py",
+      "symbol": "CapabilityAgent._plan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/capability.py",
+      "symbol": "CapabilityAgent._repair_parameter_plan_if_needed",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/capability.py",
+      "symbol": "CapabilityAgent._repair_unstructured_clarification",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/capability.py",
+      "symbol": "CapabilityAgent._review_plan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/conversation.py",
+      "symbol": "ConversationAgent._repair_incomplete_reply",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/conversation.py",
+      "symbol": "ConversationAgent.run",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/agents/deepthinking.py",
+      "symbol": "DeepThinkingAgent.run",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/agents/tool.py",
+      "symbol": "ToolAgent._extract_weather_query",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/agents/tool.py",
+      "symbol": "ToolAgent.run",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/capabilities/catalog.py",
+      "symbol": "CapabilityCatalog.refresh_live_named_skills",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/clients/hardware_client.py",
+      "symbol": "HardwareClient.health",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/clients/ollama_client.py",
+      "symbol": "OllamaClient._generate",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
+      "symbol": "CapabilityCatalogClient.search",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
+      "symbol": "CapabilityCatalogClient.snapshot",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
+      "symbol": "_review_priority_interrupt",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
+      "symbol": "_review_priority_interrupt",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
+      "symbol": "initialize_goal_interpreter",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
+      "symbol": "initialize_goal_interpreter",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
+      "symbol": "interpret_turn",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._recover_deterministic_only_decision",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._recover_deterministic_only_decision",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._recover_placeholder_capability_decision",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._repair_missing_fast_speech",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._repair_semantic_route",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_ambiguous_deep_thought",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_generic_chat_affordance",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_inactive_addressedness",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_route_only_robot_action",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.route",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.route",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.route",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "_raw_interpreter_output_summary",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/cognitive_gateway/attention_review.py",
+      "symbol": "AttentionReviewer.review",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/cognitive_gateway/attention_review.py",
+      "symbol": "AttentionReviewer.review",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/deep_planner.py",
+      "symbol": "DeepPlannerResolver._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/deep_planner.py",
+      "symbol": "DeepPlannerResolver._resolve",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/deep_planner.py",
+      "symbol": "DeepPlannerResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver._resolve",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/goal_association.py",
+      "symbol": "GoalAssociationResolver._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/goal_association.py",
+      "symbol": "GoalAssociationResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/local_tool_execution.py",
+      "symbol": "LocalToolExecutor.execute",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/main.py",
+      "symbol": "resolve_task_continuity",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/probe_capabilities.py",
+      "symbol": "_run",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/response_composer.py",
+      "symbol": "ResponseComposerResolver._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/response_composer.py",
+      "symbol": "ResponseComposerResolver._resolve_direct",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/response_composer.py",
+      "symbol": "ResponseComposerResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/runtime.py",
+      "symbol": "InteractionRuntime._ensure_social_attention_candidates",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/runtime.py",
+      "symbol": "InteractionRuntime._ensure_social_attention_candidates",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/runtime.py",
+      "symbol": "InteractionRuntime._finish_social_attention_plan",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "agent",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "agent/app/runtime.py",
+      "symbol": "InteractionRuntime._finish_social_attention_plan",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "agent",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "agent/app/runtime.py",
+      "symbol": "InteractionRuntime.run",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/social_attention.py",
+      "symbol": "SocialAttentionPlanner.plan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/soridormi_acceptance.py",
+      "symbol": "run_soridormi_runtime_cancellation_acceptance",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/task_continuity.py",
+      "symbol": "TaskContinuityResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/task_graph/service.py",
+      "symbol": "TaskGraphService._execute_tracked",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "agent/app/tool_invocation.py",
+      "symbol": "FunctionToolInvoker.invoke",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/tool_invocation.py",
+      "symbol": "McpStreamableHttpInvoker.invoke",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "agent/app/tool_result_interpreter.py",
+      "symbol": "ToolResultInterpreter.interpret",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/audio_device_manager.py",
+      "symbol": "AudioDeviceManager._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/audio_device_manager.py",
+      "symbol": "AudioDeviceManager._validate",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_pending_output_device_change.stop_and_close",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_pending_output_device_change.stop_and_close",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_reflex_cancellation",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._apply_reflex_cancellation",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._audio_device_monitor.collect_pipewire_changes",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 3,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 4,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._compose_cognitive_failure_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._compose_cognitive_failure_response",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._compose_evidence_bound_tool_result_response",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_context_json",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_identity_json",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_mind_summary",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_personality_json",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_self_model_json",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._direct_llm_speaker_name",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._execute_cognitive_outcome_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._generate_runtime_ready_greeting",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._launch_interaction",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._on_asr_task_done",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._on_routed_turn_done",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._post_interrupt_corrected_decision",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._reconcile_reflex_cancellation_receipt",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_cognitive_gateway_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_cognitive_outcome_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_cognitive_runtime_evidence",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_execution_experience_safely",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_experience",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_experience",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_soridormi_post_status",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._record_successfully_delivered_speech",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._refresh_system_default_audio_devices",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._review_task_continuity",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_cognitive_runtime_pipeline",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_fast_planner_report",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_fast_planner_report",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_goal_association_report",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_post_interrupt_correction",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_response_composer_report",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._run_task_continuity_report",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._settle_fast_first_audio_hedge",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.abort_output_stream.abort_and_close",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.abort_output_stream.abort_and_close",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.cleanup",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.close_output_stream",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.close_output_stream",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.connect_services",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.execute_agent_result",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.execute_interaction_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.execute_interaction_response",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.execute_interaction_response",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_routed_text",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_routed_text",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_routed_text",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_routed_text",
+      "ordinal": 4,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_vad_audio",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.handle_vad_audio",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.mic_stream",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.play_one_order",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.process_llm_tts",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.synthesize_one",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/readiness.py",
+      "symbol": "ServiceReadinessGate.wait_until_ready",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "CanonicalPlanRuntimeAdapter._build_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "CanonicalPlanRuntimeAdapter.build_direct_response",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_turn_closure.py",
+      "symbol": "CognitiveTurnClosure._output_schemas",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/conversation_state.py",
+      "symbol": "ConversationStateManager._commit_semantic_state_transaction",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/conversation_state.py",
+      "symbol": "ConversationStateManager.apply_semantic_task_operations_atomically",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/conversation_state.py",
+      "symbol": "ConversationStateManager.record_execution_outcome_bundle",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/runtime/episode.py",
+      "symbol": "EpisodeRecorder._emit_episode_event",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/runtime/fast_first_audio.py",
+      "symbol": "FastFirstAudioCache._resolve_cache_identity",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/fast_first_audio.py",
+      "symbol": "FastFirstAudioCache.prime_missing",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/fast_first_audio.py",
+      "symbol": "FastFirstAudioCache.prime_missing",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/interaction_coordinator.py",
+      "symbol": "InteractionRuntimeCoordinator.emergency_stop",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "dispatch_named_goal_cancellation",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "dispatch_named_goal_cancellation",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/outcome_response.py",
+      "symbol": "_validated_inputs",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/response_plan.py",
+      "symbol": "validate_immediate_response_plan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionEventWriter.write",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionEventWriter.write",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionTracker._record_external_resource_snapshots",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionTracker._render_message",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/skill_adapters.py",
+      "symbol": "_with_residual_replan",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "SkillRuntime._invoke_provider_cancel",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "SkillRuntime._run_one",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "SkillRuntime.execute",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+    },
+    {
+      "path": "orchestrator/vad.py",
+      "symbol": "<module>",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "orchestrator/vad.py",
+      "symbol": "VAD._is_speech",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "shared/chromie_runtime/accelerator_telemetry.py",
+      "symbol": "AcceleratorTelemetrySampler._collect.collect",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "shared_runtime",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "shared/chromie_runtime/accelerator_telemetry.py",
+      "symbol": "AcceleratorTelemetrySampler.sample",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "shared_runtime",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    },
+    {
+      "path": "shared/chromie_runtime/runtime_events.py",
+      "symbol": "persist_runtime_event",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "shared_runtime",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+    },
+    {
+      "path": "shared/chromie_runtime/runtime_trace.py",
+      "symbol": "_error_payload",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "shared_runtime",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+    }
+  ]
+}

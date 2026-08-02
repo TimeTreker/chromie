@@ -2,17 +2,30 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
+from .goal import GoalAssociationResolution
 from .plan import CanonicalPlan
 from .semantic_task import ResponsePlan, ResponseStage
 from .social_attention import SocialAttentionPlan
 
 ResponseCompositionStatus = Literal["resolved", "model_unavailable", "invalid_input"]
 ResponseCompositionPhase = Literal["pre_execution"]
+
+
+
+
+def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
+    payload = json.dumps(
+        resolution.model_dump(mode="json", exclude_none=True),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def canonical_plan_fingerprint(plan: CanonicalPlan) -> str:
@@ -179,11 +192,96 @@ class CoordinatedResponsePlan(BaseModel):
         return self
 
 
+class DirectResponseComposition(BaseModel):
+    """Planless composition for model-authored non-effectful speech Goals."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    composition_id: str = Field(min_length=1)
+    phase: Literal["direct"] = "direct"
+    goal_association_fingerprint: str = Field(min_length=16)
+    goal_association: GoalAssociationResolution
+    response_plan: ResponsePlan
+    social_attention_plan: SocialAttentionPlan | None = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    rationale: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator(
+        "composition_id",
+        "goal_association_fingerprint",
+        "rationale",
+        mode="before",
+    )
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_direct_composition(self) -> "DirectResponseComposition":
+        association = self.goal_association
+        if association.clarification:
+            raise ValueError("direct response composition cannot carry clarification")
+        if self.goal_association_fingerprint != goal_association_fingerprint(association):
+            raise ValueError("goal association fingerprint mismatch")
+        if association.associations:
+            raise ValueError(
+                "planless direct composition accepts only newly authored speech Goals"
+            )
+        goal_ids = [
+            str(goal.goal_id or "").strip()
+            for goal in association.new_goals
+            if str(goal.goal_id or "").strip()
+        ]
+        if not goal_ids:
+            raise ValueError("direct response composition requires canonical Goal IDs")
+        if any(
+            str((goal.metadata or {}).get("responsibility_kind") or "")
+            != "spoken_response"
+            for goal in association.new_goals
+        ):
+            raise ValueError(
+                "planless direct composition is limited to spoken_response Goals"
+            )
+        response = self.response_plan
+        if (
+            response.immediate is not None
+            or response.pre_action is not None
+            or response.progress
+            or response.final is None
+        ):
+            raise ValueError(
+                "direct response composition requires exactly one final speech stage"
+            )
+        final = response.final
+        if set(final.covers_goal_ids) != set(goal_ids):
+            raise ValueError("direct response must cover every spoken Goal exactly")
+        if final.commitment_state != "completed":
+            raise ValueError("direct response final stage must complete the spoken Goals")
+        if final.must_not_claim_completion:
+            raise ValueError(
+                "direct response final stage must permit completion of authored speech"
+            )
+        return self
+
+
+ResponseComposition = Annotated[
+    CoordinatedResponsePlan | DirectResponseComposition,
+    Field(discriminator="phase"),
+]
+
+
 class ResponseCompositionResolution(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: ResponseCompositionStatus
-    composition: CoordinatedResponsePlan | None = None
+    composition: ResponseComposition | None = None
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 

@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 from agent.app import main as agent_main
 from agent.app.cognitive_core.goal_interpreter.engine import Settings as GoalInterpreterSettings
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +41,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
+        settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
-        self.assertIn('ORCH_AGENT_TIMEOUT_MS", "9000"', orchestrator_source)
+        self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 
     def test_asr_image_includes_every_standalone_server_module(self) -> None:
@@ -609,7 +611,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         assignment = source.index(
-            'self.playback_chunk_ms = int(os.getenv("ORCH_PLAYBACK_CHUNK_MS", "80"))'
+            "self.playback_chunk_ms = playback_settings.playback_chunk_ms"
         )
         discard_diagnostic = source.index('"block_ms": self.playback_chunk_ms')
         self.assertLess(assignment, discard_diagnostic)
@@ -619,7 +621,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
         source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('os.getenv("ORCH_ASR_TIMEOUT_MS", "30000")', source)
+        settings = HostSettingsSnapshot.from_env(
+            project_root=ROOT,
+            environ={"ORCH_ASR_TIMEOUT_MS": "4321"},
+        )
+        self.assertEqual(settings.audio_input.asr_timeout_ms, 4321)
+        self.assertIn(
+            "self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)",
+            source,
+        )
         self.assertIn("timeout=self.asr_timeout_s", source)
         self.assertNotIn("timeout=15.0", source)
 
