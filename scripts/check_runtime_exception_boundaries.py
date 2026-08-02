@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,8 @@ class BroadHandler:
     symbol: str
     ordinal: int
     line: int
+    body_sha256: str
+    failure_signals: tuple[str, ...]
 
     @property
     def key(self) -> tuple[str, str, int]:
@@ -56,6 +59,37 @@ def _is_broad(node: ast.AST | None) -> bool:
     if isinstance(node, ast.Tuple):
         return any(_is_broad(item) for item in node.elts)
     return False
+
+
+def _handler_review(node: ast.ExceptHandler) -> tuple[str, tuple[str, ...]]:
+    module = ast.Module(body=node.body, type_ignores=[])
+    normalized = ast.dump(module, annotate_fields=True, include_attributes=False)
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    signals: set[str] = set()
+    for item in ast.walk(module):
+        if isinstance(item, ast.Raise):
+            signals.add("bare_reraise" if item.exc is None else "raise")
+        elif isinstance(item, ast.Return):
+            signals.add("return")
+        elif isinstance(item, ast.Continue):
+            signals.add("continue")
+        elif isinstance(item, ast.Break):
+            signals.add("break")
+        elif isinstance(item, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            signals.add("state_update")
+        elif isinstance(item, ast.Call):
+            func = item.func
+            if isinstance(func, ast.Attribute) and func.attr in {
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "exception",
+                "critical",
+                "session_log",
+            }:
+                signals.add("diagnostic")
+    return digest, tuple(sorted(signals))
 
 
 class _Visitor(ast.NodeVisitor):
@@ -88,12 +122,15 @@ class _Visitor(ast.NodeVisitor):
         if _is_broad(node.type):
             ordinal = self.counts.get(self.symbol, 0) + 1
             self.counts[self.symbol] = ordinal
+            body_sha256, failure_signals = _handler_review(node)
             self.handlers.append(
                 BroadHandler(
                     path=self.path,
                     symbol=self.symbol,
                     ordinal=ordinal,
                     line=node.lineno,
+                    body_sha256=body_sha256,
+                    failure_signals=failure_signals,
                 )
             )
         self.generic_visit(node)
@@ -133,13 +170,13 @@ def load_inventory(path: Path) -> tuple[dict[tuple[str, str, int], dict[str, Any
                 message=f"cannot load exception inventory: {type(exc).__name__}: {exc}",
             )
         ]
-    if payload.get("schema_version") != "1.0":
+    if payload.get("schema_version") != "1.1":
         findings.append(
             InventoryFinding(
                 path=path.as_posix(),
                 symbol="<inventory>",
                 line=0,
-                message="schema_version must be 1.0",
+                message="schema_version must be 1.1",
             )
         )
     entries = payload.get("handlers")
@@ -165,6 +202,9 @@ def load_inventory(path: Path) -> tuple[dict[tuple[str, str, int], dict[str, Any
         classification = str(entry.get("classification") or "").strip()
         owner = str(entry.get("owner") or "").strip()
         contract = str(entry.get("contract") or "").strip()
+        review_status = str(entry.get("review_status") or "").strip()
+        body_sha256 = str(entry.get("body_sha256") or "").strip()
+        failure_signals = entry.get("failure_signals")
         if not entry_path or not symbol or not isinstance(ordinal, int) or ordinal < 1:
             findings.append(
                 InventoryFinding(path=path.as_posix(), symbol=f"handlers[{index}]", line=0, message="path, symbol, and positive ordinal are required")
@@ -184,6 +224,18 @@ def load_inventory(path: Path) -> tuple[dict[tuple[str, str, int], dict[str, Any
             findings.append(
                 InventoryFinding(path=entry_path, symbol=symbol, line=0, message="owner and failure contract are required")
             )
+        if review_status != "reviewed":
+            findings.append(
+                InventoryFinding(path=entry_path, symbol=symbol, line=0, message="review_status must be reviewed")
+            )
+        if len(body_sha256) != 64 or any(char not in "0123456789abcdef" for char in body_sha256):
+            findings.append(
+                InventoryFinding(path=entry_path, symbol=symbol, line=0, message="body_sha256 must be a lowercase SHA-256 digest")
+            )
+        if not isinstance(failure_signals, list) or any(not isinstance(item, str) for item in failure_signals):
+            findings.append(
+                InventoryFinding(path=entry_path, symbol=symbol, line=0, message="failure_signals must be an array of strings")
+            )
         inventory[key] = entry
     return inventory, findings
 
@@ -198,7 +250,8 @@ def audit_runtime_exception_boundaries(
     inventory, findings = load_inventory(path)
     live = {handler.key: handler for handler in scan_broad_handlers(root)}
     for key, handler in live.items():
-        if key not in inventory:
+        entry = inventory.get(key)
+        if entry is None:
             findings.append(
                 InventoryFinding(
                     path=handler.path,
@@ -208,6 +261,48 @@ def audit_runtime_exception_boundaries(
                         "broad exception handler is not classified in "
                         f"{DEFAULT_INVENTORY.as_posix()} (ordinal={handler.ordinal})"
                     ),
+                )
+            )
+            continue
+        if str(entry.get("body_sha256") or "") != handler.body_sha256:
+            findings.append(
+                InventoryFinding(
+                    path=handler.path,
+                    symbol=handler.symbol,
+                    line=handler.line,
+                    message="reviewed handler body changed; re-audit classification and refresh body_sha256",
+                )
+            )
+        declared_signals = tuple(sorted(str(item) for item in entry.get("failure_signals") or []))
+        if declared_signals != handler.failure_signals:
+            findings.append(
+                InventoryFinding(
+                    path=handler.path,
+                    symbol=handler.symbol,
+                    line=handler.line,
+                    message=(
+                        "reviewed failure signals changed: "
+                        f"declared={list(declared_signals)!r} live={list(handler.failure_signals)!r}"
+                    ),
+                )
+            )
+        classification = str(entry.get("classification") or "")
+        if classification == "narrow_reraise" and not {"raise", "bare_reraise"}.intersection(handler.failure_signals):
+            findings.append(
+                InventoryFinding(
+                    path=handler.path,
+                    symbol=handler.symbol,
+                    line=handler.line,
+                    message="narrow_reraise classification requires an explicit raise signal",
+                )
+            )
+        if classification == "diagnostic_cleanup" and not {"diagnostic", "bare_reraise", "state_update"}.intersection(handler.failure_signals):
+            findings.append(
+                InventoryFinding(
+                    path=handler.path,
+                    symbol=handler.symbol,
+                    line=handler.line,
+                    message="diagnostic_cleanup must retain a diagnostic, state update, or bare re-raise",
                 )
             )
     for key in sorted(set(inventory) - set(live)):

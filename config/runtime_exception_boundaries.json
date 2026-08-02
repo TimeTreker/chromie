@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "handlers": [
     {
       "path": "agent/app/agent_skills/selection.py",
@@ -7,7 +7,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "feec55855130c618830705c1115820b122e8ce5e4d4b06c6ab5bef18cc116ccc",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/agent_skills/selection.py",
@@ -15,7 +22,14 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "86b7c0a6a8800fd50b1223edd11593e746caf88de36cc504ac1e34d6b711c694",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/agents/base.py",
@@ -23,7 +37,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "e18d9791ffb690f16c25119c0464b9655fad376b2c4798ef2e07db77e7d1e988",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/agents/capability.py",
@@ -31,7 +51,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "3e9ef1670cbb57e80f84dfb0355aa0d317f5443a511d5f1766c580fd364e330b",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/agents/capability.py",
@@ -39,7 +65,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "34436b124132d186df351276e117618c4b468ee2bc3a5fce8fc12731ef108d43",
+      "failure_signals": [
+        "continue",
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/agents/capability.py",
@@ -47,7 +79,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "372fb08321a57884eb1b8260372859baeccf2614d50659eedb44c0b90d3a83d4",
+      "failure_signals": [
+        "continue",
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/agents/capability.py",
@@ -55,7 +93,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "042555f761b9a4735e535df3f44fe45760488dfd7107f4fae4d0b83717aa13ce",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/agents/conversation.py",
@@ -63,7 +107,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "290bbe85bc7acf8106fc0e2a6dbe1d36da00c510917ee209b30d07dd96422c70",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/agents/conversation.py",
@@ -71,7 +121,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "0cf5b419ab08f024bcb11b2a07cd459b0f5dd955ad413ff4c35f3fa053139c0a",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/agents/deepthinking.py",
@@ -79,7 +136,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "3d313bc2d8052ef1b495f5c46078fbd518166000dd7791ddb94315e88744b0c7",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/agents/tool.py",
@@ -87,7 +149,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "d03d245b6809d60bc7ebe7423ee51cca5a49b08a1aaa171c21f6186fac95e86a",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/agents/tool.py",
@@ -95,7 +162,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "2591957680891e8a98f693417d84b21f2f4d362512de88dc771eb42fa040b7fa",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/capabilities/catalog.py",
@@ -103,7 +175,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "b68abc2d32d648506dbe8577891b89786bb8bbe93bc44ebc0e0af47979fb30fa",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/clients/hardware_client.py",
@@ -111,7 +189,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "6adbe610364c95c3189a4850e7358a8a7bbbc3e223f48a8c3a5b7d97905547b1",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/clients/ollama_client.py",
@@ -119,7 +203,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "04671d44b617147716773d89a39876531b7a83a0a152a324a6a26a5cb4e0c2c8",
+      "failure_signals": [
+        "bare_reraise",
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
@@ -127,7 +218,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "4db188ce721ac32117ca7b9588631e0e2fb64a409f3d17dcb0e23ef3b1faad03",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/capability_catalog.py",
@@ -135,7 +232,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "ecd040e4111d3772ca473ea25575ac11cd1cee716c4750a3a7fcc112c54fac69",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
@@ -143,7 +247,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "c94e22fcf2f2650b04f100cc7983c0bd58f4fbff3adf308517af38979060926b",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
@@ -151,7 +261,13 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "4f43346f8269bc4f60c312183b32f525cc52f4741f35a0abc65a51d9fa5cde40",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
@@ -159,7 +275,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "414cb808ec712076d74d9c02ace1a101c99aa2a445dbecddf6ba6962143812ed",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
@@ -167,7 +288,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "60c6c2949d1fea8a082a4caa558915c6771245cdf05b54c745db8a8fb4ea3662",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
@@ -175,7 +301,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "388a67836d10a2f99e201a362eee01fd8f611029c141585a9c1eb17354da90cb",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -183,7 +315,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "46906fe4d87e69c01019d54b3d05aa80661594d2b8c0756a5d67ebd125da62fe",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -191,7 +328,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "af5199f9e7cb48cbaaaffdda26d139fcded398750a49bda6f6e6238da15bb801",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -199,7 +341,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "3d975564dcb835dca3fbc6376875ec8a71e134233aa3ad47baf030a8f36bfbb5",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -207,7 +354,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "f42ad5020407f18aebcea725e0a67519276cf899dfd97d5637e5a61a1646be05",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -215,7 +368,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "56bc1c8d7950743cf90e55ac25b960b0c609be1d8467edaac2e4dc3b719970d1",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -223,7 +382,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "540b404e713e9f83639a403b9fafd879c50d69db2bc3e7422aa7e39b45fc402b",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -231,7 +395,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "07a686e23b1520012299d7e90442a9de14135a477dddcf11bdf9a13c77fcdc04",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -239,7 +409,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "3e33f18c3784f12736f60c804503b8d95a23b8d7dc492fcacba3facb44b95021",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -247,7 +423,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "1ccefabb5604a431ca103b030cfc1b0187d03ec838fe19cdf3096a7448321498",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -255,7 +438,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "96c69608b5dbf107a676eda610d67009ed8c1aaa43c1525e3851e1a4ff58092c",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -263,7 +453,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "c90d5bc0e7de2de79dc4104bdbec3736bca7480a6bd7643de35de568dfcebc8a",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -271,7 +466,13 @@
       "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "83edadc5aa9bffdaa69ca9b6c03a3b153e1ed3df4a19714c4eedb83fedf85229",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
@@ -279,7 +480,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "828942ae9d6cb3f43e9c79e836462cfe750794807c427fb6e09a4e8e9c8eea05",
+      "failure_signals": [
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/cognitive_gateway/attention_review.py",
@@ -287,7 +494,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "66179f49fe6786f3f19d32726f438913846ff23b8d513c407ba482dd80fa9954",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/cognitive_gateway/attention_review.py",
@@ -295,7 +508,13 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "43ec029c5312fd7225f35260bd2b22a3c8c07a23579170367406281a8068ab17",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/deep_planner.py",
@@ -303,7 +522,15 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "d523c60a25abfa42b014ff8c8f6001fdf554373258d2b95688c821ae47a047b4",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/deep_planner.py",
@@ -311,7 +538,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "9d4a9beaddee883c854fc174c105cdcd3b69ab955edf47f8f4cc0db2681e0708",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/deep_planner.py",
@@ -319,7 +552,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/fast_planner.py",
@@ -327,7 +565,15 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "4e2429413883e7853ae1deb975a2cba9ff023de04dce38a08da7e87394464f9f",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/fast_planner.py",
@@ -335,7 +581,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "e7e8d8578246675ea5b952c4939dc41a58472bd67dcd2dd02bf3674fc481eeab",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/fast_planner.py",
@@ -343,7 +595,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/goal_association.py",
@@ -351,7 +608,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "877fa3a241a2c70b2ab618bbe773061f8be217646bded99eb029080c39bd65c7",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/goal_association.py",
@@ -359,7 +623,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/local_tool_execution.py",
@@ -367,7 +636,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "28a5784a2a946625a32f4c8a6365dd0f0c759e213c84b604374730502dc2c5a6",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/main.py",
@@ -375,7 +650,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "aabca7d231923e8671801ca8635d7a3d03907ff14c37e00b28a083be17d3c83a",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/probe_capabilities.py",
@@ -383,7 +664,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "6acac26902ac7f77a5bfb523e06c13c292bebd889ea85a3fd5ccc1c82a9b6c57",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "agent/app/response_composer.py",
@@ -391,7 +677,15 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "fadaceac64eac50828df7fe5eb80020787f60f00a13158627ec49046d94a6382",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/response_composer.py",
@@ -399,7 +693,15 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "755944b8191a1c787486ad98390463d0860965cbb757227401302b357844e6a8",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/response_composer.py",
@@ -407,7 +709,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/runtime.py",
@@ -415,7 +722,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "07f6987e2d05c2ff031ac4a508c2ffe192d33badaf8e06fd365a8ca5b256b7fd",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/runtime.py",
@@ -423,7 +735,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5b32c1b3b09d967775ebfe9c67bc2b3c7ce39baa73c38c5249a4a56fe247baf2",
+      "failure_signals": [
+        "continue",
+        "diagnostic"
+      ]
     },
     {
       "path": "agent/app/runtime.py",
@@ -431,7 +749,14 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "agent",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "78612428601c9212d98680c0108312e7515af92c3eb96d31dbb5a8f44c066b8c",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/runtime.py",
@@ -439,7 +764,14 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "agent",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "78612428601c9212d98680c0108312e7515af92c3eb96d31dbb5a8f44c066b8c",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/runtime.py",
@@ -447,7 +779,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "e8b4a04fbad0d2a1fc09c02627981ebb51a574b362c6d8a657fa00a1d37c2621",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/social_attention.py",
@@ -455,7 +792,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "34d5aabb6e1fa6add4fdcbed270c18d5bafc49135fe9a56eb65e4cad93ecc933",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "agent/app/soridormi_acceptance.py",
@@ -463,7 +807,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "466a60dcb028112f24e2e55155b75060afd22e617a1c61e628cc4cee32c6a9ae",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/task_continuity.py",
@@ -471,7 +820,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "9f9bf845111d0038e06574fd49ba0a2fe480be7b6afa6598dd249e3ee437aba7",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "agent/app/task_graph/service.py",
@@ -479,7 +834,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "cd7ece3c88c7fc4de135bb1874c09258a636e9048675041d973be09c5708660e",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "agent/app/tool_invocation.py",
@@ -487,7 +847,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "3758dba48f99ce5a148aad1d0d4f0c9817c6a56a0b4c79884caeddde2a3fd54a",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "agent/app/tool_invocation.py",
@@ -495,7 +860,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "c6238971f92d203f31374dd8c772f896d64f0d8402b378e0b88c33ed69338de3",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "agent/app/tool_result_interpreter.py",
@@ -503,7 +873,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "b4803a06a91961fc1ca72b4c7b7155285485d25b1b6a07c76e1cb53371ed5f0c",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/audio_device_manager.py",
@@ -511,7 +888,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "b088797a4f611adc22f635dae891b031f8c8a9ae7c5f361859696e7b7d1b264f",
+      "failure_signals": [
+        "raise",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/audio_device_manager.py",
@@ -519,7 +902,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "6bdecc0a93ea42476248904b40ab63cd391c4e72db01db7bb2fba04a44df2bed",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -527,7 +915,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "605657939919a4a23427dd71fcc5dbbfb836c373e0fe087bdc70302ba1c8b066",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -535,7 +928,12 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "4e5dc5e9626f3a5bc9249db315d89c4fe3b788175031678f8f95268781dff384",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -543,7 +941,10 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "194df11ac3f93319fb1fc68df3a514765e250aa1185785a61ebd76857e60367e",
+      "failure_signals": []
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -551,7 +952,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "2ba5d07ed6888348029deb7277541a24f83175da5e31bf0fb96d8f6c8a585e3e",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -559,7 +965,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "040e7b66ee5494456361cd6062e203ba927d3200dd0f511b16419e3adea846a2",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -567,7 +978,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "5f30261fec4e881d0e26613dea34d9045cee0c46c9147860ab8e531052bd4da0",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -575,7 +992,14 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "65c053f7ec440dabfebd117063fed1539884791fcadcdf7f32d390fc3c61828d",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -583,7 +1007,14 @@
       "ordinal": 3,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "534726f2f5ab4962dde89c5fddf31f9aac455a704709fadcd635c311cf1ed967",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -591,7 +1022,13 @@
       "ordinal": 4,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "106b67f36b02fc624eb1b72533564b1969d69d901e3a0540e57d18e7979c47fc",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -599,7 +1036,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "3dcad11048614a60143d18bc8c2a1070723da090c08f16c49f83c2615e7c77ac",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -607,7 +1050,12 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "0293019aa189527d5165fed3369f126752bdd95fc4942911d61afc073b0510b1",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -615,7 +1063,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "51e693de51d64c375a358ac2abe1353d3e5d9b8a66f8d814a8097e0e19ef4db8",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -623,7 +1077,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "82a5002aa210581cdb184849f5c043f3083c86a3a65d71398ad47221c9e9d270",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -631,7 +1091,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "8d94bb4a13df4ea090f71c2fd660c15b49128d67ea1499eed1cb5b014c7a3d30",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -639,7 +1105,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "d0e6dfe21dd71a59349e936117876bb860ef132e7278b607304c343d8e715582",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -647,7 +1119,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "9fdb313bd2d0ff4d2ea2fbb1fb7ba35945118695dc03674d1d1472592e8656c4",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -655,7 +1133,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "4aa1968a3e11910d0bd847593ac533f281681a47b40e1e234031df99dbdb84a6",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -663,7 +1147,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "968c0a2a32bf269533581c723bcfc76b1fc4558d0c2bb1145d965b30121080a0",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -671,7 +1161,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "85063049c517a16145933a8a7be56390a1e8ecddcd791aea2544ad106ea74dd7",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -679,7 +1175,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "55e58531b034fbc8eae34609159cf7819a153452a8b23d1fe00f2799a540ac51",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -687,7 +1189,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "dada5309014007c2abd9c4c88764e9b4746421e99057b207b781993ce2329785",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -695,7 +1202,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "0f28c146eca604d37b4034a1fb6bc597b0c59d2fabc71ab723eeb4ab06d88bed",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -703,7 +1215,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "3b774ac571e028d5de0898dc1050b711cb834a6cdc6afee397369fa81382170f",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -711,7 +1228,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "16f0661552b71b65ff26f8759e6db70e8c7bead3b9fbb3380d7bf5714052074a",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -719,7 +1242,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "83dc00b2cb30f5c79039d73aec164342f01eedc79efff6bf22ea4236f1e3d0ff",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -727,7 +1257,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "c5d70d3f483f037186780e8b96df2a421dd800109f9a405a0814fbd6710037ef",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -735,7 +1270,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "42bc347a577a33ec6a7556391e1bbd3876085d5a3de5380ed56c66bdc477162f",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -743,7 +1283,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "a3d8773732fb2d9968ffb6d54b56a21a3cc998fb31ed861e730bed41ae0c3d05",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -751,7 +1296,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "87255132072b04339ac76521c3abf22e1b34f51c800d08105eaa18380daec46f",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -759,7 +1309,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "2e0cdc08d2eb8fd6e62a59b52ab6bc02a4124a9017acd828038a4920db7a355f",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -767,7 +1322,13 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "e8d8db1e30267ddd2a5f12582dd74b9d79a78e66b987342be5ebc9e19675754d",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -775,7 +1336,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "0e690ed0c604ddfaea5c322403560188ca435f02e6a78dc2ba06a467ef81adc4",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -783,7 +1350,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "7a685007e78327dffcbffe62e419108aff89dd53e2ed00c371a480e29f9574a3",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -791,7 +1364,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "ef80e53fd56886ae6fba39d3da65e4b6f7e840c0f4c0848b7b78727fce8cb4c2",
+      "failure_signals": [
+        "continue",
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -799,7 +1379,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "c52163e73942cf05eb3bc4712fd384b4025e61b9e35e4022cc2da9b3fe53d2ea",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -807,7 +1394,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "976a9c58e3f04d6ea864b13f281af97410428a6096000340a2b3045c371169ea",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -815,7 +1407,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "dcb548a31d676aa781829cae89840d26c0534d05e66963e07cd38833c86e6e4d",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -823,7 +1421,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "f2b8f2d4431370e2d1f66145a887e47002b7950e947d14b8ed7a80d2db35f6b5",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -831,7 +1435,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "7ea480ed1981608c1cd5da02375c362346bf8e335aa6407f7ce744dbf3b5097c",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -839,7 +1449,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "3665dc123ef87f64f17580dad770c469def0b170579d953619a111324d6c8442",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -847,7 +1462,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "2c308cde990695a3198978b680c47ca643b6aec4c8aabd3e31f8d6c5b796e372",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -855,7 +1476,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5a9bfd5dbac703a812b8702a781acfeb54d98e8a1776f2b4041d97a467848fa0",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -863,7 +1490,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "58ac17af411efb5f240ee0a0cbfb1cf8874417350db3d9bc169bb818d70917a4",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -871,7 +1504,14 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "18325cb988ed60212a9c8b9be4d309b01bf47457829eaa9b24b37e2e165e623b",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -879,7 +1519,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "621c22b66f2f4618415bedaea37b96aac71b338434e760a2e58aae1d941d2c9d",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -887,7 +1532,12 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "2256c961d701aa04657420f4cd30b50cf27785d40adfb3ba70ac0d26365dceb7",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -895,7 +1545,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "366e0ddb2e223022b83960d40dba01af1d7f43d7620c4654090314f16c41a54d",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -903,7 +1558,12 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "33ee9010e1c71eaa955b65fb3e13cc05dcc2eb47d946ba3c8afef2d98c6916a3",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -911,7 +1571,12 @@
       "ordinal": 2,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "c741e143de2f6b4b0d8015760d92f780aeae8cc337d61ed630d42941d8fdcda0",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -919,7 +1584,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "8ef99d7f9d39b6b0c21f350b469d78b668277b4060a9976ca149dc248ea7121e",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -927,7 +1597,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "f8e2493c048497dbf2b05f7888688d4d970bcdeca46396a0b2e0d432021e6b13",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -935,7 +1610,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "ebae9fbc85a94fa80f67a879b6eeb723524ebfa7b0ef7a050eaba7c21b8bf98a",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -943,7 +1623,15 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "1009773381015ec90cec91899240ec0826fee511eb2d683b772773fb25457600",
+      "failure_signals": [
+        "bare_reraise",
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -951,7 +1639,12 @@
       "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "ebae9fbc85a94fa80f67a879b6eeb723524ebfa7b0ef7a050eaba7c21b8bf98a",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -959,7 +1652,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "1067d5ec2f0c12ce64ff48d88049086fba4171b9d8ee9a62d6e09d53931bc1da",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -967,7 +1665,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "780d9d87d550f826224998e8d90d21b6abf16d935e22e77f58a55438b9d4c9ff",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -975,7 +1679,14 @@
       "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "0e0c57aa9f5996f54b608ecca959f38b66ac63e4f5606dfc043471c9e19d5a86",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -983,7 +1694,14 @@
       "ordinal": 4,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "fa391efdfe1bbc3eaa5eb912e5b17478861308f972e76e78fd86ea9913b2a26d",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -991,7 +1709,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "7051dd79abb397d15a530ce2a7490ef41d3a0b8a281ccf6f4237dc2f8d1a77d5",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -999,7 +1723,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "4da1992166a25a9b0a186a374652e8e205bcd10e1a159e538800c700678cb6c9",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -1007,7 +1736,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "ac2774c8bf876b0b69a47ca76dc0004f4cf3ef21df8b7b6534deceea97e3a6f6",
+      "failure_signals": [
+        "bare_reraise",
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -1015,7 +1750,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "a8cd6ee84e6f2b8f23320e6788fe7b157b1621830254f7b2d4a7c2f216c3dbb8",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -1023,7 +1765,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "56f2371025b5036594b98f68d81ad0df14d6a163ae5c4443aeb30a2078f367cb",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/orchestrator.py",
@@ -1031,7 +1779,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "3b3c3bea98bad7541be948be33a298092ab19fe5eb748af72c76959cd46920cc",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/readiness.py",
@@ -1039,7 +1793,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "26c8a99a90557cb081a2f4927aedcf4a34a7a6c140954de17ee61bed13078dbe",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1047,7 +1806,10 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "b3e983c68672bae1f2b136e17e3e26ba13598f11041903c9dc9eb4c2b328c938",
+      "failure_signals": []
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1055,7 +1817,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "1e11ccbc12ed1005c2d723c830d3dc621abad63b694fe47a480c37d90d46aa63",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1063,7 +1830,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "debe8fb0bdc25725a80aed679628d20c63afb4931e5251705019d1892fab4ae2",
+      "failure_signals": [
+        "continue"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1071,7 +1843,10 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "b3e983c68672bae1f2b136e17e3e26ba13598f11041903c9dc9eb4c2b328c938",
+      "failure_signals": []
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1079,7 +1854,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "40d03dfdb118ce3ef335f53a551e8c4f414730d2092b2c7000a604dac2d11890",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1087,7 +1867,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "e5e8b8424b4810e5d630e98a12c74c5fe2ded04542f75b1261e48fda99d2e85e",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
@@ -1095,7 +1880,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "orchestrator/runtime/cognitive_turn_closure.py",
@@ -1103,7 +1893,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "78136335ce23910349a38bfdb0e916b610ca8e6e1a8f0677cbb90add44c224f4",
+      "failure_signals": [
+        "continue",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/conversation_state.py",
@@ -1111,7 +1907,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "04b5dd48e70cd12711fa92d76947065cb347ce3e4bb3328211f45c530c7e1873",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "orchestrator/runtime/conversation_state.py",
@@ -1119,7 +1920,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "4a23811f9f25d162b093720b58d3025e17b13756d7d9b2249d1f3703cf8f9a9c",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/runtime/conversation_state.py",
@@ -1127,7 +1933,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "6d00b94739214bc3c738b9ed5b34182de602426bbce8192d94b5c1daeff04e13",
+      "failure_signals": [
+        "bare_reraise",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/episode.py",
@@ -1135,7 +1947,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "0bb0948850646852b998db59f70b328b7f2c03cedcefdaf82e737f806987f9f3",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/fast_first_audio.py",
@@ -1143,7 +1961,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "42bab5d3b30da58e713fe554c860dc3cb19296e3d11cf2fa4aa29a680e9b57b1",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/runtime/fast_first_audio.py",
@@ -1151,7 +1974,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "6bd7796c0588e004cb2bcc86c6e022ff6ca576a4f362c25d61b9e80329b82c8c",
+      "failure_signals": [
+        "continue",
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/runtime/fast_first_audio.py",
@@ -1159,7 +1988,14 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "67ba6315996041c31ed4daf50883e3c67a4d2cf9c8d41a46291848982927052d",
+      "failure_signals": [
+        "break",
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/interaction_coordinator.py",
@@ -1167,7 +2003,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "b847e9d5d17ab8b07b90813a143535412f765e351762257f473bc4aa2a44612d",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/named_goal_cancellation.py",
@@ -1175,7 +2016,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "e4c6d2a56a2e9c112245c99b79e7085a174aae82a3a036d294c37a87de72ebe1",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/runtime/named_goal_cancellation.py",
@@ -1183,7 +2029,12 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "dc44a935608f1ffb3485199112487387b21d537f56764cc983acd2b2ef752006",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/runtime/outcome_response.py",
@@ -1191,7 +2042,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "6d261ba632b60b24b7855e481dc3e65c80075a14603003a3c758728c0c628d51",
+      "failure_signals": [
+        "raise"
+      ]
     },
     {
       "path": "orchestrator/runtime/response_plan.py",
@@ -1199,7 +2055,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "9988e036c2f148982f0c2224d24bf671bc270358cacea2827ddc918a8aee2965",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/session.py",
@@ -1207,7 +2068,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "55f254cb2e390ed2a3186f125b05e802417179e9df1927593d290cc1a2cc3d98",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/session.py",
@@ -1215,7 +2081,12 @@
       "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "03b76c6692ac6e8d5191ce10bc999bc99b750a7595a4317664549e2af152fb69",
+      "failure_signals": [
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/runtime/session.py",
@@ -1223,7 +2094,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "345b7adac0eca3ad34a4075989ea3d645e0085c751634ddb45834c83c94242c0",
+      "failure_signals": [
+        "continue",
+        "diagnostic"
+      ]
     },
     {
       "path": "orchestrator/runtime/session.py",
@@ -1231,7 +2108,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "70a2d35dfaa06f4791ec27853ad2972ea72a121ef39535abe4f138a844473e6b",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/skill_adapters.py",
@@ -1239,7 +2121,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "54a96c20e2272c6f3ad1985bf44f5ba9f2f66b28a639057daa8e14ba4d989b06",
+      "failure_signals": [
+        "return"
+      ]
     },
     {
       "path": "orchestrator/runtime/skill_runtime.py",
@@ -1247,7 +2134,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "41f169e06d30ae33477ba5307b0537c546d0560653fb5f05dc21c8a4856936db",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/skill_runtime.py",
@@ -1255,7 +2148,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "9cd17b28ae2fe64606ca2c1ea976b88817c50936d2c199775c96b8b758e0734d",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/runtime/skill_runtime.py",
@@ -1263,7 +2161,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work."
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "db08a7bfdd14e7cc2aebf0e253b28a6882c151bbfa6a878b7f5d58347d3e9031",
+      "failure_signals": [
+        "bare_reraise"
+      ]
     },
     {
       "path": "orchestrator/vad.py",
@@ -1271,7 +2174,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "b71d8227c27e88788c6750eb8a95f25248269fab562f2c40c5068dd7cb7fb982",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "orchestrator/vad.py",
@@ -1279,7 +2187,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "467a49a1611161933724471785b3e97b6bd55ba87a9c197bf1892543565fdb17",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
     },
     {
       "path": "shared/chromie_runtime/accelerator_telemetry.py",
@@ -1287,7 +2201,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "shared_runtime",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "e0d338f028276ef1dd16a821acc9472475ea568eeb09c0da36d58399627693cb",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "shared/chromie_runtime/accelerator_telemetry.py",
@@ -1295,7 +2214,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "shared_runtime",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "aae4ae2f85dfa87f35b5e19f4bfec49b2ec3ea74025ac113d9cde0e337f87b88",
+      "failure_signals": [
+        "state_update"
+      ]
     },
     {
       "path": "shared/chromie_runtime/runtime_events.py",
@@ -1303,7 +2227,13 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "shared_runtime",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success."
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "2cbac1c85ca0364c40d25f2ae1146443983a1211ddbe07107342c4fa34b37102",
+      "failure_signals": [
+        "return",
+        "state_update"
+      ]
     },
     {
       "path": "shared/chromie_runtime/runtime_trace.py",
@@ -1311,7 +2241,14 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "shared_runtime",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract."
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "a59e54d81c86313815fa073102b80c8b3e99e2e819b347266715295b3b8551c0",
+      "failure_signals": [
+        "state_update"
+      ]
     }
-  ]
+  ],
+  "reviewed_at": "2026-08-03",
+  "review_contract": "Classification and exact handler body reviewed; any AST body or failure-signal change requires re-audit."
 }

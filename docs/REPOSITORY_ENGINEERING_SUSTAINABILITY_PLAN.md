@@ -559,14 +559,15 @@ substitute for reducing cognition before a valid speech stage exists.
 
 ## Issue: Classify Broad Runtime Exception Boundaries
 
-Status: implementation slice landed; classification review and remaining scope open; depends on **Reduce Time to First Grounded Response**
+Status: source classification review complete; retained live failure evidence remains open; depends on **Reduce Time to First Grounded Response**
 
-Implementation note (2026-08-02): a dependency-light AST inventory records each
-maintained broad handler by file, qualified symbol, and handler ordinal, with an
-owner, contract, and one of the declared failure-boundary classes. Repository
-policy now rejects new, missing, duplicate, or stale inventory entries. This is
-a checked baseline, not a claim that every broad catch has already been narrowed
-or that every classification has retained live failure evidence.
+Implementation note (2026-08-03): the dependency-light AST inventory records
+each maintained broad handler by file, qualified symbol, and handler ordinal,
+with an owner, contract, reviewed classification, exact normalized-body digest,
+and mechanically derived failure signals. Any handler-body or control-signal
+change now requires explicit re-review; new, missing, duplicate, stale, or
+unreviewed entries fail the repository gate. This closes the source review and
+does not claim retained live failure evidence for target-only boundaries.
 
 ### Problem
 
