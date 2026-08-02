@@ -30,6 +30,48 @@ from shared.chromie_contracts.interaction import InteractionResponse, SkillResul
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    async def test_fast_first_speech_enters_current_turn_context_only_after_playback(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: " ".join(str(text).strip().split()),
+            assistant,
+        )
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        key = assistant.playback_start_key(3, 7, "sid-fast")
+        assistant.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+
+        event = assistant._register_turn_speech_event(
+            session_id="sid-fast",
+            generation=3,
+            orders=[7],
+            text="好呀，我帮你看看。",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            commitment="checking_only",
+        )
+
+        self.assertIsNotNone(event)
+        self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
+        assistant.resolve_playback_start_waiter(
+            3,
+            7,
+            "sid-fast",
+            started=True,
+            reason="playback_start",
+        )
+        delivered = assistant._delivered_turn_speech_events("sid-fast")
+        self.assertEqual(len(delivered), 1)
+        self.assertEqual(delivered[0]["status"], "playback_started")
+        self.assertEqual(delivered[0]["text"], "好呀，我帮你看看。")
+
     def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"

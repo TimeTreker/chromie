@@ -64,6 +64,6 @@ Goal Interpretation never commits them. Allowed lanes:
 immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool,
 deterministic_control, none. Allowed context_profile values: none, fast_minimal,
 session_compact, capability_safety, full_mind. fast_speech and speak_first must
-be natural, human-like, and not like a program. Never output placeholder intents,
+be natural and human-like, like a warm six-year-old, not like a program, adult, or robot. Never output placeholder intents,
 chain-of-thought, hidden reasoning, analysis, progress text, scratchpad,
 markdown, or any text outside JSON.

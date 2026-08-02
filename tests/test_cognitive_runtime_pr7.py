@@ -75,6 +75,7 @@ class ScriptedClient:
         self.deep_plans = list(deep_plans or [])
         self.composition_status = composition_status
         self.deep_contexts: list[dict] = []
+        self.compose_contexts: list[dict] = []
         self.calls: list[str] = []
 
     async def resolve_goal_association(self, *args, **kwargs):
@@ -92,6 +93,7 @@ class ScriptedClient:
 
     async def compose_response_plan(self, *args, **kwargs):
         self.calls.append("compose")
+        self.compose_contexts.append(dict(kwargs.get("context") or {}))
         if self.composition_status != "resolved":
             return ResponseCompositionResolution(
                 status="model_unavailable",
@@ -434,6 +436,35 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIsNone(result.interaction_response)
         self.assertEqual(client.calls, ["association", "fast", "compose"])
         self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
+
+    def test_response_composer_receives_playback_started_current_turn_speech(self):
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[respond_plan()],
+        )
+        event = {
+            "event_id": "speech_event_fast",
+            "stage": "fast_first",
+            "purpose": "acknowledge_and_check",
+            "status": "playback_started",
+            "text": "好呀，我帮你看看。",
+        }
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+            delivered_turn_speech_provider=lambda sid: [
+                {**event, "session_id": sid}
+            ],
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "report_only")
+        self.assertEqual(
+            client.compose_contexts[0]["delivered_turn_speech"],
+            [{**event, "session_id": "sid-pr7"}],
+        )
 
     def test_budget_failure_is_preserved_without_causal_attribution(self):
         association = GoalAssociationResolution(

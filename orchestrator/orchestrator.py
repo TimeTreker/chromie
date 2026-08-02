@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from difflib import SequenceMatcher
+import hashlib
 import json
 import logging
 import math
@@ -750,6 +751,14 @@ class VoiceAssistant:
             asyncio.Future[bool],
         ] = {}
         self.cancelled_playback_orders: set[tuple[int, int, str | None]] = set()
+        # Current-turn speech is conversational state, not merely audio state.
+        # Fast-first speech may finish long before Response Composer runs, so
+        # preserve a bounded, playback-qualified record that later model stages
+        # can reason over without Host text matching or phrase rules.
+        self._turn_speech_events: dict[str, list[dict[str, Any]]] = {}
+        self._turn_speech_event_by_playback_key: dict[
+            tuple[int, int, str | None], str
+        ] = {}
         self.order_lock = asyncio.Lock()
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
@@ -833,6 +842,7 @@ class VoiceAssistant:
             # continue.  Effectful execution still remains behind the trusted
             # canonical-plan/runtime boundary.
             goal_state_apply=self._apply_cognitive_goal_association_stage,
+            delivered_turn_speech_provider=self._delivered_turn_speech_events,
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
@@ -870,6 +880,102 @@ class VoiceAssistant:
     ) -> tuple[int, int, str | None]:
         return (generation, order, session_id)
 
+    def _register_turn_speech_event(
+        self,
+        *,
+        session_id: str | None,
+        generation: int,
+        orders: list[int],
+        text: str,
+        stage: str,
+        purpose: str,
+        route: str = "",
+        intent: str = "",
+        commitment: str = "",
+    ) -> dict[str, Any] | None:
+        sid = str(session_id or "").strip()
+        normalized_text = self.normalize_tts_candidate(text)
+        if not sid or not orders or not normalized_text:
+            return None
+        event_seed = (
+            f"{sid}|{generation}|{orders[0]}|{stage}|{purpose}|{normalized_text}"
+        )
+        event_id = "speech_event_" + hashlib.sha256(
+            event_seed.encode("utf-8")
+        ).hexdigest()[:20]
+        event = {
+            "event_id": event_id,
+            "session_id": sid,
+            "stage": stage,
+            "purpose": purpose,
+            "status": "scheduled",
+            "text": normalized_text,
+            "route": str(route or ""),
+            "intent": str(intent or ""),
+            "commitment": str(commitment or ""),
+            "generation": int(generation),
+            "orders": [int(order) for order in orders],
+        }
+        events_by_sid = getattr(self, "_turn_speech_events", None)
+        if not isinstance(events_by_sid, dict):
+            events_by_sid = {}
+            self._turn_speech_events = events_by_sid
+        playback_index = getattr(
+            self, "_turn_speech_event_by_playback_key", None
+        )
+        if not isinstance(playback_index, dict):
+            playback_index = {}
+            self._turn_speech_event_by_playback_key = playback_index
+        events = events_by_sid.setdefault(sid, [])
+        events.append(event)
+        if len(events) > 12:
+            del events[:-12]
+        first_key = self.playback_start_key(generation, orders[0], session_id)
+        playback_index[first_key] = event_id
+        return event
+
+    def _update_turn_speech_event_for_playback(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: str | None,
+        started: bool,
+        reason: str,
+    ) -> None:
+        key = self.playback_start_key(generation, order, session_id)
+        playback_index = getattr(
+            self, "_turn_speech_event_by_playback_key", None
+        )
+        if not isinstance(playback_index, dict):
+            return
+        event_id = playback_index.pop(key, None)
+        sid = str(session_id or "").strip()
+        if not event_id or not sid:
+            return
+        events_by_sid = getattr(self, "_turn_speech_events", None)
+        if not isinstance(events_by_sid, dict):
+            return
+        for event in reversed(events_by_sid.get(sid, [])):
+            if event.get("event_id") != event_id:
+                continue
+            event["status"] = "playback_started" if started else "not_delivered"
+            event["playback_reason"] = str(reason or "")
+            break
+
+    def _delivered_turn_speech_events(
+        self,
+        session_id: str,
+    ) -> list[dict[str, Any]]:
+        events_by_sid = getattr(self, "_turn_speech_events", None)
+        if not isinstance(events_by_sid, dict):
+            return []
+        return [
+            dict(event)
+            for event in events_by_sid.get(str(session_id or ""), [])
+            if event.get("status") in {"playback_started", "playback_completed"}
+        ]
+
     def resolve_playback_start_waiter(
         self,
         generation: int,
@@ -884,6 +990,13 @@ class VoiceAssistant:
         if waiter is None or waiter.done():
             return
         waiter.set_result(started)
+        self._update_turn_speech_event_for_playback(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+            started=started,
+            reason=reason,
+        )
         self.session_log(
             session_id,
             "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
@@ -900,9 +1013,16 @@ class VoiceAssistant:
     ) -> None:
         waiters = list(self.playback_start_waiters.items())
         self.playback_start_waiters.clear()
-        for (_, order, session_id), waiter in waiters:
+        for (generation, order, session_id), waiter in waiters:
             if not waiter.done():
                 waiter.set_result(started)
+                self._update_turn_speech_event_for_playback(
+                    generation=generation,
+                    order=order,
+                    session_id=session_id,
+                    started=started,
+                    reason=reason,
+                )
                 self.session_log(
                     session_id,
                     "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
@@ -1013,6 +1133,9 @@ class VoiceAssistant:
         self,
         audio: CachedFastFirstAudio,
         session_id: str | None,
+        *,
+        route: str = "",
+        intent: str = "",
     ) -> dict[str, Any]:
         if not audio.pcm16 or audio.sample_rate <= 0:
             return {"scheduled": False, "reason": "invalid_cached_audio"}
@@ -1034,6 +1157,16 @@ class VoiceAssistant:
         self._remember_tts_text(generation, audio.text)
         key = self.playback_start_key(generation, order, session_id)
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        speech_event = self._register_turn_speech_event(
+            session_id=session_id,
+            generation=generation,
+            orders=[order],
+            text=audio.text,
+            stage="fast_first",
+            purpose=audio.purpose or "pending_work_acknowledgement",
+            route=route,
+            intent=intent,
+        )
         state = self.sessions.state.get(session_id or "")
         if state is not None:
             state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
@@ -1063,6 +1196,9 @@ class VoiceAssistant:
             "language": audio.language,
             "text": audio.text,
             "cached": True,
+            "speech_event_id": (
+                speech_event.get("event_id") if speech_event is not None else None
+            ),
         }
 
     def _start_fast_first_audio_hedge(
@@ -1116,7 +1252,12 @@ class VoiceAssistant:
                 await asyncio.sleep(max(0, self.fast_first_audio_hedge_ms) / 1000.0)
                 if self.is_stale_playback(self.playback_generation, session_id):
                     return {"scheduled": False, "reason": "stale_session"}
-                return await self.schedule_cached_fast_first_audio(audio, session_id)
+                return await self.schedule_cached_fast_first_audio(
+                    audio,
+                    session_id,
+                    route=decision.route,
+                    intent=decision.intent,
+                )
             except asyncio.CancelledError:
                 return {"scheduled": False, "reason": "final_ready_before_hedge"}
 
@@ -3383,6 +3524,34 @@ class VoiceAssistant:
         )
         scheduled = await self.schedule_tts_text(text, session_id)
         if scheduled.get("scheduled") is True:
+            raw_orders = scheduled.get("orders")
+            if not isinstance(raw_orders, list):
+                raw_orders = [scheduled.get("order")]
+            orders = [
+                int(order)
+                for order in raw_orders
+                if isinstance(order, int)
+            ]
+            fast_speech = decision.fast_speech
+            speech_event = self._register_turn_speech_event(
+                session_id=session_id,
+                generation=int(scheduled.get("generation") or 0),
+                orders=orders,
+                text=text,
+                stage="deep_thought_ack",
+                purpose=(
+                    str(fast_speech.purpose or "")
+                    if fast_speech is not None
+                    else "pending_work_acknowledgement"
+                ),
+                route=decision.route,
+                intent=decision.intent,
+                commitment=(
+                    str(fast_speech.commitment or "")
+                    if fast_speech is not None
+                    else ""
+                ),
+            )
             self.session_log(
                 session_id,
                 "deep_thought_ack_scheduled: order=%s chunks=%s generation=%s",
@@ -3483,6 +3652,34 @@ class VoiceAssistant:
         )
         scheduled = await self.schedule_tts_text(text, session_id)
         if scheduled.get("scheduled") is True:
+            raw_orders = scheduled.get("orders")
+            if not isinstance(raw_orders, list):
+                raw_orders = [scheduled.get("order")]
+            orders = [
+                int(order)
+                for order in raw_orders
+                if isinstance(order, int)
+            ]
+            fast_speech = decision.fast_speech
+            speech_event = self._register_turn_speech_event(
+                session_id=session_id,
+                generation=int(scheduled.get("generation") or 0),
+                orders=orders,
+                text=text,
+                stage="fast_first",
+                purpose=(
+                    str(fast_speech.purpose or "")
+                    if fast_speech is not None
+                    else "pending_work_acknowledgement"
+                ),
+                route=decision.route,
+                intent=decision.intent,
+                commitment=(
+                    str(fast_speech.commitment or "")
+                    if fast_speech is not None
+                    else ""
+                ),
+            )
             self.session_log(
                 session_id,
                 "fast_first_response_scheduled: route=%s order=%s chunks=%s generation=%s",
@@ -3501,6 +3698,11 @@ class VoiceAssistant:
                     "text": text,
                     "chunks": scheduled.get("chunks", 1),
                     "generation": scheduled.get("generation"),
+                    "speech_event_id": (
+                        speech_event.get("event_id")
+                        if speech_event is not None
+                        else None
+                    ),
                 },
             }
             if decision.speak_first and decision.speak_first.strip() == text:

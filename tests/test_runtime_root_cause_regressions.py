@@ -508,6 +508,43 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             language="zh-CN",
         )
 
+        delivered_context = {
+            **context,
+            "delivered_turn_speech": [
+                {
+                    "event_id": "speech_event_fast",
+                    "stage": "fast_first",
+                    "purpose": "acknowledge_and_check",
+                    "status": "playback_started",
+                    "text": "好呀，我帮你看看重庆一会儿的天气。",
+                }
+            ],
+        }
+        delivered_schema = ResponseComposerResolver._response_schema(
+            plan,
+            delivered_context,
+        )
+        delivered_response_plan = delivered_schema["$defs"]["ResponsePlan"]
+
+        self.assertNotIn("immediate", delivered_response_plan["required"])
+        self.assertTrue(
+            any(
+                branch.get("type") == "null"
+                for branch in delivered_response_plan["properties"]["immediate"]["anyOf"]
+            )
+        )
+        ResponseComposerResolver._validate_safe_read_acknowledgement(
+            ResponsePlan(),
+            plan=plan,
+            context=delivered_context,
+            language="zh-CN",
+        )
+        ResponseComposerResolver._validate_pending_response_contract(
+            ResponsePlan(),
+            plan=plan,
+            context=delivered_context,
+        )
+
     def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
         from agent.app.deep_planner import DeepPlannerResolver
 

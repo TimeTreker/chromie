@@ -1426,12 +1426,16 @@ class GoalDrivenRuntimeCoordinator:
         policy: CognitiveRuntimePolicy,
         goal_state_apply: Callable[..., list[dict[str, Any]]] | None = None,
         context_refresh: Callable[[], dict[str, Any]] | None = None,
+        delivered_turn_speech_provider: (
+            Callable[[str], list[dict[str, Any]]] | None
+        ) = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
         self.policy = policy
         self.goal_state_apply = goal_state_apply
         self.context_refresh = context_refresh
+        self.delivered_turn_speech_provider = delivered_turn_speech_provider
 
     @staticmethod
     def _association_goal_ids(association: GoalAssociationResolution) -> list[str]:
@@ -2066,6 +2070,16 @@ class GoalDrivenRuntimeCoordinator:
                 if callable(recent_auxiliary_evidence)
                 else []
             )
+            delivered_turn_speech = (
+                self.delivered_turn_speech_provider(sid)
+                if callable(self.delivered_turn_speech_provider)
+                else []
+            )
+            composition_context["delivered_turn_speech"] = [
+                dict(item)
+                for item in delivered_turn_speech
+                if isinstance(item, dict)
+            ]
             stage = time.perf_counter()
             composition_resolution = await self.agent_client.compose_response_plan(
                 session,

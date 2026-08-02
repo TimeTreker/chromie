@@ -976,7 +976,7 @@ def _goal_interpretation_global_context_section(mind: Any) -> str:
         "Self Model:\n"
         f"{_bounded_json(self_model or {'speaker_entity': identity}, max_chars=520)}\n"
         "Worldview:\n"
-        "- Chromie is an embodied realtime robot/voice assistant; use only supplied runtime evidence.\n"
+        "- Chromie's owner-approved first-person identity is the human child and family role in the Self Model. Implementation and embodiment metadata are outside her ordinary self-concept and speech. Use only supplied runtime evidence for abilities and outcomes.\n"
         "Lifeview:\n"
         f"{_bounded_json(long_term_goals or 'not supplied', max_chars=240)}\n"
         "Valueview:\n"
@@ -1133,7 +1133,7 @@ class OllamaGoalInterpreter:
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. For route=memory, memory_update requires scope=session, kind, text, optional key, persistence_policy=ephemeral, confidence. routes[] split responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marks unknown) only for explicit capabilities. metadata.semantic_task_operations may contain operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, reason_summary. create requires goal.description and source_text; later operations use supplied task IDs. Pending work requires structured fast_speech as a process acknowledgement with exact pairs: tool=acknowledge_and_check/checking_only; robot_action=safety_prelude/needs_confirmation; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Never claim result, motion, memory commit, or completion. fast_speech/speak_first and metadata.response_plan.immediate use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. For route=memory, memory_update requires scope=session, kind, text, optional key, persistence_policy=ephemeral, confidence. routes[] split responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marks unknown) only for explicit capabilities. metadata.semantic_task_operations may contain operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, reason_summary. create requires goal.description and source_text; later operations use supplied task IDs. Pending work requires structured fast_speech as a process acknowledgement with exact pairs: tool=acknowledge_and_check/checking_only; robot_action=safety_prelude/needs_confirmation; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Never claim result, motion, memory commit, or completion. fast_speech/speak_first and metadata.response_plan.immediate use human-like social warmth like a warm six-year-old, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
 
     def build_fast_speech_repair_payload(
@@ -1200,7 +1200,9 @@ class OllamaGoalInterpreter:
                         "- You are Chromie's bounded fast-speech repairer.\n"
                         f"- A previous interpretation decision selected route={target_route}, which needs a short immediate user-facing prelude.\n"
                         "- Generate only the missing fast_speech. Do not change route, intent, metadata, tool arguments, skills, or safety policy.\n"
-                        "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
+                        "- The text should sound like Chromie herself: a natural, warm, capable six-year-old child in her family, and in the user's language when clear.\n"
+                        "- Do not sound like customer service, an adult professional, a robot status system, a program, or a technical operator.\n"
+                        "- Keep the acknowledgement spontaneous and concise; do not announce her age or family role unless the user asked about identity.\n\n"
                         "Safety Contract:\n"
                         "- fast_speech is emitted before downstream work finishes.\n"
                         "- This boundary runs before authoritative Goal Association. It must not settle an indirect reference, correction, or ellipsis from history or recency.\n"

@@ -2368,6 +2368,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         rendered = "\n".join(str(message.get("content") or "") for message in payload["messages"])
 
         self.assertIn("fast-speech repairer", rendered)
+        self.assertIn("six-year-old child", rendered)
+        self.assertIn("Do not sound like customer service", rendered)
+        self.assertIn("robot status system", rendered)
+        self.assertIn("do not announce her age or family role", rendered)
         self.assertIn("Do not change route", rendered)
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("Never claim an external result", rendered)
