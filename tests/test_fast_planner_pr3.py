@@ -7,6 +7,7 @@ from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_contract import (
     PlannerModelOutput,
     validate_external_response_evidence_boundary,
+    validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
@@ -207,6 +208,89 @@ def multi_goal_plan(
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
+    def test_capability_dependent_goal_cannot_be_completed_by_respond_outcome(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Answer with current weather.",
+            "response_text": "内乡今天有雷雨。",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-weather"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "capability_dependent goal cannot use disposition=respond",
+        ):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": "goal-weather",
+                        "metadata": {
+                            "responsibility_kind": "capability_dependent"
+                        },
+                    }
+                ],
+            )
+
+    def test_capability_dependent_goal_can_respond_from_exact_delivered_evidence(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Restate completed weather evidence.",
+            "response_text": "现在有雷雨。",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-weather"],
+        )
+
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-weather",
+                    "metadata": {"responsibility_kind": "capability_dependent"},
+                }
+            ],
+            context={
+                "history": [
+                    {
+                        "role": "assistant",
+                        "text": "内乡现在有雷雨。",
+                        "metadata": {
+                            "evidence_bound": True,
+                            "source": "evidence_bound_tool_result_interpretation",
+                            "source_goal_ids": ["goal-weather"],
+                        },
+                    }
+                ]
+            },
+        )
+
     def test_partial_plan_cannot_carry_steps(self):
         with self.assertRaises(ValueError):
             CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","capability_id":"soridormi.walk_forward","args":{"duration_s":15}}])

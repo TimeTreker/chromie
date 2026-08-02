@@ -518,6 +518,42 @@ class AgentSkillWeatherQualificationTests(unittest.TestCase):
         )
         self.assertIn("semantic review evidence is missing", "\n".join(report["errors"]))
 
+    def test_required_runtime_turn_must_finish_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity, summary, events = self._fixture(root)
+            payloads = [
+                json.loads(line)
+                for line in events.read_text(encoding="utf-8").splitlines()
+            ]
+            for payload in payloads:
+                if (
+                    payload.get("sid") == "sid-weather-2"
+                    and payload.get("event") == "cognitive_runtime_resolution"
+                ):
+                    payload["status"] = "error"
+                    payload["lane"] = "unsupported"
+                    break
+            events.write_text(
+                "".join(json.dumps(item) + "\n" for item in payloads),
+                encoding="utf-8",
+            )
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary,
+                runtime_identity_path=identity,
+                cognitive_events_path=events,
+                expected_chromie_revision="chromie-current",
+            )
+
+        self.assertFalse(
+            report["qualification"]["live_agent_skill_selection_validated"]
+        )
+        self.assertIn(
+            "runtime status 'error' is not 'applied'",
+            "\n".join(report["errors"]),
+        )
+
     def test_canonical_location_is_not_rewritten_to_provider_syntax(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

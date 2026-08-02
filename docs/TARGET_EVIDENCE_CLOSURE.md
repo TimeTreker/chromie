@@ -161,14 +161,21 @@ The verifier rejects missing Skill provenance, digest drift, stale/mismatched
 Goal bindings, canonical-location rewriting, an unexpected provider lookup key,
 a wrong administrative match, repeated lookup on the exact-memory follow-up,
 or a Chongqing observation used to answer the corrected Neixiang request. Every
-fresh weather read must also retain a successful model-owned pre-evidence speech
-review. This is evidence that the semantic boundary ran, not a Host wording
-classifier; the fingerprint-bound human review still judges the actual speech.
+manifest-declared runtime turn must retain an applied terminal event. Every
+fresh weather read, including one represented by a `mixed` Plan, must also retain
+a successful model-owned pre-evidence speech review. This is evidence that the
+semantic boundary ran, not a Host wording classifier; the fingerprint-bound
+human review still judges the actual speech.
 Before planning, Goal Association also rejects a new direct location binding
 that is not grounded as a contiguous verbatim span of the authoritative current
 turn; indirect references remain eligible only through their supplied referent
 provenance. One bounded model repair may correct the DTO, otherwise the turn
 fails closed. Provider aliases never repair this semantic boundary.
+A material correction to an external-read binding requires a new exact read
+when the corrected answer still depends on external facts. A
+capability-dependent direct response is valid without retrieval only when the
+supplied delivered evidence-bound dialogue names that same Goal; a result for a
+different entity or Goal cannot be relabelled.
 
 ## Social Attention baseline
 

@@ -143,6 +143,91 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("verbatim", ollama.prompts[1][0])
 
+    def test_indirect_location_repair_requires_copied_referent_provenance(self):
+        neixiang = {
+            "referent_id": "ref-neixiang",
+            "entity_type": "location",
+            "canonical_value": "内乡",
+            "scope_kind": "conversation",
+            "scope_ids": [],
+            "status": "foreground",
+            "confidence": 1.0,
+            "source_turn_id": "turn-neixiang",
+            "source_goal_ids": [],
+        }
+        missing_provenance = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "查询今天内乡是否下雨。",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "内乡",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+        }
+        repaired = {
+            **missing_provenance,
+            "new_goals": [
+                {
+                    "description": "查询今天内乡是否下雨。",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "内乡",
+                            "referent_id": "ref-neixiang",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "resolved_references": [
+                {
+                    "surface_form": "那边",
+                    "entity_type": "location",
+                    "resolved_value": "内乡",
+                    "source": "discourse_referent",
+                    "referent_id": "ref-neixiang",
+                    "confidence": 1.0,
+                    "reason_summary": "内乡是当前前景地点。",
+                }
+            ],
+        }
+        ollama = ScriptedOllama([missing_provenance, repaired])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "今天那边下雨了吗？",
+                    discourse_referents=[neixiang],
+                    discourse_focus=["ref-neixiang"],
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.resolved_references[0].resolved_value, "内乡")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["referent_id"],
+            "ref-neixiang",
+        )
+        self.assertIn(
+            "copy the supplied referent_id into both the location binding and "
+            "resolved_references",
+            ollama.prompts[1][0],
+        )
+
     def test_capability_result_delivery_is_not_a_duplicate_spoken_goal(self):
         ollama = ScriptedOllama(
             [

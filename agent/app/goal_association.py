@@ -735,9 +735,13 @@ class GoalAssociationResolver:
         )
         if location_bindings:
             raise ValueError(
-                "a directly named location binding must preserve a verbatim "
-                "contiguous span from the authoritative user turn; do not "
-                "translate, transliterate, or expand it outside the turn: "
+                "a location binding must preserve explicit or referent-backed "
+                "provenance. For a directly named location, preserve a verbatim "
+                "contiguous span from the authoritative user turn and do not "
+                "translate, transliterate, or expand it. For an indirect "
+                "location, copy the supplied referent_id into both the location "
+                "binding and resolved_references, and copy the indirect user "
+                "surface into resolved_references.surface_form: "
                 + ", ".join(location_bindings)
             )
         return self._expand_model_output(
@@ -1115,7 +1119,7 @@ class GoalAssociationResolver:
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
-            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. "
+            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
@@ -1203,7 +1207,7 @@ class GoalAssociationResolver:
             + "\n\n"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
-            + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"
+            + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. For an indirect location binding, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the referent canonical value. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"
             + identity_json
             + "\n\nOwner-approved Personality Expression JSON:\n"
             + personality_json
@@ -1271,7 +1275,7 @@ class GoalAssociationResolver:
             "capability Goal. Never invent, copy, or repair an entity by character "
             "pattern; resolve it from the user meaning and supplied discourse. "
             "Persona and wording are expression concerns, not extra Goals.\n\n"
-            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. Indirect references may retain the supplied referent's canonical value.\n\n"
+            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the supplied referent's canonical value.\n\n"
             "Existing Goal bindings are provenance-stable at this contract. An "
             "association may update only its description and lifecycle relation; "
             "it cannot rewrite typed material bindings. If the current user meaning "

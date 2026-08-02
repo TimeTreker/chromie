@@ -708,6 +708,7 @@ class FastPlannerResolver:
         validate_goal_responsibility_outcomes(
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
+            context=request.context,
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)
@@ -751,6 +752,7 @@ class FastPlannerResolver:
         validate_goal_responsibility_outcomes(
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
+            context=request.context,
         )
         out = model_output.model_dump(mode="python")
         out.pop("plan_relation", None)

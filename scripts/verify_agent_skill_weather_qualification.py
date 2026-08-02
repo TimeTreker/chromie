@@ -672,6 +672,11 @@ def verify(
             if not runtime:
                 continue
             runtime_event = runtime[0]
+            if requires_runtime and runtime_event.get("status") != "applied":
+                errors.append(
+                    f"{label}: runtime status {runtime_event.get('status')!r} "
+                    "is not 'applied'"
+                )
             _record_new_goal_bindings(runtime_event, goal_binding_registry)
             if runtime_event.get("run_identity", {}).get("identity_sha256") != identity_digest:
                 errors.append(f"{label}: runtime event identity does not match")

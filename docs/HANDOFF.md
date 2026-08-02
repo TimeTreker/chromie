@@ -15,11 +15,13 @@ The active Issue is **Close Current-Revision Target Evidence**. Do not begin the
 queued response-latency architecture until this evidence Issue closes, except
 to repair a reproduced qualification blocker.
 
-The latest clean committed implementation baseline before the current
-location-binding correction is local commit `1e892e5` (`fix: require delivered
-speech in target evidence`). It has not been pushed; `main` is ahead of
-`origin/main`. The current correction must be committed and recollected in a
-new evidence root before it can become target evidence.
+The latest clean committed implementation baseline is local commit `bba21a2`
+(`fix: preserve explicit location bindings`), after `1e892e5` (`fix: require
+delivered speech in target evidence`). Neither commit has been pushed; `main`
+is ahead of `origin/main`. The worktree contains the follow-on weather-
+correction continuity repair described below. It must pass the canonical gate,
+be committed, and be recollected in a new evidence root before it can become
+target evidence.
 
 Chromie retains one Goal-driven semantic authority. The Host validates and
 coordinates but does not decide ordinary meaning, capability selection, or
@@ -70,7 +72,20 @@ episode for the next defect, but **do not finalize or resume it**:
   qualification report may be carried forward;
 - required Social Attention and LAN-exposure tracks remain absent.
 
-## Current reproduced blocker and correction
+The later clean source-bound root is:
+
+```text
+.chromie/acceptance/target-evidence/20260802T014055Z
+```
+
+It is bound to Chromie `bba21a2` and the same Soridormi revision. Preserve it,
+but **do not finalize or resume it**. Its complete Gateway/Core automatic
+collection passed with delivered speech, paired MuJoCo execution, terminal-
+Fast active cancellation, and safe idle; human review remains `pending`.
+Weather collection then exposed the adjacent correction-continuity defect
+below, so the root is an originating failure rather than closure evidence.
+
+## Reproduced blockers and current correction
 
 The first weather turn in `20260802T011257Z` exposed an explicit-binding
 provenance defect:
@@ -116,6 +131,47 @@ uses retained dialogue with no second lookup, the correction binds `内乡`, and
 the indirect `那边` lookup remains on `内乡`. Its verifier reports only
 `runtime identity is not source clean`.
 
+Clean root `20260802T014055Z` then reproduced the next general continuity
+defect. The initial Chongqing lookup used a `mixed` Plan but did not receive the
+safe-read pre-evidence review. The correction `不是重庆，我说的是内乡。` was routed
+as chat, and the planner relabelled the prior Chongqing facts as Neixiang
+without executing a new read. The final `那边` turn selected Neixiang but omitted
+the supplied referent provenance and failed closed during Goal Association
+repair.
+
+Root-cause record:
+
+```text
+Observed failure: a material external-read binding correction could reuse and relabel stale facts; mixed safe reads skipped semantic review; indirect repair omitted typed referent provenance.
+Expected contract: a material entity correction that still depends on external facts performs a new exact read; only delivered evidence for the same Goal may support a capability-dependent respond outcome; every fresh safe read is reviewed; indirect values carry the supplied referent ID and surface form.
+Earliest wrong components: model-owned route continuity review, mixed-plan safe-read classification, and Goal Association repair guidance.
+Fix classes: semantic model contract, typed plan/provenance validation, qualification verification, and regression evidence; no Host phrase rule or entity map.
+Regression boundary: corrected external-read route, mixed safe-read review, evidence-bound capability response, indirect referent repair, required applied runtime status, then the complete live weather manifest.
+Evidence level: clean originating failure plus dirty rebuilt-service diagnostic; clean post-fix target collection still required.
+General ability protected: stable cross-turn entity correction and truthful external-result grounding.
+```
+
+The current worktree sends material external-read corrections through the
+existing model-owned semantic route review, reviews both `execute` and `mixed`
+safe reads, requires capability-dependent direct responses to cite delivered
+evidence-bound dialogue for the same Goal, and gives the existing bounded Goal
+Association repair the complete indirect-reference provenance shape. The
+weather verifier now also requires each manifest-declared runtime turn to end
+with `status=applied`.
+
+Focused contract coverage passes 228/228. The relevant Level A general-ability
+classes `robust_intent_understanding` and
+`tool_and_conversation_lane_discipline` pass 17/17. This is deterministic
+automatic evidence, not a live provider, speaker, simulator, or target claim.
+
+Dirty diagnostic `/tmp/chromie-weather-continuity-diagnostic-3` is explicitly
+non-qualifying. It passes every weather semantic, provider, continuity, runtime,
+and TTS assertion; the verifier's only error is `runtime identity is not source
+clean`. The exact-result follow-up uses zero Capabilities, while the correction
+and final indirect turn each perform a fresh Neixiang lookup. All five turns
+have applied runtime events and complete speech delivery with zero failed or
+skipped chunks.
+
 ## Resume sequence
 
 1. Run the focused Goal Association, discourse, Agent Skill, and weather
@@ -130,10 +186,10 @@ the indirect `那边` lookup remains on `内乡`. Its verifier reports only
    ./scripts/run_tests.sh
    ```
 
-2. Commit the correction and rebuild the Agent image from that exact clean
-   revision.
+2. Commit the current continuity correction and rebuild all qualification
+   services from that exact clean revision.
 3. Initialize a **new** `source_bound_development` evidence root. Never carry
-   artifacts, reports, or human decisions forward from either retained root.
+   artifacts, reports, or human decisions forward from any retained root.
 4. Recollect and review Gateway/Core and Agent Skill/weather, collect and review
    Social Attention, attach local plus second-machine LAN reports, then finalize
    the default closure. Human review remains explicit.

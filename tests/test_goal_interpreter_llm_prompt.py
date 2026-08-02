@@ -2451,6 +2451,79 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             ["quick-model", "slow-review-model"],
         )
 
+    def test_material_external_read_correction_review_forbids_relabeling_old_result(
+        self,
+    ) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="不是重庆，我说的是内乡。",
+            language="zh-CN",
+            context={
+                "recent_goal_snapshots": [
+                    {
+                        "goal_id": "goal-weather",
+                        "status": "completed",
+                        "goal": {
+                            "description": "Check whether Chongqing is hot.",
+                            "object": {
+                                "bindings": {
+                                    "location": {
+                                        "name": "location",
+                                        "entity_type": "location",
+                                        "value": "重庆",
+                                    }
+                                }
+                            },
+                        },
+                    }
+                ],
+                "verified_tool_memory_index": [
+                    {
+                        "evidence_id": "weather-chongqing",
+                        "tool_id": "chromie.weather.lookup",
+                        "status": "completed",
+                        "request_args": {"location": "重庆"},
+                        "goal_ids": ["goal-weather"],
+                    }
+                ],
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "route": "tool",
+                        "description": "Retrieve current weather for a place.",
+                        "effects": ["external_read", "weather_lookup"],
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+            },
+        )
+
+        payload = interpreter.build_semantic_route_repair_payload(
+            request,
+            RouteDecision(route="chat", intent="correction", confidence=0.95),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+        )
+        rendered = "\n".join(
+            str(message.get("content") or "") for message in payload["messages"]
+        )
+
+        self.assertIn(
+            "A material binding correction to an external-read Goal requires a "
+            "new exact read",
+            rendered,
+        )
+        self.assertIn(
+            "Never relabel an older result with the corrected binding",
+            rendered,
+        )
+
     def test_social_framing_review_keeps_trailing_tool_affordance(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",

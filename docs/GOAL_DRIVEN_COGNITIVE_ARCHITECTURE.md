@@ -514,6 +514,14 @@ Later: 顺便查一下天气。
 The second turn creates a new weather goal while leaving the coffee goal
 active.
 
+When a user materially corrects an entity on an external-read Goal, Goal
+Association creates a fully bound replacement Goal while retaining the old Goal
+as history. If the corrected answer still depends on external facts, planning
+must perform a new exact read. It may not relabel evidence produced for the old
+entity as evidence for the replacement Goal. A direct response without a new
+Capability is valid only when delivered evidence-bound dialogue names the same
+Goal being answered.
+
 ### 6.2 Bounded candidate context
 
 Goal association should consider a bounded projection of:
@@ -884,6 +892,12 @@ requirement. Completion speech and terminal Goal state still require trusted
 runtime evidence.
 
 Partial satisfaction is not authorization to execute a degraded plan.
+
+Responsibility type also constrains the outcome. A `spoken_response` Goal is
+owned by Response Composer and cannot own an executable step. A
+`capability_dependent` Goal cannot use `respond` as a shortcut around execution
+unless delivered evidence-bound dialogue names that exact Goal. This validation
+uses typed Goal and evidence provenance; it does not classify user wording.
 
 For a mixed multi-goal plan, satisfaction thresholds apply to each executable
 or directly answered goal. An unavailable, refused, or waiting goal may lower

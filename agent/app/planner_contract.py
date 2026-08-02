@@ -501,12 +501,28 @@ def validate_goal_responsibility_outcomes(
     output: PlannerModelOutput,
     *,
     authoritative_goals: list[dict[str, Any]],
+    context: dict[str, Any] | None = None,
 ) -> None:
-    """Keep direct-response Goals out of executable capability ownership."""
+    """Keep planner outcomes aligned with typed Goal completion modalities."""
 
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
-    if not response_goal_ids:
-        return
+    capability_goal_ids: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        metadata = goal.get("metadata")
+        if (
+            goal_id
+            and isinstance(metadata, dict)
+            and metadata.get("responsibility_kind") == "capability_dependent"
+        ):
+            capability_goal_ids.add(goal_id)
+    evidence_goal_ids = {
+        source_goal_id
+        for item in evidence_bound_dialogue(context)
+        for source_goal_id in item.get("source_goal_ids") or []
+    }
     for goal_id in sorted(response_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
@@ -528,6 +544,21 @@ def validate_goal_responsibility_outcomes(
             "spoken_response goals cannot own executable planner steps: "
             + ",".join(invalid_steps)
         )
+    for goal_id in sorted(capability_goal_ids):
+        outcome = output.goal_outcomes.get(goal_id)
+        responds_without_capability = (
+            outcome is not None and outcome.disposition == "respond"
+        ) or (
+            len(authoritative_goals) == 1
+            and not output.goal_outcomes
+            and output.disposition == "respond"
+        )
+        if responds_without_capability and goal_id not in evidence_goal_ids:
+            raise ValueError(
+                "capability_dependent goal cannot use disposition=respond "
+                "without capability or delivered evidence-bound dialogue: "
+                + goal_id
+            )
 
 
 def coordinated_action_goal_ids(

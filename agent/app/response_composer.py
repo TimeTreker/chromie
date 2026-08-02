@@ -422,7 +422,7 @@ class ResponseComposerResolver:
         context: dict[str, Any] | None,
     ) -> bool:
         if (
-            plan.disposition != "execute"
+            plan.disposition not in {"execute", "mixed"}
             or not plan.steps
             or not isinstance(context, dict)
         ):

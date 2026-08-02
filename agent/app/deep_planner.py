@@ -903,6 +903,7 @@ class DeepPlannerResolver:
         validate_goal_responsibility_outcomes(
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
+            context=request.context,
         )
         validate_goal_binding_argument_grounding(
             model_output,

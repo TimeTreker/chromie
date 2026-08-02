@@ -867,6 +867,93 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.metadata["safe_read_semantic_review_succeeded"]
         )
 
+    def test_mixed_safe_read_plan_still_receives_pre_evidence_semantic_review(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-weather",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather", "goal-response"],
+            response_text="内乡今天有雷雨。",
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "内乡", "date": "today"},
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["weather"],
+                },
+                {
+                    "goal_id": "goal-response",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "内乡今天有雷雨。",
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+        )
+        unsafe = {
+            "response_plan": {
+                "immediate": {
+                    "text": "内乡今天有雷雨。",
+                    "speech_act": "none",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather", "goal-response"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "Incorrectly reused an earlier result.",
+        }
+        reviewed = {
+            "response_plan": {
+                "immediate": {
+                    "text": "我先按你纠正的地点重新查一下。",
+                    "speech_act": "acknowledge",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather", "goal-response"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "Only a pre-evidence acknowledgement is truthful.",
+        }
+        ollama = ScriptedOllama([unsafe, reviewed])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.composition.response_plan.immediate.text,
+            "我先按你纠正的地点重新查一下。",
+        )
+        self.assertTrue(result.metadata["safe_read_semantic_review_succeeded"])
+
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])
         response_plan = {
