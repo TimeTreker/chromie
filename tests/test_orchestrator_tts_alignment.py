@@ -804,6 +804,65 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
+    async def test_stale_session_cannot_reserve_a_playback_order(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        stale_session_id = assistant.sessions.create()
+        current_session_id = assistant.sessions.create()
+        assistant.order_lock = asyncio.Lock()
+        assistant.synthesis_order = 1
+        assistant.playback_generation = 7
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_start_waiters = {}
+        assistant._tts_text_by_generation = {}
+        scheduled: list[tuple[int, str | None, str]] = []
+
+        def session_log(
+            self: VoiceAssistant,
+            sid: str | None,
+            message: str,
+            *args: Any,
+        ) -> None:
+            self.sessions.log(sid, message, *args)
+
+        async def synthesize_one(
+            self: VoiceAssistant,
+            text: str,
+            order: int,
+            session_id: str | None,
+            generation: int,
+        ) -> None:
+            del self, generation
+            scheduled.append((order, session_id, text))
+
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        assistant.ensure_playback_worker = MethodType(
+            lambda self: None,
+            assistant,
+        )
+
+        stale = await assistant.schedule_tts_sentence(
+            "late speech from the old turn",
+            stale_session_id,
+        )
+        current = await assistant.schedule_tts_sentence(
+            "current turn speech",
+            current_session_id,
+        )
+        pending = list(assistant.active_synthesis_tasks)
+        if pending:
+            await asyncio.gather(*pending)
+
+        self.assertEqual(stale, {"scheduled": False, "reason": "stale_playback"})
+        self.assertTrue(current["scheduled"])
+        self.assertEqual(current["order"], 1)
+        self.assertEqual(assistant.synthesis_order, 2)
+        self.assertEqual(
+            scheduled,
+            [(1, current_session_id, "current turn speech")],
+        )
+
     async def test_low_confidence_deep_thought_does_not_schedule_prelude(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)

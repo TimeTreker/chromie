@@ -1705,6 +1705,7 @@ class GoalDrivenRuntimeCoordinator:
         composition_resolution: ResponseCompositionResolution | None = None
         interaction: InteractionResponse | None = None
         goal_state_results: list[dict[str, Any]] = []
+        goal_state_commit_stage = ""
         stage_diagnostics: list[dict[str, Any]] = []
         fast_planner_path = ""
         deep_planner_invocation_reasons: list[str] = []
@@ -1741,6 +1742,7 @@ class GoalDrivenRuntimeCoordinator:
                 "fast_executable_step_count": (
                     len(fast_plan.steps) if fast_plan is not None else 0
                 ),
+                "goal_state_commit_stage": goal_state_commit_stage,
             }
 
         try:
@@ -1772,6 +1774,75 @@ class GoalDrivenRuntimeCoordinator:
                         default_failure_class=association_status or "stage_failure",
                     ),
                 )
+
+            # Goal Association is the model-owned semantic interpretation of the
+            # user's responsibility.  Publish that validated semantic state as
+            # soon as the stage completes so a concurrent follow-up can reason
+            # over the in-flight Goal while planning/composition continue.  The
+            # host is only transporting and versioning the model result here; it
+            # does not infer continuity, entities, or bindings itself.
+            #
+            # Named cancellation remains deferred to the trusted runtime closure
+            # because execution-bound cancellation requires provider receipts.
+            has_named_goal_cancellation = any(
+                item.relationship == "cancel"
+                for item in association.associations
+            )
+            if (
+                self.policy.mode == "apply"
+                and self.goal_state_apply is not None
+                and association_status == "resolved"
+                and not association.clarification
+            ):
+                if has_named_goal_cancellation:
+                    goal_state_commit_stage = "deferred_named_goal_cancellation"
+                else:
+                    try:
+                        goal_state_results = self.goal_state_apply(
+                            association,
+                            sid=sid,
+                            user_text=text,
+                            route=route_decision.route,
+                            intent=route_decision.intent,
+                            source=(
+                                "goal_driven_cognitive_runtime_goal_association"
+                            ),
+                        )
+                    except Exception as exc:
+                        raise CognitiveStageFailure(
+                            "goal_association_commit",
+                            {
+                                "failure_class": type(exc).__name__,
+                                "failure_domain": "semantic_state",
+                                "architecture_attribution": "host_runtime",
+                                "retryable": False,
+                                "error_type": type(exc).__name__,
+                                "error": str(exc)[:300],
+                            },
+                        ) from exc
+                    rejected = [
+                        item
+                        for item in goal_state_results
+                        if item.get("applied") is False
+                        and item.get("reason") not in {
+                            "operation_already_applied",
+                        }
+                    ]
+                    if rejected:
+                        raise CognitiveStageFailure(
+                            "goal_association_commit",
+                            {
+                                "failure_class": "goal_state_application_rejected",
+                                "failure_domain": "semantic_state",
+                                "architecture_attribution": "host_runtime",
+                                "retryable": False,
+                                "error": json.dumps(
+                                    rejected,
+                                    ensure_ascii=False,
+                                )[:300],
+                            },
+                        )
+                    goal_state_commit_stage = "goal_association"
 
             association_goal_ids = self._association_goal_ids(association)
             if association_status == "needs_clarification" or association.clarification:
@@ -2051,28 +2122,7 @@ class GoalDrivenRuntimeCoordinator:
                     context=composition_context,
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
-                if self.goal_state_apply is not None:
-                    goal_state_results = self.goal_state_apply(
-                        association,
-                        sid=sid,
-                        user_text=text,
-                        route=route_decision.route,
-                        intent=route_decision.intent,
-                        source="goal_driven_cognitive_runtime",
-                    )
-                    rejected = [
-                        item
-                        for item in goal_state_results
-                        if item.get("applied") is False
-                        and item.get("reason") not in {
-                            "operation_already_applied",
-                        }
-                    ]
-                    if rejected:
-                        raise ValueError(
-                            "goal state application rejected: "
-                            + json.dumps(rejected, ensure_ascii=False)
-                        )
+                if goal_state_commit_stage == "goal_association":
                     interaction.metadata["goal_association"] = association.model_dump(
                         mode="json", exclude_none=True
                     )

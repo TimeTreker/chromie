@@ -1760,7 +1760,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.metadata["omitted_social_attention"],
         )
 
-    def test_goal_state_is_not_applied_when_composition_fails(self):
+    def test_goal_state_is_visible_even_when_later_composition_fails(self):
         applied = []
         client = ScriptedClient(
             association=new_goal_association(),
@@ -1771,27 +1771,161 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
             policy=CognitiveRuntimePolicy(mode="apply"),
-            goal_state_apply=lambda *args, **kwargs: applied.append(True) or [],
+            goal_state_apply=lambda *args, **kwargs: applied.append(
+                kwargs["source"]
+            )
+            or [],
         )
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "error")
-        self.assertEqual(applied, [])
+        self.assertEqual(
+            applied,
+            ["goal_driven_cognitive_runtime_goal_association"],
+        )
+        self.assertEqual(
+            result.metadata["goal_state_commit_stage"],
+            "goal_association",
+        )
 
-    def test_goal_state_applies_after_successful_composition(self):
+    def test_goal_state_applies_immediately_after_goal_association(self):
         applied = []
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[respond_plan()],
         )
+
+        def apply_goal_state(*args, **kwargs):
+            del args
+            applied.append(
+                {
+                    "source": kwargs["source"],
+                    "client_calls": list(client.calls),
+                }
+            )
+            return []
+
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
             policy=CognitiveRuntimePolicy(mode="apply"),
-            goal_state_apply=lambda *args, **kwargs: applied.append(kwargs["source"]) or [],
+            goal_state_apply=apply_goal_state,
         )
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "applied")
-        self.assertEqual(applied, ["goal_driven_cognitive_runtime"])
+        self.assertEqual(
+            applied,
+            [
+                {
+                    "source": "goal_driven_cognitive_runtime_goal_association",
+                    "client_calls": ["association"],
+                }
+            ],
+        )
+        self.assertEqual(
+            result.metadata["goal_state_commit_stage"],
+            "goal_association",
+        )
+
+    def test_followup_context_can_see_goal_while_planner_is_still_running(self):
+        manager = ConversationStateManager(enabled=True)
+
+        class BlockingPlannerClient(ScriptedClient):
+            def __init__(self):
+                super().__init__(
+                    association=new_goal_association("goal-weather"),
+                    fast_plans=[respond_plan("goal-weather")],
+                )
+                self.planner_started = asyncio.Event()
+                self.release_planner = asyncio.Event()
+
+            async def resolve_fast_plan(self, *args, **kwargs):
+                del args, kwargs
+                self.calls.append("fast")
+                self.planner_started.set()
+                await self.release_planner.wait()
+                return self.fast_plans.pop(0)
+
+        client = BlockingPlannerClient()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            goal_state_apply=manager.apply_goal_association_resolution,
+        )
+
+        async def run():
+            task = asyncio.create_task(
+                coordinator.resolve(
+                    object(),
+                    text="check the weather",
+                    sid="sid-weather",
+                    route_decision=type(
+                        "Decision",
+                        (),
+                        {
+                            "route": "chat",
+                            "intent": "conversation",
+                            "language": "en-US",
+                        },
+                    )(),
+                    context={"history": [], "active_goal_snapshots": []},
+                    history=[],
+                    language="en-US",
+                )
+            )
+            await asyncio.wait_for(client.planner_started.wait(), timeout=1.0)
+            self.assertFalse(task.done())
+            snapshots = manager.active_goal_snapshots()
+            self.assertEqual(
+                [item["goal_id"] for item in snapshots],
+                ["goal-weather"],
+            )
+            self.assertEqual(snapshots[0]["status"], "planning")
+            client.release_planner.set()
+            return await task
+
+        result = asyncio.run(run())
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(client.calls, ["association", "fast", "compose"])
+
+    def test_named_cancellation_is_not_committed_before_runtime_closure(self):
+        association = GoalAssociationResolution(
+            turn_id="turn-cancel",
+            associations=[
+                {
+                    "association_id": "association-cancel",
+                    "relationship": "cancel",
+                    "target_goal_ids": ["goal-existing"],
+                    "confidence": 0.96,
+                    "reason_summary": "The user cancelled the existing goal.",
+                }
+            ],
+            confidence=0.96,
+            metadata={"status": "resolved"},
+        )
+        applied = []
+        client = ScriptedClient(
+            association=association,
+            fast_plans=[respond_plan("goal-existing")],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            goal_state_apply=lambda *args, **kwargs: applied.append(
+                (args, kwargs)
+            )
+            or [],
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(applied, [])
+        self.assertEqual(
+            result.metadata["goal_state_commit_stage"],
+            "deferred_named_goal_cancellation",
+        )
 
     def test_mixed_plan_executes_effectful_goal_and_preserves_ownership(self):
         plan = CanonicalPlan(

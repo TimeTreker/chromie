@@ -827,9 +827,12 @@ class VoiceAssistant:
                 ),
             ),
             policy=self.cognitive_runtime_policy,
-            # Goal state is committed by the host only after the canonical plan
-            # and composed response have also passed trusted-runtime preparation.
-            goal_state_apply=None,
+            # Goal Association is already the validated, model-owned semantic
+            # result.  Publish it immediately so concurrent follow-up turns can
+            # reason over the in-flight Goal while planning and composition
+            # continue.  Effectful execution still remains behind the trusted
+            # canonical-plan/runtime boundary.
+            goal_state_apply=self._apply_cognitive_goal_association_stage,
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
@@ -1014,9 +1017,18 @@ class VoiceAssistant:
         if not audio.pcm16 or audio.sample_rate <= 0:
             return {"scheduled": False, "reason": "invalid_cached_audio"}
         async with self.order_lock:
+            generation = self.playback_generation
+            if self.is_stale_playback(generation, session_id):
+                self.session_log(
+                    session_id,
+                    "fast_first_audio_drop_stale_no_order: generation=%s current_generation=%s current_sid=%s",
+                    generation,
+                    self.playback_generation,
+                    self.session_id,
+                )
+                return {"scheduled": False, "reason": "stale_playback"}
             order = self.synthesis_order
             self.synthesis_order += 1
-            generation = self.playback_generation
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
         self._remember_tts_text(generation, audio.text)
@@ -2226,9 +2238,20 @@ class VoiceAssistant:
             self.session_log(session_id, "tts_skip_invalid_sentence_no_order: chars=%s text=%r", len(sentence), sentence)
             return {"scheduled": False, "reason": "invalid_tts_text"}
         async with self.order_lock:
+            generation = self.playback_generation
+            if self.is_stale_playback(generation, session_id):
+                self.session_log(
+                    session_id,
+                    "tts_drop_stale_no_order: chars=%s generation=%s current_generation=%s current_sid=%s text=%r",
+                    len(sentence),
+                    generation,
+                    self.playback_generation,
+                    self.session_id,
+                    sentence,
+                )
+                return {"scheduled": False, "reason": "stale_playback"}
             order = self.synthesis_order
             self.synthesis_order += 1
-            generation = self.playback_generation
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
         self._remember_tts_text(generation, sentence)
@@ -4020,6 +4043,34 @@ class VoiceAssistant:
             )
         return results
 
+    def _apply_cognitive_goal_association_stage(
+        self,
+        association: GoalAssociationResolution,
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None,
+        intent: str | None,
+        source: str,
+    ) -> list[dict[str, Any]]:
+        """Publish validated model-owned Goal semantics before slow planning.
+
+        This boundary deliberately performs no continuity or entity reasoning.
+        It only applies the Goal Association DTO that the LLM already produced
+        and the Agent already validated.  Named cancellation is withheld by the
+        coordinator until trusted runtime cancellation closure is available.
+        """
+
+        return self.conversation_state.apply_goal_association_resolution(
+            association,
+            sid=sid,
+            user_text=user_text,
+            route=route,
+            intent=intent,
+            source=source,
+            atomic=True,
+        )
+
     async def _try_apply_cognitive_runtime(
         self,
         session: aiohttp.ClientSession,
@@ -4230,12 +4281,21 @@ class VoiceAssistant:
                 response = self.interaction_runtime.prepare_response(
                     response, session_id=session_id
                 )
-                goal_state_results = self._apply_cognitive_goal_state(
-                    resolution,
-                    session_id=session_id,
-                    user_text=user_text,
-                    decision=decision,
-                )
+                if (
+                    str(
+                        resolution.metadata.get("goal_state_commit_stage")
+                        or ""
+                    )
+                    == "goal_association"
+                ):
+                    goal_state_results = list(resolution.goal_state_results)
+                else:
+                    goal_state_results = self._apply_cognitive_goal_state(
+                        resolution,
+                        session_id=session_id,
+                        user_text=user_text,
+                        decision=decision,
+                    )
                 response.metadata = {
                     **response.metadata,
                     "goal_state_results": goal_state_results,
