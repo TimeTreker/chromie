@@ -9,7 +9,6 @@ import logging
 import math
 import os
 import re
-import sys
 import time
 import unicodedata
 from datetime import datetime
@@ -42,7 +41,6 @@ import websockets
 from scipy import signal
 
 from orchestrator.audio_device_manager import AudioDeviceManager
-from orchestrator.audio_injection import read_audio_packet
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
@@ -86,6 +84,7 @@ from orchestrator.runtime.host_components import (
 )
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for
 from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
@@ -150,16 +149,6 @@ PLAYBACK_TRACE_MODULE = TraceModule(
     component_type="audio",
     implementation="ChromieOrchestrator",
 )
-VAD_TRACE_MODULE = TraceModule(
-    name="orchestrator.vad",
-    component_type="audio_input",
-    implementation="ChromieOrchestrator",
-)
-ASR_TRACE_MODULE = TraceModule(
-    name="orchestrator.asr",
-    component_type="speech_recognition",
-    implementation="ChromieOrchestrator",
-)
 
 
 def trace_session_async(module: TraceModule, operation: str, session_arg: str):
@@ -185,12 +174,6 @@ def trace_session_async(module: TraceModule, operation: str, session_arg: str):
         return wrapped
 
     return decorate
-
-
-def _sounddevice() -> Any:
-    import sounddevice as sd
-
-    return sd
 
 
 class VoiceAssistant:
@@ -526,16 +509,8 @@ class VoiceAssistant:
             max_utterance_ms=self.max_vad_utterance_ms,
         )
 
-        self.loop: asyncio.AbstractEventLoop | None = None
-        self.mic_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
-        self._vad_leftover = b""
-        # Preserve playback state from the instant a VAD segment starts. The
-        # segment can end after TTS playback has stopped; evaluating only the
-        # end-time state lets speaker echo pass the normal microphone threshold
-        # and re-enter Chromie as a fake user turn.
-        self._vad_segment_started_during_playback = False
-        self._vad_segment_playback_generation: int | None = None
-        # Task and playback state live in focused collaborators. The Host keeps
+        # Task, microphone buffering, and playback state live in focused
+        # collaborators. The Host keeps
         # compatibility aliases below while lifecycle mutation is centralized
         # and independently testable.
         self.input_turn_lifecycle = InputTurnLifecycle()
@@ -661,6 +636,15 @@ class VoiceAssistant:
         "playback_generation": int,
     }
     _INPUT_TURN_STATE_ALIASES = {
+        "loop": "loop",
+        "mic_queue": "mic_queue",
+        "_vad_leftover": "vad_leftover",
+        "_vad_segment_started_during_playback": (
+            "vad_segment_started_during_playback"
+        ),
+        "_vad_segment_playback_generation": (
+            "vad_segment_playback_generation"
+        ),
         "active_asr_task": "active_asr_task",
         "active_turn_task": "active_turn_task",
         "active_turn_tasks": "active_turn_tasks",
@@ -8095,24 +8079,7 @@ class VoiceAssistant:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
     def mic_callback(self, indata, frames, time_info, status):
-        if status:
-            logger.warning("Microphone status: %s", status)
-        if self.loop is None:
-            return
-        audio = indata.copy()
-
-        def enqueue_audio():
-            if self.mic_queue.full():
-                try:
-                    self.mic_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
-            try:
-                self.mic_queue.put_nowait(audio)
-            except asyncio.QueueFull:
-                pass
-
-        self.loop.call_soon_threadsafe(enqueue_audio)
+        return input_session_runtime_for(self).mic_callback(indata, frames, time_info, status)
 
     async def handle_vad_audio(
         self,
@@ -8121,161 +8088,14 @@ class VoiceAssistant:
         started_during_playback: bool = False,
         playback_generation_at_start: int | None = None,
     ):
-        duration_ms = (len(audio) / (self.target_asr_rate * 2)) * 1000.0
-        duration = duration_ms / 1000.0
-        rms = float(np.sqrt(np.mean(np.square(np.frombuffer(audio, dtype=np.int16).astype(np.float32))))) if audio else 0.0
-        if duration_ms >= self.max_vad_utterance_ms:
-            logger.warning(
-                "VAD speech ended but discarded at hard maximum: duration=%.2fs max_audio_ms=%s",
-                duration,
-                self.max_vad_utterance_ms,
-            )
-            return
-        if duration_ms < self.min_audio_ms:
-            logger.warning("VAD speech ended but skipped: duration=%.2fs min_audio_ms=%s", duration, self.min_audio_ms)
-            return
-        playback_contaminated = bool(
-            started_during_playback or self.is_playing_audio
-        )
-        effective_min_rms = (
-            self.barge_in_min_rms if playback_contaminated else self.min_rms
-        )
-        if rms < effective_min_rms:
-            logger.warning(
-                "VAD speech ended but skipped: duration=%.2fs RMS=%.1f "
-                "min_rms=%.1f playing=%s started_during_playback=%s "
-                "playback_generation_at_start=%s current_generation=%s",
-                duration,
-                rms,
-                effective_min_rms,
-                self.is_playing_audio,
-                started_during_playback,
-                playback_generation_at_start,
-                self.playback_generation,
-            )
-            return
-
-        session_id = self.create_session()
-        with self.sessions.trace_context(session_id):
-            runtime_tracer.mark(
-                module=VAD_TRACE_MODULE,
-                name="vad_validated",
-                kind="audio_input",
-                attributes={
-                    "audio_duration_ms": round(duration_ms, 3),
-                    "audio_bytes": len(audio),
-                    "rms": round(rms, 3),
-                    "playing_audio": bool(self.is_playing_audio),
-                    "started_during_playback": bool(started_during_playback),
-                    "playback_generation_at_start": playback_generation_at_start,
-                },
-            )
-            self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
-            self.save_audio(audio, "input", session_id=session_id)
-            # Barge-in must silence audio immediately, before ASR is available,
-            # but it cannot yet know whether the utterance means stop talking,
-            # stop moving, cancel the foreground turn, or something ordinary.
-            # Scope-dependent cognitive/runtime cancellation happens only after
-            # the transcript reaches the Cognitive Gateway.
-            self._invalidate_output_state(
-                cancel_cognitive_work=False,
-            )
-            self._schedule_output_abort(
-                new_session_id=session_id,
-                log_event=True,
-            )
-
-            try:
-                async with runtime_tracer.span(
-                    module=ASR_TRACE_MODULE,
-                    operation="transcribe",
-                    kind="model_call",
-                    attributes={
-                        "audio_duration_ms": round(duration_ms, 3),
-                        "audio_bytes": len(audio),
-                        "timeout_ms": round(self.asr_timeout_s * 1000.0, 3),
-                    },
-                ) as asr_span:
-                    if self.asr_ws is None or getattr(self.asr_ws, "close_code", None) is not None:
-                        reconnect_start_ms = now_ms()
-                        await self.connect_services()
-                        reconnect_ms = now_ms() - reconnect_start_ms
-                        asr_span.set_attribute("reconnect_ms", round(reconnect_ms, 3))
-                        self.session_log(session_id, "asr_reconnect_done: reconnect_ms=%.1f", reconnect_ms)
-
-                    asr_start_ms = now_ms()
-                    self.session_log(session_id, "asr_send_start: audio_ms=%.1f bytes=%s", duration_ms, len(audio))
-                    await self.asr_ws.send(audio)
-                    send_ms = now_ms() - asr_start_ms
-                    asr_span.set_attribute("send_ms", round(send_ms, 3))
-                    self.session_log(session_id, "asr_send_done: send_ms=%.1f", send_ms)
-                    resp = await asyncio.wait_for(self.asr_ws.recv(), timeout=self.asr_timeout_s)
-                    asr_done_ms = now_ms()
-                    result = json.loads(resp)
-                    asr_span.set_attribute("result_type", str(result.get("type") or "unknown"))
-                    if result.get("type") == "error":
-                        asr_span.set_status("error")
-                        self.session_log(session_id, "asr_error: asr_ms=%.1f error=%s", asr_done_ms - asr_start_ms, result)
-                        return
-                    if result.get("type") == "final":
-                        user_text = result.get("text", "").strip()
-                        asr_span.set_attribute("text_chars", len(user_text))
-                        runtime_tracer.mark(
-                            module=ASR_TRACE_MODULE,
-                            name="asr_final_available",
-                            kind="milestone",
-                            attributes={"text_chars": len(user_text)},
-                        )
-                        self.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
-                        likely_echo, echo_ratio, echo_coverage = self._likely_tts_echo(
-                            user_text,
-                            playback_generation_at_start=(
-                                playback_generation_at_start
-                                if started_during_playback
-                                else None
-                            ),
-                        )
-                        if likely_echo:
-                            self.session_log(
-                                session_id,
-                                "asr_tts_echo_suppressed: generation=%s ratio=%.3f "
-                                "coverage=%.3f text=%r",
-                                playback_generation_at_start,
-                                echo_ratio,
-                                echo_coverage,
-                                user_text,
-                            )
-                            state = self.sessions.state.get(session_id)
-                            if state is not None:
-                                state["llm_done"] = True
-                            self.maybe_session_done(session_id)
-                            return
-                        if user_text:
-                            self._launch_routed_turn(user_text, session_id)
-                        else:
-                            self.session_log(session_id, "asr_empty_text")
-            except Exception as exc:
-                self.session_log(session_id, "asr_exception: error=%s", exc)
-                logger.error("%s ASR error: %s", session_id, exc, exc_info=True)
-                try:
-                    if self.asr_ws:
-                        await self.asr_ws.close()
-                except Exception as close_exc:
-                    logger.debug(
-                        "%s Best-effort ASR websocket close failed: %s",
-                        session_id,
-                        close_exc,
-                    )
-                self.asr_ws = None
+        return await input_session_runtime_for(self).handle_vad_audio(audio, started_during_playback=started_during_playback, playback_generation_at_start=playback_generation_at_start)
 
     def _has_active_protective_reflex(
         self,
         *,
         excluding: asyncio.Task | None = None,
     ) -> bool:
-        return self._input_turn_state().has_active_protective_reflex(
-            excluding=excluding
-        )
+        return input_session_runtime_for(self)._has_active_protective_reflex(excluding=excluding)
 
     def _cancel_active_routed_turns(
         self,
@@ -8284,83 +8104,10 @@ class VoiceAssistant:
         cancel_all: bool,
         reason: str,
     ) -> tuple[str, ...]:
-        """Cancel routed work only after an explicit scoped decision."""
-
-        cancelled_session_ids = self._input_turn_state().request_turn_cancellation(
-            excluding=excluding,
-            cancel_all=cancel_all,
-            reason=reason,
-        )
-        for session_id in cancelled_session_ids:
-            self.session_log(
-                session_id or None,
-                "routed_turn_cancellation_requested: reason=%s scope=%s",
-                reason,
-                "all" if cancel_all else "foreground",
-            )
-        return cancelled_session_ids
+        return input_session_runtime_for(self)._cancel_active_routed_turns(excluding=excluding, cancel_all=cancel_all, reason=reason)
 
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
-        reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
-        if self._has_active_protective_reflex():
-            if reflex_candidate.action == "interrupt":
-                # A new deterministic protective input is independent of an
-                # older protective operation. It must not wait behind output
-                # cleanup or provider I/O, and an ordinary queued turn must
-                # never be able to replace it.
-                task = asyncio.create_task(
-                    self.handle_routed_text(user_text, session_id)
-                )
-                lifecycle = self._input_turn_state()
-                lifecycle.register_turn(
-                    task,
-                    session_id,
-                    protective_reflex=True,
-                    concurrent_reflex=True,
-                )
-
-                def protective_done(completed: asyncio.Task) -> None:
-                    self._on_routed_turn_done(
-                        completed,
-                        session_id,
-                        concurrent_reflex=True,
-                    )
-
-                task.add_done_callback(protective_done)
-                self.session_log(
-                    session_id,
-                    "protective_reflex_launched_concurrently: scope=%s",
-                    reflex_candidate.cancellation_scope,
-                )
-                return
-            queue_depth = self._input_turn_state().queue_turn_after_reflex(
-                user_text,
-                session_id,
-            )
-            self.session_log(
-                session_id,
-                "turn_queued_behind_cognitive_gateway_reflex: queue_depth=%s",
-                queue_depth,
-            )
-            return
-
-        task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
-        is_reflex = reflex_candidate.action == "interrupt"
-        self._input_turn_state().register_turn(
-            task,
-            session_id,
-            protective_reflex=is_reflex,
-        )
-        if is_reflex:
-            # Marked at launch time so a following utterance cannot cancel it
-            # before the coroutine reaches its first instruction.
-            self._protective_reflex_failure = False
-        task.add_done_callback(
-            lambda completed, sid=session_id: self._on_routed_turn_done(
-                completed,
-                sid,
-            )
-        )
+        return input_session_runtime_for(self)._launch_routed_turn(user_text, session_id)
 
     def _on_routed_turn_done(
         self,
@@ -8369,70 +8116,7 @@ class VoiceAssistant:
         *,
         concurrent_reflex: bool = False,
     ) -> None:
-        lifecycle = self._input_turn_state()
-        was_concurrent_hint = concurrent_reflex or task in (
-            lifecycle.concurrent_protective_reflex_tasks
-        )
-        (
-            cancellation_reason,
-            was_primary_reflex,
-            was_concurrent_reflex,
-        ) = lifecycle.unregister_turn(task)
-        was_concurrent_reflex = was_concurrent_reflex or was_concurrent_hint
-        was_reflex = was_primary_reflex or was_concurrent_reflex
-        completed_ok = False
-        if task.cancelled():
-            self.session_log(
-                session_id,
-                "turn_cancelled: reason=%s",
-                cancellation_reason or "external_or_cleanup",
-            )
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-        else:
-            try:
-                task.result()
-                completed_ok = True
-            except Exception as exc:  # pragma: no cover - defensive callback logging
-                logger.error(
-                    "%s routed turn failed outside normal handler: %s",
-                    session_id,
-                    exc,
-                    exc_info=True,
-                )
-
-        if not was_reflex:
-            return
-        if not completed_ok:
-            self._protective_reflex_failure = True
-        if self._has_active_protective_reflex():
-            return
-        pending = self._input_turn_state().drain_turns_after_reflex()
-        protective_failed = bool(
-            getattr(self, "_protective_reflex_failure", False)
-        )
-        self._protective_reflex_failure = False
-        if not pending:
-            return
-        if not protective_failed:
-            for pending_text, pending_session_id in pending:
-                self.session_log(
-                    pending_session_id,
-                    "turn_released_after_cognitive_gateway_reflex",
-                )
-                self._launch_routed_turn(pending_text, pending_session_id)
-            return
-        for _, pending_session_id in pending:
-            self.session_log(
-                pending_session_id,
-                "turn_dropped_after_failed_cognitive_gateway_reflex",
-            )
-            state = self.sessions.state.get(pending_session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(pending_session_id)
+        return input_session_runtime_for(self)._on_routed_turn_done(task, session_id, concurrent_reflex=concurrent_reflex)
 
     def _queue_vad_utterance(
         self,
@@ -8441,242 +8125,22 @@ class VoiceAssistant:
         started_during_playback: bool = False,
         playback_generation_at_start: int | None = None,
     ) -> None:
-        queued: bytes | tuple[bytes, bool, int | None]
-        if started_during_playback or playback_generation_at_start is not None:
-            queued = (
-                audio,
-                bool(started_during_playback),
-                playback_generation_at_start,
-            )
-        else:
-            queued = audio
-        lifecycle = self._input_turn_state()
-        active = lifecycle.active_asr_task
-        if active is not None and not active.done():
-            replaced = lifecycle.queue_pending_vad_audio(queued)
-            logger.info(
-                "ASR is processing; queued latest utterance%s",
-                " and replaced older pending audio" if replaced else "",
-            )
-            return
-        task = asyncio.create_task(
-            self.handle_vad_audio(
-                audio,
-                started_during_playback=started_during_playback,
-                playback_generation_at_start=playback_generation_at_start,
-            )
-        )
-        lifecycle.register_asr_task(task)
-        task.add_done_callback(self._on_asr_task_done)
+        return input_session_runtime_for(self)._queue_vad_utterance(audio, started_during_playback=started_during_playback, playback_generation_at_start=playback_generation_at_start)
 
     def _on_asr_task_done(self, task: asyncio.Task) -> None:
-        lifecycle = self._input_turn_state()
-        lifecycle.complete_asr_task(task)
-        if not task.cancelled():
-            try:
-                task.result()
-            except Exception as exc:  # pragma: no cover - handle_vad_audio logs normally
-                logger.error("ASR task failed: %s", exc, exc_info=True)
-        pending = lifecycle.take_pending_vad_audio()
-        if pending:
-            if isinstance(pending, tuple) and len(pending) == 3:
-                (
-                    pending_audio,
-                    pending_started_playing,
-                    pending_generation,
-                ) = pending
-            else:
-                # Compatibility for tests and old in-process embeddings that
-                # populated the pre-provenance bytes-only queue directly.
-                pending_audio = pending
-                pending_started_playing = False
-                pending_generation = None
-            if pending_started_playing or pending_generation is not None:
-                self._queue_vad_utterance(
-                    pending_audio,
-                    started_during_playback=pending_started_playing,
-                    playback_generation_at_start=pending_generation,
-                )
-            else:
-                self._queue_vad_utterance(pending_audio)
+        return input_session_runtime_for(self)._on_asr_task_done(task)
 
     async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
-        frame_bytes_target = int(
-            self.target_asr_rate * self.frame_duration_ms / 1000
-        ) * 2
-        buffered = self._vad_leftover + pcm_16k
-        offset = 0
-        while offset + frame_bytes_target <= len(buffered):
-            frame = buffered[offset : offset + frame_bytes_target]
-            offset += frame_bytes_target
-            started, ended, vad_audio = self.vad.process_chunk(frame)
-            if started:
-                self._vad_segment_started_during_playback = bool(
-                    self.is_playing_audio
-                )
-                self._vad_segment_playback_generation = self.playback_generation
-                logger.info(
-                    "VAD detected voice: playing=%s playback_generation=%s",
-                    self._vad_segment_started_during_playback,
-                    self._vad_segment_playback_generation,
-                )
-            if ended and vad_audio:
-                started_during_playback = bool(
-                    self._vad_segment_started_during_playback
-                )
-                playback_generation_at_start = (
-                    self._vad_segment_playback_generation
-                )
-                self._vad_segment_started_during_playback = False
-                self._vad_segment_playback_generation = None
-                if getattr(self.vad, "last_end_reason", None) == "max_duration":
-                    logger.warning(
-                        "VAD force-closed and discarded an overlong utterance: duration_limit_ms=%s bytes=%s",
-                        self.max_vad_utterance_ms,
-                        len(vad_audio),
-                    )
-                else:
-                    self._queue_vad_utterance(
-                        vad_audio,
-                        started_during_playback=started_during_playback,
-                        playback_generation_at_start=(
-                            playback_generation_at_start
-                        ),
-                    )
-        self._vad_leftover = buffered[offset:]
-        await asyncio.sleep(0)
+        return await input_session_runtime_for(self)._feed_vad_pcm16(pcm_16k)
 
     async def mic_stream(self):
-        logger.info("Opening microphone with sounddevice")
-        self.loop = asyncio.get_running_loop()
-        while True:
-            await self._apply_pending_input_device_change()
-            sd = _sounddevice()
-            try:
-                with sd.InputStream(
-                    samplerate=self.input_rate,
-                    channels=self.input_channels,
-                    dtype="float32",
-                    blocksize=self.input_block_size,
-                    device=self.input_device,
-                    latency=self.input_latency,
-                    callback=self.mic_callback,
-                ):
-                    logger.info(
-                        "Microphone started: name=%s device=%r rate=%s channels=%s",
-                        self.input_params.get("name", "unknown"),
-                        self.input_device,
-                        self.input_rate,
-                        self.input_channels,
-                    )
-                    logger.info("Audio input started: mode=device")
-                    while not self._input_device_change_event.is_set():
-                        try:
-                            audio = await asyncio.wait_for(
-                                self.mic_queue.get(),
-                                timeout=0.5,
-                            )
-                        except asyncio.TimeoutError:
-                            continue
-                        pcm_16k = self.prepare_mic_chunk_for_asr(audio)
-                        await self._feed_vad_pcm16(pcm_16k)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                if not self.audio_mgr.follows_system_default("input"):
-                    raise
-                logger.warning(
-                    "OS-default microphone stream failed; waiting for the "
-                    "current valid system default: %s",
-                    exc,
-                )
-                await self._refresh_system_default_audio_devices(
-                    force_kinds={"input"},
-                )
-                await asyncio.sleep(1.0)
+        return await input_session_runtime_for(self).mic_stream()
 
     async def injected_audio_stream(self):
-        """Consume framed PCM16 utterances from stdin for acceptance testing.
-
-        The binary framing is intentionally available only through inherited
-        stdin. It does not open a network control port in normal operation.
-        Each packet is treated as microphone input and still passes through
-        Chromie's VAD and ASR path.
-        """
-
-        logger.info("Audio input started: mode=stdin protocol=CAUD/v1")
-        while True:
-            packet = await asyncio.to_thread(read_audio_packet, sys.stdin.buffer)
-            if packet is None:
-                logger.info("Injected audio input reached EOF")
-                return
-            samples = np.frombuffer(packet.pcm16, dtype=np.int16)
-            if packet.channels > 1:
-                samples = samples.reshape(-1, packet.channels).mean(axis=1).astype(
-                    np.int16
-                )
-            pcm = samples.astype(np.int16, copy=False).tobytes()
-            pcm_16k = self.resample_int16_bytes(
-                pcm,
-                packet.sample_rate,
-                self.target_asr_rate,
-            )
-            duration_ms = len(pcm_16k) / (self.target_asr_rate * 2) * 1000.0
-            logger.info(
-                "Injected audio received: source_rate=%s channels=%s bytes=%s "
-                "resampled_ms=%.1f",
-                packet.sample_rate,
-                packet.channels,
-                len(packet.pcm16),
-                duration_ms,
-            )
-            await self._feed_vad_pcm16(pcm_16k)
-            # Ensure the VAD sees enough trailing silence to close the utterance.
-            configured_vad_silence_ms = int(
-                getattr(
-                    getattr(
-                        getattr(self, "host_settings", None),
-                        "audio_input",
-                        None,
-                    ),
-                    "vad_silence_ms",
-                    650,
-                )
-            )
-            silence_ms = max(900, configured_vad_silence_ms + 150)
-            silence = b"\x00\x00" * int(
-                self.target_asr_rate * silence_ms / 1000
-            )
-            await self._feed_vad_pcm16(silence)
+        return await input_session_runtime_for(self).injected_audio_stream()
 
     async def _session_idle_sweeper(self) -> None:
-        session_settings = getattr(
-            getattr(self, "host_settings", None),
-            "session",
-            None,
-        )
-        interval_s = float(getattr(session_settings, "idle_sweep_s", 5.0))
-        idle_timeout_ms = float(
-            getattr(session_settings, "idle_timeout_ms", 120000.0)
-        )
-        loop = asyncio.get_running_loop()
-        expected_wake = loop.time() + interval_s
-        while True:
-            await asyncio.sleep(interval_s)
-            actual_wake = loop.time()
-            event_loop_lag_ms = max(0.0, (actual_wake - expected_wake) * 1000.0)
-            expected_wake = actual_wake + interval_s
-            self.sessions.sample_active_resources(
-                event_loop_lag_ms=event_loop_lag_ms,
-                attributes={
-                    "playback_queue_depth": self.playback_queue.qsize(),
-                    "mic_queue_depth": self.mic_queue.qsize(),
-                    "active_synthesis_tasks": len(self.active_synthesis_tasks),
-                },
-            )
-            await self._sample_accelerator_resources(reason="periodic")
-            self.sessions.checkpoint_active_traces()
-            self.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
+        return await input_session_runtime_for(self)._session_idle_sweeper()
 
     async def _prime_fast_first_audio(self) -> dict[str, int]:
         fast_first_cache = getattr(self, "fast_first_audio_cache", None)

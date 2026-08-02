@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 
 PendingVadAudio: TypeAlias = bytes | tuple[bytes, bool, int | None]
@@ -18,6 +18,14 @@ PendingVadAudio: TypeAlias = bytes | tuple[bytes, bool, int | None]
 
 @dataclass
 class InputTurnLifecycle:
+    loop: asyncio.AbstractEventLoop | None = None
+    mic_queue: asyncio.Queue = field(
+        default_factory=lambda: asyncio.Queue(maxsize=50)
+    )
+    vad_leftover: bytes = b""
+    vad_segment_started_during_playback: bool = False
+    vad_segment_playback_generation: int | None = None
+    runtime: Any | None = None
     active_asr_task: asyncio.Task | None = None
     active_turn_task: asyncio.Task | None = None
     active_turn_tasks: dict[asyncio.Task, str] = field(default_factory=dict)
@@ -156,6 +164,11 @@ class InputTurnLifecycle:
         return tuple(tasks)
 
     def reset(self) -> None:
+        self.loop = None
+        self.vad_leftover = b""
+        self.vad_segment_started_during_playback = False
+        self.vad_segment_playback_generation = None
+        self.runtime = None
         self.active_asr_task = None
         self.active_turn_task = None
         self.active_turn_tasks.clear()

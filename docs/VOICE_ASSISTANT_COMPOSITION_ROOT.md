@@ -72,7 +72,7 @@ Further work is ordered by
 |---|---|
 | Host configuration | immutable typed audio, cognition, playback, session, and evidence settings composed before `VoiceAssistant` |
 | playback delivery | one owner for TTS chunking, synthesis order, transport-versus-audible streaming, incremental PCM playback, playback barriers, echo handling, cancellation, output-generation versus future-result eligibility, and delivery evidence |
-| input turn/session lifecycle | one owner for microphone/VAD/ASR tasks, injected audio, session registry, and deterministic shutdown |
+| input turn/session lifecycle | `InputTurnLifecycle` owns mutable input/task state and `InputSessionRuntime` owns microphone/VAD/ASR transport, injected audio, routed turns, idle sweeping, and deterministic task shutdown; `SessionRegistry` remains the independent trace/session store |
 | direct-LLM compatibility path | prove maintained-profile reachability; remove it when unreachable or confine it to an explicit rollback contract |
 | Cognitive Gateway/Core turn dispatch | one turn-execution owner that delegates semantic work without gaining semantic authority |
 | observability recording | keep storage mechanics delegated and move lifecycle sampling only when a concrete owner can preserve correlation |

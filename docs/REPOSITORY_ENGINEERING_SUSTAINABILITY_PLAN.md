@@ -189,7 +189,7 @@ Issue must refresh its own baseline because counts may change.
 | Classify Broad Runtime Exception Boundaries | implementation slice landed; classification review open | grounded-response latency Issue | A symbol-level checked inventory now rejects new, missing, or stale broad handlers; deeper narrowing and retained failure evidence remain open. |
 | Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
 | Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
-| Extract Input Turn and Session Lifecycle | direct-LLM audit and structural ratchet slice landed; full ownership audit open | playback lifecycle | ASR, routed-turn, reflex, and pending-VAD task lifecycle have one collaborator. Maintained apply modes block the direct-LLM path; microphone/session-registry extraction and conversation-state audit remain open. |
+| Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
 | Reduce Supported Configuration Combinations | implementation slice landed; deprecation/removal work open | typed Host settings and live proof | Four source-controlled operator modes, a generated 433-key ownership inventory, and public/alias ratchets define maintained combinations. `CONDA_ENV_NAME` has been removed in favor of the single `CHROMIE_CONDA_ENV` owner, leaving one bounded compatibility alias. Further redundant-switch migration/removal remains open. |
 | Expand Mypy by Owned Package | contract-package slice landed; runtime-package expansion open | stable extracted boundaries | `shared/chromie_contracts` and `orchestrator/runtime/cognitive_gateway_modules` are package-scoped and new modules enter automatically; remaining runtime seams stay individually scoped until another complete owned package is clean. |
 | Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
@@ -725,20 +725,19 @@ ordering contract but no independent owner.
 
 ## Issue: Extract Input Turn and Session Lifecycle
 
-Status: direct-LLM audit and structural ratchet slice landed; microphone/session-registry extraction and ownership audit open
+Status: source extraction complete; live microphone and target evidence deferred
 
-Implementation note (2026-08-02): an input-turn lifecycle collaborator now owns
-active ASR work, routed-turn registration/cancellation, protective-reflex
-queues, pending turns behind reflexes, and pending VAD audio. Gateway/Core
-meaning and deterministic reflex authority remain outside this collaborator.
-The remaining direct-LLM call has one checked owner and is reachable only when
-`ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1` and the route has not entered a
-maintained Goal-driven apply lane. All four maintained operator modes set that
-rollback gate to `0`; apply-lane Agent failures now use a bounded Host-owned
-failure response rather than transferring semantic authority. Composition-root
-counts and direct-call ownership are monotonic repository gates. Microphone
-callback ownership, full session-registry mechanics, and the
-`conversation_state.py` ownership audit remain open.
+Implementation note (2026-08-02): `InputTurnLifecycle` owns all mutable
+input/task state and `InputSessionRuntime` owns microphone callback delivery,
+VAD framing, ASR WebSocket transport, routed-turn and protective-reflex task
+mechanics, injected-audio framing, and idle-session sweeping. `SessionRegistry`
+continues to own trace/session storage while `conversation_state.py` owns
+semantic dialogue, Goal, and confirmation state; the input runtime imports
+neither semantic boundary. Gateway/Core meaning, cancellation scope, and
+Protective Reflex authority remain outside the collaborator. The remaining
+direct-LLM call has one checked rollback-only owner and all maintained modes
+disable it. Composition-root and lifecycle-state counts are monotonic gates.
+Live microphone, default-device rollover, and target evidence remain deferred.
 
 ### Problem
 

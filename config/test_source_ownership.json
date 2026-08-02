@@ -2,6 +2,16 @@
   "schema_version": "1.0",
   "python_source_readers": [
     {
+      "test_path": "tests/test_input_session_runtime_extraction.py",
+      "category": "architecture_policy",
+      "reason": "Verifies that microphone, VAD, ASR, routed-turn, and injected-input mechanics remain outside the VoiceAssistant composition root and semantic state boundary."
+    },
+    {
+      "test_path": "tests/test_playback_transport_extraction.py",
+      "category": "architecture_policy",
+      "reason": "Verifies that provider WebSocket and output-stream mechanics remain outside the VoiceAssistant composition root and delegated through the reviewed playback boundary."
+    },
+    {
       "test_path": "tests/test_runtime_configuration.py",
       "category": "generated_artifact_contract",
       "reason": "Validates committed launcher, generated-environment, provider, and runtime-default artifacts whose literal content is the public deployment contract."
