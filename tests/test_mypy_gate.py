@@ -49,6 +49,10 @@ class MypyGateTests(unittest.TestCase):
             "orchestrator/runtime/host_settings.py",
             "orchestrator/runtime/input_turn_lifecycle.py",
             "orchestrator/runtime/playback_delivery.py",
+            "orchestrator/runtime/input_session_runtime.py",
+            "orchestrator/runtime/playback_transport.py",
+            "orchestrator/runtime/outcome_delivery.py",
+            "orchestrator/runtime/host_components.py",
         ):
             self.assertIn(runtime_boundary, entries)
         gateway_files = tuple(
@@ -61,6 +65,14 @@ class MypyGateTests(unittest.TestCase):
         )
         self.assertGreaterEqual(len(gateway_files), 5)
         self.assertTrue(set(gateway_files).issubset(entries))
+        schema_files = tuple(
+            sorted(
+                path.relative_to(ROOT).as_posix()
+                for path in (ROOT / "orchestrator" / "schemas").rglob("*.py")
+            )
+        )
+        self.assertGreaterEqual(len(schema_files), 4)
+        self.assertTrue(set(schema_files).issubset(entries))
 
     def test_scope_accepts_python_package_and_rejects_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

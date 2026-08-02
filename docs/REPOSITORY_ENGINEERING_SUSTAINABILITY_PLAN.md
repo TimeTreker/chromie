@@ -190,8 +190,8 @@ Issue must refresh its own baseline because counts may change.
 | Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
 | Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
 | Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
-| Reduce Supported Configuration Combinations | implementation slice landed; deprecation/removal work open | typed Host settings and live proof | Four source-controlled operator modes, a generated 433-key ownership inventory, and public/alias ratchets define maintained combinations. `CONDA_ENV_NAME` has been removed in favor of the single `CHROMIE_CONDA_ENV` owner, leaving one bounded compatibility alias. Further redundant-switch migration/removal remains open. |
-| Expand Mypy by Owned Package | contract-package slice landed; runtime-package expansion open | stable extracted boundaries | `shared/chromie_contracts` and `orchestrator/runtime/cognitive_gateway_modules` are package-scoped and new modules enter automatically; remaining runtime seams stay individually scoped until another complete owned package is clean. |
+| Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 439 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
+| Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
 | Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
 | Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
 
@@ -776,20 +776,19 @@ need an ownership audit.
 
 ## Issue: Reduce Supported Configuration Combinations
 
-Status: implementation slice landed; redundant-switch migration and removal criteria open
+Status: source implementation complete; target-profile qualification deferred
 
 Implementation note (2026-08-02): four source-controlled operator modes now
 own complete maintained combinations for services, speech, voice plus MuJoCo,
 and qualification. The generated runtime manifest records the active mode and
 source file; mode contradictions fail before startup. A machine-generated
-inventory currently classifies 433 discovered keys into public choice, profile
-constant, service internal, acceptance override, or bounded compatibility
-alias. The maintained public surface contains nine choices, one public Boolean,
-and one compatibility alias, with ratchets and launcher/profile tests.
-`CONDA_ENV_NAME` has been removed; launchers and acceptance tools now use the
-single `CHROMIE_CONDA_ENV` owner. This refreshes the old raw-read baseline but
-does not yet close all required deprecation warnings, migrations, or removals
-for redundant switches.
+inventory now classifies 439 discovered keys into public choice, profile
+constant, service internal, or acceptance override. The maintained public
+surface contains eight choices and one public Boolean. The last compatibility
+alias (`CHROMIE_SOCIAL_ATTENTION_MODE`) was removed; the service-owned
+`AGENT_SOCIAL_ATTENTION_MODE` value is composed by the maintained modes instead
+of being a second operator switch. Public Boolean and alias counts are protected
+by zero-growth ratchets, and launcher/profile tests enumerate all four modes.
 
 ### Problem
 
@@ -830,19 +829,19 @@ larger than the tested profile set.
 
 ## Issue: Expand Mypy by Owned Package
 
-Status: contract-package slice landed; next complete runtime package and canonical Mypy execution open
+Status: source scope expansion complete; canonical Mypy execution remains an environment gate
 
 Implementation note (2026-08-02): `config/mypy_scope.txt` now accepts owned
 package directories and expands every Python module recursively, rejects
 overlapping entries, and automatically includes newly added modules. All of
-`shared/chromie_contracts/` and
-`orchestrator/runtime/cognitive_gateway_modules/` are selected as owned
-packages; the stable Host settings and playback/input lifecycle boundaries
-remain independently selected files. Focused tests prove package expansion and
-automatic inclusion. The restricted archive environment does not contain the
-pinned Mypy executable, so this note does not claim the strict package gate ran
-here; the canonical dependency environment and the next complete runtime
-package remain open.
+`shared/chromie_contracts/`,
+`orchestrator/runtime/cognitive_gateway_modules/`, and
+`orchestrator/schemas/` are selected as owned packages. Stable Host settings,
+component factories, outcome delivery, playback transport, and input lifecycle
+boundaries are explicitly selected files. Focused tests prove package expansion,
+automatic inclusion, sorting, and overlap rejection. The archive environment
+does not contain the pinned Mypy executable, so strict execution remains a
+normal dependency-environment gate rather than unfinished source ownership.
 
 ### Problem
 

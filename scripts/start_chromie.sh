@@ -532,7 +532,7 @@ services:
       AGENT_EXPRESSIVE_BODY_CUES: off
       # Honor the resolved embodiment-independent policy. Soridormi/provider
       # owns backend selection and safety; auxiliary behavior stays optional.
-      AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-on}}
+      AGENT_SOCIAL_ATTENTION_MODE: ${AGENT_SOCIAL_ATTENTION_MODE:-on}
       AGENT_SOCIAL_ATTENTION_MODEL: "${EFFECTIVE_SOCIAL_ATTENTION_MODEL}"
       AGENT_INTERACTION_OUTPUT_MODE: native
       AGENT_NATIVE_INTERACTION_FALLBACK: "0"

@@ -1319,7 +1319,7 @@
     },
     {
       "boolean": true,
-      "category": "bounded_compatibility_alias",
+      "category": "acceptance_override",
       "key": "AGENT_SOCIAL_ATTENTION_MODE",
       "owners": [
         ".env.common",
@@ -2119,14 +2119,6 @@
       "owners": [
         "orchestrator/runtime/host_settings.py",
         "shared/chromie_runtime/resource_sampling.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "CHROMIE_SOCIAL_ATTENTION_MODE",
-      "owners": [
-        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -4681,14 +4673,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 56,
-      "bounded_compatibility_alias": 1,
+      "acceptance_override": 57,
+      "bounded_compatibility_alias": 0,
       "profile_constant": 155,
       "public_choice": 9,
-      "service_internal": 219
+      "service_internal": 218
     },
-    "compatibility_aliases": 1,
+    "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 440
+    "total_keys": 439
   }
 }

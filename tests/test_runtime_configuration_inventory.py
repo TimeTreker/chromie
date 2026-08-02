@@ -23,7 +23,6 @@ class RuntimeConfigurationInventoryTests(unittest.TestCase):
             {entry["category"] for entry in entries},
             {
                 "acceptance_override",
-                "bounded_compatibility_alias",
                 "profile_constant",
                 "public_choice",
                 "service_internal",
@@ -55,7 +54,7 @@ class RuntimeConfigurationInventoryTests(unittest.TestCase):
         )
         summary = payload["summary"]
         self.assertLessEqual(summary["public_boolean_choices"], 1)
-        self.assertLessEqual(summary["compatibility_aliases"], 1)
+        self.assertEqual(summary["compatibility_aliases"], 0)
         public = {
             entry["key"]
             for entry in payload["entries"]

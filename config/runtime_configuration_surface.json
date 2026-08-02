@@ -5,9 +5,7 @@
     "ORCH_EVENT_LOG_",
     "ORCH_RUNTIME_OVERRIDE_"
   ],
-  "compatibility_aliases": {
-    "AGENT_SOCIAL_ATTENTION_MODE": "CHROMIE_SOCIAL_ATTENTION_MODE"
-  },
+  "compatibility_aliases": {},
   "maintained_modes": {
     "qualification": {
       "file": "env/modes/qualification.env",
@@ -41,7 +39,7 @@
     "SORIDORMI_MCP_URL"
   ],
   "ratchets": {
-    "max_compatibility_aliases": 1,
+    "max_compatibility_aliases": 0,
     "max_public_boolean_choices": 1
   },
   "schema_version": "1.0"

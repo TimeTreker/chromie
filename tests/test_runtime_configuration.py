@@ -532,7 +532,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("--architecture-validation", source)
         self.assertIn("Social Attention remains active", source)
         self.assertIn(
-            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-on}}",
+            "${AGENT_SOCIAL_ATTENTION_MODE:-on}",
             source,
         )
         self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
@@ -616,9 +616,12 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertNotIn('hasattr(self, "playback_chunk_ms")', source)
 
     def test_orchestrator_uses_configurable_asr_timeout(self) -> None:
-        source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
+        host_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
+        input_source = (
+            ROOT / "orchestrator" / "runtime" / "input_session_runtime.py"
+        ).read_text(encoding="utf-8")
         settings = HostSettingsSnapshot.from_env(
             project_root=ROOT,
             environ={"ORCH_ASR_TIMEOUT_MS": "4321"},
@@ -626,10 +629,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(settings.audio_input.asr_timeout_ms, 4321)
         self.assertIn(
             "self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)",
-            source,
+            host_source,
         )
-        self.assertIn("timeout=self.asr_timeout_s", source)
-        self.assertNotIn("timeout=15.0", source)
+        self.assertIn("timeout=host.asr_timeout_s", input_source)
+        self.assertNotIn("timeout=15.0", input_source)
 
     def test_task_graph_diagnostics_fail_closed_without_token(self) -> None:
         with patch.object(agent_main.settings, "task_graph_diagnostics_token", ""):

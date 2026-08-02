@@ -437,15 +437,13 @@ class HostSettingsSnapshot:
             raise HostConfigurationError(
                 "ORCH_COGNITIVE_APPLY_LANES must contain at least one lane"
             )
-        social_mode = (
-            _text(values, "CHROMIE_SOCIAL_ATTENTION_MODE")
-            or _text(values, "AGENT_SOCIAL_ATTENTION_MODE")
-            or "on"
+        social_mode = _text(
+            values, "AGENT_SOCIAL_ATTENTION_MODE", "on"
         ).casefold()
         if social_mode not in {"off", "report_only", "on"}:
             raise HostConfigurationError(
-                "CHROMIE_SOCIAL_ATTENTION_MODE/AGENT_SOCIAL_ATTENTION_MODE "
-                f"must be off, report_only, or on; got {social_mode!r}"
+                "AGENT_SOCIAL_ATTENTION_MODE must be off, report_only, or on; "
+                f"got {social_mode!r}"
             )
         default_reset_phrases = (
             "new conversation",
