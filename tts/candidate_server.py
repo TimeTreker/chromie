@@ -6,7 +6,6 @@ import asyncio
 import contextlib
 import json
 import logging
-import os
 import re
 import time
 import uuid
@@ -19,18 +18,21 @@ if hasattr(time, "tzset"):
 
 from provider import TTSAudioChunk, TTSSynthesisCompleted, TTSSynthesisRequest
 from provider_impl import create_provider
+from settings import TTSServiceSettings
 
+
+settings = TTSServiceSettings.from_env()
 
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=settings.log_level,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logger = logging.getLogger("chromie.tts.candidate")
 
-HOST = os.getenv("TTS_HOST", "0.0.0.0")
-PORT = int(os.getenv("TTS_PORT", "5000"))
+HOST = settings.host
+PORT = settings.port
 provider = create_provider()
-configured_provider = str(os.getenv("TTS_PROVIDER") or "").strip().lower()
+configured_provider = settings.provider
 if configured_provider and configured_provider != provider.capabilities.provider_id:
     raise RuntimeError(
         "TTS_PROVIDER does not match the provider image: "
@@ -158,7 +160,7 @@ async def main() -> None:
     await provider.start()
     logger.info(
         "Candidate TTS runtime timezone tz=%s local=%s",
-        os.getenv("TZ", "unset"),
+        settings.timezone,
         time.strftime("%Y-%m-%d %H:%M:%S %Z"),
     )
     logger.info(

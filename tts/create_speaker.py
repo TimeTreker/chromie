@@ -3,7 +3,6 @@ import contextlib
 import json
 import logging
 import math
-import os
 import shutil
 import types
 from pathlib import Path
@@ -16,17 +15,20 @@ from outetts import Backend, Interface, LlamaCppQuantization, Models
 from scipy import signal
 
 from model_sources import apply_model_sources, resolve_model_sources
+from settings import TTSServiceSettings
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s - %(levelname)s - %(message)s")
+settings = TTSServiceSettings.from_env()
+
+logging.basicConfig(level=settings.log_level, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("create-oute-speaker")
 
-MODEL_SIZE = os.getenv("TTS_MODEL_SIZE", "0.6B")
-QUANTIZATION_NAME = os.getenv("TTS_QUANTIZATION", "FP16")
-TTS_N_GPU_LAYERS = int(os.getenv("TTS_N_GPU_LAYERS", "-1"))
-TTS_CONTEXT_SIZE = int(os.getenv("TTS_CONTEXT_SIZE", "4096"))
-TTS_N_BATCH = int(os.getenv("TTS_N_BATCH", "256"))
-TTS_THREADS = int(os.getenv("TTS_THREADS", "4"))
-SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
+MODEL_SIZE = settings.model_size
+QUANTIZATION_NAME = settings.quantization
+TTS_N_GPU_LAYERS = settings.n_gpu_layers
+TTS_CONTEXT_SIZE = settings.context_size
+TTS_N_BATCH = settings.n_batch
+TTS_THREADS = settings.threads
+SPEAKER_DIR = settings.speaker_dir
 
 
 def get_model_version():
@@ -76,7 +78,9 @@ def build_model_config():
         TTS_THREADS,
     )
     cfg = outetts.ModelConfig.auto_config(model=get_model_version(), backend=Backend.LLAMACPP, quantization=get_quantization())
-    sources = resolve_model_sources(MODEL_SIZE, QUANTIZATION_NAME)
+    sources = resolve_model_sources(
+        MODEL_SIZE, QUANTIZATION_NAME, service_settings=settings
+    )
     apply_model_sources(cfg, sources)
     logger.info(
         "Using pinned OuteTTS sources: tokenizer=%s@%s gguf=%s@%s file=%s",

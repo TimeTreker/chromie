@@ -14,6 +14,7 @@ python scripts/run_ruff.py
 python scripts/run_mypy.py
 python scripts/runtime_configuration_inventory.py --check
 python scripts/check_host_configuration_ownership.py
+python scripts/check_service_configuration_ownership.py
 python scripts/check_runtime_structure.py
 python scripts/check_docs.py
 

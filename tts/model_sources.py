@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
+
+from settings import TTSServiceSettings
 
 
 TOKENIZER_ALLOW_PATTERNS = [
@@ -39,15 +40,6 @@ class ResolvedModelSources:
         return asdict(self)
 
 
-def required_env(name: str) -> str:
-    value = (os.getenv(name) or "").strip()
-    if not value:
-        raise RuntimeError(
-            f"{name} is required so OuteTTS does not resolve a mutable model revision"
-        )
-    return value
-
-
 def gguf_filename(model_size: str, quantization: str) -> str:
     if model_size != "0.6B":
         raise RuntimeError(
@@ -65,11 +57,15 @@ def resolve_model_sources(
     quantization: str,
     *,
     downloader=snapshot_download,
+    service_settings: TTSServiceSettings | None = None,
 ) -> ResolvedModelSources:
-    tokenizer_repo = required_env("TTS_TOKENIZER_REPO")
-    tokenizer_revision = required_env("TTS_TOKENIZER_REVISION")
-    gguf_repo = required_env("TTS_GGUF_REPO")
-    gguf_revision = required_env("TTS_GGUF_REVISION")
+    resolved_settings = service_settings or TTSServiceSettings.from_env()
+    (
+        tokenizer_repo,
+        tokenizer_revision,
+        gguf_repo,
+        gguf_revision,
+    ) = resolved_settings.required_model_sources()
     filename = gguf_filename(model_size, quantization)
 
     tokenizer_path = Path(

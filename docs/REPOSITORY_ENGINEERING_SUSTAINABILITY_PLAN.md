@@ -190,7 +190,7 @@ Issue must refresh its own baseline because counts may change.
 | Establish Typed Host Configuration Snapshots | implementation slice landed; inventory completion open | broad-exception classification | Immutable typed startup groups now own the principal Host audio, cognition, playback, session, and evidence settings; remaining Host reads and generated documentation are open. |
 | Extract Playback Delivery Lifecycle | structural ratchet slice landed; transport extraction open | typed Host settings | Playback order, generations, waiters, cancellation bookkeeping, and delivered-speech events have one collaborator; compatibility properties were collapsed and composition-root counts are now ratcheted. PCM/output transport remains open. |
 | Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
-| Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 439 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
+| Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 438 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
 | Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
 | Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
 | Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
@@ -782,7 +782,7 @@ Implementation note (2026-08-02): four source-controlled operator modes now
 own complete maintained combinations for services, speech, voice plus MuJoCo,
 and qualification. The generated runtime manifest records the active mode and
 source file; mode contradictions fail before startup. A machine-generated
-inventory now classifies 439 discovered keys into public choice, profile
+inventory now classifies 438 discovered keys into public choice, profile
 constant, service internal, or acceptance override. The maintained public
 surface contains eight choices and one public Boolean. The last compatibility
 alias (`CHROMIE_SOCIAL_ATTENTION_MODE`) was removed; the service-owned
@@ -1272,7 +1272,7 @@ Modernize behavioral and architecture test ownership
 
 ## Issue: Establish Typed Service Configuration Boundaries
 
-Status: implemented and automatically verified through the ASR service boundary; remaining service migrations are recorded in `SERVICE_CONFIGURATION_BOUNDARIES.md`.
+Status: source implementation complete for ASR, TTS, and the maintained Host boundary; Agent and shared-runtime migrations remain recorded in `SERVICE_CONFIGURATION_BOUNDARIES.md`.
 
 
 ### Problem

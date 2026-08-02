@@ -24,7 +24,7 @@ environment variable independently. This boundary does not change hardware
 profile precedence and does not move owner-editable identity or personality into
 Python defaults.
 
-## Migrated boundary: ASR
+## Migrated boundaries: ASR and TTS
 
 `asr.settings.ASRServiceSettings` owns the complete maintained ASR service
 environment surface. It provides:
@@ -41,19 +41,26 @@ environment surface. It provides:
 transcription executor, and backend factory all consume the same immutable
 settings instance.
 
+`tts.settings.TTSServiceSettings` now owns the maintained TTS transport,
+provider, generation-budget, worker-pool, speaker, alignment, and immutable
+model-source environment surface. `tts/server.py`, `tts/candidate_server.py`,
+`tts/create_speaker.py`, and `tts/model_sources.py` receive one typed snapshot
+instead of reparsing environment values independently. Invalid ports, ranges,
+booleans, and missing immutable model references fail with the owning key.
+
 
 ## Continuation objective
 
-The first ASR migration is a proven slice, not closure of the configuration
+The ASR and TTS migrations are proven slices, not closure of the configuration
 problem. The current archive still contains about 276 distinct environment keys
 read directly by maintained runtime sources. Before changing names, inventory
 each key as profile authority, service setting, operator override, diagnostics,
 experiment, or stale compatibility. Ordinary behavior should be composed from a
 small set of orthogonal profile axes rather than freely combined Boolean flags.
 
-Further migrations remain queued until current-revision target evidence closes.
-Each migrated service must delete duplicate parsing and obsolete keys instead of
-adding another compatibility layer indefinitely.
+Agent and shared-runtime migrations remain source work. Each migrated service
+must delete duplicate parsing and obsolete keys instead of adding another
+compatibility layer indefinitely. Live startup proof remains target evidence.
 
 ## Remaining migration map
 
@@ -69,13 +76,9 @@ The remaining services keep their current behavior and are future ratchet work:
 | Boundary | Current concentration | Recommended next seam |
 |---|---|---|
 | Agent service | `agent/app/main.py` | extract Agent startup settings by functional groups, preserving generated profile authority |
-| TTS service | `tts/server.py`, `tts/candidate_server.py` | common transport/watchdog snapshot with provider-owned model settings |
-| Host Orchestrator | `orchestrator/orchestrator.py` | compose typed audio, cognition, playback, and evidence settings rather than one global object |
 | Shared runtime | trace/resource modules | inject narrow typed policy values where repeated reads remain |
 
 Each future migration must be independently tested and must not become one global
-cross-service settings object. The active sequence first retains a
-current-revision live voice loop, then classifies broad failure boundaries,
-then establishes typed Host settings before reducing supported deployment
-combinations. See
+cross-service settings object. The source sequence now continues with Agent and shared-runtime ownership.
+Physical startup and device proof remain in the target-evidence track. See
 [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).

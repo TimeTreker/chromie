@@ -2293,9 +2293,7 @@
         "docker-compose.yml",
         "orchestrator/.env.local.example",
         "orchestrator/orchestrator.py",
-        "tts/candidate_server.py",
-        "tts/create_speaker.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4061,8 +4059,7 @@
       "category": "service_internal",
       "key": "SPEAKER_DIR",
       "owners": [
-        "tts/create_speaker.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4089,7 +4086,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4164,7 +4161,7 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_CONTEXT_SIZE",
       "owners": [
         "docker-compose.yml",
@@ -4176,8 +4173,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "tts/create_speaker.py"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -4311,7 +4307,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4321,7 +4317,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4329,8 +4325,7 @@
       "category": "service_internal",
       "key": "TTS_HOST",
       "owners": [
-        "tts/candidate_server.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4413,13 +4408,12 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "tts/create_speaker.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_N_BATCH",
       "owners": [
         "docker-compose.yml",
@@ -4431,26 +4425,16 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "tts/create_speaker.py"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_N_GPU_LAYERS",
       "owners": [
         ".env.common",
-        "docker-compose.yml",
-        "tts/create_speaker.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "TTS_PORT",
-      "owners": [
-        "tts/candidate_server.py"
+        "docker-compose.yml"
       ]
     },
     {
@@ -4460,8 +4444,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/candidate_server.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4480,18 +4463,16 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/create_speaker.py",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_REPETITION_PENALTY",
       "owners": [
         ".env.common",
-        "docker-compose.yml",
-        "tts/server.py"
+        "docker-compose.yml"
       ]
     },
     {
@@ -4522,7 +4503,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4540,27 +4521,25 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY",
       "owners": [
         ".env.common",
-        "docker-compose.yml",
-        "tts/server.py"
+        "docker-compose.yml"
       ]
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_TEMPERATURE",
       "owners": [
         ".env.common",
-        "docker-compose.yml",
-        "tts/server.py"
+        "docker-compose.yml"
       ]
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_THREADS",
       "owners": [
         "docker-compose.yml",
@@ -4572,8 +4551,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "tts/create_speaker.py"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -4583,7 +4561,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4593,7 +4571,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4629,12 +4607,11 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_WORKER_STARTUP_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml",
-        "tts/server.py"
+        "docker-compose.yml"
       ]
     },
     {
@@ -4642,7 +4619,7 @@
       "category": "service_internal",
       "key": "TZ",
       "owners": [
-        "tts/candidate_server.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4675,12 +4652,12 @@
     "category_counts": {
       "acceptance_override": 57,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 155,
+      "profile_constant": 163,
       "public_choice": 9,
-      "service_internal": 218
+      "service_internal": 209
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 439
+    "total_keys": 438
   }
 }

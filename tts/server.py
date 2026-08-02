@@ -8,7 +8,6 @@ import hashlib
 import json
 import logging
 import math
-import os
 import re
 import threading
 import time
@@ -34,6 +33,7 @@ from outetts import (
 from scipy import signal
 
 from model_sources import apply_model_sources, resolve_model_sources
+from settings import TTSServiceSettings
 
 from cancellable_worker import RestartableProcessWorker
 from oute_provider import OuteTTSProvider, OuteTTSProviderConfig
@@ -49,18 +49,13 @@ from provider import (
     TTSProviderRegistry,
 )
 
+settings = TTSServiceSettings.from_env()
+
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=settings.log_level,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("chromie-tts")
-
-
-def env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return bool(default)
-    return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def cuda_available() -> bool:
@@ -74,40 +69,22 @@ def cuda_available() -> bool:
         return False
 
 
-def env_int(name: str, default: int, *, minimum: int | None = None) -> int:
-    raw = os.getenv(name)
-    try:
-        value = int(raw) if raw not in (None, "") else int(default)
-    except ValueError:
-        logger.warning("Invalid integer env %s=%r; using %s", name, raw, default)
-        value = int(default)
-    if minimum is not None and value < minimum:
-        logger.warning("Env %s=%s is below minimum %s; using %s", name, value, minimum, minimum)
-        value = minimum
-    return value
-
-
-HOST = os.getenv("TTS_HOST", "0.0.0.0")
-PORT = env_int("TTS_PORT", 5000, minimum=1)
-TTS_PROVIDER_NAME = os.getenv("TTS_PROVIDER", "oute").strip().lower()
-MODEL_SIZE = os.getenv("TTS_MODEL_SIZE", "0.6B")
-QUANTIZATION_NAME = os.getenv("TTS_QUANTIZATION", "FP16")
+HOST = settings.host
+PORT = settings.port
+TTS_PROVIDER_NAME = settings.provider
+MODEL_SIZE = settings.model_size
+QUANTIZATION_NAME = settings.quantization
 
 # Raw PCM sample rate reported to orchestrator. The host orchestrator may resample
 # this source rate to the actual speaker output rate.
-TTS_SAMPLE_RATE = env_int("TTS_SAMPLE_RATE", 44100, minimum=8000)
-TTS_CHUNK_MS = env_int("TTS_CHUNK_MS", 120, minimum=20)
-TTS_N_GPU_LAYERS = env_int("TTS_N_GPU_LAYERS", -1)
-TTS_CONTEXT_SIZE = env_int("TTS_CONTEXT_SIZE", 4096, minimum=512)
+TTS_SAMPLE_RATE = settings.sample_rate
+TTS_CHUNK_MS = settings.chunk_ms
+TTS_N_GPU_LAYERS = settings.n_gpu_layers
+TTS_CONTEXT_SIZE = settings.context_size
 
-# IMPORTANT:
-# TTS_MAX_LENGTH is the OuteTTS/llama generation token budget, not a text
-# character limit. Very small values such as 100/120/180 can make OuteTTS emit
-# zero audio codec tokens, which later fails in DAC decode with:
-#   torch.cat(): expected a non-empty list of Tensors
-# Use TTS_MAX_TEXT_CHARS to limit spoken text length.
-REQUESTED_TTS_MAX_LENGTH = env_int("TTS_MAX_LENGTH", TTS_CONTEXT_SIZE, minimum=1)
-MIN_TTS_GENERATION_LENGTH = env_int("MIN_TTS_GENERATION_LENGTH", 1024, minimum=128)
+# IMPORTANT: TTS_MAX_LENGTH is the generation token budget, not a text limit.
+REQUESTED_TTS_MAX_LENGTH = settings.requested_max_length
+MIN_TTS_GENERATION_LENGTH = settings.min_generation_length
 
 if TTS_CONTEXT_SIZE < MIN_TTS_GENERATION_LENGTH:
     logger.warning(
@@ -133,42 +110,35 @@ if REQUESTED_TTS_MAX_LENGTH != EFFECTIVE_TTS_MAX_LENGTH:
         MIN_TTS_GENERATION_LENGTH,
     )
 
-TTS_N_BATCH = env_int("TTS_N_BATCH", 256, minimum=1)
-TTS_THREADS = env_int("TTS_THREADS", 4, minimum=1)
-TTS_TEMPERATURE = float(os.getenv("TTS_TEMPERATURE", "0.4"))
-TTS_REPETITION_PENALTY = float(os.getenv("TTS_REPETITION_PENALTY", "1.1"))
-MAX_CONCURRENT_SYNTHESIS = env_int("TTS_MAX_CONCURRENT_SYNTHESIS", 1, minimum=1)
-TTS_WORKER_COUNT = env_int("TTS_WORKER_COUNT", 1, minimum=1)
-TTS_MIN_TEXT_CHARS = env_int("TTS_MIN_TEXT_CHARS", 4, minimum=1)
-TTS_MAX_TEXT_CHARS = env_int("TTS_MAX_TEXT_CHARS", 220, minimum=TTS_MIN_TEXT_CHARS)
-TTS_GENERATION_RETRIES = env_int("TTS_GENERATION_RETRIES", 1, minimum=1)
-TTS_RESET_LLAMA_STATE = env_bool("TTS_RESET_LLAMA_STATE", True)
-TTS_DETAILED_TIMING = env_bool("TTS_DETAILED_TIMING", True)
-TTS_METRICS_WINDOW = env_int("TTS_METRICS_WINDOW", 20, minimum=1)
-TTS_AUDIO_CODEC_DEVICE_REQUESTED = os.getenv("TTS_AUDIO_CODEC_DEVICE", "auto")
+TTS_N_BATCH = settings.n_batch
+TTS_THREADS = settings.threads
+TTS_TEMPERATURE = settings.temperature
+TTS_REPETITION_PENALTY = settings.repetition_penalty
+MAX_CONCURRENT_SYNTHESIS = settings.max_concurrent_synthesis
+TTS_WORKER_COUNT = settings.worker_count
+TTS_MIN_TEXT_CHARS = settings.min_text_chars
+TTS_MAX_TEXT_CHARS = settings.max_text_chars
+TTS_GENERATION_RETRIES = settings.generation_retries
+TTS_RESET_LLAMA_STATE = settings.reset_llama_state
+TTS_DETAILED_TIMING = settings.detailed_timing
+TTS_METRICS_WINDOW = settings.metrics_window
+TTS_AUDIO_CODEC_DEVICE_REQUESTED = settings.audio_codec_device
 TTS_AUDIO_CODEC_DEVICE = resolve_audio_codec_device(
     TTS_AUDIO_CODEC_DEVICE_REQUESTED,
     cuda_available=cuda_available(),
 )
 
-SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
+SPEAKER_DIR = settings.speaker_dir
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 MAX_SPEAKER_TRANSCRIPT_CHARS = 4000
 OUTETTS_V3_AUDIO_TOKENS_PER_SECOND = 75
 MIN_SPEAKER_AUDIO_CODES = 30
 MIN_SPEAKER_REFERENCE_COVERAGE = 0.5
 TTS_SPEAKER_ALIGNMENT_MODEL = "turbo"
-TTS_SPEAKER_ALIGNMENT_DEVICE = os.getenv(
-    "TTS_SPEAKER_ALIGNMENT_DEVICE", "cpu"
-).strip().lower()
-TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY = float(
-    os.getenv("TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY", "0.75")
+TTS_SPEAKER_ALIGNMENT_DEVICE = settings.speaker_alignment_device
+TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY = (
+    settings.speaker_transcript_min_similarity
 )
-
-if TTS_SPEAKER_ALIGNMENT_DEVICE not in {"cpu", "cuda"}:
-    raise ValueError("TTS_SPEAKER_ALIGNMENT_DEVICE must be cpu or cuda")
-if not 0.0 <= TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY <= 1.0:
-    raise ValueError("TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY must be between 0 and 1")
 
 # One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
 # process-global mutable CUDA state inside the generation worker process.
@@ -280,7 +250,9 @@ def build_model_config():
         backend=Backend.LLAMACPP,
         quantization=get_quantization(),
     )
-    sources = resolve_model_sources(MODEL_SIZE, QUANTIZATION_NAME)
+    sources = resolve_model_sources(
+        MODEL_SIZE, QUANTIZATION_NAME, service_settings=settings
+    )
     apply_model_sources(cfg, sources)
     logger.info(
         "Using pinned OuteTTS sources: tokenizer=%s@%s gguf=%s@%s file=%s",
@@ -1082,7 +1054,7 @@ generation_workers = [
     RestartableProcessWorker(
         generation_worker_main,
         name=f"chromie-tts-generation-{index}",
-        startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "600")),
+        startup_timeout_s=settings.worker_startup_timeout_s,
     )
     for index in range(TTS_WORKER_COUNT)
 ]
@@ -1126,10 +1098,10 @@ provider_registry.register(
     "oute",
     lambda: OuteTTSProvider(
         config=OuteTTSProviderConfig(
-            tokenizer_id=os.getenv("TTS_TOKENIZER_REPO", ""),
-            tokenizer_revision=os.getenv("TTS_TOKENIZER_REVISION", ""),
-            gguf_id=os.getenv("TTS_GGUF_REPO", ""),
-            gguf_revision=os.getenv("TTS_GGUF_REVISION", ""),
+            tokenizer_id=settings.tokenizer_repo,
+            tokenizer_revision=settings.tokenizer_revision,
+            gguf_id=settings.gguf_repo,
+            gguf_revision=settings.gguf_revision,
             sample_rate=TTS_SAMPLE_RATE,
             chunk_ms=TTS_CHUNK_MS,
             max_concurrency=MAX_CONCURRENT_SYNTHESIS,

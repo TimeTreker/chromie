@@ -33,6 +33,7 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
+- Added immutable TTS service settings for transport, provider, generation, worker, speaker, alignment, and immutable model-source configuration; maintained TTS modules no longer parse environment values independently.
 - Preserved completed evidence-bound results across newer ordinary turns with a non-interrupting delivery window; explicit cancellation and supersession still suppress late speech.
 - Reused exact planner-authored Agent Skill selections for Response Composer and Tool Result Interpreter after validating Plan provenance, avoiding redundant downstream selection model calls without adding Host semantic choice.
 - Added immutable model-generation Host settings for direct response, bounded failure speech, and runtime-ready greetings; turn-time environment reparsing was removed from those paths.
