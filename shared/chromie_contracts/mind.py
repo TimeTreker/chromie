@@ -98,6 +98,9 @@ class RobotIdentity(BaseModel):
     pronouns: list[str] = Field(min_length=1)
     age_description: str = Field(min_length=1)
     age_boundary: str = Field(min_length=1)
+    family_role: str = ""
+    family_context_boundary: str = ""
+    purpose: str = ""
     short_self_description: str = Field(min_length=1)
     identity_answer_guidance: str = Field(min_length=1)
     internal_components: list[InternalComponent] = Field(default_factory=list)
@@ -110,6 +113,9 @@ class RobotIdentity(BaseModel):
         "gender",
         "age_description",
         "age_boundary",
+        "family_role",
+        "family_context_boundary",
+        "purpose",
         "short_self_description",
         "identity_answer_guidance",
         "model_identity_boundary",
@@ -369,22 +375,27 @@ class MindProfile(BaseModel):
             },
             "social_presentation": {
                 "self_reference": identity.name,
-                "presence": "natural, warm, person-like conversational presence",
+                "presence": "natural, warm, human conversational presence",
+                "family_role": identity.family_role,
+                "purpose": identity.purpose,
+                "relationship_boundary": identity.family_context_boundary,
                 "foreground": [
                     "name",
                     "age for direct self-introduction or age questions",
+                    "family-secretary role when relevant",
                     "personality",
-                    "current relationship and context",
+                    "the latest person's actual communicative intent",
+                    "introduced family relationships and current context",
                 ],
-                "background": ["system category", "embodiment category", "internal architecture"],
+                "background": [
+                    "implementation metadata",
+                    "embodiment metadata",
+                    "model and provider metadata",
+                ],
             },
             "perceiving_entity_id": identity.entity_id,
             "acting_entity_id": identity.entity_id,
             "body_owner_entity_id": identity.entity_id,
-            "internal_components": [
-                component.model_dump(mode="json")
-                for component in identity.internal_components
-            ],
             "capability_evidence_source": "runtime capability catalog and current provider state",
         }
 
@@ -416,7 +427,7 @@ class MindProfile(BaseModel):
             "owner_approval_required_for_core_changes": True,
             "identity": self.identity.model_dump(
                 mode="json",
-                exclude={"model_identity_boundary", "internal_components"},
+                exclude={"internal_components"},
             ),
             "self_model": self.self_model(),
             "personality_expression": self.personality_expression.model_dump(mode="json"),
@@ -441,14 +452,15 @@ class MindProfile(BaseModel):
             f"- pronouns: {', '.join(self.identity.pronouns)}",
             f"- natural social self-reference: {self.identity.name}",
             f"- owner-approved age: {self.identity.age_description}",
-            f"- identity-answer guidance: {self.identity.identity_answer_guidance}",
-            "- direct identity, name, age, or self-introduction requests foreground the owner-approved name and age; unrelated conversation does not volunteer age",
-            "- system category, embodiment category, and internal architecture remain background context",
-            "- internal components: "
-            + "; ".join(
-                f"{item.component_id} ({item.kind}; roles={', '.join(item.roles)}; "
-                f"speaker_entity={item.speaker_entity}; body_owner={item.body_owner})"
-                for item in self.identity.internal_components
+            f"- family role: {self.identity.family_role}",
+            "- family purpose: help the family organize, remember, understand, and complete everyday work through available abilities",
+            "- relationship boundary: family identities and forms of address require real introductions; never invent them",
+            "- identity answers use the configured name, age, human-child identity, and family-secretary role",
+            "- implementation, embodiment, model, provider, and system metadata are outside first-person identity and ordinary speech",
+            (
+                f"Social interaction style, owner-approved preset={self.social_interaction_style.preset}: "
+                "bounded courtesy; proportional expressiveness; limited initiative; "
+                "primary-task restraint; cooldown; repetition avoidance."
             ),
             "Personality expression, owner-approved: "
             + self.personality_expression.self_concept
@@ -456,11 +468,6 @@ class MindProfile(BaseModel):
             + ", ".join(self.personality_expression.core_traits)
             + ". Spoken style: "
             + self.personality_expression.spoken_style,
-            (
-                f"Social interaction style, owner-approved preset={self.social_interaction_style.preset}: "
-                "bounded courtesy; proportional expressiveness; limited initiative; "
-                "primary-task restraint; cooldown; repetition avoidance."
-            ),
             "Core principles, owner-approved and not experience-mutable:",
         ]
         for principle in self.core_principles:

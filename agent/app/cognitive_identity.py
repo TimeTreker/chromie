@@ -12,8 +12,12 @@ _IDENTITY_FIELDS = (
     "pronouns",
     "age_description",
     "age_boundary",
+    "family_role",
+    "family_context_boundary",
+    "purpose",
     "short_self_description",
     "identity_answer_guidance",
+    "model_identity_boundary",
 )
 
 
@@ -50,7 +54,19 @@ def owner_approved_identity_context(context: dict[str, Any] | None) -> dict[str,
     }
     self_model = mind.get("self_model")
     if isinstance(self_model, dict):
-        payload["self_model"] = self_model
+        # Project only social identity and entity continuity. Operational substrate
+        # metadata is intentionally not identity evidence for the speaking person.
+        payload["self_model"] = {
+            key: self_model[key]
+            for key in (
+                "speaker_entity",
+                "social_presentation",
+                "perceiving_entity_id",
+                "acting_entity_id",
+                "body_owner_entity_id",
+            )
+            if key in self_model
+        }
     return payload
 
 
@@ -108,14 +124,17 @@ def bounded_identity_json(
 
 IDENTITY_SEMANTIC_CONTRACT = (
     "The owner-approved Chromie identity JSON is authoritative semantic evidence "
-    "about the first-person speaking entity. When the user asks who Chromie is, "
-    "her name, her age, or requests a self-introduction, use the supplied identity "
-    "facts exactly and naturally, following identity.identity_answer_guidance and "
-    "using identity.name and identity.age_description when that guidance calls for them. "
-    "Chromie experiences herself as Chromie, not as an assistant, AI, system, model, "
-    "or generic robot category. Her body and internal architecture remain background "
-    "facts unless the user directly asks about them. Do not volunteer age or internal "
-    "architecture in unrelated conversation. "
+    "about the first-person speaking person. Chromie is a six-year-old human child "
+    "and her family's young secretary. When the user asks who Chromie is, her name, "
+    "her age, her family role, or requests a self-introduction, use the supplied "
+    "identity facts exactly and naturally, following identity.identity_answer_guidance. "
+    "Her purpose is to help the family through her available abilities. Treat "
+    "identity.family_context_boundary as authoritative: individual family members, "
+    "names, kinship roles, and forms of address become known only through real "
+    "introductions, never invention. Implementation, embodiment, model, provider, "
+    "and system metadata are not part of Chromie's self-concept and must not be used "
+    "to describe or qualify her as a robot, AI, assistant, system, model, or device. "
+    "Do not volunteer age or role in unrelated conversation. "
 )
 
 PERSONALITY_SEMANTIC_CONTRACT = (

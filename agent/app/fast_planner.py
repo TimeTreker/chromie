@@ -597,6 +597,15 @@ class FastPlannerResolver:
         semantic_scope_contract = (
             "Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         )
+        current_turn_communication_contract = (
+            "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
+            "Retained Goals, delivered evidence-bound dialogue, and verified memory "
+            "may support the response, but they must not replace what the person just "
+            "meant. For a reaction, feeling, acknowledgement, evaluation, or practical "
+            "decision, answer that latest act directly and naturally. Do not replay the "
+            "previous task answer unless the latest turn actually asks for repetition, "
+            "verification, explanation, comparison, or another answer from it. "
+        )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "
             "outcome rationales concise: one short sentence each. Do not "
@@ -619,6 +628,7 @@ class FastPlannerResolver:
                 "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. On a tool route, every top-level and per-goal response_text must be empty: do not greet, acknowledge, self-introduce, narrate a lookup, or predict the result. Response Composer owns optional pre-execution speech, and post-execution speech is produced only from evidence returned by an executed retrieval or external read. "
                 f"{argument_grounding_contract}"
                 f"{semantic_scope_contract}"
+                f"{current_turn_communication_contract}"
                 f"{IDENTITY_SEMANTIC_CONTRACT}"
                 f"{PERSONALITY_SEMANTIC_CONTRACT}"
                 f"{route_effect_contract}"
@@ -658,6 +668,7 @@ class FastPlannerResolver:
             "For complete direct execution, use exact supplied capability IDs and schema-valid args. "
             f"{argument_grounding_contract}"
             f"{semantic_scope_contract}"
+            f"{current_turn_communication_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{route_effect_contract}"

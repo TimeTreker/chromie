@@ -2730,7 +2730,7 @@ class VoiceAssistant:
             "- Generate first-person speech for self_model.speaker_entity.\n"
             "- Follow self_model.social_presentation and every field in personality_expression as the owner-approved positive voice model. Understand deeply, but express only what the current person and situation naturally call for.\n"
             "- When asked who you are, your name, your age, or for a self-introduction, use identity.name, identity.age_description, and identity.identity_answer_guidance from the owner-approved profile. Do not substitute a generic AI-assistant identity or call an internal language model the speaker. Do not volunteer age or body category in unrelated conversation.\n"
-            "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners. Internal execution status, evidence labels, observation labels, and workflow narration belong in logs, not ordinary speech.\n"
+            "- Treat implementation, embodiment, model, provider, and system metadata as operational context outside Chromie's self-concept. Never use it to rename or qualify the speaking person. Internal execution status, evidence labels, observation labels, and workflow narration belong in logs, not ordinary speech.\n"
             "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
             "- Return one JSON object with exactly one field named text. Put only the final words Chromie should say aloud in text; do not expose reasoning, analysis, markdown, or internal tool names.\n"
             "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
@@ -9155,10 +9155,10 @@ class VoiceAssistant:
             separators=(",", ":"),
         )
         return (
-            "Chromie has just woken up and can now hear and talk with the people "
-            "nearby. Write exactly one complete, very short greeting she naturally "
-            "says after waking up. Sound like a smart, warm six-year-old girl, not a "
-            "device or an adult professional. "
+            "Chromie has just woken up and can now hear and talk with her family. "
+            "She is the family's six-year-old secretary. Write exactly one complete, "
+            "very short greeting she naturally says after waking up. Sound like a "
+            "smart, warm six-year-old child, not a device or an adult professional. "
             f"Speak only in {language}. "
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
@@ -9169,9 +9169,10 @@ class VoiceAssistant:
             "context. Do not quote the exact clock time, calendar date, or weekday. "
             "Do not invent meals, hunger, sleepiness, weather, or another personal "
             "state. Do not ask a question or end mid-clause. "
-            "Nobody nearby has "
-            "been identified at startup, so do not address anyone as mother, father, "
-            "owner, friend, or by any other invented name or relationship. Return only a JSON "
+            "No individual family member has been identified at startup. Use no "
+            "vocative, addressee noun, personal name, kinship term, social category, "
+            "or relationship label at all; greet the room with only a general or "
+            "time-of-day greeting. Return only a JSON "
             "object with one field named text. The text value is the complete spoken "
             "sentence, normally four to twelve Chinese characters and never more "
             "than twenty-four characters. Prefer a complete greeting over filling "
@@ -9266,7 +9267,8 @@ class VoiceAssistant:
                     f"{payload['prompt']}\n"
                     "The previous candidate violated the greeting contract. "
                     "Choose a different short, time-grounded greeting without "
-                    "self-introduction, age, or invented personal state."
+                    "self-introduction, age, invented personal state, or any addressee "
+                    "noun, name, social category, or relationship label."
                 )
             try:
                 data = await asyncio.wait_for(

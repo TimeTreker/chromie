@@ -1159,6 +1159,57 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn('"goal_id":"goal-weather"', prompt)
         self.assertIn('"goal_id":"goal-coffee"', prompt)
 
+    def test_social_reaction_after_completed_weather_is_a_fresh_spoken_goal(self):
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "associations": [],
+                "new_goals": [
+                    {
+                        "description": "回应用户认为26度有点冷并准备赶紧离开的反应。",
+                        "responsibility_kind": "spoken_response",
+                        "bindings": [],
+                    }
+                ],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": (
+                    "The latest turn is a new conversational reaction and practical "
+                    "decision; the completed weather result is supporting context."
+                ),
+            }
+        )
+        completed = active_goal(
+            "goal-weather",
+            "判断重庆一会儿是否会下大雨。",
+            status="done",
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "是得赶紧走啊。",
+                    recent_goals=[completed],
+                    history=[
+                        {"role": "assistant", "text": "重庆有雷雨和冰雹预报。"},
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(result.associations, [])
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "spoken_response",
+        )
+        prompt = ollama.prompts[0][0]
+        self.assertIn("latest turn is a social reaction", prompt)
+        self.assertIn("prior delivered information remains context", prompt)
+        self.assertIn("Do not use continue or reference merely because the topic overlaps", prompt)
+
     def test_recent_terminal_goal_remains_a_bounded_association_candidate(self):
         ollama = FakeOllama(
             {
@@ -1242,7 +1293,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("host owns all IDs", prompt)
         self.assertIn('relationship must be copied exactly from ["continue","modify","clarify"', prompt)
         self.assertIn("clarify means the current user turn supplies missing information", prompt)
-        self.assertIn("Use reference when the turn discusses, follows up on", prompt)
+        self.assertIn("Use reference when the current turn asks to retrieve, restate", prompt)
+        self.assertIn("Do not use continue or reference merely because the topic overlaps", prompt)
         self.assertNotIn("continues, modifies", prompt)
         schema = kwargs["response_format"]
         self.assertIsInstance(schema, dict)

@@ -99,8 +99,12 @@ class GoalAssociationModelAssociation(BaseModel):
     relationship: GoalAssociationModelRelationship = Field(
         description=(
             "Model-owned semantic relationship to the targeted Goal. continue "
-            "advances unchanged work; reference discusses or answers from a "
-            "retained Goal without changing it; clarify means the current user "
+            "advances unfinished unchanged work; reference requests retrieval, "
+            "restatement, explanation, comparison, or another answer from a retained "
+            "Goal without changing it. A social reaction, personal feeling, practical "
+            "decision, acknowledgement, or new conversational judgment is a fresh "
+            "spoken_response Goal even when prior Goal evidence supplies context. "
+            "clarify means the current user "
             "turn supplies missing information for that Goal, not that the user "
             "is asking for more explanation."
         )
@@ -1106,7 +1110,7 @@ class GoalAssociationResolver:
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and the applicable updated_description, resolved_gap_ids, and requires_replan fields. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
-                "Use continue when the current turn advances unchanged active or recoverable work. Use reference when the turn discusses, follows up on, or answers from a retained Goal without changing its meaning or lifecycle. Use modify or replace only when the user meaning actually changes and include updated_description or resolved_gap_ids. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
+                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify or replace only when the user meaning actually changes and include updated_description or resolved_gap_ids. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
             )
@@ -1123,7 +1127,7 @@ class GoalAssociationResolver:
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description and typed bindings for each responsibility. "
             "Every new Goal must also declare responsibility_kind. Use executable_action for a user-visible physical or other effectful action; spoken_response only when the responsibility is completed directly from Chromie's authored speech or text without external evidence, including singing, telling a joke, or a social reply; capability_dependent when lookup, retrieval, computation, or another capability must determine completion; and other only when none of those meanings is accurate. This is the Goal's completion modality, not a capability choice. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
-            "A standalone social interaction such as a greeting, thanks, reassurance request, or casual check-in is itself one satisfiable conversational Goal: respond naturally to that social act. Do not treat it as an empty turn. "
+            "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
             "A physical action and a conversational answer or spoken performance are independent goals. Physical actions are independent goals whenever either can succeed or fail separately, including actions requested simultaneously, with shared duration, or in one coordinated sentence. Do not collapse walking, gestures, speech, or other independently observable responsibilities into one Goal merely because they share timing. Before returning, verify that every independently observable responsibility appears in exactly one new_goals item: no merged action-collection Goal and no duplicated responsibility across Goals. "
@@ -1206,7 +1210,7 @@ class GoalAssociationResolver:
             revision_action = "Re-evaluate the semantic associations"
             state_instructions = (
                 "Re-evaluate continuity against only the supplied bounded candidate Goal IDs. "
-                "Existing Goal bindings are provenance-stable and cannot be changed by an association. If current user meaning changes a material binding, use decision=create_goals with one fully bound replacement Goal rather than a description-only association. "
+                "The final authoritative user turn owns the current communicative responsibility. A completed task may supply context, but a reaction, feeling, evaluation, acknowledgement, or practical decision about that context is normally a fresh spoken_response Goal rather than continuation or reference. Existing Goal bindings are provenance-stable and cannot be changed by an association. If current user meaning changes a material binding, use decision=create_goals with one fully bound replacement Goal rather than a description-only association. "
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
@@ -1279,7 +1283,11 @@ class GoalAssociationResolver:
             "Use semantic reasoning over the authoritative user turn and bounded "
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
-            "Keep separate Goals when the user truly requested an independently "
+            "Keep or create a fresh spoken_response Goal when the latest turn is an "
+            "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
+            "decision, or other direct conversational act, even when a retained Goal "
+            "supplies the topic or evidence. Do not replay the retained task as the "
+            "current responsibility. Keep separate Goals when the user truly requested an independently "
             "satisfiable direct spoken or text response in addition to capability "
             "work, such as a song, joke, or unrelated social answer. When a "
             "spoken_response item merely phrases, reports, explains, or interprets "
@@ -1376,7 +1384,7 @@ class GoalAssociationResolver:
             "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded candidate Goals and their bindings, and dialogue context. Candidate Goals may be active, recoverable, or recently terminal; referencing a terminal Goal does not reopen it. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
             "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
             "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "
-            "Conversational framing attached to substantive work is not a separate Goal; a standalone social interaction remains one conversational Goal. One lookup and an interpretation derived from the same evidence are one Goal. "
+            "Conversational framing attached to substantive work is not a separate Goal; a standalone social interaction remains one conversational Goal. A new reaction, feeling, evaluation, acknowledgement, or practical decision after a prior result is a current conversational responsibility, not continuation of the completed lookup. One lookup and an interpretation requested as part of that same lookup are one Goal. "
             "You are advisory only and never execute or commit. Return JSON only."
         )
 

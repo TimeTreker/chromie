@@ -70,13 +70,15 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertEqual(projected["identity"]["name"], "Chromie")
         self.assertEqual(projected["identity"]["age_description"], "6 years old")
         self.assertIn("identity_answer_guidance", projected["identity"])
+        self.assertEqual(projected["identity"]["family_role"], "the family's secretary")
+        self.assertNotIn("internal_components", projected["self_model"])
         self.assertIn('"name":"Chromie"', bounded_identity_json(self.context))
 
     def test_owner_approved_personality_projection_uses_active_profile(self) -> None:
         projected = owner_approved_personality_context(self.context)
         self.assertTrue(projected["owner_approved"])
         self.assertIn("smart", projected["core_traits"])
-        self.assertIn("six-year-old girl", projected["self_concept"])
+        self.assertIn("six-year-old human girl", projected["self_concept"])
         encoded = bounded_personality_json(self.context)
         self.assertIn('"answer_style"', encoded)
         self.assertIn('"internal_language_boundary"', encoded)
@@ -119,7 +121,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             self.assertIn("Owner-approved Chromie identity JSON", prompt)
             self.assertIn('"name":"Chromie"', prompt)
             self.assertIn('"age_description":"6 years old"', prompt)
-            self.assertIn("generic robot category", prompt)
+            self.assertIn("six-year-old human child", prompt)
             self.assertIn("Owner-approved Personality Expression JSON", prompt)
             self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 

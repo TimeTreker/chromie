@@ -1637,6 +1637,41 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("verified-memory index is provenance only", system)
         self.assertIn("preserve every measurement and condition exactly", system)
 
+    def test_prompt_keeps_latest_social_reaction_above_retained_weather_answer(self):
+        ollama = FakeOllama({
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "response_text": "嗯，那就快走吧，记得带伞。",
+            "steps": [],
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-reaction"],
+            },
+        })
+        planner_request = request(
+            "是得赶紧走啊。",
+            route="chat",
+            goal_ids=["goal-reaction"],
+        )
+        context = dict(planner_request.context)
+        context["history"] = [
+            {
+                "role": "assistant",
+                "text": "重庆现在有雷雨伴随冰雹的预报。",
+                "metadata": {"evidence_bound": True},
+            }
+        ]
+        planner_request = planner_request.model_copy(update={"context": context})
+
+        asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(planner_request))
+
+        prompt = ollama.prompts[0][0]
+        self.assertIn("FINAL AUTHORITATIVE USER TURN owns the current communicative act", prompt)
+        self.assertIn("must not replace what the person just meant", prompt)
+        self.assertIn("Do not replay the previous task answer", prompt)
+
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
         raw = multi_goal_plan(
             disposition="execute",
