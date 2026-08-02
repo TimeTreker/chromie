@@ -192,7 +192,7 @@ Issue must refresh its own baseline because counts may change.
 | Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
 | Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 450 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
 | Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
-| Reduce the Current Documentation Surface | consolidation slice landed; specialized ownership audit open | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, and three in-tree archives were removed. Remaining specialized-document ownership review is open. |
+| Reduce the Current Documentation Surface | source implementation complete | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, three in-tree archives were removed, and every specialized document must now be reachable from a current owner entrypoint or a declared mechanical contract. |
 | Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
 
 ### Completed first-intake Issues
@@ -874,7 +874,7 @@ runtime seams created by decomposition.
 
 ## Issue: Reduce the Current Documentation Surface
 
-Status: consolidation slice landed; remaining specialized-document ownership audit open
+Status: source implementation complete
 
 Implementation note (2026-08-02): eight overlapping trace, event, lifecycle,
 and recovery documents were consolidated into `RUNTIME_OBSERVABILITY.md` and
@@ -883,8 +883,12 @@ after current facts and references were retained; Git history remains the
 historical authority. The tree decreased from 125 to 116 Markdown files and
 from 80 to 73 files directly under `docs/`; the core reading path is 14
 documents. File/core-path ratchets and authority/link checks are now enforced.
-The remaining specialized-document entrypoint/mechanical-contract audit and
-further prose reduction remain open.
+The specialized-document audit is also complete: the documentation index no
+longer counts as ownership, component entrypoints form the current ownership
+graph, and Agent Skill package documents remain under explicit mechanically
+checked contracts. Index-only specialized documents now fail the canonical
+documentation gate. Further prose reduction may continue as ordinary
+maintenance, but it is no longer an open Issue exit criterion.
 
 ### Problem
 

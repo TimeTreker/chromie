@@ -459,6 +459,125 @@ def check_configuration_reference(errors: list[str]) -> None:
 
 
 
+def _local_markdown_targets(source: Path) -> set[Path]:
+    targets: set[Path] = set()
+    text = source.read_text(encoding="utf-8", errors="replace")
+    for raw in MARKDOWN_LINK_RE.findall(text):
+        if is_external_or_anchor(raw):
+            continue
+        target = normalized_link_target(raw)
+        if not target:
+            continue
+        resolved = (source.parent / target).resolve()
+        if resolved.suffix.lower() == ".md" and resolved.is_file():
+            try:
+                resolved.relative_to(ROOT.resolve())
+            except ValueError:
+                continue
+            targets.add(resolved)
+    return targets
+
+
+def _matches_any(relative: str, patterns: list[str]) -> bool:
+    path = Path(relative)
+    return any(path.match(pattern) for pattern in patterns)
+
+
+def _check_specialized_document_ownership(
+    payload: dict[str, object], errors: list[str]
+) -> None:
+    ownership = payload.get("specialized_ownership")
+    if not isinstance(ownership, dict):
+        errors.append("specialized_ownership must be an object")
+        return
+
+    raw_entrypoints = ownership.get("entrypoint_paths")
+    raw_globs = ownership.get("entrypoint_globs")
+    raw_contracts = ownership.get("mechanical_contracts")
+    if not isinstance(raw_entrypoints, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw_entrypoints
+    ):
+        errors.append("specialized_ownership.entrypoint_paths must be non-empty strings")
+        raw_entrypoints = []
+    if not isinstance(raw_globs, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw_globs
+    ):
+        errors.append("specialized_ownership.entrypoint_globs must be non-empty strings")
+        raw_globs = []
+    if not isinstance(raw_contracts, list):
+        errors.append("specialized_ownership.mechanical_contracts must be a list")
+        raw_contracts = []
+
+    contract_globs: list[str] = []
+    for item in raw_contracts:
+        if not isinstance(item, dict):
+            errors.append("mechanical contract ownership entry must be an object")
+            continue
+        pattern = str(item.get("glob") or "").strip()
+        checker = str(item.get("checker") or "").strip()
+        if not pattern or not checker:
+            errors.append("mechanical contract ownership requires glob and checker")
+            continue
+        checker_path = (ROOT / checker).resolve()
+        try:
+            checker_path.relative_to(ROOT.resolve())
+        except ValueError:
+            errors.append(f"mechanical contract checker escapes repository: {checker}")
+            continue
+        if not checker_path.is_file():
+            errors.append(f"mechanical contract checker does not exist: {checker}")
+            continue
+        contract_globs.append(pattern)
+
+    documents = markdown_files()
+    relative_by_path = {
+        path.resolve(): path.relative_to(ROOT).as_posix() for path in documents
+    }
+    roots: set[Path] = set()
+    for entry in payload.get("authorities") or []:
+        if not isinstance(entry, dict):
+            continue
+        raw_path = str(entry.get("path") or "").strip()
+        if raw_path and raw_path != "docs/README.md":
+            roots.add((ROOT / raw_path).resolve())
+    for raw_path in payload.get("core_reading_path") or []:
+        if isinstance(raw_path, str) and raw_path.strip() and raw_path != "docs/README.md":
+            roots.add((ROOT / raw_path).resolve())
+    for raw_path in raw_entrypoints:
+        path = (ROOT / str(raw_path)).resolve()
+        if not path.is_file():
+            errors.append(f"specialized documentation entrypoint does not exist: {raw_path}")
+        else:
+            roots.add(path)
+    for path, relative in relative_by_path.items():
+        if _matches_any(relative, [str(item) for item in raw_globs]):
+            roots.add(path)
+        if _matches_any(relative, contract_globs):
+            roots.add(path)
+
+    reachable: set[Path] = set()
+    pending = [path for path in roots if path in relative_by_path]
+    while pending:
+        source = pending.pop()
+        if source in reachable:
+            continue
+        reachable.add(source)
+        if source == DOC_INDEX.resolve():
+            continue
+        for target in _local_markdown_targets(source):
+            if target in relative_by_path and target not in reachable:
+                pending.append(target)
+
+    for path, relative in sorted(relative_by_path.items(), key=lambda item: item[1]):
+        if path == DOC_INDEX.resolve():
+            continue
+        if path not in reachable:
+            errors.append(
+                f"specialized documentation has no current owner entrypoint or "
+                f"mechanical contract: {relative}"
+            )
+
+
 def check_documentation_authority(errors: list[str]) -> None:
     required_roles = {
         "mission_architecture",
@@ -512,6 +631,8 @@ def check_documentation_authority(errors: list[str]) -> None:
     missing = sorted(required_roles - roles)
     if missing:
         errors.append(f"documentation authority registry is missing roles: {missing}")
+
+    _check_specialized_document_ownership(payload, errors)
 
     archives = payload.get("historical_archives")
     if not isinstance(archives, list):

@@ -72,5 +72,26 @@
     "max_core_reading_path": 15,
     "max_docs_root_markdown_files": 73,
     "max_markdown_files": 116
+  },
+  "specialized_ownership": {
+    "entrypoint_paths": [
+      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "SUPPORT.md"
+    ],
+    "entrypoint_globs": [
+      "README.md",
+      "**/README.md"
+    ],
+    "mechanical_contracts": [
+      {
+        "glob": "agent-skills/**/SKILL.md",
+        "checker": "tests/test_agent_skill_domain_packages.py"
+      },
+      {
+        "glob": "agent-skills/**/projections/*.md",
+        "checker": "tests/test_agent_skill_progressive_disclosure.py"
+      }
+    ]
   }
 }

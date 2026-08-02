@@ -76,6 +76,24 @@ class DocumentationAuthorityTests(unittest.TestCase):
         )
 
 
+    def test_specialized_documents_have_owned_entrypoints_or_contracts(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, "scripts/check_docs.py"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(
+            (ROOT / "config" / "documentation_authority.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        ownership = payload["specialized_ownership"]
+        self.assertTrue(ownership["entrypoint_globs"])
+        self.assertTrue(ownership["mechanical_contracts"])
+
     def test_retired_target_runner_is_not_current_authority(self) -> None:
         self.assertFalse((ROOT / "scripts" / "run_supervised_target_acceptance.sh").exists())
         for path in (ROOT / "docs" / "ACCEPTANCE.md", ROOT / "CHROMIE_RUNBOOK.md"):

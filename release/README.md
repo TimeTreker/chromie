@@ -22,3 +22,6 @@ python scripts/prepare_release.py --preview \
 The preview validates evidence and repository consistency, can run the test
 suite, and writes source/provenance/checksum artifacts for engineering review.
 It does not create a tag, a publishable bundle, or a support promise.
+
+The complete preview-only packaging contract is documented in
+[Optional Development Artifact Packaging](../docs/RELEASE.md).

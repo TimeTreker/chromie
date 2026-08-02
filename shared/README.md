@@ -70,3 +70,6 @@ package:
 ```bash
 ./scripts/run_tests.sh
 ```
+
+Cognitive truncation and integrity incident packages are defined in
+[Cognitive Integrity Events](../docs/COGNITIVE_INTEGRITY_EVENTS.md).

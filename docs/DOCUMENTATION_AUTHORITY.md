@@ -55,7 +55,14 @@ authority.
 - historical narrative is removed from the working tree after consolidation;
 - concise owner documents remain within reviewed line limits;
 - every maintained Markdown file is indexed;
+- every specialized document is reachable from a current authority or component
+  entry point, or is covered by a declared mechanical-contract checker;
 - current-focus, link, API, configuration, and reproducibility checks still pass.
+
+The machine-readable `specialized_ownership` section distinguishes component
+entry points from mechanically checked package documentation. The documentation
+index is intentionally excluded as an ownership root, so an index-only document
+fails the gate.
 
 ## Addition and consolidation rule
 

@@ -191,3 +191,10 @@ without weakening the others:
 
 New features that do not help close the current milestone, remove a documented
 blocker, or strengthen one of these outcomes should normally wait.
+
+## Detailed brain/body decisions
+
+The stable mission above is authoritative. Detailed implementation boundaries
+for task-agent integration and proposal-derived embodiment are maintained in
+[Chromie and Soridormi Task-Agent Implementation Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
+and [Chromie/Soridormi Proposal Boundary Plan](CHROMIE_SORIDORMI_PROPOSAL_BOUNDARY_PLAN.md).

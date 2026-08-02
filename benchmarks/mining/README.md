@@ -34,3 +34,6 @@ python -m benchmarks.mining promote candidate.json \
 Promotion never commits changes, edits prompts, modifies personality, changes
 Runtime policy, or grants release qualification. Related committed scenarios
 require an explicit human override; exact input duplicates are rejected.
+
+The event schema, immutable derivation chain, and review boundary are defined in
+[Scenario Candidate Data Loop](../../docs/SCENARIO_CANDIDATE_DATA_LOOP.md).

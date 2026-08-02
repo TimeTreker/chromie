@@ -409,3 +409,6 @@ profile remains the complete seven-case voice/MuJoCo matrix.
 
 Audio capture retention is controlled by `ORCH_SAVE_AUDIO`; both recordings and
 session events may contain private speech and require review before sharing.
+
+The static, non-routing responsibility ontology used by the Orchestrator is
+documented in the [Chromie High-Level Ability Registry](../docs/chromie_ability_registry.md).

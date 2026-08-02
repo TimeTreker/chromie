@@ -42,6 +42,7 @@ This file records notable current changes. Detailed earlier development history 
 - Ratcheted the generated ownership inventory at 450 keys, eight public choices, one public Boolean, and zero compatibility aliases.
 - Made `shared/chromie_contracts` package-scoped in Mypy so new modules enter automatically.
 - Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
+- Closed specialized-document ownership: the index no longer counts as an owner, component entrypoints form a checked reachability graph, and package documents require declared mechanical contracts.
 - Replaced 37 lifecycle property methods with delegated state aliases, reducing `VoiceAssistant` from 221 to 187 methods and 19 to one property.
 - Confined the direct-LLM call to one rollback owner; maintained apply lanes use bounded fail-closed speech after Agent failure.
 

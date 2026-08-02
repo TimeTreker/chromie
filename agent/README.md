@@ -332,3 +332,12 @@ by its model and validates arguments only against that skill's advertised schema
 It does not replace `soridormi.look_direction` with
 `soridormi.look_at_person`, reinterpret yaw/pitch fields, or silently clamp one
 skill into another provider contract.
+
+## Agent semantic contracts
+
+The Agent implementation is further specified by these owned contracts:
+
+- [Interaction Agent Skill Runtime](../docs/interaction_agent_skill_runtime.md)
+- [Catalog-Aware Goal Interpretation](../docs/CATALOG_AWARE_GOAL_INTERPRETATION.md)
+- [Tool Result Interpretation](../docs/TOOL_RESULT_INTERPRETATION.md)
+- [Agent Capability Registry](../docs/agent_capability_registry.md)

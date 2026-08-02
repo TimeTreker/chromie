@@ -195,3 +195,10 @@ review template. Objective completion and ASR round-trip checks do not replace
 human evaluation of Mandarin pronunciation, tones, prosody, speaker similarity,
 or audible artifacts. See
 [`../docs/TTS_PROVIDER_EVALUATION.md`](../docs/TTS_PROVIDER_EVALUATION.md).
+
+## Speaker-reference authoring
+
+For the optional Oute bilingual-reference workflow, see the
+[Chromie Bilingual Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md).
+The default CosyVoice path continues to use the versioned references under
+`assets/tts/voices/`.
