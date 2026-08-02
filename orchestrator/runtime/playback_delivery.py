@@ -38,6 +38,14 @@ class PlaybackDeliveryLifecycle:
         default_factory=dict
     )
     order_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    playback_queue: asyncio.Queue[Any] = field(default_factory=asyncio.Queue)
+    playback_task: asyncio.Task[Any] | None = None
+    active_synthesis_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
+    synthesis_semaphore: asyncio.Semaphore | None = None
+    output_stream: Any | None = None
+    output_stream_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    output_write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    transport: Any | None = None
 
     @staticmethod
     def key(

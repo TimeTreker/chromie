@@ -5,8 +5,8 @@
     "class_name": "VoiceAssistant",
     "max_method_count": 187,
     "max_property_count": 1,
-    "max_init_lines": 444,
-    "max_init_self_attributes": 151,
+    "max_init_lines": 417,
+    "max_init_self_attributes": 144,
     "required_collaborators": [
       "input_turn_lifecycle",
       "playback_delivery"
@@ -29,7 +29,14 @@
       "active_reflex_task",
       "concurrent_protective_reflex_tasks",
       "_pending_turn_after_reflex",
-      "_pending_vad_audio"
+      "_pending_vad_audio",
+      "playback_queue",
+      "playback_task",
+      "active_synthesis_tasks",
+      "synthesis_semaphore",
+      "output_stream",
+      "output_stream_lock",
+      "output_write_lock"
     ],
     "direct_llm_compatibility_owner": "_launch_direct_llm_compatibility_or_fail_closed"
   }

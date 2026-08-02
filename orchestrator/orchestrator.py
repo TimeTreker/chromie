@@ -88,6 +88,7 @@ from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
+from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.outcome_response import compose_outcome_response
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
@@ -534,19 +535,14 @@ class VoiceAssistant:
         # and re-enter Chromie as a fake user turn.
         self._vad_segment_started_during_playback = False
         self._vad_segment_playback_generation: int | None = None
-        self.playback_queue: asyncio.Queue = asyncio.Queue()
-        self.playback_task: asyncio.Task | None = None
-        self.active_synthesis_tasks: set[asyncio.Task] = set()
         # Task and playback state live in focused collaborators. The Host keeps
-        # compatibility properties below while lifecycle mutation is centralized
+        # compatibility aliases below while lifecycle mutation is centralized
         # and independently testable.
         self.input_turn_lifecycle = InputTurnLifecycle()
-        self.playback_delivery = PlaybackDeliveryLifecycle()
+        self.playback_delivery = PlaybackDeliveryLifecycle(
+            synthesis_semaphore=asyncio.Semaphore(playback_settings.concurrency)
+        )
         self._protective_reflex_failure = False
-        self.synthesis_semaphore = asyncio.Semaphore(playback_settings.concurrency)
-        self.output_stream = None
-        self.output_stream_lock = asyncio.Lock()
-        self.output_write_lock = asyncio.Lock()
         self._audio_device_refresh_lock = asyncio.Lock()
         self._input_device_change_event = asyncio.Event()
         self._pending_input_params: dict[str, Any] | None = None
@@ -651,6 +647,13 @@ class VoiceAssistant:
         "_turn_speech_events": "turn_speech_events",
         "_turn_speech_event_by_playback_key": "turn_speech_event_by_playback_key",
         "order_lock": "order_lock",
+        "playback_queue": "playback_queue",
+        "playback_task": "playback_task",
+        "active_synthesis_tasks": "active_synthesis_tasks",
+        "synthesis_semaphore": "synthesis_semaphore",
+        "output_stream": "output_stream",
+        "output_stream_lock": "output_stream_lock",
+        "output_write_lock": "output_write_lock",
     }
     _PLAYBACK_STATE_COERCERS = {
         "next_playback_order": int,
@@ -1672,398 +1675,33 @@ class VoiceAssistant:
         return np.tile(samples.reshape(-1, 1), (1, self.output_channels))
 
     async def ensure_output_stream(self):
-        if self.output_stream is not None:
-            return
-        async with self.output_stream_lock:
-            if self.output_stream is not None:
-                return
-            sd = _sounddevice()
-            self.output_stream = sd.OutputStream(
-                samplerate=self.output_rate,
-                channels=self.output_channels,
-                dtype="int16",
-                device=self.output_device,
-                latency=self.output_latency,
-                blocksize=self.output_params.get("blocksize", 0),
-            )
-            self.output_stream.start()
-            logger.info(
-                "Output stream opened: device=%s rate=%s channels=%s latency=%s",
-                self.output_device,
-                self.output_rate,
-                self.output_channels,
-                self.output_latency,
-            )
+        return await playback_transport_for(self).ensure_output_stream()
 
     async def abort_output_stream(self):
-        async with self.output_write_lock:
-            async with self.output_stream_lock:
-                if self.output_stream is None:
-                    return
-                stream = self.output_stream
-
-                def abort_and_close() -> None:
-                    try:
-                        stream.abort()
-                    except Exception as exc:
-                        logger.warning(
-                            "Failed to abort output stream: %s",
-                            exc,
-                        )
-                    try:
-                        stream.close()
-                    except Exception as exc:
-                        logger.warning(
-                            "Failed to close output stream after abort: %s",
-                            exc,
-                        )
-
-                try:
-                    await asyncio.to_thread(abort_and_close)
-                finally:
-                    if self.output_stream is stream:
-                        self.output_stream = None
+        return await playback_transport_for(self).abort_output_stream()
 
     async def close_output_stream(self):
-        async with self.output_write_lock:
-            async with self.output_stream_lock:
-                if self.output_stream is None:
-                    return
-                try:
-                    self.output_stream.stop()
-                except Exception as exc:
-                    logger.debug(
-                        "Best-effort output stream stop failed during close: %s",
-                        exc,
-                    )
-                try:
-                    self.output_stream.close()
-                except Exception as exc:
-                    logger.debug(
-                        "Best-effort output stream close failed: %s",
-                        exc,
-                    )
-                self.output_stream = None
+        return await playback_transport_for(self).close_output_stream()
 
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
         return generation != self.playback_generation or session_id != self.session_id
 
     async def play_audio(self, audio_bytes: bytes, source_rate: Optional[int], generation: int, session_id: Optional[str]):
-        if self.audio_output_mode == "device":
-            await self._apply_pending_output_device_change()
-        pcm = self.resample_int16_bytes(audio_bytes, source_rate or self.default_tts_rate, self.output_rate)
-        samples = np.frombuffer(pcm, dtype=np.int16)
-        if samples.size == 0:
-            return
-        if self.audio_output_mode == "discard":
-            frames_per_chunk = max(
-                1,
-                int(self.output_rate * self.playback_chunk_ms / 1000),
-            )
-            for offset in range(0, samples.size, frames_per_chunk):
-                if self.is_stale_playback(generation, session_id):
-                    raise asyncio.CancelledError(
-                        "Discarded playback interrupted by newer session"
-                    )
-                if self.discard_playback_realtime:
-                    chunk_frames = min(frames_per_chunk, samples.size - offset)
-                    await asyncio.sleep(chunk_frames / self.output_rate)
-                else:
-                    await asyncio.sleep(0)
-            return
-        output = self.mono_to_output_channels(samples)
-        await self.ensure_output_stream()
-        stream = self.output_stream
-        if stream is None:
-            raise RuntimeError("Output stream is not available")
-        frames_per_chunk = max(1, int(self.output_rate * self.playback_chunk_ms / 1000))
-        for offset in range(0, len(output), frames_per_chunk):
-            if self.is_stale_playback(generation, session_id):
-                await self.abort_output_stream()
-                raise asyncio.CancelledError("Playback interrupted by newer session")
-            chunk = output[offset : offset + frames_per_chunk]
-            async with self.output_write_lock:
-                if self.output_stream is not stream:
-                    raise asyncio.CancelledError("Output stream changed during playback")
-                if self.is_stale_playback(generation, session_id):
-                    raise asyncio.CancelledError("Playback interrupted by newer session")
-                await asyncio.to_thread(stream.write, chunk)
-        # If the OS changed output while this ordered item was playing, close
-        # the old stream now. The next item will open on the new default.
-        await self._apply_pending_output_device_change()
+        return await playback_transport_for(self).play_audio(audio_bytes, source_rate, generation, session_id)
 
     async def enqueue_playback_skip(self, generation: int, order: int, session_id: Optional[str], reason: str):
-        if self.is_stale_playback(generation, session_id):
-            self.session_log(
-                session_id,
-                "playback_skip_drop_stale: order=%s reason=%s generation=%s current_generation=%s current_sid=%s",
-                order,
-                reason,
-                generation,
-                self.playback_generation,
-                self.session_id,
-            )
-            return
-        await self.playback_queue.put((generation, order, b"", self.default_tts_rate, session_id, reason))
+        return await playback_transport_for(self).enqueue_playback_skip(generation, order, session_id, reason)
 
     async def playback_worker(self):
-        while True:
-            item = await self.playback_queue.get()
-            if not item:
-                continue
-            generation = item[0]
-            if generation is None:
-                break
-            generation, order, audio, source_rate, session_id, skip_reason = item
-            if self.is_stale_playback(generation, session_id):
-                self.resolve_playback_start_waiter(
-                    generation,
-                    order,
-                    session_id,
-                    started=False,
-                    reason="stale_before_order",
-                )
-                self.session_log(session_id, "playback_drop_stale_before_order: order=%s", order)
-                continue
-            if order != self.next_playback_order:
-                self.pending_audio[order] = (generation, audio, source_rate, session_id, skip_reason)
-                continue
-            played = await self.play_one_order(generation, order, audio, source_rate, session_id, skip_reason)
-            if played:
-                self.next_playback_order += 1
-            while self.next_playback_order in self.pending_audio:
-                ng, na, nsr, nsid, nreason = self.pending_audio.pop(self.next_playback_order)
-                if self.is_stale_playback(ng, nsid):
-                    self.resolve_playback_start_waiter(
-                        ng,
-                        self.next_playback_order,
-                        nsid,
-                        started=False,
-                        reason="stale_pending_order",
-                    )
-                    self.next_playback_order += 1
-                    continue
-                played = await self.play_one_order(ng, self.next_playback_order, na, nsr, nsid, nreason)
-                if played:
-                    self.next_playback_order += 1
-                else:
-                    break
+        return await playback_transport_for(self).playback_worker()
 
     @trace_session_async(PLAYBACK_TRACE_MODULE, "play_one_order", "session_id")
     async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
-        key = self.playback_start_key(generation, order, session_id)
-        cancelled_orders = getattr(self, "cancelled_playback_orders", set())
-        if key in cancelled_orders:
-            cancelled_orders.discard(key)
-            self.session_log(
-                session_id,
-                "playback_skip_cancelled: order=%s generation=%s",
-                order,
-                generation,
-            )
-            self.maybe_session_done(session_id)
-            return True
-        if self.is_stale_playback(generation, session_id):
-            self.resolve_playback_start_waiter(
-                generation,
-                order,
-                session_id,
-                started=False,
-                reason="stale_playback",
-            )
-            return False
-        state = self.sessions.state.get(session_id or "")
-        if not audio:
-            reason = skip_reason or "empty_audio"
-            self.resolve_playback_start_waiter(
-                generation,
-                order,
-                session_id,
-                started=False,
-                reason=reason,
-            )
-            if state is not None:
-                if reason in {"tts_error", "tts_exception", "playback_exception"}:
-                    state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
-                else:
-                    state["skipped_tts"] = int(state.get("skipped_tts", 0)) + 1
-            self.session_log(session_id, "playback_skip_empty: order=%s reason=%s", order, reason)
-            self.maybe_session_done(session_id)
-            return True
-
-        audio_ms = (len(audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
-        self.sessions.trace_mark(
-            session_id,
-            "first_audio_playback" if not state or not state.get("trace_first_audio_marked") else "audio_playback_started",
-            kind="user_observable",
-            attributes={"order": order, "audio_ms": round(audio_ms, 3)},
-        )
-        if state is not None:
-            state["trace_first_audio_marked"] = True
-        self.session_log(
-            session_id,
-            "playback_start: order=%s source_rate=%s output_rate=%s audio_ms=%.1f generation=%s",
-            order,
-            source_rate,
-            self.output_rate,
-            audio_ms,
-            generation,
-        )
-        self.resolve_playback_start_waiter(
-            generation,
-            order,
-            session_id,
-            started=True,
-            reason="playback_start",
-        )
-        playback_start_ms = now_ms()
-        try:
-            self.is_playing_audio = True
-            try:
-                await self.play_audio(audio, source_rate, generation, session_id)
-            finally:
-                self.is_playing_audio = False
-        except asyncio.CancelledError:
-            self.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, now_ms() - playback_start_ms, generation)
-            return False
-        except Exception as exc:
-            await self.abort_output_stream()
-            if state is not None:
-                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
-            self.session_log(session_id, "playback_exception: order=%s playback_ms=%.1f error=%s", order, now_ms() - playback_start_ms, exc)
-            logger.error("Playback exception: %s", exc, exc_info=True)
-            self.maybe_session_done(session_id)
-            return True
-
-        playback_ms = now_ms() - playback_start_ms
-        if self.is_stale_playback(generation, session_id):
-            self.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, playback_ms, generation)
-            return False
-        if state is not None:
-            state["played_tts"] = int(state.get("played_tts", 0)) + 1
-        self.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
-        self.save_audio(audio, "output", session_id=session_id)
-        self.maybe_session_done(session_id)
-        return True
+        return await playback_transport_for(self).play_one_order(generation, order, audio, source_rate, session_id, skip_reason)
 
     @trace_session_async(TTS_TRACE_MODULE, "synthesize_one", "session_id")
     async def synthesize_one(self, text: str, order: int, session_id: Optional[str], generation: int):
-        text = self.normalize_tts_candidate(text)
-        if not self.is_valid_tts_text(text):
-            self.session_log(session_id, "tts_skip_invalid_sentence: order=%s chars=%s text=%r", order, len(text), text)
-            await self.enqueue_playback_skip(generation, order, session_id, "invalid_tts_text")
-            return
-        if self.is_stale_playback(generation, session_id):
-            return
-        async with self.synthesis_semaphore:
-            request_id = f"{session_id}-{order}"
-            tts_start_ms = now_ms()
-            max_attempts = max(1, self.tts_ws_retries)
-            retry_delay = max(0, self.tts_ws_retry_delay_ms) / 1000.0
-            last_error: Exception | None = None
-            self.session_log(session_id, "tts_request_start: order=%s chars=%s generation=%s retries=%s text=%r", order, len(text), generation, max_attempts, text)
-            for attempt in range(1, max_attempts + 1):
-                if self.is_stale_playback(generation, session_id):
-                    return
-                try:
-                    async with websockets.connect(self.tts_url, max_size=10**7, open_timeout=10, ping_interval=20, ping_timeout=20) as ws:
-                        await ws.send(json.dumps({"type": "synthesize_stream", "text": text, "speaker_id": self.speaker_id, "request_id": request_id}, ensure_ascii=False))
-                        audio_buffer = bytearray()
-                        source_rate = self.default_tts_rate
-                        async for msg in ws:
-                            if self.is_stale_playback(generation, session_id):
-                                return
-                            if isinstance(msg, bytes):
-                                audio_buffer.extend(msg)
-                                continue
-                            data = json.loads(msg)
-                            msg_type = data.get("type")
-                            if msg_type == "start":
-                                source_rate = int(data.get("sample_rate") or self.default_tts_rate)
-                                self.sessions.trace_mark(
-                                    session_id,
-                                    "tts_stream_started",
-                                    attributes={"order": order, "attempt": attempt, "source_rate": source_rate},
-                                )
-                                self.session_log(session_id, "tts_stream_start: order=%s attempt=%s/%s source_rate=%s output_rate=%s generation=%s", order, attempt, max_attempts, source_rate, self.output_rate, generation)
-                                continue
-                            if msg_type == "error":
-                                self.session_log(session_id, "tts_error: order=%s attempt=%s/%s tts_ms=%.1f error=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, data.get("message"))
-                                await self.enqueue_playback_skip(generation, order, session_id, "tts_error")
-                                self.maybe_session_done(session_id)
-                                return
-                            if msg_type == "end":
-                                provider_metadata = data.get("provider")
-                                if not isinstance(provider_metadata, dict):
-                                    provider_metadata = {}
-                                model_artifacts = provider_metadata.get("model_artifacts")
-                                if not isinstance(model_artifacts, list):
-                                    model_artifacts = []
-                                provider_revision_summary = ",".join(
-                                    f"{artifact.get('kind')}={artifact.get('revision')}"
-                                    for artifact in model_artifacts
-                                    if isinstance(artifact, dict)
-                                    and artifact.get("kind")
-                                    and artifact.get("revision")
-                                )
-                                self.sessions.trace_mark(
-                                    session_id,
-                                    "tts_stream_finished",
-                                    attributes={
-                                        "order": order,
-                                        "attempt": attempt,
-                                        "audio_bytes": len(audio_buffer),
-                                        "source_rate": source_rate,
-                                        "queue_wait_seconds": float(data.get("queue_wait_seconds") or 0.0),
-                                        "generate_seconds": float(data.get("generate_seconds") or 0.0),
-                                        "provider_id": provider_metadata.get("provider_id"),
-                                        "provider_implementation": provider_metadata.get("implementation"),
-                                        "provider_model_revisions": provider_revision_summary,
-                                    },
-                                )
-                                self.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, len(audio_buffer), source_rate, generation)
-                                self.session_log(
-                                    session_id,
-                                    "tts_server_metrics: order=%s provider=%s implementation=%s model_revisions=%s audio_s=%.3f generate_s=%.3f model_s=%.3f codec_s=%.3f pcm_s=%.3f queue_s=%.3f rtf=%s codec_device=%s quantization=%s context=%s prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
-                                    order,
-                                    provider_metadata.get("provider_id"),
-                                    provider_metadata.get("implementation"),
-                                    provider_revision_summary,
-                                    float(data.get("audio_seconds") or 0.0),
-                                    float(data.get("generate_seconds") or 0.0),
-                                    float(data.get("model_generate_seconds") or 0.0),
-                                    float(data.get("codec_decode_seconds") or 0.0),
-                                    float(data.get("pcm_conversion_seconds") or 0.0),
-                                    float(data.get("queue_wait_seconds") or 0.0),
-                                    data.get("realtime_factor"),
-                                    data.get("audio_codec_device"),
-                                    data.get("quantization"),
-                                    data.get("context_size"),
-                                    data.get("model_prompt_tokens"),
-                                    data.get("model_generated_tokens"),
-                                    data.get("generation_headroom_tokens"),
-                                    data.get("generation_limit_reached"),
-                                )
-                                state = self.sessions.state.get(session_id or "")
-                                if audio_buffer:
-                                    if state is not None:
-                                        state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
-                                    await self.playback_queue.put((generation, order, bytes(audio_buffer), source_rate, session_id, None))
-                                else:
-                                    await self.enqueue_playback_skip(generation, order, session_id, "tts_empty_audio")
-                                self.maybe_session_done(session_id)
-                                return
-                        raise RuntimeError("TTS websocket closed before end message")
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    last_error = exc
-                    self.session_log(session_id, "tts_ws_attempt_failed: order=%s attempt=%s/%s tts_ms=%.1f error=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, exc)
-                    if attempt < max_attempts:
-                        await asyncio.sleep(retry_delay)
-            logger.error("TTS error after retries: %s", last_error, exc_info=True)
-            await self.enqueue_playback_skip(generation, order, session_id, "tts_exception")
-            self.maybe_session_done(session_id)
+        return await playback_transport_for(self).synthesize_one(text, order, session_id, generation)
 
     @staticmethod
     def _normalize_echo_text(text: str) -> str:

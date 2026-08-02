@@ -664,18 +664,20 @@ Host still lacks equivalent narrow configuration ownership.
 
 ## Issue: Extract Playback Delivery Lifecycle
 
-Status: structural ratchet slice landed; provider/output transport and live exit criteria open
+Status: source extraction complete; live latency and audible-delivery evidence remain open
 
-Implementation note (2026-08-02): a playback-delivery collaborator now owns
-playback/synthesis ordering, generations, start waiters, cancellation
-bookkeeping, pending audio, and current-turn delivered-speech events.
-`VoiceAssistant` delegates those state transitions while preserving its public
-path and evidence logging. Eighteen lifecycle state aliases no longer require
-37 composition-root property methods; the class decreased from 221 to 187
-methods and from 19 to one property, and method/property/initializer counts are
-now protected by `scripts/check_runtime_structure.py`. Provider PCM transport,
-output-stream ownership, echo/chunk processing, incremental audible playback,
-and current live proof remain open.
+Implementation note (2026-08-02): playback lifecycle state owns ordering,
+generations, start waiters, cancellation bookkeeping, pending audio, provider
+queue/task state, synthesis concurrency, output-stream state and locks, and
+current-turn delivered-speech events. A dedicated `PlaybackTransport` now owns
+TTS WebSocket provider I/O, ordered queue consumption, resampling/output writes,
+stream open/abort/close, and delivery evidence. `VoiceAssistant` keeps thin
+public delegates so existing callers and trace decorators remain stable. The
+composition root remains at 187 methods and one property, while initializer
+state decreased to 144 attributes and 417 lines; ratchets forbid transport
+state from returning. True provider-incremental PCM playback and retained live
+first-PCM/audible timing evidence remain open because they require provider and
+target measurement rather than more Host ownership.
 
 ### Problem
 

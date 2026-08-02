@@ -1515,32 +1515,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.abort_output_stream.abort_and_close",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "621c22b66f2f4618415bedaea37b96aac71b338434e760a2e58aae1d941d2c9d",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.abort_output_stream.abort_and_close",
-      "ordinal": 2,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "2256c961d701aa04657420f4cd30b50cf27785d40adfb3ba70ac0d26365dceb7",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant.cleanup",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
@@ -1548,32 +1522,6 @@
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
       "body_sha256": "366e0ddb2e223022b83960d40dba01af1d7f43d7620c4654090314f16c41a54d",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.close_output_stream",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "33ee9010e1c71eaa955b65fb3e13cc05dcc2eb47d946ba3c8afef2d98c6916a3",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.close_output_stream",
-      "ordinal": 2,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
-      "review_status": "reviewed",
-      "body_sha256": "c741e143de2f6b4b0d8015760d92f780aeae8cc337d61ed630d42941d8fdcda0",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1746,21 +1694,6 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.play_one_order",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "a8cd6ee84e6f2b8f23320e6788fe7b157b1621830254f7b2d4a7c2f216c3dbb8",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant.process_llm_tts",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -1768,20 +1701,6 @@
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
       "body_sha256": "56f2371025b5036594b98f68d81ad0df14d6a163ae5c4443aeb30a2078f367cb",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant.synthesize_one",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "3b3c3bea98bad7541be948be33a298092ab19fe5eb748af72c76959cd46920cc",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -2047,6 +1966,87 @@
       "body_sha256": "6d261ba632b60b24b7855e481dc3e65c80075a14603003a3c758728c0c628d51",
       "failure_signals": [
         "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.abort_output_stream.abort_and_close",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "621c22b66f2f4618415bedaea37b96aac71b338434e760a2e58aae1d941d2c9d",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.abort_output_stream.abort_and_close",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "2256c961d701aa04657420f4cd30b50cf27785d40adfb3ba70ac0d26365dceb7",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.close_output_stream",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "33ee9010e1c71eaa955b65fb3e13cc05dcc2eb47d946ba3c8afef2d98c6916a3",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.close_output_stream",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "review_status": "reviewed",
+      "body_sha256": "c741e143de2f6b4b0d8015760d92f780aeae8cc337d61ed630d42941d8fdcda0",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.play_one_order",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "05c61102993362633728e6353514924e5bc4979e63fa0ea38d4c0c8378383d9f",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.synthesize_one",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "review_status": "reviewed",
+      "body_sha256": "b561b687c6de8accbad44984ea007c2686db1a8fbf8fcf3b61aa696a7a286ba4",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
       ]
     },
     {
