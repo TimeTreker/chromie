@@ -2523,6 +2523,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             "Never relabel an older result with the corrected binding",
             rendered,
         )
+        self.assertIn("provider canonicalization", rendered)
+        self.assertIn("intent=clarify_uncertain_request", rendered)
+        self.assertIn(
+            "When the user supplies an exact replacement binding",
+            interpreter.build_user_prompt(request),
+        )
 
     def test_social_framing_review_keeps_trailing_tool_affordance(self) -> None:
         interpreter = OllamaGoalInterpreter(

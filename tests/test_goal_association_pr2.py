@@ -916,6 +916,99 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(binding["value"], "内乡")
         self.assertEqual(binding["referent_id"], update.referent.referent_id)
 
+    def test_candidate_goal_location_clarification_gets_semantic_review(self):
+        chongqing = {
+            "referent_id": "ref-chongqing",
+            "entity_type": "location",
+            "canonical_value": "重庆",
+            "scope_kind": "goal",
+            "scope_ids": ["goal-chongqing-weather"],
+            "status": "foreground",
+            "confidence": 1.0,
+            "source_turn_id": "turn-chongqing",
+            "source_goal_ids": ["goal-chongqing-weather"],
+        }
+        proposed_clarification = {
+            "decision": "clarify",
+            "associations": [],
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "Which Neixiang do you mean?",
+            "confidence": 1.0,
+            "reason_summary": "The provider may find more than one place.",
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "查询用户纠正后的内乡天气。",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "内乡",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "referent_updates": [
+                {
+                    "operation": "correct",
+                    "entity_type": "location",
+                    "canonical_value": "内乡",
+                    "target_referent_ids": ["ref-chongqing"],
+                    "scope_kind": "conversation",
+                    "confidence": 1.0,
+                    "reason_summary": "用户直接提供了新的地点绑定。",
+                }
+            ],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "The exact replacement binding can be resolved downstream.",
+        }
+        ollama = ScriptedOllama([proposed_clarification, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "不是重庆，我说的是内乡。",
+                    active_goals=[
+                        active_goal(
+                            "goal-chongqing-weather",
+                            "查询重庆今天的天气。",
+                            bindings={
+                                "location": {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "重庆",
+                                    "confidence": 1.0,
+                                }
+                            },
+                        )
+                    ],
+                    discourse_referents=[chongqing],
+                    discourse_focus=["ref-chongqing"],
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.metadata["semantic_review"]["triggers"],
+            ["candidate_goal_clarification_continuity"],
+        )
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["value"],
+            "内乡",
+        )
+        self.assertEqual(result.referent_updates[0].operation, "correct")
+        self.assertIn("provider canonicalization", ollama.prompts[1][0])
+
     def test_pronoun_resolves_from_foreground_referent_not_stale_tool_evidence(self):
         chongqing = {
             "referent_id": "ref-chongqing",

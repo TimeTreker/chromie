@@ -15,12 +15,13 @@ The active Issue is **Close Current-Revision Target Evidence**. Do not begin the
 queued response-latency architecture until this evidence Issue closes, except
 to repair a reproduced qualification blocker.
 
-The current clean committed implementation baseline includes three local
-corrections: delivered-speech evidence, explicit location-binding provenance,
-and weather-correction continuity. The latest commit subject is
-`fix: preserve weather correction continuity`. These commits have not been
-pushed; `main` is ahead of `origin/main`. Rebuild this exact clean revision and
-collect a new evidence root before treating the correction as target evidence.
+The current implementation baseline includes delivered-speech evidence,
+explicit location-binding provenance, weather-correction continuity, and the
+exact-replacement-binding clarification correction below. The latest
+implementation commit subject is `fix: preserve explicit correction bindings`.
+These local commits have not been pushed; `main` is ahead of `origin/main`.
+Rebuild this exact clean revision and collect a new evidence root before
+treating the correction as target evidence.
 
 Chromie retains one Goal-driven semantic authority. The Host validates and
 coordinates but does not decide ordinary meaning, capability selection, or
@@ -83,6 +84,26 @@ collection passed with delivered speech, paired MuJoCo execution, terminal-
 Fast active cancellation, and safe idle; human review remains `pending`.
 Weather collection then exposed the adjacent correction-continuity defect
 below, so the root is an originating failure rather than closure evidence.
+
+Clean root `20260802T022441Z` on revision `b4157b3` passed both automatic
+Gateway/Core and Agent Skill/weather collection. It retained complete TTS,
+paired walk/nod/turn MuJoCo execution, active cancellation, safe idle, exact-
+result dialogue reuse, and fresh Neixiang correction/reference reads. Local LAN
+exposure also passed for `172.20.10.2`. Human reviews and second-machine LAN
+evidence remained open. A documentation-only correction then changed the
+revision, so preserve this root but **do not finalize or resume it**.
+
+The next final-source attempt is:
+
+```text
+.chromie/acceptance/target-evidence/20260802T024019Z
+```
+
+It is bound to clean Chromie revision `662a1c7`. Its complete Gateway/Core
+automatic collection passed, pending human review. Preserve it as the
+originating episode for the clarification-continuity defect below, but **do not
+finalize or resume it**: the weather correction was treated as provider
+ambiguity, and the final indirect turn consequently returned to Chongqing.
 
 ## Reproduced blockers and current correction
 
@@ -158,7 +179,7 @@ Association repair the complete indirect-reference provenance shape. The
 weather verifier now also requires each manifest-declared runtime turn to end
 with `status=applied`.
 
-Focused contract coverage passes 228/228. The relevant Level A general-ability
+Focused contract coverage passes 229/229. The relevant Level A general-ability
 classes `robust_intent_understanding` and
 `tool_and_conversation_lane_discipline` pass 17/17. This is deterministic
 automatic evidence, not a live provider, speaker, simulator, or target claim.
@@ -171,9 +192,44 @@ and final indirect turn each perform a fresh Neixiang lookup. All five turns
 have applied runtime events and complete speech delivery with zero failed or
 skipped chunks.
 
+Clean root `20260802T024019Z` exposed one remaining nondeterministic continuity
+gap. Goal Interpretation and its semantic repair both treated the user's exact
+replacement location `内乡` as a request requiring more administrative detail.
+Goal Association repeated that judgment, so it committed no corrected Goal or
+referent. The final `那边` turn then continued the still-active Chongqing Goal
+and executed the wrong provider query.
+
+Root-cause record:
+
+```text
+Observed failure: an exact user-supplied replacement binding was mistaken for provider-canonicalization ambiguity, so no corrected Goal was committed and the next indirect reference fell back to stale state.
+Expected contract: an exact replacement binding continues the existing external-read responsibility verbatim; the Capability resolves the value or reports provider ambiguity. Clarification is reserved for genuinely underdetermined user meaning.
+Earliest wrong components: model-owned Goal Interpretation semantic repair, followed by Goal Association clarification.
+Fix classes: semantic model contract plus bounded independent Goal Association review; no Host phrase rule, place-name extraction, provider alias, or deterministic route choice.
+Regression boundary: correction-route prompt, candidate-Goal clarification review, complete five-turn weather manifest, provider query, runtime status, and TTS delivery.
+Evidence level: clean originating failure plus dirty rebuilt-service diagnostic; clean post-fix target collection still required.
+General ability protected: stable cross-turn entity correction without offloading provider resolution to the user.
+```
+
+Goal Interpretation now distinguishes user-semantic ambiguity from downstream
+provider resolution: an exact replacement binding stays verbatim and continues
+the external read. Goal Association applies the same contract and independently
+reviews a proposed clarification when a candidate Goal exists and the admitted
+route was not clarification. The review remains model-owned and may preserve a
+genuinely necessary question.
+
+Dirty diagnostic `/tmp/chromie-weather-continuity-diagnostic-4` is explicitly
+non-qualifying because it runs a rebuilt dirty image with the earlier retained
+runtime identity. It passes the complete weather verifier with zero semantic or
+provider errors: the exact follow-up uses no Capability, the correction and
+final indirect turn execute fresh Neixiang reads, all five runtime events are
+`applied`, and every scheduled TTS chunk is played with zero failures or skips.
+Human review remains pending and is not inferred from the automatic result.
+
 ## Resume sequence
 
-1. Confirm the focused Goal Association, discourse, Agent Skill, weather, and
+1. Confirm the focused Goal Interpretation, Goal Association, discourse, Agent
+   Skill, weather, and
    relevant general-ability checks plus the required repository gates remain
    green after any further source change:
 

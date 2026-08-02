@@ -568,7 +568,11 @@ class GoalAssociationResolver:
             if review_candidate is None:
                 raise ValueError("goal-association review candidate is missing")
             model_output = output_type.model_validate(review_candidate)
-            review_triggers = self._semantic_review_triggers(model_output)
+            review_triggers = self._semantic_review_triggers(
+                model_output,
+                request=request,
+                candidate_goals=candidate_goals,
+            )
             if review_triggers:
                 semantic_review_attempted = True
                 logger.info(
@@ -827,6 +831,9 @@ class GoalAssociationResolver:
     @staticmethod
     def _semantic_review_triggers(
         model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+        *,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
     ) -> list[str]:
         """Return typed review triggers without making a semantic judgment."""
 
@@ -844,6 +851,13 @@ class GoalAssociationResolver:
             for association in model_output.associations
         ):
             triggers.append("existing_goal_semantic_update")
+        if (
+            isinstance(model_output, GoalAssociationModelOutput)
+            and model_output.decision == "clarify"
+            and candidate_goals
+            and not GoalAssociationResolver._clarification_only(request)
+        ):
+            triggers.append("candidate_goal_clarification_continuity")
         return triggers
 
     @staticmethod
@@ -1119,7 +1133,7 @@ class GoalAssociationResolver:
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
             "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
-            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
+            "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
@@ -1214,7 +1228,7 @@ class GoalAssociationResolver:
             + "\n\n"
             + skill_section
             + f"Latest user turn:\n{request.text}\n\n"
-            "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
+            "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"
@@ -1275,7 +1289,7 @@ class GoalAssociationResolver:
             "capability Goal. Never invent, copy, or repair an entity by character "
             "pattern; resolve it from the user meaning and supplied discourse. "
             "Persona and wording are expression concerns, not extra Goals.\n\n"
-            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the supplied referent's canonical value.\n\n"
+            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the supplied referent's canonical value.\n\n"
             "Existing Goal bindings are provenance-stable at this contract. An "
             "association may update only its description and lifecycle relation; "
             "it cannot rewrite typed material bindings. If the current user meaning "
