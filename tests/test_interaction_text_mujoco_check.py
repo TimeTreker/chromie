@@ -18,6 +18,7 @@ from scripts.interaction_text_mujoco_check import (
     collect_run_provenance,
     parse_expected_arg,
     record_execution_bindings,
+    required_speech_delivery_errors,
     safe_idle_errors,
     should_apply_cognitive_runtime,
     should_require_tts_speech,
@@ -576,6 +577,58 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         self.assertTrue(should_require_tts_speech(route, require_speech=True))
         self.assertFalse(should_require_tts_speech(route, require_speech=False))
+
+    def test_required_speech_delivery_rejects_skipped_undelivered_speech(self) -> None:
+        errors = required_speech_delivery_errors(
+            {
+                "scheduled_tts": 3,
+                "played_tts": 0,
+                "failed_tts": 0,
+                "skipped_tts": 3,
+                "workflow_events": [],
+            }
+        )
+
+        self.assertTrue(any("skipped" in item for item in errors))
+        self.assertTrue(any("incomplete" in item for item in errors))
+
+    def test_required_speech_delivery_rejects_failed_speak_execution(self) -> None:
+        errors = required_speech_delivery_errors(
+            {
+                "scheduled_tts": 1,
+                "played_tts": 1,
+                "failed_tts": 0,
+                "skipped_tts": 0,
+                "workflow_events": [
+                    {
+                        "event": "skill_result",
+                        "severity": "error",
+                        "message": (
+                            "skill_result: request_id=speech-1 "
+                            "skill_id=chromie.speak status=failed "
+                            "reason=playback_not_started"
+                        ),
+                    }
+                ],
+            }
+        )
+
+        self.assertTrue(any("chromie.speak" in item for item in errors))
+
+    def test_interrupted_execution_allows_stale_speech_suppression(self) -> None:
+        errors = required_speech_delivery_errors(
+            {
+                "scheduled_tts": 2,
+                "played_tts": 1,
+                "failed_tts": 0,
+                "skipped_tts": 1,
+                "interrupted": True,
+                "workflow_events": [],
+            },
+            allow_interrupted=True,
+        )
+
+        self.assertEqual(errors, [])
 
     def test_apply_soridormi_timeout_sets_request_timeouts(self) -> None:
         response = InteractionResponse.model_validate(

@@ -195,6 +195,72 @@ def should_require_tts_speech(route: Any, *, require_speech: bool) -> bool:
     return True
 
 
+def _workflow_field(message: str, key: str) -> str:
+    match = re.search(rf"(?:^|\s){re.escape(key)}=([^\s]+)", message)
+    if not match:
+        return ""
+    return match.group(1).strip().strip("'\"")
+
+
+def required_speech_delivery_errors(
+    session_state: Any,
+    *,
+    allow_interrupted: bool = False,
+) -> list[str]:
+    """Validate completed, correlated delivery for one required-speech turn."""
+
+    if not isinstance(session_state, dict):
+        return ["required speech delivery has no retained session state"]
+
+    def count(name: str) -> int:
+        try:
+            return int(session_state.get(name, 0))
+        except (TypeError, ValueError):
+            return 0
+
+    scheduled = count("scheduled_tts")
+    played = count("played_tts")
+    failed = count("failed_tts")
+    skipped = count("skipped_tts")
+    interrupted = session_state.get("interrupted") is True
+    errors: list[str] = []
+    if scheduled < 1:
+        errors.append("required speech delivery scheduled no TTS items")
+    if failed > 0:
+        errors.append(f"required speech delivery failed {failed} TTS item(s)")
+    if skipped > 0 and not (allow_interrupted and interrupted):
+        errors.append(f"required speech delivery skipped {skipped} TTS item(s)")
+    if scheduled < 1 or (
+        played != scheduled and not (allow_interrupted and interrupted)
+    ):
+        errors.append(
+            "required speech delivery incomplete: "
+            f"scheduled={scheduled} played={played}"
+        )
+
+    workflow_events = session_state.get("workflow_events") or []
+    if isinstance(workflow_events, list):
+        for item in workflow_events:
+            if not isinstance(item, dict) or item.get("event") != "skill_result":
+                continue
+            message = str(item.get("message") or "")
+            capability_id = (
+                _workflow_field(message, "capability_id")
+                or _workflow_field(message, "skill_id")
+            )
+            status = _workflow_field(message, "status").casefold()
+            if capability_id == "chromie.speak" and status not in {
+                "completed",
+                "ok",
+                "success",
+            }:
+                errors.append(
+                    "required chromie.speak execution failed with status "
+                    f"{status or 'unknown'!r}"
+                )
+    return errors
+
+
 def should_apply_cognitive_runtime(
     route: Any,
     *,
@@ -1068,10 +1134,13 @@ async def run_check(
                 route,
                 require_speech=args.require_speech,
             )
-            if require_tts and int(session_state.get("scheduled_tts", 0)) < 1:
-                errors.append("no TTS speech was scheduled")
-            if require_tts and int(session_state.get("failed_tts", 0)) > 0:
-                errors.append(f"TTS failed {session_state.get('failed_tts')} time(s)")
+            if require_tts:
+                errors.extend(
+                    required_speech_delivery_errors(
+                        session_state,
+                        allow_interrupted=bool(args.interrupt_text),
+                    )
+                )
 
         debug_summary = build_debug_summary(
             route=route,

@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import subprocess
 import sys
+import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -23,6 +26,8 @@ import aiohttp
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from orchestrator.clients.tts_client import TTSClient  # noqa: E402
 
 DEFAULT_CAPABILITY_MANIFEST = ROOT / "capabilities" / "soridormi.json"
 DEFAULT_OUTPUT = (
@@ -139,6 +144,7 @@ def _evaluate_preflight(
     manifest_revision: str | None,
     agent_health: dict[str, Any],
     provider_status: dict[str, Any],
+    tts_readiness: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[str]]:
     checks: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -180,6 +186,14 @@ def _evaluate_preflight(
         "agent_loaded_soridormi",
         "soridormi" in capability_sources,
         "Chromie Agent did not load the Soridormi capability manifest",
+    )
+
+    check(
+        "tts_synthesis_ready",
+        tts_readiness.get("ready") is True
+        and int(tts_readiness.get("pcm_bytes") or 0) > 0,
+        "TTS synthesis readiness failed: "
+        + str(tts_readiness.get("error") or "no completed PCM synthesis"),
     )
 
     check(
@@ -247,6 +261,46 @@ async def _agent_health(agent_url: str, timeout_s: float) -> dict[str, Any]:
             return value
 
 
+async def _synthesize_tts_readiness(
+    *,
+    tts_url: str,
+    speaker_id: str,
+    timeout_s: float,
+    text: str = "Hello.",
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    try:
+        pcm, sample_rate = await asyncio.wait_for(
+            TTSClient(tts_url).synthesize(
+                text=text,
+                speaker_id=speaker_id,
+                request_id=f"gateway-core-preflight-{uuid.uuid4().hex}",
+            ),
+            timeout=max(1.0, timeout_s),
+        )
+    except Exception as exc:
+        raise PreflightError(
+            f"TTS synthesis probe failed within {timeout_s:.1f}s: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    if not pcm:
+        raise PreflightError("TTS synthesis probe completed without PCM audio")
+    if int(sample_rate) <= 0:
+        raise PreflightError(
+            f"TTS synthesis probe returned invalid sample rate {sample_rate!r}"
+        )
+    return {
+        "ready": True,
+        "url": tts_url,
+        "speaker_id": speaker_id,
+        "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "pcm_bytes": len(pcm),
+        "sample_rate": int(sample_rate),
+        "timeout_s": float(timeout_s),
+        "duration_ms": round((time.perf_counter() - started) * 1000.0, 1),
+    }
+
+
 async def _provider_status(
     *,
     manifest: Path,
@@ -274,6 +328,21 @@ async def run_preflight(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     soridormi = _git_identity(args.soridormi_repo.expanduser().resolve())
     manifest_revision = _manifest_upstream_revision(capability_manifest)
     agent_health = await _agent_health(args.agent_url, args.timeout_s)
+    try:
+        tts_readiness = await _synthesize_tts_readiness(
+            tts_url=args.tts_url,
+            speaker_id=args.tts_speaker_id,
+            timeout_s=args.tts_readiness_timeout_s,
+            text=args.tts_probe_text,
+        )
+    except Exception as exc:
+        tts_readiness = {
+            "ready": False,
+            "url": args.tts_url,
+            "speaker_id": args.tts_speaker_id,
+            "timeout_s": args.tts_readiness_timeout_s,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
     provider_status = await _provider_status(
         manifest=capability_manifest,
         mcp_url=args.soridormi_mcp_url,
@@ -284,6 +353,7 @@ async def run_preflight(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         manifest_revision=manifest_revision,
         agent_health=agent_health,
         provider_status=provider_status,
+        tts_readiness=tts_readiness,
     )
     payload = {
         "schema_version": 1,
@@ -301,6 +371,7 @@ async def run_preflight(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             "url": args.agent_url,
             "health": agent_health,
         },
+        "tts": tts_readiness,
         "provider": {
             "url": args.soridormi_mcp_url,
             "status": provider_status,
@@ -333,6 +404,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
     )
     parser.add_argument("--timeout-s", type=float, default=5.0)
+    parser.add_argument(
+        "--tts-url",
+        default=os.getenv("TTS_URL", "ws://127.0.0.1:5000"),
+    )
+    parser.add_argument(
+        "--tts-speaker-id",
+        default=os.getenv("TTS_SPEAKER_ID", "default"),
+    )
+    parser.add_argument(
+        "--tts-readiness-timeout-s",
+        type=float,
+        default=float(os.getenv("TTS_COSYVOICE_WARMUP_TIMEOUT_SEC", "300")),
+    )
+    parser.add_argument(
+        "--tts-probe-text",
+        default=os.getenv("TTS_COSYVOICE_EN_WARMUP_TEXT", "Hello."),
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser
 

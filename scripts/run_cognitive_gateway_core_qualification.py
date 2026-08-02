@@ -427,7 +427,12 @@ def _collect_stages(
     ]
 
     return [
-        StageSpec("preflight", tuple(preflight_command), (paths.preflight,)),
+        StageSpec(
+            "preflight",
+            tuple(preflight_command),
+            (paths.preflight,),
+            (args.orchestrator_env,),
+        ),
         StageSpec(
             "runtime-identity",
             tuple(identity_command),

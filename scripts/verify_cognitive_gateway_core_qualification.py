@@ -29,6 +29,9 @@ from scripts.cognitive_runtime_acceptance import (  # noqa: E402
     _run_provenance,
     _simulator_report,
 )
+from scripts.interaction_text_mujoco_check import (  # noqa: E402
+    required_speech_delivery_errors,
+)
 
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
@@ -247,6 +250,7 @@ def _validate_runtime_identity(
 def _validate_turn(
     *,
     turn: dict[str, Any],
+    retained_turn: dict[str, Any],
     sid: str,
     events: list[dict[str, Any]],
     identity_sha256: str,
@@ -378,6 +382,11 @@ def _validate_turn(
                 completed = True
         if not completed:
             errors.append("turn has no completed execution outcome bundle")
+
+    if expectations.get("require_delivered_speech") is True:
+        errors.extend(
+            required_speech_delivery_errors(retained_turn.get("session_state"))
+        )
 
     continuity_key = str(expectations.get("require_goal_continuity_from") or "")
     if continuity_key:
@@ -734,6 +743,7 @@ def verify(
                 )
             report, turn_errors = _validate_turn(
                 turn=turn,
+                retained_turn=retained_turn,
                 sid=sid,
                 events=events,
                 identity_sha256=identity["identity_sha256"],

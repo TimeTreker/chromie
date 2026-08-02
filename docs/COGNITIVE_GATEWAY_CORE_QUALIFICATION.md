@@ -68,6 +68,13 @@ The retained set covers:
 - an elliptical follow-up that reuses recent trusted tool evidence, targets the
   prior semantic Goal, and does not repeat the lookup.
 
+Every manifest-declared user-facing speech turn must retain correlated delivery:
+at least one scheduled TTS item, zero failed or skipped items, every scheduled
+item played through the configured output mode, and no failed `chromie.speak`
+result. Scheduling alone is not delivery. The live collector and final verifier
+both enforce this contract after cognition; the expectation is never passed to
+the model.
+
 The paired MuJoCo runner retains its exact `AttentionReviewRequest` and
 `AttentionReviewResult` before Core admission. A suppression candidate must be
 independently reconsidered inside the existing model-owned Attention Review;
@@ -158,6 +165,9 @@ read-only deployment preflight. It requires:
 - the Chromie capability manifest upstream revision to match the paired
   Soridormi checkout;
 - a healthy Chromie Agent that loaded the Soridormi capability source;
+- a complete no-playback synthesis from the generated environment's selected
+  TTS endpoint and speaker, with non-empty PCM inside the existing
+  `TTS_COSYVOICE_WARMUP_TIMEOUT_SEC` readiness budget;
 - the running Soridormi endpoint to report `sim`, no active task, no emergency
   stop, no fallen state, and `safe_idle=true`;
 - `robot.get_status` to report its own source/provider revision;

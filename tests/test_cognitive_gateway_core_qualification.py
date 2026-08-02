@@ -253,6 +253,22 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                 "turn_key": turn_key,
                 "sid": sid,
                 "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "session_state": {
+                    "scheduled_tts": 1,
+                    "played_tts": 1,
+                    "failed_tts": 0,
+                    "skipped_tts": 0,
+                    "workflow_events": [
+                        {
+                            "event": "skill_result",
+                            "severity": "info",
+                            "message": (
+                                "skill_result: request_id=speech-fixture "
+                                "skill_id=chromie.speak status=completed"
+                            ),
+                        }
+                    ],
+                },
             }
 
         summary = {
@@ -364,6 +380,47 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             )
         self.assertFalse(report["passed"])
         self.assertIn("forbidden repeated terminal capability", "\n".join(report["errors"]))
+
+    def test_required_speech_turn_rejects_scheduled_but_skipped_delivery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity_path, events_path, summary_path = self.build_fixture(root)
+            manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+            direct = next(
+                item
+                for item in manifest["scenarios"]
+                if item["scenario_id"] == "direct_question_admission"
+            )
+            direct["turns"][0]["expect"]["require_delivered_speech"] = True
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            retained_direct = next(
+                item
+                for item in summary["scenarios"]
+                if item["scenario_id"] == "direct_question_admission"
+            )["turns"][0]
+            retained_direct["session_state"] = {
+                "scheduled_tts": 3,
+                "played_tts": 0,
+                "failed_tts": 0,
+                "skipped_tts": 3,
+                "workflow_events": [],
+            }
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+
+            report = verify(
+                manifest_path=manifest_path,
+                live_summary_path=summary_path,
+                runtime_identity_path=identity_path,
+                cognitive_events_path=events_path,
+                expected_chromie_revision="chromie-current",
+                expected_soridormi_revision="soridormi-current",
+            )
+
+        self.assertFalse(report["live_text"]["passed"])
+        self.assertIn("required speech delivery", "\n".join(report["errors"]))
 
     def test_runtime_agent_fingerprint_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

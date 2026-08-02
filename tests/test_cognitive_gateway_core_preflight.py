@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from scripts.preflight_cognitive_gateway_core_qualification import (
+    PreflightError,
     _endpoint_source_revision,
     _evaluate_preflight,
+    _synthesize_tts_readiness,
 )
 
 
@@ -24,6 +28,11 @@ class CognitiveGatewayCorePreflightTests(unittest.TestCase):
                 "emergency_stop": False,
                 "fallen": False,
                 "source_revision": revision,
+            },
+            "tts_readiness": {
+                "ready": True,
+                "pcm_bytes": 128,
+                "sample_rate": 24000,
             },
         }
 
@@ -57,6 +66,32 @@ class CognitiveGatewayCorePreflightTests(unittest.TestCase):
             _endpoint_source_revision({"provider": {"git_revision": revision}}),
             revision,
         )
+
+    def test_tts_without_pcm_fails_readiness(self) -> None:
+        with patch(
+            "scripts.preflight_cognitive_gateway_core_qualification.TTSClient"
+        ) as client_type:
+            client_type.return_value.synthesize = AsyncMock(
+                return_value=(b"", 24000)
+            )
+            with self.assertRaisesRegex(PreflightError, "without PCM"):
+                asyncio.run(
+                    _synthesize_tts_readiness(
+                        tts_url="ws://tts",
+                        speaker_id="default",
+                        timeout_s=1.0,
+                    )
+                )
+
+    def test_failed_tts_readiness_fails_preflight(self) -> None:
+        values = self._valid_inputs()
+        values["tts_readiness"] = {
+            "ready": False,
+            "error": "synthesis timed out",
+        }
+        _, errors = _evaluate_preflight(**values)
+
+        self.assertTrue(any("TTS synthesis" in item for item in errors))
 
 
 if __name__ == "__main__":

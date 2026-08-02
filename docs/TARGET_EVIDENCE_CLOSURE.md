@@ -106,6 +106,12 @@ python scripts/run_target_evidence_closure.py collect-core \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
+Before retained cognition or motion, the Core collector binds the generated
+Orchestrator environment and requires a complete no-playback synthesis from its
+selected TTS. Manifest-declared speech turns then require correlated completed
+delivery; scheduled, skipped, failed, or undelivered speech cannot satisfy the
+track.
+
 Review the exact artifacts and edit:
 
 ```text

@@ -65,6 +65,7 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
         self.assertIn("soridormi.walk_velocity", cancellation)
         self.assertNotIn("approve", " ".join(by_name["human-review-template"].command))
         for name in (
+            "preflight",
             "runtime-identity",
             "live-text",
             "mujoco",
@@ -99,6 +100,7 @@ class CognitiveGatewayCoreWorkflowTests(unittest.TestCase):
         self.assertIn(str(paths.preflight), command)
         self.assertIn("http://agent:8092", command)
         self.assertIn("http://soridormi:8000/mcp", command)
+        self.assertEqual(stages[0].env_files, (root / "orchestrator.env",))
 
     def test_resume_requires_matching_artifact_digest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

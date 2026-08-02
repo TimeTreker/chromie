@@ -27,6 +27,9 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
 )
+from scripts.interaction_text_mujoco_check import (  # noqa: E402
+    required_speech_delivery_errors,
+)
 
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
@@ -138,6 +141,18 @@ async def _run_scenario(
                 scenario_errors.append(f"{turn_key}: {error}")
             context = assistant.build_context(sid)
             history = context.get("history")
+            session_state = assistant.sessions.state.get(sid)
+            expectations = item.get("expect")
+            if (
+                isinstance(expectations, dict)
+                and expectations.get("require_delivered_speech") is True
+            ):
+                scenario_errors.extend(
+                    f"{turn_key}: {delivery_error}"
+                    for delivery_error in required_speech_delivery_errors(
+                        session_state
+                    )
+                )
             turn_results.append(
                 {
                     "turn_key": turn_key,
@@ -147,7 +162,7 @@ async def _run_scenario(
                     "text_sha256": _text_sha256(text),
                     "duration_ms": round((time.perf_counter() - started) * 1000.0, 1),
                     "error": error or None,
-                    "session_state": assistant.sessions.state.get(sid),
+                    "session_state": session_state,
                     "history_tail": (
                         list(history[-6:]) if isinstance(history, list) else []
                     ),
