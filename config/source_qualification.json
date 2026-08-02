@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "gates": [
+    {
+      "id": "repository_policies",
+      "argv": ["{python}", "scripts/check_repository_policies.py"]
+    },
+    {
+      "id": "test_ownership",
+      "argv": ["{python}", "scripts/check_test_ownership.py"]
+    },
+    {
+      "id": "runtime_exception_boundaries",
+      "argv": ["{python}", "scripts/check_runtime_exception_boundaries.py"]
+    },
+    {
+      "id": "runtime_configuration_inventory",
+      "argv": ["{python}", "scripts/runtime_configuration_inventory.py", "--check"]
+    },
+    {
+      "id": "host_configuration_ownership",
+      "argv": ["{python}", "scripts/check_host_configuration_ownership.py"]
+    },
+    {
+      "id": "service_configuration_ownership",
+      "argv": ["{python}", "scripts/check_service_configuration_ownership.py"]
+    },
+    {
+      "id": "runtime_structure",
+      "argv": ["{python}", "scripts/check_runtime_structure.py"]
+    },
+    {
+      "id": "documentation",
+      "argv": ["{python}", "scripts/check_docs.py"]
+    },
+    {
+      "id": "ruff",
+      "argv": ["{python}", "scripts/run_ruff.py"],
+      "dependency": "ruff==0.16.0"
+    },
+    {
+      "id": "mypy",
+      "argv": ["{python}", "scripts/run_mypy.py"],
+      "dependency": "mypy==2.3.0"
+    },
+    {
+      "id": "maintained_tests",
+      "argv": ["./scripts/run_tests.sh"],
+      "full_suite": true
+    }
+  ],
+  "excluded_target_claims": [
+    "microphone input",
+    "audible speaker output",
+    "audio-device hot-plug",
+    "shared-GPU target latency",
+    "MuJoCo or physical robot execution",
+    "second-machine LAN reachability",
+    "release qualification"
+  ]
+}

@@ -2,14 +2,7 @@
 
 - Reproduced clean source-bound active cancellation failing before Provider start on revision `1849bb5` after Fast Planner selected the exact velocity capability, `0.2` speed, `20`-second duration, and Goal ownership. Removed redundant free-text `source_ref`; the model still authors capability, arguments, mapping, and `source_goal_ids`, while deterministic validation requires explicit numeric Goal values to match the claimed step and source Goal without adding a Host semantic rule.
 - Reproduced clean source-bound compound execution preserving a specific Response Composer sentence until the Host replaced unfamiliar actions with “perform the requested action.” Removed the Host phrase renderer and preserved fingerprint-bound model wording; confirmation, goal coverage, commitment state, playback barriers, schemas, and effect authorization remain typed and fail closed.
-- Reproduced the clean source-bound active-cancellation case failing before
-  Provider start after a valid Fast Planner meaning was rejected at ambiguous
-  provenance/repair representation boundaries and a later Deep attempt
-  exhausted its output budget. The initial correction accepted a bare or
-  Goal-qualified verbatim span, rendered step and parameter feedback
-  separately, and stopped treating one step as a concurrency request. The
-  later clean replay above proved that free-text copying remained an
-  unnecessary failure surface, so stable Goal IDs now carry that provenance.
+- Reproduced the clean source-bound active-cancellation case failing before Provider start after a valid Fast Planner meaning was rejected at ambiguous provenance/repair representation boundaries and a later Deep attempt exhausted its output budget. The initial correction accepted a bare or Goal-qualified verbatim span, rendered step and parameter feedback separately, and stopped treating one step as a concurrency request. The later clean replay above proved that free-text copying remained an unnecessary failure surface, so stable Goal IDs now carry that provenance.
 - Reproduced the source-bound compound MuJoCo request being discarded before
   Core entry because Attention Review mislabeled a direct imperative as
   dictation. Suppression candidates now receive one independent schema-bound
@@ -43,6 +36,7 @@ This file records notable current changes. Detailed earlier development history 
 - Made `shared/chromie_contracts` package-scoped in Mypy so new modules enter automatically.
 - Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
 - Closed specialized-document ownership: the index no longer counts as an owner, component entrypoints form a checked reachability graph, and package documents require declared mechanical contracts.
+- Added revision-bound source qualification reports that fail closed on dirty source, failed gates, or unavailable pinned static tools and explicitly exclude all target/hardware claims.
 - Replaced 37 lifecycle property methods with delegated state aliases, reducing `VoiceAssistant` from 221 to 187 methods and 19 to one property.
 - Confined the direct-LLM call to one rollback owner; maintained apply lanes use bounded fail-closed speech after Agent failure.
 

@@ -76,3 +76,12 @@ stable, expand Mypy through complete ownership scopes: first
 `shared/chromie_contracts/`, then coherent slices of `orchestrator/runtime/`. Do
 not add isolated showcase files merely to increase a count, and do not use broad
 `Any`, import skipping, global ignores, or scope removal to manufacture a pass.
+
+## Source qualification reporting
+
+`python scripts/run_source_qualification.py` executes the checked source gate
+contract in `config/source_qualification.json` and writes a revision-bound JSON
+report. Missing pinned Ruff or Mypy executables are reported as `unavailable`
+and block qualification; they are never silently skipped. The report is source
+evidence only and always excludes target, audio, simulator, robot, LAN, and
+release claims. Use `--skip-full-suite` only for a diagnostic partial report.

@@ -29,7 +29,7 @@ feasibility, collision safety, stop, and recovery.
 - Canonical Capability terminology and passive Agent Skills.
 - Grounded external-information and weather Skill packages.
 - Loopback-only local service publication and repository policy gates.
-- Ruff, Mypy, and test-ownership ratchets.
+- Ruff, Mypy, test-ownership ratchets, and revision-bound source qualification reporting.
 - Typed ASR service settings and the first `VoiceAssistant` collaborator extraction.
 - Consolidated documentation authority with mechanically checked specialized-document ownership.
 - Final core-principle audit closure: Host semantic delegation, phrase agents,

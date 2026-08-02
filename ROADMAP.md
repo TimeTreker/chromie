@@ -75,9 +75,11 @@ with a generated configuration inventory, package-scoped shared-contract Mypy
 selection, observability-document consolidation, dated-archive removal,
 composition-root structure ratchets, and an explicit direct-LLM rollback gate.
 The maintained configuration aliases are removed, playback/input transport is
-extracted, and specialized-document ownership is mechanically closed. Canonical
-static-tool execution and source-bound requalification remain open; target and
-hardware evidence stay under their dedicated closure workflow.
+extracted, and specialized-document ownership is mechanically closed. A
+revision-bound source qualification report now fails closed on dirty source,
+failed gates, or unavailable pinned static tools. Clean dependency-complete
+execution and target/hardware requalification remain under their dedicated
+closure workflows.
 
 Arbitrary file, method, boolean, or document counts are not substitute exit
 criteria. Every Issue refreshes its baseline, preserves public behavior and

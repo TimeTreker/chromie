@@ -193,7 +193,7 @@ Issue must refresh its own baseline because counts may change.
 | Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 450 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
 | Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
 | Reduce the Current Documentation Surface | source implementation complete | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, three in-tree archives were removed, and every specialized document must now be reachable from a current owner entrypoint or a declared mechanical contract. |
-| Requalify the Simplified Runtime | queued | simplification Issues complete | Rerun the same source-bound profile and compare behavior, safety, latency, and evidence completeness. |
+| Requalify the Simplified Runtime | source qualification workflow implemented; clean dependency-complete execution and target requalification deferred | simplification Issues source-complete | Bind deterministic source gates to one revision and retain an explicit report without claiming target, audio, simulator, LAN, robot, or release evidence. |
 
 ### Completed first-intake Issues
 
@@ -929,12 +929,22 @@ candidates.
 
 ## Issue: Requalify the Simplified Runtime
 
-Status: queued; depends on all accepted simplification Issues
+Status: source qualification workflow implemented; clean dependency-complete
+execution and target requalification deferred
 
-Run the same default source-bound closure after the accepted structural
-changes. The program closes only when behavior, cancellation, safety ownership,
-latency, and evidence completeness are no worse than the retained baseline and
-every claim is bound to the final clean revisions.
+`config/source_qualification.json` now owns the deterministic source gate set,
+and `scripts/run_source_qualification.py` binds every result to the current Git
+revision, clean/dirty state, elapsed time, exit status, and bounded output. A
+missing pinned Ruff or Mypy dependency is recorded as `unavailable` and blocks
+qualification rather than being treated as a pass. The report always records
+`target_validated=false` and `release_qualified=false` and enumerates the
+excluded microphone, speaker, hot-plug, shared-GPU, simulator/robot, and LAN
+claims.
+
+The remaining closure is intentionally target-dependent: run the dependency-
+complete source report from a clean revision, then rerun the same default
+source-bound evidence profile and compare behavior, cancellation, safety
+ownership, latency, and evidence completeness against the retained baseline.
 
 ## Issue: Secure Local Runtime Exposure
 
