@@ -15,13 +15,12 @@ The active Issue is **Close Current-Revision Target Evidence**. Do not begin the
 queued response-latency architecture until this evidence Issue closes, except
 to repair a reproduced qualification blocker.
 
-The latest clean committed implementation baseline is local commit `bba21a2`
-(`fix: preserve explicit location bindings`), after `1e892e5` (`fix: require
-delivered speech in target evidence`). Neither commit has been pushed; `main`
-is ahead of `origin/main`. The worktree contains the follow-on weather-
-correction continuity repair described below. It must pass the canonical gate,
-be committed, and be recollected in a new evidence root before it can become
-target evidence.
+The current clean committed implementation baseline includes three local
+corrections: delivered-speech evidence, explicit location-binding provenance,
+and weather-correction continuity. The latest commit subject is
+`fix: preserve weather correction continuity`. These commits have not been
+pushed; `main` is ahead of `origin/main`. Rebuild this exact clean revision and
+collect a new evidence root before treating the correction as target evidence.
 
 Chromie retains one Goal-driven semantic authority. The Host validates and
 coordinates but does not decide ordinary meaning, capability selection, or
@@ -151,7 +150,7 @@ Evidence level: clean originating failure plus dirty rebuilt-service diagnostic;
 General ability protected: stable cross-turn entity correction and truthful external-result grounding.
 ```
 
-The current worktree sends material external-read corrections through the
+The current implementation sends material external-read corrections through the
 existing model-owned semantic route review, reviews both `execute` and `mixed`
 safe reads, requires capability-dependent direct responses to cite delivered
 evidence-bound dialogue for the same Goal, and gives the existing bounded Goal
@@ -174,8 +173,9 @@ skipped chunks.
 
 ## Resume sequence
 
-1. Run the focused Goal Association, discourse, Agent Skill, and weather
-   qualification tests, then the required repository gates:
+1. Confirm the focused Goal Association, discourse, Agent Skill, weather, and
+   relevant general-ability checks plus the required repository gates remain
+   green after any further source change:
 
    ```bash
    python scripts/check_repository_policies.py
@@ -186,8 +186,7 @@ skipped chunks.
    ./scripts/run_tests.sh
    ```
 
-2. Commit the current continuity correction and rebuild all qualification
-   services from that exact clean revision.
+2. Rebuild all qualification services from the exact clean committed revision.
 3. Initialize a **new** `source_bound_development` evidence root. Never carry
    artifacts, reports, or human decisions forward from any retained root.
 4. Recollect and review Gateway/Core and Agent Skill/weather, collect and review
