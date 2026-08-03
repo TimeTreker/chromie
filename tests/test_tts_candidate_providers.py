@@ -427,6 +427,13 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("onnxruntime-gpu==1.18.1", cosy_dockerfile)
         self.assertNotIn("onnxruntime-gpu==1.18.0", cosy_dockerfile)
 
+        qwen_dockerfile = (ROOT / "tts_candidates" / "qwen3" / "Dockerfile").read_text(
+            encoding="utf-8"
+        )
+        legacy_dockerfile = (ROOT / "tts" / "Dockerfile").read_text(encoding="utf-8")
+        for dockerfile in (cosy_dockerfile, qwen_dockerfile, legacy_dockerfile):
+            self.assertIn("settings.py", dockerfile)
+
 
     def test_cosyvoice_catalog_exposes_and_routes_builtin_speakers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

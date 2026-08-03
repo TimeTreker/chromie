@@ -53,7 +53,7 @@ RUN pip install --no-deps /opt/Qwen3-TTS && \
       websockets==16.0
 
 WORKDIR /app
-COPY tts/provider.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py ./
+COPY tts/provider.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py tts/settings.py ./
 COPY tts_candidates/qwen3/provider_impl.py ./
 
 EXPOSE 5000
