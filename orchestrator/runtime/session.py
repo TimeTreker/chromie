@@ -128,6 +128,7 @@ class SessionTracker:
         "tts_playback_start_waiter_resolved",
         "playback_start",
         "playback_end",
+        "playback_stream_incomplete",
         "session_done",
     )
 

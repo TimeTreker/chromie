@@ -2308,6 +2308,131 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             events.index(("playback_end", 0)),
         )
 
+    async def test_provider_pcm_starts_playback_before_stream_end(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.playback_generation = 0
+        assistant.playback_start_waiters = {}
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_queue = asyncio.Queue()
+        assistant.playback_task = None
+        assistant.pending_audio = {}
+        assistant.next_playback_order = 0
+        assistant.synthesis_semaphore = asyncio.Semaphore(1)
+        assistant.tts_url = "ws://tts"
+        assistant.speaker_id = "default"
+        assistant.tts_ws_retries = 1
+        assistant.tts_ws_retry_delay_ms = 0
+        assistant.default_tts_rate = 24000
+        assistant.output_rate = 24000
+        assistant.is_playing_audio = False
+        assistant.save_audio_enabled = False
+
+        playback_started = asyncio.Event()
+        provider_allowed_to_end = asyncio.Event()
+        played_chunks: list[bytes] = []
+
+        def session_log(
+            self: VoiceAssistant,
+            sid: str | None,
+            message: str,
+            *args: Any,
+        ) -> None:
+            self.sessions.log(sid, message, *args)
+
+        def maybe_session_done(self: VoiceAssistant, sid: str | None) -> None:
+            self.sessions.maybe_done(sid)
+
+        def save_audio(
+            self: VoiceAssistant,
+            data: bytes,
+            prefix: str,
+            session_id: str | None = None,
+        ) -> None:
+            del self, data, prefix, session_id
+
+        async def play_audio(
+            self: VoiceAssistant,
+            audio_bytes: bytes,
+            source_rate: int | None,
+            generation: int,
+            sid: str | None,
+        ) -> None:
+            del self, source_rate, generation, sid
+            played_chunks.append(audio_bytes)
+            playback_started.set()
+            provider_allowed_to_end.set()
+
+        class _StreamingTtsWebSocket:
+            def __init__(self) -> None:
+                self._index = 0
+
+            async def send(self, payload: str) -> None:
+                del payload
+
+            def __aiter__(self) -> "_StreamingTtsWebSocket":
+                return self
+
+            async def __anext__(self) -> str | bytes:
+                self._index += 1
+                if self._index == 1:
+                    return json.dumps({"type": "start", "sample_rate": 24000})
+                if self._index == 2:
+                    return b"\x01\x00" * 240
+                if self._index == 3:
+                    await asyncio.wait_for(provider_allowed_to_end.wait(), timeout=1.0)
+                    return b"\x02\x00" * 240
+                if self._index == 4:
+                    return json.dumps({"type": "end"})
+                raise StopAsyncIteration
+
+        class _FakeConnect:
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                del args, kwargs
+                self.ws = _StreamingTtsWebSocket()
+
+            async def __aenter__(self) -> _StreamingTtsWebSocket:
+                return self.ws
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc: BaseException | None,
+                tb: object | None,
+            ) -> None:
+                del exc_type, exc, tb
+
+        original_connect = getattr(orchestrator_module.websockets, "connect", None)
+        orchestrator_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
+        assistant.save_audio = MethodType(save_audio, assistant)
+        assistant.play_audio = MethodType(play_audio, assistant)
+
+        assistant.ensure_playback_worker()
+        synthesis = asyncio.create_task(
+            assistant.synthesize_one("Stream this sentence.", 0, session_id, 0)
+        )
+        try:
+            await asyncio.wait_for(playback_started.wait(), timeout=1.0)
+            self.assertFalse(synthesis.done())
+            await asyncio.wait_for(synthesis, timeout=1.0)
+            await assistant.playback_queue.put((None, None, None, None, None, None))
+            if assistant.playback_task is not None:
+                await asyncio.wait_for(assistant.playback_task, timeout=1.0)
+        finally:
+            if original_connect is None:
+                delattr(orchestrator_module.websockets, "connect")
+            else:
+                orchestrator_module.websockets.connect = original_connect
+
+        self.assertEqual(len(played_chunks), 2)
+        self.assertEqual(
+            assistant.sessions.state[session_id]["played_tts"],
+            1,
+        )
+
     async def test_tts_splitter_groups_tiny_fragments_without_swallowing_long_chunk(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.tts_text_chunking_enabled = True

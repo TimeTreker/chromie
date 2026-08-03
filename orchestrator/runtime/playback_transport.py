@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import numpy as np
@@ -18,6 +19,47 @@ import websockets
 from .session import now_ms
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProviderPcmStream:
+    """One authorized TTS order delivered as provider PCM becomes available."""
+
+    source_rate: int
+    chunks: asyncio.Queue[bytes | None] = field(
+        default_factory=lambda: asyncio.Queue(maxsize=8)
+    )
+    retained_audio: bytearray = field(default_factory=bytearray)
+    error_reason: str | None = None
+    cancelled: bool = False
+    finished: bool = False
+
+    async def feed(self, pcm: bytes) -> None:
+        if self.cancelled or self.finished or not pcm:
+            return
+        self.retained_audio.extend(pcm)
+        await self.chunks.put(bytes(pcm))
+
+    async def finish(self, reason: str | None = None) -> None:
+        if self.finished:
+            return
+        self.error_reason = reason
+        self.finished = True
+        await self.chunks.put(None)
+
+    def cancel(self, reason: str) -> None:
+        self.cancelled = True
+        self.error_reason = reason
+        if not self.finished:
+            self.finished = True
+            self.chunks.put_nowait(None)
+
+    async def read(self) -> bytes | None:
+        return await self.chunks.get()
+
+    @property
+    def audio_bytes(self) -> bytes:
+        return bytes(self.retained_audio)
 
 
 def _sounddevice() -> Any:
@@ -213,12 +255,14 @@ class PlaybackTransport:
                 else:
                     break
 
-    async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
+    async def play_one_order(self, generation: int, order: int, audio: bytes | ProviderPcmStream, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
         host = self.host
         key = host.playback_start_key(generation, order, session_id)
         cancelled_orders = getattr(host, "cancelled_playback_orders", set())
         if key in cancelled_orders:
             cancelled_orders.discard(key)
+            if isinstance(audio, ProviderPcmStream):
+                audio.cancel("cancelled_before_playback")
             host.session_log(
                 session_id,
                 "playback_skip_cancelled: order=%s generation=%s",
@@ -237,7 +281,31 @@ class PlaybackTransport:
             )
             return False
         state = host.sessions.state.get(session_id or "")
-        if not audio:
+        first_stream_chunk: bytes | None = None
+        if isinstance(audio, ProviderPcmStream):
+            source_rate = audio.source_rate
+            while first_stream_chunk is None:
+                if audio.finished and audio.chunks.empty():
+                    break
+                if host.is_stale_playback(generation, session_id):
+                    audio.cancel("stale_before_first_pcm")
+                    host.resolve_playback_start_waiter(
+                        generation,
+                        order,
+                        session_id,
+                        started=False,
+                        reason="stale_before_first_pcm",
+                    )
+                    return False
+                try:
+                    first_stream_chunk = await asyncio.wait_for(audio.read(), timeout=0.1)
+                except TimeoutError:
+                    continue
+            if first_stream_chunk is None:
+                skip_reason = audio.error_reason or skip_reason or "tts_empty_audio"
+        if (isinstance(audio, bytes) and not audio) or (
+            isinstance(audio, ProviderPcmStream) and first_stream_chunk is None
+        ):
             reason = skip_reason or "empty_audio"
             host.resolve_playback_start_waiter(
                 generation,
@@ -255,7 +323,9 @@ class PlaybackTransport:
             host.maybe_session_done(session_id)
             return True
 
-        audio_ms = (len(audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
+        initial_audio = first_stream_chunk if isinstance(audio, ProviderPcmStream) else audio
+        assert initial_audio is not None
+        audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
         host.sessions.trace_mark(
             session_id,
             "first_audio_playback" if not state or not state.get("trace_first_audio_marked") else "audio_playback_started",
@@ -284,7 +354,13 @@ class PlaybackTransport:
         try:
             host.is_playing_audio = True
             try:
-                await host.play_audio(audio, source_rate, generation, session_id)
+                if isinstance(audio, ProviderPcmStream):
+                    chunk = first_stream_chunk
+                    while chunk is not None:
+                        await host.play_audio(chunk, source_rate, generation, session_id)
+                        chunk = await audio.read()
+                else:
+                    await host.play_audio(audio, source_rate, generation, session_id)
             finally:
                 host.is_playing_audio = False
         except asyncio.CancelledError:
@@ -303,10 +379,22 @@ class PlaybackTransport:
         if host.is_stale_playback(generation, session_id):
             host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, playback_ms, generation)
             return False
+        retained_audio = audio.audio_bytes if isinstance(audio, ProviderPcmStream) else audio
+        if isinstance(audio, ProviderPcmStream) and audio.error_reason:
+            if state is not None:
+                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+            host.session_log(
+                session_id,
+                "playback_stream_incomplete: order=%s reason=%s bytes=%s generation=%s",
+                order,
+                audio.error_reason,
+                len(retained_audio),
+                generation,
+            )
         if state is not None:
             state["played_tts"] = int(state.get("played_tts", 0)) + 1
         host.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
-        host.save_audio(audio, "output", session_id=session_id)
+        host.save_audio(retained_audio, "output", session_id=session_id)
         host.maybe_session_done(session_id)
         return True
 
@@ -332,13 +420,23 @@ class PlaybackTransport:
                 try:
                     async with websockets.connect(host.tts_url, max_size=10**7, open_timeout=10, ping_interval=20, ping_timeout=20) as ws:
                         await ws.send(json.dumps({"type": "synthesize_stream", "text": text, "speaker_id": host.speaker_id, "request_id": request_id}, ensure_ascii=False))
-                        audio_buffer = bytearray()
+                        stream: ProviderPcmStream | None = None
+                        total_audio_bytes = 0
                         source_rate = host.default_tts_rate
                         async for msg in ws:
                             if host.is_stale_playback(generation, session_id):
+                                if stream is not None:
+                                    await stream.finish("stale_playback")
                                 return
                             if isinstance(msg, bytes):
-                                if msg and not audio_buffer:
+                                if msg and stream is None:
+                                    stream = ProviderPcmStream(source_rate=source_rate)
+                                    state = host.sessions.state.get(session_id or "")
+                                    if state is not None:
+                                        state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
+                                    await host.playback_queue.put(
+                                        (generation, order, stream, source_rate, session_id, None)
+                                    )
                                     first_pcm_latency_ms = now_ms() - tts_start_ms
                                     host.sessions.trace_mark(
                                         session_id,
@@ -362,7 +460,9 @@ class PlaybackTransport:
                                         source_rate,
                                         generation,
                                     )
-                                audio_buffer.extend(msg)
+                                total_audio_bytes += len(msg)
+                                if stream is not None:
+                                    await stream.feed(msg)
                                 continue
                             data = json.loads(msg)
                             msg_type = data.get("type")
@@ -377,7 +477,10 @@ class PlaybackTransport:
                                 continue
                             if msg_type == "error":
                                 host.session_log(session_id, "tts_error: order=%s attempt=%s/%s tts_ms=%.1f error=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, data.get("message"))
-                                await host.enqueue_playback_skip(generation, order, session_id, "tts_error")
+                                if stream is not None:
+                                    await stream.finish("tts_error")
+                                else:
+                                    await host.enqueue_playback_skip(generation, order, session_id, "tts_error")
                                 host.maybe_session_done(session_id)
                                 return
                             if msg_type == "end":
@@ -400,7 +503,7 @@ class PlaybackTransport:
                                     attributes={
                                         "order": order,
                                         "attempt": attempt,
-                                        "audio_bytes": len(audio_buffer),
+                                        "audio_bytes": total_audio_bytes,
                                         "source_rate": source_rate,
                                         "queue_wait_seconds": float(data.get("queue_wait_seconds") or 0.0),
                                         "generate_seconds": float(data.get("generate_seconds") or 0.0),
@@ -409,7 +512,7 @@ class PlaybackTransport:
                                         "provider_model_revisions": provider_revision_summary,
                                     },
                                 )
-                                host.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, len(audio_buffer), source_rate, generation)
+                                host.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, total_audio_bytes, source_rate, generation)
                                 host.session_log(
                                     session_id,
                                     "tts_server_metrics: order=%s provider=%s implementation=%s model_revisions=%s audio_s=%.3f generate_s=%.3f model_s=%.3f codec_s=%.3f pcm_s=%.3f queue_s=%.3f rtf=%s codec_device=%s quantization=%s context=%s prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
@@ -432,19 +535,22 @@ class PlaybackTransport:
                                     data.get("generation_headroom_tokens"),
                                     data.get("generation_limit_reached"),
                                 )
-                                state = host.sessions.state.get(session_id or "")
-                                if audio_buffer:
-                                    if state is not None:
-                                        state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
-                                    await host.playback_queue.put((generation, order, bytes(audio_buffer), source_rate, session_id, None))
+                                if stream is not None:
+                                    await stream.finish()
                                 else:
                                     await host.enqueue_playback_skip(generation, order, session_id, "tts_empty_audio")
                                 host.maybe_session_done(session_id)
                                 return
                         raise RuntimeError("TTS websocket closed before end message")
                 except asyncio.CancelledError:
+                    if "stream" in locals() and stream is not None:
+                        await stream.finish("synthesis_cancelled")
                     raise
                 except Exception as exc:
+                    if "stream" in locals() and stream is not None:
+                        await stream.finish("tts_stream_exception")
+                        host.maybe_session_done(session_id)
+                        return
                     last_error = exc
                     host.session_log(session_id, "tts_ws_attempt_failed: order=%s attempt=%s/%s tts_ms=%.1f error=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, exc)
                     if attempt < max_attempts:

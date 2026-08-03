@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 
 PlaybackKey = tuple[int, int, str | None]
-PendingAudio = tuple[int, bytes, int, str | None, str | None]
+PendingAudio = tuple[int, Any, int, str | None, str | None]
 
 
 @dataclass
