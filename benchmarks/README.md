@@ -85,6 +85,29 @@ semantic failure requires an explicit `--oracle-command` that reads replay JSON
 from stdin and returns `{"failure_reproduced": true|false}`. The minimizer never
 uses phrases or keywords to decide meaning.
 
+Run the maintained controlled provider-fault matrix through the real Ollama
+client boundary:
+
+```bash
+python -m benchmarks.faults run \
+  --manifest benchmarks/manifests/fault_injection_v1.json \
+  --output benchmarks/reports/fault-injection.json \
+  --repeat 3
+```
+
+Repeat any qualification command and retain every stdout/stderr stream:
+
+```bash
+python -m benchmarks.faults repeat \
+  --count 5 \
+  --timeout 7200 \
+  --output-dir .chromie/repeats/comprehensive \
+  -- ./scripts/qualification/run_comprehensive_test.sh --strict-exit
+```
+
+Reports distinguish `consistent_pass`, `consistent_fail`, `intermittent`, and
+`infrastructure_timeout`; one successful run never hides intermittent failure.
+
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset

@@ -486,6 +486,23 @@ mechanical failure result. Semantic minimization requires an explicit external
 predicate command; the Host and minimizer do not infer semantic failure from
 phrases. Every attempt and its evidence directory are retained.
 
+Controlled dependency faults are declared in
+`benchmarks/manifests/fault_injection_v1.json` and run with:
+
+```bash
+python -m benchmarks.faults run \
+  --manifest benchmarks/manifests/fault_injection_v1.json \
+  --output benchmarks/reports/fault-injection.json \
+  --repeat 3
+```
+
+The initial matrix drives HTTP failure, timeout, disconnect/recovery, and
+malformed-response behavior through the real Ollama client. Expected failure
+classes remain deterministic fixture truth. Repeated command qualification uses
+`python -m benchmarks.faults repeat -- ...` and classifies consistent pass,
+consistent failure, intermittency, or infrastructure timeout while retaining
+every attempt's logs.
+
 For an opt-in automatic multi-judge run, supply the same reviewer configuration
 to the comprehensive collector:
 

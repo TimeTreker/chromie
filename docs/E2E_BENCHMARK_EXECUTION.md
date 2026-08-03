@@ -183,5 +183,17 @@ default oracle minimizes only a reproduced mechanical failure. Pass an explicit
 `--oracle-command` for meaning-based failure; it must return a typed boolean and
 its result is retained with every attempt.
 
+The comprehensive collector also runs the repository-owned provider-client fault
+manifest. For flakiness evidence, wrap the full collector rather than trusting a
+single run:
+
+```bash
+python -m benchmarks.faults repeat \
+  --count 5 \
+  --timeout 7200 \
+  --output-dir .chromie/repeats/comprehensive \
+  -- ./scripts/qualification/run_comprehensive_test.sh --strict-exit
+```
+
 The command adapter contract is documented in
 [`benchmarks/e2e/README.md`](../benchmarks/e2e/README.md).

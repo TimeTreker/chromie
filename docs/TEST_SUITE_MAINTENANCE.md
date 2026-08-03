@@ -40,6 +40,9 @@ claim.
   production code. Minimize only by structural turn removal and an explicit
   mechanical or external semantic predicate; never encode regression phrases as
   the minimizer's truth.
+- Keep dependency faults manifest-owned and deterministic. Run repeated
+  qualifications when model or timing variance matters, and report intermittent
+  behavior separately from consistent failure or infrastructure timeout.
 - Use at least three genuinely different model families for important semantic
   regression review when cost and privacy permit. Keep individual reviews,
   prompt/model provenance, and disagreement; do not replace them with one score.

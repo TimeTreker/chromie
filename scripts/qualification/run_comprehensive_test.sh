@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.3.0"
+SCRIPT_VERSION="1.4.0"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -158,6 +158,7 @@ required_files=(
   scripts/voice_acceptance.py
   scripts/verify_voice_evidence.py
   benchmarks/manifests/closed_loop_e2e_v1.json
+  benchmarks/manifests/fault_injection_v1.json
 )
 for required in "${required_files[@]}"; do
   [[ -e "$required" ]] || {
@@ -181,7 +182,7 @@ Semantic judges:  ${SEMANTIC_REVIEWERS:-disabled}
 Phases:
   0. Record revision, host, audio, Docker, GPU, and runner identity.
   1. Run revision-bound source qualification and maintained deterministic tests.
-  2. Validate benchmark inventory/contracts and run deterministic scenarios.
+  2. Validate benchmark inventory/contracts, run deterministic scenarios, and inject controlled provider faults.
   3. Build/start maintained services and run GPU/TTS health checks.
   4. Run bilingual generated-speech closed-loop E2E and package semantic evidence.
   5. Repeat TTS and workflow E2E under bounded shared-GPU load.
@@ -444,6 +445,10 @@ if (( SKIP_DETERMINISTIC == 0 )); then
   run_capture deterministic "all maintained deterministic scenarios" "$BENCHMARK_TIMEOUT_S" \
     "${PYTHON_CMD[@]}" -m benchmarks.scenarios run \
     --report-dir "$BENCH_ROOT/behavior-reports" --json
+  run_capture deterministic "provider client fault injection" "$BENCHMARK_TIMEOUT_S" \
+    "${PYTHON_CMD[@]}" -m benchmarks.faults run \
+    --manifest benchmarks/manifests/fault_injection_v1.json \
+    --output "$BENCH_ROOT/fault-injection.json"
 else
   record_skip deterministic "benchmark framework and scenarios" "Skipped by --skip-deterministic."
 fi

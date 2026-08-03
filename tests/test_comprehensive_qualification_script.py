@@ -41,6 +41,7 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn("--dry-run", completed.stdout)
         self.assertIn("--semantic-reviewers", completed.stdout)
         self.assertIn("independent model ensemble", completed.stdout)
+        self.assertTrue((ROOT / "benchmarks" / "manifests" / "fault_injection_v1.json").is_file())
 
 
     def test_dry_run_accepts_repository_owned_reviewer_configuration(self) -> None:

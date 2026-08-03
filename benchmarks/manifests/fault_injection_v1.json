@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "qualification_id": "provider-client-fault-injection-v1",
+  "cases": [
+    {
+      "id": "ollama_http_500",
+      "description": "The real Ollama client classifies a provider HTTP failure without trusting a result.",
+      "timeout_ms": 500,
+      "response_format": "text",
+      "responses": [
+        {"action": "status", "status": 500, "body": {"error": "injected provider failure"}}
+      ],
+      "request_count": 1,
+      "expected": [
+        {"status": "failure", "failure_class": "http_error", "retryable": true}
+      ]
+    },
+    {
+      "id": "ollama_timeout",
+      "description": "The real Ollama client classifies a bounded provider timeout.",
+      "timeout_ms": 80,
+      "response_format": "text",
+      "responses": [
+        {"action": "success", "delay_ms": 250, "response": "late"}
+      ],
+      "request_count": 1,
+      "expected": [
+        {"status": "failure", "failure_class": "timeout", "retryable": true}
+      ]
+    },
+    {
+      "id": "ollama_disconnect_then_recovery",
+      "description": "A transport disconnect does not poison the next independent request.",
+      "timeout_ms": 500,
+      "response_format": "text",
+      "responses": [
+        {"action": "disconnect"},
+        {"action": "success", "response": "recovered"}
+      ],
+      "request_count": 2,
+      "expected": [
+        {"status": "failure", "failure_class": "http_error"},
+        {"status": "success", "value": "recovered"}
+      ]
+    },
+    {
+      "id": "ollama_malformed_json",
+      "description": "Malformed provider JSON is retained as an explicit untyped client failure.",
+      "timeout_ms": 500,
+      "response_format": "text",
+      "responses": [
+        {"action": "malformed_json"}
+      ],
+      "request_count": 1,
+      "expected": [
+        {"status": "failure", "failure_class": "structured_output_invalid"}
+      ]
+    }
+  ]
+}
