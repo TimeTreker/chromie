@@ -201,8 +201,11 @@ semantic-review evidence plus host/container/GPU/audio logs, run:
 
 The comprehensive collector never requires operator speech. It generates
 Chinese and English speech for monitor or acoustic capture, preserves failed
-checks in the uploadable archive, and never grants release qualification by
-itself. `--strict-exit` returns nonzero only after the archive is written. For important prompt, reasoning, memory, routing,
+checks in the local raw archive, and never grants release qualification by
+itself. Add `--sanitize-archive` to create a separate credential-, identity-,
+and durable-memory-redacted upload copy; add `--sanitize-exclude-audio` when
+audio must not leave the machine. Review conversational text even after
+sanitization. `--strict-exit` returns nonzero only after evidence is written. For important prompt, reasoning, memory, routing,
 response, or audio changes, retain clean before/after archives. Semantic bundles
 may be judged independently by several configured model families:
 

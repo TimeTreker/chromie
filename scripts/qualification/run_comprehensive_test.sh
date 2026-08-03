@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.4.0"
+SCRIPT_VERSION="1.5.0"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -40,6 +40,8 @@ TTS_REPEAT=8
 DOCKER_LOG_SINCE=""
 SEMANTIC_REVIEWERS=""
 SEMANTIC_REVIEWER_IDS=()
+SANITIZE_ARCHIVE=0
+SANITIZE_EXCLUDE_AUDIO=0
 
 usage() {
   cat <<'USAGE'
@@ -72,6 +74,8 @@ Options:
   --gpu-load-requests N       Ollama requests during contention (default: 20)
   --semantic-reviewers PATH   Opt in to external multi-LLM semantic adjudication
   --semantic-reviewer ID      Select one configured reviewer (repeatable)
+  --sanitize-archive          Also create a credential- and identity-redacted upload copy
+  --sanitize-exclude-audio    Exclude audio from the sanitized upload copy
   -h, --help                  Show this help
 
 Output:
@@ -107,6 +111,8 @@ while (($#)); do
     --gpu-load-requests) GPU_LOAD_REQUESTS="${2:?--gpu-load-requests needs a number}"; shift 2 ;;
     --semantic-reviewers) SEMANTIC_REVIEWERS="${2:?--semantic-reviewers needs a path}"; shift 2 ;;
     --semantic-reviewer) SEMANTIC_REVIEWER_IDS+=("${2:?--semantic-reviewer needs an id}"); shift 2 ;;
+    --sanitize-archive) SANITIZE_ARCHIVE=1; shift ;;
+    --sanitize-exclude-audio) SANITIZE_ARCHIVE=1; SANITIZE_EXCLUDE_AUDIO=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[comprehensive][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -178,6 +184,8 @@ Allow dirty:      $ALLOW_DIRTY
 Collect only:     $COLLECT_ONLY
 Strict exit:      $STRICT_EXIT
 Semantic judges:  ${SEMANTIC_REVIEWERS:-disabled}
+Sanitized copy:   $SANITIZE_ARCHIVE
+Exclude audio:    $SANITIZE_EXCLUDE_AUDIO
 
 Phases:
   0. Record revision, host, audio, Docker, GPU, and runner identity.
@@ -187,7 +195,8 @@ Phases:
   4. Run bilingual generated-speech closed-loop E2E and package semantic evidence.
   5. Repeat TTS and workflow E2E under bounded shared-GPU load.
   6. Optionally run independent configured LLM judges and aggregate consensus.
-  7. Collect all program/container logs, artifacts, hashes, and one uploadable archive.
+  7. Collect all program/container logs, artifacts, hashes, and the raw local archive.
+  8. Optionally create a separate sanitized upload archive without modifying raw evidence.
 
 Objective fixtures, contracts, and invariants remain deterministic truth.
 Semantic dimensions remain pending retained LLM or human adjudication.
@@ -876,6 +885,17 @@ ARCHIVE="$DOWNLOAD_DIR/chromie-comprehensive-$REV_SHORT-$RUN_ID.tar.gz"
 tar -czf "$ARCHIVE" -C "$REPO_DIR" "$RESULT_REL"
 sha256sum "$ARCHIVE" | tee "$ARCHIVE.sha256"
 
+SANITIZED_ARCHIVE=""
+SANITIZE_STATUS=0
+if (( SANITIZE_ARCHIVE == 1 )); then
+  SANITIZED_ARCHIVE="$DOWNLOAD_DIR/chromie-comprehensive-$REV_SHORT-$RUN_ID-sanitized.tar.gz"
+  sanitize_args=("${PYTHON_CMD[@]}" -m benchmarks.evidence sanitize
+    --input "$RESULT_ROOT"
+    --output "$SANITIZED_ARCHIVE")
+  (( SANITIZE_EXCLUDE_AUDIO == 1 )) && sanitize_args+=(--exclude-audio)
+  "${sanitize_args[@]}" > "$RESULT_ROOT/logs/evidence-sanitization.log" 2>&1 || SANITIZE_STATUS=$?
+fi
+
 trap - EXIT INT TERM
 cleanup_background
 
@@ -890,6 +910,11 @@ echo "  Skipped:        $SKIP_COUNT"
 echo "  Evidence root:  $RESULT_ROOT"
 echo "  Archive:        $ARCHIVE"
 echo "  Checksum:       $ARCHIVE.sha256"
+if [[ -n "$SANITIZED_ARCHIVE" ]]; then
+  echo "  Sanitized:      $SANITIZED_ARCHIVE"
+  echo "  Sanitized sum:  $SANITIZED_ARCHIVE.sha256"
+  echo "  Sanitize exit:  $SANITIZE_STATUS"
+fi
 echo "========================================================================"
 OVERALL_STATUS="$(python3 - "$RESULT_ROOT/collection-report.json" <<'PY_STATUS'
 import json
@@ -900,7 +925,7 @@ PY_STATUS
 )"
 
 echo "  Overall status: $OVERALL_STATUS"
-if (( STRICT_EXIT == 1 )) && [[ "$OVERALL_STATUS" != "passed" ]]; then
+if (( STRICT_EXIT == 1 )) && { [[ "$OVERALL_STATUS" != "passed" ]] || (( SANITIZE_STATUS != 0 )); }; then
   echo "The archive was retained, but strict mode is failing this run." >&2
   exit 1
 fi

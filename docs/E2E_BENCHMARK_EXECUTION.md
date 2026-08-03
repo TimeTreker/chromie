@@ -157,6 +157,20 @@ configured external providers:
   --semantic-reviewers .chromie/semantic-reviewers.json
 ```
 
+For external upload, prefer a separate sanitized archive while keeping the raw
+archive local:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --strict-exit \
+  --sanitize-archive
+```
+
+Use `--sanitize-exclude-audio` only when playback/audio review is not needed. The
+sanitized archive includes a redaction/exclusion report and rebuilt artifact
+index. A sanitizer failure makes strict mode fail after preserving the raw
+archive.
+
 The reviewer configuration declares protocols, base URLs, model names, explicit
 model-family identities, and API key environment-variable names. It contains no
 keys. The collector invokes the

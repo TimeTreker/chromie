@@ -49,6 +49,9 @@ claim.
 - Keep API reviewer profiles outside committed secrets. Configuration may name
   an API-key environment variable, but no API key may enter Git, command logs,
   review reports, or evidence archives.
+- Keep raw evidence local by default. Use the maintained evidence sanitizer for
+  upload copies, retain its report, exclude durable profile memory, and never
+  treat credential redaction as proof that ordinary conversation is non-private.
 - Treat reviewer timeout, missing credentials, malformed JSON, or provider
   outage as review-infrastructure failure. It must not be mislabeled as Chromie
   pass or fail.

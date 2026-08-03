@@ -25,7 +25,7 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
-- Added a no-operator-speech strict comprehensive collector, revision-bound archive comparison, exact replay/minimization, controlled provider faults, repeated-run stability classification, expanded bilingual live cognition, and provider-neutral multi-LLM review.
+- Added a no-operator-speech strict collector, archive comparison, replay/minimization, controlled faults, repeated-run classification, privacy-safe upload copies, expanded bilingual cognition, and multi-LLM review.
 - Added hybrid oracles, grounded session recall, consent-bound durable profile
   memory, provider-PCM/audible milestones, and ordered incremental Host playback;
   deterministic failures remain non-overridable.

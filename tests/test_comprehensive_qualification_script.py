@@ -40,6 +40,8 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn("--ci", completed.stdout)
         self.assertIn("--dry-run", completed.stdout)
         self.assertIn("--semantic-reviewers", completed.stdout)
+        self.assertIn("--sanitize-archive", completed.stdout)
+        self.assertIn("--sanitize-exclude-audio", completed.stdout)
         self.assertIn("independent model ensemble", completed.stdout)
         self.assertTrue((ROOT / "benchmarks" / "manifests" / "fault_injection_v1.json").is_file())
 
@@ -91,6 +93,19 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
             completed.stdout,
         )
         self.assertNotIn("Chromie comprehensive collection complete", completed.stdout)
+
+    def test_dry_run_reports_sanitized_copy_policy(self) -> None:
+        completed = subprocess.run(
+            [str(SCRIPT), "--repo", str(ROOT), "--sanitize-exclude-audio", "--dry-run"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Sanitized copy:   1", completed.stdout)
+        self.assertIn("Exclude audio:    1", completed.stdout)
 
     def test_dry_run_reports_strict_exit_mode(self) -> None:
         completed = subprocess.run(

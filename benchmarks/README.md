@@ -108,6 +108,20 @@ python -m benchmarks.faults repeat \
 Reports distinguish `consistent_pass`, `consistent_fail`, `intermittent`, and
 `infrastructure_timeout`; one successful run never hides intermittent failure.
 
+Create a separate upload-safe copy without modifying raw evidence:
+
+```bash
+python -m benchmarks.evidence sanitize \
+  --input ~/Downloads/chromie-comprehensive-REV-RUN.tar.gz \
+  --output ~/Downloads/chromie-comprehensive-REV-RUN-sanitized.tar.gz
+```
+
+Durable profile memory is excluded, credential-bearing keys and headers are
+redacted, local identities are replaced, artifact hashes are rebuilt, and a
+`sanitization-report.json` records every exclusion and redaction. Use
+`--exclude-audio` when the reviewer does not need playback evidence. The raw
+archive remains unchanged and must stay local unless explicitly approved.
+
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset

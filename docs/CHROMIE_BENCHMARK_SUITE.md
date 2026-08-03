@@ -503,6 +503,22 @@ classes remain deterministic fixture truth. Repeated command qualification uses
 consistent failure, intermittency, or infrastructure timeout while retaining
 every attempt's logs.
 
+Comprehensive evidence is raw by default and may contain private conversation.
+Create a separate sanitized upload copy with:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --strict-exit \
+  --sanitize-archive
+```
+
+The sanitizer never modifies raw evidence. It excludes durable profile-memory
+files, redacts credentials, authorization headers, local identities and home
+paths, rebuilds artifact hashes, and emits `sanitization-report.json`.
+`--sanitize-exclude-audio` removes audio when semantic playback review is not
+required. Sanitization cannot decide whether ordinary conversation is private,
+so the operator must still inspect the report and archive before upload.
+
 For an opt-in automatic multi-judge run, supply the same reviewer configuration
 to the comprehensive collector:
 
