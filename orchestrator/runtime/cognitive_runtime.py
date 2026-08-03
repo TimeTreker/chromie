@@ -358,11 +358,21 @@ class CognitiveEvidenceRecorder:
         if resolution is None:
             return None
         composition = resolution.composition
+        coordinated = (
+            composition if isinstance(composition, CoordinatedResponsePlan) else None
+        )
+        direct = (
+            composition if isinstance(composition, DirectResponseComposition) else None
+        )
         return {
             "status": resolution.status,
             "composition_id": composition.composition_id if composition else None,
+            "phase": composition.phase if composition else None,
             "canonical_plan_fingerprint": (
-                composition.canonical_plan_fingerprint if composition else None
+                coordinated.canonical_plan_fingerprint if coordinated else None
+            ),
+            "goal_association_fingerprint": (
+                direct.goal_association_fingerprint if direct else None
             ),
             "social_attention": (
                 composition.social_attention_plan.decision

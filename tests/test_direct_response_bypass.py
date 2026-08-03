@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from agent.app.response_composer import ResponseComposerResolver
 from agent.app.schema import AgentRunRequest, RouteDecision
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
+    CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
@@ -220,3 +224,52 @@ class DirectResponseRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result.metadata["planless_direct_response"])
         self.assertTrue(result.metadata["deep_planner_avoided"])
+
+    def test_direct_response_evidence_uses_goal_association_fingerprint(self) -> None:
+        association = direct_association()
+        composition = direct_composition(association)
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=DirectRuntimeClient(association, composition),
+            adapter=CanonicalPlanRuntimeAdapter(NoopInteractionRuntime()),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat"}),
+            ),
+        )
+        route = type(
+            "Decision",
+            (),
+            {
+                "route": "chat",
+                "intent": "greeting",
+                "language": "zh-CN",
+            },
+        )()
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="你好",
+                sid="sid-direct-evidence",
+                route_decision=route,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cognitive.jsonl"
+            CognitiveEvidenceRecorder(path).record(
+                result,
+                sid="sid-direct-evidence",
+                text="你好",
+            )
+            payload = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+
+        summary = payload["composition"]
+        self.assertEqual(summary["phase"], "direct")
+        self.assertIsNone(summary["canonical_plan_fingerprint"])
+        self.assertEqual(
+            summary["goal_association_fingerprint"],
+            composition.goal_association_fingerprint,
+        )
