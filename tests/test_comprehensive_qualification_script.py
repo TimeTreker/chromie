@@ -36,6 +36,8 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn("semantic-evidence", completed.stdout)
         self.assertIn("No operator speech is used", completed.stdout)
         self.assertIn("--collect-only", completed.stdout)
+        self.assertIn("--strict-exit", completed.stdout)
+        self.assertIn("--ci", completed.stdout)
         self.assertIn("--dry-run", completed.stdout)
         self.assertIn("--semantic-reviewers", completed.stdout)
         self.assertIn("independent model ensemble", completed.stdout)
@@ -88,6 +90,24 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
             completed.stdout,
         )
         self.assertNotIn("Chromie comprehensive collection complete", completed.stdout)
+
+    def test_dry_run_reports_strict_exit_mode(self) -> None:
+        completed = subprocess.run(
+            [str(SCRIPT), "--repo", str(ROOT), "--strict-exit", "--dry-run"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Strict exit:      1", completed.stdout)
+
+    def test_script_records_machine_readable_overall_status(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('"overall_status": overall_status', source)
+        self.assertIn('"review_infrastructure_failed": review_infrastructure_failed', source)
+        self.assertIn('[[ "$OVERALL_STATUS" != "passed" ]]', source)
 
 
 if __name__ == "__main__":

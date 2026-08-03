@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.2.0"
+SCRIPT_VERSION="1.3.0"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -30,6 +30,7 @@ SKIP_SYNTHETIC=0
 SKIP_GPU_LOAD=0
 DRY_RUN=0
 COLLECT_ONLY=0
+STRICT_EXIT=0
 SOURCE_TIMEOUT_S=2400
 BENCHMARK_TIMEOUT_S=1800
 SERVICE_TIMEOUT_S=900
@@ -56,6 +57,8 @@ Options:
   --stop-services             Stop Compose services after evidence collection
   --dry-run                   Validate inputs and print the execution plan only
   --collect-only              Collect current host/container evidence without running tests
+  --strict-exit               Retain the archive but exit nonzero unless the run passed
+  --ci                        Alias for --strict-exit
   --skip-source               Skip revision-bound source/unit qualification
   --skip-deterministic        Skip benchmark contracts and deterministic scenarios
   --skip-services             Skip Docker/GPU/TTS and all live E2E phases
@@ -90,6 +93,7 @@ while (($#)); do
     --stop-services) STOP_SERVICES=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --collect-only) COLLECT_ONLY=1; shift ;;
+    --strict-exit|--ci) STRICT_EXIT=1; shift ;;
     --skip-source) SKIP_SOURCE=1; shift ;;
     --skip-deterministic) SKIP_DETERMINISTIC=1; shift ;;
     --skip-services) SKIP_SERVICES=1; shift ;;
@@ -171,6 +175,7 @@ Capture mode:     $CAPTURE_MODE
 Languages:        $LANGUAGES
 Allow dirty:      $ALLOW_DIRTY
 Collect only:     $COLLECT_ONLY
+Strict exit:      $STRICT_EXIT
 Semantic judges:  ${SEMANTIC_REVIEWERS:-disabled}
 
 Phases:
@@ -711,7 +716,10 @@ redacted, but arbitrary program logs cannot be guaranteed secret-free.
 EOF
 
 # Convert the append-only check ledger into a machine-readable collection report.
-python3 - "$RESULT_ROOT" "$REVISION" "$STARTED_UTC" "$COMPLETED_UTC" "$CAPTURE_MODE" "$LANGUAGES" "$ALLOW_DIRTY" "$SCRIPT_VERSION" "$COLLECT_ONLY" <<'PY'
+SEMANTIC_REVIEWERS_ENABLED=0
+[[ -n "$SEMANTIC_REVIEWERS" ]] && SEMANTIC_REVIEWERS_ENABLED=1
+
+python3 - "$RESULT_ROOT" "$REVISION" "$STARTED_UTC" "$COMPLETED_UTC" "$CAPTURE_MODE" "$LANGUAGES" "$ALLOW_DIRTY" "$SCRIPT_VERSION" "$COLLECT_ONLY" "$STRICT_EXIT" "$SEMANTIC_REVIEWERS_ENABLED" <<'PY'
 from __future__ import annotations
 
 import csv
@@ -725,6 +733,8 @@ revision, started, completed, capture, languages = sys.argv[2:7]
 allow_dirty = sys.argv[7] == "1"
 script_version = sys.argv[8]
 collect_only = sys.argv[9] == "1"
+strict_exit = sys.argv[10] == "1"
+semantic_reviewers_enabled = sys.argv[11] == "1"
 checks = []
 with (root / "checks.tsv").open(encoding="utf-8", newline="") as handle:
     for row in csv.DictReader(handle, delimiter="\t"):
@@ -769,8 +779,38 @@ for judge_path in sorted((root / "semantic-judgments").glob("**/judge-report.jso
             "consensus": payload.get("consensus"),
         }
     )
+hard_failure = counts["FAIL"] > 0 or counts["TIMEOUT"] > 0
+closed_loop_failure = any(
+    bool(item.get("parse_error")) or item.get("mechanical_passed") is False
+    for item in closed_loop
+)
+semantic_pending = any(
+    item.get("semantic_review_pending") is True for item in closed_loop
+)
+review_infrastructure_failed = any(
+    bool(item.get("parse_error")) or item.get("complete") is False
+    for item in semantic_judgments
+)
+semantic_review_complete = (
+    not semantic_pending
+    or (
+        semantic_reviewers_enabled
+        and bool(semantic_judgments)
+        and not review_infrastructure_failed
+        and all(item.get("complete") is True for item in semantic_judgments)
+    )
+)
+if collect_only:
+    overall_status = "collection_only"
+elif hard_failure or closed_loop_failure:
+    overall_status = "failed"
+elif allow_dirty or counts["SKIP"] > 0 or not semantic_review_complete:
+    overall_status = "incomplete"
+else:
+    overall_status = "passed"
+
 report = {
-    "schema_version": 1,
+    "schema_version": 2,
     "runner": "scripts/qualification/run_comprehensive_test.sh",
     "runner_version": script_version,
     "revision": revision,
@@ -782,6 +822,10 @@ report = {
     "operator_pronunciation_graded": False,
     "allow_dirty": allow_dirty,
     "collect_only": collect_only,
+    "strict_exit": strict_exit,
+    "overall_status": overall_status,
+    "semantic_review_complete": semantic_review_complete,
+    "review_infrastructure_failed": review_infrastructure_failed,
     "counts": counts,
     "checks": checks,
     "closed_loop_runs": closed_loop,
@@ -842,5 +886,19 @@ echo "  Evidence root:  $RESULT_ROOT"
 echo "  Archive:        $ARCHIVE"
 echo "  Checksum:       $ARCHIVE.sha256"
 echo "========================================================================"
-echo "The collector exits successfully even when tests fail so the archive is retained."
+OVERALL_STATUS="$(python3 - "$RESULT_ROOT/collection-report.json" <<'PY_STATUS'
+import json
+from pathlib import Path
+import sys
+print(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["overall_status"])
+PY_STATUS
+)"
+
+echo "  Overall status: $OVERALL_STATUS"
+if (( STRICT_EXIT == 1 )) && [[ "$OVERALL_STATUS" != "passed" ]]; then
+  echo "The archive was retained, but strict mode is failing this run." >&2
+  exit 1
+fi
+
+echo "The archive was retained. Fail-soft mode does not convert failed checks into a pass."
 exit 0
