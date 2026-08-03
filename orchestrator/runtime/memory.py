@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
+import os
+import tempfile
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque
+from pathlib import Path
+from typing import Any, Deque, Iterable
+
+
+logger = logging.getLogger("chromie.orchestrator.memory")
 
 
 def now_ms() -> float:
@@ -37,6 +45,7 @@ class MemoryEntry:
     updated_ms: float = field(default_factory=now_ms)
     expires_ms: float | None = None
     persistence_policy: str = "ephemeral"
+    consent_basis: str | None = None
     safety_note: str = "Memory guides interpretation only; it does not authorize side effects."
     id: str | None = None
 
@@ -72,6 +81,7 @@ class MemoryEntry:
             "updated_ms": self.updated_ms,
             "expires_ms": self.expires_ms,
             "persistence_policy": self.persistence_policy,
+            "consent_basis": self.consent_basis,
             "safety_note": self.safety_note,
         }
 
@@ -92,6 +102,29 @@ class MemoryStore:
 
     def clear(self) -> None:
         self._entries.clear()
+
+    def entries(self) -> list[MemoryEntry]:
+        self.prune_expired()
+        return list(self._entries)
+
+    def replace(self, entries: Iterable[MemoryEntry]) -> None:
+        self._entries = deque(maxlen=self.max_entries)
+        self.add_many(list(entries))
+
+    def remove(self, *, key: str | None = None, entry_id: str | None = None) -> int:
+        normalized_key = compact_text(key, limit=120) if key else None
+        retained = [
+            entry
+            for entry in self._entries
+            if not (
+                (normalized_key is not None and entry.key == normalized_key)
+                or (entry_id is not None and entry.id == entry_id)
+            )
+        ]
+        removed = len(self._entries) - len(retained)
+        if removed:
+            self._entries = deque(retained, maxlen=self.max_entries)
+        return removed
 
     def add(self, entry: MemoryEntry) -> None:
         if not entry.text:
@@ -146,6 +179,139 @@ class MemoryStore:
         ]
         if len(retained) != len(self._entries):
             self._entries = deque(retained, maxlen=self.max_entries)
+
+
+class ProtectedDurableMemoryStore:
+    """Atomic owner-local profile memory with restrictive file permissions."""
+
+    schema_version = 1
+
+    def __init__(
+        self,
+        *,
+        enabled: bool,
+        path: str | os.PathLike[str],
+        max_entries: int = 64,
+    ) -> None:
+        self.enabled = bool(enabled)
+        self.path = Path(path).expanduser()
+        self.store = MemoryStore(max_entries=max_entries)
+        self.last_error: str | None = None
+        if self.enabled:
+            self.load()
+
+    def load(self) -> None:
+        if not self.enabled or not self.path.is_file():
+            return
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or payload.get("schema_version") != self.schema_version:
+                raise ValueError("unsupported durable memory schema")
+            entries: list[MemoryEntry] = []
+            for item in payload.get("entries") or []:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("scope") != "profile":
+                    continue
+                if item.get("persistence_policy") != "durable_with_explicit_consent":
+                    continue
+                if item.get("consent_basis") != "explicit_current_turn":
+                    continue
+                entries.append(
+                    MemoryEntry(
+                        scope="profile",
+                        kind=str(item.get("kind") or "note"),
+                        key=str(item.get("key") or "") or None,
+                        text=str(item.get("text") or ""),
+                        confidence=float(item.get("confidence") or 0.8),
+                        source_turn_ids=[str(v) for v in item.get("source_turn_ids") or []],
+                        source_sids=[str(v) for v in item.get("source_sids") or []],
+                        created_ms=float(item.get("created_ms") or now_ms()),
+                        updated_ms=float(item.get("updated_ms") or now_ms()),
+                        expires_ms=(
+                            float(item["expires_ms"])
+                            if item.get("expires_ms") is not None
+                            else None
+                        ),
+                        persistence_policy="durable_with_explicit_consent",
+                        consent_basis=(
+                            str(item.get("consent_basis") or "") or None
+                        ),
+                        id=str(item.get("id") or "") or None,
+                    )
+                )
+            self.store.replace(entries)
+            self.store.prune_expired()
+            self.persist()
+            self.last_error = None
+        except Exception as exc:
+            self.store.clear()
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("durable_memory_load_failed: %s", self.last_error)
+
+    def add_many(self, entries: Iterable[MemoryEntry]) -> int:
+        accepted = 0
+        for entry in entries:
+            if (
+                entry.scope != "profile"
+                or entry.persistence_policy != "durable_with_explicit_consent"
+                or entry.consent_basis != "explicit_current_turn"
+                or not entry.key
+            ):
+                continue
+            self.store.add(entry)
+            accepted += 1
+        if accepted:
+            self.persist()
+        return accepted
+
+    def remove(self, *, key: str | None = None, entry_id: str | None = None) -> int:
+        removed = self.store.remove(key=key, entry_id=entry_id)
+        if removed:
+            self.persist()
+        return removed
+
+    def clear(self) -> int:
+        count = len(self.store.entries())
+        self.store.clear()
+        if self.enabled:
+            self.persist()
+        return count
+
+    def prompt_entries(self, *, limit: int = 8) -> list[dict[str, Any]]:
+        return self.store.prompt_entries(limit=limit) if self.enabled else []
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        return self.store.snapshot() if self.enabled else []
+
+    def persist(self) -> None:
+        if not self.enabled:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": self.schema_version,
+            "entries": self.store.snapshot(),
+        }
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
+        )
+        temporary_path = Path(temporary)
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, sort_keys=True, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_path, self.path)
+            os.chmod(self.path, 0o600)
+            self.last_error = None
+        except Exception as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            temporary_path.unlink(missing_ok=True)
+            logger.error("durable_memory_persist_failed: %s", self.last_error)
+            raise
+
 
 
 class MemoryPromptBuilder:
@@ -299,7 +465,15 @@ class MemoryExtractor:
                     text=text,
                     confidence=float(item.get("confidence") or 0.75),
                     source_sids=[sid] if sid else [],
+                    expires_ms=(
+                        now_ms() + float(item.get("retention_days")) * 86400000.0
+                        if item.get("retention_days") is not None
+                        else None
+                    ),
                     persistence_policy=str(item.get("persistence_policy") or "ephemeral"),
+                    consent_basis=(
+                        str(item.get("consent_basis") or "") or None
+                    ),
                 )
             )
         return entries

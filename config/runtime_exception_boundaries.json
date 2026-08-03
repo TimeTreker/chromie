@@ -1930,6 +1930,35 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/memory.py",
+      "symbol": "ProtectedDurableMemoryStore.load",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Reject malformed or unreadable durable profile state, clear in-memory entries, and retain a diagnostic without exposing unvalidated content.",
+      "review_status": "reviewed",
+      "body_sha256": "a16f293da254a89abd8f15ebb5c30dd9936b9227525bc9c80f9ad7ed43dc6eab",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/memory.py",
+      "symbol": "ProtectedDurableMemoryStore.persist",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Remove temporary output, retain a persistence diagnostic, and re-raise so the owning operation cannot claim durable success.",
+      "review_status": "reviewed",
+      "body_sha256": "fc5865e7627366fab6aa024dbf8806aa6c8ee71ea9af172dd63e872e834f62e3",
+      "failure_signals": [
+        "bare_reraise",
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/named_goal_cancellation.py",
       "symbol": "dispatch_named_goal_cancellation",
       "ordinal": 1,

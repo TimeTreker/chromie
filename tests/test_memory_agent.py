@@ -45,6 +45,38 @@ class MemoryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.actions[0].params["text"], "User prefers jasmine tea without sugar.")
         self.assertEqual(result.speak_immediate, [])
 
+    async def test_memory_agent_emits_typed_durable_forget(self) -> None:
+        agent = MemoryAgent(AgentServices(use_llm=False))
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "memory-forget",
+                "text": "Forget my saved tea preference everywhere.",
+                "route_decision": {
+                    "route": "memory",
+                    "agents": ["memory_agent"],
+                    "intent": "forget_durable_preference",
+                    "confidence": 0.95,
+                    "source": "llm",
+                    "memory_update": {
+                        "operation": "forget",
+                        "scope": "profile",
+                        "kind": "preference",
+                        "key": "tea_preference",
+                        "text": "Forget the saved tea preference.",
+                        "persistence_policy": "durable_with_explicit_consent",
+                        "consent_basis": "explicit_current_turn",
+                    },
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.memory_updates[0].type, "durable_memory_forget")
+        self.assertEqual(result.memory_updates[0].key, "tea_preference")
+        self.assertEqual(result.actions[0].type, "memory.forget")
+        self.assertEqual(result.actions[0].target, "memory_store")
+
     async def test_memory_agent_missing_proposal_fails_closed_to_clarification(self) -> None:
         agent = MemoryAgent(AgentServices(use_llm=False))
         request = AgentRunRequest.model_validate(

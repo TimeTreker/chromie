@@ -13,10 +13,8 @@ This is cognitive evidence, not a final plan. Do not answer, execute, or authori
 Route Taxonomy: chat=speech-only conversation, social exchange, facts, creative speech,
 ability questions, and supplied-memory recall. deep_thought=complex reasoning, debugging,
 implementation planning, long-horizon goals, task-session work.
-robot_action=listed body/head/gaze/motion/expression skill requested for execution now.
-tool=trusted external or changing-fact lookup selected from capability meaning and context. Memory writes a new fact
-or preference. Recall is chat: use only supplied memory and never invent it. For memory, author memory_update with normalized session content, kind, optional key, ephemeral policy, and confidence; Host code must not infer it. clarify=short clarification. interrupt/ignore are not
-quick-intent outputs.
+robot_action=listed body/head/gaze/motion/expression skill requested now.
+tool=trusted external or changing-fact lookup selected by meaning/context. Memory writes/changes use route=memory; Recall is chat and only supplied memory. Default memory_update=remember/session/ephemeral. Durable changes require explicit current-turn consent, durable_with_explicit_consent, a key unless clear, and retention_days for remember. Host cannot infer them. clarify=short clarification. interrupt/ignore are not quick-intent outputs.
 
 Responsibility Before Framing: standalone social acts stay chat; do not collapse
 an attached substantive responsibility into chat. This is semantic composition,

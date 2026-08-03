@@ -33,31 +33,61 @@ class MemoryAgent(BaseAgent):
             return result
 
         entry = proposal.model_dump(mode="json")
-        result.memory_updates.append(
-            MemoryUpdate(
-                type="extracted_memory",
-                key=proposal.key or proposal.kind,
-                value=entry,
-                confidence=proposal.confidence,
-                metadata={"source": "goal_interpreter_memory_proposal"},
+        if proposal.operation == "remember":
+            result.memory_updates.append(
+                MemoryUpdate(
+                    type="extracted_memory",
+                    key=proposal.key or proposal.kind,
+                    value=entry,
+                    confidence=proposal.confidence,
+                    metadata={"source": "goal_interpreter_memory_proposal"},
+                )
             )
-        )
+            action_type = "memory_store"
+            action_target = "memory.store"
+        elif proposal.operation == "forget":
+            result.memory_updates.append(
+                MemoryUpdate(
+                    type="durable_memory_forget",
+                    key=proposal.key,
+                    value=entry,
+                    confidence=proposal.confidence,
+                    metadata={"source": "goal_interpreter_memory_proposal"},
+                )
+            )
+            action_type = "memory_store"
+            action_target = "memory.forget"
+        else:
+            result.memory_updates.append(
+                MemoryUpdate(
+                    type="durable_memory_clear",
+                    value=entry,
+                    confidence=proposal.confidence,
+                    metadata={"source": "goal_interpreter_memory_proposal"},
+                )
+            )
+            action_type = "memory_store"
+            action_target = "memory.clear_profile"
         result.memory_updates.append(
             MemoryUpdate(
                 type="user_statement",
                 key=proposal.key,
-                value={"text": proposal.text, "kind": proposal.kind},
+                value={
+                    "text": proposal.text,
+                    "kind": proposal.kind,
+                    "operation": proposal.operation,
+                },
                 confidence=proposal.confidence,
                 metadata={"source": "model_authored_memory_proposal"},
             )
         )
         result.add_action(
-            "memory_store",
-            "memory.store",
+            action_type,
+            action_target,
             params=entry,
             blocking=False,
             timeout_ms=1000,
             reason="model_authored_memory_update",
         )
-        self.trace(result, "applied model-authored memory proposal")
+        self.trace(result, f"applied model-authored memory {proposal.operation} proposal")
         return result

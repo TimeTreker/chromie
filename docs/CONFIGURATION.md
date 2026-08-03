@@ -736,6 +736,9 @@ and Goal Interpretation validation.
 | `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
 | `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
 | `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
+| `ORCH_ENABLE_DURABLE_PROFILE_MEMORY` | `0`; opt in to consent-bound profile memory. Disabled mode never creates or writes the profile store. |
+| `ORCH_DURABLE_PROFILE_MEMORY_PATH` | `.chromie/memory/profile.json`; owner-local JSON written atomically with mode `0600`. The store is not encrypted and must not hold secrets. |
+| `ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES` | `64`; bounded retained profile entries. Each durable remember requires model-authored explicit current-turn consent, a stable key, and `retention_days`; forget and clear also require retained current-turn consent evidence. |
 
 `ORCH_CONTEXT_MAX_TURNS`, `ORCH_CONTEXT_IDLE_TIMEOUT_SEC`,
 `ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
@@ -748,6 +751,12 @@ configured through phrase lists and remains Goal Association responsibility.
 The task-context store never resumes physical work by itself; restored
 robot-action tasks are prompt-facing recoverable context and require fresh
 confirmation before any new action can run.
+
+Durable profile memory survives ordinary conversation resets, while session
+memory does not. The Host validates typed scope, policy, consent provenance,
+retention, and storage limits but does not infer what a user wants remembered.
+Durable entries are removed only by expiry or an explicitly consented forget or
+clear mutation.
 
 Goal Association resolves references before planning and emits typed Goal
 bindings plus scoped referent/focus updates. Tool-result contents are excluded

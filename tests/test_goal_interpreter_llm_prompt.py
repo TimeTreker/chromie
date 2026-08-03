@@ -79,6 +79,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("ordered actions[]", prompt)
         self.assertIn("confidence", prompt)
         self.assertIn("supplied-memory recall", prompt)
+        self.assertIn("durable_with_explicit_consent", prompt)
+        self.assertIn("explicit current-turn consent", prompt)
         self.assertIn("Memory writes", prompt)
         self.assertIn("Recall is chat", prompt)
         self.assertNotIn("intent=weather_query", prompt)

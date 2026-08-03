@@ -225,6 +225,9 @@ class ConversationSettings:
     completed_task_retention_sec: int
     task_store_enabled: bool
     task_store_path: Path
+    durable_memory_enabled: bool
+    durable_memory_path: Path
+    durable_memory_max_entries: int
     reset_phrases: tuple[str, ...]
 
 
@@ -844,6 +847,21 @@ class HostSettingsSnapshot:
                     "ORCH_TASK_CONTEXT_STORE_PATH",
                     ".chromie/conversation/task_contexts.json",
                     project_root=project_root,
+                ),
+                durable_memory_enabled=_bool(
+                    values, "ORCH_ENABLE_DURABLE_PROFILE_MEMORY", False
+                ),
+                durable_memory_path=_path(
+                    values,
+                    "ORCH_DURABLE_PROFILE_MEMORY_PATH",
+                    ".chromie/memory/profile.json",
+                    project_root=project_root,
+                ),
+                durable_memory_max_entries=_int(
+                    values,
+                    "ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES",
+                    64,
+                    minimum=1,
                 ),
                 reset_phrases=_phrases(
                     values, "ORCH_CONVERSATION_RESET_PHRASES", default_reset_phrases

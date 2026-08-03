@@ -12,7 +12,13 @@ from typing import TYPE_CHECKING, Any, Callable, Deque
 
 from pydantic import ValidationError
 
-from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
+from orchestrator.runtime.memory import (
+    MemoryEntry,
+    MemoryExtractor,
+    MemoryPromptBuilder,
+    MemoryStore,
+    ProtectedDurableMemoryStore,
+)
 
 if TYPE_CHECKING:
     from orchestrator.runtime.host_settings import ConversationSettings
@@ -74,6 +80,7 @@ _TASK_RELATIONS = {
 }
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_TASK_STORE_PATH = ".chromie/conversation/task_contexts.json"
+_DEFAULT_DURABLE_MEMORY_PATH = ".chromie/memory/profile.json"
 
 
 logger = logging.getLogger("chromie.orchestrator.conversation_state")
@@ -116,11 +123,13 @@ DEFAULT_RESET_PHRASES = (
 
 
 class ConversationStateManager:
-    """Host-side short-term conversation state for Chromie.
+    """Host-side conversation state and consent-bound profile memory.
 
-    This is not long-term memory. It stores bounded recent turns, active Goal
-    snapshots, typed discourse referents, and evidence for LLM-owned reference
-    resolution. It does not classify follow-ups or new topics from user phrases.
+    Session state stores bounded recent turns, active Goal snapshots, typed
+    discourse referents, and evidence for LLM-owned reference resolution. The
+    optional profile store persists only model-authored mutations carrying
+    explicit current-turn consent. The Host does not decide what should be
+    remembered or classify follow-ups from user phrases.
 
     The orchestrator still creates one SID per VAD utterance. This manager adds
     a separate conversation_id that spans SIDs until an explicit reset command
@@ -145,6 +154,9 @@ class ConversationStateManager:
         completed_task_retention_sec: int = 180,
         task_store_enabled: bool = False,
         task_store_path: str | os.PathLike[str] | None = None,
+        durable_memory_enabled: bool = False,
+        durable_memory_path: str | os.PathLike[str] | None = None,
+        durable_memory_max_entries: int = 64,
         reset_phrases: tuple[str, ...] = DEFAULT_RESET_PHRASES,
     ) -> None:
         self.base_conversation_id = base_conversation_id or "local_default"
@@ -163,6 +175,11 @@ class ConversationStateManager:
         self.task_store_enabled = bool(task_store_enabled)
         self.task_store_path = self._resolve_task_store_path(task_store_path)
         self.last_task_store_error: str | None = None
+        self.durable_memory_enabled = bool(durable_memory_enabled)
+        self.durable_memory_path = self._resolve_durable_memory_path(
+            durable_memory_path
+        )
+        self.durable_memory_max_entries = max(1, int(durable_memory_max_entries))
         self.reset_phrases = tuple(p.lower() for p in reset_phrases)
 
         self._conversation_seq = 1
@@ -182,6 +199,11 @@ class ConversationStateManager:
             maxlen=self.max_discourse_focus
         )
         self._memory_store = MemoryStore(max_entries=self.max_memory_entries)
+        self._durable_memory = ProtectedDurableMemoryStore(
+            enabled=self.durable_memory_enabled,
+            path=self.durable_memory_path,
+            max_entries=self.durable_memory_max_entries,
+        )
         self._memory_extractor = MemoryExtractor()
         self._memory_prompt_builder = MemoryPromptBuilder()
         self.last_split_reason: str | None = None
@@ -208,6 +230,9 @@ class ConversationStateManager:
             completed_task_retention_sec=settings.completed_task_retention_sec,
             task_store_enabled=settings.task_store_enabled,
             task_store_path=settings.task_store_path,
+            durable_memory_enabled=settings.durable_memory_enabled,
+            durable_memory_path=settings.durable_memory_path,
+            durable_memory_max_entries=settings.durable_memory_max_entries,
             reset_phrases=settings.reset_phrases,
         )
 
@@ -243,6 +268,15 @@ class ConversationStateManager:
             completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
             task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
             task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
+            durable_memory_enabled=_env_bool(
+                "ORCH_ENABLE_DURABLE_PROFILE_MEMORY", False
+            ),
+            durable_memory_path=os.getenv(
+                "ORCH_DURABLE_PROFILE_MEMORY_PATH", _DEFAULT_DURABLE_MEMORY_PATH
+            ),
+            durable_memory_max_entries=int(
+                os.getenv("ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES", "64")
+            ),
             reset_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_RESET_PHRASES"), DEFAULT_RESET_PHRASES),
         )
 
@@ -252,6 +286,51 @@ class ConversationStateManager:
         if not resolved.is_absolute():
             resolved = _PROJECT_ROOT / resolved
         return resolved
+
+    @staticmethod
+    def _resolve_durable_memory_path(
+        path: str | os.PathLike[str] | None,
+    ) -> Path:
+        resolved = Path(path or _DEFAULT_DURABLE_MEMORY_PATH).expanduser()
+        if not resolved.is_absolute():
+            resolved = _PROJECT_ROOT / resolved
+        return resolved
+
+    def _store_explicit_memory_entries(self, entries: list[MemoryEntry]) -> None:
+        session_entries = [
+            entry
+            for entry in entries
+            if not (
+                entry.scope == "profile"
+                and entry.persistence_policy == "durable_with_explicit_consent"
+            )
+        ]
+        durable_entries = [
+            entry
+            for entry in entries
+            if entry.scope == "profile"
+            and entry.persistence_policy == "durable_with_explicit_consent"
+        ]
+        self._memory_store.add_many(session_entries)
+        if durable_entries:
+            self._durable_memory.add_many(durable_entries)
+
+    def forget_durable_memory(self, *, key: str) -> int:
+        return self._durable_memory.remove(key=key)
+
+    def clear_durable_memory(self) -> int:
+        return self._durable_memory.clear()
+
+    @staticmethod
+    def _authorized_durable_mutation(value: Any, *, operation: str) -> bool:
+        return (
+            isinstance(value, dict)
+            and value.get("operation") == operation
+            and value.get("scope") == "profile"
+            and value.get("persistence_policy")
+            == "durable_with_explicit_consent"
+            and value.get("consent_basis") == "explicit_current_turn"
+        )
 
     def _compact_text(self, text: str | None, *, limit: int | None = None) -> str:
         text = " ".join((text or "").strip().split())
@@ -3175,6 +3254,11 @@ class ConversationStateManager:
         latest_user = self._latest_turn("user")
         latest_assistant = self._latest_turn("assistant")
         extracted_memory = self._memory_prompt_builder.build(self._memory_store)
+        durable_entries = self._durable_memory.prompt_entries(limit=8)
+        combined_entries = [*durable_entries, *extracted_memory["entries"]][-12:]
+        combined_summary_lines = [
+            f"- {entry['text']}" for entry in combined_entries if entry.get("text")
+        ]
         summaries = [
             str(task.get("summary") or task.get("type") or "task")
             for task in active_tasks[-4:]
@@ -3206,10 +3290,20 @@ class ConversationStateManager:
             "verified_tool_memory_index": self.verified_tool_memory_index(),
             "discourse_referents": self.discourse_referents(),
             "discourse_focus": self.discourse_focus(),
-            "extracted_memory": extracted_memory["entries"],
-            "memory_summary": extracted_memory["summary"],
+            "extracted_memory": combined_entries,
+            "memory_summary": (
+                "\n".join(combined_summary_lines) if combined_summary_lines else "None"
+            ),
+            "durable_profile_memory": {
+                "enabled": self.durable_memory_enabled,
+                "entries": durable_entries,
+                "protected_storage": "owner_local_mode_0600",
+                "last_error": self._durable_memory.last_error,
+            },
             "forgetting_policy": {
                 "explicit_reset_clears_history_and_tasks": True,
+                "explicit_reset_clears_durable_profile_memory": False,
+                "durable_profile_requires_explicit_forget_or_clear": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
                 "last_split_reason": self.last_split_reason,
@@ -3238,6 +3332,12 @@ class ConversationStateManager:
             "recent_tool_evidence": self.recent_tool_evidence(),
             "verified_tool_memory_index": self.verified_tool_memory_index(),
             "extracted_memory": self._memory_store.snapshot(),
+            "durable_profile_memory": {
+                "enabled": self.durable_memory_enabled,
+                "path": str(self.durable_memory_path),
+                "entries": self._durable_memory.snapshot(),
+                "last_error": self._durable_memory.last_error,
+            },
             "session_memory": self.session_memory(),
             "task_store": {
                 "enabled": self.task_store_enabled,
@@ -3250,6 +3350,7 @@ class ConversationStateManager:
                 "soft_idle_timeout_sec": self.soft_idle_timeout_sec,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "max_memory_entries": self.max_memory_entries,
+                "durable_memory_max_entries": self.durable_memory_max_entries,
                 "max_tool_evidence": self.max_tool_evidence,
                 "max_discourse_referents": self.max_discourse_referents,
                 "max_discourse_focus": self.max_discourse_focus,
@@ -4498,12 +4599,30 @@ class ConversationStateManager:
                 continue
             update_type = str(update.get("type") or "")
             if update_type in {"extracted_memory", "memory_entry", "memory"}:
-                self._memory_store.add_many(
+                self._store_explicit_memory_entries(
                     self._memory_extractor.extract_explicit_entries(
                         update.get("value"),
                         sid=sid,
                     )
                 )
+                continue
+            if update_type == "durable_memory_forget":
+                value = update.get("value")
+                key = str(update.get("key") or "").strip()
+                if (
+                    key
+                    and self._authorized_durable_mutation(
+                        value, operation="forget"
+                    )
+                    and str(value.get("key") or "").strip() == key
+                ):
+                    self.forget_durable_memory(key=key)
+                continue
+            if update_type == "durable_memory_clear":
+                if self._authorized_durable_mutation(
+                    update.get("value"), operation="clear_profile"
+                ):
+                    self.clear_durable_memory()
                 continue
             if update_type not in {"pending_task", "task_status", "active_task"}:
                 continue

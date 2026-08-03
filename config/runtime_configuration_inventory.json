@@ -3151,6 +3151,24 @@
     {
       "boolean": false,
       "category": "service_internal",
+      "key": "ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES",
+      "owners": [
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_DURABLE_PROFILE_MEMORY_PATH",
+      "owners": [
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
       "key": "ORCH_EMIT_EPISODE_RUNTIME_EVENTS",
       "owners": [
         "orchestrator/runtime/episode.py",
@@ -3180,6 +3198,14 @@
       "key": "ORCH_ENABLE_CONVERSATION_STATE",
       "owners": [
         ".env.common",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_ENABLE_DURABLE_PROFILE_MEMORY",
+      "owners": [
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -4791,10 +4817,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 145,
       "public_choice": 9,
-      "service_internal": 239
+      "service_internal": 242
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 450
+    "total_keys": 453
   }
 }
