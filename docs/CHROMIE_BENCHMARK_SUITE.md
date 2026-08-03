@@ -453,6 +453,20 @@ capability selection, response composition, audio flow, or lifecycle behavior:
    or evidence loss using the correlated logs before changing expectations.
 7. If the reviewer roster or provider model revisions changed, report that
    separately; do not attribute all score movement to Chromie source changes.
+8. Run the maintained archive comparator and retain its machine-readable report:
+
+   ```bash
+   python -m benchmarks.regression compare \
+     --baseline ~/Downloads/chromie-baseline.tar.gz \
+     --candidate ~/Downloads/chromie-candidate.tar.gz \
+     --output benchmarks/reports/regression-comparison.json
+   ```
+
+The comparator verifies artifact digests, compares deterministic boundaries
+first, then retained semantic verdicts and evidence, and finally latency/audio
+metrics. It fails on a pass-to-fail check, missing previously retained evidence,
+semantic degradation, or a configured performance regression. Different capture
+modes or language cohorts make the result inconclusive rather than comparable.
 
 For an opt-in automatic multi-judge run, supply the same reviewer configuration
 to the comprehensive collector:

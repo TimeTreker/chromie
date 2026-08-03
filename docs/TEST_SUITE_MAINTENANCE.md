@@ -33,6 +33,9 @@ claim.
 - For prompt, model, reasoning, memory, routing, capability, response, audio, or
   lifecycle changes, retain clean before/after comprehensive archives and use the
   same scenario cohort and evidence profile to detect capability degradation.
+- Compare those archives with `python -m benchmarks.regression compare`; do not
+  hand-wave a changed check ledger, missing evidence, semantic pass-to-partial,
+  or latency regression. Preserve an inconclusive result when cohorts differ.
 - Use at least three genuinely different model families for important semantic
   regression review when cost and privacy permit. Keep individual reviews,
   prompt/model provenance, and disagreement; do not replace them with one score.

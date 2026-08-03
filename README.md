@@ -211,6 +211,15 @@ may be judged independently by several configured model families:
   --semantic-reviewers .chromie/semantic-reviewers.json
 ```
 
+Compare a clean baseline and candidate archive after a large change:
+
+```bash
+python -m benchmarks.regression compare \
+  --baseline ~/Downloads/chromie-baseline.tar.gz \
+  --candidate ~/Downloads/chromie-candidate.tar.gz \
+  --output benchmarks/reports/regression-comparison.json
+```
+
 Copy `benchmarks/manifests/semantic_reviewers.example.json`, verify current
 provider model/base-URL values, assign honest model-family identities, enable
 selected profiles, and keep API keys in environment variables. See the

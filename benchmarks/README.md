@@ -53,6 +53,22 @@ semantic truth. Existing fixture/contract checks remain deterministic, and
 pending qualitative cases are packaged for retained LLM or human review. The
 runner records its own digest and the tested Git revision in the archive.
 
+Compare a clean known-good archive with a candidate using the maintained
+revision-bound comparator:
+
+```bash
+python -m benchmarks.regression compare \
+  --baseline ~/Downloads/chromie-baseline.tar.gz \
+  --candidate ~/Downloads/chromie-candidate.tar.gz \
+  --output benchmarks/reports/regression-comparison.json
+```
+
+The comparator verifies retained artifact indexes, compares deterministic checks
+before semantic verdicts, reports missing scenarios/evidence, and measures
+latency/audio regressions. Exit status `1` means a regression was found; exit
+status `2` means the evidence could not be validated. Cohort mismatches are
+reported as inconclusive rather than silently treated as equivalent.
+
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset
