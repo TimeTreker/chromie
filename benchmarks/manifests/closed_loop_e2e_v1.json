@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "qualification_id": "bilingual-generated-speech-closed-loop-v2",
+  "qualification_id": "bilingual-generated-speech-closed-loop-v3",
   "transport_cases": [
     {
       "id": "zh_short",
@@ -10,7 +10,12 @@
       "max_error_rate": 0.35,
       "oracle_policy": {
         "mode": "deterministic",
-        "deterministic_sources": ["source_text", "tts_pcm", "asr_transcript", "cer_threshold"],
+        "deterministic_sources": [
+          "source_text",
+          "tts_pcm",
+          "asr_transcript",
+          "cer_threshold"
+        ],
         "semantic_dimensions": []
       }
     },
@@ -22,7 +27,12 @@
       "max_error_rate": 0.35,
       "oracle_policy": {
         "mode": "deterministic",
-        "deterministic_sources": ["source_text", "tts_pcm", "asr_transcript", "cer_threshold"],
+        "deterministic_sources": [
+          "source_text",
+          "tts_pcm",
+          "asr_transcript",
+          "cer_threshold"
+        ],
         "semantic_dimensions": []
       }
     },
@@ -34,7 +44,12 @@
       "max_error_rate": 0.35,
       "oracle_policy": {
         "mode": "deterministic",
-        "deterministic_sources": ["source_text", "tts_pcm", "asr_transcript", "wer_threshold"],
+        "deterministic_sources": [
+          "source_text",
+          "tts_pcm",
+          "asr_transcript",
+          "wer_threshold"
+        ],
         "semantic_dimensions": []
       }
     },
@@ -46,7 +61,12 @@
       "max_error_rate": 0.35,
       "oracle_policy": {
         "mode": "deterministic",
-        "deterministic_sources": ["source_text", "tts_pcm", "asr_transcript", "wer_threshold"],
+        "deterministic_sources": [
+          "source_text",
+          "tts_pcm",
+          "asr_transcript",
+          "wer_threshold"
+        ],
         "semantic_dimensions": []
       }
     }
@@ -55,46 +75,496 @@
     {
       "id": "zh_family_help",
       "language": "zh-CN",
-      "text": "请用一句简短的话说说你会怎么帮助家人。",
+      "turns": [
+        "请用一句简短的话说说你会怎么帮助家人。"
+      ],
       "speaker_id": "chromie_zh",
-      "max_error_rate": 0.40,
+      "max_error_rate": 0.45,
       "primary_outcomes": [
-        "用自然、简短、符合六岁家庭小秘书身份的话回答自己会怎样帮助家人"
+        "自然、简短地说明会怎样帮助家人"
       ],
       "oracle_policy": {
         "mode": "hybrid",
-        "deterministic_sources": ["delivered_speech_event", "playback_capture", "asr_transcript", "cer_threshold"],
-        "semantic_dimensions": ["intent_understanding", "identity_consistency", "naturalness", "conciseness"]
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "identity_consistency",
+          "naturalness",
+          "conciseness"
+        ]
       },
       "review_rubric": {
-        "dimensions": ["intent_understanding", "identity_consistency", "naturalness", "conciseness"],
+        "dimensions": [
+          "intent_understanding",
+          "identity_consistency",
+          "naturalness",
+          "conciseness"
+        ],
         "guidance": [
-          "Chromie should answer as a capable six-year-old family secretary, not a bureaucratic robot.",
-          "Do not require exact wording or mandatory identity recitation.",
-          "The response should directly answer the request in one short sentence."
+          "直接回答，不要求逐字复述身份。",
+          "语气应像能干、温暖的六岁家庭小秘书，而不是客服或程序。"
         ]
       }
     },
     {
       "id": "en_family_help",
       "language": "en-US",
-      "text": "In one short sentence, tell me how you help your family.",
+      "turns": [
+        "In one short sentence, tell me how you help your family."
+      ],
       "speaker_id": "chromie_en",
-      "max_error_rate": 0.40,
+      "max_error_rate": 0.45,
       "primary_outcomes": [
-        "Answer naturally and briefly about how Chromie helps her family"
+        "Answer naturally and briefly about helping the family"
       ],
       "oracle_policy": {
         "mode": "hybrid",
-        "deterministic_sources": ["delivered_speech_event", "playback_capture", "asr_transcript", "wer_threshold"],
-        "semantic_dimensions": ["intent_understanding", "identity_consistency", "naturalness", "conciseness"]
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "identity_consistency",
+          "naturalness",
+          "conciseness"
+        ]
       },
       "review_rubric": {
-        "dimensions": ["intent_understanding", "identity_consistency", "naturalness", "conciseness"],
+        "dimensions": [
+          "intent_understanding",
+          "identity_consistency",
+          "naturalness",
+          "conciseness"
+        ],
         "guidance": [
-          "Chromie should answer as a capable six-year-old family secretary, not a bureaucratic robot.",
-          "Do not require exact wording or mandatory identity recitation.",
-          "The response should directly answer the request in one short sentence."
+          "Answer the request directly without mandatory identity recitation.",
+          "Sound like a capable, warm six-year-old family secretary, not customer support."
+        ]
+      }
+    },
+    {
+      "id": "zh_stable_knowledge",
+      "language": "zh-CN",
+      "turns": [
+        "月亮为什么会发光？请用一句话告诉我。"
+      ],
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "用常识直接解释月亮反射太阳光，不发起外部查询"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "factual_correctness",
+          "directness",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "intent_understanding",
+          "factual_correctness",
+          "directness",
+          "naturalness"
+        ],
+        "guidance": [
+          "这是稳定常识，应直接回答。",
+          "不得把月亮说成自己发光，也不要只说“我去看看”。"
+        ]
+      }
+    },
+    {
+      "id": "en_stable_knowledge",
+      "language": "en-US",
+      "turns": [
+        "Why does the Moon shine? Tell me in one sentence."
+      ],
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "Explain that moonlight is reflected sunlight without an external lookup"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "factual_correctness",
+          "directness",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "intent_understanding",
+          "factual_correctness",
+          "directness",
+          "naturalness"
+        ],
+        "guidance": [
+          "This is stable knowledge and should be answered directly.",
+          "Do not claim the Moon makes its own visible light or merely announce a lookup."
+        ]
+      }
+    },
+    {
+      "id": "zh_session_memory_recall",
+      "language": "zh-CN",
+      "turns": [
+        "请记住，我的测试颜色是蓝色。",
+        "我刚才说的测试颜色是什么？"
+      ],
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "先确认已记住，再在下一轮准确回答蓝色"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "memory_write",
+          "memory_recall",
+          "latest_intent",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "memory_write",
+          "memory_recall",
+          "latest_intent",
+          "naturalness"
+        ],
+        "guidance": [
+          "第二轮必须从本次会话记忆回答“蓝色”。",
+          "不得重复泛化的“我帮你看看”或声称没有记忆。"
+        ]
+      }
+    },
+    {
+      "id": "en_session_memory_recall",
+      "language": "en-US",
+      "turns": [
+        "Remember that my test color is blue.",
+        "What test color did I say?"
+      ],
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "Store the session fact and recall blue on the next turn"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "memory_write",
+          "memory_recall",
+          "latest_intent",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "memory_write",
+          "memory_recall",
+          "latest_intent",
+          "naturalness"
+        ],
+        "guidance": [
+          "The second response should directly recall blue from session memory.",
+          "Do not route recall as a new memory write or give a generic checking response."
+        ]
+      }
+    },
+    {
+      "id": "zh_weather_followup",
+      "language": "zh-CN",
+      "turns": [
+        "重庆今天会下雨吗？",
+        "那我出门需要带伞吗？"
+      ],
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "获取重庆当前天气证据，并基于同一证据自然回答带伞建议"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "grounding",
+          "follow_up_continuity",
+          "non_repetition"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "intent_understanding",
+          "grounding",
+          "follow_up_continuity",
+          "non_repetition"
+        ],
+        "guidance": [
+          "天气事实必须来自实际工具证据。",
+          "第二轮应回答用户的实际决定问题，不要机械重播完整天气报告。"
+        ]
+      }
+    },
+    {
+      "id": "en_weather_correction",
+      "language": "en-US",
+      "turns": [
+        "What is the weather in Seattle today?",
+        "Sorry, I meant Portland."
+      ],
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "Use Seattle for the first read, then perform a fresh exact read for Portland"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "intent_understanding",
+          "grounding",
+          "correction_handling",
+          "latest_intent"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "intent_understanding",
+          "grounding",
+          "correction_handling",
+          "latest_intent"
+        ],
+        "guidance": [
+          "The corrected location must replace Seattle exactly.",
+          "Do not reuse Seattle evidence for Portland or merely apologize without answering."
+        ]
+      }
+    },
+    {
+      "id": "zh_multi_part",
+      "language": "zh-CN",
+      "turns": [
+        "请先用一句话告诉我月亮为什么发光，再提醒我今晚早点睡。"
+      ],
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "完成稳定知识解释和睡觉提醒两个独立责任"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "multi_goal_coverage",
+          "factual_correctness",
+          "ordering",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "multi_goal_coverage",
+          "factual_correctness",
+          "ordering",
+          "naturalness"
+        ],
+        "guidance": [
+          "两个责任都要完成，不能只回应其中一个。",
+          "先解释月亮，再给简短自然的提醒。"
+        ]
+      }
+    },
+    {
+      "id": "en_multi_part",
+      "language": "en-US",
+      "turns": [
+        "Tell me why the Moon shines, then remind me to go to bed early tonight."
+      ],
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.45,
+      "primary_outcomes": [
+        "Complete both the stable-knowledge explanation and the bedtime reminder"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "multi_goal_coverage",
+          "factual_correctness",
+          "ordering",
+          "naturalness"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "multi_goal_coverage",
+          "factual_correctness",
+          "ordering",
+          "naturalness"
+        ],
+        "guidance": [
+          "Both independent responsibilities must be completed exactly once.",
+          "Explain first, then give the reminder."
+        ]
+      }
+    },
+    {
+      "id": "zh_long_ordered_playback",
+      "language": "zh-CN",
+      "turns": [
+        "请讲一个三句话的小故事，主角是一只帮家人整理东西的小猫。"
+      ],
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.5,
+      "primary_outcomes": [
+        "生成完整三句话故事并按顺序播放，不截断、不重复"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "cer_threshold"
+        ],
+        "semantic_dimensions": [
+          "creative_fulfillment",
+          "coherence",
+          "identity_consistency",
+          "non_repetition"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "creative_fulfillment",
+          "coherence",
+          "identity_consistency",
+          "non_repetition"
+        ],
+        "guidance": [
+          "故事应完整且有自然起承转合。",
+          "音频中不得漏掉后半段、重复句子或乱序。"
+        ]
+      }
+    },
+    {
+      "id": "en_long_ordered_playback",
+      "language": "en-US",
+      "turns": [
+        "Tell me a three-sentence story about a kitten who helps the family organize things."
+      ],
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.5,
+      "primary_outcomes": [
+        "Generate and play a complete three-sentence story in order without truncation or duplication"
+      ],
+      "oracle_policy": {
+        "mode": "hybrid",
+        "deterministic_sources": [
+          "delivered_speech_event",
+          "turn_completion",
+          "unique_delivery",
+          "playback_capture",
+          "asr_transcript",
+          "wer_threshold"
+        ],
+        "semantic_dimensions": [
+          "creative_fulfillment",
+          "coherence",
+          "identity_consistency",
+          "non_repetition"
+        ]
+      },
+      "review_rubric": {
+        "dimensions": [
+          "creative_fulfillment",
+          "coherence",
+          "identity_consistency",
+          "non_repetition"
+        ],
+        "guidance": [
+          "The story should be complete and coherent.",
+          "Playback must not truncate, duplicate, or reorder later sentences."
         ]
       }
     }

@@ -44,6 +44,35 @@ class ClosedLoopE2ETests(unittest.TestCase):
         self.assertEqual(cases[0].speaker_id, "chromie_zh")
         self.assertEqual(cases[1].speaker_id, "chromie_en")
 
+    def test_manifest_supports_multi_turn_workflow_cases(self) -> None:
+        payload = {
+            "workflow_cases": [
+                {
+                    "id": "memory",
+                    "language": "en-US",
+                    "turns": [
+                        "Remember that my test color is blue.",
+                        "What test color did I say?",
+                    ],
+                    "speaker_id": "chromie_en",
+                    "oracle_policy": {
+                        "mode": "hybrid",
+                        "deterministic_sources": ["turn_completion"],
+                        "semantic_dimensions": ["memory_recall"],
+                    },
+                }
+            ]
+        }
+        case = parse_cases(payload, "workflow_cases")[0]
+        self.assertEqual(
+            case.user_turns(),
+            (
+                "Remember that my test color is blue.",
+                "What test color did I say?",
+            ),
+        )
+        self.assertEqual(case.text, "Remember that my test color is blue.")
+
     def test_primary_error_uses_cer_for_chinese_and_wer_for_english(self) -> None:
         self.assertEqual(primary_error("zh-CN", "你好", "你好")[0], "cer")
         self.assertEqual(primary_error("en-US", "hello there", "hello there")[0], "wer")
@@ -129,6 +158,15 @@ class ClosedLoopE2ETests(unittest.TestCase):
         self.assertTrue(
             all("expected_any" not in row for row in payload["workflow_cases"])
         )
+        self.assertGreaterEqual(len(payload["workflow_cases"]), 12)
+        workflow_ids = {row["id"] for row in payload["workflow_cases"]}
+        self.assertIn("en_session_memory_recall", workflow_ids)
+        self.assertIn("zh_weather_followup", workflow_ids)
+        self.assertIn("en_weather_correction", workflow_ids)
+        self.assertIn("zh_long_ordered_playback", workflow_ids)
+        self.assertTrue(
+            any(len(row.get("turns", [])) > 1 for row in payload["workflow_cases"])
+        )
 
     def test_closed_loop_review_bundle_uses_external_semantic_review(self) -> None:
         case = ClosedLoopCase(
@@ -172,6 +210,8 @@ class ClosedLoopE2ETests(unittest.TestCase):
             bundle["scenarios"][0]["review_request"]["semantic_dimensions"],
             ["intent_understanding", "naturalness"],
         )
+        normalized = bundle["scenarios"][0]["scenario"]
+        self.assertEqual(normalized["inputs"]["turns"], ["How do you help?"])
 
 
 if __name__ == "__main__":

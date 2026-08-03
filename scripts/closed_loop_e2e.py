@@ -66,6 +66,7 @@ class ClosedLoopCase:
     text: str
     speaker_id: str
     max_error_rate: float
+    turns: tuple[str, ...] = ()
     expected_any: tuple[str, ...] = ()
     expected_all: tuple[str, ...] = ()
     oracle_mode: str = "deterministic"
@@ -73,6 +74,9 @@ class ClosedLoopCase:
     primary_outcomes: tuple[str, ...] = ()
     semantic_dimensions: tuple[str, ...] = ()
     review_rubric: dict[str, Any] | None = None
+
+    def user_turns(self) -> tuple[str, ...]:
+        return self.turns or (self.text,)
 
 
 @dataclass(frozen=True)
@@ -393,12 +397,22 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
             raise ValueError(f"manifest {key} {mode} oracle needs deterministic_sources")
         if mode in {"semantic_review", "hybrid"} and not semantic_dimensions:
             raise ValueError(f"manifest {key} {mode} oracle needs semantic_dimensions")
+        raw_turns = row.get("turns")
+        turns = tuple(
+            str(value).strip()
+            for value in raw_turns
+            if str(value).strip()
+        ) if isinstance(raw_turns, list) else ()
+        text = str(row.get("text") or (turns[0] if turns else "")).strip()
+        if not text:
+            raise ValueError(f"manifest {key} item {row.get('id')!r} needs text or turns")
         cases.append(
             ClosedLoopCase(
                 case_id=str(row["id"]),
                 language=str(row["language"]),
-                text=str(row["text"]),
+                text=text,
                 speaker_id=str(row.get("speaker_id") or "default"),
+                turns=turns,
                 max_error_rate=float(row.get("max_error_rate", 0.35)),
                 expected_any=tuple(str(v) for v in row.get("expected_any", [])),
                 expected_all=tuple(str(v) for v in row.get("expected_all", [])),
@@ -710,21 +724,50 @@ async def run_workflow_case(
         input_device=args.input_device,
     )
     assistant = VoiceAssistant()
-    sid = assistant.create_session()
     error = ""
+    turn_records: list[dict[str, Any]] = []
+    delivered_events: list[dict[str, Any]] = []
+    delivered_text = ""
+    hypothesis = ""
+    metrics = transcript_metrics(case.language, "", "")
+    semantic = expected_term_result(case, "")
+    audio_passed = False
+    mechanical_passed = False
+    semantic_review_required = case.oracle_mode in {"semantic_review", "hybrid"}
+    status = "fail"
+    trimmed_wav = case_dir / "playback-capture-trimmed.wav"
     try:
         with capture:
-            await assistant.handle_routed_text(case.text, sid, channel="text")
-            await wait_for_session_done(assistant, sid, timeout_s=args.workflow_timeout)
+            for index, user_text in enumerate(case.user_turns(), start=1):
+                sid = assistant.create_session()
+                await assistant.handle_routed_text(user_text, sid, channel="text")
+                await wait_for_session_done(
+                    assistant,
+                    sid,
+                    timeout_s=args.workflow_timeout,
+                )
+                await asyncio.sleep(0.25)
+                turn_events = assistant._delivered_turn_speech_events(sid)
+                turn_text = " ".join(
+                    str(event.get("text") or "").strip()
+                    for event in turn_events
+                    if str(event.get("text") or "").strip()
+                ).strip()
+                delivered_events.extend(turn_events)
+                turn_records.append(
+                    {
+                        "turn_index": index,
+                        "session_id": sid,
+                        "user_text": user_text,
+                        "delivered_text": turn_text,
+                        "delivered_speech_events": turn_events,
+                    }
+                )
             await asyncio.sleep(0.75)
-        delivered_events = assistant._delivered_turn_speech_events(sid)
         delivered_text = " ".join(
-            str(event.get("text") or "").strip()
-            for event in delivered_events
-            if str(event.get("text") or "").strip()
+            row["delivered_text"] for row in turn_records if row["delivered_text"]
         ).strip()
         captured = trim_silence(read_wav(captured_wav))
-        trimmed_wav = case_dir / "playback-capture-trimmed.wav"
         write_pcm16_wav(
             trimmed_wav,
             pcm16=captured.pcm16,
@@ -741,8 +784,19 @@ async def run_workflow_case(
             metrics["error_rate"] <= case.max_error_rate
         )
         semantic = expected_term_result(case, delivered_text)
-        mechanical_passed = audio_passed and semantic["passed"]
-        semantic_review_required = case.oracle_mode in {"semantic_review", "hybrid"}
+        event_ids = [
+            str(event.get("event_id") or "")
+            for event in delivered_events
+            if str(event.get("event_id") or "")
+        ]
+        unique_delivery = len(event_ids) == len(set(event_ids))
+        all_turns_finished = len(turn_records) == len(case.user_turns())
+        mechanical_passed = (
+            audio_passed
+            and semantic["passed"]
+            and unique_delivery
+            and all_turns_finished
+        )
         status = (
             "fail"
             if not mechanical_passed
@@ -752,26 +806,19 @@ async def run_workflow_case(
         )
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
-        delivered_events = assistant._delivered_turn_speech_events(sid)
         delivered_text = " ".join(
-            str(event.get("text") or "").strip()
-            for event in delivered_events
-            if str(event.get("text") or "").strip()
+            row["delivered_text"] for row in turn_records if row["delivered_text"]
         ).strip()
-        hypothesis = ""
-        metrics = transcript_metrics(case.language, delivered_text, hypothesis)
+        metrics = transcript_metrics(case.language, delivered_text, "")
         semantic = expected_term_result(case, delivered_text)
-        audio_passed = False
-        mechanical_passed = False
-        semantic_review_required = case.oracle_mode in {"semantic_review", "hybrid"}
-        status = "fail"
-        trimmed_wav = case_dir / "playback-capture-trimmed.wav"
     finally:
         await assistant.cleanup()
     result = {
         "id": case.case_id,
         "language": case.language,
         "user_text": case.text,
+        "user_turns": list(case.user_turns()),
+        "turns": turn_records,
         "capture_backend": capture.name,
         "delivered_speech_events": delivered_events,
         "delivered_text": delivered_text,
@@ -791,6 +838,20 @@ async def run_workflow_case(
             "pending" if semantic_review_required and status != "fail" else "not_required"
         ),
         "audio_passed": audio_passed,
+        "all_turns_finished": len(turn_records) == len(case.user_turns()),
+        "unique_delivery": len(
+            {
+                str(event.get("event_id") or "")
+                for event in delivered_events
+                if str(event.get("event_id") or "")
+            }
+        ) == len(
+            [
+                event
+                for event in delivered_events
+                if str(event.get("event_id") or "")
+            ]
+        ),
         "mechanical_passed": mechanical_passed,
         "captured_wav": str(captured_wav),
         "trimmed_wav": str(trimmed_wav),
@@ -831,6 +892,7 @@ def closed_loop_review_bundle(
                 },
                 "inputs": {
                     "user_text": case.text,
+                    "turns": list(case.user_turns()),
                     "language": case.language,
                 },
                 "context": {},
@@ -895,6 +957,7 @@ def closed_loop_review_bundle(
                     "social_attention_lifecycle": {},
                     "evidence": [
                         {
+                            "turns": result.get("turns"),
                             "delivered_speech_events": result.get(
                                 "delivered_speech_events"
                             ),
