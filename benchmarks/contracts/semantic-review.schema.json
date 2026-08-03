@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/semantic-review-v1.json",
+  "title": "Chromie Semantic Benchmark Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "reviewer", "reviews"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["llm", "human", "llm_assisted_human"]},
+        "model": {"type": ["string", "null"]},
+        "reviewer_id": {"type": ["string", "null"]}
+      }
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["scenario_id", "verdict", "rationale", "evidence_refs"],
+        "properties": {
+          "scenario_id": {"type": "string", "minLength": 1},
+          "verdict": {"enum": ["pass", "partial", "fail", "insufficient_evidence"]},
+          "rationale": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "dimensions": {"type": "object"},
+          "findings": {"type": "array"},
+          "likely_root_causes": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
