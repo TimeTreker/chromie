@@ -168,5 +168,20 @@ failures. See
 and
 [Big-change capability-degradation protocol](CHROMIE_BENCHMARK_SUITE.md#732-big-change-capability-degradation-protocol).
 
+Replay a single retained closed-loop case after a comprehensive failure:
+
+```bash
+python -m benchmarks.regression replay \
+  --archive ~/Downloads/chromie-comprehensive-REV-RUN.tar.gz \
+  --scenario SCENARIO_ID \
+  --output-dir .chromie/replay/SCENARIO_ID \
+  --start-services
+```
+
+Use `python -m benchmarks.regression minimize` for a multi-turn failure. The
+default oracle minimizes only a reproduced mechanical failure. Pass an explicit
+`--oracle-command` for meaning-based failure; it must return a typed boolean and
+its result is retained with every attempt.
+
 The command adapter contract is documented in
 [`benchmarks/e2e/README.md`](../benchmarks/e2e/README.md).

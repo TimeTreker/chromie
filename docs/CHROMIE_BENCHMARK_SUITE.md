@@ -468,6 +468,24 @@ metrics. It fails on a pass-to-fail check, missing previously retained evidence,
 semantic degradation, or a configured performance regression. Different capture
 modes or language cohorts make the result inconclusive rather than comparable.
 
+A failing retained scenario can be replayed alone from the same archive:
+
+```bash
+python -m benchmarks.regression replay \
+  --archive ~/Downloads/chromie-candidate.tar.gz \
+  --scenario en_session_memory_recall \
+  --output-dir .chromie/replay/en_session_memory_recall \
+  --start-services
+```
+
+The replay command reconstructs a one-case manifest from the retained normalized
+scenario rather than silently using a newer scenario definition. For multi-turn
+failures, `benchmarks.regression minimize` removes structural turn subsets and
+reruns the real closed-loop boundary. Mechanical minimization uses the exact
+mechanical failure result. Semantic minimization requires an explicit external
+predicate command; the Host and minimizer do not infer semantic failure from
+phrases. Every attempt and its evidence directory are retained.
+
 For an opt-in automatic multi-judge run, supply the same reviewer configuration
 to the comprehensive collector:
 

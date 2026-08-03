@@ -36,6 +36,10 @@ claim.
 - Compare those archives with `python -m benchmarks.regression compare`; do not
   hand-wave a changed check ledger, missing evidence, semantic pass-to-partial,
   or latency regression. Preserve an inconclusive result when cohorts differ.
+- Reproduce one failed case with `benchmarks.regression replay` before changing
+  production code. Minimize only by structural turn removal and an explicit
+  mechanical or external semantic predicate; never encode regression phrases as
+  the minimizer's truth.
 - Use at least three genuinely different model families for important semantic
   regression review when cost and privacy permit. Keep individual reviews,
   prompt/model provenance, and disagreement; do not replace them with one score.

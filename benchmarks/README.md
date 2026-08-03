@@ -69,6 +69,22 @@ latency/audio regressions. Exit status `1` means a regression was found; exit
 status `2` means the evidence could not be validated. Cohort mismatches are
 reported as inconclusive rather than silently treated as equivalent.
 
+Replay one retained live workflow case without rerunning the full suite:
+
+```bash
+python -m benchmarks.regression replay \
+  --archive ~/Downloads/chromie-candidate.tar.gz \
+  --scenario en_session_memory_recall \
+  --output-dir .chromie/replay/en_session_memory_recall \
+  --start-services
+```
+
+For a multi-turn failure, `benchmarks.regression minimize` uses structural
+delta-debugging. Its default oracle is the exact mechanical failure boundary. A
+semantic failure requires an explicit `--oracle-command` that reads replay JSON
+from stdin and returns `{"failure_reproduced": true|false}`. The minimizer never
+uses phrases or keywords to decide meaning.
+
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset

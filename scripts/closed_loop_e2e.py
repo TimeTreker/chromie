@@ -1053,10 +1053,18 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         for item in args.languages.split(",")
         if item.strip()
     }
+    selected_case_ids = {str(value).strip() for value in args.case if str(value).strip()}
     transport_cases = filter_language(
         parse_cases(manifest, "transport_cases"), languages
     )
     workflow_cases = filter_language(parse_cases(manifest, "workflow_cases"), languages)
+    if selected_case_ids:
+        transport_cases = [case for case in transport_cases if case.case_id in selected_case_ids]
+        workflow_cases = [case for case in workflow_cases if case.case_id in selected_case_ids]
+        found = {case.case_id for case in transport_cases + workflow_cases}
+        missing = sorted(selected_case_ids - found)
+        if missing:
+            raise ValueError("requested closed-loop cases not found: " + ", ".join(missing))
     output_dir = (args.output_dir or DEFAULT_OUTPUT_ROOT / utc_id()).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     log_handler = install_python_log_capture(output_dir / "logs" / "python-runtime.log")
@@ -1154,6 +1162,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--languages", default="zh,en")
+    parser.add_argument(
+        "--case",
+        action="append",
+        default=[],
+        help="Run only the named closed-loop case (repeatable).",
+    )
     parser.add_argument("--tts-url", default=os.getenv("TTS_URL", "ws://127.0.0.1:5000"))
     parser.add_argument("--asr-url", default=os.getenv("ASR_URL", "ws://127.0.0.1:9001"))
     parser.add_argument(
