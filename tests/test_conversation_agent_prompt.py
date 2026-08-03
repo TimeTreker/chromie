@@ -1289,5 +1289,55 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Verse three", " ".join(item.text for item in result.speak_immediate))
 
 
+    async def test_session_memory_recall_is_answered_directly_from_supplied_fact(self) -> None:
+        ollama = _CapturingOllama("You said your test color is blue.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "session-memory-recall",
+                "text": "What test color did I say?",
+                "context": {
+                    "session_memory": {
+                        "kind": "short_term_session_memory",
+                        "memory_summary": "- The user's test color is blue.",
+                        "extracted_memory": [
+                            {
+                                "scope": "session",
+                                "kind": "preference",
+                                "key": "test_color",
+                                "text": "The user's test color is blue.",
+                                "confidence": 0.98,
+                            }
+                        ],
+                    }
+                },
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "recall_session_fact",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "You said your test color is blue.")
+        self.assertEqual(len(ollama.calls), 1)
+        prompt = ollama.calls[0]["prompt"]
+        system = ollama.calls[0]["system"]
+        self.assertIn("The user's test color is blue", prompt)
+        self.assertIn("answer that fact directly", system)
+        self.assertIn("If the requested fact is absent", system)
+
+
 if __name__ == "__main__":
     unittest.main()
