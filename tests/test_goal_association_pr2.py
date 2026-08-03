@@ -50,12 +50,19 @@ def request(
     discourse_focus=None,
     recent_tool_evidence=None,
     recent_goals=None,
+    route="chat",
+    intent="conversation",
 ):
     return AgentRunRequest(
         sid="sid-pr2",
         text=text,
         language=language,
-        route_decision=RouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm"),
+        route_decision=RouteDecision(
+            route=route,
+            intent=intent,
+            confidence=0.8,
+            source="llm",
+        ),
         context={
             "active_goal_snapshots": active_goals or [],
             "recent_goal_snapshots": recent_goals or [],
@@ -119,6 +126,87 @@ class GoalAssociationModelOutputTests(unittest.TestCase):
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+    def test_preassociation_clarify_route_does_not_force_goal_loss(self):
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": (
+                            "Recommend interesting places near the user."
+                        ),
+                        "responsibility_kind": "capability_dependent",
+                        "bindings": [],
+                    }
+                ],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": (
+                    "The desired outcome is clear; capability planning may ask "
+                    "for a location binding later."
+                ),
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "帮我推荐附近好玩的地方。",
+                    route="clarify",
+                    intent="clarify_missing_location",
+                )
+            )
+        )
+
+        self.assertEqual(result.clarification, "")
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].description,
+            "Recommend interesting places near the user.",
+        )
+        prompt, kwargs = ollama.prompts[0]
+        self.assertIn(
+            "pre-association route and intent are advisory only", prompt
+        )
+        self.assertNotIn(
+            "an admitted clarify route requires", prompt
+        )
+        self.assertEqual(
+            kwargs["response_format"]["properties"]["decision"]["enum"],
+            ["create_goals", "clarify"],
+        )
+
+    def test_preassociation_clarify_route_can_still_ask_for_semantic_clarification(self):
+        ollama = FakeOllama(
+            {
+                "decision": "clarify",
+                "new_goals": [],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "你想找吃饭的地方，还是游玩的地方？",
+                "confidence": 0.8,
+                "reason_summary": "The requested outcome itself is ambiguous.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "附近有什么好地方？",
+                    route="clarify",
+                    intent="clarify_uncertain_request",
+                )
+            )
+        )
+
+        self.assertEqual(
+            result.clarification,
+            "你想找吃饭的地方，还是游玩的地方？",
+        )
+        self.assertEqual(result.new_goals, [])
+
     def test_explicit_location_binding_repairs_non_verbatim_model_value(self):
         mistranslated = {
             "decision": "create_goals",

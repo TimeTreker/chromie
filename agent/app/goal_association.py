@@ -502,7 +502,7 @@ class GoalAssociationResolver:
             output_type,
             candidate_goals,
             discourse_referents,
-            clarification_only=self._clarification_only(request),
+            clarification_only=False,
         )
         generation_options = {
             "temperature": 0,
@@ -737,11 +737,6 @@ class GoalAssociationResolver:
         ),
     ) -> GoalAssociationResolution:
         model_output = output_type.model_validate(raw)
-        if self._clarification_only(request) and model_output.decision != "clarify":
-            raise ValueError(
-                "an admitted clarify route requires a clarification-only Goal "
-                "Association result"
-            )
         collection_bindings = self._action_collection_bindings(model_output)
         if collection_bindings:
             raise ValueError(
@@ -877,7 +872,6 @@ class GoalAssociationResolver:
             isinstance(model_output, GoalAssociationModelOutput)
             and model_output.decision == "clarify"
             and candidate_goals
-            and not GoalAssociationResolver._clarification_only(request)
         ):
             triggers.append("candidate_goal_clarification_continuity")
         return triggers
@@ -1076,10 +1070,6 @@ class GoalAssociationResolver:
         return out
 
     @staticmethod
-    def _clarification_only(request: AgentRunRequest) -> bool:
-        return str(request.route_decision.route or "").strip() == "clarify"
-
-    @staticmethod
     def _turn_id(request: AgentRunRequest) -> str:
         seed = f"{request.sid or 'turn'}|{request.text}"
         return f"turn_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:20]}"
@@ -1104,14 +1094,6 @@ class GoalAssociationResolver:
         skill_section = agent_skill_prompt_section(
             context,
             agent_role="goal_association",
-        )
-        clarification_authority = (
-            "The admitted Cognitive Core disposition is clarify. Preserve that "
-            "semantic authority: return decision=clarify with one concise "
-            "user-facing question, associations=[], and new_goals=[]. Do not "
-            "reinterpret the low-information turn as a social goal.\n\n"
-            if self._clarification_only(request)
-            else ""
         )
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
@@ -1139,7 +1121,9 @@ class GoalAssociationResolver:
             )
         return (
             state_instructions
-            + clarification_authority
+            + "The supplied pre-association route and intent are advisory only. "
+            "They must not force a clarification branch or attach the turn to an existing Goal. "
+            "If the user's intended outcome is clear, create or associate the semantic Goal even when downstream capability planning may still need a binding; the Planner owns execution-information gaps. "
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
@@ -1204,13 +1188,6 @@ class GoalAssociationResolver:
             context,
             agent_role="goal_association",
         )
-        clarification_authority = (
-            "The admitted Cognitive Core disposition is clarify. Return only "
-            "decision=clarify with a concise user-facing question; do not create "
-            "or associate goals.\n\n"
-            if self._clarification_only(request)
-            else ""
-        )
         if output_type is GoalSegmentationModelOutput:
             contract_name = "Goal Segmentation"
             revision_action = "Re-evaluate the independent goal segmentation"
@@ -1239,8 +1216,7 @@ class GoalAssociationResolver:
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             + state_instructions
-            + clarification_authority
-            + "\n\n"
+            + "The supplied pre-association route and intent are advisory only. Reconstruct semantic Goals from the authoritative user turn and bounded Goal state; do not preserve a clarification branch merely because an earlier stage selected route=clarify.\n\n"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             + "\n\nResolved references are only for indirect references bound to a supplied discourse referent or active Goal binding. Direct explicit entity mentions belong in Goal bindings and salient referent updates, not resolved_references. For an indirect location binding, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the referent canonical value. Every resolved reference and referent update must include explicit confidence.\n\nOwner-approved Chromie identity JSON:\n"

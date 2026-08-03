@@ -7,6 +7,7 @@ from unittest import mock
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
+    SemanticRouteRepairOutput,
     _catalog_observability_profile,
     _payload_message_texts,
     _prompt_feature_flags,
@@ -17,6 +18,34 @@ from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, Rout
 
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
+    def test_missing_ability_alias_is_canonicalized_before_branch_validation(self) -> None:
+        output = SemanticRouteRepairOutput.model_validate(
+            {
+                "route": "clarify",
+                "intent": "missing_or_supported_ability",
+                "confidence": 1.0,
+                "speak_first": (
+                    "我明白你想找附近好玩的地方，不过我现在还没有本地地点搜索和推荐能力。"
+                ),
+                "metadata": {
+                    "desired_abilities": [
+                        {
+                            "ability_id": "local.place_recommendation",
+                            "intent": "推荐用户附近好玩的地方",
+                            "status": "missing_ability",
+                            "confidence": 1.0,
+                            "reason": "当前能力目录没有本地地点搜索能力。",
+                        }
+                    ]
+                },
+            }
+        )
+
+        self.assertEqual(
+            output.intent,
+            "missing_or_unsupported_ability",
+        )
+
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -2748,7 +2777,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     "message": {
                         "content": (
                             '{"route":"clarify",'
-                            '"intent":"missing_or_unsupported_ability",'
+                            '"intent":"missing_or_supported_ability",'
                             '"confidence":1.0,'
                             '"speak_first":"我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",'
                             '"metadata":{"desired_abilities":[{'

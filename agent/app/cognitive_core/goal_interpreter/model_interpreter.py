@@ -117,6 +117,49 @@ class SemanticRouteRepairOutput(BaseModel):
     speak_first: str | None = Field(default=None, min_length=1, max_length=240)
     metadata: SemanticRouteRepairMetadata | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_missing_ability_intent(
+        cls, value: Any
+    ) -> Any:
+        """Canonicalize model wording for the typed missing-ability branch.
+
+        The semantic repair model may express the same branch with a nearby
+        label (for example ``missing_or_supported_ability``).  Metadata carrying
+        ``desired_abilities`` is already an unambiguous declaration that the
+        model selected the missing-ability branch, so normalize it before the
+        strict branch validator runs.  This is contract normalization only; it
+        does not infer an ability from user text or catalog keywords.
+        """
+
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        intent = "_".join(
+            str(normalized.get("intent") or "")
+            .strip()
+            .casefold()
+            .replace("-", "_")
+            .split()
+        )
+        metadata = normalized.get("metadata")
+        has_desired_abilities = (
+            isinstance(metadata, dict)
+            and isinstance(metadata.get("desired_abilities"), list)
+            and bool(metadata.get("desired_abilities"))
+        )
+        missing_aliases = {
+            "missing_or_unsupported_ability",
+            "missing_or_supported_ability",
+            "missing_ability",
+            "unsupported_ability",
+            "ability_unavailable",
+            "capability_missing",
+        }
+        if has_desired_abilities or intent in missing_aliases:
+            normalized["intent"] = "missing_or_unsupported_ability"
+        return normalized
+
     @model_validator(mode="after")
     def validate_missing_ability_terminal(self) -> "SemanticRouteRepairOutput":
         is_missing = self.intent == "missing_or_unsupported_ability"
@@ -2279,10 +2322,26 @@ class OllamaGoalInterpreter:
                 stage="capability_grounding_review",
                 request=request,
             )
-            reviewed_decision = self._decision_from_response(
+            content = str(reviewed.get("message", {}).get("content") or "")
+            minimal = SemanticRouteRepairOutput.model_validate(
+                _extract_json_object(content)
+            )
+            reviewed_decision = finalize_decision(
+                RouteDecision(
+                    route=minimal.route,
+                    intent=minimal.intent,
+                    confidence=minimal.confidence,
+                    language=request.language or "auto",
+                    speak_first=minimal.speak_first,
+                    metadata=(
+                        minimal.metadata.model_dump(mode="json")
+                        if minimal.metadata is not None
+                        else {}
+                    ),
+                    source="llm",
+                ),
                 request,
-                reviewed,
-                stage="capability_grounding_review",
+                source="llm",
             )
         except Exception as exc:
             logger.warning(
