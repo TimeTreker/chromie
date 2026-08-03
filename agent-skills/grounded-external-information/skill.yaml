@@ -6,7 +6,7 @@ description: Select for read-only external-information Goals that need authorita
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:cdfe261dba373e64da93bbe32a37e82c323e66cfa6f15f9537e672913ce694c5
+content_digest: sha256:1dbcca4abd57bb04446d8f8f2aad7317e53f47c578dc21303abcb53ca8bd21fa
 extends: []
 required_capabilities: []
 optional_capabilities:
