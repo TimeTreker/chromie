@@ -5,6 +5,7 @@ import unittest
 
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
+    GoalAssociationModelOutput,
     GoalAssociationResolver,
     GoalSegmentationModelOutput,
 )
@@ -87,6 +88,34 @@ def active_goal(goal_id: str, description: str, *, bindings=None, status="open")
         "last_user_update": description,
         "metadata": {},
     }
+
+
+class GoalAssociationModelOutputTests(unittest.TestCase):
+    def test_association_only_create_goals_branch_normalizes_to_associate(self):
+        output = GoalAssociationModelOutput.model_validate(
+            {
+                "decision": "create_goals",
+                "associations": [
+                    {
+                        "relationship": "modify",
+                        "target_goal_ids": ["goal-restaurant"],
+                        "confidence": 1.0,
+                        "reason_summary": "The user supplied the missing location.",
+                        "updated_description": (
+                            "Recommend restaurants near Chongqing Longxing Tianjie."
+                        ),
+                        "requires_replan": True,
+                    }
+                ],
+                "new_goals": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": "Update the existing Goal.",
+            }
+        )
+
+        self.assertEqual(output.decision, "associate")
+        self.assertEqual(len(output.associations), 1)
 
 
 class GoalAssociationResolverTests(unittest.TestCase):

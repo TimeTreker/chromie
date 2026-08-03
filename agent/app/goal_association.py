@@ -391,6 +391,18 @@ class GoalAssociationModelOutput(BaseModel):
                 decision = "create_goals"
             else:
                 decision = "clarify"
+        elif (
+            decision == "create_goals"
+            and not normalized.get("new_goals")
+            and normalized.get("associations")
+        ):
+            decision = "associate"
+        elif (
+            decision == "associate"
+            and not normalized.get("associations")
+            and normalized.get("new_goals")
+        ):
+            decision = "create_goals"
         normalized["decision"] = decision
         if decision == "clarify":
             normalized["associations"] = []

@@ -154,6 +154,21 @@ class ExperienceManager:
                 "coverage, or skill-selection preferences. Do not change core "
                 "principles or physical safety rules without owner approval."
             )
+        missing_requests = record.metadata.get("missing_ability_requests")
+        if isinstance(missing_requests, list) and missing_requests:
+            ability_ids = [
+                str(item.get("ability_id") or "").strip()
+                for item in missing_requests
+                if isinstance(item, dict)
+            ]
+            ability_ids = [item for item in ability_ids if item]
+            requested = ", ".join(ability_ids[:4]) or "an understood missing ability"
+            proposed_change = (
+                f"Review the user-requested missing ability ({requested}) and decide whether "
+                "to add or prioritize a trusted Capability or Agent Skill. Preserve the "
+                "understood user outcome, require owner approval, and never substitute a "
+                "nearby capability or auto-apply the change."
+            )
         return MindUpdateProposal(
             target="experience_tuned_strategy",
             proposed_change=proposed_change,
@@ -179,6 +194,9 @@ class ExperienceManager:
             summary = cls._safe_summary(ledger.get("summary"))
             if summary:
                 metadata["task_proposal_summary"] = summary
+            missing_requests = cls._missing_ability_requests(ledger.get("proposals"))
+            if missing_requests:
+                metadata["missing_ability_requests"] = missing_requests
         preflight = response.metadata.get("preflight_validation")
         if isinstance(preflight, dict):
             summary = cls._safe_summary(preflight.get("summary"))
@@ -203,12 +221,20 @@ class ExperienceManager:
             )
             rejected = cls._int_from_mapping(proposal.get("states"), "rejected")
             superseded = cls._int_from_summary(proposal, "superseded_count")
+            missing_abilities = cls._int_from_mapping(
+                proposal.get("states"),
+                "missing_ability",
+            )
             if not_committed > 0:
                 signals.append(f"{not_committed} effectful proposal(s) were not committed")
             if rejected > 0:
                 signals.append(f"{rejected} proposal(s) were rejected")
             if superseded > 0:
                 signals.append(f"{superseded} proposal(s) were superseded")
+            if missing_abilities > 0:
+                signals.append(
+                    f"{missing_abilities} missing ability request(s) were recorded"
+                )
         if isinstance(preflight, dict):
             blocked = cls._int_from_summary(preflight, "blocked_count")
             if blocked > 0:
@@ -216,6 +242,34 @@ class ExperienceManager:
         if metadata.get("truth_reconciled") is True:
             signals.append("truth reconciliation corrected optimistic action speech")
         return "; ".join(signals)
+
+    @classmethod
+    def _missing_ability_requests(cls, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        requests: list[dict[str, Any]] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("state") or "").strip() != "missing_ability":
+                continue
+            ability_id = str(item.get("ability_id") or "").strip()[:160]
+            if not ability_id:
+                continue
+            raw_metadata = item.get("metadata")
+            proposal_metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+            request: dict[str, Any] = {
+                "ability_id": ability_id,
+                "intent": str(proposal_metadata.get("intent") or "").strip()[:240],
+                "reason": str(item.get("reason") or "").strip()[:500],
+            }
+            confidence = proposal_metadata.get("confidence")
+            if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+                request["confidence"] = max(0.0, min(1.0, float(confidence)))
+            requests.append(request)
+            if len(requests) >= 8:
+                break
+        return requests
 
     @staticmethod
     def _safe_summary(value: Any) -> dict[str, Any]:

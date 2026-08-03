@@ -333,6 +333,30 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
         self.assertEqual(selection_request.goals[0].goal_id, "goal-nested")
         self.assertIn("location", selection_request.goals[0].bindings[0])
 
+    def test_goal_association_selection_excludes_retained_terminal_goal(self) -> None:
+        request = self._request()
+        context = dict(request.context)
+        context["active_goal_snapshots"] = []
+        context["recent_goal_snapshots"] = [
+            {
+                "status": "done",
+                "goal": {
+                    "goal_id": "goal-greeting-complete",
+                    "description": "Respond to the greeting.",
+                    "bindings": [],
+                    "success_criteria": ["Greeting was delivered."],
+                },
+            }
+        ]
+        context.pop("goal_association_resolution", None)
+
+        selection_request = build_agent_skill_selection_request(
+            request.model_copy(update={"context": context}),
+            agent_role="goal_association",
+        )
+
+        self.assertEqual(selection_request.goals, ())
+
     def test_retained_terminal_goal_becomes_selection_goal_context(self) -> None:
         request = self._request()
         context = dict(request.context)

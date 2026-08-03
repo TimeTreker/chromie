@@ -325,9 +325,15 @@ def _goal_contexts(
     context: dict[str, Any],
     *,
     allowed_goal_ids: set[str] | None = None,
+    include_recent: bool = True,
 ) -> tuple[AgentSkillSelectionGoalContext, ...]:
     candidates: list[Any] = []
-    for key in ("active_goal_snapshots", "recent_goal_snapshots", "goals"):
+    snapshot_keys = (
+        ("active_goal_snapshots", "recent_goal_snapshots", "goals")
+        if include_recent
+        else ("active_goal_snapshots", "goals")
+    )
+    for key in snapshot_keys:
         value = context.get(key)
         if isinstance(value, list):
             candidates.extend(value)
@@ -423,7 +429,11 @@ def build_agent_skill_selection_request(
         agent_role=agent_role,
         text=request.text,
         language=str(request.language or "und"),
-        goals=_goal_contexts(context, allowed_goal_ids=allowed_goal_ids),
+        goals=_goal_contexts(
+            context,
+            allowed_goal_ids=allowed_goal_ids,
+            include_recent=agent_role != "goal_association",
+        ),
         context_summary=tuple(summary),
     )
 

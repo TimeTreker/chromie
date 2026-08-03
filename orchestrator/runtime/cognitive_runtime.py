@@ -1669,6 +1669,78 @@ class GoalDrivenRuntimeCoordinator:
         )
 
     @staticmethod
+    def _is_terminal_missing_ability_decision(route_decision: Any) -> bool:
+        return bool(
+            str(getattr(route_decision, "route", "") or "").strip() == "clarify"
+            and str(getattr(route_decision, "intent", "") or "").strip()
+            == "missing_or_unsupported_ability"
+        )
+
+    @staticmethod
+    def _terminal_missing_ability_interaction(
+        route_decision: Any,
+        *,
+        sid: str,
+        language: str,
+        context: dict[str, Any],
+    ) -> InteractionResponse:
+        text = " ".join(
+            str(getattr(route_decision, "speak_first", "") or "").strip().split()
+        )
+        if not text:
+            raise ValueError(
+                "terminal missing-ability decision requires model-authored speak_first"
+            )
+        route_metadata = getattr(route_decision, "metadata", {})
+        if not isinstance(route_metadata, dict):
+            route_metadata = {}
+        desired_abilities = route_metadata.get("desired_abilities")
+        task_proposals = route_metadata.get("task_proposals")
+        metadata: dict[str, Any] = {
+            "source": "goal_driven_cognitive_runtime",
+            "cognitive_runtime_apply": True,
+            "language": language,
+            "planning_result": "terminal_missing_ability",
+            "capability_decision": "unavailable",
+            "operational_speech_authority": "goal_interpreter_model",
+            "missing_ability_terminal": True,
+            "desired_abilities": (
+                list(desired_abilities)
+                if isinstance(desired_abilities, list)
+                else []
+            ),
+            "task_proposals": (
+                list(task_proposals) if isinstance(task_proposals, list) else []
+            ),
+        }
+        if isinstance(context.get("user_turn_envelope"), dict):
+            metadata["user_turn_envelope"] = context["user_turn_envelope"]
+        return InteractionResponse(
+            interaction_id=f"cognitive_{sid}",
+            status="clarify",
+            reason="missing_or_unsupported_ability",
+            speech=[
+                InteractionSpeech(
+                    text=text,
+                    timing="immediate",
+                    style="brief",
+                    metadata={
+                        "source": "goal_interpreter_missing_ability",
+                        "phase": "final",
+                        "speech_act": "capability_limitation",
+                        "commitment_state": "completed",
+                        "must_not_claim_completion": True,
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                    },
+                )
+            ],
+            skills=[],
+            requires_confirmation=False,
+            metadata=metadata,
+        )
+
+    @staticmethod
     def _fast_plan_path(plan: CanonicalPlan | None) -> str:
         if plan is None:
             return ""
@@ -1942,7 +2014,11 @@ class GoalDrivenRuntimeCoordinator:
                     deep_planner_invocation_reasons
                 ),
                 "deep_planner_avoided": bool(
-                    fast_planner_path in {"terminal", "direct_spoken_response"}
+                    fast_planner_path in {
+                        "terminal",
+                        "direct_spoken_response",
+                        "terminal_missing_ability",
+                    }
                     and not deep_planner_invocation_reasons
                 ),
                 "terminal_planner_tier": (
@@ -1961,6 +2037,68 @@ class GoalDrivenRuntimeCoordinator:
                 ),
                 "goal_state_commit_stage": goal_state_commit_stage,
             }
+
+        if self._is_terminal_missing_ability_decision(route_decision):
+            lane = "chat"
+            fast_planner_path = "terminal_missing_ability"
+            terminal_metadata = {
+                "stage_diagnostics": stage_diagnostics,
+                "architecture_attribution": "not_evaluated",
+                "terminal_goal_interpretation": True,
+                **path_metadata(),
+            }
+            if self.policy.mode == "apply":
+                if not self.policy.lane_enabled(lane):
+                    return self._finish(
+                        mode="apply",
+                        status="error",
+                        lane=lane,
+                        association=None,
+                        fast_plan=None,
+                        terminal_plan=None,
+                        composition=None,
+                        timings=timings,
+                        started=started,
+                        fallback_reason="missing_ability_lane_not_enabled_for_apply",
+                        metadata={
+                            **terminal_metadata,
+                            "failure_stage": "authority_boundary",
+                            "failure_class": "terminal_missing_ability_lane_mismatch",
+                            "failure_domain": "cognitive_runtime",
+                            "retryable": False,
+                        },
+                    )
+                interaction = self._terminal_missing_ability_interaction(
+                    route_decision,
+                    sid=sid,
+                    language=language,
+                    context=context,
+                )
+                return self._finish(
+                    mode="apply",
+                    status="applied",
+                    lane=lane,
+                    association=None,
+                    fast_plan=None,
+                    terminal_plan=None,
+                    composition=None,
+                    interaction=interaction,
+                    timings=timings,
+                    started=started,
+                    metadata=terminal_metadata,
+                )
+            return self._finish(
+                mode="report_only",
+                status="report_only",
+                lane=lane,
+                association=None,
+                fast_plan=None,
+                terminal_plan=None,
+                composition=None,
+                timings=timings,
+                started=started,
+                metadata=terminal_metadata,
+            )
 
         try:
             stage = time.perf_counter()

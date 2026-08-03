@@ -2721,6 +2721,172 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("robot.common_13", rendered)
         self.assertIn("chromie.external.lookup", rendered)
 
+    async def test_generic_chat_review_emits_terminal_missing_ability(self) -> None:
+        class RestaurantInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="slow-review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.calls = 0
+
+            async def _chat(self, payload: dict) -> dict:
+                self.calls += 1
+                if self.calls == 1:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"chat","intent":"respond_to_user",'
+                                '"confidence":0.95}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"clarify",'
+                            '"intent":"missing_or_unsupported_ability",'
+                            '"confidence":1.0,'
+                            '"speak_first":"我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",'
+                            '"metadata":{"desired_abilities":[{'
+                            '"ability_id":"local.restaurant_recommendation",'
+                            '"intent":"查找并推荐用户附近的优质餐厅",'
+                            '"status":"missing_ability",'
+                            '"confidence":1.0,'
+                            '"reason":"当前能力目录没有餐厅搜索或本地商家推荐能力。"}]}}'
+                        )
+                    }
+                }
+
+        interpreter = RestaurantInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="不知道该去什么地方吃饭，附近有啥好吃的？",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "description": "Retrieve current weather for a place.",
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.intent, "missing_or_unsupported_ability")
+        self.assertIn("餐厅搜索和推荐能力", decision.speak_first or "")
+        self.assertEqual(decision.actions, [])
+        self.assertEqual(
+            decision.metadata["desired_abilities"][0]["ability_id"],
+            "local.restaurant_recommendation",
+        )
+        proposals = [
+            item
+            for item in decision.metadata["task_proposals"]
+            if item.get("proposal_kind") == "ability"
+        ]
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(proposals[0]["state"], "missing_ability")
+        self.assertEqual(interpreter.calls, 2)
+
+    async def test_generic_chat_review_adopts_same_route_intent_correction(self) -> None:
+        class IntentCorrectionInterpreter(OllamaGoalInterpreter):
+            async def _chat(self, payload: dict) -> dict:
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"chat","intent":"user_statement",'
+                            '"confidence":1.0}'
+                        )
+                    }
+                }
+
+        interpreter = IntentCorrectionInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="我在重庆两江新区龙兴天街。",
+            language="zh-CN",
+            context={
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "route": "tool",
+                        "description": "Retrieve current weather for a place.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ]
+            },
+        )
+        original = RouteDecision(
+            route="chat",
+            intent="respond_to_greeting",
+            confidence=0.95,
+            language="zh-CN",
+            source="llm",
+        )
+
+        reviewed = await interpreter._review_generic_chat_affordance(
+            request,
+            original,
+        )
+
+        self.assertEqual(reviewed.route, "chat")
+        self.assertEqual(reviewed.intent, "user_statement")
+        self.assertEqual(
+            reviewed.metadata["generic_chat_affordance_review"]["status"],
+            "intent_corrected",
+        )
+
+    def test_semantic_repair_contract_distinguishes_missing_parameter_from_missing_ability(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        payload = interpreter.build_semantic_route_repair_payload(
+            RouteRequest(
+                text="Recommend a good restaurant nearby.",
+                context={
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "description": "Retrieve current weather for a place.",
+                        }
+                    ]
+                },
+            ),
+            RouteDecision(route="chat", intent="respond_to_user", confidence=0.9),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+        )
+        rendered = json.dumps(payload, ensure_ascii=False)
+
+        self.assertIn("Never substitute the nearest topical Capability", rendered)
+        self.assertIn("do not ask for parameters", rendered)
+        self.assertIn("missing_or_unsupported_ability", rendered)
+        self.assertIn(
+            "desired_abilities",
+            payload["format"]["$defs"]["SemanticRouteRepairMetadata"]["properties"],
+        )
+        self.assertIn("speak_first", payload["format"]["properties"])
+
     async def test_standalone_greeting_remains_chat_after_focused_review(self) -> None:
         class GreetingInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:

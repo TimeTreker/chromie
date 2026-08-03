@@ -96,6 +96,28 @@ class AgentSkillSelectionService:
             candidate_truncated,
         )
 
+        if request.agent_role == "goal_association" and not request.goals:
+            resolution = AgentSkillSelectionResolution(
+                selection_id=selection_id,
+                sid=request.sid,
+                turn_id=request.turn_id,
+                agent_role=request.agent_role,
+                decision="no_skill",
+                status="no_skill",
+                selected_agent_skills=(),
+                candidate_summaries=candidates,
+                confidence=1.0,
+                reason_summary=(
+                    "Goal Association must establish the current Goal before "
+                    "passive domain methods may be selected."
+                ),
+                candidate_total=candidate_total,
+                candidate_truncated=candidate_truncated,
+                model=model_name,
+            )
+            self._log_resolution(resolution)
+            return resolution
+
         if not candidates:
             return AgentSkillSelectionResolution(
                 selection_id=selection_id,
@@ -452,6 +474,7 @@ class AgentSkillSelectionService:
             "its parent projection. Evaluate each candidate independently; when both "
             "a reusable base method and its domain specialization are useful, select "
             "both explicitly and order the base method before the specialization. "
+            "For the Goal Association role, if no current Goals are supplied, return no_skill; establish the user Goal before selecting a domain method. "
             "Judge applicability from the current "
             "Goal meanings, not from an older Goal, generic context, or a shared "
             "field such as a number, duration, date, or location. External-information "

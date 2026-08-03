@@ -22,6 +22,7 @@ from orchestrator.runtime.skill_runtime import (
     SkillRuntime,
     local_speech_definition,
 )
+from orchestrator.runtime.task_proposals import annotate_task_proposal_ledger
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
@@ -33,6 +34,7 @@ from shared.chromie_contracts.response_composition import (
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
+from shared.chromie_contracts.task_proposal import TaskProposalLedger
 
 
 TEST_SKILL_OUTPUT_SCHEMA = {
@@ -420,6 +422,118 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             payload_root = Path(event["payload_root"])
             self.assertTrue((payload_root / "trace.json").is_file())
             self.assertTrue((payload_root / "trace-summary.json").is_file())
+
+    def test_apply_terminal_missing_ability_skips_goal_and_planner_stages(self):
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat"}),
+            ),
+        )
+        route = type(
+            "Decision",
+            (),
+            {
+                "route": "clarify",
+                "intent": "missing_or_unsupported_ability",
+                "language": "zh-CN",
+                "speak_first": (
+                    "我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。"
+                ),
+                "metadata": {
+                    "desired_abilities": [
+                        {
+                            "ability_id": "local.restaurant_recommendation",
+                            "intent": "查找并推荐用户附近的优质餐厅",
+                            "status": "missing_ability",
+                            "confidence": 1.0,
+                            "reason": "当前能力目录没有餐厅搜索能力。",
+                        }
+                    ],
+                    "task_proposals": [
+                        {
+                            "id": (
+                                "semantic_route_repair:ability:0:"
+                                "local.restaurant_recommendation"
+                            ),
+                            "source": "semantic_route_repair",
+                            "proposal_kind": "ability",
+                            "task_type": "ability.requested",
+                            "state": "missing_ability",
+                            "reason": "当前能力目录没有餐厅搜索能力。",
+                            "effectful": False,
+                            "priority": "normal",
+                            "sequence": 0,
+                            "ability_id": "local.restaurant_recommendation",
+                            "metadata": {
+                                "route": "clarify",
+                                "intent": "查找并推荐用户附近的优质餐厅",
+                                "status": "missing_ability",
+                                "confidence": 1.0,
+                            },
+                        }
+                    ],
+                },
+            },
+        )()
+
+        result = asyncio.run(
+            coordinator.resolve(
+                object(),
+                text="附近有啥好吃的？",
+                sid="sid-missing-restaurant",
+                route_decision=route,
+                context={"history": [], "active_goal_snapshots": []},
+                history=[],
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(result.lane, "chat")
+        self.assertEqual(client.calls, [])
+        self.assertIsNone(result.goal_association)
+        self.assertIsNone(result.terminal_plan)
+        self.assertTrue(result.metadata["deep_planner_avoided"])
+        self.assertEqual(
+            result.metadata["fast_planner_path"],
+            "terminal_missing_ability",
+        )
+        interaction = result.interaction_response
+        self.assertIsNotNone(interaction)
+        assert interaction is not None
+        self.assertEqual(interaction.status, "clarify")
+        self.assertEqual(interaction.skills, [])
+        self.assertIn("餐厅搜索和推荐能力", interaction.speech[0].text)
+        self.assertEqual(
+            interaction.metadata["desired_abilities"][0]["ability_id"],
+            "local.restaurant_recommendation",
+        )
+        self.assertEqual(
+            interaction.metadata["task_proposals"][0]["state"],
+            "missing_ability",
+        )
+        audited = annotate_task_proposal_ledger(interaction)
+        ledger = TaskProposalLedger.model_validate(
+            audited.metadata["task_proposal_ledger"]
+        )
+        missing = [
+            proposal
+            for proposal in ledger.proposals
+            if proposal.state == "missing_ability"
+        ]
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(
+            missing[0].ability_id,
+            "local.restaurant_recommendation",
+        )
+        self.assertEqual(ledger.summary.effectful_proposal_count, 0)
 
     def test_report_only_builds_terminal_plan_without_interaction(self):
         client = ScriptedClient(

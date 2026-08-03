@@ -5,10 +5,10 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ...clients.ollama_client import OllamaGenerationError
 from ...settings import agent_service_settings
@@ -82,14 +82,62 @@ REVIEW_STAGES = {
     "fast_speech_repair",
 }
 
-class SemanticRouteRepairOutput(BaseModel):
-    """Minimal repair DTO; it cannot carry planner or runtime diagnostics."""
 
-    model_config = ConfigDict(extra="ignore")
+class SemanticRouteRepairDesiredAbility(BaseModel):
+    """One understood but currently unavailable user ability request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ability_id: str = Field(min_length=3, max_length=160)
+    intent: str = Field(min_length=1, max_length=240)
+    status: Literal["missing_ability"] = "missing_ability"
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class SemanticRouteRepairMetadata(BaseModel):
+    """Bounded metadata allowed only for terminal missing-ability repair."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    desired_abilities: list[SemanticRouteRepairDesiredAbility] = Field(
+        min_length=1,
+        max_length=4,
+    )
+
+
+class SemanticRouteRepairOutput(BaseModel):
+    """Bounded semantic repair DTO with an honest missing-ability terminal."""
+
+    model_config = ConfigDict(extra="forbid")
 
     route: str
     intent: str = Field(min_length=1, max_length=120)
     confidence: float = Field(ge=0.0, le=1.0)
+    speak_first: str | None = Field(default=None, min_length=1, max_length=240)
+    metadata: SemanticRouteRepairMetadata | None = None
+
+    @model_validator(mode="after")
+    def validate_missing_ability_terminal(self) -> "SemanticRouteRepairOutput":
+        is_missing = self.intent == "missing_or_unsupported_ability"
+        if is_missing:
+            if self.route != "clarify":
+                raise ValueError(
+                    "missing_or_unsupported_ability requires route=clarify"
+                )
+            if not str(self.speak_first or "").strip():
+                raise ValueError(
+                    "missing_or_unsupported_ability requires truthful speak_first"
+                )
+            if self.metadata is None or not self.metadata.desired_abilities:
+                raise ValueError(
+                    "missing_or_unsupported_ability requires desired_abilities"
+                )
+        elif self.metadata is not None:
+            raise ValueError(
+                "desired_abilities metadata is allowed only for missing ability"
+            )
+        return self
 
 
 PLACEHOLDER_CAPABILITY_INTENTS = {
@@ -1664,7 +1712,8 @@ class OllamaGoalInterpreter:
                     "content": (
                         "Repair one semantic route from the latest user turn. "
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
-                        "Return exactly route, intent, and confidence. "
+                        "First understand the requested outcome independently of the catalog, then compare that outcome with exact supplied ability descriptions. "
+                        "Return route, intent, and confidence, plus speak_first and metadata only for a terminal missing-ability result. "
                         "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
                         "A standalone greeting or thanks remains chat, but social framing attached "
                         "to a substantive request must not replace the substantive lane. "
@@ -1682,10 +1731,10 @@ class OllamaGoalInterpreter:
                         "or report its own ambiguity. "
                         "Use tool only when the model selects an exact supplied external-read Capability. "
                         "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
-                        "Use clarify only when the user meaning remains genuinely underdetermined before provider "
-                        "resolution, and then use intent=clarify_uncertain_request. Never pair route=chat with a "
-                        "clarification intent. "
-                        "No analysis, rationale, metadata, actions, markdown, or extra fields."
+                        "Never substitute the nearest topical Capability merely because it shares an entity or binding such as a location, date, number, or person. "
+                        "When the requested outcome is clear but no exact supplied Capability can perform the required lookup or action, do not ask for parameters that cannot make an absent ability executable and do not imply that Chromie will check. Return route=clarify, intent=missing_or_unsupported_ability, one brief truthful speak_first sentence in the user's language, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. "
+                        "Use intent=clarify_uncertain_request only when the user's meaning itself remains genuinely underdetermined, or when one exact supplied Capability exists but requires a user-provided binding before provider resolution. Never pair route=chat with a clarification intent. "
+                        "No analysis, rationale, actions, markdown, or fields outside the declared schema."
                     ),
                 },
                 {
@@ -1706,7 +1755,7 @@ class OllamaGoalInterpreter:
                 "temperature": 0,
                 "top_p": 0.9,
                 "num_ctx": self.num_ctx,
-                "num_predict": 96,
+                "num_predict": 512,
             },
         }
 
@@ -2258,12 +2307,19 @@ class OllamaGoalInterpreter:
             reviewed_decision.confidence < self.confidence_threshold
         ):
             return decision
-        if reviewed_decision.route == "chat":
+        if (
+            reviewed_decision.route == "chat"
+            and reviewed_decision.intent == decision.intent
+        ):
             return decision
 
         metadata = dict(reviewed_decision.metadata or {})
         metadata["generic_chat_affordance_review"] = {
-            "status": "reclassified",
+            "status": (
+                "intent_corrected"
+                if reviewed_decision.route == decision.route
+                else "reclassified"
+            ),
             "original_route": decision.route,
             "original_intent": decision.intent,
             "reviewed_route": reviewed_decision.route,
@@ -2533,6 +2589,12 @@ class OllamaGoalInterpreter:
                     intent=minimal.intent,
                     confidence=minimal.confidence,
                     language=request.language or "auto",
+                    speak_first=minimal.speak_first,
+                    metadata=(
+                        minimal.metadata.model_dump(mode="json")
+                        if minimal.metadata is not None
+                        else {}
+                    ),
                     source="llm",
                 ),
                 request,
