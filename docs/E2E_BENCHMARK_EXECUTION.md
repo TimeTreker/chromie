@@ -127,6 +127,7 @@ Run the maintained comprehensive collector from a clean committed checkout:
 
 ```bash
 ./scripts/qualification/run_comprehensive_test.sh \
+  --strict-exit \
   --capture auto \
   --languages zh,en
 ```
@@ -138,8 +139,12 @@ and E2E entrypoints, retains partial failure evidence, captures all Compose logs
 and bounded host/GPU/audio diagnostics, writes a check ledger and artifact hash
 index, and creates one `chromie-comprehensive-<revision>-<run-id>.tar.gz`
 archive. Semantic results remain pending review and deterministic failures remain
-non-overridable. Use `--dry-run` to inspect the plan or `--collect-only` to
-package an already-running system without executing tests.
+non-overridable. The live workflow cohort includes stable knowledge, session
+recall, weather follow-up and correction, multi-part requests, long ordered
+playback, and Chinese/English interaction. Use `--strict-exit` (or `--ci`) when a
+failed, timed-out, incomplete, dirty, or required-unreviewed run must return
+nonzero after the archive is safely written. Use `--dry-run` to inspect the plan
+or `--collect-only` to package an already-running system without executing tests.
 
 Optionally run independent semantic judges during the same comprehensive
 collection. This is opt-in because bounded scenario evidence is sent to the

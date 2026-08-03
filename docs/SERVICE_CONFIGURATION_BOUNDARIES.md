@@ -67,7 +67,7 @@ does not create a global settings object spanning services.
 The Agent, ASR, TTS, maintained Host, and shared-runtime policy boundaries are
 source-complete and mechanically enforced by
 `scripts/check_service_configuration_ownership.py`. The generated configuration
-inventory classifies 450 keys across profiles, validation overrides, service
+inventory classifies 453 keys across profiles, validation overrides, service
 internals, and the eight public choices; no compatibility aliases remain.
 
 Standalone factories retained for focused tests must still instantiate their

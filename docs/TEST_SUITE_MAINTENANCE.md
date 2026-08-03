@@ -27,6 +27,9 @@ claim.
   schema they already own.
 - Keep `scripts/qualification/run_comprehensive_test.sh --dry-run` side-effect
   free and update its command contract whenever a maintained entrypoint changes.
+- Use `--strict-exit`/`--ci` in automated regression jobs. The archive must still
+  be written before a failed, timed-out, incomplete, dirty, or required-unreviewed
+  run returns nonzero.
 - For prompt, model, reasoning, memory, routing, capability, response, audio, or
   lifecycle changes, retain clean before/after comprehensive archives and use the
   same scenario cohort and evidence profile to detect capability degradation.

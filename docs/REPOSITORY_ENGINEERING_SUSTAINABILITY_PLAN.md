@@ -167,7 +167,7 @@ measurements from `aedfebabe5d7f519c0a21863a75acb6918382764`:
 | Literal runtime environment keys | 295 across Orchestrator, Agent, ASR, TTS, and shared runtime | These include public, profile-owned, internal, and compatibility values; they must be classified before a reduction target is set. |
 | Documented configuration keys | 321 | Documentation currently exposes more knobs than the four deployment-mode summary suggests. |
 | Current Mypy ratchet | 4 files | The mechanism exists, but package coverage is not yet meaningful. |
-| `except Exception` handlers | 141: 85 Orchestrator, 53 Agent, 3 shared; 57 in `orchestrator.py` | The existing gate rejects only trivially silent handlers; a complete classification is still open. |
+| Broad runtime exception handlers | 166: 99 Orchestrator, 63 Agent, 4 shared; 53 in `orchestrator.py` | Every maintained handler is bound to a symbol, ordinal, body digest, owner, failure contract, and reviewed classification; drift fails closed. |
 | Markdown surface | 125 repository files, including 80 directly under `docs/`; 31,438 lines | The core reading path and specialized reference set are not clearly separated. |
 | In-tree historical archives | 3 files; 237,276 bytes | They are indexed and marked historical, but Git history may be the better owner. |
 | Canonical local gate | At Issue intake, `python -m unittest discover -s tests -q` ran 1,654 tests but ended with 5 failures and 8 errors; pinned Mypy reported 42 errors in 11 imported files while checking its 4-file scope | Historical reproduced baseline; the Issue and its current result are recorded below. |
@@ -190,7 +190,7 @@ Issue must refresh its own baseline because counts may change.
 | Establish Typed Host Configuration Snapshots | source implementation complete; live startup proof deferred | broad-exception classification | Immutable Host settings own all maintained Orchestrator environment parsing, and generated ownership checks reject new direct reads. |
 | Extract Playback Delivery Lifecycle | source extraction complete; live first-PCM/audible evidence deferred | typed Host settings | Playback state, provider WebSocket I/O, ordered queue consumption, resampling, output writes, and stream lifecycle have one collaborator behind ratcheted Host delegation. |
 | Extract Input Turn and Session Lifecycle | source extraction complete; live input evidence deferred | playback lifecycle | One collaborator owns microphone callbacks, VAD framing, ASR transport, routed-turn/reflex tasks, injected audio, pending utterances, and idle-session sweeping. Session registry storage and semantic conversation state remain separate documented boundaries; live microphone, hot-plug, and target evidence remain deferred. |
-| Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 450 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
+| Reduce Supported Configuration Combinations | source implementation complete; target qualification deferred | typed Host settings and live proof | Four source-controlled operator modes own complete maintained combinations. The generated inventory classifies 453 keys, public choices are ratcheted, and all compatibility aliases have been removed. |
 | Expand Mypy by Owned Package | source scope expansion complete; canonical tool execution required in the normal dependency environment | stable extracted boundaries | `shared/chromie_contracts`, `orchestrator/runtime/cognitive_gateway_modules`, and `orchestrator/schemas` are package-scoped; extracted Host lifecycle modules are explicitly owned and new package modules enter automatically. |
 | Reduce the Current Documentation Surface | source implementation complete | structural Issues complete | The core path is ratcheted, eight trace documents became two owned observability documents, three in-tree archives were removed, and every specialized document must now be reachable from a current owner entrypoint or a declared mechanical contract. |
 | Requalify the Simplified Runtime | source qualification workflow implemented; clean dependency-complete execution and target requalification deferred | simplification Issues source-complete | Bind deterministic source gates to one revision and retain an explicit report without claiming target, audio, simulator, LAN, robot, or release evidence. |
@@ -507,9 +507,11 @@ overlap.
   confirmation, cancellation, source-effect bounds, speech-claim validation,
   outcome reconciliation, and sequential physical TaskGraph execution.
 
-True incremental PCM playback remains owned by **Extract Playback Delivery
-Lifecycle** below. It is measured in the same end-to-end scenarios but is not a
-substitute for reducing cognition before a valid speech stage exists.
+Host-side incremental PCM playback is implemented by **Extract Playback
+Delivery Lifecycle** below. It is measured in the same end-to-end scenarios but
+is not a substitute for reducing cognition before a valid speech stage exists.
+Provider-native model generation streaming remains a separately retained
+capability/evidence question.
 
 ### Non-goals
 
@@ -674,10 +676,13 @@ TTS WebSocket provider I/O, ordered queue consumption, resampling/output writes,
 stream open/abort/close, and delivery evidence. `VoiceAssistant` keeps thin
 public delegates so existing callers and trace decorators remain stable. The
 composition root remains at 187 methods and one property, while initializer
-state decreased to 144 attributes and 417 lines; ratchets forbid transport
-state from returning. True provider-incremental PCM playback and retained live
-first-PCM/audible timing evidence remain open because they require provider and
-target measurement rather than more Host ownership.
+state is ratcheted at 139 attributes and 409 lines; ratchets forbid transport
+state from returning. Authorized provider PCM now enters ordered Host playback before the provider
+`end` message, with bounded backpressure, cancellation, stale-generation
+handling, retained audio, and incomplete-stream accounting. Request, stream
+start, first provider PCM, stream end, and actual playback-start milestones are
+retained. Provider-native generation streaming and current target latency/audible
+evidence remain open.
 
 ### Problem
 
@@ -782,7 +787,7 @@ Implementation note (2026-08-02): four source-controlled operator modes now
 own complete maintained combinations for services, speech, voice plus MuJoCo,
 and qualification. The generated runtime manifest records the active mode and
 source file; mode contradictions fail before startup. A machine-generated
-inventory now classifies 450 discovered keys into public choice, profile
+inventory now classifies 453 discovered keys into public choice, profile
 constant, service internal, or acceptance override. The maintained public
 surface contains eight choices and one public Boolean. The last compatibility
 alias (`CHROMIE_SOCIAL_ATTENTION_MODE`) was removed; the service-owned

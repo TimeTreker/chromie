@@ -15,37 +15,24 @@ Router content, moved generated runtime configuration behind explicit startup,
 and repaired the existing four-file Mypy ratchet without ignores or scope
 removal.
 
-## Deferred target validation — Retain a Current-Revision Live Voice Loop
+## Optional target validation — Retain a Supervised Physical Voice Loop
 
-Before further architecture, feature, configuration, terminology, or broad
-documentation growth, retain the smallest complete proof of the current
-Goal-driven authority path:
+Physical microphone and room-acoustic evidence remains useful for the stricter
+`supervised_physical_pilot` profile, but it is not the default semantic or audio
+qualification path and never requires the operator to speak. The maintained
+closed-loop runner generates Chinese and English speech with Chromie's TTS,
+plays or loopback-captures it, transcribes it with Chromie's ASR, and correlates
+the result with the exact delivered speech. `capture=acoustic` exercises the
+physical speaker-to-microphone path; `capture=auto` prefers the system monitor.
 
-```text
-physical microphone
-→ ASR final utterance
-→ Cognitive Gateway admission
-→ Goal-driven chat handling
-→ validated response
-→ TTS scheduling and audible playback
-```
+A supervised human-voice run may still be retained when specifically needed to
+claim real-user microphone behavior, accent robustness, or room interaction. It
+is optional for `source_bound_development` and cannot substitute for the
+Gateway/Core, Agent Skill/weather, Social Attention, MuJoCo, LAN, or source
+identity evidence owned by the active target profile.
 
-The named `current-revision-live-voice` verifier profile is implemented and
-automatically verified without
-weakening the default seven-case voice/MuJoCo matrix. It requires clean source,
-digest-bound running runtime identity, physical input/output recordings,
-admitted and applied speech-only chat with zero executable work, complete
-playback, artifact hashes, and an operator audible-output verdict. The current
-host now exposes a physical input, but supervised attempts retained only
-unusable ASR transcripts and no live-loop claim. Default audio selections now
-follow OS device changes at runtime; supervised physical hot-plug and
-intelligible microphone validation remain open.
-
-This claim excludes Soridormi, simulator execution, physical robots, broad
-voice-device support, and release readiness. The unfulfilled physical exit
-criterion remains visible and cannot be satisfied by synthetic evidence.
-Detailed scope and exit criteria are in
-[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+See [End-to-End Benchmark Execution](docs/E2E_BENCHMARK_EXECUTION.md) and
+[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
 
 ## Active Issue — Close Current-Revision Target Evidence
 
@@ -55,13 +42,14 @@ MuJoCo, and second-machine LAN evidence. That profile explicitly does not
 require physical voice or robot evidence.
 
 Only after that evidence closes, qualify and finish one semantic Issue at a time.
-The 2026-08-02 archive implementation lands bounded, automatically tested slices
-for the first five items below and the next source-verifiable sustainability
-batch. All source-verifiable sustainability implementation is now complete:
-grounded direct responses, overlapping result delivery, exact exception review,
-typed Host/service configuration, playback/input extraction, maintained modes,
-package-owned typing scope, specialized documentation ownership, and
-revision-bound source qualification reporting are implemented and ratcheted.
+The source-verifiable sustainability line is implemented and ratcheted:
+grounded direct responses, ordinary overlapping-result delivery, exact exception
+review, typed Host/service configuration, playback/input extraction, maintained
+modes, package-owned typing scope, specialized documentation ownership,
+revision-bound source qualification, session-memory recall, comprehensive hybrid
+collection, bilingual closed-loop scenarios, strict CI status, provider-PCM
+latency milestones, ordered incremental Host playback, and consent-bound durable
+profile memory.
 
 The active evidence Issue is not closed. A clean maintained environment must
 still execute the pinned Ruff/Mypy/full-suite gate, and target qualification
@@ -101,13 +89,15 @@ speculative generation remain evidence-gated later input work; bounded
 two-request model concurrency requires shared-GPU proof; incremental PCM remains
 with the playback-delivery lifecycle Issue.
 
-Implementation status (2026-08-02): a typed planless direct-response branch is
-implemented and automatically tested, so a complete non-effectful spoken Goal
-can reach Response Composer without Fast or Deep Planner. The Issue remains open
-for retained latency qualification, result rescheduling, independently scheduled
-stages, model-call reduction, and the remaining exit criteria. The next four
-queued structural Issues also have bounded implementation slices recorded in the
-engineering sustainability plan; none is marked closed.
+Implementation status (2026-08-03): source implementation is complete. A typed
+planless branch bypasses unnecessary planners, downstream stages reuse the
+planner's exact Agent Skill selection, ordinary overlapping results wait for a
+safe speech opening and deliver once, completed stages use the ordered delivery
+lifecycle, and provider PCM enters playback before the provider end message.
+Runtime evidence distinguishes TTS request, stream start, first provider PCM,
+stream end, and actual playback start. The remaining exit criteria are retained
+warm/cold and shared-GPU measurements on the current revision; source checks do
+not manufacture those target claims.
 
 Detailed problem evidence, scope, non-goals, and exit criteria are in
 [Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
@@ -318,20 +308,17 @@ Completed domain implementation slices:
 
 The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
 
-The first VoiceAssistant extraction is complete: runtime-ready greeting
-scheduling and playback barriers are delegated to an independently tested
-collaborator. The 8,886-line/167-method root still requires typed Host settings
-and behavior-preserving playback/input lifecycle extractions after the current
-live proof and target-evidence closure. See
+The VoiceAssistant sustainability line is complete in source: immutable Host
+settings own maintained configuration, playback and input/session transports are
+extracted behind checked collaborators, provider PCM enters ordered playback
+incrementally, and structure ratchets hold the composition root at 187 methods,
+one property, 409 constructor lines, and 139 initialized attributes. See
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
 
-The first engineering-sustainability intake and canonical local-gate repair are
-complete. The live-voice verifier is implemented while physical validation is
-open because the current microphone has not produced an intelligible required
-utterance. Runtime OS-default device following is implemented, while supervised
-physical hot-plug evidence remains open. The active named Issue is
-**Close Current-Revision Target Evidence**; later
-simplification Issues are queued behind the evidence work in the same plan.
+The canonical source gate, generated-speech bilingual closed loop, comprehensive
+collector, and optional physical-voice verifier are implemented. Physical voice
+and hot-plug observation remain optional target claims; they are not blockers for
+the active **Close Current-Revision Target Evidence** profile.
 
 Exit criteria:
 

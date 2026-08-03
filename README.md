@@ -196,12 +196,13 @@ fixture truth, runs bilingual generated-speech closed-loop E2E, and packages
 semantic-review evidence plus host/container/GPU/audio logs, run:
 
 ```bash
-./scripts/qualification/run_comprehensive_test.sh
+./scripts/qualification/run_comprehensive_test.sh --strict-exit
 ```
 
-The comprehensive collector never requires operator speech. It is fail-soft so
-failed checks remain in the uploadable archive, and it never grants release
-qualification by itself. For important prompt, reasoning, memory, routing,
+The comprehensive collector never requires operator speech. It generates
+Chinese and English speech for monitor or acoustic capture, preserves failed
+checks in the uploadable archive, and never grants release qualification by
+itself. `--strict-exit` returns nonzero only after the archive is written. For important prompt, reasoning, memory, routing,
 response, or audio changes, retain clean before/after archives. Semantic bundles
 may be judged independently by several configured model families:
 

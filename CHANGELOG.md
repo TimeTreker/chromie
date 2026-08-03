@@ -25,11 +25,11 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
-- Added a no-operator-speech comprehensive qualification collector plus
-  provider-neutral, provenance-bound multi-LLM degradation review.
-- Added hybrid benchmark oracles and bilingual closed-loop review bundles:
-  objective fixture/audio/evidence checks remain deterministic, semantic quality
-  uses retained LLM/human review, and hard-gate failures remain non-overridable.
+- Added a no-operator-speech strict comprehensive collector, expanded bilingual
+  live cognition, and provider-neutral multi-LLM degradation review.
+- Added hybrid oracles, grounded session recall, consent-bound durable profile
+  memory, provider-PCM/audible milestones, and ordered incremental Host playback;
+  deterministic failures remain non-overridable.
 - Centralized Agent, Goal Interpreter, and shared-runtime observability policy configuration; internal model, weather, capability, trace, event, resource, accelerator, and CLI-color helpers no longer parse environment values independently.
 - Added immutable TTS service settings for transport, provider, generation, worker, speaker, alignment, and immutable model-source configuration; maintained TTS modules no longer parse environment values independently.
 - Preserved completed evidence-bound results across newer ordinary turns with a non-interrupting delivery window; explicit cancellation and supersession still suppress late speech.
@@ -37,7 +37,7 @@ This file records notable current changes. Detailed earlier development history 
 - Added immutable model-generation Host settings for direct response, bounded failure speech, and runtime-ready greetings; turn-time environment reparsing was removed from those paths.
 - Expanded package-owned Mypy scope to `orchestrator/runtime/cognitive_gateway_modules`; actual Mypy execution remains an environment gate.
 - Added four complete operator modes with generated manifest identity, contradiction checks, and legacy direct-LLM fallback disabled.
-- Ratcheted the generated ownership inventory at 450 keys, eight public choices, one public Boolean, and zero compatibility aliases.
+- Ratcheted the generated ownership inventory at 453 keys, eight public choices, one public Boolean, and zero compatibility aliases.
 - Made `shared/chromie_contracts` package-scoped in Mypy so new modules enter automatically.
 - Consolidated eight trace documents into two, removed three dated archives, and ratcheted the 14-document core path.
 - Closed specialized-document ownership: the index no longer counts as an owner, component entrypoints form a checked reachability graph, and package documents require declared mechanical contracts.

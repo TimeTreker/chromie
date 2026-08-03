@@ -436,7 +436,7 @@ Before a change that can alter model prompts, reasoning, routing, memory,
 capability selection, response composition, audio flow, or lifecycle behavior:
 
 1. Commit a clean baseline and run
-   `scripts/qualification/run_comprehensive_test.sh`.
+   `scripts/qualification/run_comprehensive_test.sh --strict-exit`.
 2. Retain the baseline archive, check ledger, normalized scenario inventory,
    deterministic report, semantic bundle, reviewer configuration, individual
    reviews, and ensemble review.
@@ -469,9 +469,11 @@ Chromie semantic failure.
 The bilingual closed-loop runner follows the same contract. TTS/ASR transport,
 playback capture, CER/WER, process health, and lifecycle facts are deterministic.
 Injected workflow meaning is packaged for semantic review rather than judged by
-phrase lists. It can retain Python logs, all Compose logs, Git/runtime identity,
-GPU diagnostics, audio artifacts, and one review archive without requiring an
-operator's voice:
+phrase lists. The maintained cohort covers stable knowledge, session recall,
+weather follow-up/correction, multi-part requests, and long ordered playback in
+Chinese and English. It can retain Python logs, all Compose logs, Git/runtime
+identity, GPU diagnostics, audio artifacts, and one review archive without
+requiring an operator's voice:
 
 ```bash
 python scripts/closed_loop_e2e.py \
@@ -489,8 +491,10 @@ one correlated evidence root. Objective verdicts remain owned by their existing
 fixtures and executable assertions; semantic cases remain `review` and are
 packaged for external LLM or human adjudication. The archive includes the exact
 runner and digest, revision, commands, check ledger, audio, ASR, runtime events,
-Docker logs, GPU telemetry, and artifact hashes. The collector is fail-soft for
-diagnosis and always records `release_qualified=false`.
+Docker logs, GPU telemetry, and artifact hashes. The collector always preserves diagnosis artifacts and records
+`release_qualified=false`. Default mode exits successfully after packaging;
+`--strict-exit`/`--ci` returns nonzero after the archive is written when checks
+fail, time out, remain incomplete, run dirty, or require unfinished review.
 
 Use `--dry-run` to inspect the plan without touching hardware or services. Use
 `--collect-only` to package current host/container evidence without executing
