@@ -215,7 +215,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_RESPONSE_COMPOSER_MODE"], "off")
-        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "off")
+        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "apply")
         self.assertEqual(values["ORCH_TASK_CONTINUITY_TIMEOUT_MS"], "3500")
         self.assertEqual(values["AGENT_TASK_CONTINUITY_MODEL"], "qwen3:4b")
         self.assertEqual(values["AGENT_TASK_CONTINUITY_TIMEOUT_MS"], "3000")

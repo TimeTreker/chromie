@@ -734,7 +734,7 @@ class HostSettingsSnapshot:
                 task_continuity_mode=_choice(
                     values,
                     "ORCH_TASK_CONTINUITY_MODE",
-                    "off",
+                    "apply",
                     {"off", "report_only", "apply"},
                 ),
                 task_continuity_timeout_ms=_int(
