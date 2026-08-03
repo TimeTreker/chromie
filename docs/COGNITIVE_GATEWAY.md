@@ -1,6 +1,6 @@
 # Cognitive Gateway / 认知网关
 
-Status: authoritative architecture with the code migration implemented. Input
+Status: authoritative architecture with the production implementation complete. Input
 Normalization, Protective Reflex, Context Assembly, Attention Review, and Turn
 Admission are explicit modules. The normal order completes admission before
 ordinary Goal Interpretation; the admitted immutable `UserTurnEnvelope` and
@@ -67,7 +67,7 @@ voice / text / trusted interaction event
        agent, tool, memory, and embodied execution coordination
        outcome reconciliation against goal success criteria
        final response composition
-  -> trusted Skill Runtime / tools / memory / Soridormi
+  -> trusted Trusted Capability Runtime / tools / memory / Soridormi
   -> execution evidence returned to the Core
   -> validated speech and optional social-attention delivery
 ```
@@ -219,7 +219,7 @@ The Cognitive Gateway does **not** own:
 - authorization of ordinary side effects.
 
 Those responsibilities belong to the Goal-Driven Cognitive Core, deterministic
-validators, the host Skill Runtime, tools, memory providers, and Soridormi.
+validators, the host Trusted Capability Runtime, tools, memory providers, and Soridormi.
 
 `Semantic Triage`, `Affordance Grounding`, and `Turn Proposal` were useful names
 during exploration, but are not Gateway modules in the settled boundary:
@@ -253,7 +253,7 @@ the dispatch receipt with the reflex turn. Exact named-Goal cancellation has a
 separate implemented receipt-to-Goal transaction; automatic reconciliation of
 broad fixed reflex receipts into every affected canonical Goal remains open.
 
-Output invalidation, scoped Skill Runtime cancellation, and the dedicated
+Output invalidation, scoped Trusted Capability Runtime cancellation, and the dedicated
 E-stop are dispatched in one safety-first phase. Device/audio teardown may wait
 on a playback lock, but it cannot serialize runtime cancellation or E-stop
 behind that wait. The receipt distinguishes provider cancellation failures,
@@ -262,7 +262,7 @@ itself a safe-idle claim.
 
 For `global_emergency`, the host also cancels every unfinished interaction
 workflow, including work still blocked in preflight. This fail-closed sweep is
-independent of a successful Skill Runtime receipt, so a runtime dispatch
+independent of a successful Trusted Capability Runtime receipt, so a runtime dispatch
 failure cannot leave an older host interaction able to start later. The receipt
 records every host interaction for which task cancellation was requested.
 
@@ -325,7 +325,7 @@ goal-only cancellation. A deterministic hold for ambiguous safety-relevant
 language is a future policy, not current implementation.
 
 `embodied_motion` is ledger-bound: it selects motion registered in the host
-Skill Runtime. It is not an unconditional controller stop for motion started
+Trusted Capability Runtime. It is not an unconditional controller stop for motion started
 outside that ledger. `global_emergency` is the scope that additionally
 dispatches Soridormi's dedicated E-stop regardless of the host request ledger.
 
@@ -346,12 +346,12 @@ The Gateway remains a narrow ingress boundary. Goal Interpretation may emit a
 structured advisory decision for downstream contracts, but the Gateway itself
 never authors an ordinary intent, goal, capability choice, plan, or response.
 Historical `RouteDecision` names may remain inside versioned data contracts
-until a separate contract-version migration; they do not represent an active
+until a separate contract-version update; they do not represent an active
 Router component or service.
 
-## 8. Completed migration
+## 8. Implemented closure
 
-The migration is complete at the production-topology and authority boundaries:
+The production topology and authority boundaries are complete:
 
 1. the shared `ReflexOutcome` and `UserTurnEnvelope` contracts are authoritative;
 2. Protective Reflex runs locally before model-dependent cognition;

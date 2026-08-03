@@ -25,7 +25,7 @@ feasibility, collision safety, stop, and recovery.
 
 ## Implemented foundations
 
-- Cognitive Gateway/Core migration and fail-closed runtime boundaries.
+- Cognitive Gateway/Core decomposition and fail-closed runtime boundaries.
 - Canonical Capability terminology and passive Agent Skills.
 - Grounded external-information and weather Skill packages.
 - Loopback-only local service publication and repository policy gates.

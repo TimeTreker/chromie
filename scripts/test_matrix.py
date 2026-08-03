@@ -137,7 +137,7 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "skill-runtime": TestGroup(
-        "Trusted Skill Runtime, confirmation dialogue, evidence, and control-plane flow.",
+        "Trusted Capability Runtime, confirmation dialogue, evidence, and control-plane flow.",
         (
             _unittest(
                 "tests.test_confirmation_dialogue",

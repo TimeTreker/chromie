@@ -6,7 +6,7 @@
   "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; the Host does not repair a stale domain decision.",
   "tags": [
     "voice-log",
-    "router-contract",
+    "goal-interpretation-contract",
     "weather-context-pollution",
     "walk",
     "model-grounding"

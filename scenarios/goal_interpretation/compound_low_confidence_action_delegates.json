@@ -3,7 +3,7 @@
   "id": "compound_low_confidence_action_delegates",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A compound quick-router plan must delegate to deepthinking when one required action is below per-action confidence threshold instead of executing the high-confidence subset.",
+  "description": "A compound fast Goal Interpreter plan must delegate to deepthinking when one required action is below per-action confidence threshold instead of executing the high-confidence subset.",
   "tags": [
     "cognitive-core-agent-contract",
     "compound",

@@ -3,8 +3,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
+
+from scripts import check_docs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,6 +102,25 @@ class DocumentationAuthorityTests(unittest.TestCase):
         self.assertFalse((ROOT / "scripts" / "run_supervised_target_acceptance.sh").exists())
         for path in (ROOT / "docs" / "ACCEPTANCE.md", ROOT / "CHROMIE_RUNBOOK.md"):
             self.assertNotIn("run_supervised_target_acceptance.sh", path.read_text(encoding="utf-8"))
+
+    def test_current_gate_summary_rejects_copied_test_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            summary = Path(temp_dir) / "summary.md"
+            summary.write_text(
+                "The gate passed 1,999 primary tests.\n",
+                encoding="utf-8",
+            )
+            errors: list[str] = []
+            with (
+                mock.patch.object(check_docs, "ROOT", Path(temp_dir)),
+                mock.patch.object(
+                    check_docs,
+                    "CURRENT_GATE_SUMMARY_FILES",
+                    [summary],
+                ),
+            ):
+                check_docs.check_current_gate_summaries(errors)
+            self.assertTrue(any("hardcodes a test count" in error for error in errors))
 
     def test_canonical_documentation_gate_passes(self) -> None:
         completed = subprocess.run(

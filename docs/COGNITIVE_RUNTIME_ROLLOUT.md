@@ -50,7 +50,7 @@ User Turn
 → trusted runtime adapter
 → atomic Goal-state application
 → existing request-bound confirmation
-→ existing Skill Runtime
+→ existing Trusted Capability Runtime
 → provider execution and retained evidence
 ```
 
@@ -129,7 +129,7 @@ its user-facing speech plan.
 - request-bound confirmation;
 - Goal and plan version application;
 - atomic state commit or rollback;
-- Skill Runtime submission;
+- Trusted Capability Runtime submission;
 - execution evidence and terminal state.
 
 ## 3. Runtime modes

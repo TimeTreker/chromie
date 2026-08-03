@@ -25,10 +25,11 @@ revision cannot be mixed into the closure. A completed closure report always
 contains `release_qualified=false`; product or physical release approval remains
 a separate owner decision.
 
-The strict current-revision `speech-only` verifier is implemented, but physical
-target validation is deferred because the current host has no microphone. That
-does not weaken the physical claim and does not block `source_bound_development`,
-whose required tracks are non-physical. It remains required for
+The strict current-revision `speech-only` verifier is implemented. Retained
+physical attempts have reached VAD/ASR, but no attempt has produced the required
+intelligible utterance and complete audible-response evidence, so physical target
+validation remains open without a claim. That does not block
+`source_bound_development`, whose required tracks are non-physical. It remains required for
 `supervised_physical_pilot` and does not satisfy Gateway/Core MuJoCo, Agent
 Skill/weather, Social Attention, LAN, or physical-robot tracks.
 

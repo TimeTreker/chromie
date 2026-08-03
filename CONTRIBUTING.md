@@ -37,7 +37,7 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   retained and the default target-evidence profile closes, feature,
   architecture, flag, and terminology growth is frozen except for work that
   closes those prerequisites or a demonstrated safety/provenance blocker.
-- Keep microphone, playback, VAD, interruption, and trusted Skill Runtime
+- Keep microphone, playback, VAD, interruption, and Trusted Capability Runtime
   coordination in the host Orchestrator.
 - Keep robot-body execution and physical safety in Soridormi.
 - Do not expose raw motors, joints, torques, or actuator arrays to the LLM.

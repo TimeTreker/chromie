@@ -43,11 +43,12 @@ control evidence, but it does not own user-goal meaning, decomposition,
 planning, semantic agent coordination, outcome synthesis, or response
 composition. Those belong to the Goal-Driven Cognitive Core.
 
-The deployed Goal Interpreter is currently a compatibility implementation that spans both
-sides of this target boundary: it performs Gateway-like emergency and
-addressedness work and still emits semantic/advisory route, intent, affordance,
-action, and task proposals. Those outputs remain current migration inputs, not a
-claim that the Gateway/Core split is already complete.
+The fast Goal Interpreter is an Agent-owned compatibility stage inside the
+Goal-Driven Cognitive Core. It receives only an admitted `UserTurnEnvelope`
+projection and may emit a bounded advisory route, intent, source-effect envelope,
+affordance set, or candidate proposal for dependent contracts. It does not own
+Gateway normalization, protective reflex, attention, or admission; it is not an
+independent service, a second semantic planner, or execution authority.
 
 The executable state machine that carries one admitted turn through specialist
 delegation, trusted observations, per-goal reconciliation, and a final response
@@ -196,7 +197,7 @@ emergency claim whose non-empty `turn_id` exactly matches the request turn.
 Missing, empty, or cross-turn claims fail closed before model planning. The
 claim is internal routing metadata, not caller authentication or a consumed
 single-use nonce. Emergency compatibility does not widen execution authority:
-its output still crosses the same host validation, confirmation, Skill Runtime,
+its output still crosses the same host validation, confirmation, Trusted Capability Runtime,
 provider, and evidence boundaries.
 
 ### 3.9 Semantic choice, deterministic enforcement
@@ -374,7 +375,7 @@ It is not a user goal unless the user explicitly requested the behavior.
 
 ### 4.8 Execution evidence
 
-Trusted records from Skill Runtime, tools, memory stores, and Soridormi that
+Trusted records from Trusted Capability Runtime, tools, memory stores, and Soridormi that
 prove what was attempted and what completed.
 
 ### 4.9 Experience record
@@ -427,7 +428,7 @@ Deterministic Validator
   ↓
 Pre-execution Response Plan + optional Social Attention Plan
   ↓
-Skill Runtime / Tools / Memory / Soridormi
+Trusted Capability Runtime / Tools / Memory / Soridormi
   ↓
 ExecutionOutcomeBundle
   ↓
@@ -446,11 +447,11 @@ semantic interpretation. A protective reflex may act immediately, before model
 inference, while preserving its input and outcome for cognitive state. Admitted
 turns reach Goal Association with the original user meaning intact.
 
-In the current deployment, the legacy routing path still supplies route and
-intent advisories, addressedness review, and task/action proposals before this
-pipeline. They may bound rollout lanes and the source-effect envelope, but they
-do not replace Goal Association or become a second authority after Core
-acquisition.
+In the current deployment, Core-owned fast Goal Interpretation may supply a
+bounded advisory route/effect projection after Gateway admission. That projection
+may constrain configured lanes and the maximum source-effect envelope, but it
+does not replace Goal Association, become a canonical Plan, or create a second
+authority after Core acquisition.
 
 ### 5.1 Model-facing Goal Association boundary
 
@@ -1014,10 +1015,10 @@ serve; optional social-attention requests never enter the primary user-goal
 lifecycle.
 
 Effect authority is also monotonic within one turn. The configured cognitive
-lane allowlist says which kinds of plans the deployment can support. During the
-current migration, the legacy routing path decision supplies the turn's
-maximum source-effect envelope; that safety constraint is not semantic goal
-ownership. A speech-only `chat` turn cannot become `robot_action` after Goal
+lane allowlist says which kinds of plans the deployment can support. The
+Core-owned interpretation result supplies the turn's maximum source-effect
+envelope; that safety constraint is not semantic goal ownership or a Plan. A
+speech-only `chat` turn cannot become `robot_action` after Goal
 Association or planning merely because both lanes are enabled. Such escalation
 stops at the authority boundary before Response Composition, capability
 validation, or any SkillRequest is emitted.
@@ -1144,7 +1145,7 @@ The validator must not:
 
 Execution is owned by trusted runtimes:
 
-- Skill Runtime;
+- Trusted Capability Runtime;
 - tools and trusted services;
 - memory providers;
 - Soridormi for embodied planning and execution.
@@ -1314,13 +1315,12 @@ The following are merge-blocking invariants:
 18. Runtime never silently fills semantic parameters through action-specific
     rules.
 
-After the queued grounded-response latency Issue is implemented, its acceptance
-boundary must additionally require that a complete non-effectful
-spoken-response Goal not invoke a planner merely to transport speech, that
-every Deep invocation have a recorded reason requiring the wider semantic
-boundary, and that concurrent output preparation neither create a second
-semantic authority nor permit raw model fragments to reach TTS. These are
-future Issue exit requirements, not current merge-blocking invariants.
+The implemented grounded-response latency boundary additionally requires that
+a complete non-effectful spoken-response Goal not invoke a planner merely to
+transport speech, that every Deep invocation record a reason requiring the wider
+semantic boundary, and that concurrent output preparation neither create a
+second semantic authority nor permit raw model fragments to reach TTS. Current
+latency measurements remain target-evidence claims, not architecture assumptions.
 
 ## 18. Prohibited anti-patterns
 
@@ -1357,11 +1357,11 @@ maintained runtime still runs those components as independent report-only
 observers. Each stage began with retained scenarios and did not claim
 later-stage behavior.
 
-PR1-PR9 establish the Goal-Driven Cognitive Core and close one admitted
-effectful turn through evidence-bound final response. They do not establish
-that the current Goal Interpreter service has been fully decomposed into a narrow
-Cognitive Gateway or that target live behavior is qualified; those migrations
-and evidence claims are tracked separately.
+PR1-PR9 established the Goal-Driven Cognitive Core and closed one admitted
+effectful turn through evidence-bound final response. The subsequent Gateway
+work completed the five-module admission boundary and removed the independent
+Goal Interpreter service. Target live behavior remains a separate evidence
+claim tracked by the current status and qualification documents.
 
 ### PR1 — Goal contracts and continuity projection
 
@@ -1526,8 +1526,8 @@ This stage closes the two contract gaps around PR1-PR8 without redesigning its
 semantic planners:
 
 - a versioned `UserTurnEnvelope` is the preserved Gateway-to-Core input;
-- a compatibility adapter keeps current Goal Interpreter and Agent interfaces
-  behavior-preserving during migration;
+- a compatibility adapter preserves bounded Goal Interpreter and Agent data
+  contracts inside the Core without restoring a service or fallback authority;
 - a deterministic `ExecutionOutcomeBundle` joins exact canonical
   step/skill/arguments/timing, committed requests/schema identity, and trusted
   runtime results/traces to exact goal IDs;
@@ -1555,36 +1555,38 @@ Exit criteria:
 - no automated test is reported as live provider, simulator, microphone, or
   physical-robot evidence.
 
-## 20. Migration strategy
+## 20. Retained compatibility and evolution rules
 
-Routes, route items, semantic tasks, and task proposal ledgers remain bounded
-compatibility surfaces around the maintained Goal-driven Runtime.
+Routes, route items, semantic tasks, and task-proposal ledgers may remain only as
+bounded, versioned compatibility or evidence surfaces around the maintained
+Goal-driven Runtime.
 
-Migration rules:
+Evolution rules:
 
-- do not delete current safety or evidence boundaries;
-- establish the Cognitive Gateway as a local, model-independent protective
-  reflex and bounded attention/admission boundary before removing Goal Interpreter
-  compatibility behavior;
-- move goal meaning, goal association, task decomposition, affordance grounding,
-  planning, semantic agent coordination, outcome synthesis, and response
-  composition behind the Goal-Driven Cognitive Core boundary;
-- preserve current Goal Interpreter route/intent and proposal fields as explicitly named
-  compatibility inputs until every consumer and regression boundary migrates;
-- introduce goal contracts alongside existing task contracts;
+- preserve deterministic safety, authorization, cancellation, and evidence
+  boundaries;
+- keep Cognitive Gateway normalization, protective reflex, attention, context,
+  and admission distinct from Core semantics;
+- keep goal meaning, association, decomposition, affordance grounding, planning,
+  semantic coordination, outcome synthesis, and response composition inside one
+  Goal-Driven Cognitive Core authority;
+- treat `RouteDecision` route/intent/action/proposal fields as digest-bound
+  advisory inputs only, never as a service, canonical Plan, or execution grant;
 - use `report_only` only for explicit observation or rollout diagnosis, not as
   the maintained authority mode;
-- compare goal coverage and committed skills before widening an apply lane;
-- widen `apply` only per lane and reviewed scenario class;
-- preserve rollback switches;
-- remove compatibility semantics only after retained evidence.
+- compare complete Goal coverage and committed capabilities before widening an
+  apply lane;
+- after Core authority is acquired, fail closed rather than falling through to a
+  second semantic planner;
+- remove remaining compatibility aliases only through an explicit contract
+  version change with retained regression and target evidence.
 
 ## 21. Observability
 
 The cognitive pipeline should record, without exposing private model reasoning:
 
 - normalized input identity, protective-reflex result, and admission decision;
-- legacy routing path advisories while that service topology remains;
+- digest-bound Core interpretation advisories and source-effect envelope, when present;
 - goal-association result and confidence;
 - candidate goal IDs considered;
 - goal segmentation count;
@@ -1601,11 +1603,11 @@ The cognitive pipeline should record, without exposing private model reasoning:
 - response claims;
 - optional attention status.
 
-The queued grounded-response latency Issue must extend those records with
-direct/Fast/Deep path classification and its reason, first-valid-speech-
-commitment, TTS-request, first-PCM, and first-audible-playback timing, plus model
-queue/evaluation and contract-repair count/duration. These are future
-instrumentation requirements, not current trace claims.
+Current traces distinguish direct/Fast/Deep path classification and reason,
+first-valid-speech commitment, TTS request, provider stream/PCM milestones,
+actual playback start, completion, model evaluation, and contract repair. Exact
+warm/cold and shared-resource latency remains target evidence and must be
+reported from retained runs.
 
 Logs should show decisions and contracts, not hidden chain-of-thought.
 

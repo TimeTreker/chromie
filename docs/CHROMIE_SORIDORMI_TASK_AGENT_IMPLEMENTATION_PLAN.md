@@ -374,7 +374,7 @@ Next Chromie-side work should stay in this order:
    before preview or submit is allowed;
 4. keep refusal and blocked-subsystem graph reporting deterministic and concise,
    keep trace-only report fallbacks available for planning graphs, and connect
-   audible speech only through the host Skill Runtime path without making
+   audible speech only through the host Trusted Capability Runtime path without making
    unsupported Soridormi goals sound like completed motion;
 5. only after that, connect the same flow to retained live Soridormi task API
    evidence; physical execution still waits for the reference robot gate.

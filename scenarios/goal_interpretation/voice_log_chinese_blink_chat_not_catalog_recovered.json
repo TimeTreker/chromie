@@ -40,7 +40,7 @@
       "confidence": 0.9,
       "language": "zh-CN",
       "source": "llm",
-      "reason": "quick router treated the ASR phrase as conversation"
+      "reason": "fast Goal Interpreter treated the ASR phrase as conversation"
     }
   },
   "expect": {

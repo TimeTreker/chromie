@@ -18,7 +18,7 @@ do not patch only the exact sentence that exposed the problem. First identify
 which interaction contract was violated:
 
 - Did ASR provide an uncertain hypothesis that was treated as truth?
-- Did the legacy routing path or Cognitive Core substitute a nearby capability
+- Did the Core interpretation projection or canonical planner substitute a nearby capability
   for unclear user meaning?
 - Did fast-first speech and final speech both answer the same conversational act?
 - Did an agent claim an action or tool result that had not been committed?
@@ -50,7 +50,7 @@ Core ability classes include:
 - **Natural uncertainty handling** that asks about the real ambiguity instead
   of producing generic missing-skill or internal-policy speech.
 - **Composable high-level action planning** for supported multi-step body
-  requests, while keeping physical TaskGraph and Skill Runtime execution
+  requests, while keeping physical TaskGraph and Trusted Capability Runtime execution
   sequential and validated.
 - **Truthful embodied speech** that reflects proposal, confirmation,
   execution, failure, cancellation, and provider evidence.
@@ -76,18 +76,18 @@ Classify the root cause before choosing a fix:
 - **ASR/audio** - the transcript is wrong, uncertain, clipped, duplicated, or
   over-trusted.
 - **Cognitive Gateway/ingress** - normalization, protective reflex, attention,
-  or turn admission is wrong. Current traces may expose this through the
-  legacy routing path.
+  or turn admission is wrong. Current traces expose this through Gateway evidence and the
+  admitted `UserTurnEnvelope`.
 - **Cognitive Core/goal meaning** - goal association, intent, decomposition,
-  planning, affordance grounding, or outcome synthesis is wrong. During
-  migration, some advisory route/intent output still originates in the Goal Interpreter.
+  planning, affordance grounding, or outcome synthesis is wrong. A bounded advisory route/effect projection may originate in the fast Goal
+  Interpreter inside the Core, but Goal Association and canonical planning own meaning.
 - **Agent contract** - the model is allowed to invent speech acts, tool results,
   skill proposals, or physical execution claims.
 - **Prompt wording** - the state and authority are correct, but the generated
   wording is poor.
 - **Orchestrator policy** - fast-first/final response, conversation state,
   confirmation, cancellation, timeout, or TTS scheduling is inconsistent.
-- **Skill Runtime/provider** - authorization, preflight, execution result,
+- **Trusted Capability Runtime/provider** - authorization, preflight, execution result,
   fallback, or Soridormi/provider evidence is missing or misreported.
 - **Test evidence** - the existing tests mock or skip the boundary that failed
   for the user.
@@ -138,8 +138,8 @@ Use a prompt-only fix only when all of these are true:
 Use an architecture or policy fix when any of these are true:
 
 - Multiple modules can independently speak for the same turn.
-- A downstream agent can reinterpret a Gateway admission decision or a
-  legacy routing path clarification/refusal as an action.
+- A downstream agent can reinterpret a Gateway admission decision or a bounded
+  Core interpretation clarification/refusal as an action.
 - Fast-first speech is not known to the final response generator.
 - Internal markers such as `checking_only` can reach TTS.
 - ASR homophones, clipped speech, or low-information text are treated as
@@ -615,8 +615,8 @@ Before submitting a fix for a user-visible interaction problem, write down:
 
 1. What did the user actually say, and what did ASR produce?
 2. What reflex or admission decision did the Cognitive Gateway make?
-3. What advisory route/intent did the legacy routing path propose, and what
-   goal meaning did the Cognitive Core resolve?
+3. What bounded advisory route/effect projection did fast Goal Interpretation
+   produce, and what Goal meaning and canonical Plan did the Cognitive Core resolve?
 4. What uncertainty or missing argument existed?
 5. Which component first violated the human-like interaction contract?
 6. Which later component amplified the bad behavior?

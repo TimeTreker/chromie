@@ -77,6 +77,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    @staticmethod
+    def _generator_env() -> dict[str, str]:
+        env = dict(os.environ)
+        # Tests that validate default mode selection must not inherit operator
+        # state leaked by another test or by the developer's current shell.
+        env.pop("CHROMIE_OPERATOR_MODE", None)
+        # A stale inherited hardware marker must not control selection.
+        env["CHROMIE_HARDWARE_PROFILE"] = "rtx4090_laptop"
+        return env
+
     def _generate(
         self,
         root: Path,
@@ -85,9 +95,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         check: bool = True,
         strict: bool = False,
     ) -> subprocess.CompletedProcess[str]:
-        env = dict(os.environ)
-        # A stale inherited marker must not control selection.
-        env["CHROMIE_HARDWARE_PROFILE"] = "rtx4090_laptop"
+        env = self._generator_env()
         if strict:
             env["CHROMIE_ENV_STRICT"] = "1"
         else:
@@ -176,6 +184,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                     str(system_info),
                 ],
                 cwd=root,
+                env=self._generator_env(),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -198,7 +207,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 memory="32607",
                 cuda_arch="120",
             )
-            env = dict(os.environ)
+            env = self._generator_env()
             env["CHROMIE_OPERATOR_MODE"] = "voice_mujoco"
             completed = subprocess.run(
                 [

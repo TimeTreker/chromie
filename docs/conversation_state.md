@@ -147,7 +147,7 @@ Task context is closed or forgotten when:
 
 - the conversation boundary resets;
 - the Cognitive Core or user explicitly closes/cancels the task;
-- the Skill Runtime reports the associated request IDs as completed, failed,
+- the Trusted Capability Runtime reports the associated request IDs as completed, failed,
   cancelled, or expired, and the completed-task retention window elapses;
 - pending-task capacity trims older entries.
 

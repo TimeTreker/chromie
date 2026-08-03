@@ -46,6 +46,19 @@ STATUS_FILES = [
     ROOT / "DEVELOPMENT_CHECKPOINT.md",
     ROOT / "docs" / "STATUS.md",
 ]
+CURRENT_GATE_SUMMARY_FILES = [
+    ROOT / "README.md",
+    ROOT / "docs" / "ACCEPTANCE.md",
+    ROOT / "docs" / "PROJECT_GUIDE.zh-CN.md",
+]
+CURRENT_RUNTIME_TERM_FILES = [
+    ROOT / "docs" / "COGNITIVE_TURN_LOOP.md",
+    ROOT / "docs" / "COGNITIVE_GATEWAY.md",
+    ROOT / "docs" / "GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
+]
+HARDCODED_GATE_COUNT_RE = re.compile(
+    r"(?:\b\d{1,3},\d{3}\s+primary tests\b|\b\d{1,3},\d{3}\s+个主要测试)"
+)
 
 ROUTE_SOURCES = [
     ROOT / "agent" / "app" / "main.py",
@@ -97,6 +110,7 @@ STALE_PHRASES = {
     "add request-bound confirmation dialogue": "spoken request-bound confirmation is implemented",
     "spoken-confirmation blocker remains": "only retained confirmation evidence remains open",
     "8c448e2de2cd8a602b0d48e31461f9be9f1b8d08": "stale repository snapshot revision",
+    "current host has no microphone": "retained physical input now reaches VAD/ASR; the intelligible required utterance remains open",
 }
 
 MILESTONE_TOKEN_RE = re.compile(
@@ -272,6 +286,33 @@ def check_current_focus(errors: list[str]) -> None:
                 errors.append(
                     f"{path.relative_to(ROOT)} contains stale phrase {phrase!r}: {reason}"
                 )
+
+
+def check_current_gate_summaries(errors: list[str]) -> None:
+    """Keep current-facing summaries from copying revision-specific test counts."""
+
+    for path in CURRENT_GATE_SUMMARY_FILES:
+        text = path.read_text(encoding="utf-8")
+        match = HARDCODED_GATE_COUNT_RE.search(text)
+        if match is not None:
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{path.relative_to(ROOT)}:{line}: current gate summary hardcodes "
+                "a test count; quote a fresh ./scripts/run_tests.sh result instead"
+            )
+
+
+def check_current_runtime_terminology(errors: list[str]) -> None:
+    """Keep canonical architecture docs on the current runtime term."""
+
+    for path in CURRENT_RUNTIME_TERM_FILES:
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"(?<!Trusted Capability )Skill Runtime", text):
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{path.relative_to(ROOT)}:{line}: canonical architecture uses "
+                "legacy Skill Runtime terminology; use Trusted Capability Runtime"
+            )
 
 
 def check_project_direction(errors: list[str]) -> None:
@@ -808,6 +849,8 @@ def main() -> int:
     check_document_index(errors)
     check_semantic_project_naming(errors)
     check_current_focus(errors)
+    check_current_gate_summaries(errors)
+    check_current_runtime_terminology(errors)
     check_project_direction(errors)
     check_api_reference(errors)
     check_configuration_reference(errors)

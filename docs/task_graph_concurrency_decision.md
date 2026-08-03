@@ -3,7 +3,7 @@
 ## Decision status
 
 Accepted and implemented for eligible non-physical Agent
-TaskGraph execution and host Skill Runtime scheduling.
+TaskGraph execution and host Trusted Capability Runtime scheduling.
 
 The decision is:
 
@@ -40,7 +40,7 @@ AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION=1
 AGENT_TASK_GRAPH_MAX_CONCURRENCY=4
 ```
 
-Host Skill Runtime concurrency is bounded with:
+Host Trusted Capability Runtime concurrency is bounded with:
 
 ```env
 ORCH_SKILL_MAX_CONCURRENCY=4
@@ -59,7 +59,7 @@ is enabled. They still require:
 - a declared emergency fallback;
 - explicit physical-execution enablement.
 
-The host Skill Runtime also relies on Soridormi for embodied exclusivity,
+The host Trusted Capability Runtime also relies on Soridormi for embodied exclusivity,
 cancellation, stop, and emergency behavior. An Agent arbiter and Orchestrator
 arbiter cannot coordinate each other directly.
 

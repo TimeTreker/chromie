@@ -3,7 +3,7 @@
   "id": "voice_log_exact_walk_forward_not_nod",
   "suite": "interaction",
   "level": "integration",
-  "description": "Regression from the 2026-06-30 live voice log: Router selected walk_forward but the Agent tried to execute nod_yes.",
+  "description": "Regression from the 2026-06-30 live voice log: the then-current Goal Interpreter selected walk_forward but the Agent tried to execute nod_yes.",
   "tags": [
     "voice-log",
     "robot-action",

@@ -337,7 +337,8 @@ skill into another provider contract.
 
 The Agent implementation is further specified by these owned contracts:
 
-- [Interaction Agent Skill Runtime](../docs/interaction_agent_skill_runtime.md)
-- [Catalog-Aware Goal Interpretation](../docs/CATALOG_AWARE_GOAL_INTERPRETATION.md)
+- [Interaction Agent and Capability Runtime](../docs/interaction_agent_skill_runtime.md)
+- [Goal-Driven Cognitive Architecture](../docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Fast Planner Multi-Goal Contract](../docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 - [Tool Result Interpretation](../docs/TOOL_RESULT_INTERPRETATION.md)
 - [Agent Capability Registry](../docs/agent_capability_registry.md)

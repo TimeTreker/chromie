@@ -79,7 +79,7 @@ and conversational authority for every admitted turn. It owns:
 - intent and goal understanding;
 - goal continuity and independent-goal segmentation;
 - complete canonical planning;
-- selection of bounded Agent, tool, memory, and Skill Runtime work;
+- selection of bounded Agent, tool, memory, and Trusted Capability Runtime work;
 - outcome reconciliation against each goal;
 - replan, clarification, failure, or completion decisions;
 - the final user-facing response.
@@ -308,8 +308,8 @@ request metadata. At closure, the current trusted `SkillDefinition` schema is
 usable only when its digest exactly matches that commitment. A missing
 commitment, missing definition, changed or invalid schema, or an empty schema
 produces `schema_unavailable` with a bounded reason and exposes no provider
-payload. This also keeps Soridormi capabilities whose current catalog omits an
-output schema fail-closed during migration.
+payload. This also keeps Soridormi capabilities whose compatibility catalog omits an
+output schema fail-closed.
 
 Raw Agent, tool, memory, and provider output never enters a model prompt
 directly. The trusted host first validates correlation and schema, then creates
@@ -433,7 +433,7 @@ fingerprint. Retry requests receive new request and idempotency identities and
 must match that child plan exactly.
 
 The child plan requires fresh request-bound confirmation and then re-enters the
-normal validation, Skill Runtime, Soridormi preflight, outcome reconciliation,
+normal validation, Trusted Capability Runtime, Soridormi preflight, outcome reconciliation,
 and final-response path. Earlier completed sibling goals remain in parent
 history and are not overwritten or replayed. If a complete child plan cannot be
 constructed, any committed sibling lacks a terminal result, a non-recoverable
@@ -527,7 +527,7 @@ separable and fails closed.
 
 For non-urgent named cancellation, the Core resolves semantic Goal IDs only.
 The trusted host maps those IDs to the exact active interaction, committed plan
-ID and fingerprint, then dispatches `specific_goal` to Skill Runtime. Goal state
+ID and fingerprint, then dispatches `specific_goal` to Trusted Capability Runtime. Goal state
 is mutated only after the host validates one exact receipt for every
 execution-bound target, including selected requests and any stale, shared-owner,
 non-interruptible, provider-failure, dispatch-failure, or provider-widening

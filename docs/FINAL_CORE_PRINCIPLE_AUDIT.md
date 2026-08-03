@@ -1,7 +1,8 @@
 # Final Core-Principle Audit
 
 Status: implementation audit; non-authoritative evidence record
-Date: 2026-07-30
+Initial date: 2026-07-30
+Follow-up date: 2026-08-03
 Current authorities: `config/documentation_authority.json`
 
 ## Scope
@@ -109,6 +110,56 @@ The high-level ability ontology still carried fixed bilingual speech templates,
 Provider identifiers, default arguments, and timeout hints. It now records only
 responsibility ownership and availability state. It neither speaks nor executes.
 
+### Stale architecture and contract residue (follow-up 2026-08-03)
+
+Five indexed staged-design or pre-Core planning documents still described
+Router-proposed operations, Goal-Interpreter-selected task plans, Orchestrator
+semantic consolidation, and migration-era proposal authority as if they were
+current. They were removed and their index/Roadmap references now point
+to the Goal-driven architecture and Cognitive Turn Loop. Current documentation
+and scenario metadata were also aligned with
+`fast_goal_interpreter_review_request`,
+`goal_interpretation_action_confidence`, `interpretation_mode`, Cognitive
+Gateway, and Agent-owned Cognitive Core terminology. The architecture constitution, Human-Like Interaction Contract, contributor
+guide, Roadmap, and summaries now describe the implemented Gateway/Core split;
+none claims that `/route`, a Goal Interpreter service, or pre-Goal task proposals
+are current semantic or execution authorities.
+The Router-removal guard now rejects these retired contract names and obsolete
+documents across maintained docs and scenarios.
+
+### Canonical runtime terminology and compatibility state
+
+Current architecture, operations, contributor, scenario, and evidence text still
+used **Skill Runtime** as though it were the canonical component and described
+the rename as an unfinished migration. Current-facing text now uses **Trusted
+Capability Runtime**. Legacy `SkillRuntime`, `SkillRequest`, `SkillResult`,
+`skill_id`, and retained historical labels remain only at explicit compatibility
+boundaries; no current document treats migration as open architecture work.
+
+### Pre-Goal speech and evidence-summary contract drift
+
+One maintained scenario still required the retired physical
+`safety_prelude`/`needs_confirmation` fast-speech pair. The current contract
+allows silence before authoritative Goals and Plans exist and accepts only the
+route-valid, claim-free fast-speech schema. The scenario was renamed and turned
+into a rejection regression for the stale pair.
+
+A Cognitive Turn Loop fixture also expected deterministic speech from a generic
+provider `summary`. The trusted fallback intentionally exposes only an explicit,
+schema-committed `user_summary`; the fixture now matches that safety boundary
+while the changed-schema tests continue proving that undeclared Provider output
+cannot cross into speech.
+
+### Test isolation and ownership drift
+
+The complete suite exposed two stale test contracts. Automatic profile tests
+inherited `CHROMIE_OPERATOR_MODE` from unrelated process state, making their
+default-mode assertions order-dependent. Their subprocess environments now
+clear inherited operator mode unless the test explicitly selects one. The
+Python-source-reader ownership test duplicated an obsolete one-file allowlist
+even though the authoritative registry already contained three reviewed tests;
+it now compares discovery directly with that registry.
+
 ## Areas audited with no remaining violation found
 
 ### Benchmark purity
@@ -169,12 +220,13 @@ python scripts/check_docs.py
 ```
 
 Automated checks establish implementation consistency only. The audited tree
-passed 1,631 primary tests, 20 legacy Agent tests, repository policy checks,
-test-ownership checks, documentation checks, and Python compilation. The pinned
-Ruff and Mypy executables were unavailable from the restricted validation
-package mirror, so this audit does not claim a real Ruff or Mypy run; their
-wrappers remain fail-closed and must run in the normal developer environment
-with `requirements-test.txt` installed.
+passed 1,880 primary tests in 42.623 seconds, 20 legacy Agent tests, the Router
+removal guard, repository policy checks, test-ownership checks, documentation
+checks, runtime configuration/ownership/structure ratchets, JSON parsing, and
+Python compilation. The pinned Ruff and Mypy executables were unavailable from
+the restricted validation package mirror, so this audit does not claim a real
+Ruff or Mypy run; their wrappers remain fail-closed and must run in the normal
+developer environment with `requirements-test.txt` installed.
 
 These checks do not replace clean source-bound live-text, positive Agent Skill
 selection, provider-backed weather, MuJoCo, physical audio, or supervised
@@ -183,7 +235,8 @@ physical-robot evidence.
 ## Closure statement
 
 All named implementation Issues from the handoff are complete, and the concrete
-principle violations found by this final audit are corrected in the audited tree.
+principle violations found by the original and 2026-08-03 follow-up audits are
+corrected in the audited tree.
 Remaining work is target-evidence collection under the existing authoritative
 qualification documents, not another semantic architecture implementation
 backlog.

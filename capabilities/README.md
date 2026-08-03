@@ -90,9 +90,10 @@ exemption.
 
 The existing typed manifest, live provider schema, capability registry, Trusted
 Capability Runtime, and Soridormi validation remain the only execution-
-authoritative path. Current code may still expose the legacy Skill Runtime name
-until the compatibility migration lands. Do not add a second execution registry, script entrypoint, automatic
-provider-registration hook, or install mechanism. The planned Agent Skill
+authoritative path. Legacy `SkillRuntime`, `SkillRequest`, `SkillResult`, and
+`skill_id` names remain readable only at explicit compatibility boundaries. Do
+not add a second execution registry, script entrypoint, automatic provider-
+registration hook, or install mechanism. The planned Agent Skill
 registry is a read-only cognitive-content index with no execution authority.
 
 ## Prompt-tier preset
@@ -158,10 +159,11 @@ Chromie currently has two related but distinct capability views:
 1. The Agent capability registry is a startup-loaded, static manifest view used
    for TaskGraph planning, validation, policy, and MCP invocation.
 2. The Orchestrator Skill Registry is a runtime catalog of trusted named skills
-   used by `InteractionResponse` and the host Skill Runtime.
+   used by `InteractionResponse` and the host Trusted Capability Runtime.
 
 They share the principle that the model selects validated named capabilities,
 not raw motor or joint commands, but they are not the same in-memory object.
-The native structured Agent path now emits Skill Runtime requests directly,
-while the host registry remains the final provider and execution authority.
+The native structured Agent path now emits Trusted Capability Runtime requests
+directly, while the host registry remains the final provider and execution
+authority.
 Future catalog-alignment work must not bypass either policy layer.

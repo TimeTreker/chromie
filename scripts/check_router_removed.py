@@ -14,6 +14,31 @@ FORBIDDEN_PATHS = (
     Path("goal_interpretation"),
     Path("orchestrator/clients/router_client.py"),
 )
+RETIRED_DOCUMENTS = (
+    Path("docs/ORCHESTRATOR_TASK_PROPOSAL_MERGE.md"),
+    Path("docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md"),
+    Path("docs/FAST_COGNITIVE_PLANNING.md"),
+    Path("docs/CATALOG_AWARE_GOAL_INTERPRETATION.md"),
+    Path("docs/MODEL_ASSISTED_COGNITIVE_GUARDRAILS.md"),
+)
+RETIRED_CURRENT_TOKENS = (
+    "quick_router_review_request",
+    "router_action_confidence",
+    '"router_mode"',
+    "router-agent-contract",
+    "router-contract",
+    "Router/intent",
+    "Compatibility Router/attention",
+    "llm_hints.router_contract",
+    "tests.test_router_llm_prompt",
+    "physical_pending_work_gets_safety_prelude",
+    "Tasks emitted by routers are proposals",
+    "Router-proposed advisory operations",
+    "A Router may propose",
+    "The Router must not invent",
+    "Router splits the responsibilities",
+    "`RouteDecision`, `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`",
+)
 STRUCTURAL_TOKENS = (
     "chromie-router",
     "RouterClient",
@@ -106,6 +131,9 @@ def audit_removed_router(root: Path = ROOT) -> list[str]:
         path = root / relative
         if removed_path_has_maintained_content(path):
             errors.append(f"removed Router path contains maintained content: {relative}")
+    for relative in RETIRED_DOCUMENTS:
+        if (root / relative).exists():
+            errors.append(f"retired pre-Core document is still maintained: {relative}")
     for relative in CURRENT_FILES:
         path = root / relative
         if not path.exists():
@@ -201,6 +229,28 @@ def audit_removed_router(root: Path = ROOT) -> list[str]:
                         f"{path.relative_to(root)} contains stale "
                         f"current-architecture claim {token!r}"
                     )
+
+    # Retired Router-era contract names may not survive in maintained docs,
+    # Roadmap text, or active scenario metadata. Historical changelog/evidence
+    # files use explicit provenance wording and are intentionally outside this
+    # current-facing scan.
+    current_text_paths = [root / "README.md", root / "ROADMAP.md"]
+    for base, pattern in ((root / "docs", "*.md"), (root / "scenarios", "*.json")):
+        if base.exists():
+            current_text_paths.extend(base.rglob(pattern))
+    for path in current_text_paths:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for token in RETIRED_CURRENT_TOKENS:
+            if token in text:
+                errors.append(
+                    f"{path.relative_to(root)} contains retired Router-era "
+                    f"contract or architecture text {token!r}"
+                )
 
     compose_path = root / "docker-compose.yml"
     if compose_path.exists():

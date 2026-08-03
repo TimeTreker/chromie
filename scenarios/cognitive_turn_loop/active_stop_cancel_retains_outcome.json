@@ -3,7 +3,7 @@
   "id": "active_stop_cancel_retains_outcome",
   "suite": "cognitive_turn_loop",
   "level": "integration",
-  "description": "A deterministic current-interaction stop cancels both the active and queued Skill Runtime requests, records the queued request as cancelled_before_start, retains both outcomes, and emits no stale final.",
+  "description": "A deterministic current-interaction stop cancels both the active and queued Trusted Capability Runtime requests, records the queued request as cancelled_before_start, retains both outcomes, and emits no stale final.",
   "tags": ["level-a", "stop", "cancel", "skill-runtime", "evidence-retention"],
   "input": {
     "text": "Run the long first task and then the second task.",

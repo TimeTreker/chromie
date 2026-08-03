@@ -139,7 +139,7 @@ thread:
 - infer the user's likely intent from the turn and prior context;
 - compare route, speech, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
-- separate ASR, Goal Interpreter, Agent, Skill Runtime, TTS, and latency problems;
+- separate ASR, Goal Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.
 
 The evaluator output should be structured JSON:
@@ -395,7 +395,7 @@ Behavior:
   tags are present;
 - preserve source evidence IDs;
 - default to `dialogue` when the failure spans multiple turns;
-- default to `interaction` when the failure is one Agent/Skill Runtime turn;
+- default to `interaction` when the failure is one Agent/Trusted Capability Runtime turn;
 - default to `goal interpreter` when the failure is route classification only;
 - mark every generated file as `requires_human_review=true`.
 

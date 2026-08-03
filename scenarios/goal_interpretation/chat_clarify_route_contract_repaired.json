@@ -4,7 +4,7 @@
   "suite": "goal_interpretation",
   "level": "integration",
   "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must be semantically repaired instead of being sent to the conversation lane unchanged.",
-  "tags": ["router-contract", "semantic-repair", "clarify", "model-authority"],
+  "tags": ["goal-interpretation-contract", "semantic-repair", "clarify", "model-authority"],
   "input": {
     "text": "Make that one colder.",
     "language": "en-US"

@@ -55,7 +55,7 @@ The word "ability" has two different meanings in this system.
 
 Experience can guide interpretation and propose new work. Runtime execution
 still requires declared abilities, schema validation, confirmation gates,
-Skill Runtime authorization, and Soridormi or tool-provider evidence.
+Trusted Capability Runtime authorization, and Soridormi or tool-provider evidence.
 
 ## Products Of Experience
 

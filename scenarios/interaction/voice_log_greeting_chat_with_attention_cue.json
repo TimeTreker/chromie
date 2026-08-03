@@ -9,7 +9,7 @@
     "greeting",
     "social-attention",
     "model-driven",
-    "router-agent-contract"
+    "goal-interpretation-agent-contract"
   ],
   "input": {
     "text": "Hello, how are you.",

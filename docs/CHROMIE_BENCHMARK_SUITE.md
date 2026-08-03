@@ -115,7 +115,7 @@ system. Examples:
 ```text
 MindProfile -> Response Composer -> Social Attention proposal
 Cognitive Gateway -> Goal-Driven Cognitive Core -> Planner
-Capability catalog -> Planner -> Skill Runtime validation
+Capability catalog -> Planner -> Trusted Capability Runtime validation
 Tool result -> interpretation -> truthful final speech
 ```
 

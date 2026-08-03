@@ -6,7 +6,7 @@ tests. It is not the primary embodiment boundary for the current alpha
 interaction architecture.
 
 New robot-body behavior must be exposed as validated named skills through the
-host Skill Runtime and Soridormi MCP. Soridormi owns embodied planning,
+host Trusted Capability Runtime and Soridormi MCP. Soridormi owns embodied planning,
 resource policy, stop/emergency behavior, simulator integration, and real
 hardware commissioning.
 

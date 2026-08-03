@@ -149,11 +149,11 @@ The semantic-authority audit remains closed. The newly active proof and
 repository-simplification Issues do not reopen Router or Host semantic
 authority; they address current evidence and maintenance risk.
 
-## Open evidence issue — Complete Cognitive Gateway Decomposition and Core Entry Migration
+## Open evidence issue — Qualify Cognitive Gateway Decomposition and Core Entry
 
-The Goal-Driven Cognitive Turn Loop and the Gateway/Core code migration are now
-implemented. This evidence Issue remains open for source-bound qualification and the
-final post-evidence audit:
+The Goal-Driven Cognitive Turn Loop, Gateway decomposition, and Core entry are
+implemented. This evidence Issue remains open for source-bound qualification and
+the final post-evidence audit:
 
 - [x] expose explicit contracts and implementations for Input Normalization,
   Protective Reflex, Attention Review, Context Assembly, and Turn Admission;
@@ -617,66 +617,32 @@ are deleted. Backend identity and calibrated body arguments are absent from the
 model-facing Social Attention boundary. Remaining work is retained live Soridormi
 interaction evidence and the full release-quality regression gate.
 
-## Implemented architecture track - Orchestrator task proposal merge
+## Implemented architecture foundation - Goal continuity and proposal evidence
 
-Goal Interpretation, quick intent, and deepthinking stages may all propose tasks, but
-effectful work must become an Orchestrator commitment before execution. The
-detailed design and implementation sequence are maintained in
-[Orchestrator Task Proposal Merge](docs/ORCHESTRATOR_TASK_PROPOSAL_MERGE.md).
+The former proposal-merge and semantic-task-continuity migration tracks are
+subsumed by the single Goal-driven Cognitive Core. The maintained authorities
+are [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+and [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md).
 
-Exit criteria before treating this as a complete smart merge layer:
+Current maintained behavior:
 
-- Goal Interpretation, Agent, and deepthinking task proposals use one shared schema; the
-  shared `TaskProposalLedger` contract exists and Goal Interpretation emits shared
-  `task_proposals`, the Agent deepthinking path emits shared
-  `deepthinking_task_proposals`, and final Agent speech/skills emit shared
-  `agent_task_proposals`;
-- the Orchestrator can accept, reject, revise, supersede, or commit proposals
-  with deterministic audit metadata;
-- static host preflight records schema/provider/availability/confirmation
-  status without pretending to prove real-world feasibility;
-- effectful proposals never execute until committed and authorized through the
-  Trusted Capability Runtime;
-- later-stage corrections can produce concise user-facing repair speech without
-  claiming unverified execution;
-- retained traces and experience summaries expose proposal, commit, execution,
-  and correction causes without injecting raw history into prompts;
-- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+- Goal Association owns semantic continuity, reference resolution, correction,
+  clarification, cancellation, and versioned Goal updates;
+- Fast or terminal Deep Planning produces a canonical Plan with complete Goal
+  coverage before effectful execution;
+- fast Goal Interpretation output and proposal-ledger records are advisory
+  evidence surfaces, not a second semantic authority or executable commitment;
+- the Host validates identities, versions, schemas, confirmation, authorization,
+  scheduling, cancellation, and evidence without inventing user meaning;
+- the Trusted Capability Runtime executes only exact Plan-bound requests, while
+  Soridormi owns embodied feasibility, safety, monitoring, stop, and recovery;
+- outcome reconciliation joins exact plan/request/result evidence before the
+  model-owned final response may make a completion claim.
 
-## Implemented architecture track - Semantic task continuity and situational planning
-
-Chromie should preserve open semantic user goals across turns, associate later
-utterances with active tasks through model-based meaning understanding, and
-select concrete skills only during capability planning. The detailed design and
-staged implementation sequence are maintained in
-[Semantic Task Continuity and Situational Planning](docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
-
-This track complements the proposal ledger. Semantic models propose task
-creation, modification, clarification, correction, cancellation, and response
-composition. The Orchestrator remains the deterministic authority for task IDs,
-versions, lifecycle transitions, authorization, confirmation validity,
-commitment, scheduling, and execution evidence.
-
-Exit criteria before treating semantic task continuity as a maintained runtime
-capability:
-
-- goals are retained as versioned open semantic descriptions rather than fixed
-  action or intent enums;
-- one independent user responsibility maps to one RouteItem, while implementation
-  steps remain TaskGraph or provider-plan nodes;
-- later turns can semantically modify, clarify, confirm, cancel, or query active
-  tasks without regex, phrase-table, or lexical-score decisions;
-- missing user parameters retain the original task in a waiting-for-user state,
-  while missing world facts request observation or trusted lookup;
-- capability planning returns a direct skill, valid composition, context request,
-  clarification request, or honest unavailable result;
-- goal changes supersede stale plans and confirmations before any effectful work
-  can execute;
-- natural multi-goal feedback is model-composed, while speech claims and
-  commitments are checked against trusted task state;
-- simple chat and explicit direct-skill latency remain bounded;
-- generalization-oriented Level A and retained live-text evidence pass;
-- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+Obsolete standalone proposal and pre-Core planning documents were removed
+because they described a Router-era staged migration or Goal-Interpreter-selected
+plans and could be mistaken for current architecture.
+Historical implementation provenance remains available in Git history.
 
 ## Implemented contract track - Cognitive Gateway decomposition
 
@@ -707,14 +673,14 @@ one durable transaction. The five physical Gateway modules and their contracts a
 and automatically verified. Retained E-stop, safe-idle, live-text, and MuJoCo
 evidence remains open.
 
-Exit criteria before treating the Gateway/Core migration as complete:
+Maintained Gateway/Core closure criteria:
 
 - the implemented `UserTurnEnvelope` continues to preserve original input,
   normalized evidence, quality, attention, context provenance, admission,
   reflex outcome, and turn correlation without embedding a Gateway-authored
   normal intent or plan;
-- the five logical Gateway modules have explicit contracts and tests, even if
-  some remain co-deployed during migration;
+- the five logical Gateway modules have explicit contracts and tests, even
+  when several are co-deployed in one host process;
 - stop, cancel, emergency, silence, and unusable-input controls remain
   deterministic, while dedicated E-stop claims require trusted provider and
   safe-idle evidence;
@@ -722,9 +688,9 @@ Exit criteria before treating the Gateway/Core migration as complete:
   direct or unclear speech, and cannot authorize effects;
 - normal goal interpretation, semantic triage, affordance grounding, planning,
   execution reconciliation, and final response are owned by one Core authority;
-- `RouteDecision`, `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`, and existing log
-  names remain compatibility surfaces until dual-contract parity and rollback
-  evidence permit deprecation;
+- the versioned `RouteDecision` name may remain as a bounded internal Core
+  contract, but there is no independent `/route` API, Router client, service,
+  container, or Goal Interpreter host/port/URL compatibility surface;
 - focused contract tests, deterministic-safety General Ability Level A,
   retained live-text, cancellation, simulator safe-idle, and documentation
   checks pass without overstating microphone or physical-robot evidence.

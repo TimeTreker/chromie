@@ -43,7 +43,7 @@ PR0 through PR6 are implemented and automatically verified at Level A:
   levels without turning local or automated output into release readiness;
 - `trace view` reads retained local JSONL and JSON artifacts, filters by
   session, interaction, graph, or trace id, and summarizes session events,
-  interaction responses, Skill Runtime executions, TaskGraph traces, and
+  interaction responses, Trusted Capability Runtime executions, TaskGraph traces, and
   acceptance summaries according to [Trace Schema](RUNTIME_OBSERVABILITY.md);
 - plain text and JSON output are both supported.
 
@@ -255,8 +255,8 @@ python -m tools.chromie_cli trace view
 ```
 
 The command reads retained local artifacts only. It supports filters for
-Orchestrator sessions, InteractionResponse/Skill Runtime interactions,
-TaskGraph graph ids, and Skill Runtime trace ids.
+Orchestrator sessions, InteractionResponse/Trusted Capability Runtime interactions,
+TaskGraph graph ids, and Trusted Capability Runtime trace ids.
 
 Exit criteria:
 
@@ -269,7 +269,7 @@ Exit criteria:
 
 `trace explain` should be a follow-up milestone after the initial retained
 artifact viewer has enough real bundles to harden causal semantics. It needs
-stable cross-links for session, interaction, TaskGraph, Skill Runtime,
+stable cross-links for session, interaction, TaskGraph, Trusted Capability Runtime,
 Soridormi task events, TTS/playback, and fallback causes. Until then, avoid
 explanations that imply more certainty than the artifacts retain.
 

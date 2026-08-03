@@ -3,7 +3,7 @@
 
 This runner feeds user text into the deployed Cognitive Core and, by default, the
 maintained goal-driven cognitive runtime. It executes the resulting structured
-response through the host trusted Skill Runtime and optionally plays Chromie
+response through the host Trusted Capability Runtime and optionally plays Chromie
 speech through the configured speaker. An explicit legacy Agent ``/interaction``
 compatibility mode remains available. This is a simulator/live-integration
 check, not supervised microphone evidence.
@@ -667,7 +667,7 @@ async def wait_for_provider_started(
     """Wait until a matching provider request has actually started.
 
     Cancellation qualification must not issue the interrupt while work is only
-    planned or queued. The trusted Skill Runtime observation excludes request
+    planned or queued. The Trusted Capability Runtime observation excludes request
     arguments and provider payloads; it is used only to establish the timing
     boundary for the retained stop command.
     """
@@ -678,7 +678,7 @@ async def wait_for_provider_started(
     observer = getattr(runtime, "runtime", runtime)
     observe = getattr(observer, "execution_observation", None)
     if not callable(observe):
-        raise RuntimeError("Skill Runtime execution observation is unavailable")
+        raise RuntimeError("Trusted Capability Runtime execution observation is unavailable")
     deadline = time.monotonic() + timeout_s
     last_observation: dict[str, Any] = {}
     while time.monotonic() < deadline:
@@ -764,7 +764,7 @@ async def run_check(
 
         invoker = assistant.interaction_runtime.soridormi_invoker
         if invoker is None:
-            raise RuntimeError("Soridormi Skill Runtime invoker is not configured")
+            raise RuntimeError("Soridormi Trusted Capability Runtime invoker is not configured")
 
         status_before_start = time.perf_counter()
         status_before = await _invoke_soridormi_status(invoker)
@@ -1077,7 +1077,7 @@ async def run_check(
                     errors.append("--expect-cancelled requires --interrupt-text")
                 if execution.status != "cancelled":
                     errors.append(
-                        f"Skill Runtime status was {execution.status!r}; expected 'cancelled'"
+                        f"Trusted Capability Runtime status was {execution.status!r}; expected 'cancelled'"
                     )
                 cancelled_body = [
                     result
@@ -1091,7 +1091,7 @@ async def run_check(
                     )
             else:
                 if execution.status != "completed":
-                    errors.append(f"Skill Runtime status was {execution.status!r}")
+                    errors.append(f"Trusted Capability Runtime status was {execution.status!r}")
                 for result in body_results:
                     if result.status != "completed":
                         errors.append(
@@ -1238,7 +1238,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Run text through the maintained goal-driven runtime and trusted "
-            "Skill Runtime to Soridormi/MuJoCo without microphone or ASR."
+            "Trusted Capability Runtime to Soridormi/MuJoCo without microphone or ASR."
         )
     )
     parser.add_argument("text", nargs="?", default=DEFAULT_TEXT)
@@ -1380,7 +1380,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--expect-cancelled",
         action="store_true",
         help=(
-            "Require a cancelled Skill Runtime result with trusted Soridormi "
+            "Require a cancelled Trusted Capability Runtime result with trusted Soridormi "
             "cancellation evidence."
         ),
     )

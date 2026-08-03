@@ -396,7 +396,7 @@ def _base_abilities() -> dict[str, AbilitySpec]:
         AbilitySpec(
             "task.execute_skill",
             "task",
-            "Execute a trusted structured skill through the Skill Runtime.",
+            "Execute a trusted structured skill through the Trusted Capability Runtime.",
             status="available",
             implementation="skill_runtime",
         ),

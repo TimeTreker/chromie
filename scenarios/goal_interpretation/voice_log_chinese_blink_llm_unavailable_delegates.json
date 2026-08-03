@@ -3,7 +3,7 @@
   "id": "voice_log_chinese_blink_llm_unavailable_delegates",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, the Router must delegate to deep_thought instead of letting catalog scores execute or select a skill.",
+  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, the fast Goal Interpreter must delegate to deep_thought instead of letting catalog scores execute or select a skill.",
   "tags": [
     "voice-log",
     "zh-CN",

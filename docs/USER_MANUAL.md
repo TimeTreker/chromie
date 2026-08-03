@@ -103,7 +103,7 @@ Compose file explicitly.
 ## Text Input To MuJoCo
 
 Use this when you want to skip microphone and ASR while still testing routing,
-the maintained goal-driven runtime, the trusted Skill Runtime, live Soridormi
+the maintained goal-driven runtime, the Trusted Capability Runtime, live Soridormi
 MCP, and MuJoCo execution.
 
 If the paired stack is already running, the compact no-microphone wrapper is:

@@ -78,7 +78,7 @@ When documents disagree, correct the lower-authority document.
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
-| How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
+| How are semantic goals preserved and revised across turns? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
@@ -187,11 +187,6 @@ mechanical-contract owner.
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
-- [Model-Assisted Cognitive Guardrails](MODEL_ASSISTED_COGNITIVE_GUARDRAILS.md)
-- [Catalog-Aware Goal Interpretation Tiers](CATALOG_AWARE_GOAL_INTERPRETATION.md)
-- [Fast Goal Interpreter Task Planning](FAST_COGNITIVE_PLANNING.md)
-- [Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md)
-- [Semantic Task Continuity and Situational Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md)
 - [TaskGraph](agent_task_graph.md)
 - [Trace Schema](RUNTIME_OBSERVABILITY.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)

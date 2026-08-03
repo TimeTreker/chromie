@@ -109,7 +109,7 @@ When the fast Goal Interpreter emits an exact catalog skill task with enough con
 the native Agent path may skip a second LLM planning call and build a
 schema-validated `SkillRequest` directly from the Goal Interpretation task plus simple
 catalog arguments. This is an execution-latency optimization only: catalog
-availability, schema validation, confirmation, Skill Runtime policy, and
+availability, schema validation, confirmation, Trusted Capability Runtime policy, and
 provider execution checks still apply unchanged.
 
 ## Agent registry versus Skill Registry

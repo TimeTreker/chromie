@@ -66,7 +66,7 @@
       "confidence": 0.86,
       "language": "en-US",
       "source": "llm",
-      "reason": "bad quick-router speech skill interpretation on greeting"
+      "reason": "bad fast Goal Interpreter speech-capability interpretation on greeting"
     }
   },
   "expect": {

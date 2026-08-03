@@ -305,8 +305,9 @@ results.
 
 ## Issue: Retain a Current-Revision Live Voice Loop
 
-Status: implementation and automatic verification complete; physical target
-validation deferred because the current host has no microphone
+Status: implementation and automatic verification complete; retained physical
+input reaches VAD/ASR, but the required intelligible utterance and complete
+speech-only evidence remain open
 
 ### Problem
 
@@ -349,14 +350,16 @@ and automatically verified. The runner captures a digest-valid runtime identity,
 binds Gateway/Core evidence to it, retains physical input/output recordings and
 device selection, and hashes the exact collection artifacts. The verifier keeps
 the full seven-case profile as its default and fails closed on every rejection
-class in the exit criteria. Sixty-eight focused tests and the canonical 1,664-test
-suite pass. Target validation remains open until one clean committed revision
-produces and retains a passing supervised bundle with operator review.
+class in the exit criteria. The focused rejection/regression suite and canonical repository gate pass in
+the retained source record. Any new claim must quote a fresh gate run. Target
+validation remains open until one clean committed revision produces and retains
+a passing supervised bundle with operator review.
 
 Attempt `20260731T110834Z` used the supported Python 3.11.15 runtime and healthy
-services but captured no input; the operator confirmed that the PC has no
-microphone and directed that physical validation be skipped. No live claim is
-made, and the unfulfilled physical exit criterion remains open.
+services but captured no input; that attempt remains historical diagnostic
+evidence only. Later retained attempts reached physical VAD/ASR but did not
+produce the required intelligible utterance, so no live physical voice claim is
+made and the exit criterion remains open.
 
 ### Non-goals
 

@@ -97,10 +97,10 @@ Chromie's cognitive models.
 ## Retained active-Goal cancellation case
 
 The cancellation runner starts the manifest-owned walking request through the
-authoritative Gateway/Core and trusted Skill Runtime path. Before execution it
+authoritative Gateway/Core and Trusted Capability Runtime path. Before execution it
 commits the exact model response and any confirmed request IDs through the same
 conversation-state binding boundary used by the Host. It then reads the trusted
-Skill Runtime through its Host-owned coordinator and waits on a bounded read-only
+Trusted Capability Runtime through its Host-owned coordinator and waits on a bounded read-only
 observation until `soridormi.walk_velocity` has actually entered its Provider.
 Only then does it send the exact manifest-owned `Stop.` turn through the normal
 Gateway. Qualification requires:
@@ -142,7 +142,7 @@ accepts `skill_id` only as a bounded retained-artifact compatibility alias.
 ## Retained MuJoCo case
 
 The maintained compound request runs through the same Goal-Driven Runtime and
-trusted Skill Runtime to Soridormi. Qualification requires:
+Trusted Capability Runtime to Soridormi. Qualification requires:
 
 - cognitive runtime mode `apply` on the `robot_action` lane;
 - the exact evaluated Chromie revision;

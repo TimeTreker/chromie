@@ -37,8 +37,10 @@ The implementation historically uses **named skill**, `skill_id`, and
 separate passive concept: an Agent Skill is reusable LLM task methodology
 with no provider registration or execution authority. Agent Skill selection
 may inform a Plan; only the executable named capability requests described here
-reach the Trusted Capability Runtime. Current code and retained traces may still
-use the legacy Trusted Skill Runtime name during compatibility migration.
+reach the Trusted Capability Runtime. Current code identifiers and retained
+historical traces may still use the legacy **Skill Runtime** name at explicit
+compatibility boundaries; current architecture, model-facing contracts, and
+new evidence use **Trusted Capability Runtime**.
 
 ## Design goal
 
@@ -151,8 +153,8 @@ because submit returned; Chromie waits for terminal task events when needed, and
 Soridormi refusal/failure/cancellation becomes a failed graph node for the
 global orchestrator to report or route from.
 When the native Agent returns a planned graph, it is emitted as a
-`chromie.task_graph.execute` skill request. The host Skill Runtime can dispatch
-that request back to the Agent's planning executor. The Agent-side planning
+`chromie.task_graph.execute` skill request. The host Trusted Capability Runtime
+can dispatch that request back to the Agent's planning executor. The Agent-side planning
 execution flag remains the gate, and failed graph traces become failed skill
 results so completion speech is not played after a blocked or refused embodied
 task.
@@ -163,8 +165,8 @@ Chromie should treat that readiness as Soridormi-owned state.
 Near-term enrichment should happen on the Soridormi side first. Add or harden
 no-motion/simulator task types for `navigate_to_location`, `approach_target`,
 `look_at_target`, `perform_gesture`, and `recover_safe_idle`; then add Chromie
-routing and Skill Runtime tests for the declared contracts. Until a task type
-is declared, Chromie should clarify or refuse rich embodied requests instead of
+Goal Interpretation and Trusted Capability Runtime tests for the declared
+contracts. Until a task type is declared, Chromie should clarify or refuse rich embodied requests instead of
 falling back to raw motion or low-level named skills. Motion-control model
 training waits for Soridormi-owned task metrics, calibration, telemetry, and
 safety envelopes.
@@ -224,7 +226,7 @@ The coordinator:
 - registers `chromie.speak` locally;
 - loads the Soridormi named-skill catalog when the provider is enabled;
 - attaches session metadata;
-- translates speech items into Skill Runtime requests;
+- translates speech items into Trusted Capability Runtime requests;
 - imports the provider's effective semantic confirmation contract;
 - applies Host-owned confirmation only for interaction-level rules such as a
   material alternative or post-interrupt physical resume;
@@ -371,7 +373,7 @@ text-to-simulator evidence. These paths deliberately do not prove microphone
 capture, real TTS playback, or hardware motion.
 
 The deployed text-to-MuJoCo check exercises the embedded Goal Interpreter, goal-driven
-association/planning/composition endpoints, trusted Skill Runtime, live
+association/planning/composition endpoints, Trusted Capability Runtime, live
 Soridormi MCP, and optional real speaker output while skipping microphone and
 ASR. The old Agent `/interaction` path is available only with
 `--no-cognitive-runtime` for labelled compatibility diagnosis:

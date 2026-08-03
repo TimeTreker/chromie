@@ -202,7 +202,7 @@ python scripts/general_ability_acceptance.py \
 ```
 
 These turn-loop cases use the real turn envelope, canonical-plan runtime
-adapter, Skill Runtime cancellation path, outcome reconciler, goal-state
+adapter, Trusted Capability Runtime cancellation path, outcome reconciler, goal-state
 commit, stale-turn gate, and final-response composer with deterministic
 providers. They are Level A synthetic integration evidence only; they do not
 prove a live model, microphone, speaker, simulator, or robot run.

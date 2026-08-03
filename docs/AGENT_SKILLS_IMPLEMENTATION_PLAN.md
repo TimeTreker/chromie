@@ -62,7 +62,8 @@ Agents, and provider compatibility remains in Capabilities.
   fails closed.
 - **Trusted Capability Runtime**, **CapabilityRequest**, **CapabilityResult**,
   and **named capability** are the canonical architecture terms. Current code,
-  logs, APIs, and retained artifacts may keep legacy aliases during migration.
+  logs, APIs, and retained artifacts may keep legacy aliases only at explicit,
+  bounded compatibility boundaries.
 - New model-facing schemas, prompts, Plans, traces, and examples emit canonical
   Capability terminology.
 - Agent Skills are stored under `agent-skills/`, separately from capability

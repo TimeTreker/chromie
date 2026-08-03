@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
-  "id": "physical_pending_work_gets_safety_prelude",
+  "id": "physical_pending_work_rejects_stale_safety_prelude",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A physical request whose first Core interpretation omits fast speech receives a model-authored safety prelude without claiming that motion has started or completed.",
+  "description": "A physical request whose first Core interpretation omits fast speech rejects the retired safety_prelude/needs_confirmation repair contract and remains silent before authoritative Goals and Plans exist.",
   "tags": [
     "pending-work",
-    "fast-first",
+    "claim-free",
     "physical-safety",
+    "compatibility-rejection",
     "zh-CN"
   ],
   "input": {
@@ -68,10 +69,7 @@
       "quick_intent",
       "fast_speech_repair"
     ],
-    "fast_speech_present": true,
-    "fast_speech_purpose": "safety_prelude",
-    "fast_speech_commitment": "needs_confirmation",
-    "fast_speech_must_not_claim_completion": true,
+    "fast_speech_present": false,
     "task_types_include": [
       "task.execute_skill"
     ]

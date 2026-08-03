@@ -137,7 +137,7 @@ too uncertain.
 
 `Output Contract` defines the exact JSON/schema or response template. The model
 may propose routes, speech, task metadata, or skill plans only through this
-contract. Validators, confirmation gates, Skill Runtime authorization, and
+contract. Validators, confirmation gates, Trusted Capability Runtime authorization, and
 Soridormi provider checks remain separate runtime authority.
 
 ## Runtime Flow
@@ -158,7 +158,7 @@ The Orchestrator builds a context object for every routed turn. It now includes:
 
 The fast Goal Interpreter receives this context and may use it to classify intent, but
 it cannot treat principles as authorization. Emergency filtering, capability
-constraints, confirmation, Skill Runtime validation, and Soridormi provider
+constraints, confirmation, Trusted Capability Runtime validation, and Soridormi provider
 checks remain code-enforced.
 
 The fast Goal Interpreter and native capability planner use the prompt context group
@@ -226,7 +226,7 @@ Focused checks:
 
 ```bash
 PYTHONPATH=. python -m pytest -q tests/test_mind_profile.py tests/test_cognitive_identity_context.py
-PYTHONPATH=agent python -m unittest tests.test_router_llm_prompt tests.test_conversation_agent_prompt tests.test_deepthinking_agent
+PYTHONPATH=. python -m pytest -q tests/test_goal_interpreter_llm_prompt.py tests/test_conversation_agent_prompt.py tests/test_deepthinking_agent.py
 ```
 
 Full gate:

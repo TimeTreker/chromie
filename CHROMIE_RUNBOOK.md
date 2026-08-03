@@ -214,8 +214,8 @@ simulator skills, or `--build` to rebuild repository-owned service images.
 
 ## 5.2 Text-to-MuJoCo without microphone or ASR
 
-For route, goal-driven planning, Skill Runtime, speaker, and live MuJoCo checks without
-microphone capture or ASR, start Soridormi first:
+For route, goal-driven planning, Trusted Capability Runtime, speaker, and
+live MuJoCo checks without microphone capture or ASR, start Soridormi first:
 
 ```bash
 cd ../soridormi
@@ -509,9 +509,9 @@ python scripts/provider_conformance.py --live --profile sim
 
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
-audio path, so the test still crosses VAD, ASR, Goal Interpretation, goal-driven Agent
-planning/composition, Skill Runtime, response TTS, and Soridormi without relying
-on a person speaking:
+audio path, so the test still crosses VAD, ASR, Goal Interpretation,
+goal-driven Agent planning/composition, Trusted Capability Runtime, response
+TTS, and Soridormi without relying on a person speaking:
 
 ```bash
 python scripts/voice_acceptance.py \

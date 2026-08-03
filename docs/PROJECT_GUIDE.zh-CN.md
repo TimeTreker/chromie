@@ -31,7 +31,7 @@ Chromie 负责：
 - 对话状态、原生结构化 Agent 输出和严格契约；
 - Agent Skills：由 Agent 按需选择的无执行权任务方法，帮助生成 Plan；
 - Capability / Tool：通过可信 Runtime 和 Provider 执行的原子能力；
-- 可信 Skill Runtime 的确认、调度、超时、取消和证据；
+- 可信能力运行时（Trusted Capability Runtime）的确认、调度、超时、取消和证据；
 - 配置、验收与可复现开发制品工具。
 
 Soridormi 负责：
@@ -45,10 +45,11 @@ Soridormi 负责：
 
 ## 当前状态
 
-可复现的本地标准测试门禁已经恢复：仓库策略、测试归属、Ruff、Mypy、文档、
-1,664 个主要测试及 20 个旧 Agent 测试均已通过。与当前源码一致的最小真实
-语音闭环 strict verifier 已实现；但本机没有麦克风，因此不伪造真实输入证据，
-物理语音目标验证延后。当前优先级是完成不要求物理语音的
+可复现的本地标准测试门禁已经恢复。任何门禁声明都必须引用一次新的
+`./scripts/run_tests.sh` 的精确输出，不在概览中维护容易过期的固定测试数量。
+与当前源码一致的最小真实语音闭环 strict verifier 已实现；当前保留的物理输入
+已经到达 VAD/ASR，但尚未产生包含要求含义的可理解语句，因此不能宣称物理语音
+闭环已通过。当前优先级是完成不要求物理语音的
 `source_bound_development` 证据闭环。在该证据关闭前，除直接修复或明确的
 安全/来源阻塞外，不新增功能架构、运行开关或术语。仓库使用
 `development` 作为中性开发身份，当前没有版本发布或公开分发计划。
@@ -83,7 +84,7 @@ Chromie 已接受 Agent Skills 架构：Agent 在自己的职责范围内，根�
 Goal 和上下文选择零个、一个或多个 Agent Skills，并生成本次 Plan；Skill
 只提供可复用方法和领域经验，没有独立 Goal、Provider 注册、权限或执行权；
 Plan 最终仍只能通过 `capability_id` 调用已注册 Capability，并经过 Trusted
-Capability Runtime（当前代码兼容名仍为 Trusted Skill Runtime）与
+Trusted Capability Runtime（当前代码兼容名仍为 Skill Runtime）与
 Provider/Soridormi 校验。
 
 该架构已经实现：当前输出使用 `capability_id`，保留有界的历史
@@ -95,22 +96,18 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 开发主线
 
-- **延后的物理验证**：独立、严格的 `current-revision-live-voice`
-  source-bound verifier 已实现；待有麦克风的主机再保留 supervised bundle。
-- **当前 Issue**：完成默认 `source_bound_development` 证据闭环；该 profile
-  不要求物理语音或物理机器人证据。
-- **后续工程 Issue**：依次完成 broad exception 分类、Host typed settings、
-  playback/input lifecycle 拆分、受支持配置组合收缩、按 package 扩大 Mypy、
-  文档表面收缩。
-- **开放证据 Issue**：保留统一 Goal-driven Runtime 的干净、来源绑定 live-text、
-  active cancellation 和 MuJoCo safe-idle 证据。
-- **取消证据**：named-goal 精确取消、Goal 状态原子协调和剩余确认令牌重建已
-  实现；仍需补充受监督的 E-stop/safe-idle 及宽范围 reflex 协调证据。
-- **实体准备**：选择一台实体参考机器人，先完成身份、安全、网络和无动作检查。
-- **实体试点**：从无动作检查、单技能低速运行逐步进入受监督多技能任务。
-- **语音设备证据**：需要真实麦克风/扬声器支持时，再单独完成 supervised
-  语音验收与人工审核。
-- **后续**：在基础闭环稳定后，再考虑视觉、长期记忆、复杂恢复和更高自治。
+- **当前 Issue**：完成默认 `source_bound_development` 证据闭环；保留与当前
+  revision 绑定的 Gateway/Core、Agent Skill 与 weather、Social Attention、
+  配对 MuJoCo 以及第二台机器 LAN 证据。
+- **开放证据**：干净的 live-text、active cancellation、MuJoCo safe-idle、
+  人工语义审核和来源身份必须按目标 profile 一起判断，历史成功不能代替当前证据。
+- **已完成工程边界**：Host typed settings、playback/input lifecycle、受支持配置
+  收缩、package 级 Mypy 扩展和文档表面收缩已经实现；它们不是新的待办架构。
+- **可选物理验证**：默认 profile 不要求物理语音或实体机器人。只有需要对应
+  支持声明时，才运行 supervised 麦克风/扬声器或实体机器人验收。
+- **实体准备与试点**：未来选择参考机器人后，从身份、安全、网络和无动作检查，
+  再逐步进入受监督的低速单技能与多技能任务。
+- **后续产品能力**：只有基础证据闭环稳定后，才评估视觉、复杂恢复和更高自治。
 
 早期开发增量现在统一归入“实时交互基础”和“结构化具身基础”两项已完成能力，
 不再使用顺序编号作为独立规划单位。语音验收使用功能化脚本名和

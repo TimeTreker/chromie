@@ -1808,7 +1808,7 @@ class OllamaGoalInterpreter:
                         "- Choose interrupt when the user truly asked to stop, cancel, pause, be quiet, or halt current work.\n"
                         "- Choose a non-interrupt route when the text merely mentions stop, uses stop in another meaning, or asks for a different chat/tool/memory/body task.\n"
                         "- If correcting to robot_action, use intent capability:<exact capability_id> when a supplied common ability clearly fits.\n"
-                        "- Physical actions are still only proposals; downstream Agent and Skill Runtime must validate and confirm them.\n\n"
+                        "- Physical actions are still only proposals; downstream planning and the Trusted Capability Runtime must validate and confirm them.\n\n"
                         "Output Contract:\n"
                         "- Return one compact RouteDecision JSON object.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"

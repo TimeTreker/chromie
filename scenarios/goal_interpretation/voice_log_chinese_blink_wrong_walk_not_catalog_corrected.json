@@ -49,7 +49,7 @@
       "confidence": 0.9,
       "language": "zh-CN",
       "source": "llm",
-      "reason": "quick router selected walking from a noisy Chinese blink phrase"
+      "reason": "fast Goal Interpreter selected walking from a noisy Chinese blink phrase"
     }
   },
   "expect": {

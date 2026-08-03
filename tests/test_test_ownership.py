@@ -30,9 +30,14 @@ class TestOwnershipTests(unittest.TestCase):
 
     def test_current_repository_has_only_reviewed_python_source_readers(self) -> None:
         self.assertEqual(ownership.audit_test_ownership(ROOT), [])
+        approved, findings = ownership.load_ownership(
+            ROOT / "config" / "test_source_ownership.json",
+            root=ROOT,
+        )
+        self.assertEqual(findings, [])
         self.assertEqual(
             set(ownership.discover_python_source_readers(ROOT)),
-            {"tests/test_runtime_configuration.py"},
+            set(approved),
         )
 
     def test_unclassified_behavior_source_read_is_rejected(self) -> None:

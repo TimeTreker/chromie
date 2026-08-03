@@ -1,13 +1,14 @@
 # Adding Agent and Tool Capabilities
 
-This guide explains how to add a new Chromie-side Agent or read-only tool so the
-fast Goal Interpreter, downstream Agents, Orchestrator, and logs all agree on what the
-robot can do.
+This guide explains how to add a new Chromie-side Agent or read-only tool so
+catalog projection, Goal Association, canonical planning, the Trusted Capability
+Runtime, and evidence all agree on what Chromie can do.
 
 Chromie should not rely on hidden code paths that only one Agent knows about. If
-an Agent can answer or perform a user request, that capability must be exposed in
-the Agent capability catalog so Goal Interpretation can ground natural language against a
-real affordance.
+an Agent can perform a registered read or effect, that Capability must be exposed
+in the catalog so the model-owned planner can select an exact real affordance.
+Catalog presence does not itself decide user meaning, authorize execution, or
+prove availability.
 
 ## Mental model
 
@@ -15,14 +16,19 @@ Use this split for new capabilities:
 
 ```text
 User request
-  -> Goal Interpreter sees catalog affordance and chooses route/routes plus fast_speech
-  -> Agent receives the route and metadata/proposal
-  -> Agent/tool performs read-only lookup or creates a proposal
-  -> SkillRuntime/Soridormi validate physical work when applicable
-  -> Speaker reports grounded result or asks for clarification
+  -> Cognitive Gateway admits an immutable UserTurnEnvelope
+  -> Goal Association resolves the user's responsibility and continuity
+  -> Fast or terminal Deep Planner selects an exact registered Capability
+  -> Trusted Capability Runtime validates and invokes the owning Provider
+  -> exact result evidence is reconciled to the source Goal and Plan
+  -> model-owned response composition reports the grounded outcome
 ```
 
-The Goal Interpreter may generate a short process acknowledgement such as “好的，我查一下重庆今天的天气。” It must not invent the final answer. The Agent/tool owns the grounded result.
+Before Goals and Plans exist, fast speech is optional and must use
+`claim_state=none` with no claimed Goal or Capability IDs. It may acknowledge the
+process naturally, but it must not claim a selected Capability, execution, or
+result. The Provider returns structured evidence; Goal reconciliation and the
+model-owned response boundary determine what may be said afterward.
 
 An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent
@@ -49,7 +55,8 @@ feature.
 1. **Create or select the Agent implementation.**
    - Use `agent/app/agents/tool.py` for small read-only tools such as weather.
    - Use a dedicated Agent class when the capability has its own state machine,
-     planner, long-running workflow, or domain-specific adjudication.
+     long-running workflow, or domain-specific result interpretation. It must not
+     become a second canonical planner.
 
 2. **Expose the capability in the registry.**
    - Add an `AgentManifest` and `ToolCapability` in
@@ -67,36 +74,45 @@ feature.
    - Put common, safe, frequently requested tools in the `common` prompt tier by
      setting `llm_hints.prompt_tier = "common"` or adding the capability to
      `capabilities/prompt_tiers.json`.
-   - Add `llm_hints.tool_name`, `llm_hints.router_contract`, and any compact
-     guidance that helps the Goal Interpreter choose the correct route without examples.
+   - Add `llm_hints.tool_name`, `llm_hints.semantic_type`,
+     `llm_hints.semantic_scope`, `llm_hints.when_to_use`, and any compact
+     guidance that helps model-owned interpretation and planning understand the
+     Capability without phrase examples. Add `fast_speech_guidance` only when the capability needs
+     capability-specific pre-result acknowledgement constraints.
 
-4. **Connect execution in the owning Agent.**
-   - The Agent should detect its route using route/intent/metadata, then call the
-     actual client/service.
+4. **Bind execution to the owning Provider.**
+   - The execution adapter must require an exact plan-selected `capability_id`
+     and schema-valid arguments; it must not infer a call from route, intent, or
+     user-text phrases.
    - For read-only tools, failures should be explicit: disabled, missing
-     location, lookup not found, timeout, or provider error.
-   - The Agent should produce a grounded spoken result only after the data source
-     returns.
+     arguments, lookup not found, timeout, schema failure, or provider error.
+   - Return structured result evidence. Do not compose final user speech inside
+     the Provider adapter.
 
-5. **Make the Goal Interpreter prompt and review stages aware of the route contract.**
-   - Main fast Goal Interpreter prompts can mention the general tool family.
-   - Intent review and repair prompts must use the same route/tool contract if
-     they can override or repair quick routing.
-   - Do not make Orchestrator template the user-facing acknowledgement when the
-     Goal Interpreter can supply `fast_speech`.
+5. **Expose the Capability to model-owned planning.**
+   - Catalog projection may present the compact semantic description and schema
+     to fast Goal Interpretation and the canonical planners.
+   - Goal Association owns what the user means; Fast or terminal Deep Planning
+     owns exact Capability selection and complete Goal coverage.
+   - Review/repair stages may reject malformed or out-of-envelope proposals, but
+     deterministic code must not substitute another Capability or invent user
+     meaning.
 
 6. **Add observability.**
-   - Goal Interpreter logs should show the capability in `tool_like_ability_ids` or a more
-     specific diagnostic field.
-   - Agent logs should show start, parameter extraction, client lookup, success,
-     and failure reasons.
+   - Catalog/interpretation traces should show which bounded candidate set was
+     supplied without treating retrieval rank as semantic choice.
+   - Plan, request, Provider, and result traces should preserve exact Capability,
+     schema, Goal, Plan, request, and evidence identities plus failure reasons.
 
 7. **Add tests.**
-   - Registry/catalog test: the capability is visible in the expected prompt
-     tier and has the expected route.
-   - Search/routing test: representative user requests match the capability.
-   - Agent test: metadata and LLM-extracted parameters are handled correctly.
-   - Prompt/review test: review stages preserve the same route contract.
+   - Registry/catalog test: the Capability is visible in the expected prompt
+     tier with a closed schema and correct safety/effect metadata.
+   - Model-contract scenario: representative paraphrases produce the correct
+     Goal and exact plan-selected Capability without phrase-specific Host rules.
+   - Provider test: exact arguments, timeout, schema validation, and structured
+     result/failure evidence are handled correctly.
+   - End-to-end contract test: no result is spoken before exact request/result
+     reconciliation, and unsupported or partial work fails honestly.
 
 8. **Audit the authoritative contract.**
    - Run `python -m tools.chromie_cli capability check` for static validation.
@@ -122,30 +138,31 @@ The weather lookup capability is registered as:
 ```text
 capability_id: chromie.weather.lookup
 agent_id: chromie.weather
-route: tool
 effects: read_only, external_read, weather_lookup
+semantic_type: weather_lookup
 safety_class: safe_read
 prompt_tier: common
 ```
 
-Its schema exposes `location`, `date`, and `units`. The Goal Interpreter should treat
-current or upcoming weather questions as `route=tool` / `intent=weather_query`
-when this capability is visible. The Goal Interpreter may say it will check the requested
-weather, but only the Weather Tool Agent may report the weather result after the
-lookup returns.
+Its schema exposes `location`, `date`, and `units`. Goal Association preserves
+the weather responsibility and resolved references; the canonical planner may
+select `chromie.weather.lookup` only when the catalog and Goal require it. The
+Provider returns structured weather evidence, and only the evidence-bound
+response path may report the result after exact reconciliation.
 
 ## Anti-patterns
 
-Do not add a tool only as hidden Agent code. The Goal Interpreter will not reliably choose
-it if it is absent from the catalog.
+Do not add a tool only as hidden Agent code. The canonical planner cannot
+select or prove a Capability that is absent from the catalog.
 
 Do not add large phrase tables such as “重庆天气 -> weather”. Use semantic
 capability descriptions and schemas instead.
 
 Do not let a read-only tool path fall back to ordinary conversation that says “I
 cannot access realtime data” when the catalog advertises a working tool. If the
-tool is disabled, the Agent should say it is disabled.
+Capability is disabled or fails, return a structured grounded failure so the
+model-owned response boundary can report it honestly.
 
-Do not let Goal Interpreter `fast_speech` claim final results, permanent memory writes, or
-physical completion. It is only a short acknowledgement before downstream work
-finishes.
+Do not let fast Goal Interpretation speech claim a Goal, selected Capability,
+final result, permanent memory write, or physical completion. Before Goal
+Association it is optional, claim-free process speech only.

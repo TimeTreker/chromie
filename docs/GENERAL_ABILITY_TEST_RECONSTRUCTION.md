@@ -148,7 +148,7 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
 
 Preview mode is not execution evidence. Execution mode is simulator evidence
 only when Soridormi is in `sim` mode and the retained summary shows successful
-Skill Runtime completion and safe idle.
+Trusted Capability Runtime completion and safe idle.
 The declared `--soridormi-repo` is diagnostic provenance only; it does not bind
 the MCP endpoint to that checkout.
 
@@ -244,7 +244,7 @@ Scope:
 
 - attach a first-pass failure classification to retained summaries:
   ASR/audio, Goal Interpreter/intent, Agent contract, Prompt wording, Orchestrator policy,
-  Skill Runtime/provider, or Test evidence;
+  Trusted Capability Runtime/provider, or Test evidence;
 - include route, response, speech, skill, provider, and fallback facts needed to
   inspect the classification;
 - keep the classifier advisory and auditable.

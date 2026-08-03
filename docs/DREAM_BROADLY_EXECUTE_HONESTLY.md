@@ -152,7 +152,7 @@ final `InteractionResponse` contains committed speech or skills.
 - `metadata.desired_abilities` and deepthinking `task_proposals[]` become
   shared `TaskProposal` ledger entries with `state=missing_ability`.
 - Missing-ability proposals are never executable and are not forwarded to the
-  Skill Runtime.
+  Trusted Capability Runtime.
 - Experience evaluation may mine these proposals into owner-review-only
   ability backlog items or future scenario candidates.
 

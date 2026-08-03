@@ -6,7 +6,7 @@ First deterministic slice implemented. The host Orchestrator has process-local
 `MemoryEntry`, `MemoryStore`, `MemoryExtractor`, and `MemoryPromptBuilder`
 support. `ConversationStateManager` exposes `memory_summary` and
 `extracted_memory` through `session_memory`, records compact task/context
-memory from structured metadata, and records trusted Skill Runtime outcomes as
+memory from structured metadata, and records Trusted Capability Runtime outcomes as
 task outcome memory. Fast Goal Interpreter prompts sanitize raw history/conversation
 fields and use compact session memory instead. Deepthinking prompts consume the
 extracted memory block. Ordinary conversation prompts now use extracted memory
@@ -49,7 +49,7 @@ payload for routing, planning, or deepthinking.
 
 The host Orchestrator owns short-term memory extraction and prompt-context
 construction. This keeps microphone, VAD, playback, interruption, conversation
-state, and trusted Skill Runtime coordination in the host boundary.
+state, and Trusted Capability Runtime coordination in the host boundary.
 
 Soridormi remains the authority for embodied planning, execution, resource
 safety, stop/emergency behavior, and hardware commissioning. Memory can help
@@ -122,7 +122,7 @@ Do not extract:
 - every sentence from the transcript;
 - model guesses as facts;
 - unverified real-world claims as system truth;
-- completed physical side effects unless Skill Runtime or Soridormi evidence
+- completed physical side effects unless Trusted Capability Runtime or Soridormi evidence
   confirms them;
 - anything that would grant future action authority.
 
@@ -175,7 +175,7 @@ prefer `MemoryPromptBuilder` output over `history_block`.
 Memory is interpretive context, not authority.
 
 - A remembered preference cannot bypass confirmation, policy, schema
-  validation, Skill Runtime checks, or Soridormi safety gates.
+  validation, Trusted Capability Runtime checks, or Soridormi safety gates.
 - A model-written memory update cannot prove that an action happened.
 - Runtime evidence may update task outcome memory; model speech alone may not.
 - Contradictory new evidence should revise or expire stale memory rather than
@@ -191,7 +191,7 @@ Memory is interpretive context, not authority.
 1. Implemented: host-side `MemoryEntry` schema and process-local `MemoryStore`.
 2. Implemented first slice: `MemoryExtractor` reads the latest user turn,
    structured task context metadata, explicit extracted-memory metadata, and
-   trusted Skill Runtime outcomes.
+   Trusted Capability Runtime outcomes.
 3. Implemented first slice: deterministic extraction from route metadata, task
    context patches, explicit memory entries, `memory_agent` updates, and
    runtime task outcomes.

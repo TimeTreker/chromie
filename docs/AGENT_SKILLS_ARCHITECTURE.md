@@ -138,7 +138,7 @@ Capabilities remain registered through typed manifests or authoritative live
 provider schemas. An Agent Skill may declare that a capability is required
 or useful, but that declaration does not register or authorize the capability.
 
-## Canonical naming and compatibility migration
+## Canonical naming and bounded compatibility
 
 Earlier retained artifacts and Provider-native compatibility boundaries used
 `skill_id`, `SkillRequest`, `SkillResult`, “named skill”, and “Trusted Skill
@@ -184,8 +184,8 @@ Canonical terms:
 - **Trusted Capability Runtime**: deterministic capability execution boundary;
 - **named capability**: provider-advertised executable operation.
 
-The migration must preserve compatibility rather than perform an unsafe
-repository-wide textual replacement:
+Bounded compatibility must preserve existing readers without making legacy
+terms canonical or performing an unsafe repository-wide identifier replacement:
 
 - new model-facing contracts, Plans, traces, and documentation emit
   `capability_id`;
@@ -193,13 +193,13 @@ repository-wide textual replacement:
   boundaries;
 - if both fields are present, they must match exactly or validation fails;
 - retained episodes, traces, fixtures, and external callers using `skill_id`
-  remain readable during the compatibility window;
-- legacy class names and log event names may remain as aliases until their
-  consumers migrate, but they are not the canonical architecture vocabulary;
+  remain readable through explicit compatibility readers;
+- legacy class names and log event names may remain as bounded aliases where
+  current consumers still require them, but they are not canonical vocabulary;
 - the rename changes readability only and must not change registry, policy,
   confirmation, provider, or physical-safety authority.
 
-This terminology migration was completed before Agent Skill selection was
+This terminology transition was completed before Agent Skill selection was
 enabled. Current Canonical Plans therefore distinguish content-free
 `selected_agent_skills` provenance from executable `capability_id` steps.
 Bounded compatibility readers do not make legacy names canonical again.

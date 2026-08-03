@@ -25,7 +25,7 @@ from shared.chromie_contracts.response_composition import (
 
 _TEST_OUTPUT_SCHEMA = {
     "type": "object",
-    "properties": {"summary": {"type": "string"}},
+    "properties": {"user_summary": {"type": "string"}},
     "additionalProperties": False,
 }
 
@@ -418,7 +418,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
                         skill_id="chromie.test.first",
                         provider_id="test.provider",
                         status="completed",
-                        output={"summary": "The first check passed"},
+                        output={"user_summary": "The first check passed"},
                     )
                 ],
             )
@@ -695,8 +695,10 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             skill_id="chromie.test.first",
             provider_id="test.provider",
             output_schema={
-                **_TEST_OUTPUT_SCHEMA,
+                "type": "object",
+                "properties": {"summary": {"type": "string"}},
                 "required": ["summary"],
+                "additionalProperties": False,
             },
         )
 

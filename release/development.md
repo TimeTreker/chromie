@@ -12,7 +12,7 @@ does not promise support for any deployment target.
   playback, and deterministic interruption paths;
 - native strict `InteractionResponse` output with explicit compatibility
   rollback;
-- trusted host Skill Runtime scheduling, request-bound confirmation,
+- trusted host Trusted Capability Runtime scheduling, request-bound confirmation,
   cancellation, timeout, and trace evidence;
 - generated-speech regression through `synthetic`, `virtual-mic`, and
   `acoustic` modes;

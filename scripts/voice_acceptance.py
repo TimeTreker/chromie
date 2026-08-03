@@ -328,7 +328,7 @@ CASES: dict[str, AcceptanceCase] = {
             "Observe the simulator and verify safe idle afterward.",
         ),
         (
-            "Host-observed Skill Runtime cancellation is recorded.",
+            "Host-observed Trusted Capability Runtime cancellation is recorded.",
             "Post-cancellation Soridormi status reports safe idle.",
             "No active simulated task is reported afterward.",
         ),
@@ -1963,7 +1963,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             CheckResult(
                 "host-observed skill cancellation",
                 cancelled,
-                "host evidence must record a cancelled Skill Runtime task or result",
+                "host evidence must record a cancelled Trusted Capability Runtime task or result",
             )
         )
         checks.append(

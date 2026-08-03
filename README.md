@@ -18,12 +18,13 @@ experience artifacts. See
 > per-goal outcome reconciliation -> speech-only final response. A frozen
 > `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
 > The contracts and host path are automatically verified and default to
-> authoritative chat in the common safe base; the maintained Soridormi launcher
-> widens authority to simulator robot actions. Historical voice-pipeline and
+> authoritative chat plus registered safe read-only tools in the common safe
+> base; the maintained Soridormi launcher widens authority to simulator robot
+> actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
-> The canonical local gate is reproducible again: repository policy,
-> test-ownership, Ruff, Mypy, documentation, 1,755 primary tests, and 20 legacy
-> Agent tests pass from the documented setup. A strict source-bound verifier for
+> The canonical local gate is reproducible again. Any gate claim must use
+> the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied
+> test count. A strict source-bound verifier for
 > the current-revision microphone-to-audible-response loop is implemented. The
 > current input reaches VAD/ASR but has not produced an intelligible required
 > utterance, so physical target validation remains open without a claim. Default

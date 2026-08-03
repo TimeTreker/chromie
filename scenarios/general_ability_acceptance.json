@@ -4,7 +4,7 @@
   "claim_policy": {
     "principle": "Examples are probes into a general ability class, not the target by themselves.",
     "level_a_scope": "Deterministic file-backed regression evidence only. It does not prove live services, microphone, speaker, simulator execution, or robot behavior.",
-    "live_text_scope": "Text enters the same Router and Agent interaction boundary used after ASR. Preview mode proves live interpretation and planning only; execute mode is required before claiming simulator execution.",
+    "live_text_scope": "Text enters the same Cognitive Gateway and Agent-owned Cognitive Core path used after ASR. Preview mode proves live interpretation and planning only; execute mode is required before claiming simulator execution.",
     "failure_policy": "A failed case requires a root-cause report naming the earliest wrong boundary before prompts or wording are changed."
   },
   "ability_classes": [
@@ -15,7 +15,7 @@
       "minimum_level_a_cases": 4,
       "root_cause_boundaries": [
         "ASR/audio",
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
         "Test evidence"
       ],
@@ -81,9 +81,9 @@
       "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
       "minimum_level_a_cases": 4,
       "root_cause_boundaries": [
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
-        "Skill Runtime/provider",
+        "Trusted Capability Runtime/provider",
         "Test evidence"
       ],
       "level_a_scenarios": [
@@ -166,7 +166,7 @@
       "minimum_level_a_cases": 4,
       "root_cause_boundaries": [
         "ASR/audio",
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
         "Orchestrator policy"
       ],
@@ -239,9 +239,9 @@
       "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
       "minimum_level_a_cases": 3,
       "root_cause_boundaries": [
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
-        "Skill Runtime/provider",
+        "Trusted Capability Runtime/provider",
         "Test evidence"
       ],
       "level_a_scenarios": [
@@ -383,7 +383,7 @@
       "root_cause_boundaries": [
         "Agent contract",
         "Orchestrator policy",
-        "Skill Runtime/provider",
+        "Trusted Capability Runtime/provider",
         "Test evidence"
       ],
       "level_a_scenarios": [
@@ -420,8 +420,8 @@
           "rationale": "Natural attention remains optional; the model can choose speech-only behavior instead of a repetitive fixed gesture."
         },
         {
-          "key": "goal_interpretation/physical_pending_work_gets_safety_prelude",
-          "rationale": "Physical work gets a truthful safety prelude without claiming motion has started or completed."
+          "key": "goal_interpretation/physical_pending_work_rejects_stale_safety_prelude",
+          "rationale": "Before Goals and Plans exist, stale physical safety-prelude metadata is rejected and silence remains valid instead of implying motion authority."
         },
         {
           "key": "cognitive_runtime/compound_walk_blink_runtime_replan",
@@ -436,7 +436,7 @@
       "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
       "minimum_level_a_cases": 4,
       "root_cause_boundaries": [
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
         "Prompt wording",
         "Test evidence"
@@ -504,9 +504,9 @@
       "minimum_level_a_cases": 3,
       "root_cause_boundaries": [
         "Cognitive Gateway/ingress",
-        "Compatibility Router/attention",
+        "Cognitive Gateway/attention review",
         "Orchestrator policy",
-        "Skill Runtime/provider"
+        "Trusted Capability Runtime/provider"
       ],
       "level_a_scenarios": [
         {
@@ -535,7 +535,7 @@
       "minimum_level_a_cases": 4,
       "root_cause_boundaries": [
         "Test evidence",
-        "Router/intent",
+        "Cognitive Core/goal interpretation",
         "Agent contract",
         "Orchestrator policy"
       ],
@@ -569,7 +569,7 @@
         "Planner contract",
         "Response Composer",
         "Trusted runtime adapter",
-        "Skill Runtime/provider",
+        "Trusted Capability Runtime/provider",
         "Test evidence"
       ],
       "level_a_scenarios": [
@@ -786,7 +786,7 @@
         "Cognitive Gateway/ingress",
         "Goal-Driven Cognitive Core",
         "Orchestrator policy",
-        "Skill Runtime/provider",
+        "Trusted Capability Runtime/provider",
         "Execution outcome evidence"
       ],
       "level_a_scenarios": [

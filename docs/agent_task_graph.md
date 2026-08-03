@@ -118,9 +118,9 @@ Planning execution may run `chromie.report` nodes through a local trace-only
 adapter, primarily as failure-policy fallback nodes. This records a report in
 the execution trace without invoking TTS or audio playback. `chromie.speak`
 remains outside planning execution; audible speech still belongs to the native
-InteractionResponse and host Skill Runtime path.
+InteractionResponse and host Trusted Capability Runtime path.
 Native `POST /interaction` emits planned graphs as
-`chromie.task_graph.execute` Skill Runtime requests. The host Orchestrator wires
+`chromie.task_graph.execute` Trusted Capability Runtime requests. The host Orchestrator wires
 that skill to the Agent's planning executor, which still requires
 `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1`; if the planning executor is
 disabled or returns a failed trace, the skill result is failed and completion
@@ -295,7 +295,7 @@ Properties:
 
 The API proves TaskGraph control-plane binding. The separate host Orchestrator
 implements the spoken request-bound confirmation dialogue used by the
-InteractionResponse and Skill Runtime path.
+InteractionResponse and Trusted Capability Runtime path.
 
 ## Cancellation and traces
 

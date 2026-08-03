@@ -54,8 +54,8 @@ A successful Chromie release lets an operator:
 - owner-approved Agent Skill discovery, bounded Agent projections, and
   selection provenance without granting Skill content execution authority;
 - Trusted Capability Runtime validation, authorization, scheduling, timeout,
-  and cancellation; current code may retain legacy Skill Runtime aliases during
-  migration;
+  and cancellation; legacy `SkillRuntime`, `SkillRequest`, `SkillResult`, and
+  `skill_id` names remain only at explicit compatibility boundaries;
 - evidence capture, acceptance tooling, deployment configuration, and release
   packaging.
 

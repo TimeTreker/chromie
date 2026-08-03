@@ -89,7 +89,7 @@ therefore removed.
 
 The July 17, 2026 operator-supplied simulator run passed all four final
 `multi_goal_daily_life` cases through Deep Planner recovery. Goal Association,
-Deep Planner, Response Composer, the trusted runtime adapter, Skill Runtime,
+Deep Planner, Response Composer, the trusted runtime adapter, Trusted Capability Runtime,
 TTS scheduling, Soridormi execution, and safe-idle closure worked.
 
 The first Fast-terminal implementation was then measured over five warm runs,
@@ -108,7 +108,7 @@ the deterministic validator necessarily rejected. Mocked tests supplied ideal
 complete objects and did not reproduce that live decoder gap.
 
 The earliest wrong boundary is therefore the Fast Planner model-facing contract
-and its decoder/validator alignment. It is not Goal Interpreter, Soridormi, Skill Runtime,
+and its decoder/validator alignment. It is not Goal Interpreter, Soridormi, Trusted Capability Runtime,
 or provider execution.
 
 An earlier July 21 tuning snapshot was exercised in three consecutive warm
@@ -416,7 +416,7 @@ For every retained terminal case:
 - every step ID and ownership relation originates in model output;
 - skills and arguments match the request and catalog;
 - speech covers every Goal ID without claiming pending physical completion;
-- Skill Runtime and Soridormi complete in `sim` mode;
+- Trusted Capability Runtime and Soridormi complete in `sim` mode;
 - post-execution status is standing and safe idle.
 
 ### 13.2 Semantic escalation cases

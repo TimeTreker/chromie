@@ -19,11 +19,11 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, 1,755 primary tests, and 20 legacy Agent tests pass from the documented setup | Not applicable | Not applicable | Not applicable |
+| Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
 | Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Open: current physical input reaches VAD/ASR but has not produced an intelligible required utterance; no physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
-| Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
+| Interaction contracts and Trusted Capability Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider; corrected local Oute `chromie_mixed` passed 10/10 smoke plus two repeated 6/6 full matrices at 8192; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; physical listening and comparative shared-resource target evidence open |
@@ -223,7 +223,7 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
 Use `--execute` only for supervised simulator runs. Live text preview checks the
 Goal Interpretation, Agent, and Soridormi status/preflight boundary but does not execute
 motion; live text execution can support a Level C simulator claim only when the
-summary shows successful Skill Runtime execution and safe idle. Neither mode is
+summary shows successful Trusted Capability Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
 `--soridormi-repo` records a declared paired checkout for diagnostic
 provenance; it does not prove which source revision is executing behind the MCP
@@ -281,7 +281,7 @@ The prompt command is for generating reviewed candidate JSON with an LLM; the
 LLM is not used as the pass/fail judge during regression runs.
 
 The target organization, common case contract, distribution metrics, and staged
-migration are defined in the
+rollout are defined in the
 [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) and its
 [Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md). Benchmark
 failures must be fixed through general model, prompt, context, contract,
@@ -310,13 +310,13 @@ Level A routing evidence must continue to prove:
   finalization;
 - low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
   ignore, or fall back safely;
-- native InteractionRuntime and the host Skill Runtime re-resolve capabilities
+- native InteractionRuntime and the host Trusted Capability Runtime re-resolve capabilities
   before execution;
 - Soridormi task preview, refusal, events, cancellation, and safe-idle status
   remain authoritative for embodied goals.
 
-See
-[Model-Assisted Cognitive Guardrails](MODEL_ASSISTED_COGNITIVE_GUARDRAILS.md).
+See [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+and [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md).
 
 ## Level B — deployed service checks
 
@@ -447,7 +447,7 @@ calls hang. Add representative live text probes to
 instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
-Goal Interpretation, the goal-driven runtime, the host trusted Skill Runtime, live Soridormi
+Goal Interpretation, the goal-driven runtime, the host Trusted Capability Runtime, live Soridormi
 MCP, and optional real speaker playback, start Chromie with the Soridormi
 manifest loaded and run:
 
@@ -491,7 +491,7 @@ the MCP endpoint executes. Target validation additionally requires an
 endpoint-reported Soridormi source revision matching the clean paired checkout
 and manifest; the current runner records no such endpoint revision, so its new
 summaries remain diagnostic. It fails if
-Skill Runtime execution fails, if the simulator does not return to safe idle,
+Trusted Capability Runtime execution fails, if the simulator does not return to safe idle,
 or, when assertion flags are supplied, if the ordered Soridormi skills or
 expected arguments do not match. Use `--no-speaker` for headless automation;
 otherwise Chromie schedules TTS through the configured output device. The
@@ -821,7 +821,7 @@ captured audio, Orchestrator logs, and per-case checks.
 
 | Mode | Input path | Operator interaction | What it proves | Human voice-device closure |
 |---|---|---|---|---:|
-| `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Skill Runtime regression | No |
+| `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Trusted Capability Runtime regression | No |
 | `virtual-mic` | Chromie TTS WAV -> Pulse/PipeWire null sink monitor -> normal host capture -> VAD -> ASR | None | Host audio-device capture plus the automated control path | No |
 | `acoustic` | Chromie TTS WAV -> host output -> configured host input device -> VAD -> ASR | None | Repeatable host audio-device path for generated speech; physical evidence when bound to a real speaker/microphone pair | No |
 | `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes, for physical voice-device release claims |
@@ -885,7 +885,7 @@ WebSocket service and stores it under:
 It then injects a private framed PCM16 stream through the Orchestrator process's
 stdin. No network injection endpoint is opened. The Orchestrator resamples the
 packet, feeds normal VAD frames, sends the resulting utterance to ASR, and uses
-the same Cognitive Gateway, Agent/Cognitive Core, Skill Runtime, TTS, and Soridormi paths as a microphone
+the same Cognitive Gateway, Agent/Cognitive Core, Trusted Capability Runtime, TTS, and Soridormi paths as a microphone
 session.
 
 This mode is the recommended first run because it removes pronunciation,
@@ -1036,7 +1036,7 @@ and only `supervised` adds human speech and operator observations.
 | Speech plus body skill | “Nod” or equivalent, then “Yes” | Exact nod/count proposal; request-bound confirmation prompt scheduled and fully played before approval; requested, approved, and authorized events bound by confirmation ID and fingerprint; completed skill result; safe idle. |
 | Refusal | Valid body request, then “No thanks” | Requested, denied, and rejected events bound by confirmation ID and fingerprint; no Soridormi result; completed denial speech output. |
 | Barge-in | Interrupt while speaking | Active old-session playback linked to the new interrupt session, deterministic interrupt route, and no old-session playback after interruption completes. |
-| Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, host-observed Skill Runtime cancellation, host interruption completion, and post-cancellation safe-idle/no-active-task status. This does not claim a provider cancel RPC unless a provider event explicitly records one. |
+| Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, host-observed Trusted Capability Runtime cancellation, host interruption completion, and post-cancellation safe-idle/no-active-task status. This does not claim a provider cancel RPC unless a provider event explicitly records one. |
 | Stop/emergency | Explicit stop during active work | Deterministic operational route linked to the active prior session, with no later old-session output or completed work. |
 | Follow-up | “Remember … blue,” then ask for the color | Same conversation ID, both intended ASR utterances, and completed second-response output containing `blue`. |
 
