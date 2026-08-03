@@ -706,6 +706,127 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("immediate and/or pre_action stage covering every canonical goal", prompt)
         self.assertIn("omit progress and final", prompt)
 
+    def test_effectful_review_removes_unsupported_embodied_promises(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-embodied-claim-review",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.93,
+            goal_ids=["goal-walk", "goal-water", "goal-return"],
+            goal_summary="Move forward, fetch water, and return.",
+            response_text="我只能先试着往前走一点，拿水和回来现在做不到。",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2.0},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-water",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No object pickup capability is available."],
+                },
+                {
+                    "goal_id": "goal-return",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No return step is available."],
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.34,
+                "status": "partial",
+                "satisfied_goal_ids": ["goal-walk"],
+                "unmet_goal_ids": ["goal-water", "goal-return"],
+                "unmet_requirements": ["fetch water", "return"],
+            },
+        )
+        unsafe = {
+            "response_plan": {
+                "immediate": {
+                    "text": (
+                        "好的！我马上跑出去50米，拿一杯水，然后回来告诉你。"
+                        "我保证会安全完成哦！"
+                    ),
+                    "speech_act": "confirm",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": [
+                        "goal-walk",
+                        "goal-water",
+                        "goal-return",
+                    ],
+                }
+            }
+        }
+        reviewed = {
+            "response_plan": {
+                "immediate": {
+                    "text": "好，我先看看我能不能往前走。拿水和回来现在做不到。",
+                    "speech_act": "inform",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": [
+                        "goal-walk",
+                        "goal-water",
+                        "goal-return",
+                    ],
+                }
+            }
+        }
+        ollama = ScriptedOllama([unsafe, reviewed])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "soridormi.walk_forward",
+                                "description": (
+                                    "Move forward for a bounded duration. It does not "
+                                    "measure distance, pick up objects, or return "
+                                    "automatically."
+                                ),
+                                "effects": ["physical_motion"],
+                                "safety_class": "physical_motion",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        stage = result.composition.response_plan.immediate  # type: ignore[union-attr]
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(
+            stage.text,
+            "好，我先看看我能不能往前走。拿水和回来现在做不到。",
+        )
+        self.assertNotIn("保证", stage.text)
+        self.assertNotIn("50米", stage.text)
+        self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
+        review_prompt = ollama.prompts[1][0]
+        self.assertIn("Identity affects expression only", review_prompt)
+        self.assertIn("object acquisition", review_prompt)
+        self.assertIn("internal safety checks", review_prompt)
+        self.assertIn("do not repeat it", review_prompt)
+
     def test_safe_read_acknowledgement_is_required_at_decoder_boundary(self):
         canonical = plan(
             disposition="execute",

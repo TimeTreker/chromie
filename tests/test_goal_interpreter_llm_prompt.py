@@ -2258,6 +2258,139 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fast_speech_repair", decision.metadata)
         self.assertEqual(interpreter.stages, ["primary_interpreter", "fast_speech_repair"])
 
+    async def test_robot_action_fast_speech_repair_stays_generic_before_planning(self) -> None:
+        class RobotInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    pending_work_fast_speech_repair_enabled=True,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                system = str(payload["messages"][0].get("content") or "")
+                if "independent fast-speech semantic and style reviewer" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"嗯，我想想怎么帮你。",'
+                                '"purpose":"acknowledge",'
+                                '"commitment":"prelude_only",'
+                                '"claim_state":"none",'
+                                '"claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],'
+                                '"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                if "fast-speech repairer" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"我这就去确认路径安全，然后帮你拿水。",'
+                                '"purpose":"acknowledge",'
+                                '"commitment":"prelude_only",'
+                                '"claim_state":"none",'
+                                '"claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],'
+                                '"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action",'
+                            '"intent":"capability:soridormi.walk_forward",'
+                            '"confidence":0.95}'
+                        )
+                    }
+                }
+
+        interpreter = RobotInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="你能往前跑50米，帮我拿杯水，然后回来吗？",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(decision.route, "robot_action")
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "嗯，我想想怎么帮你。")
+        self.assertEqual(decision.fast_speech.purpose, "acknowledge")
+        self.assertEqual(decision.fast_speech.commitment, "prelude_only")
+        repair_rendered = "\n".join(
+            str(message.get("content") or "")
+            for message in interpreter.payloads[1]["messages"]
+        )
+        review_rendered = "\n".join(
+            str(message.get("content") or "")
+            for message in interpreter.payloads[2]["messages"]
+        )
+        self.assertIn("Identity and personality shape voice only", repair_rendered)
+        self.assertIn("Do not use a universal or canned acknowledgement", repair_rendered)
+        self.assertIn("fast_speech=null", repair_rendered)
+        self.assertIn("claim_state=none", repair_rendered)
+        self.assertIn("Review meaning, not keywords", review_rendered)
+        self.assertIn("preserved, naturally rewritten", review_rendered)
+        self.assertEqual(len(interpreter.payloads), 3)
+
+    async def test_robot_action_fast_speech_reviewer_may_choose_silence(self) -> None:
+        class RobotInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    pending_work_fast_speech_repair_enabled=True,
+                )
+
+            async def _chat(self, payload: dict) -> dict:
+                system = str(payload["messages"][0].get("content") or "")
+                if "independent fast-speech semantic and style reviewer" in system:
+                    return {"message": {"content": '{"fast_speech":null}'}}
+                if "fast-speech repairer" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"嗯。",'
+                                '"purpose":"acknowledge",'
+                                '"commitment":"prelude_only",'
+                                '"claim_state":"none",'
+                                '"claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],'
+                                '"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action",'
+                            '"intent":"capability:soridormi.walk_forward",'
+                            '"confidence":0.95}'
+                        )
+                    }
+                }
+
+        decision = await RobotInterpreter().route(
+            RouteRequest(text="往前走。", language="zh-CN")
+        )
+
+        self.assertIsNone(decision.fast_speech)
+        self.assertFalse(decision.speak_first)
+        self.assertEqual(
+            decision.metadata["fast_speech_review"]["speech_selected"],
+            False,
+        )
+
     async def test_tool_route_missing_fast_speech_does_not_add_interpreter_latency_by_default(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
@@ -2373,22 +2506,26 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("fast-speech repairer", rendered)
         self.assertIn("six-year-old child", rendered)
-        self.assertIn("Do not sound like customer service", rendered)
+        self.assertIn("not customer service", rendered)
         self.assertIn("robot status system", rendered)
-        self.assertIn("do not announce her age or family role", rendered)
+        self.assertIn("Do not announce her age or role", rendered)
         self.assertIn("Do not change route", rendered)
         self.assertIn("exact model-authored bindings", rendered)
-        self.assertIn("Never claim an external result", rendered)
-        self.assertIn("before authoritative Goal Association", rendered)
-        self.assertIn("keep the acknowledgement generic", rendered)
+        self.assertIn("must not semantically claim", rendered)
+        self.assertIn("Goal Association and planning have not happened yet", rendered)
+        self.assertIn("silence is a valid choice", rendered)
         self.assertIn("never phrase matching", rendered)
         self.assertIn("purpose=acknowledge_and_check", rendered)
         self.assertIn("commitment=checking_only", rendered)
+        speech_schema = payload["format"]["properties"]["fast_speech"]["anyOf"][1]
         self.assertEqual(
-            payload["format"]["properties"]["fast_speech"]["properties"][
-                "purpose"
-            ]["enum"],
+            speech_schema["properties"]["purpose"]["enum"],
             ["acknowledge_and_check"],
+        )
+        self.assertEqual(speech_schema["properties"]["claim_state"]["const"], "none")
+        self.assertEqual(
+            speech_schema["properties"]["claimed_capability_ids"]["maxItems"],
+            0,
         )
         self.assertEqual(payload["model"], "quality-model")
         self.assertIn("今天重庆天气怎么样", rendered)

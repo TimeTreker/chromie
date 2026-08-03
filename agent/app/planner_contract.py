@@ -729,7 +729,7 @@ async def review_coordinated_action_plan_coverage(
                 "adjustment/alternative for user confirmation. When that adjustment "
                 "contract is explicit, confirmation-bound, and explained, do not "
                 "reject solely because its retained steps are sequential; the changed "
-                "timing is represented for the user to approve. A Goal whose "
+                "timing is represented for the user to approve. A person's age, family role, personality, or self-concept is never evidence that a physical Capability exists. Only the supplied executable Capability semantics can establish ability. An exact distance, object acquisition, carrying, return trip, or safety result must be implemented by the supplied Capability semantics and represented by owned steps; duration or a generic movement step cannot be treated as proof of an unsupported distance or another physical responsibility. A Goal whose "
                 "responsibility_kind is spoken_response is completed by its respond "
                 "outcome response_text and requires no executable speech-transport "
                 "step. Still reject a promise, acknowledgement, title, or stage "

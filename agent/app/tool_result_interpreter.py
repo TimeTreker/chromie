@@ -101,6 +101,26 @@ class ToolResultInterpreter:
                 response_format=self._response_schema(request),
             )
             output = ToolResultModelOutput.model_validate(raw)
+            effectful_reviewed = False
+            if self._requires_effectful_review(request):
+                reviewed = await self.ollama.generate(
+                    self._effectful_review_prompt(request, candidate=output),
+                    system=self._effectful_review_system_prompt(),
+                    options={
+                        "temperature": 0,
+                        "top_p": 0.9,
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                    },
+                    response_format=self._response_schema(request),
+                )
+                if not isinstance(reviewed, dict):
+                    raise ValueError(
+                        "effectful tool-result review output is not a JSON object"
+                    )
+                raw = reviewed
+                output = ToolResultModelOutput.model_validate(reviewed)
+                effectful_reviewed = True
             selected_values = self._validate_fact_references(
                 output.selected_facts,
                 evidence_by_id=evidence_by_id,
@@ -122,6 +142,7 @@ class ToolResultInterpreter:
                     "contract": "ToolResultModelOutput",
                     "evidence_count": len(request.evidence),
                     "selected_fact_count": len(output.selected_facts),
+                    "effectful_semantic_review": effectful_reviewed,
                     "full_tool_result_retained": True,
                 },
             )
@@ -212,9 +233,66 @@ class ToolResultInterpreter:
             "available_scalar_json_pointers. The pointer root is the evidence data object itself; "
             "never add a /data prefix and never invent or modify a field name. Preserve numbers "
             "and named facts exactly. "
-            "Conclusions may be phrased naturally but must be supported by selected facts. Normally "
-            "use one short sentence; use a second sentence only when it adds something genuinely "
-            "useful. Return JSON only."
+            "Conclusions may be phrased naturally but must be supported by selected facts and the immutable per-goal outcomes in the supplied CanonicalPlan. A completed boolean proves only the exact Capability step that produced it; it does not prove an unsupported distance, object acquisition, carrying, return trip, safety guarantee, or completion of another requested responsibility. A no_motion value means no physical movement occurred even when the provider request completed. Identity and personality shape expression only and never expand capability or evidence. Normally use one short sentence; use a second sentence only when it adds something genuinely useful. Return JSON only."
+        )
+
+    @staticmethod
+    def _requires_effectful_review(
+        request: ToolResultInterpretationRequest,
+    ) -> bool:
+        return request.context.get("effectful_result_review_required") is True
+
+    def _effectful_review_prompt(
+        self,
+        request: ToolResultInterpretationRequest,
+        *,
+        candidate: ToolResultModelOutput,
+    ) -> str:
+        evidence_payload = [
+            {
+                "evidence_id": item.evidence_id,
+                "tool_id": item.tool_id,
+                "status": item.status,
+                "data": item.data,
+                "available_scalar_json_pointers": self._scalar_json_pointers(
+                    item.data
+                ),
+            }
+            for item in request.evidence
+        ]
+        return (
+            "Independently review the candidate tool-result answer for effectful "
+            "work and return the complete corrected ToolResultModelOutput JSON. "
+            "Judge semantic entailment, not wording overlap. Every user-facing claim "
+            "must follow from the selected exact evidence facts and the immutable "
+            "CanonicalPlan outcomes.\n\n"
+            "A provider completed flag proves only that exact Capability request. It "
+            "does not prove an exact physical distance, pickup, carrying, return, "
+            "safe completion, or another requested responsibility unless those facts "
+            "are explicitly present in trusted evidence and owned by matching Plan "
+            "steps. no_motion=true means no physical motion occurred. Do not repeat a "
+            "pre-action promise as if it were a result. Do not expose provider names, "
+            "plan IDs, request IDs, internal summaries, or execution diagnostics. "
+            "Identity affects voice only and never grants ability. State the completed "
+            "subset and any Plan-declared limitation honestly, in concrete everyday "
+            "language suitable for Chromie. Never guarantee safety.\n\n"
+            f"Original user request:\n{request.user_request}\n\n"
+            f"Target language: {request.language}\n\n"
+            "Immutable CanonicalPlan JSON:\n"
+            f"{self._bounded(request.context.get('canonical_plan_resolution') or {}, 10000)}\n\n"
+            "Trusted evidence JSON:\n"
+            f"{self._bounded(evidence_payload, 14000)}\n\n"
+            "Candidate ToolResultModelOutput JSON:\n"
+            f"{self._bounded(candidate.model_dump(mode='json'), 5000)}\n\n"
+            "Return only the complete corrected ToolResultModelOutput JSON object."
+        )
+
+    @staticmethod
+    def _effectful_review_system_prompt() -> str:
+        return (
+            "You are Chromie's independent effectful-result entailment reviewer. "
+            "Keep only claims supported by exact evidence and immutable Plan outcomes. "
+            "Do not authorize actions or infer ability from identity. Return JSON only."
         )
 
     @staticmethod

@@ -63,6 +63,9 @@ class FastSpeech(BaseModel):
     purpose: str | None = None
     language: str | None = None
     commitment: str | None = None
+    claim_state: Literal["none", "planned", "started", "completed"] = "none"
+    claimed_capability_ids: list[str] = Field(default_factory=list)
+    claimed_goal_ids: list[str] = Field(default_factory=list)
     must_not_claim_completion: bool = True
 
     @model_validator(mode="before")
@@ -76,6 +79,16 @@ class FastSpeech(BaseModel):
     def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
         if self.must_not_claim_completion is not True:
             raise ValueError("fast_speech must forbid completion claims")
+        if self.claim_state == "completed":
+            raise ValueError("fast_speech cannot claim completed work")
+        self.claimed_capability_ids = list(dict.fromkeys(
+            str(item or "").strip() for item in self.claimed_capability_ids
+            if str(item or "").strip()
+        ))
+        self.claimed_goal_ids = list(dict.fromkeys(
+            str(item or "").strip() for item in self.claimed_goal_ids
+            if str(item or "").strip()
+        ))
         marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
         if marker in {
             "checking_only",

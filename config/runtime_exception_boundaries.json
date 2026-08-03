@@ -350,16 +350,29 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_pending_fast_speech",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Suppress unreviewed or invalid model-authored immediate speech and return a typed decision without authorizing semantic claims.",
+      "review_status": "reviewed",
+      "body_sha256": "d9f86eb0dd19008afbd2781909460021669525eb1088b88d9e815564b6dfd165",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter._repair_missing_fast_speech",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f42ad5020407f18aebcea725e0a67519276cf899dfd97d5637e5a61a1646be05",
+      "body_sha256": "75b310f93601f02e439e078f72874201ff124f56ecd5d500ca23598087d0d029",
       "failure_signals": [
-        "diagnostic",
-        "return"
+        "diagnostic"
       ]
     },
     {
@@ -679,7 +692,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "fadaceac64eac50828df7fe5eb80020787f60f00a13158627ec49046d94a6382",
+      "body_sha256": "6ef6964a0cb23871c9c445d14f015ee23a2bde876563abe3abe83008948a37f9",
       "failure_signals": [
         "continue",
         "diagnostic",

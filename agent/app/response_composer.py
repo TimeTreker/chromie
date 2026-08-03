@@ -167,8 +167,11 @@ class ResponseComposerResolver:
         contract_repair_attempted = False
         safe_read_semantic_review_attempted = False
         safe_read_semantic_review_succeeded = False
+        effectful_semantic_review_attempted = False
+        effectful_semantic_review_succeeded = False
         for attempt in range(2):
             safe_read_semantic_review_succeeded = False
+            effectful_semantic_review_succeeded = False
             raw: Any = None
             try:
                 raw = await self.ollama.generate(
@@ -224,6 +227,39 @@ class ResponseComposerResolver:
                     safe_read_semantic_review_succeeded = True
                     logger.info(
                         "response_composer_safe_read_semantic_review_done sid=%s "
+                        "status=success",
+                        request.sid,
+                    )
+                elif self._requires_effectful_semantic_review(plan, request.context):
+                    effectful_semantic_review_attempted = True
+                    logger.info(
+                        "response_composer_effectful_semantic_review_start sid=%s",
+                        request.sid,
+                    )
+                    reviewed = await self.ollama.generate(
+                        self._effectful_semantic_review_prompt(
+                            request=request,
+                            plan=plan,
+                            candidate=model_output,
+                        ),
+                        system=self._effectful_semantic_review_system_prompt(),
+                        options={
+                            "temperature": 0,
+                            "top_p": 0.9,
+                            "num_ctx": self.num_ctx,
+                            "num_predict": self.num_predict,
+                        },
+                        response_format=response_schema,
+                    )
+                    if not isinstance(reviewed, dict):
+                        raise ValueError(
+                            "effectful semantic review output is not a JSON object"
+                        )
+                    raw = reviewed
+                    model_output = ResponseComposerModelOutput.model_validate(reviewed)
+                    effectful_semantic_review_succeeded = True
+                    logger.info(
+                        "response_composer_effectful_semantic_review_done sid=%s "
                         "status=success",
                         request.sid,
                     )
@@ -336,6 +372,11 @@ class ResponseComposerResolver:
                             "succeeded": safe_read_semantic_review_succeeded,
                             "strategy": "model_owned_pre_evidence_speech_review",
                         },
+                        "effectful_semantic_review": {
+                            "attempted": effectful_semantic_review_attempted,
+                            "succeeded": effectful_semantic_review_succeeded,
+                            "strategy": "model_owned_pre_execution_claim_review",
+                        },
                     },
                 )
                 return ResponseCompositionResolution(
@@ -363,6 +404,12 @@ class ResponseComposerResolver:
                         ),
                         "safe_read_semantic_review_succeeded": (
                             safe_read_semantic_review_succeeded
+                        ),
+                        "effectful_semantic_review_attempted": (
+                            effectful_semantic_review_attempted
+                        ),
+                        "effectful_semantic_review_succeeded": (
+                            effectful_semantic_review_succeeded
                         ),
                     },
                 )
@@ -403,6 +450,10 @@ class ResponseComposerResolver:
                             safe_read_semantic_review_attempted
                         ),
                         "safe_read_semantic_review_succeeded": False,
+                        "effectful_semantic_review_attempted": (
+                            effectful_semantic_review_attempted
+                        ),
+                        "effectful_semantic_review_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
                         "initial_raw_output": self._bounded(previous_raw, 5000)
                         if contract_repair_attempted and previous_raw is not None
@@ -646,6 +697,25 @@ class ResponseComposerResolver:
             raise ValueError(
                 "spoken response must use the authoritative English language"
             )
+
+    @classmethod
+    def _requires_effectful_semantic_review(
+        cls,
+        plan: CanonicalPlan,
+        context: dict[str, Any] | None,
+    ) -> bool:
+        execution_capabilities = (
+            context.get("execution_capabilities")
+            if isinstance(context, dict)
+            else None
+        )
+        return bool(
+            plan.disposition in {"execute", "mixed"}
+            and plan.steps
+            and isinstance(execution_capabilities, list)
+            and bool(execution_capabilities)
+            and not cls._is_safe_read_plan(plan, context)
+        )
 
     @staticmethod
     def _social_attention_candidate_count(
@@ -1572,6 +1642,56 @@ class ResponseComposerResolver:
             "Candidate Response Composer DTO JSON:\n"
             f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
             "Return only the complete ResponseComposerModelOutput JSON object."
+        )
+
+    def _effectful_semantic_review_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        candidate: ResponseComposerModelOutput,
+    ) -> str:
+        return (
+            "Independently review the candidate Response Composer DTO for pending "
+            "effectful work and return the complete final DTO as JSON. This review "
+            "happens before execution evidence exists. Keep the immutable Plan and "
+            "its supplied Capability semantics unchanged.\n\n"
+            "Every spoken claim must stay within what the immutable Plan actually "
+            "authorizes. Do not promise success, safety, an exact physical distance, "
+            "object acquisition, carrying, a return trip, or any other responsibility "
+            "that lacks an owned executable step and matching Capability semantics. "
+            "Identity affects expression only; a person's age, family role, personality, or self-concept never proves "
+            "a physical ability. Do not say that movement has started. Do not turn "
+            "internal safety checks, route checks, plans, providers, or execution "
+            "states into ordinary speech.\n\n"
+            "When the Plan contains unavailable, refused, or clarification outcomes, "
+            "state the limitation or question naturally instead of promising the whole "
+            "request. When current-turn speech already gave an adequate generic "
+            "acknowledgement, do not repeat it. Use concrete everyday wording that "
+            "sounds like Chromie, not customer service or a machine status message. "
+            "Never guarantee that an effectful action will be completed safely. Use "
+            "semantic reasoning, not phrase matching. Preserve valid goal coverage and "
+            "the explicit social-attention decision.\n\n"
+            f"Authoritative user turn:\n{request.text}\n\n"
+            "Speech already delivered in this current turn JSON:\n"
+            f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
+            "Pending execution Capability semantics JSON:\n"
+            f"{self._bounded(request.context.get('execution_capabilities') or [], 6000)}\n\n"
+            "Immutable CanonicalPlan JSON:\n"
+            f"{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
+            "Candidate Response Composer DTO JSON:\n"
+            f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
+            "Return only the complete ResponseComposerModelOutput JSON object."
+        )
+
+    @staticmethod
+    def _effectful_semantic_review_system_prompt() -> str:
+        return (
+            "You are Chromie's independent pre-execution claim reviewer. Use model "
+            "reasoning to keep speech childlike, truthful, and strictly bounded by "
+            "the immutable Plan and supplied Capability semantics. Identity affects "
+            "expression only, never ability. Host code does not inspect wording or "
+            "make the semantic judgment. Return JSON only."
         )
 
     @staticmethod

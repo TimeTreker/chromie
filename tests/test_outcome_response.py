@@ -308,7 +308,7 @@ class OutcomeResponseTests(unittest.TestCase):
             statuses,
             observations={
                 "evidence-1-1": _observation(
-                    {"summary": "It is raining in Beijing"}
+                    {"user_summary": "It is raining in Beijing"}
                 )
             },
         )
@@ -324,6 +324,27 @@ class OutcomeResponseTests(unittest.TestCase):
             observed.speech[0].metadata["observed_evidence_ids"],
             ["evidence-1-1"],
         )
+
+    def test_generic_provider_summary_is_not_a_speakable_contract(self) -> None:
+        statuses = [("goal-weather", ["completed"])]
+        plan = _plan(statuses)
+        bundle = _bundle(
+            plan,
+            statuses,
+            observations={
+                "evidence-1-1": _observation(
+                    {"summary": "Runtime completed successfully."}
+                )
+            },
+        )
+
+        response = compose_outcome_response(bundle, plan, "en")
+
+        self.assertEqual(
+            response.speech[0].text,
+            "I could not make sense of that just now.",
+        )
+        self.assertNotIn("Runtime", response.speech[0].text)
 
     def test_structured_observation_is_not_rendered_as_a_host_report(self) -> None:
         statuses = [("goal-weather", ["completed"])]
@@ -375,6 +396,81 @@ class OutcomeResponseTests(unittest.TestCase):
         )
         self.assertNotIn("goal-weather", response.speech[0].text)
         self.assertNotIn("plan-post-execution", response.speech[0].text)
+
+    def test_completed_subset_does_not_sound_like_whole_request_completed(self) -> None:
+        plan = CanonicalPlan(
+            plan_id="plan-partial-embodied",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.9,
+            goal_ids=["goal-walk", "goal-water"],
+            goal_summary="Move and fetch water.",
+            response_text="Only movement is available.",
+            steps=[
+                {
+                    "step_id": "step-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step-walk"],
+                },
+                {
+                    "goal_id": "goal-water",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No pickup capability."],
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.5,
+                "status": "partial",
+                "satisfied_goal_ids": ["goal-walk"],
+                "unmet_goal_ids": ["goal-water"],
+                "unmet_requirements": ["fetch water"],
+            },
+        )
+        evidence = ExecutionEvidence(
+            evidence_id="evidence-walk",
+            request_id="request-walk",
+            step_id="step-walk",
+            skill_id="soridormi.walk_forward",
+            source_goal_ids=["goal-walk"],
+            status="completed",
+            reported_status="completed",
+            provider_id="test-provider",
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-partial-embodied",
+            turn_id="turn-partial-embodied",
+            interaction_id="interaction-partial-embodied",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_goal_ids=list(plan.goal_ids),
+            non_execution_goal_ids=["goal-water"],
+            aggregate_status="completed",
+            evidence=[evidence],
+            goal_outcomes=[
+                GoalExecutionOutcome(
+                    goal_id="goal-walk",
+                    status="completed",
+                    step_ids=["step-walk"],
+                    evidence_ids=["evidence-walk"],
+                    completed_step_ids=["step-walk"],
+                )
+            ],
+        )
+
+        response = compose_outcome_response(bundle, plan, "zh-CN")
+
+        self.assertEqual(response.speech[0].text, "这一小步弄好啦。")
+        self.assertNotEqual(response.speech[0].text, "好啦。")
 
     def test_metadata_retains_exact_bundle_fingerprint_and_evidence_refs(self) -> None:
         statuses = [

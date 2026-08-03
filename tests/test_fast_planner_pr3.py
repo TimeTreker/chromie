@@ -761,6 +761,122 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(plan.metadata["execution_allowed"])
         self.assertIn("spoken performance", ollama.prompts[1][0])
 
+    def test_embodied_coverage_review_rejects_walk_step_as_fetch_and_return(self):
+        goal_ids = ["goal-distance", "goal-water", "goal-return"]
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Move 50 metres, fetch water, and return.",
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 50.0},
+                    goal_ids,
+                    "Use the movement capability for the whole request.",
+                )
+            ],
+            goal_outcomes={
+                goal_id: execute_outcome(
+                    goal_id,
+                    ["walk"],
+                    "The one movement step covers this responsibility.",
+                )
+                for goal_id in goal_ids
+            },
+            goal_satisfaction=exact_satisfaction(goal_ids),
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "value": 50.0,
+                    "strategy": "user_supplied",
+                    "source_goal_ids": ["goal-distance"],
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied the user's number.",
+                }
+            ],
+        )
+        run_request = request(
+            "你能往前给我跑个50米，帮我拿杯水，然后回来吗？",
+            goal_ids=goal_ids,
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-distance",
+                    "description": "往前移动50米。",
+                    "source_text": run_request.text,
+                    "object": {
+                        "bindings": {
+                            "distance": {
+                                "name": "distance",
+                                "entity_type": "distance",
+                                "value": "50米",
+                            }
+                        }
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                },
+                {
+                    "goal_id": "goal-water",
+                    "description": "拿一杯水。",
+                    "source_text": run_request.text,
+                    "object": {"bindings": {}},
+                    "metadata": {"responsibility_kind": "executable_action"},
+                },
+                {
+                    "goal_id": "goal-return",
+                    "description": "返回用户身边。",
+                    "source_text": run_request.text,
+                    "object": {"bindings": {}},
+                    "metadata": {"responsibility_kind": "executable_action"},
+                },
+            ],
+        }
+        ollama = ScriptedOllama(
+            [
+                raw,
+                {
+                    "decision": "reject",
+                    "confidence": 1.0,
+                    "uncovered_requirements": [
+                        "exact 50-metre distance",
+                        "fetching water",
+                        "returning",
+                    ],
+                    "reason": (
+                        "walk_forward is duration-based movement and does not "
+                        "implement distance measurement, object pickup, or return."
+                    ),
+                },
+            ]
+        )
+
+        resolved = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(resolved.disposition, "escalate")
+        self.assertEqual(resolved.steps, [])
+        self.assertEqual(
+            resolved.escalation_reason,
+            "coordinated_action_coverage_incomplete",
+        )
+        self.assertEqual(
+            resolved.unresolved,
+            ["exact 50-metre distance", "fetching water", "returning"],
+        )
+        review_prompt = ollama.prompts[1][0]
+        self.assertIn("age, family role, personality", review_prompt)
+        self.assertIn("object acquisition", review_prompt)
+        self.assertIn("duration or a generic movement step", review_prompt)
+
     def test_parallel_plan_without_declared_provider_support_escalates(self):
         goal_ids = ["goal-walk", "goal-blink"]
         raw = multi_goal_plan(

@@ -1186,14 +1186,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     intent="robot_action",
                     language="en-US",
                     fast_speech={
-                        "text": "I’ll check whether I can do that safely.",
-                        "purpose": "safety_prelude",
-                        "commitment": "needs_confirmation",
+                        "text": "Hmm, let me think about that.",
+                        "purpose": "acknowledge",
+                        "commitment": "prelude_only",
+                        "claim_state": "none",
+                        "claimed_capability_ids": [],
+                        "claimed_goal_ids": [],
                     },
                 ),
                 "Walk forward for 15 seconds.",
             ),
-            "I’ll check whether I can do that safely.",
+            "Hmm, let me think about that.",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -1309,20 +1312,41 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    def test_dynamic_fast_speech_rejects_terminal_claims(self) -> None:
-        unsafe = (
+    def test_dynamic_fast_speech_uses_typed_claim_authority_not_wording_rules(self) -> None:
+        # The Host applies transport checks only; semantic wording is reviewed
+        # by the Cognitive Core and represented by typed claim provenance.
+        self.assertEqual(
+            VoiceAssistant._safe_immediate_route_speech("I finished it."),
             "I finished it.",
-            "I've finished that.",
-            "I already took care of it.",
-            "That's taken care of.",
-            "It is ready.",
-            "任务办好了。",
-            "处理好了。",
         )
-
-        for text in unsafe:
-            with self.subTest(text=text):
-                self.assertIsNone(VoiceAssistant._safe_immediate_route_speech(text))
+        self.assertIsNone(
+            VoiceAssistant._validated_fast_speech_payload_text(
+                {
+                    "text": "I finished it.",
+                    "purpose": "acknowledge",
+                    "commitment": "prelude_only",
+                    "claim_state": "completed",
+                    "claimed_capability_ids": [],
+                    "claimed_goal_ids": [],
+                    "must_not_claim_completion": True,
+                },
+                route="robot_action",
+            )
+        )
+        self.assertIsNone(
+            VoiceAssistant._validated_fast_speech_payload_text(
+                {
+                    "text": "I can do that.",
+                    "purpose": "acknowledge",
+                    "commitment": "prelude_only",
+                    "claim_state": "none",
+                    "claimed_capability_ids": ["soridormi.walk_forward"],
+                    "claimed_goal_ids": [],
+                    "must_not_claim_completion": True,
+                },
+                route="robot_action",
+            )
+        )
 
     def test_unsafe_deep_thought_speak_first_does_not_trigger_host_wording(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

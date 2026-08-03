@@ -301,6 +301,77 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "model_owned_goal_association_review",
         )
 
+    def test_embodied_request_is_split_and_acknowledgement_is_not_a_goal(self):
+        merged = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "跑出50米并帮用户拿一杯水，然后返回。",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+                {
+                    "description": "回应用户的请求。",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前移动50米。",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "distance",
+                            "entity_type": "distance",
+                            "value": "50米",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "拿一杯水。",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+                {
+                    "description": "返回用户身边。",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([merged, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("你能往前给我跑个50米，帮我拿杯水，然后回来吗？")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["往前移动50米。", "拿一杯水。", "返回用户身边。"],
+        )
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["executable_action", "executable_action", "executable_action"],
+        )
+        self.assertEqual(
+            result.metadata["semantic_review"]["triggers"],
+            ["embodied_responsibility_decomposition"],
+        )
+        review_prompt = ollama.prompts[1][0]
+        self.assertIn("acknowledgement, confirmation", review_prompt)
+        self.assertIn("acquiring or manipulating an object", review_prompt)
+        self.assertIn("Identity shapes expression only", review_prompt)
+
     def test_independent_spoken_performance_survives_model_semantic_review(self):
         mixed = {
             "decision": "create_goals",

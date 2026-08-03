@@ -218,7 +218,15 @@ independently schema-valid `fast_speech` or `ResponseStage` only after Host
 validation authorizes it against the applicable turn/Goal correlation,
 commitment or evidence state, claim guards, and cancellation generation. It
 need not wait for unrelated later response fields. The stages have distinct
-truth requirements:
+truth requirements. For dynamic fast speech, the Core model owns whether to
+speak and the exact wording under the owner-approved mind and style context. An
+independent semantic/style review may preserve, rewrite, or remove the candidate.
+The typed `claim_state`, `claimed_capability_ids`, and `claimed_goal_ids` carry
+claim authority; before Goals and Plans exist they must be `none`, empty, and
+empty. The Host validates those typed fields, turn correlation, internal-token
+safety, and lifecycle state. It must not infer conversational meaning from a
+phrase blacklist or replace invalid ordinary speech with a canned sentence;
+failed review means silence.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable

@@ -2728,9 +2728,15 @@ class VoiceAssistant:
             "prelude_only",
         }:
             return None
+        if str(payload.get("claim_state") or "").strip().casefold() != "none":
+            return None
+        claimed_capability_ids = payload.get("claimed_capability_ids")
+        claimed_goal_ids = payload.get("claimed_goal_ids")
+        if claimed_capability_ids != [] or claimed_goal_ids != []:
+            return None
         route_contracts = {
             "tool": ("acknowledge_and_check", "checking_only"),
-            "robot_action": ("safety_prelude", "needs_confirmation"),
+            "robot_action": ("acknowledge", "prelude_only"),
             "deep_thought": ("thinking", "prelude_only"),
             "memory": ("acknowledge", "prelude_only"),
         }
@@ -2746,55 +2752,26 @@ class VoiceAssistant:
 
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
+        """Apply only transport-safe checks to model-reviewed immediate speech.
+
+        Semantic claim authority is carried by the typed FastSpeech fields and
+        independently reviewed in the Cognitive Core. The Host deliberately
+        does not infer meaning from phrases, keywords, punctuation, or style.
+        """
+
         cleaned = " ".join((text or "").strip().split())
         if not cleaned or len(cleaned) > 120:
             return None
         lowered = cleaned.casefold()
-        blocked_terms = (
+        if any(marker in lowered for marker in (
             "soridormi.",
             "chromie.",
             "task split",
             "key risk",
             "next step",
-            "done",
-            "completed",
-            "finished",
-            "handled",
-            "took care",
-            "resolved",
-            "delivered",
-            "performed",
-            "executing",
-            "moving",
-            "walking",
-            "turning",
-            "tool result",
-            "the result is",
-            "i found the result",
-            "i remembered",
-            "i have remembered",
-            "我记住了",
-            "我查到",
-            "查询结果",
-            "已经",
-            "完成",
-            "执行",
-            "正在",
-        )
-        if any(term in lowered for term in blocked_terms):
+        )):
             return None
-        terminal_claim_patterns = (
-            r"\b(?:i|we)(?:['’]ve|\s+have|\s+already|\s+just|\s+successfully)*\s+"
-            r"(?:did|made|fixed|sent|saved|booked|updated|changed|created|removed|"
-            r"deleted|ordered|called|emailed|wrote|finished|completed|handled|resolved)\b",
-            r"\b(?:it|that|this)(?:['’]s|\s+is|\s+has\s+been)\s+"
-            r"(?:done|ready|fixed|sent|saved|finished|completed|handled|resolved)\b",
-            r"\b(?:taken\s+care\s+of|all\s+set)\b",
-            r"(?:任务|事情|这件事|这个请求|工作|处理).{0,6}"
-            r"(?:办好|做好|处理好|搞定|完成)了?",
-            r"(?:办好了|做好了|处理好了|搞定了)",
-        )
-        if any(re.search(pattern, lowered) for pattern in terminal_claim_patterns):
+        if any(ord(char) < 32 and char not in {"\t", "\n", "\r"} for char in cleaned):
             return None
         return cleaned
 
@@ -6720,13 +6697,7 @@ class VoiceAssistant:
     ) -> str:
         """Return one provider-authored user summary for exceptional fallback only."""
 
-        explicit_fields = (
-            "user_summary",
-            "summary",
-            "answer",
-            "text",
-            "result_text",
-        )
+        explicit_fields = ("user_summary",)
         for item in evidence:
             for field in explicit_fields:
                 value = item.data.get(field)
@@ -6817,6 +6788,10 @@ class VoiceAssistant:
             detailed_max_sentences=5,
             context={
                 "aggregate_status": bundle.aggregate_status,
+                "effectful_result_review_required": (
+                    self._execution_outcome_route(source_response, plan)
+                    == "robot_action"
+                ),
                 "goal_statuses": [
                     {"goal_id": item.goal_id, "status": item.status}
                     for item in bundle.goal_outcomes

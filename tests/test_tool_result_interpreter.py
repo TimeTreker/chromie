@@ -27,15 +27,17 @@ from shared.chromie_contracts.tool_result import (
 
 
 class _ScriptedOllama:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.payload = payload
+    def __init__(self, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
+        self.payloads = list(payload) if isinstance(payload, list) else [payload]
         self.prompts: list[str] = []
         self.calls: list[dict[str, Any]] = []
 
     async def generate(self, prompt: str, **kwargs) -> dict[str, Any]:
         self.prompts.append(prompt)
         self.calls.append(dict(kwargs))
-        return dict(self.payload)
+        if not self.payloads:
+            raise AssertionError("unexpected extra model call")
+        return dict(self.payloads.pop(0))
 
 
 class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
@@ -226,6 +228,148 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "unavailable")
         self.assertEqual(result.spoken_response, "")
+
+    async def test_effectful_review_limits_result_to_completed_evidence(self) -> None:
+        data = {
+            "completed": True,
+            "no_motion": True,
+            "summary": (
+                "Soridormi runtime completed plan "
+                "soridormi-plan-fff70c38edb4."
+            ),
+            "plan_id": "soridormi-plan-fff70c38edb4",
+        }
+        canonical_plan = CanonicalPlan(
+            plan_id="plan-embodied-result",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.9,
+            goal_ids=["goal-walk", "goal-water", "goal-return"],
+            goal_summary="Move forward, fetch water, and return.",
+            response_text="Only the bounded movement request was submitted.",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2.0},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-water",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No pickup capability."],
+                },
+                {
+                    "goal_id": "goal-return",
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                    "unresolved": ["No return step."],
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.0,
+                "status": "unsatisfied",
+                "satisfied_goal_ids": [],
+                "unmet_goal_ids": [
+                    "goal-walk",
+                    "goal-water",
+                    "goal-return",
+                ],
+                "unmet_requirements": [
+                    "physical motion",
+                    "fetch water",
+                    "return",
+                ],
+            },
+        )
+        request = ToolResultInterpretationRequest(
+            sid="effectful-result",
+            user_request="你能往前跑50米，帮我拿杯水，然后回来吗？",
+            language="zh-CN",
+            evidence=[
+                ToolResultEvidence(
+                    evidence_id="walk-result",
+                    tool_id="soridormi.walk_forward",
+                    status="completed",
+                    data=data,
+                    output_sha256=canonical_value_sha256(data),
+                )
+            ],
+            max_spoken_chars=72,
+            max_sentences=2,
+            context={
+                "identity": default_mind_profile().prompt_context()["identity"],
+                "personality_expression": default_mind_profile().prompt_context()[
+                    "personality_expression"
+                ],
+                "canonical_plan_resolution": canonical_plan.model_dump(mode="json"),
+                "effectful_result_review_required": True,
+            },
+        )
+        ollama = _ScriptedOllama(
+            [
+                {
+                    "spoken_response": (
+                        "好的！我已经跑完50米，拿到水又回来了，"
+                        "我保证全都安全完成了！"
+                    ),
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {
+                            "evidence_id": "walk-result",
+                            "json_pointer": "/completed",
+                        }
+                    ],
+                    "confidence": 0.99,
+                    "rationale": "The provider completed the request.",
+                },
+                {
+                    "spoken_response": (
+                        "刚才没有真的往前走，拿水和回来也没有完成。"
+                    ),
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {
+                            "evidence_id": "walk-result",
+                            "json_pointer": "/no_motion",
+                        }
+                    ],
+                    "confidence": 1.0,
+                    "rationale": (
+                        "no_motion proves that the completed provider request "
+                        "did not produce physical movement."
+                    ),
+                },
+            ]
+        )
+
+        result = await ToolResultInterpreter(ollama).interpret(request)
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.spoken_response,
+            "刚才没有真的往前走，拿水和回来也没有完成。",
+        )
+        self.assertNotIn("Soridormi", result.spoken_response)
+        self.assertNotIn("50米", result.spoken_response)
+        self.assertNotIn("保证", result.spoken_response)
+        self.assertTrue(result.metadata["effectful_semantic_review"])
+        self.assertEqual(len(ollama.prompts), 2)
+        review_prompt = ollama.prompts[1]
+        self.assertIn("completed flag proves only that exact Capability request", review_prompt)
+        self.assertIn("no_motion=true", review_prompt)
+        self.assertIn("plan IDs", review_prompt)
+        self.assertIn("Identity affects voice only", review_prompt)
 
     async def test_rejects_unknown_fact_pointer(self) -> None:
         ollama = _ScriptedOllama(

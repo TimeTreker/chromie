@@ -19,7 +19,7 @@
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
           "type": "object",
-          "properties": {"summary": {"type": "string"}},
+          "properties": {"user_summary": {"type": "string"}},
           "additionalProperties": false
         }
       },
@@ -29,7 +29,7 @@
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
         "output_schema": {
           "type": "object",
-          "properties": {"summary": {"type": "string"}},
+          "properties": {"user_summary": {"type": "string"}},
           "additionalProperties": false
         }
       }
@@ -82,7 +82,7 @@
       {
         "step_id": "step-first",
         "status": "completed",
-        "output": {"summary": "The first check passed"}
+        "output": {"user_summary": "The first check passed"}
       }
     ]
   },

@@ -52,13 +52,7 @@ _ENGLISH_ORDINALS = (
     "tenth",
 )
 
-_EXPLICIT_OBSERVATION_FIELDS = (
-    "user_summary",
-    "summary",
-    "answer",
-    "text",
-    "result_text",
-)
+_EXPLICIT_OBSERVATION_FIELDS = ("user_summary",)
 
 _INTERPRETATION_UNAVAILABLE_TEXT = {
     "zh": "我刚才没看明白。",
@@ -114,6 +108,7 @@ def compose_outcome_response(
             index=index,
             count=goal_count,
             chinese=chinese,
+            part_of_larger_request=bool(bundle.non_execution_goal_ids),
         )
         if observation_text:
             text = _append_observation(
@@ -396,6 +391,18 @@ def _internal_identifiers(
         ):
             if optional:
                 values.add(optional)
+        observation = evidence.observation
+        if observation is not None and isinstance(observation.data, dict):
+            for key, raw_value in observation.data.items():
+                normalized_key = str(key or "").strip().casefold()
+                if (
+                    normalized_key == "id"
+                    or normalized_key.endswith("_id")
+                    or normalized_key in {"plan_id", "request_id", "trace_id"}
+                ) and isinstance(raw_value, str):
+                    identifier = _normalize_text(raw_value)
+                    if identifier:
+                        values.add(identifier)
     return {value for value in values if value}
 
 
@@ -405,6 +412,7 @@ def _status_text(
     index: int,
     count: int,
     chinese: bool,
+    part_of_larger_request: bool,
 ) -> str:
     base = (
         _CHINESE_STATUS_TEXT[status]
@@ -412,6 +420,8 @@ def _status_text(
         else _ENGLISH_STATUS_TEXT[status]
     )
     if count == 1:
+        if status == "completed" and part_of_larger_request:
+            return "这一小步弄好啦。" if chinese else "That part is done."
         return base
 
     if chinese:
