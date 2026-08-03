@@ -26,6 +26,7 @@ def _write_trace(
         "schema_version": 1,
         "trace_id": f"trace_{name}",
         "state": "complete",
+        "started_at": "2026-07-21T00:00:00+00:00",
         "coverage": "partial",
         "correlations": {"session_id": name},
         "items": [
@@ -45,6 +46,66 @@ def _write_trace(
                 "started_at": "2026-07-21T00:00:00+00:00",
                 "finished_at": "2026-07-21T00:00:01+00:00",
                 "duration_ms": ollama_ms,
+                "status": "ok",
+                "attributes": {},
+                "links": [],
+            },
+            {
+                "trace_id": f"trace_{name}",
+                "item_id": f"item_stream_{name}",
+                "parent_item_id": None,
+                "name": "tts_stream_started",
+                "operation": None,
+                "kind": "milestone",
+                "module": {"name": "orchestrator.tts", "schema_version": 1},
+                "started_at": "2026-07-21T00:00:00.200000+00:00",
+                "finished_at": "2026-07-21T00:00:00.200000+00:00",
+                "duration_ms": 0.0,
+                "status": "ok",
+                "attributes": {},
+                "links": [],
+            },
+            {
+                "trace_id": f"trace_{name}",
+                "item_id": f"item_pcm_{name}",
+                "parent_item_id": None,
+                "name": "tts_first_provider_pcm",
+                "operation": None,
+                "kind": "milestone",
+                "module": {"name": "orchestrator.tts", "schema_version": 1},
+                "started_at": "2026-07-21T00:00:00.350000+00:00",
+                "finished_at": "2026-07-21T00:00:00.350000+00:00",
+                "duration_ms": 0.0,
+                "status": "ok",
+                "attributes": {},
+                "links": [],
+            },
+            {
+                "trace_id": f"trace_{name}",
+                "item_id": f"item_stream_end_{name}",
+                "parent_item_id": None,
+                "name": "tts_stream_finished",
+                "operation": None,
+                "kind": "milestone",
+                "module": {"name": "orchestrator.tts", "schema_version": 1},
+                "started_at": "2026-07-21T00:00:00.800000+00:00",
+                "finished_at": "2026-07-21T00:00:00.800000+00:00",
+                "duration_ms": 0.0,
+                "status": "ok",
+                "attributes": {},
+                "links": [],
+            },
+            {
+                "trace_id": f"trace_{name}",
+                "item_id": f"item_playback_{name}",
+                "parent_item_id": None,
+                "name": "first_audio_playback",
+                "operation": None,
+                "kind": "user_observable",
+                "module": {"name": "orchestrator.playback", "schema_version": 1},
+                "started_at": "2026-07-21T00:00:00.900000+00:00",
+                "finished_at": "2026-07-21T00:00:00.900000+00:00",
+                "duration_ms": 0.0,
                 "status": "ok",
                 "attributes": {},
                 "links": [],
@@ -150,6 +211,18 @@ class RuntimeTraceLatencyTests(unittest.TestCase):
                 "chromie.runtime.accelerator.accelerator_gpu_utilization_max_percent"
             ]["p50"],
             60.0,
+        )
+        self.assertEqual(
+            report["metrics"]["tts_first_provider_pcm_latency_ms"]["p50"],
+            350.0,
+        )
+        self.assertEqual(
+            report["metrics"]["provider_pcm_to_playback_gap_ms"]["p50"],
+            550.0,
+        )
+        self.assertEqual(
+            report["samples"][0]["milestones"]["stream_end_to_playback_gap_ms"],
+            100.0,
         )
 
     def test_gate_passes_and_fails_from_retained_reports(self) -> None:

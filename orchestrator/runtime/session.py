@@ -121,6 +121,7 @@ class SessionTracker:
         "tts_schedule",
         "tts_request_start",
         "tts_stream_start",
+        "tts_first_provider_pcm",
         "tts_stream_end",
         "tts_server_metrics",
         "tts_stream_failed",

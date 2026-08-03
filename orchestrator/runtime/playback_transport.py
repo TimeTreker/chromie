@@ -338,6 +338,30 @@ class PlaybackTransport:
                             if host.is_stale_playback(generation, session_id):
                                 return
                             if isinstance(msg, bytes):
+                                if msg and not audio_buffer:
+                                    first_pcm_latency_ms = now_ms() - tts_start_ms
+                                    host.sessions.trace_mark(
+                                        session_id,
+                                        "tts_first_provider_pcm",
+                                        attributes={
+                                            "order": order,
+                                            "attempt": attempt,
+                                            "first_chunk_bytes": len(msg),
+                                            "source_rate": source_rate,
+                                            "request_latency_ms": round(first_pcm_latency_ms, 3),
+                                        },
+                                    )
+                                    host.session_log(
+                                        session_id,
+                                        "tts_first_provider_pcm: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s",
+                                        order,
+                                        attempt,
+                                        max_attempts,
+                                        first_pcm_latency_ms,
+                                        len(msg),
+                                        source_rate,
+                                        generation,
+                                    )
                                 audio_buffer.extend(msg)
                                 continue
                             data = json.loads(msg)

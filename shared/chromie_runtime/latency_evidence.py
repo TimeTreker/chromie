@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-LATENCY_REPORT_SCHEMA_VERSION = 1
+LATENCY_REPORT_SCHEMA_VERSION = 2
 LATENCY_GATE_POLICY_SCHEMA_VERSION = 1
 LATENCY_GATE_RESULT_SCHEMA_VERSION = 1
 REPORT_TYPE = "chromie.runtime_trace_latency_report"
@@ -100,6 +100,60 @@ def _event_manifest(trace_path: Path) -> dict[str, Any]:
     return _read_json(path) if path.is_file() else {}
 
 
+
+def _parse_timestamp(value: Any) -> float | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() * 1000.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _milestone_latencies(trace: Mapping[str, Any]) -> dict[str, float | None]:
+    trace_start = _parse_timestamp(trace.get("started_at"))
+    starts: dict[str, list[float]] = defaultdict(list)
+    for item in trace.get("items") or []:
+        if not isinstance(item, Mapping):
+            continue
+        name = str(item.get("name") or "")
+        if name not in {
+            "tts_stream_started",
+            "tts_first_provider_pcm",
+            "tts_stream_finished",
+            "first_audio_playback",
+        }:
+            continue
+        started = _parse_timestamp(item.get("started_at"))
+        if started is not None:
+            starts[name].append(started)
+
+    def offset(name: str) -> float | None:
+        if trace_start is None or not starts.get(name):
+            return None
+        return max(0.0, min(starts[name]) - trace_start)
+
+    stream_start = offset("tts_stream_started")
+    first_pcm = offset("tts_first_provider_pcm")
+    stream_end = offset("tts_stream_finished")
+    playback = offset("first_audio_playback")
+    return {
+        "tts_stream_start_latency_ms": stream_start,
+        "tts_first_provider_pcm_latency_ms": first_pcm,
+        "tts_stream_end_latency_ms": stream_end,
+        "first_audio_playback_latency_ms": playback,
+        "provider_pcm_to_playback_gap_ms": (
+            max(0.0, playback - first_pcm)
+            if playback is not None and first_pcm is not None
+            else None
+        ),
+        "stream_end_to_playback_gap_ms": (
+            max(0.0, playback - stream_end)
+            if playback is not None and stream_end is not None
+            else None
+        ),
+    }
+
 def _numeric_resource_metrics(trace: Mapping[str, Any]) -> dict[str, float]:
     per_metric: dict[str, list[float]] = defaultdict(list)
     for item in trace.get("items") or []:
@@ -137,6 +191,7 @@ def build_latency_report(
     total_values: list[float] = []
     observable_values: list[float] = []
     item_values: list[float] = []
+    milestone_values: dict[str, list[float]] = defaultdict(list)
     module_values: dict[str, dict[str, list[float]]] = defaultdict(
         lambda: defaultdict(list)
     )
@@ -181,6 +236,10 @@ def build_latency_report(
         resource_metrics = _numeric_resource_metrics(trace)
         for name, value in resource_metrics.items():
             resource_values[name].append(value)
+        milestones = _milestone_latencies(trace)
+        for name, value in milestones.items():
+            if value is not None:
+                milestone_values[name].append(value)
         samples.append(
             {
                 "trace_id": str(trace.get("trace_id") or ""),
@@ -191,6 +250,10 @@ def build_latency_report(
                     round(observable, 3) if observable is not None else None
                 ),
                 "item_count": int(item_count),
+                "milestones": {
+                    name: (round(value, 3) if value is not None else None)
+                    for name, value in milestones.items()
+                },
                 "correlations": dict(trace.get("correlations") or {}),
                 "event": {
                     "event_id": manifest.get("event_id"),
@@ -244,6 +307,10 @@ def build_latency_report(
             "total_duration_ms": distribution(total_values),
             "first_user_observable_latency_ms": distribution(observable_values),
             "item_count": distribution(item_values),
+            **{
+                name: distribution(values)
+                for name, values in sorted(milestone_values.items())
+            },
         },
         "module_metrics": {
             module: {
