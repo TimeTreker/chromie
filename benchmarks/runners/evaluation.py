@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from benchmarks.runners.models import ExecutionObservation, RunProfile
+from benchmarks.runners.oracles import oracle_policy_for_scenario
 
 
 def evaluate_boundaries(
@@ -15,6 +16,7 @@ def evaluate_boundaries(
     """
 
     expectations = scenario.get("expectations", {})
+    oracle_policy = oracle_policy_for_scenario(scenario)
     required_invariants = tuple(expectations.get("invariants", []))
     reported = {item.name: item for item in observation.invariant_results}
     invariant_results: list[dict[str, Any]] = []
@@ -40,8 +42,7 @@ def evaluate_boundaries(
         )
 
     hard_failure = any(not item["passed"] for item in invariant_results)
-    primary_declared = bool(expectations.get("primary_outcomes"))
-    semantic_review_required = primary_declared and observation.primary_task_passed is None
+    semantic_review_required = oracle_policy.mode in {"semantic_review", "hybrid"}
     if observation.primary_task_passed is False:
         hard_failure = True
 
@@ -69,6 +70,11 @@ def evaluate_boundaries(
         "evaluation": {
             "semantic_review_required": semantic_review_required,
             "forbidden_behavior_hits": forbidden_hits,
+            "oracle_policy": oracle_policy.to_dict(),
+            "deterministic_status": "fail" if hard_failure else "pass",
+            "semantic_review_status": (
+                "pending" if semantic_review_required else "not_required"
+            ),
         },
         "invariant_results": invariant_results,
         "artifacts": list(observation.artifacts),

@@ -51,6 +51,20 @@ safe-idle evidence.
 Partial evidence does not turn a failed run into a pass. It improves diagnosis
 and preserves the strongest claim actually supported.
 
+## Hybrid oracle evaluation
+
+E2E evidence profiles own transport and evidence strength, not semantic truth.
+Objective facts such as provider completion, correlation, playback lifecycle,
+audio transcript similarity, safe idle, and exactly-once delivery are evaluated
+deterministically. Intent understanding, relevance, naturalness, continuity,
+and identity/style quality use the declared semantic-review rubric.
+
+The same E2E run may therefore be mechanically complete while its scenario
+status remains `review`. Package the retained result and artifacts with
+`python -m benchmarks.review package`, then apply the reviewed JSON with
+`python -m benchmarks.review apply`. See
+[Hybrid oracle execution](CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execution).
+
 ## Timing observations
 
 Profiles require markers appropriate to their input and execution level. The

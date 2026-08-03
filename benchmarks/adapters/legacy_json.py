@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from benchmarks.contracts import ContractError, NormalizedScenario, SourceReference
+from benchmarks.contracts import (
+    ContractError,
+    NormalizedScenario,
+    OraclePolicy,
+    SourceReference,
+)
 
 ID_KEYS = ("id", "scenario_id", "case_id", "test_id", "name")
 INPUT_KEYS = (
@@ -28,6 +33,7 @@ FORBIDDEN_KEYS = ("forbidden", "forbidden_behavior", "forbidden_behaviors")
 INVARIANT_KEYS = ("invariants", "required_invariants")
 DISTRIBUTION_KEYS = ("distribution_observations", "distribution_expectations")
 RUBRIC_KEYS = ("review_rubric", "rubric", "qualitative_review")
+ORACLE_KEYS = ("oracle_policy", "oracle")
 
 
 @dataclass(frozen=True)
@@ -172,6 +178,7 @@ class LegacyJsonAdapter:
             item = dict(raw_item)
             scenario_id, source_id = _stable_id(context, item, index)
             primary = _as_strings(_first(item, PRIMARY_KEYS))
+            explicit_primary = bool(primary)
             auxiliary = _as_strings(_first(item, AUXILIARY_KEYS))
             forbidden = _as_strings(_first(item, FORBIDDEN_KEYS))
             invariants = _as_strings(_first(item, INVARIANT_KEYS)) or list(inherited_invariants)
@@ -183,6 +190,39 @@ class LegacyJsonAdapter:
             if not isinstance(capabilities, (str, list, tuple)):
                 capabilities = []
             rubric = _first(item, RUBRIC_KEYS)
+            explicit_oracle = _first(item, ORACLE_KEYS)
+            if explicit_oracle is not None and not isinstance(explicit_oracle, Mapping):
+                raise ContractError(
+                    f"{context.source_path}[{index}].oracle_policy must be an object"
+                )
+            if isinstance(explicit_oracle, Mapping):
+                oracle_policy: OraclePolicy | Mapping[str, Any] = explicit_oracle
+            else:
+                deterministic_sources: list[str] = []
+                if legacy:
+                    deterministic_sources.append("legacy_expectations")
+                if invariants:
+                    deterministic_sources.append("invariants")
+                if forbidden:
+                    deterministic_sources.append("forbidden_behaviors")
+                dimensions: list[str] = []
+                if isinstance(rubric, Mapping):
+                    dimensions = _as_strings(rubric.get("dimensions"))
+                if explicit_primary and not dimensions:
+                    dimensions = ["primary_outcome"]
+                if deterministic_sources and dimensions:
+                    mode = "hybrid"
+                elif dimensions:
+                    mode = "semantic_review"
+                else:
+                    mode = "deterministic"
+                    if not deterministic_sources:
+                        deterministic_sources.append("primary_task_observation")
+                oracle_policy = OraclePolicy.create(
+                    mode=mode,
+                    deterministic_sources=deterministic_sources,
+                    semantic_dimensions=dimensions,
+                )
             normalized.append(
                 NormalizedScenario.create(
                     id=scenario_id,
@@ -205,6 +245,7 @@ class LegacyJsonAdapter:
                     evidence_requirements=context.evidence_requirements,
                     review_rubric=rubric if isinstance(rubric, Mapping) else {},
                     legacy_expectations=legacy,
+                    oracle_policy=oracle_policy,
                 )
             )
         return normalized

@@ -66,8 +66,11 @@ The repository keeps both conventional tests and benchmarks.
 - A benchmark may reuse deterministic assertions, but deterministic assertions
   must guard boundaries rather than replace semantic reasoning.
 - A live LLM is the system under evaluation, not the sole pass/fail judge.
-  Machine-checkable contracts and retained evidence provide the primary gates;
-  optional model critique may support reviewed qualitative analysis.
+  Machine-checkable contracts and retained evidence own objective boundaries;
+  declared semantic dimensions use a separate retained LLM or human review.
+- Every normalized scenario declares or derives an oracle mode:
+  `deterministic`, `semantic_review`, or `hybrid`. Existing unit/module fixtures
+  remain deterministic and are not pushed behind an LLM judge.
 
 ## 4. Layered architecture
 
@@ -230,6 +233,10 @@ the interaction.
 
 ## 7. Evaluation model
 
+Deterministic evaluation runs before semantic review and cannot be overridden by
+it. A semantic scenario remains `review` until a retained reviewer result is
+applied.
+
 ### 7.1 Hard gates
 
 Hard gates remain deterministic and architecture-owned:
@@ -261,7 +268,80 @@ not a single expected string or gesture. A scenario may define:
 Exact wording should be asserted only when the text itself is a contract, such
 as an explicit safety notice or protocol token.
 
-### 7.3 Distribution metrics
+An executor's own `primary_task_passed=true` is not sufficient to pass a
+declared semantic oracle. The evaluator must review the retained conversation,
+plans, evidence, delivered speech, and relevant artifacts.
+
+### 7.3 Hybrid oracle execution
+
+Every normalized scenario declares or derives one oracle mode:
+
+- `deterministic` for schemas, fixtures, exact arguments, state transitions,
+  evidence, signal thresholds, and transport facts;
+- `semantic_review` for intent, relevance, naturalness, continuity, empathy,
+  and identity/style quality;
+- `hybrid` for realistic integration and E2E cases that require both.
+
+Existing Level A and module fixtures remain deterministic and are not routed
+through an LLM evaluator. Legacy expectations, invariants, and forbidden effects
+remain authoritative for the objective facts they own. Exact text is required
+only when the text itself is a protocol contract.
+
+Hybrid execution is:
+
+```text
+scenario execution
+-> deterministic boundary evaluation
+-> retained result and correlated artifacts
+-> semantic review bundle for pending cases
+-> LLM or human review JSON
+-> non-overridable adjudication
+-> final suite report
+```
+
+Package pending semantic cases and artifacts:
+
+```bash
+python -m benchmarks.review package \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --report benchmarks/reports/run.json \
+  --artifact-root .chromie/acceptance/run-id \
+  --include .chromie/acceptance/run-id/logs \
+  --output-dir .chromie/review/run-id \
+  --archive ~/Downloads/chromie-review-run-id.tar.gz
+```
+
+The reviewer returns versioned JSON with one `pass`, `partial`, `fail`, or
+`insufficient_evidence` verdict per scenario, rationale, declared-dimension
+judgments, and evidence references. Apply it with:
+
+```bash
+python -m benchmarks.review apply \
+  --report benchmarks/reports/run.json \
+  --reviews reviews.json \
+  --output benchmarks/reports/run-reviewed.json
+```
+
+`partial` and `insufficient_evidence` remain `review`. A deterministic failure
+always remains `fail`; semantic review may diagnose it but cannot convert it to
+pass. The reviewer is evaluation-only and never participates in production
+cognition.
+
+The bilingual closed-loop runner follows the same contract. TTS/ASR transport,
+playback capture, CER/WER, process health, and lifecycle facts are deterministic.
+Injected workflow meaning is packaged for semantic review rather than judged by
+phrase lists. It can retain Python logs, all Compose logs, Git/runtime identity,
+GPU diagnostics, audio artifacts, and one review archive without requiring an
+operator's voice:
+
+```bash
+python scripts/closed_loop_e2e.py \
+  --start-services \
+  --capture auto \
+  --archive ~/Downloads/chromie-closed-loop-review.tar.gz
+```
+
+### 7.4 Distribution metrics
 
 Repeated and cohort runs report behavior distributions. Initial metric families
 include:

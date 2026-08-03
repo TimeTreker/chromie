@@ -11,6 +11,7 @@ import numpy as np
 from scripts.closed_loop_e2e import (
     AudioData,
     ClosedLoopCase,
+    closed_loop_review_bundle,
     expected_term_result,
     parse_cases,
     primary_error,
@@ -72,6 +73,23 @@ class ClosedLoopE2ETests(unittest.TestCase):
         )
         self.assertFalse(expected_term_result(case, "I like the weather.")["passed"])
 
+    def test_hybrid_workflow_does_not_use_phrase_matching_as_semantic_truth(self) -> None:
+        case = ClosedLoopCase(
+            case_id="family",
+            language="en-US",
+            text="question",
+            speaker_id="chromie_en",
+            max_error_rate=0.4,
+            expected_any=("help",),
+            oracle_mode="hybrid",
+            deterministic_sources=("audio_transport",),
+            primary_outcomes=("Answer how Chromie helps her family",),
+            semantic_dimensions=("intent_understanding",),
+        )
+        result = expected_term_result(case, "Any natural answer is reviewed later.")
+        self.assertTrue(result["passed"])
+        self.assertFalse(result["applied"])
+
     def test_resample_pcm16_changes_sample_count(self) -> None:
         source_rate = 24000
         samples = np.arange(source_rate, dtype=np.int16)
@@ -96,6 +114,64 @@ class ClosedLoopE2ETests(unittest.TestCase):
             for row in payload[key]
         }
         self.assertEqual(languages, {"zh", "en"})
+        self.assertTrue(
+            all(
+                row["oracle_policy"]["mode"] == "deterministic"
+                for row in payload["transport_cases"]
+            )
+        )
+        self.assertTrue(
+            all(
+                row["oracle_policy"]["mode"] == "hybrid"
+                for row in payload["workflow_cases"]
+            )
+        )
+        self.assertTrue(
+            all("expected_any" not in row for row in payload["workflow_cases"])
+        )
+
+    def test_closed_loop_review_bundle_uses_external_semantic_review(self) -> None:
+        case = ClosedLoopCase(
+            case_id="family",
+            language="en-US",
+            text="How do you help?",
+            speaker_id="chromie_en",
+            max_error_rate=0.4,
+            oracle_mode="hybrid",
+            deterministic_sources=("audio_transport",),
+            primary_outcomes=("Answer how Chromie helps her family",),
+            semantic_dimensions=("intent_understanding", "naturalness"),
+            review_rubric={"dimensions": ["intent_understanding", "naturalness"]},
+        )
+        bundle = closed_loop_review_bundle(
+            [case],
+            [
+                {
+                    "id": "family",
+                    "status": "review",
+                    "mechanical_passed": True,
+                    "semantic_review_required": True,
+                    "oracle_policy": {
+                        "mode": "hybrid",
+                        "deterministic_sources": ["audio_transport"],
+                        "semantic_dimensions": ["intent_understanding", "naturalness"],
+                        "semantic_blocking": True,
+                    },
+                    "delivered_text": "I help my family remember and organize things.",
+                    "delivered_speech_events": [{"text": "I help my family."}],
+                    "captured_transcript": "I help my family.",
+                    "metrics": {"wer": 0.0},
+                    "audio_passed": True,
+                    "artifacts": ["result.json"],
+                    "error": None,
+                }
+            ],
+        )
+        self.assertEqual(bundle["scenarios"][0]["review_reason"], "semantic_adjudication")
+        self.assertEqual(
+            bundle["scenarios"][0]["review_request"]["semantic_dimensions"],
+            ["intent_understanding", "naturalness"],
+        )
 
 
 if __name__ == "__main__":

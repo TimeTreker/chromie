@@ -61,6 +61,18 @@ declared IDs and legacy expectations, records source provenance, and derives a
 stable content ID only when the source has no ID. Adapters do not execute a
 scenario and do not interpret user phrases.
 
+Every normalized case also declares or derives `oracle_policy`:
+
+- `deterministic` for fixtures, schemas, exact tool arguments, lifecycle,
+  evidence, signal, and transport truth;
+- `semantic_review` for meaning and qualitative interaction judgment;
+- `hybrid` when both authorities are required.
+
+Existing deterministic runners remain authoritative. Semantic review is a
+separate retained adjudication phase and cannot override a deterministic
+failure. See
+[hybrid oracle execution](../docs/CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execution).
+
 After generating the inventory, check all JSON scenario adapters with:
 
 ```bash
@@ -90,6 +102,26 @@ invariants, explicit `primary_task_passed`, and exact forbidden-behavior labels.
 Naturalness, empathy, style fit, and other semantic dimensions are returned as
 `review` when no reviewed evaluator supplies a result. Missing required invariant
 evidence fails closed.
+
+Package pending semantic cases and their correlated artifacts:
+
+```bash
+python -m benchmarks.review package \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --report benchmarks/reports/run.json \
+  --artifact-root .chromie/acceptance/run-id \
+  --output-dir .chromie/review/run-id \
+  --archive ~/Downloads/chromie-review-run-id.tar.gz
+```
+
+Apply a retained LLM or human review without weakening hard gates:
+
+```bash
+python -m benchmarks.review apply \
+  --report benchmarks/reports/run.json \
+  --reviews reviews.json \
+  --output benchmarks/reports/run-reviewed.json
+```
 
 Run a module cohort from the generated inventory:
 

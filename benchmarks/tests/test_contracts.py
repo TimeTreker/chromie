@@ -7,7 +7,12 @@ import pytest
 
 from benchmarks.adapters.legacy_json import normalize_payload
 from benchmarks.adapters.normalize import normalize_inventory
-from benchmarks.contracts import ContractError, NormalizedScenario, SourceReference
+from benchmarks.contracts import (
+    ContractError,
+    NormalizedScenario,
+    OraclePolicy,
+    SourceReference,
+)
 
 
 def test_common_contract_keeps_behavior_regions_separate() -> None:
@@ -22,9 +27,39 @@ def test_common_contract_keeps_behavior_regions_separate() -> None:
         forbidden_behaviors=["locomotion", "repeated auxiliary behavior"],
         invariants=["primary response is not delayed"],
         distribution_observations=["record auxiliary selection"],
+        review_rubric={"dimensions": ["primary_outcome"]},
     ).to_dict()
     assert scenario["expectations"]["acceptable_auxiliary"][0] == "none"
     assert scenario["expectations"]["invariants"] == ["primary response is not delayed"]
+    assert scenario["oracle_policy"]["mode"] == "hybrid"
+    assert scenario["oracle_policy"]["semantic_dimensions"] == ["primary_outcome"]
+
+
+def test_explicit_deterministic_oracle_keeps_fixture_truth_authoritative() -> None:
+    scenario = NormalizedScenario.create(
+        id="module.fixture.001",
+        layer="module",
+        datasets=["goal_interpretation"],
+        source=SourceReference(path="fixture.json", adapter="test"),
+        inputs={"user_text": "weather"},
+        primary_outcomes=["preserved human-readable description"],
+        legacy_expectations={"expected_route": "tool"},
+        oracle_policy=OraclePolicy.create(
+            mode="deterministic",
+            deterministic_sources=["legacy_expectations"],
+        ),
+    ).to_dict()
+    assert scenario["oracle_policy"] == {
+        "mode": "deterministic",
+        "deterministic_sources": ["legacy_expectations"],
+        "semantic_dimensions": [],
+        "semantic_blocking": True,
+    }
+
+
+def test_oracle_contract_rejects_missing_semantic_dimensions() -> None:
+    with pytest.raises(ContractError, match="requires semantic_dimensions"):
+        OraclePolicy.create(mode="hybrid", deterministic_sources=["fixture"])
 
 
 def test_legacy_list_preserves_declared_id_and_expectation() -> None:
@@ -39,6 +74,7 @@ def test_legacy_list_preserves_declared_id_and_expectation() -> None:
     assert cases[0]["inputs"] == {"user_text": "重庆天气如何？"}
     assert cases[0]["legacy_expectations"]["expected_route"] == "tool"
     assert cases[0]["source"]["source_id"] == "goal_interpretation.weather.zh"
+    assert cases[0]["oracle_policy"]["mode"] == "deterministic"
 
 
 def test_legacy_container_and_single_case_are_supported() -> None:

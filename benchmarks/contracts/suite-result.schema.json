@@ -35,6 +35,15 @@
           "error": {"type": "string"}
         }
       }
+    },
+    "semantic_review_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer", "review_count"],
+      "properties": {
+        "reviewer": {"type": "object"},
+        "review_count": {"type": "integer", "minimum": 0}
+      }
     }
   }
 }

@@ -160,7 +160,9 @@ def invoke(request):
         executor,
         E2ERunProfile(run_id="callable", evidence_profile=evidence_profile),
     ).run([case])
-    assert report["summary"]["pass"] == 1
+    assert report["summary"]["review"] == 1
+    assert report["results"][0]["evaluation"]["deterministic_status"] == "pass"
+    assert report["results"][0]["evaluation"]["semantic_review_status"] == "pending"
     assert report["summary"]["evidence_complete"] == 1
     assert report["summary"]["social_attention_lifecycle"]["proposal_state"] == {
         "none": 1

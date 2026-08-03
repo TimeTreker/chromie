@@ -145,6 +145,42 @@
           "items": {
             "type": "string"
           }
+        },
+        "oracle_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "deterministic_sources",
+            "semantic_dimensions",
+            "semantic_blocking"
+          ],
+          "properties": {
+            "mode": {
+              "enum": ["deterministic", "semantic_review", "hybrid"]
+            },
+            "deterministic_sources": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1}
+            },
+            "semantic_dimensions": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1}
+            },
+            "semantic_blocking": {"type": "boolean"}
+          }
+        },
+        "deterministic_status": {
+          "enum": ["pass", "fail"]
+        },
+        "semantic_review_status": {
+          "enum": ["not_required", "pending", "pass", "partial", "fail", "insufficient_evidence"]
+        },
+        "semantic_review": {
+          "type": "object"
+        },
+        "semantic_review_effect": {
+          "enum": ["accepted", "diagnostic_only", "requires_follow_up"]
         }
       }
     }

@@ -9,7 +9,7 @@ from benchmarks.runners.executors import CommandExecutor, ReplayExecutor
 from benchmarks.runners.models import RunProfile
 
 
-def _scenario(**expectation_overrides):
+def _scenario(*, oracle_policy=None, **expectation_overrides):
     expectations = {
         "primary_outcomes": ["complete the requested task"],
         "acceptable_auxiliary": ["none"],
@@ -31,6 +31,13 @@ def _scenario(**expectation_overrides):
         "evidence_requirements": ["replay"],
         "review_rubric": {},
         "legacy_expectations": {},
+        "oracle_policy": oracle_policy
+        or {
+            "mode": "deterministic",
+            "deterministic_sources": ["replay_fixture", "invariants"],
+            "semantic_dimensions": [],
+            "semantic_blocking": True,
+        },
     }
 
 
@@ -84,9 +91,48 @@ def test_subjective_primary_outcome_enters_review() -> None:
             }
         ),
         RunProfile("replay", "replay"),
-    ).run([_scenario()])
+    ).run(
+        [
+            _scenario(
+                oracle_policy={
+                    "mode": "hybrid",
+                    "deterministic_sources": ["invariants"],
+                    "semantic_dimensions": ["primary_outcome", "naturalness"],
+                    "semantic_blocking": True,
+                }
+            )
+        ]
+    )
     assert report["results"][0]["status"] == "review"
     assert report["results"][0]["evaluation"]["semantic_review_required"] is True
+
+
+def test_semantic_oracle_cannot_be_short_circuited_by_executor_pass_flag() -> None:
+    report = BenchmarkRunner(
+        ReplayExecutor(
+            {
+                "case.001": {
+                    "primary_task_passed": True,
+                    "invariant_results": {"explicit action has priority": True},
+                }
+            }
+        ),
+        RunProfile("replay", "replay"),
+    ).run(
+        [
+            _scenario(
+                oracle_policy={
+                    "mode": "hybrid",
+                    "deterministic_sources": ["invariants"],
+                    "semantic_dimensions": ["intent_understanding"],
+                    "semantic_blocking": True,
+                }
+            )
+        ]
+    )
+    assert report["results"][0]["status"] == "review"
+    assert report["results"][0]["evaluation"]["deterministic_status"] == "pass"
+    assert report["results"][0]["evaluation"]["semantic_review_status"] == "pending"
 
 
 def test_command_executor_uses_json_boundary(tmp_path: Path) -> None:

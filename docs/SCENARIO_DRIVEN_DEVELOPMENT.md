@@ -37,6 +37,12 @@ invariants. LLMs may help generate and diversify candidate scenarios, but a
 reviewer must reject cases that encode phrase-to-action mappings or teach the
 runtime to the test.
 
+Scenario truth is hybrid where appropriate. Simple module, contract, transport,
+and lifecycle facts keep exact fixture/assertion authority. Semantic interaction
+quality is reviewed by an LLM or human from retained evidence. A scenario must
+not use phrase lists as a substitute for judging intent or naturalness. See
+[Hybrid oracle execution](CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execution).
+
 Existing scenario directories remain authoritative during staged migration.
 The benchmark inventory will index and classify them before any physical move.
 

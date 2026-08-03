@@ -17,6 +17,10 @@ claim.
   status documents.
 - Prefer user-outcome acceptance for release behavior and use internal-path
   assertions only for component qualification.
+- Keep deterministic module/unit truth in fixtures and executable assertions;
+  do not route objective tests through an LLM reviewer.
+- Use semantic review only for declared qualitative dimensions, and retain the
+  deterministic and semantic verdicts separately in hybrid reports.
 
 ## Audit commands
 

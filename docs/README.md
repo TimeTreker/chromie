@@ -63,6 +63,7 @@ When documents disagree, correct the lower-authority document.
 | Which component owns semantic planning for each entrypoint? | `docs/SEMANTIC_AUTHORITY.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
+| Which tests use exact fixture truth and which require reviewed semantic judgment? | `docs/CHROMIE_BENCHMARK_SUITE.md` Section 7.3 |
 | What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
 | Which evidence-first stabilization and post-evidence simplification Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
 | How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |

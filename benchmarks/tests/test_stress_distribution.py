@@ -221,7 +221,7 @@ def test_stress_runner_preserves_order_and_passes_harness_metadata() -> None:
         _e2e_manifest().get("replay_text"),
     ).run(_social_cases())
     assert report["summary"]["samples"] == 6
-    assert report["summary"]["pass"] == 6
+    assert report["summary"]["review"] == 6
     assert [item["sample"]["index"] for item in report["results"]] == list(range(6))
     assert report["qualification"]["release_qualified"] is False
     assert report["qualification"]["runtime_policy_authority"] is False

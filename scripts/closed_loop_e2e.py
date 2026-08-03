@@ -19,12 +19,14 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import logging
 import math
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 import uuid
@@ -51,6 +53,7 @@ from scripts.evaluate_asr_accuracy import (  # noqa: E402
     normalize_text,
     word_tokens,
 )
+from benchmarks.review.bundle import build_review_bundle  # noqa: E402
 
 DEFAULT_MANIFEST = ROOT / "benchmarks" / "manifests" / "closed_loop_e2e_v1.json"
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "acceptance" / "closed-loop-e2e"
@@ -65,6 +68,11 @@ class ClosedLoopCase:
     max_error_rate: float
     expected_any: tuple[str, ...] = ()
     expected_all: tuple[str, ...] = ()
+    oracle_mode: str = "deterministic"
+    deterministic_sources: tuple[str, ...] = ("audio_transport",)
+    primary_outcomes: tuple[str, ...] = ()
+    semantic_dimensions: tuple[str, ...] = ()
+    review_rubric: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +252,123 @@ def write_json(path: Path, payload: Any) -> None:
     )
 
 
+def install_python_log_capture(path: Path) -> logging.Handler:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s %(threadName)s %(message)s"
+        )
+    )
+    logging.getLogger().addHandler(handler)
+    return handler
+
+
+def collect_command(
+    output: Path,
+    command: Sequence[str],
+    *,
+    cwd: Path = ROOT,
+) -> dict[str, Any]:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        completed = subprocess.run(
+            list(command),
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+        rendered = completed.stdout
+        if completed.stderr:
+            rendered += "\n--- stderr ---\n" + completed.stderr
+        output.write_text(rendered, encoding="utf-8")
+        return {
+            "command": list(command),
+            "returncode": completed.returncode,
+            "artifact": str(output),
+        }
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        output.write_text(f"{type(exc).__name__}: {exc}\n", encoding="utf-8")
+        return {
+            "command": list(command),
+            "returncode": None,
+            "error": f"{type(exc).__name__}: {exc}",
+            "artifact": str(output),
+        }
+
+
+def copy_redacted_env(source: Path, target: Path) -> None:
+    sensitive_fragments = (
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "PASSWD",
+        "API_KEY",
+        "CREDENTIAL",
+        "PRIVATE_KEY",
+    )
+    rendered: list[str] = []
+    for raw_line in source.read_text(encoding="utf-8").splitlines():
+        if "=" not in raw_line or raw_line.lstrip().startswith("#"):
+            rendered.append(raw_line)
+            continue
+        key, value = raw_line.split("=", 1)
+        if any(fragment in key.upper() for fragment in sensitive_fragments):
+            value = "<redacted>"
+        rendered.append(f"{key}={value}")
+    target.write_text("\n".join(rendered) + "\n", encoding="utf-8")
+
+
+def collect_run_diagnostics(output_dir: Path) -> list[dict[str, Any]]:
+    diagnostics_dir = output_dir / "diagnostics"
+    commands = [
+        ("git-status.txt", ["git", "status", "--short"]),
+        ("git-revision.txt", ["git", "rev-parse", "HEAD"]),
+        (
+            "docker-compose-ps.txt",
+            ["docker", "compose", "--env-file", ".env.runtime", "ps"],
+        ),
+        (
+            "docker-compose-logs.txt",
+            [
+                "docker",
+                "compose",
+                "--env-file",
+                ".env.runtime",
+                "logs",
+                "--no-color",
+                "--timestamps",
+            ],
+        ),
+        ("nvidia-smi.txt", ["nvidia-smi"]),
+    ]
+    records = [
+        collect_command(diagnostics_dir / name, command)
+        for name, command in commands
+    ]
+    for candidate in (
+        ROOT / ".chromie" / "runtime_profile.json",
+        ROOT / ".env.runtime",
+    ):
+        if candidate.exists():
+            target = diagnostics_dir / candidate.name
+            if candidate.name.startswith(".env"):
+                copy_redacted_env(candidate, target)
+            else:
+                shutil.copy2(candidate, target)
+            records.append(
+                {
+                    "command": None,
+                    "returncode": 0,
+                    "artifact": str(target),
+                    "source": str(candidate),
+                }
+            )
+    return records
+
+
 def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
     rows = payload.get(key)
     if not isinstance(rows, list):
@@ -252,6 +377,22 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"manifest {key} item must be an object")
+        oracle = row.get("oracle_policy") or {}
+        if not isinstance(oracle, dict):
+            raise ValueError(f"manifest {key} oracle_policy must be an object")
+        mode = str(oracle.get("mode") or "deterministic")
+        deterministic_sources = tuple(
+            str(v) for v in oracle.get("deterministic_sources", ["audio_transport"])
+        )
+        semantic_dimensions = tuple(
+            str(v) for v in oracle.get("semantic_dimensions", [])
+        )
+        if mode not in {"deterministic", "semantic_review", "hybrid"}:
+            raise ValueError(f"manifest {key} has unknown oracle mode {mode!r}")
+        if mode in {"deterministic", "hybrid"} and not deterministic_sources:
+            raise ValueError(f"manifest {key} {mode} oracle needs deterministic_sources")
+        if mode in {"semantic_review", "hybrid"} and not semantic_dimensions:
+            raise ValueError(f"manifest {key} {mode} oracle needs semantic_dimensions")
         cases.append(
             ClosedLoopCase(
                 case_id=str(row["id"]),
@@ -261,6 +402,15 @@ def parse_cases(payload: dict[str, Any], key: str) -> list[ClosedLoopCase]:
                 max_error_rate=float(row.get("max_error_rate", 0.35)),
                 expected_any=tuple(str(v) for v in row.get("expected_any", [])),
                 expected_all=tuple(str(v) for v in row.get("expected_all", [])),
+                oracle_mode=mode,
+                deterministic_sources=deterministic_sources,
+                primary_outcomes=tuple(str(v) for v in row.get("primary_outcomes", [])),
+                semantic_dimensions=semantic_dimensions,
+                review_rubric=(
+                    dict(row.get("review_rubric") or {})
+                    if isinstance(row.get("review_rubric") or {}, dict)
+                    else None
+                ),
             )
         )
     return cases
@@ -387,6 +537,21 @@ def choose_capture_backend(
 
 
 def expected_term_result(case: ClosedLoopCase, text: str) -> dict[str, Any]:
+    """Evaluate explicit phrase contracts only for deterministic cases.
+
+    Semantic workflow cases must use the retained semantic review bundle instead
+    of phrase matching.
+    """
+
+    if case.oracle_mode != "deterministic":
+        return {
+            "expected_any": [],
+            "expected_all": [],
+            "any_ok": True,
+            "all_ok": True,
+            "passed": True,
+            "applied": False,
+        }
     normalized = normalize_text(text)
     any_ok = not case.expected_any or any(
         normalize_text(term) in normalized for term in case.expected_any
@@ -398,6 +563,7 @@ def expected_term_result(case: ClosedLoopCase, text: str) -> dict[str, Any]:
         "any_ok": any_ok,
         "all_ok": all_ok,
         "passed": any_ok and all_ok,
+        "applied": True,
     }
 
 
@@ -465,6 +631,12 @@ async def run_transport_case(
         "language": case.language,
         "source_text": case.text,
         "speaker_id": case.speaker_id,
+        "oracle_policy": {
+            "mode": case.oracle_mode,
+            "deterministic_sources": list(case.deterministic_sources),
+            "semantic_dimensions": list(case.semantic_dimensions),
+            "semantic_blocking": True,
+        },
         "capture_backend": capture.name,
         "source_wav": str(source_wav),
         "captured_wav": str(captured_wav),
@@ -479,6 +651,9 @@ async def run_transport_case(
             "metrics": playback_metrics,
             "passed": playback_passed,
         },
+        "mechanical_passed": digital_passed and playback_passed,
+        "semantic_review_required": False,
+        "status": "pass" if digital_passed and playback_passed else "fail",
         "passed": digital_passed and playback_passed,
     }
 
@@ -566,7 +741,15 @@ async def run_workflow_case(
             metrics["error_rate"] <= case.max_error_rate
         )
         semantic = expected_term_result(case, delivered_text)
-        passed = audio_passed and semantic["passed"]
+        mechanical_passed = audio_passed and semantic["passed"]
+        semantic_review_required = case.oracle_mode in {"semantic_review", "hybrid"}
+        status = (
+            "fail"
+            if not mechanical_passed
+            else "review"
+            if semantic_review_required
+            else "pass"
+        )
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         delivered_events = assistant._delivered_turn_speech_events(sid)
@@ -579,7 +762,9 @@ async def run_workflow_case(
         metrics = transcript_metrics(case.language, delivered_text, hypothesis)
         semantic = expected_term_result(case, delivered_text)
         audio_passed = False
-        passed = False
+        mechanical_passed = False
+        semantic_review_required = case.oracle_mode in {"semantic_review", "hybrid"}
+        status = "fail"
         trimmed_wav = case_dir / "playback-capture-trimmed.wav"
     finally:
         await assistant.cleanup()
@@ -593,14 +778,170 @@ async def run_workflow_case(
         "captured_transcript": hypothesis,
         "metrics": metrics,
         "semantic_expectations": semantic,
+        "oracle_policy": {
+            "mode": case.oracle_mode,
+            "deterministic_sources": list(case.deterministic_sources),
+            "semantic_dimensions": list(case.semantic_dimensions),
+            "semantic_blocking": True,
+        },
+        "primary_outcomes": list(case.primary_outcomes),
+        "review_rubric": dict(case.review_rubric or {}),
+        "semantic_review_required": semantic_review_required,
+        "semantic_review_status": (
+            "pending" if semantic_review_required and status != "fail" else "not_required"
+        ),
         "audio_passed": audio_passed,
+        "mechanical_passed": mechanical_passed,
         "captured_wav": str(captured_wav),
         "trimmed_wav": str(trimmed_wav),
+        "artifacts": [
+            str(case_dir / "session-events.jsonl"),
+            str(captured_wav),
+            str(trimmed_wav),
+            str(case_dir / "result.json"),
+        ],
         "error": error or None,
-        "passed": passed,
+        "status": status,
+        "passed": status == "pass",
     }
     write_json(case_dir / "result.json", result)
     return result
+
+
+def closed_loop_review_bundle(
+    workflow_cases: Sequence[ClosedLoopCase],
+    workflow_results: Sequence[dict[str, Any]],
+) -> dict[str, Any]:
+    cases_by_id = {case.case_id: case for case in workflow_cases}
+    normalized_cases: list[dict[str, Any]] = []
+    suite_results: list[dict[str, Any]] = []
+    for result in workflow_results:
+        case = cases_by_id[str(result["id"])]
+        normalized_cases.append(
+            {
+                "schema_version": 1,
+                "id": case.case_id,
+                "layer": "e2e",
+                "datasets": ["closed_loop_audio", "bilingual_and_asr_noise"],
+                "source": {
+                    "path": "benchmarks/manifests/closed_loop_e2e_v1.json",
+                    "adapter": "closed_loop_e2e_v1",
+                    "source_index": None,
+                    "source_id": case.case_id,
+                },
+                "inputs": {
+                    "user_text": case.text,
+                    "language": case.language,
+                },
+                "context": {},
+                "capabilities": [],
+                "expectations": {
+                    "primary_outcomes": list(case.primary_outcomes),
+                    "acceptable_auxiliary": [],
+                    "forbidden_behaviors": [],
+                    "invariants": [
+                        "generated speech is delivered through playback",
+                        "captured playback substantially matches delivered speech",
+                    ],
+                    "distribution_observations": [],
+                },
+                "evidence_requirements": ["live_service"],
+                "review_rubric": dict(case.review_rubric or {}),
+                "legacy_expectations": {},
+                "oracle_policy": {
+                    "mode": case.oracle_mode,
+                    "deterministic_sources": list(case.deterministic_sources),
+                    "semantic_dimensions": list(case.semantic_dimensions),
+                    "semantic_blocking": True,
+                },
+            }
+        )
+        invariant_results = [
+            {
+                "name": "generated speech is delivered through playback",
+                "passed": bool(result.get("delivered_text")),
+                "detail": None if result.get("delivered_text") else "no delivered speech",
+            },
+            {
+                "name": "captured playback substantially matches delivered speech",
+                "passed": bool(result.get("audio_passed")),
+                "detail": (
+                    None
+                    if result.get("audio_passed")
+                    else f"audio metric={result.get('metrics')}"
+                ),
+            },
+        ]
+        deterministic_failed = not bool(result.get("mechanical_passed"))
+        semantic_required = bool(result.get("semantic_review_required"))
+        suite_results.append(
+            {
+                "schema_version": 1,
+                "scenario_id": case.case_id,
+                "status": str(result.get("status") or "fail"),
+                "run": {
+                    "mode": "live_model",
+                    "evidence_level": "live_service",
+                    "model": None,
+                    "prompt_revision": None,
+                    "metadata": {"transport": "closed_loop_playback_asr"},
+                },
+                "observations": {
+                    "primary_task_passed": None if semantic_required else not deterministic_failed,
+                    "primary_outcome": result.get("delivered_text"),
+                    "auxiliary_behavior": None,
+                    "behaviors": [],
+                    "latency_ms": None,
+                    "social_attention_lifecycle": {},
+                    "evidence": [
+                        {
+                            "delivered_speech_events": result.get(
+                                "delivered_speech_events"
+                            ),
+                            "captured_transcript": result.get("captured_transcript"),
+                            "audio_metrics": result.get("metrics"),
+                            "error": result.get("error"),
+                        }
+                    ],
+                },
+                "evaluation": {
+                    "semantic_review_required": semantic_required,
+                    "forbidden_behavior_hits": [],
+                    "oracle_policy": result.get("oracle_policy"),
+                    "deterministic_status": (
+                        "fail" if deterministic_failed else "pass"
+                    ),
+                    "semantic_review_status": (
+                        "pending" if semantic_required else "not_required"
+                    ),
+                },
+                "invariant_results": invariant_results,
+                "artifacts": list(result.get("artifacts") or []),
+            }
+        )
+    report = {
+        "schema_version": 1,
+        "run": {
+            "mode": "live_model",
+            "evidence_level": "live_service",
+            "model": None,
+            "prompt_revision": None,
+            "metadata": {"transport": "closed_loop_playback_asr"},
+        },
+        "summary": {
+            "total": len(suite_results),
+            "pass": sum(item["status"] == "pass" for item in suite_results),
+            "fail": sum(item["status"] == "fail" for item in suite_results),
+            "review": sum(item["status"] == "review" for item in suite_results),
+            "error": 0,
+        },
+        "results": suite_results,
+        "errors": [],
+    }
+    return build_review_bundle(
+        {"schema_version": 1, "cases": normalized_cases},
+        report,
+    )
 
 
 def filter_language(cases: Iterable[ClosedLoopCase], languages: set[str]) -> list[ClosedLoopCase]:
@@ -655,6 +996,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     workflow_cases = filter_language(parse_cases(manifest, "workflow_cases"), languages)
     output_dir = (args.output_dir or DEFAULT_OUTPUT_ROOT / utc_id()).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    log_handler = install_python_log_capture(output_dir / "logs" / "python-runtime.log")
     input_device = parse_device(args.input_device)
 
     transport_results: list[dict[str, Any]] = []
@@ -680,8 +1022,27 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 await run_workflow_case(case, output_dir=output_dir, args=args)
             )
 
+    review_bundle = closed_loop_review_bundle(workflow_cases, workflow_results)
+    write_json(output_dir / "semantic-review-bundle.json", review_bundle)
+    diagnostics = (
+        collect_run_diagnostics(output_dir) if args.collect_diagnostics else []
+    )
+    mechanical_passed = all(
+        bool(row.get("passed")) for row in transport_results
+    ) and all(bool(row.get("mechanical_passed")) for row in workflow_results)
+    semantic_review_pending = any(
+        bool(row.get("semantic_review_required")) and row.get("status") != "fail"
+        for row in workflow_results
+    )
+    status = (
+        "fail"
+        if not mechanical_passed
+        else "review"
+        if semantic_review_pending
+        else "pass"
+    )
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "qualification_id": manifest.get("qualification_id"),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source_revision": subprocess.check_output(
@@ -691,17 +1052,36 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "capture_requested": args.capture,
         "transport": transport_results,
         "workflow": workflow_results,
-        "passed": all(row["passed"] for row in [*transport_results, *workflow_results]),
+        "mechanical_passed": mechanical_passed,
+        "semantic_review_pending": semantic_review_pending,
+        "status": status,
+        "passed": status == "pass",
+        "collection_succeeded": mechanical_passed,
         "human_voice_required": False,
         "operator_pronunciation_graded": False,
+        "semantic_truth_source": "external_llm_or_human_review",
+        "deterministic_truth_source": "declared_fixtures_contracts_and_invariants",
+        "semantic_review_bundle": str(output_dir / "semantic-review-bundle.json"),
+        "diagnostics": diagnostics,
         "claim": (
             "Automated generated-speech closed-loop evidence. It validates bilingual "
-            "TTS/ASR transport and captured workflow playback; it does not claim "
-            "human speech-recognition accuracy."
+            "TTS/ASR transport and captured workflow playback. Mechanical boundaries "
+            "are evaluated deterministically; semantic workflow quality remains pending "
+            "external LLM or human review. It does not claim human speech-recognition "
+            "accuracy."
         ),
         "output_dir": str(output_dir),
     }
     write_json(output_dir / "summary.json", payload)
+    if args.archive:
+        archive_path = args.archive.resolve()
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(archive_path, "w:gz") as archive:
+            archive.add(output_dir, arcname=output_dir.name)
+        payload["archive"] = str(archive_path)
+        write_json(output_dir / "summary.json", payload)
+    logging.getLogger().removeHandler(log_handler)
+    log_handler.close()
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return payload
 
@@ -728,6 +1108,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workflow-timeout", type=float, default=300.0)
     parser.add_argument("--transport-only", action="store_true")
     parser.add_argument("--workflow-only", action="store_true")
+    parser.add_argument(
+        "--collect-diagnostics",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Collect Git, Docker, runtime-profile, and GPU diagnostics.",
+    )
+    parser.add_argument(
+        "--archive",
+        type=Path,
+        help="Optional .tar.gz path containing the complete evidence directory.",
+    )
     parser.add_argument("--start-services", action="store_true")
     parser.add_argument("--stop-services", action="store_true")
     return parser
@@ -744,7 +1135,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     finally:
         if args.stop_services:
             stop_services()
-    return 0 if payload["passed"] else 2
+    # Semantic review pending is a successful collection state, not a failed
+    # mechanical qualification. External review decides the final verdict.
+    return 0 if payload["collection_succeeded"] else 2
 
 
 if __name__ == "__main__":

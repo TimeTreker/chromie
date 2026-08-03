@@ -42,6 +42,54 @@
     },
     "evidence_requirements": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["static", "replay", "live_model", "live_service", "simulated", "physical", "unknown"]}},
     "review_rubric": {"type": "object"},
-    "legacy_expectations": {"type": "object"}
+    "legacy_expectations": {"type": "object"},
+    "oracle_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "deterministic_sources", "semantic_dimensions", "semantic_blocking"],
+      "properties": {
+        "mode": {"enum": ["deterministic", "semantic_review", "hybrid"]},
+        "deterministic_sources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "semantic_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "semantic_blocking": {"type": "boolean"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "deterministic"}}},
+          "then": {
+            "properties": {
+              "deterministic_sources": {"minItems": 1},
+              "semantic_dimensions": {"maxItems": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"mode": {"const": "semantic_review"}}},
+          "then": {
+            "properties": {
+              "deterministic_sources": {"maxItems": 0},
+              "semantic_dimensions": {"minItems": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"mode": {"const": "hybrid"}}},
+          "then": {
+            "properties": {
+              "deterministic_sources": {"minItems": 1},
+              "semantic_dimensions": {"minItems": 1}
+            }
+          }
+        }
+      ]
+    }
   }
 }

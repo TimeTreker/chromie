@@ -13,6 +13,17 @@ Examples include deterministic reflex behavior, Goal Association output,
 Planner prompt capture through the model-client boundary, Capability execution,
 and grounded failure speech.
 
+Behavioral ownership is split by truth type:
+
+- objective schemas, fixtures, exact arguments, lifecycle transitions, signal
+  thresholds, and evidence invariants remain deterministic assertions;
+- meaning, relevance, naturalness, continuity, and identity/style quality use
+  a declared semantic-review oracle over retained evidence;
+- hybrid scenarios run both, and semantic review cannot override a failed
+  deterministic boundary.
+
+See [Hybrid oracle execution](CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execution).
+
 ## Architecture policy tests
 
 Forbidden architecture is owned by dependency-light AST or structured policy
