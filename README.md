@@ -201,7 +201,19 @@ semantic-review evidence plus host/container/GPU/audio logs, run:
 
 The comprehensive collector never requires operator speech. It is fail-soft so
 failed checks remain in the uploadable archive, and it never grants release
-qualification by itself.
+qualification by itself. For important prompt, reasoning, memory, routing,
+response, or audio changes, retain clean before/after archives. Semantic bundles
+may be judged independently by several configured model families:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --semantic-reviewers .chromie/semantic-reviewers.json
+```
+
+Copy `benchmarks/manifests/semantic_reviewers.example.json`, verify current
+provider model/base-URL values, assign honest model-family identities, enable
+selected profiles, and keep API keys in environment variables. See the
+[Benchmark Suite](docs/CHROMIE_BENCHMARK_SUITE.md#731-independent-multi-llm-adjudication).
 
 Higher-level evidence commands and claim rules are in
 [Acceptance and Evidence](docs/ACCEPTANCE.md). Current simulator operational

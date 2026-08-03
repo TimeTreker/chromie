@@ -126,12 +126,46 @@ python -m benchmarks.review package \
   --archive ~/Downloads/chromie-review-run-id.tar.gz
 ```
 
-Apply a retained LLM or human review without weakening hard gates:
+Run several independent API reviewers over the same evidence capsule:
+
+```bash
+cp benchmarks/manifests/semantic_reviewers.example.json \
+  .chromie/semantic-reviewers.json
+# Edit current model/base URL values, enable selected profiles, and export keys.
+
+python -m benchmarks.review judge \
+  --bundle .chromie/review/run-id \
+  --reviewers .chromie/semantic-reviewers.json \
+  --output-dir .chromie/review/run-id/judgments
+```
+
+The supported provider protocols are OpenAI Responses, Anthropic Messages, and
+OpenAI-compatible Chat Completions. Each profile declares `model_family`; the
+consensus threshold counts distinct families rather than reviewer aliases.
+DeepSeek, Kimi/Moonshot, local gateways, or other compatible services use the
+last form with their current documented base URL and model. No provider model
+name is permanent repository truth.
+
+Aggregate reviews produced manually or by separate systems:
+
+```bash
+python -m benchmarks.review aggregate \
+  --reviews reviews-openai.json \
+  --reviews reviews-claude.json \
+  --reviews reviews-deepseek.json \
+  --policy majority \
+  --minimum-reviewers 3 \
+  --minimum-model-families 3 \
+  --output ensemble-reviews.json
+```
+
+Apply a retained individual, ensemble, or human review without weakening hard
+gates:
 
 ```bash
 python -m benchmarks.review apply \
   --report benchmarks/reports/run.json \
-  --reviews reviews.json \
+  --reviews ensemble-reviews.json \
   --output benchmarks/reports/run-reviewed.json
 ```
 

@@ -4,17 +4,48 @@
   "title": "Chromie Semantic Benchmark Review",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "reviewer", "reviews"],
+  "required": [
+    "schema_version",
+    "reviewer",
+    "reviews"
+  ],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {
+      "const": 1
+    },
     "reviewer": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "properties": {
-        "kind": {"enum": ["llm", "human", "llm_assisted_human"]},
-        "model": {"type": ["string", "null"]},
-        "reviewer_id": {"type": ["string", "null"]}
+        "kind": {
+          "enum": [
+            "llm",
+            "human",
+            "llm_assisted_human",
+            "llm_ensemble"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewer_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "reviews": {
@@ -22,18 +53,48 @@
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["scenario_id", "verdict", "rationale", "evidence_refs"],
+        "required": [
+          "scenario_id",
+          "verdict",
+          "rationale",
+          "evidence_refs"
+        ],
         "properties": {
-          "scenario_id": {"type": "string", "minLength": 1},
-          "verdict": {"enum": ["pass", "partial", "fail", "insufficient_evidence"]},
-          "rationale": {"type": "string", "minLength": 1},
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "enum": [
+              "pass",
+              "partial",
+              "fail",
+              "insufficient_evidence"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
           "evidence_refs": {
             "type": "array",
-            "items": {"type": "string", "minLength": 1}
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "dimensions": {"type": "object"},
-          "findings": {"type": "array"},
-          "likely_root_causes": {"type": "array", "items": {"type": "string"}}
+          "dimensions": {
+            "type": "object"
+          },
+          "findings": {
+            "type": "array"
+          },
+          "likely_root_causes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     }

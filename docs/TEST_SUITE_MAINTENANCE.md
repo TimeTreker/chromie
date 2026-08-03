@@ -27,6 +27,18 @@ claim.
   schema they already own.
 - Keep `scripts/qualification/run_comprehensive_test.sh --dry-run` side-effect
   free and update its command contract whenever a maintained entrypoint changes.
+- For prompt, model, reasoning, memory, routing, capability, response, audio, or
+  lifecycle changes, retain clean before/after comprehensive archives and use the
+  same scenario cohort and evidence profile to detect capability degradation.
+- Use at least three genuinely different model families for important semantic
+  regression review when cost and privacy permit. Keep individual reviews,
+  prompt/model provenance, and disagreement; do not replace them with one score.
+- Keep API reviewer profiles outside committed secrets. Configuration may name
+  an API-key environment variable, but no API key may enter Git, command logs,
+  review reports, or evidence archives.
+- Treat reviewer timeout, missing credentials, malformed JSON, or provider
+  outage as review-infrastructure failure. It must not be mislabeled as Chromie
+  pass or fail.
 
 ## Audit commands
 

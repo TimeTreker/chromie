@@ -327,6 +327,145 @@ always remains `fail`; semantic review may diagnose it but cannot convert it to
 pass. The reviewer is evaluation-only and never participates in production
 cognition.
 
+#### 7.3.1 Independent multi-LLM adjudication
+
+Semantic review may be performed by one retained reviewer, a human, or several
+independent model families. Chromie supports three provider protocols without
+making any provider part of production cognition:
+
+- `openai_responses` for the OpenAI Responses API;
+- `anthropic_messages` for the Anthropic Messages API;
+- `openai_chat_completions` for compatible providers and gateways, including
+  configured DeepSeek or Kimi/Moonshot endpoints.
+
+Provider model names and compatible base URLs change over time, so the repository
+does not declare one permanent model as the semantic truth. Copy and edit the
+example configuration, enable only profiles whose current provider settings have
+been verified, and keep API keys only in environment variables:
+
+```bash
+cp benchmarks/manifests/semantic_reviewers.example.json \
+  .chromie/semantic-reviewers.json
+
+export OPENAI_API_KEY='...'
+export ANTHROPIC_API_KEY='...'
+export DEEPSEEK_API_KEY='...'
+export MOONSHOT_API_KEY='...'
+```
+
+Every enabled profile must declare an honest `model_family`. The configured
+`minimum_model_families` threshold prevents several aliases, snapshots, or
+gateways for one underlying family from satisfying diversity by themselves.
+
+Validate prompt construction without sending evidence to any provider:
+
+```bash
+python -m benchmarks.review judge \
+  --bundle .chromie/review/run-id \
+  --reviewers .chromie/semantic-reviewers.json \
+  --output-dir .chromie/review/run-id/judgments \
+  --dry-run
+```
+
+Run every enabled reviewer independently and generate an ensemble review:
+
+```bash
+python -m benchmarks.review judge \
+  --bundle .chromie/review/run-id \
+  --reviewers .chromie/semantic-reviewers.json \
+  --output-dir .chromie/review/run-id/judgments
+```
+
+Each judge receives the same prompt protocol, scenario, execution result, and
+bounded retained-evidence capsule. Judges do not see one another's verdicts.
+Every request records reviewer/model identity, prompt digest, response digest,
+request ID when available, returned model, and latency, but never records the API
+key. Individual `reviews.json` files remain authoritative evidence even when an
+ensemble is generated.
+
+For reviews produced manually in ChatGPT, Claude, Kimi, DeepSeek, or another web
+interface, give every retained reviewer a stable `reviewer_id` and
+`model_family`, save each valid review JSON separately, and aggregate them
+locally:
+
+```bash
+python -m benchmarks.review aggregate \
+  --reviews reviews-openai.json \
+  --reviews reviews-claude.json \
+  --reviews reviews-deepseek.json \
+  --policy majority \
+  --minimum-reviewers 3 \
+  --minimum-model-families 3 \
+  --output ensemble-reviews.json
+```
+
+Supported consensus policies are:
+
+- `majority`: requires a strict majority; a tie or split without a strict
+  majority becomes `insufficient_evidence`;
+- `unanimous`: accepts a verdict only when every available judge agrees;
+- `conservative`: any `fail` dominates, followed by `partial`, then
+  `insufficient_evidence`, then `pass`.
+
+Consensus is not a new semantic authority. The ensemble retains every vote and
+agreement ratio, cannot override deterministic failure, and should be sent to a
+human or stronger tie-break review when important judges disagree. Different
+aliases or replicas of one model family do not count as independent diversity;
+`minimum_model_families` enforces this mechanically.
+A model used by Chromie may participate as one evaluator, but it must not be the
+sole evaluator of its own behavior.
+
+Apply the ensemble through the same adjudication boundary:
+
+```bash
+python -m benchmarks.review apply \
+  --report benchmarks/reports/run.json \
+  --reviews ensemble-reviews.json \
+  --output benchmarks/reports/run-reviewed.json
+```
+
+External API judging transmits the bounded evidence capsule to the configured
+provider. Review logs and artifacts for private conversation, credentials, or
+family information before enabling it. The manual archive workflow remains the
+preferred path when evidence must not leave the operator-selected review
+channel.
+
+#### 7.3.2 Big-change capability-degradation protocol
+
+Before a change that can alter model prompts, reasoning, routing, memory,
+capability selection, response composition, audio flow, or lifecycle behavior:
+
+1. Commit a clean baseline and run
+   `scripts/qualification/run_comprehensive_test.sh`.
+2. Retain the baseline archive, check ledger, normalized scenario inventory,
+   deterministic report, semantic bundle, reviewer configuration, individual
+   reviews, and ensemble review.
+3. Make the change and rerun from a clean committed revision with the same
+   scenario cohort, evidence profiles, capture mode, reviewer roster, consensus
+   policy, and prompt-protocol version.
+4. Compare deterministic failures first. No semantic score or consensus may
+   hide a new schema, safety, evidence, lifecycle, transport, or exactly-once
+   failure.
+5. Compare per-scenario semantic verdicts, dimension verdicts, judge
+   disagreement, latency/resource distributions, and newly insufficient
+   evidence. Aggregate score alone is not a regression explanation.
+6. Investigate every new fail, pass-to-partial transition, disagreement spike,
+   or evidence loss using the correlated logs before changing expectations.
+7. If the reviewer roster or provider model revisions changed, report that
+   separately; do not attribute all score movement to Chromie source changes.
+
+For an opt-in automatic multi-judge run, supply the same reviewer configuration
+to the comprehensive collector:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --semantic-reviewers .chromie/semantic-reviewers.json
+```
+
+The collector still packages evidence when an API judge fails or times out. A
+missing judge or unavailable key is a review-infrastructure failure, not a
+Chromie semantic failure.
+
 The bilingual closed-loop runner follows the same contract. TTS/ASR transport,
 playback capture, CER/WER, process health, and lifecycle facts are deterministic.
 Injected workflow meaning is packaged for semantic review rather than judged by

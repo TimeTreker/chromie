@@ -2,14 +2,14 @@
 
 **Status authority:** this file owns current implementation, automatic verification, target-validation, and deployment claims.
 **Development identity:** `development`; no release version or publication target is planned.
-**Status refresh date:** 2026-08-02
+**Status refresh date:** 2026-08-03
 **Active Issue:** **Close Current-Revision Target Evidence**. The canonical local gate and live-voice verifier are implemented; physical validation remains open because the current microphone has not produced an intelligible utterance for the narrow retained claim. Archive-based source-verifiable sustainability slices do not change that evidence owner or create target claims.
 
 Chromie’s current runtime is Goal-driven and has one semantic authority. The Host
 validates and executes; it does not replace LLM reasoning with phrase rules.
 Soridormi remains the physical safety and embodiment authority.
 
-Bounded sustainability slices now include four operator modes and a generated configuration inventory, package-scoped shared-contract Mypy selection, two consolidated observability documents, no dated in-tree archives, `VoiceAssistant` structure ratchets, and an explicit direct-LLM rollback boundary disabled in maintained modes. These are source implementation/test claims, not requalification evidence.
+Bounded sustainability slices now include four operator modes and a generated configuration inventory, package-scoped shared-contract Mypy selection, two consolidated observability documents, no dated in-tree archives, `VoiceAssistant` structure ratchets, and an explicit direct-LLM rollback boundary disabled in maintained modes. The benchmark layer also retains deterministic fixture truth, bilingual generated-speech closed-loop evidence, provider-neutral independent semantic reviews, and non-overridable ensemble adjudication for before/after capability-degradation analysis. These are source implementation/test claims, not requalification evidence.
 
 A final core-principle audit removed Host-owned semantic delegation, phrase/
 regex motion and pose agents, catalog phrase-action boosts, weather-specific

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/semantic-reviewers-v1.json",
+  "title": "Chromie Semantic Reviewer Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reviewers",
+    "consensus"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "reviewers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "protocol",
+          "base_url",
+          "model",
+          "model_family",
+          "api_key_env"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "protocol": {
+            "enum": [
+              "openai_responses",
+              "openai_chat_completions",
+              "anthropic_messages"
+            ]
+          },
+          "base_url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "api_key_env": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timeout_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "temperature": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 2
+          },
+          "anthropic_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extra_headers": {
+            "type": "object"
+          },
+          "extra_body": {
+            "type": "object"
+          },
+          "model_family": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "consensus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "minimum_reviewers",
+        "minimum_model_families"
+      ],
+      "properties": {
+        "policy": {
+          "enum": [
+            "majority",
+            "unanimous",
+            "conservative"
+          ]
+        },
+        "minimum_reviewers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_model_families": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

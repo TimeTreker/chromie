@@ -25,8 +25,8 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
-- Added a no-operator-speech comprehensive qualification collector that composes
-  existing test owners and retains revision-bound, hash-indexed review evidence.
+- Added a no-operator-speech comprehensive qualification collector plus
+  provider-neutral, provenance-bound multi-LLM degradation review.
 - Added hybrid benchmark oracles and bilingual closed-loop review bundles:
   objective fixture/audio/evidence checks remain deterministic, semantic quality
   uses retained LLM/human review, and hard-gate failures remain non-overridable.

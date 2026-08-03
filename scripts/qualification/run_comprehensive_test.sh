@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="1.2.0"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -37,6 +37,8 @@ E2E_TIMEOUT_S=2400
 GPU_LOAD_REQUESTS=20
 TTS_REPEAT=8
 DOCKER_LOG_SINCE=""
+SEMANTIC_REVIEWERS=""
+SEMANTIC_REVIEWER_IDS=()
 
 usage() {
   cat <<'USAGE'
@@ -65,14 +67,16 @@ Options:
   --e2e-timeout SECONDS       Per closed-loop run timeout (default: 2400)
   --tts-repeat N              TTS benchmark repetitions (default: 8)
   --gpu-load-requests N       Ollama requests during contention (default: 20)
+  --semantic-reviewers PATH   Opt in to external multi-LLM semantic adjudication
+  --semantic-reviewer ID      Select one configured reviewer (repeatable)
   -h, --help                  Show this help
 
 Output:
   ~/Downloads/chromie-comprehensive-<revision>-<UTC_RUN_ID>.tar.gz
   ~/Downloads/chromie-comprehensive-<revision>-<UTC_RUN_ID>.tar.gz.sha256
 
-Upload the archive to ChatGPT for semantic scenario adjudication and root-cause
-analysis. Review it first because runtime/ASR logs may contain private content.
+Review the archive with a chosen LLM/human or use --semantic-reviewers for an
+independent model ensemble. Inspect it first because logs may contain private content.
 USAGE
 }
 
@@ -97,6 +101,8 @@ while (($#)); do
     --e2e-timeout) E2E_TIMEOUT_S="${2:?--e2e-timeout needs seconds}"; shift 2 ;;
     --tts-repeat) TTS_REPEAT="${2:?--tts-repeat needs a number}"; shift 2 ;;
     --gpu-load-requests) GPU_LOAD_REQUESTS="${2:?--gpu-load-requests needs a number}"; shift 2 ;;
+    --semantic-reviewers) SEMANTIC_REVIEWERS="${2:?--semantic-reviewers needs a path}"; shift 2 ;;
+    --semantic-reviewer) SEMANTIC_REVIEWER_IDS+=("${2:?--semantic-reviewer needs an id}"); shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[comprehensive][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -121,6 +127,21 @@ REPO_DIR="$(cd "$REPO_DIR" 2>/dev/null && pwd)" || {
 }
 cd "$REPO_DIR"
 mkdir -p "$DOWNLOAD_DIR"
+
+if ((${#SEMANTIC_REVIEWER_IDS[@]} > 0)) && [[ -z "$SEMANTIC_REVIEWERS" ]]; then
+  echo "[comprehensive][error] --semantic-reviewer requires --semantic-reviewers" >&2
+  exit 2
+fi
+
+if [[ -n "$SEMANTIC_REVIEWERS" ]]; then
+  if [[ "$SEMANTIC_REVIEWERS" != /* ]]; then
+    SEMANTIC_REVIEWERS="$REPO_DIR/$SEMANTIC_REVIEWERS"
+  fi
+  [[ -f "$SEMANTIC_REVIEWERS" ]] || {
+    echo "[comprehensive][error] Semantic reviewer config not found: $SEMANTIC_REVIEWERS" >&2
+    exit 2
+  }
+fi
 
 required_files=(
   scripts/run_source_qualification.py
@@ -150,6 +171,7 @@ Capture mode:     $CAPTURE_MODE
 Languages:        $LANGUAGES
 Allow dirty:      $ALLOW_DIRTY
 Collect only:     $COLLECT_ONLY
+Semantic judges:  ${SEMANTIC_REVIEWERS:-disabled}
 
 Phases:
   0. Record revision, host, audio, Docker, GPU, and runner identity.
@@ -158,7 +180,8 @@ Phases:
   3. Build/start maintained services and run GPU/TTS health checks.
   4. Run bilingual generated-speech closed-loop E2E and package semantic evidence.
   5. Repeat TTS and workflow E2E under bounded shared-GPU load.
-  6. Collect all program/container logs, artifacts, hashes, and one uploadable archive.
+  6. Optionally run independent configured LLM judges and aggregate consensus.
+  7. Collect all program/container logs, artifacts, hashes, and one uploadable archive.
 
 Objective fixtures, contracts, and invariants remain deterministic truth.
 Semantic dimensions remain pending retained LLM or human adjudication.
@@ -322,6 +345,8 @@ python_command=$(printf '%q ' "${PYTHON_CMD[@]}")
 human_voice_required=false
 operator_pronunciation_graded=false
 collect_only=$COLLECT_ONLY
+semantic_reviewers_config=${SEMANTIC_REVIEWERS:-disabled}
+semantic_reviewer_ids=$(IFS=,; echo "${SEMANTIC_REVIEWER_IDS[*]}")
 EOF
 
 # ---------------------------------------------------------------------------
@@ -573,7 +598,39 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Phase 6: complete correlated process/container evidence for this run window.
+# Phase 6: optional independent multi-LLM semantic adjudication.
+# ---------------------------------------------------------------------------
+if [[ -n "$SEMANTIC_REVIEWERS" ]]; then
+  cp "$SEMANTIC_REVIEWERS" "$SYSTEM_ROOT/semantic-reviewers.json"
+  sha256sum "$SYSTEM_ROOT/semantic-reviewers.json" \
+    > "$SYSTEM_ROOT/semantic-reviewers.json.sha256"
+  review_bundle_count=0
+  while IFS= read -r review_bundle; do
+    [[ -n "$review_bundle" ]] || continue
+    review_bundle_count=$((review_bundle_count + 1))
+    review_name="$(safe_name "$(basename "$(dirname "$review_bundle")")")"
+    review_output="$RESULT_ROOT/semantic-judgments/$review_name"
+    judge_args=("${PYTHON_CMD[@]}" -m benchmarks.review judge
+      --bundle "$review_bundle"
+      --reviewers "$SEMANTIC_REVIEWERS"
+      --output-dir "$review_output")
+    for reviewer_id in "${SEMANTIC_REVIEWER_IDS[@]}"; do
+      judge_args+=(--reviewer "$reviewer_id")
+    done
+    run_capture semantic_review "multi-LLM review $review_name" "$E2E_TIMEOUT_S" \
+      "${judge_args[@]}"
+  done < <(find "$E2E_ROOT" -type f -name 'semantic-review-bundle.json' -print | sort)
+  if (( review_bundle_count == 0 )); then
+    record_skip semantic_review "multi-LLM semantic adjudication" \
+      "No semantic-review-bundle.json was produced by the selected E2E phases."
+  fi
+else
+  record_skip semantic_review "multi-LLM semantic adjudication" \
+    "No --semantic-reviewers configuration was supplied; retained bundles remain available for manual review."
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 7: complete correlated process/container evidence for this run window.
 # ---------------------------------------------------------------------------
 run_shell_capture collection "final process snapshot" 120 "ps -eo pid,ppid,etimes,%cpu,%mem,stat,comm,args --sort=-%cpu | head -300"
 run_shell_capture collection "final GPU snapshot" 120 "nvidia-smi || true"
@@ -643,9 +700,10 @@ audio captures, ASR transcripts, and source/runtime identity.
 
 No operator voice or pronunciation judgment was used.
 
-Upload the complete .tar.gz archive to ChatGPT. Semantic-review scenarios must
-be judged from their retained evidence; deterministic failures remain failures
-and cannot be overridden by semantic review.
+Review the complete archive with one model or use --semantic-reviewers to run
+independent API judges. Semantic-review scenarios must be judged from retained
+evidence; deterministic failures remain failures and cannot be overridden by
+semantic review or consensus.
 
 Privacy: review the archive before uploading. ASR, conversation, and container
 logs may contain private content. Secret-like values from .env.runtime are
@@ -693,6 +751,24 @@ for summary_path in sorted((root / "e2e").glob("**/summary.json")):
             "workflow": payload.get("workflow_summary"),
         }
     )
+semantic_judgments = []
+for judge_path in sorted((root / "semantic-judgments").glob("**/judge-report.json")):
+    try:
+        payload = json.loads(judge_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        semantic_judgments.append(
+            {"path": str(judge_path.relative_to(root)), "parse_error": str(exc)}
+        )
+        continue
+    semantic_judgments.append(
+        {
+            "path": str(judge_path.relative_to(root)),
+            "complete": payload.get("complete"),
+            "selected_reviewers": payload.get("selected_reviewers"),
+            "reviewers": payload.get("reviewers"),
+            "consensus": payload.get("consensus"),
+        }
+    )
 report = {
     "schema_version": 1,
     "runner": "scripts/qualification/run_comprehensive_test.sh",
@@ -709,7 +785,8 @@ report = {
     "counts": counts,
     "checks": checks,
     "closed_loop_runs": closed_loop,
-    "semantic_truth_source": "external_llm_or_human_review",
+    "semantic_judgments": semantic_judgments,
+    "semantic_truth_source": "configured_multi_llm_ensemble_or_external_llm_or_human_review",
     "deterministic_truth_source": "declared_fixtures_contracts_and_invariants",
     "release_qualified": False,
 }

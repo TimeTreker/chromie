@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "reviewers": [
+    {
+      "id": "openai-reviewer",
+      "enabled": false,
+      "protocol": "openai_responses",
+      "base_url": "https://api.openai.com/v1",
+      "model": "REPLACE_WITH_CURRENT_OPENAI_MODEL",
+      "api_key_env": "OPENAI_API_KEY",
+      "timeout_s": 180,
+      "max_output_tokens": 4096,
+      "temperature": 0,
+      "model_family": "openai"
+    },
+    {
+      "id": "claude-reviewer",
+      "enabled": false,
+      "protocol": "anthropic_messages",
+      "base_url": "https://api.anthropic.com/v1",
+      "model": "REPLACE_WITH_CURRENT_CLAUDE_MODEL",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "timeout_s": 180,
+      "max_output_tokens": 4096,
+      "temperature": 0,
+      "model_family": "anthropic-claude"
+    },
+    {
+      "id": "deepseek-reviewer",
+      "enabled": false,
+      "protocol": "openai_chat_completions",
+      "base_url": "https://api.deepseek.com",
+      "model": "REPLACE_WITH_CURRENT_DEEPSEEK_MODEL",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "timeout_s": 180,
+      "max_output_tokens": 4096,
+      "temperature": 0,
+      "model_family": "deepseek"
+    },
+    {
+      "id": "kimi-reviewer",
+      "enabled": false,
+      "protocol": "openai_chat_completions",
+      "base_url": "https://REPLACE_WITH_CURRENT_KIMI_OPENAI_COMPATIBLE_BASE_URL",
+      "model": "REPLACE_WITH_CURRENT_KIMI_MODEL",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "timeout_s": 180,
+      "max_output_tokens": 4096,
+      "temperature": 0,
+      "model_family": "moonshot-kimi"
+    }
+  ],
+  "consensus": {
+    "policy": "majority",
+    "minimum_reviewers": 3,
+    "minimum_model_families": 3
+  }
+}

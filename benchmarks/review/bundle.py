@@ -201,6 +201,7 @@ def write_review_bundle(
         "reviewer": {
             "kind": "llm",
             "model": None,
+            "model_family": None,
             "reviewer_id": None,
         },
         "reviews": [
@@ -232,7 +233,13 @@ def write_review_bundle(
         "Fill review-template.json with pass, partial, fail, or "
         "insufficient_evidence.\n"
         "Do not override deterministic failures or require exact conversational "
-        "wording.\n",
+        "wording.\n"
+        "For independent API judges, run: python -m benchmarks.review judge "
+        "--bundle . --reviewers <config.json> --output-dir judgments\n"
+        "For separately produced reviews, run: python -m benchmarks.review "
+        "aggregate --reviews <one.json> --reviews <two.json> "
+        "--minimum-model-families 2 --output "
+        "ensemble-reviews.json\n",
         encoding="utf-8",
     )
     if archive_path is not None:

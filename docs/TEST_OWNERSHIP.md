@@ -46,6 +46,13 @@ checks its executable bit, shell syntax, help contract, and side-effect-free
 evidence; it cannot introduce expected model answers or override benchmark
 oracles.
 
+Multi-LLM judging is also evaluation tooling rather than scenario truth.
+`benchmarks/review/providers.py` owns provider transport, `prompting.py` owns the
+versioned evidence capsule, `consensus.py` owns vote aggregation, and
+`adjudicate.py` remains the only boundary that can apply a retained semantic
+review to a suite report. Provider profiles cannot alter scenario definitions,
+deterministic fixtures, or production runtime behavior.
+
 ## Enforcement
 
 Run:

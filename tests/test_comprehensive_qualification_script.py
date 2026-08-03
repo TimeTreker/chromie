@@ -37,6 +37,33 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn("No operator speech is used", completed.stdout)
         self.assertIn("--collect-only", completed.stdout)
         self.assertIn("--dry-run", completed.stdout)
+        self.assertIn("--semantic-reviewers", completed.stdout)
+        self.assertIn("independent model ensemble", completed.stdout)
+
+
+    def test_dry_run_accepts_repository_owned_reviewer_configuration(self) -> None:
+        config = ROOT / "benchmarks" / "manifests" / "semantic_reviewers.example.json"
+        completed = subprocess.run(
+            [
+                str(SCRIPT),
+                "--repo",
+                str(ROOT),
+                "--semantic-reviewers",
+                str(config),
+                "--dry-run",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(str(config), completed.stdout)
+        self.assertIn(
+            "Optionally run independent configured LLM judges",
+            completed.stdout,
+        )
 
     def test_dry_run_preserves_oracle_ownership_and_runs_no_hardware(self) -> None:
         completed = subprocess.run(

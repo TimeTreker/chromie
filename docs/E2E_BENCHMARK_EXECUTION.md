@@ -141,5 +141,27 @@ archive. Semantic results remain pending review and deterministic failures remai
 non-overridable. Use `--dry-run` to inspect the plan or `--collect-only` to
 package an already-running system without executing tests.
 
+Optionally run independent semantic judges during the same comprehensive
+collection. This is opt-in because bounded scenario evidence is sent to the
+configured external providers:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --capture auto \
+  --languages zh,en \
+  --semantic-reviewers .chromie/semantic-reviewers.json
+```
+
+The reviewer configuration declares protocols, base URLs, model names, explicit
+model-family identities, and API key environment-variable names. It contains no
+keys. The collector invokes the
+same `benchmarks.review judge` boundary used for standalone review, retains every
+individual verdict and raw response, generates consensus when the configured
+minimum succeeds, and packages failures without converting them into runtime
+failures. See
+[Independent multi-LLM adjudication](CHROMIE_BENCHMARK_SUITE.md#731-independent-multi-llm-adjudication)
+and
+[Big-change capability-degradation protocol](CHROMIE_BENCHMARK_SUITE.md#732-big-change-capability-degradation-protocol).
+
 The command adapter contract is documented in
 [`benchmarks/e2e/README.md`](../benchmarks/e2e/README.md).
