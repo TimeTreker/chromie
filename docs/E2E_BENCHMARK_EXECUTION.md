@@ -123,5 +123,23 @@ python -m benchmarks.e2e.run \
   --id scenario-id
 ```
 
+Run the maintained comprehensive collector from a clean committed checkout:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh \
+  --capture auto \
+  --languages zh,en
+```
+
+`auto` prefers a speaker-monitor source; `acoustic` plays Chromie's generated
+TTS through the physical speaker and records it through the microphone. Neither
+mode asks the operator to speak. The collector runs the existing deterministic
+and E2E entrypoints, retains partial failure evidence, captures all Compose logs
+and bounded host/GPU/audio diagnostics, writes a check ledger and artifact hash
+index, and creates one `chromie-comprehensive-<revision>-<run-id>.tar.gz`
+archive. Semantic results remain pending review and deterministic failures remain
+non-overridable. Use `--dry-run` to inspect the plan or `--collect-only` to
+package an already-running system without executing tests.
+
 The command adapter contract is documented in
 [`benchmarks/e2e/README.md`](../benchmarks/e2e/README.md).

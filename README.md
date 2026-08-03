@@ -191,6 +191,18 @@ base. Configuration semantics are maintained in
 This runs the dependency-light automated suite and documentation checks. It does
 not prove GPU, microphone, speaker, simulator, or hardware behavior.
 
+For one revision-bound comprehensive collection that preserves deterministic
+fixture truth, runs bilingual generated-speech closed-loop E2E, and packages
+semantic-review evidence plus host/container/GPU/audio logs, run:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh
+```
+
+The comprehensive collector never requires operator speech. It is fail-soft so
+failed checks remain in the uploadable archive, and it never grants release
+qualification by itself.
+
 Higher-level evidence commands and claim rules are in
 [Acceptance and Evidence](docs/ACCEPTANCE.md). Current simulator operational
 commands are in the [Runbook](CHROMIE_RUNBOOK.md).

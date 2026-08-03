@@ -39,6 +39,13 @@ executing the artifact would require unavailable hardware, Docker, or process
 replacement. These exceptions are listed exactly in
 `config/test_source_ownership.json` with a reviewed reason.
 
+The comprehensive qualification entrypoint is owned as an executable artifact,
+not as a semantic scenario source. `tests/test_comprehensive_qualification_script.py`
+checks its executable bit, shell syntax, help contract, and side-effect-free
+`--dry-run`. The script only orchestrates existing test owners and collects
+evidence; it cannot introduce expected model answers or override benchmark
+oracles.
+
 ## Enforcement
 
 Run:

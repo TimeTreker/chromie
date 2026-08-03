@@ -341,6 +341,22 @@ python scripts/closed_loop_e2e.py \
   --archive ~/Downloads/chromie-closed-loop-review.tar.gz
 ```
 
+The maintained repository orchestration entrypoint is
+`scripts/qualification/run_comprehensive_test.sh`. It does not define scenarios
+or expected model answers. It composes the existing source gate, deterministic
+benchmark inventory/contracts/scenarios, service and GPU checks, bilingual
+closed-loop runner, retained synthetic acceptance, and shared-GPU workload into
+one correlated evidence root. Objective verdicts remain owned by their existing
+fixtures and executable assertions; semantic cases remain `review` and are
+packaged for external LLM or human adjudication. The archive includes the exact
+runner and digest, revision, commands, check ledger, audio, ASR, runtime events,
+Docker logs, GPU telemetry, and artifact hashes. The collector is fail-soft for
+diagnosis and always records `release_qualified=false`.
+
+Use `--dry-run` to inspect the plan without touching hardware or services. Use
+`--collect-only` to package current host/container evidence without executing
+tests. Neither mode creates a new oracle authority.
+
 ### 7.4 Distribution metrics
 
 Repeated and cohort runs report behavior distributions. Initial metric families

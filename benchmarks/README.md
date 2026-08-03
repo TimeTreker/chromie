@@ -41,6 +41,18 @@ stable, and output contains no timestamps. A duplicate ID, unknown taxonomy
 value, missing required source, malformed JSON, or broken source reference fails
 closed with exit status `2`.
 
+Run the maintained comprehensive source, benchmark, service, bilingual
+closed-loop, GPU-contention, and evidence-collection workflow with:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh
+```
+
+The shell entrypoint is orchestration only. It does not own scenario content or
+semantic truth. Existing fixture/contract checks remain deterministic, and
+pending qualitative cases are packaged for retained LLM or human review. The
+runner records its own digest and the tested Git revision in the archive.
+
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset

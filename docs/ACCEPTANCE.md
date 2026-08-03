@@ -800,6 +800,21 @@ The generated-speech report is strong evidence for bilingual TTS, ASR,
 playback routing, and end-to-end workflow delivery. It does not claim arbitrary
 human-speech recognition accuracy.
 
+For a complete revision-bound collection, use the maintained orchestrator:
+
+```bash
+./scripts/qualification/run_comprehensive_test.sh --capture auto
+```
+
+It runs the source gate, existing deterministic benchmark owners, service/GPU
+checks, bilingual closed-loop cases, retained synthetic acceptance, and bounded
+shared-GPU contention, then collects all host and Compose logs into one
+hash-indexed archive. The script does not define expected AI answers: fixture
+and contract truth stays deterministic, while declared semantic dimensions are
+packaged for external LLM or human review. `--capture acoustic` still uses
+Chromie's generated TTS rather than the operator's voice. The collector is
+diagnostic and always records `release_qualified=false`.
+
 `scripts/voice_acceptance.py` has four explicit modes. All four retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.

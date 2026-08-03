@@ -1655,6 +1655,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/general_ability_acceptance.py",
@@ -1869,7 +1870,8 @@
       "key": "ASR_URL",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py"
       ]
     },
     {
@@ -2771,6 +2773,7 @@
       "key": "ORCH_AUDIO_INPUT_MODE",
       "owners": [
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2782,6 +2785,7 @@
       "key": "ORCH_AUDIO_OUTPUT_MODE",
       "owners": [
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2824,6 +2828,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -2869,6 +2874,7 @@
         ".env.common",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -2894,6 +2900,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -3002,6 +3009,7 @@
         ".env.common",
         "orchestrator/runtime/conversation_state.py",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -3136,7 +3144,8 @@
       "category": "service_internal",
       "key": "ORCH_DISCARD_PLAYBACK_REALTIME",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py"
       ]
     },
     {
@@ -3159,6 +3168,7 @@
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3204,6 +3214,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3221,6 +3232,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3232,6 +3244,7 @@
       "key": "ORCH_ENABLE_TASK_CONTEXT_STORE",
       "owners": [
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py"
       ]
     },
@@ -3263,6 +3276,7 @@
         ".env.common",
         "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/session.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3504,6 +3518,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py"
       ]
     },
@@ -3649,7 +3664,8 @@
       "key": "ORCH_RUNTIME_READY_GREETING_ENABLED",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py"
       ]
     },
     {
@@ -4046,6 +4062,7 @@
       "owners": [
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/deep_thought_response_check.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -4699,6 +4716,7 @@
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/benchmark_tts.py",
+        "scripts/closed_loop_e2e.py",
         "scripts/preflight_cognitive_gateway_core_qualification.py",
         "scripts/voice_acceptance.py"
       ]

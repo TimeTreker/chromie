@@ -21,6 +21,12 @@ claim.
   do not route objective tests through an LLM reviewer.
 - Use semantic review only for declared qualitative dimensions, and retain the
   deterministic and semantic verdicts separately in hybrid reports.
+- Keep comprehensive orchestration thin: it may invoke maintained test owners,
+  collect correlated evidence, and package artifacts, but scenario definitions
+  and pass/fail truth remain in the benchmark contracts, fixtures, and review
+  schema they already own.
+- Keep `scripts/qualification/run_comprehensive_test.sh --dry-run` side-effect
+  free and update its command contract whenever a maintained entrypoint changes.
 
 ## Audit commands
 
@@ -28,6 +34,7 @@ claim.
 ./scripts/run_tests.sh
 python scripts/test_matrix.py --list
 python scripts/general_ability_acceptance.py --mode check
+./scripts/qualification/run_comprehensive_test.sh --dry-run
 ```
 
 When removing tests, record the original and resulting file/method counts,
