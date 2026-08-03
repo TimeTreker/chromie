@@ -324,7 +324,25 @@ class PlaybackTransport:
             return True
 
         initial_audio = first_stream_chunk if isinstance(audio, ProviderPcmStream) else audio
-        assert initial_audio is not None
+        if initial_audio is None:
+            reason = "playback_missing_initial_pcm"
+            host.resolve_playback_start_waiter(
+                generation,
+                order,
+                session_id,
+                started=False,
+                reason=reason,
+            )
+            if state is not None:
+                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+            host.session_log(
+                session_id,
+                "playback_skip_empty: order=%s reason=%s",
+                order,
+                reason,
+            )
+            host.maybe_session_done(session_id)
+            return True
         audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
         host.sessions.trace_mark(
             session_id,

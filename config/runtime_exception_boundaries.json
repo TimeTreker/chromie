@@ -2070,11 +2070,12 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "contract": "Fail a provider stream into the ordered playback lifecycle, retain diagnostics, and never emit success for incomplete audio.",
       "review_status": "reviewed",
-      "body_sha256": "b561b687c6de8accbad44984ea007c2686db1a8fbf8fcf3b61aa696a7a286ba4",
+      "body_sha256": "58d49835d17b611f75c2cdaf45ad8c6e2ae8ef30fd36239e2db53be2f0a33e7e",
       "failure_signals": [
         "diagnostic",
+        "return",
         "state_update"
       ]
     },
