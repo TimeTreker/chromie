@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "qualification_id": "bilingual-generated-speech-closed-loop-v1",
+  "transport_cases": [
+    {
+      "id": "zh_short",
+      "language": "zh-CN",
+      "text": "你好，我是 Chromie，很高兴见到你。",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.35
+    },
+    {
+      "id": "zh_weather",
+      "language": "zh-CN",
+      "text": "重庆今天可能有雷雨，出门记得带伞。",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.35
+    },
+    {
+      "id": "en_short",
+      "language": "en-US",
+      "text": "Hello, I am Chromie. It is nice to meet you.",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.35
+    },
+    {
+      "id": "en_weather",
+      "language": "en-US",
+      "text": "It may rain in Chongqing today, so please take an umbrella.",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.35
+    }
+  ],
+  "workflow_cases": [
+    {
+      "id": "zh_family_help",
+      "language": "zh-CN",
+      "text": "请用一句简短的话说说你会怎么帮助家人。",
+      "speaker_id": "chromie_zh",
+      "max_error_rate": 0.40,
+      "expected_any": ["家人", "帮助", "帮"]
+    },
+    {
+      "id": "en_family_help",
+      "language": "en-US",
+      "text": "In one short sentence, tell me how you help your family.",
+      "speaker_id": "chromie_en",
+      "max_error_rate": 0.40,
+      "expected_all": ["family"],
+      "expected_any": ["help", "organize", "remember"]
+    }
+  ]
+}

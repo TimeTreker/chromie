@@ -25,6 +25,7 @@ This file records notable current changes. Detailed earlier development history 
 ## Unreleased
 
 ### Runtime sustainability follow-up
+- Added bilingual generated-speech closed-loop qualification for Chinese and English: direct TTS-to-ASR transport plus injected-text workflow, real playback capture, and ASR verification without grading an operator's pronunciation.
 - Centralized Agent, Goal Interpreter, and shared-runtime observability policy configuration; internal model, weather, capability, trace, event, resource, accelerator, and CLI-color helpers no longer parse environment values independently.
 - Added immutable TTS service settings for transport, provider, generation, worker, speaker, alignment, and immutable model-source configuration; maintained TTS modules no longer parse environment values independently.
 - Preserved completed evidence-bound results across newer ordinary turns with a non-interrupting delivery window; explicit cancellation and supersession still suppress late speech.

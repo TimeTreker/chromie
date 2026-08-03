@@ -766,6 +766,40 @@ remain inside the evidence root, requires the provider manifest's
 `metadata.upstream_commit` to match `revisions.soridormi`, and requires
 calibration artifact SHA-256 values to match.
 
+## Bilingual generated-speech closed loop
+
+The default end-to-end audio qualification does not require an operator to
+speak. Run:
+
+```bash
+python scripts/closed_loop_e2e.py --start-services --capture auto
+```
+
+The manifest at
+`benchmarks/manifests/closed_loop_e2e_v1.json` contains both Chinese and
+English cases. The runner retains two related evidence paths:
+
+1. source text -> language-matched Chromie TTS -> WAV/PCM -> Chromie ASR;
+2. injected user text -> Cognitive Gateway/Core/Agent/tools -> TTS -> actual
+   host playback capture -> Chromie ASR.
+
+`--capture auto` prefers the default Pulse/PipeWire sink monitor, so the
+workflow validates the emitted speaker stream without room noise. When monitor
+capture is unavailable it uses the physical microphone while Chromie's own TTS
+plays through the speaker; no human pronunciation is graded. Use
+`--capture acoustic` explicitly for that physical speaker-to-microphone path.
+
+Chinese cases are evaluated primarily with character error rate; English cases
+use word error rate. Workflow playback is compared with the exact speech that
+Chromie actually delivered during the same turn, not with a hard-coded model
+answer. Separate manifest terms check the intended response outcome. This keeps
+ASR in the role of an automated audio observer rather than making a human
+accent part of the release gate.
+
+The generated-speech report is strong evidence for bilingual TTS, ASR,
+playback routing, and end-to-end workflow delivery. It does not claim arbitrary
+human-speech recognition accuracy.
+
 `scripts/voice_acceptance.py` has four explicit modes. All four retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.

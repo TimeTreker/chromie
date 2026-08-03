@@ -212,6 +212,21 @@ endpoint.
 The old standalone text scenario suite and text skill sweep commands have been
 removed and should not be used as behavior-quality evidence.
 
+## Automatic bilingual end-to-end audio check
+
+Use Chromie's generated voice for repeatable Chinese and English qualification:
+
+```bash
+python scripts/closed_loop_e2e.py --start-services --capture auto
+```
+
+This checks TTS -> ASR directly and then injects text into the complete cognitive
+workflow, captures the actual playback stream, and transcribes that output with
+ASR. It never asks the operator to pronounce English or Chinese. Use
+`--capture acoustic` when you specifically want Chromie's speaker output to be
+recorded through the physical microphone. Evidence is written under
+`.chromie/acceptance/closed-loop-e2e/`.
+
 ## Voice Modes
 
 Use voice modes when you need audio pipeline evidence. Start the external
