@@ -36,6 +36,10 @@ Skill does not add an executable capability, provider, permission, or route. See
 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) and
 [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
 
+## Resource-provider capabilities
+
+For a capability that acquires and delivers a resource, declare semantic scope rather than relying on provider names or topic keywords. Physical and information providers are peers. A complete contract should state `responsibility_type=acquire_and_deliver_resource`, supported `resource_kinds`, acquisition semantics, delivery semantics, and complete-outcome evidence. Partial primitives must not claim the full responsibility. See [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md).
+
 ## One authoritative capability contract
 
 Keep contributor guidance separate from execution authority. A capability may have

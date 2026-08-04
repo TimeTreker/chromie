@@ -20,6 +20,7 @@ from .agent_skills import (
     inherited_plan_agent_skill_provenance,
     build_configured_agent_skill_registry,
 )
+from .clients.external_information_client import HttpExternalInformationClient
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
@@ -127,6 +128,15 @@ ollama_client = OllamaClient(
         service_settings=settings,
 )
 weather_client = OpenMeteoWeatherClient(service_settings=settings) if settings.weather_enabled else None
+external_information_client = (
+    HttpExternalInformationClient(
+        settings.external_information_url,
+        timeout_s=settings.external_information_timeout_ms / 1000.0,
+        bearer_token=settings.external_information_token,
+    )
+    if settings.external_information_enabled and settings.external_information_url
+    else None
+)
 
 response_reviewer_client = (
     OllamaClient(
@@ -239,6 +249,7 @@ agent_skill_progressive_disclosure = AgentSkillProgressiveDisclosureCoordinator(
 local_tool_executor = LocalToolExecutor(
     capability_registry,
     weather_client=weather_client,
+    external_information_client=external_information_client,
 )
 try:
     capability_registry.get_tool("soridormi.skill.list")

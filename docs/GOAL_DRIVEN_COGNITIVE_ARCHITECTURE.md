@@ -1,5 +1,10 @@
 # Goal-Driven Cognitive Architecture
 
+## Provider-neutral resource acquisition and delivery
+
+Physical fetching and external-information retrieval share one semantic responsibility: acquire a requested resource and make it available to the recipient. `SemanticGoal.resource_responsibility` carries this provider-neutral meaning. Goal Association never names Soridormi, a website, or another provider; the Planner selects an exact registered capability from declared semantic scope, and the Trusted Capability Runtime invokes the owning peer Provider. See [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md).
+
+
 Status: Maintained architecture constitution
 Scope: Chromie cognition, planning, interaction, validation, and execution
 Implementation state: the maintained goal-association, planning, validation,

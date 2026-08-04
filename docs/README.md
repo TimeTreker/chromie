@@ -253,3 +253,5 @@ Run:
 python scripts/check_docs.py
 ./scripts/run_tests.sh
 ```
+
+- [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md): provider-neutral physical and information resource Goals, peer Provider contracts, and completion evidence.

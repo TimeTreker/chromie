@@ -43,6 +43,12 @@ try:
         GoalAssociationResolution,
         stable_goal_operation_id,
     )
+    from chromie_contracts.resource import (
+        AcquireAndDeliverResource,
+        ResourceDescriptor,
+        ResourceRecipient,
+        ResourceSource,
+    )
     from chromie_contracts.semantic_task import SemanticGoal
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.discourse import (
@@ -57,6 +63,12 @@ except ImportError:  # pragma: no cover
         GoalAssociation,
         GoalAssociationResolution,
         stable_goal_operation_id,
+    )
+    from shared.chromie_contracts.resource import (
+        AcquireAndDeliverResource,
+        ResourceDescriptor,
+        ResourceRecipient,
+        ResourceSource,
     )
     from shared.chromie_contracts.semantic_task import SemanticGoal
 
@@ -269,6 +281,77 @@ class GoalAssociationModelReferentUpdate(BaseModel):
         return self
 
 
+class GoalAssociationModelResourceResponsibility(BaseModel):
+    """Provider-neutral acquire-and-deliver responsibility emitted by the model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    resource_kind: Literal["physical_object", "information"]
+    resource_description: str = Field(min_length=1)
+    source_status: Literal["known", "unknown", "provider_resolved"]
+    source_description: str = ""
+    source_binding_names: list[str] = Field(default_factory=list, max_length=8)
+    recipient_description: str = Field(default="requester", min_length=1)
+    delivery_mode: Literal[
+        "physical_handover",
+        "spoken_explanation",
+        "structured_result",
+    ]
+
+    @field_validator(
+        "resource_description",
+        "source_description",
+        "recipient_description",
+        mode="before",
+    )
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("source_binding_names", mode="before")
+    @classmethod
+    def normalize_binding_names(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("source_binding_names must be a list or string")
+        return [
+            text
+            for item in value
+            if (text := " ".join(str(item or "").strip().split()))
+        ]
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "GoalAssociationModelResourceResponsibility":
+        if self.source_status == "known" and not (
+            self.source_description or self.source_binding_names
+        ):
+            raise ValueError(
+                "known resource source requires source_description or source_binding_names"
+            )
+        if self.source_status == "unknown" and (
+            self.source_description or self.source_binding_names
+        ):
+            raise ValueError("unknown resource source must not invent a source")
+        if (
+            self.resource_kind == "physical_object"
+            and self.delivery_mode != "physical_handover"
+        ):
+            raise ValueError(
+                "physical_object resource requires physical_handover delivery"
+            )
+        if (
+            self.resource_kind == "information"
+            and self.delivery_mode == "physical_handover"
+        ):
+            raise ValueError("information resource cannot use physical_handover")
+        return self
+
+
 class GoalAssociationModelGoal(BaseModel):
     """Minimal model-facing semantic goal. IDs and persistence fields are host-owned."""
 
@@ -287,6 +370,7 @@ class GoalAssociationModelGoal(BaseModel):
         default_factory=list,
         max_length=12,
     )
+    resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
 
     @field_validator("description", mode="before")
     @classmethod
@@ -1127,13 +1211,13 @@ class GoalAssociationResolver:
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
-            "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description and typed bindings for each responsibility. "
+            "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
             "Every new Goal must also declare responsibility_kind. Use executable_action for a user-visible physical or other effectful action; spoken_response only when the responsibility is completed directly from Chromie's authored speech or text without external evidence, including singing, telling a joke, or a social reply; capability_dependent when lookup, retrieval, computation, or another capability must determine completion; and other only when none of those meanings is accurate. This is the Goal's completion modality, not a capability choice. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
-            "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Physical actions are independent goals whenever either can succeed or fail separately, including actions requested simultaneously, with shared duration, or in one coordinated sentence. Do not collapse movement, object acquisition or manipulation, return travel, gestures, speech, or other independently observable responsibilities into one Goal merely because they form one everyday request. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a spoken_response Goal; Response Composer owns that surface. Before returning, verify that every independently observable responsibility appears in exactly one new_goals item: no merged action-collection Goal and no duplicated responsibility across Goals. "
-            "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
+            "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a spoken_response Goal; Response Composer owns that surface. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Set source_status=known only when the user or discourse already supplies the source; set unknown when source information is required but absent; use provider_resolved when the exact source is intentionally chosen by the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
@@ -1147,7 +1231,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description, responsibility_kind, and bindings only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, responsibility_kind, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -1240,7 +1324,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, and bindings only. executable_action is effectful work; spoken_response is direct authored speech or text, including spoken performance; capability_dependent requires capability planning; other is only for a genuinely different modality. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, bindings, and optional provider-neutral resource_responsibility only. executable_action is effectful work; spoken_response is direct authored speech or text, including spoken performance; capability_dependent requires capability planning; other is only for a genuinely different modality. Preserve resource_responsibility when the responsibility is to acquire and deliver a physical object or grounded information; never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1621,6 +1705,37 @@ class GoalAssociationResolver:
                     mode="json",
                     exclude_none=True,
                 )
+            resource_responsibility = None
+            if item.resource_responsibility is not None:
+                resource_item = item.resource_responsibility
+                unknown_source_bindings = sorted(
+                    set(resource_item.source_binding_names) - set(binding_map)
+                )
+                if unknown_source_bindings:
+                    raise ValueError(
+                        "resource source references unknown Goal bindings: "
+                        f"{unknown_source_bindings}"
+                    )
+                source_bindings = {
+                    name: binding_map[name]
+                    for name in resource_item.source_binding_names
+                }
+                resource_responsibility = AcquireAndDeliverResource(
+                    resource=ResourceDescriptor(
+                        kind=resource_item.resource_kind,
+                        description=resource_item.resource_description,
+                    ),
+                    source=ResourceSource(
+                        status=resource_item.source_status,
+                        description=resource_item.source_description,
+                        bindings=source_bindings,
+                    ),
+                    recipient=ResourceRecipient(
+                        description=resource_item.recipient_description
+                    ),
+                    delivery_mode=resource_item.delivery_mode,
+                )
+
             new_goals.append(
                 SemanticGoal(
                     goal_id=goal_id,
@@ -1629,6 +1744,7 @@ class GoalAssociationResolver:
                     object={"bindings": binding_map} if binding_map else {},
                     constraints={},
                     success_criteria=[item.description],
+                    resource_responsibility=resource_responsibility,
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,

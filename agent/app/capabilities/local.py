@@ -23,6 +23,24 @@ def _weather_tool_availability() -> ToolAvailability:
         reason=None if enabled else "AGENT_WEATHER_ENABLED is disabled",
     )
 
+
+def _external_information_availability() -> ToolAvailability:
+    enabled = (
+        agent_service_settings.external_information_enabled
+        and bool(agent_service_settings.external_information_url)
+    )
+    reason = None
+    if not agent_service_settings.external_information_enabled:
+        reason = "AGENT_EXTERNAL_INFORMATION_ENABLED is disabled"
+    elif not agent_service_settings.external_information_url:
+        reason = "AGENT_EXTERNAL_INFORMATION_URL is not configured"
+    return ToolAvailability(
+        available=enabled,
+        modes=["runtime", "read_only"],
+        requires=["network", "external_information_provider"],
+        reason=reason,
+    )
+
 def chromie_manifests() -> list[AgentManifest]:
     speech = AgentManifest(
         agent_id="chromie.speech",
@@ -385,7 +403,173 @@ def chromie_manifests() -> list[AgentManifest]:
             )
         ],
     )
-    return [speech, task, memory, weather]
+    external_information = AgentManifest(
+        agent_id="chromie.external_information",
+        display_name="Chromie External Information Provider Adapter",
+        description=(
+            "Read-only adapter for a configured external-information provider. "
+            "It retrieves grounded evidence for current facts, place or restaurant "
+            "recommendations, how-to research, and other web-backed information; "
+            "Chromie's Tool Result Interpreter and Response Composer own the final answer."
+        ),
+        transport=TransportSpec(
+            kind="local_python",
+            module="app.clients.external_information_client",
+        ),
+        tags=["chromie", "tool", "external_information", "external_read"],
+        tools=[
+            ToolCapability(
+                name="chromie.external_information.retrieve",
+                agent_id="chromie.external_information",
+                display_name="Retrieve grounded external information",
+                description=(
+                    "Retrieve grounded, read-only external information for a fully "
+                    "specified question. Use for restaurant or place recommendations, "
+                    "current web facts, news, and how-to research when no more exact "
+                    "registered Capability covers the Goal. The provider returns "
+                    "evidence material; it does not author Chromie's final speech."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1200,
+                        },
+                        "request_kind": {
+                            "type": "string",
+                            "enum": [
+                                "general_research",
+                                "fact_lookup",
+                                "recommendation",
+                                "place_search",
+                                "restaurant_search",
+                                "how_to",
+                                "news",
+                            ],
+                            "default": "general_research",
+                        },
+                        "location": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 300,
+                        },
+                        "time_scope": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                        },
+                        "freshness": {
+                            "type": "string",
+                            "enum": ["current", "recent", "any"],
+                            "default": "current",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 8,
+                        },
+                        "constraints": {
+                            "type": "object",
+                            "additionalProperties": True,
+                        },
+                    },
+                    "required": ["question"],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "object"},
+                        "summary": {"type": "string", "minLength": 1},
+                        "items": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                        },
+                        "sources": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string"},
+                                    "url": {"type": "string"},
+                                    "published_at": {"type": ["string", "null"]},
+                                    "retrieved_at": {"type": ["string", "null"]},
+                                },
+                                "additionalProperties": False,
+                            },
+                        },
+                        "retrieved_at": {"type": "string", "minLength": 1},
+                        "provider": {"type": "string", "minLength": 1},
+                    },
+                    "required": [
+                        "query",
+                        "summary",
+                        "items",
+                        "sources",
+                        "retrieved_at",
+                        "provider",
+                    ],
+                    "additionalProperties": False,
+                },
+                effects=["read_only", "external_read", "information_retrieval"],
+                safety_class="safe_read",
+                availability=_external_information_availability(),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=max(
+                        0.1,
+                        agent_service_settings.external_information_timeout_ms / 1000.0,
+                    ),
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "interaction_executable": True,
+                    "prompt_tier": "common",
+                    "prompt_tier_reason": (
+                        "Externally grounded facts and recommendations are common user needs."
+                    ),
+                    "when_to_use": (
+                        "Use for a provider-neutral information resource Goal after "
+                        "Goal Association has fixed all material bindings and no more "
+                        "specific exact read Capability covers the request."
+                    ),
+                    "when_not_to_use": (
+                        "Do not use as a topical substitute for physical objects, "
+                        "effectful actions, or a more exact registered Capability."
+                    ),
+                    "semantic_type": "external_information_retrieval",
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                        "acquisition": "external_grounded_retrieval",
+                        "provider_result": "evidence_material",
+                        "delivery": "response_composer_spoken_explanation",
+                        "supported_request_kinds": [
+                            "general_research",
+                            "fact_lookup",
+                            "recommendation",
+                            "place_search",
+                            "restaurant_search",
+                            "how_to",
+                            "news",
+                        ],
+                    },
+                    "pre_execution_speech_guidance": (
+                        "Acknowledge the specific information being checked without "
+                        "claiming a result before provider evidence returns."
+                    ),
+                },
+            )
+        ],
+    )
+
+    return [speech, task, memory, weather, external_information]
 
 
 def chromie_capability_bundle() -> CapabilityBundle:

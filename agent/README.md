@@ -153,6 +153,10 @@ execution authority.
 | `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | `128` | Bound unconsumed in-memory confirmation grants. |
 | `AGENT_WEATHER_ENABLED` | `1` | Enable read-only weather lookup through Open-Meteo. |
 | `AGENT_WEATHER_TIMEOUT_S` | `8` | Weather provider HTTP timeout in seconds. |
+| `AGENT_EXTERNAL_INFORMATION_ENABLED` | `0` | Enable the provider-neutral grounded external-information adapter. |
+| `AGENT_EXTERNAL_INFORMATION_URL` | blank | Exact HTTP endpoint accepting one evidence-retrieval request and returning the declared structured evidence contract. |
+| `AGENT_EXTERNAL_INFORMATION_TOKEN` | blank | Optional bearer token sent only to the configured external-information endpoint. |
+| `AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS` | `15000` | Provider request timeout. |
 | `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable authorized guarded side effects. Requires an execution token. |
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit physical nodes after confirmation and active-monitor proof. Requires guarded execution. |
 

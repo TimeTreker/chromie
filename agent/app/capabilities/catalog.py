@@ -581,6 +581,16 @@ class CapabilityCatalog:
                             f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
                         )
 
+                    upstream_metadata = item.get("metadata")
+                    if not isinstance(upstream_metadata, dict):
+                        upstream_metadata = {}
+                    semantic_scope = upstream_metadata.get("semantic_scope")
+                    if not isinstance(semantic_scope, dict):
+                        semantic_scope = {}
+                    resource_contract = upstream_metadata.get("resource_contract")
+                    if not isinstance(resource_contract, dict):
+                        resource_contract = {}
+
                     capability = CatalogCapability(
                         capability_id=capability_id,
                         agent_id="soridormi.skill",
@@ -622,10 +632,14 @@ class CapabilityCatalog:
                             "when_to_use": item.get("when_to_use"),
                             "examples": item.get("examples"),
                             "safety_sensitive": item.get("safety_sensitive"),
+                            "semantic_scope": dict(semantic_scope),
+                            "resource_contract": dict(resource_contract),
                         },
                         metadata={
                             "upstream_skill_id": upstream_id,
                             "version": item.get("version"),
+                            "semantic_scope": dict(semantic_scope),
+                            "resource_contract": dict(resource_contract),
                         },
                         can_run_parallel=(
                             bool(can_run_parallel)

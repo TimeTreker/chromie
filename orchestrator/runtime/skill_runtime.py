@@ -48,6 +48,31 @@ SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
         "no_motion": {"type": "boolean"},
         "recommendation_only": {"type": "boolean"},
         "summary": {"type": "string"},
+        "resource_outcome": {
+            "type": ["object", "null"],
+            "properties": {
+                "responsibility_type": {
+                    "type": "string",
+                    "enum": ["acquire_and_deliver_resource"],
+                },
+                "resource_kind": {
+                    "type": "string",
+                    "enum": ["physical_object"],
+                },
+                "resource_description": {"type": "string"},
+                "resource_acquired": {"type": "boolean"},
+                "resource_delivered": {"type": "boolean"},
+                "recipient_description": {"type": "string"},
+                "evidence_summary": {"type": "string"},
+            },
+            "required": [
+                "responsibility_type",
+                "resource_kind",
+                "resource_acquired",
+                "resource_delivered",
+            ],
+            "additionalProperties": False,
+        },
     },
     "required": [
         "completed",
@@ -270,6 +295,16 @@ class SkillRegistry:
                         for value in upstream_metadata.get("behavior_domains", [])
                         if str(value).strip()
                     ],
+                    "semantic_scope": (
+                        dict(upstream_metadata.get("semantic_scope"))
+                        if isinstance(upstream_metadata.get("semantic_scope"), dict)
+                        else {}
+                    ),
+                    "resource_contract": (
+                        dict(upstream_metadata.get("resource_contract"))
+                        if isinstance(upstream_metadata.get("resource_contract"), dict)
+                        else {}
+                    ),
                 },
             )
 

@@ -298,6 +298,24 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
+    external_information_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_EXTERNAL_INFORMATION_ENABLED", "0"
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    external_information_url: str = Field(
+        default_factory=lambda: os.getenv("AGENT_EXTERNAL_INFORMATION_URL", "").strip()
+    )
+    external_information_token: str = Field(
+        default_factory=lambda: os.getenv("AGENT_EXTERNAL_INFORMATION_TOKEN", "").strip()
+    )
+    external_information_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS", "15000")
+        ),
+        ge=100,
+        le=120000,
+    )
     capability_prompt_tier_preset: str = Field(
         default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_PRESET", "")
     )

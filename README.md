@@ -40,6 +40,11 @@ experience artifacts. See
 > includes grounded external-information and weather methods. Executable
 > operations still use registered `capability_id` contracts through the Trusted
 > Capability Runtime.
+> Provider-neutral physical and informational acquisition now share a typed
+> `AcquireAndDeliverResource` Goal. Soridormi, external-information, weather,
+> memory, and future integrations remain peer Capability Providers selected only
+> by planning from exact registered semantic scope. See
+> [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
 

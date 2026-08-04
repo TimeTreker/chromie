@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .capabilities.models import CapabilityRegistry, ToolCapability
+from .clients.external_information_client import (
+    ExternalInformationError,
+    ExternalInformationQuery,
+    HttpExternalInformationClient,
+)
 from .clients.weather_client import (
     OpenMeteoWeatherClient,
     WeatherLocationContext,
@@ -48,11 +53,14 @@ class LocalToolExecutor:
         registry: CapabilityRegistry,
         *,
         weather_client: OpenMeteoWeatherClient | None = None,
+        external_information_client: HttpExternalInformationClient | None = None,
     ) -> None:
         self.registry = registry
         self.weather_client = weather_client
+        self.external_information_client = external_information_client
         self._handlers: dict[str, ToolHandler] = {
             "chromie.weather.lookup": self._execute_weather,
+            "chromie.external_information.retrieve": self._execute_external_information,
         }
 
     async def execute(self, request: ToolExecutionRequest) -> ToolExecutionResponse:
@@ -89,11 +97,11 @@ class LocalToolExecutor:
             return self._result(request, "timed_out", "provider_timeout", "Local tool timed out")
         except (ValueError, TypeError) as exc:
             return self._result(request, "refused", "contract_invalid", str(exc))
-        except WeatherLookupError as exc:
+        except (WeatherLookupError, ExternalInformationError) as exc:
             return self._result(
                 request,
                 "failed",
-                exc.reason_code or "weather_lookup_failed",
+                exc.reason_code or "local_tool_failed",
                 str(exc),
             )
         except Exception as exc:  # pragma: no cover - final provider boundary
@@ -159,6 +167,43 @@ class LocalToolExecutor:
                     "matched_location": report.location_name,
                     "matched_admin1": report.provider_admin1,
                     "matched_country": report.country,
+                }
+            },
+        )
+
+    async def _execute_external_information(
+        self,
+        args: dict[str, Any],
+    ) -> LocalToolResult:
+        if self.external_information_client is None:
+            raise ExternalInformationError(
+                "external-information provider is disabled",
+                reason_code="provider_disabled",
+            )
+        language = str(args.pop("__request_language", "en-US") or "en-US")
+        output = await self.external_information_client.retrieve(
+            ExternalInformationQuery(
+                question=str(args.get("question") or ""),
+                request_kind=str(args.get("request_kind") or "general_research"),
+                location=str(args.get("location") or ""),
+                time_scope=str(args.get("time_scope") or ""),
+                freshness=str(args.get("freshness") or "current"),
+                max_results=int(args.get("max_results") or 8),
+                constraints=(
+                    dict(args["constraints"])
+                    if isinstance(args.get("constraints"), dict)
+                    else None
+                ),
+                language=language,
+            )
+        )
+        return LocalToolResult(
+            output=output,
+            metadata={
+                "provider_resolution": {
+                    "provider": output.get("provider"),
+                    "source_count": len(output.get("sources") or []),
+                    "retrieved_at": output.get("retrieved_at"),
                 }
             },
         )

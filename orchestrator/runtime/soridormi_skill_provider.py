@@ -151,6 +151,14 @@ class SoridormiNamedSkillAdapter:
                     f"{upstream_skill_id!r}"
                 ),
             )
+        if completed:
+            resource_failure = self._resource_completion_failure(
+                request,
+                definition,
+                executed.output,
+            )
+            if resource_failure is not None:
+                return resource_failure
         return SkillResult(
             request_id=request.request_id,
             skill_id=request.skill_id,
@@ -234,6 +242,51 @@ class SoridormiNamedSkillAdapter:
             and (reviewed_social or canonical_goal_action)
         )
 
+    def _resource_completion_failure(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        output: dict[str, Any],
+    ) -> SkillResult | None:
+        metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
+        semantic_scope = metadata.get("semantic_scope")
+        if not isinstance(semantic_scope, dict):
+            return None
+        if semantic_scope.get("responsibility_type") != "acquire_and_deliver_resource":
+            return None
+
+        resource_outcome = output.get("resource_outcome")
+        if not isinstance(resource_outcome, dict):
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=output,
+                reason_code="resource_outcome_missing",
+                message=(
+                    "Provider reported completion without acquisition-and-delivery evidence"
+                ),
+            )
+        if (
+            resource_outcome.get("resource_acquired") is not True
+            or resource_outcome.get("resource_delivered") is not True
+        ):
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=output,
+                reason_code="resource_delivery_incomplete",
+                message=(
+                    "Provider did not prove both resource acquisition and delivery"
+                ),
+            )
+        return None
+
     @staticmethod
     def _successful_execution_output(
         output: dict[str, Any],
@@ -242,7 +295,7 @@ class SoridormiNamedSkillAdapter:
     ) -> dict[str, Any]:
         """Project successful provider output into the declared adapter schema."""
 
-        return {
+        projected = {
             "completed": True,
             "skill_id": str(output.get("skill_id") or upstream_skill_id),
             "mode": str(output.get("mode") or ""),
@@ -250,6 +303,10 @@ class SoridormiNamedSkillAdapter:
             "recommendation_only": output.get("recommendation_only") is True,
             "summary": str(output.get("summary") or ""),
         }
+        resource_outcome = output.get("resource_outcome")
+        if isinstance(resource_outcome, dict):
+            projected["resource_outcome"] = dict(resource_outcome)
+        return projected
 
     def _chromie_intent_payload(
         self,

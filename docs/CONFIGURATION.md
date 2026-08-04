@@ -611,6 +611,10 @@ retained. See
 | `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
 | `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
 | `AGENT_WEATHER_FORECAST_URL` | Weather forecast endpoint; default `https://api.open-meteo.com/v1/forecast`. |
+| `AGENT_EXTERNAL_INFORMATION_ENABLED` | Enable the provider-neutral read-only external-information adapter; default `0`. |
+| `AGENT_EXTERNAL_INFORMATION_URL` | Exact HTTP endpoint for grounded evidence retrieval. The provider performs web/source access and ranking; it must return the `chromie.external_information.retrieve` result schema. Blank means unavailable. |
+| `AGENT_EXTERNAL_INFORMATION_TOKEN` | Optional bearer token for the configured external-information endpoint. It is provider authentication, not model context or user-visible evidence. |
+| `AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS` | Timeout for one external-information provider request; default `15000`. |
 
 `chromie.weather.lookup` keeps its required `location` argument equal to the
 canonical Goal binding. It also accepts optional `location_context` fields

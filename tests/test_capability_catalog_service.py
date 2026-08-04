@@ -267,6 +267,54 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second["catalog_version"], first_version)
         self.assertEqual(second["capabilities"], first["capabilities"])
         self.assertIn("duplicate Soridormi skill_id", second["live_refresh_error"])
+    async def test_live_named_skill_preserves_provider_neutral_resource_scope(self) -> None:
+        invoker = _SequenceInvoker(
+            [
+                {
+                    "mode": "sim",
+                    "skills": [
+                        {
+                            "skill_id": "fetch_and_deliver_object",
+                            "description": "Acquire and deliver a described physical object.",
+                            "parameters_schema": {"type": "object"},
+                            "available": True,
+                            "effects": ["physical_motion", "resource_delivery"],
+                            "safety_class": "physical_motion",
+                            "requires_confirmation": True,
+                            "metadata": {
+                                "semantic_scope": {
+                                    "responsibility_type": "acquire_and_deliver_resource",
+                                    "resource_kinds": ["physical_object"],
+                                    "delivery": "physical_handover",
+                                },
+                                "resource_contract": {
+                                    "result_field": "resource_outcome"
+                                },
+                            },
+                        }
+                    ],
+                }
+            ]
+        )
+        catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
+
+        capability = await catalog.get_capability(
+            "soridormi.fetch_and_deliver_object",
+            refresh=True,
+        )
+
+        self.assertIsNotNone(capability)
+        assert capability is not None
+        self.assertEqual(
+            capability.hints["semantic_scope"]["responsibility_type"],
+            "acquire_and_deliver_resource",
+        )
+        self.assertEqual(
+            capability.metadata["resource_contract"]["result_field"],
+            "resource_outcome",
+        )
+        self.assertNotIn("provider_id", capability.hints["semantic_scope"])
+
     async def test_refreshes_live_named_skills_and_routes_motion(self) -> None:
         invoker = _Invoker()
         catalog = CapabilityCatalog(_registry(), live_invoker=invoker, min_score=0.10)

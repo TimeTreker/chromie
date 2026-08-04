@@ -159,6 +159,15 @@ from .goal import (
     GoalVersionRef,
     stable_goal_operation_id,
 )
+from .resource import (
+    AcquireAndDeliverResource,
+    ResourceDeliveryMode,
+    ResourceDescriptor,
+    ResourceKind,
+    ResourceRecipient,
+    ResourceSource,
+    ResourceSourceStatus,
+)
 from .semantic_task import (
     CommitmentState,
     InformationGap,
@@ -329,6 +338,13 @@ __all__ = [
     "ResponsePlan",
     "ResponseStage",
     "SemanticGoal",
+    "AcquireAndDeliverResource",
+    "ResourceDeliveryMode",
+    "ResourceDescriptor",
+    "ResourceKind",
+    "ResourceRecipient",
+    "ResourceSource",
+    "ResourceSourceStatus",
     "SemanticTaskOperation",
     "SemanticTaskOperationSet",
     "TaskContextSnapshot",

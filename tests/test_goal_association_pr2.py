@@ -888,7 +888,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description, responsibility_kind, and bindings only",
+            "Each new_goals item contains description, responsibility_kind, bindings, and optional provider-neutral resource_responsibility only",
             ollama.prompts[1][0],
         )
 
@@ -1498,7 +1498,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "responsibility_kind", "bindings"},
+            {"description", "responsibility_kind", "bindings", "resource_responsibility"},
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(
@@ -1704,7 +1704,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "physical action and a conversational answer or spoken performance are independent goals",
             prompt,
         )
-        self.assertIn("including actions requested simultaneously", prompt)
+        self.assertIn("acquisition and delivery stages that together constitute one human responsibility are one Goal", prompt)
+        self.assertIn("external search, evidence retrieval, evaluation, and spoken explanation", prompt)
         self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
         self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
         self.assertIn(

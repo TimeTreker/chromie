@@ -706,5 +706,159 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                     )
 
 
+    def test_resource_capability_rejects_completed_without_full_delivery_evidence(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "fetch_and_deliver_object",
+                    "description": "Acquire and deliver a physical object.",
+                    "available": True,
+                    "parameters_schema": {"type": "object"},
+                    "metadata": {
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                        }
+                    },
+                }
+            ]
+        )
+        provider = SoridormiMcpSkillProvider(_RecordingInvoker())
+        request = SkillRequest(
+            request_id="resource-incomplete",
+            skill_id="soridormi.fetch_and_deliver_object",
+        )
+        definition = registry.get(request.skill_id)
+
+        missing = provider._resource_completion_failure(
+            request,
+            definition,
+            {"completed": True, "skill_id": "fetch_and_deliver_object"},
+        )
+        self.assertIsNotNone(missing)
+        assert missing is not None
+        self.assertEqual(missing.reason_code, "resource_outcome_missing")
+
+        incomplete = provider._resource_completion_failure(
+            request,
+            definition,
+            {
+                "completed": True,
+                "skill_id": "fetch_and_deliver_object",
+                "resource_outcome": {
+                    "resource_acquired": True,
+                    "resource_delivered": False,
+                },
+            },
+        )
+        self.assertIsNotNone(incomplete)
+        assert incomplete is not None
+        self.assertEqual(incomplete.reason_code, "resource_delivery_incomplete")
+
+    async def test_fetch_and_deliver_preserves_scope_and_complete_resource_evidence(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "fetch_and_deliver_object",
+                    "description": (
+                        "Acquire a described physical object and deliver it to the "
+                        "intended recipient."
+                    ),
+                    "available": True,
+                    "requires_confirmation": True,
+                    "effects": [
+                        "physical_motion",
+                        "object_manipulation",
+                        "resource_delivery",
+                    ],
+                    "safety_class": "physical_motion",
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {
+                            "object": {"type": "object"},
+                            "source": {"type": "object"},
+                            "recipient": {"type": "object"},
+                        },
+                        "required": ["object", "source", "recipient"],
+                        "additionalProperties": False,
+                    },
+                    "metadata": {
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                            "delivery": "physical_handover",
+                        },
+                        "resource_contract": {
+                            "result_field": "resource_outcome",
+                        },
+                    },
+                }
+            ]
+        )
+        definition = registry.get("soridormi.fetch_and_deliver_object")
+        self.assertEqual(
+            definition.metadata["semantic_scope"]["responsibility_type"],
+            "acquire_and_deliver_resource",
+        )
+        self.assertEqual(
+            definition.metadata["resource_contract"]["result_field"],
+            "resource_outcome",
+        )
+
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.execute_plan": ToolCallOutcome.success(
+                    {
+                        "completed": True,
+                        "skill_id": "fetch_and_deliver_object",
+                        "summary": "The requested bottle was delivered.",
+                        "resource_outcome": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kind": "physical_object",
+                            "resource_description": "a bottle of water",
+                            "resource_acquired": True,
+                            "resource_delivered": True,
+                            "recipient_description": "requester",
+                            "evidence_summary": "Acquisition and delivery state verified.",
+                        },
+                    }
+                )
+            }
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(SoridormiMcpSkillProvider(invoker))
+        execution = await runtime.execute(
+            InteractionResponse(
+                interaction_id="fetch-resource",
+                skills=[
+                    {
+                        "request_id": "fetch-resource-1",
+                        "skill_id": "soridormi.fetch_and_deliver_object",
+                        "args": {
+                            "object": {"description": "a bottle of water"},
+                            "source": {
+                                "status": "known",
+                                "description": "100 meters ahead",
+                            },
+                            "recipient": {"description": "requester"},
+                        },
+                        "requires_confirmation": True,
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"fetch-resource-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "completed")
+        outcome = execution.results[0].output["resource_outcome"]
+        self.assertTrue(outcome["resource_acquired"])
+        self.assertTrue(outcome["resource_delivered"])
+
+
 if __name__ == "__main__":
     unittest.main()

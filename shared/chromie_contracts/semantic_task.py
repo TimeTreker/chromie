@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
+from .resource import AcquireAndDeliverResource
 
 
 _STAGE_DIRECTION_PATTERN = re.compile(r"\*([^*]+)\*|\[([^\]]+)\]|\(([^)]+)\)")
@@ -143,6 +144,10 @@ class SemanticGoal(BaseModel):
     object: dict[str, Any] = Field(default_factory=dict)
     constraints: dict[str, Any] = Field(default_factory=dict)
     success_criteria: list[str] = Field(default_factory=list)
+    resource_responsibility: AcquireAndDeliverResource | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator(
