@@ -592,6 +592,9 @@ def coordinated_action_goal_ids(
             == "executable_action"
         ):
             goal_ids.add(goal_id)
+        resource_responsibility = goal.get("resource_responsibility")
+        if isinstance(resource_responsibility, dict) and resource_responsibility:
+            goal_ids.add(goal_id)
         goal_object = goal.get("object")
         if not isinstance(goal_object, dict):
             continue
@@ -739,11 +742,18 @@ async def review_coordinated_action_plan_coverage(
                 "contract is explicit, confirmation-bound, and explained, do not "
                 "reject solely because its retained steps are sequential; the changed "
                 "timing is represented for the user to approve. A person's age, family role, personality, or self-concept is never evidence that a physical Capability exists. Only the supplied executable Capability semantics can establish ability. An exact distance, object acquisition, carrying, return trip, or safety result must be implemented by the supplied Capability semantics and represented by owned steps; duration or a generic movement step cannot be treated as proof of an unsupported distance or another physical responsibility. A Goal whose "
+                "typed resource_responsibility must be covered by an exact Capability "
+                "whose supplied semantic_scope supports that resource kind, acquisition, "
+                "and delivery. A locomotion step cannot acquire or deliver information, "
+                "and a response promise cannot replace requested authored content. A Goal whose "
                 "responsibility_kind is spoken_response is completed by its respond "
                 "outcome response_text and requires no executable speech-transport "
                 "step. Still reject a promise, acknowledgement, title, or stage "
                 "direction that does not contain the requested authored response or "
-                "performance itself. Do not propose or authorize replacement steps."
+                "performance itself. Treat movement mode, expression, spoken performance, "
+                "and simultaneity as material when the user requested them; walking is not "
+                "running unless the supplied Capability semantics explicitly say so. Do not "
+                "propose or authorize replacement steps."
             ),
             "user_text": request_text,
             "language": language,

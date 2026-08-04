@@ -947,6 +947,13 @@ class GoalAssociationResolver:
         )
         if executable_goal_count == 1:
             triggers.append("embodied_responsibility_decomposition")
+        if (
+            isinstance(model_output, GoalAssociationModelOutput)
+            and model_output.decision == "create_goals"
+            and len(model_output.new_goals) == 1
+            and candidate_goals
+        ):
+            triggers.append("single_new_goal_with_retained_context")
         if isinstance(model_output, GoalAssociationModelOutput) and any(
             association.relationship in {"modify", "clarify", "replace"}
             for association in model_output.associations
@@ -1374,7 +1381,7 @@ class GoalAssociationResolver:
             "the complete requested outcome and correct semantic bindings in the "
             "capability Goal. Never invent, copy, or repair an entity by character "
             "pattern; resolve it from the user meaning and supplied discourse. "
-            "Persona and wording are expression concerns, not extra Goals. A mere acknowledgement, confirmation, promise of willingness, or progress prelude for an executable request is owned by Response Composer and must not become a spoken_response Goal. For embodied work, independently review whether movement, acquiring or manipulating an object, and returning are separate observable responsibilities; keep each separate when it could succeed or fail without the others. Identity shapes expression only and never proves that a physical responsibility is available.\n\n"
+            "Persona and wording are expression concerns, not extra Goals. A mere acknowledgement, confirmation, promise of willingness, or progress prelude for an executable request is owned by Response Composer and must not become a spoken_response Goal. Simultaneous, ordered, or performance framing does not merge independently observable outcomes into one Goal: movement, subtle expression, and a directly requested spoken performance remain separate responsibilities when each can succeed or fail on its own. Preserve their temporal relationship for planning rather than consolidating their meanings. Directly authored singing, humming, recitation, jokes, or other spoken performance is spoken_response, not an information resource acquisition. For embodied work, independently review whether movement, acquiring or manipulating an object, and returning are separate observable responsibilities; keep each separate when it could succeed or fail without the others. Identity shapes expression only and never proves that a physical responsibility is available.\n\n"
             "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the supplied referent's canonical value.\n\n"
             "Existing Goal bindings are provenance-stable at this contract. An "
             "association may update only its description and lifecycle relation; "

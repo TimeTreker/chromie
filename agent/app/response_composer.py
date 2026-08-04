@@ -199,6 +199,7 @@ class ResponseComposerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
+                raw = self._canonicalize_lane_coordination_payload(raw, plan=plan)
                 model_output = ResponseComposerModelOutput.model_validate(raw)
                 if self._is_safe_read_plan(plan, request.context):
                     safe_read_semantic_review_attempted = True
@@ -226,6 +227,9 @@ class ResponseComposerResolver:
                             "safe-read semantic review output is not a JSON object"
                         )
                     raw = reviewed
+                    reviewed = self._canonicalize_lane_coordination_payload(
+                        reviewed, plan=plan
+                    )
                     model_output = ResponseComposerModelOutput.model_validate(reviewed)
                     safe_read_semantic_review_succeeded = True
                     logger.info(
@@ -259,6 +263,9 @@ class ResponseComposerResolver:
                             "effectful semantic review output is not a JSON object"
                         )
                     raw = reviewed
+                    reviewed = self._canonicalize_lane_coordination_payload(
+                        reviewed, plan=plan
+                    )
                     model_output = ResponseComposerModelOutput.model_validate(reviewed)
                     effectful_semantic_review_succeeded = True
                     logger.info(
@@ -308,6 +315,14 @@ class ResponseComposerResolver:
                 validated_social_behavior_count = (
                     len(social_plan.behaviors) if social_plan is not None else 0
                 )
+                response_plan, lane_coordination, lane_reasons = (
+                    self._reconcile_lane_coordination(
+                        response_plan=model_output.response_plan,
+                        lane_coordination=model_output.lane_coordination,
+                        social_attention_plan=social_plan,
+                        plan=plan,
+                    )
+                )
                 logger.info(
                     "response_composer_social_attention_decision sid=%s mode=%s "
                     "candidates=%s required=%s model_decision=%s "
@@ -328,9 +343,9 @@ class ResponseComposerResolver:
                     canonical_plan_id=plan.plan_id,
                     canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
                     canonical_plan=plan,
-                    response_plan=model_output.response_plan,
+                    response_plan=response_plan,
                     social_attention_plan=social_plan,
-                    lane_coordination=model_output.lane_coordination,
+                    lane_coordination=lane_coordination,
                     confidence=model_output.confidence,
                     rationale=model_output.rationale,
                     metadata={
@@ -338,6 +353,7 @@ class ResponseComposerResolver:
                         "resolver": "response_composer",
                         "task_plan_immutable": True,
                         "social_attention_validation_reasons": social_reasons,
+                        "lane_coordination_validation_reasons": lane_reasons,
                         "social_attention_policy": {
                             "mode": social_attention_mode,
                             "execution_enabled": social_attention_mode == "on",
@@ -1495,6 +1511,172 @@ class ResponseComposerResolver:
             }
         ), reasons
 
+
+    @staticmethod
+    def _raw_response_stages(response_plan: Any) -> list[dict[str, Any]]:
+        if not isinstance(response_plan, dict):
+            return []
+        stages: list[dict[str, Any]] = []
+        for key in ("immediate", "pre_action", "final"):
+            stage = response_plan.get(key)
+            if isinstance(stage, dict):
+                stages.append(stage)
+        progress = response_plan.get("progress")
+        if isinstance(progress, list):
+            stages.extend(item for item in progress if isinstance(item, dict))
+        return stages
+
+    @classmethod
+    def _canonicalize_lane_coordination_payload(
+        cls,
+        raw: dict[str, Any],
+        *,
+        plan: CanonicalPlan,
+    ) -> dict[str, Any]:
+        """Normalize only unambiguous DTO references from the immutable Plan.
+
+        The model still owns whether overlap is desired.  This adapter may copy
+        exact already-parallel Plan step IDs and attach an existing coordination
+        ID to the one response stage that already covers a model-authored respond
+        Goal.  It never chooses a Capability, changes timing, invents speech, or
+        authorizes execution.
+        """
+
+        normalized = copy.deepcopy(raw)
+        groups = normalized.get("lane_coordination")
+        if not isinstance(groups, list) or not groups:
+            return normalized
+        valid_groups = [item for item in groups if isinstance(item, dict)]
+        activity_groups = [
+            item
+            for item in valid_groups
+            if "activity" in {
+                str(value).strip() for value in item.get("lanes") or []
+            }
+        ]
+        parallel_step_ids = [
+            step.step_id for step in plan.steps if step.timing == "parallel"
+        ]
+        if (
+            len(activity_groups) == 1
+            and parallel_step_ids
+            and len(parallel_step_ids) == len(plan.steps)
+        ):
+            group = activity_groups[0]
+            if not group.get("activity_step_ids"):
+                group["activity_step_ids"] = list(parallel_step_ids)
+
+        respond_goal_ids = {
+            outcome.goal_id
+            for outcome in plan.goal_outcomes
+            if outcome.disposition == "respond"
+        }
+        stages = cls._raw_response_stages(normalized.get("response_plan"))
+        for group in valid_groups:
+            lanes = {str(value).strip() for value in group.get("lanes") or []}
+            coordination_id = " ".join(
+                str(group.get("coordination_id") or "").strip().split()
+            )
+            if "speaking" not in lanes or not coordination_id:
+                continue
+            if any(
+                str(stage.get("coordination_id") or "").strip() == coordination_id
+                for stage in stages
+            ):
+                continue
+            candidates = []
+            for stage in stages:
+                covered = {
+                    str(value).strip()
+                    for value in stage.get("covers_goal_ids") or []
+                    if str(value).strip()
+                }
+                if not covered.intersection(respond_goal_ids):
+                    continue
+                if (
+                    str(stage.get("speech_act") or "").strip().casefold()
+                    == "ask_confirmation"
+                    or str(stage.get("commitment_state") or "").strip()
+                    == "waiting_for_user"
+                ):
+                    continue
+                candidates.append(stage)
+            if len(candidates) == 1:
+                candidates[0]["coordination_id"] = coordination_id
+                candidates[0]["delivery_role"] = "performance"
+        normalized["lane_coordination"] = valid_groups
+        return normalized
+
+    @classmethod
+    def _reconcile_lane_coordination(
+        cls,
+        *,
+        response_plan: ResponsePlan,
+        lane_coordination: list[LaneCoordinationGroup],
+        social_attention_plan: SocialAttentionPlan | None,
+        plan: CanonicalPlan,
+    ) -> tuple[ResponsePlan, list[LaneCoordinationGroup], list[str]]:
+        """Prune invalid optional lane references without discarding the turn."""
+
+        response_payload = response_plan.model_dump(mode="python", exclude_none=True)
+        stages = cls._raw_response_stages(response_payload)
+        speech_ids = {
+            str(stage.get("coordination_id") or "").strip()
+            for stage in stages
+            if str(stage.get("coordination_id") or "").strip()
+        }
+        social_ids: set[str] = set()
+        if social_attention_plan is not None:
+            social_ids = {
+                str(item.coordination_id or "").strip()
+                for item in social_attention_plan.behaviors
+                if str(item.coordination_id or "").strip()
+            }
+        parallel_steps = {
+            step.step_id for step in plan.steps if step.timing == "parallel"
+        }
+        kept: list[LaneCoordinationGroup] = []
+        reasons: list[str] = []
+        dropped_ids: set[str] = set()
+        for group in lane_coordination:
+            lanes: list[str] = []
+            if "speaking" in group.lanes and group.coordination_id in speech_ids:
+                lanes.append("speaking")
+            if (
+                "activity" in group.lanes
+                and group.activity_step_ids
+                and set(group.activity_step_ids).issubset(parallel_steps)
+            ):
+                lanes.append("activity")
+            if (
+                "social_attention" in group.lanes
+                and group.coordination_id in social_ids
+            ):
+                lanes.append("social_attention")
+            if len(lanes) < 2:
+                dropped_ids.add(group.coordination_id)
+                reasons.append(
+                    "lane_coordination_pruned_after_member_validation:"
+                    + group.coordination_id
+                )
+                continue
+            activity_step_ids = (
+                list(group.activity_step_ids) if "activity" in lanes else []
+            )
+            kept.append(
+                group.model_copy(
+                    update={
+                        "lanes": lanes,
+                        "activity_step_ids": activity_step_ids,
+                    }
+                )
+            )
+        if dropped_ids:
+            for stage in stages:
+                if str(stage.get("coordination_id") or "").strip() in dropped_ids:
+                    stage.pop("coordination_id", None)
+                    stage.pop("delivery_role", None)
+        return ResponsePlan.model_validate(response_payload), kept, reasons
 
     @staticmethod
     def _social_attention_mode(context: dict[str, Any]) -> str:

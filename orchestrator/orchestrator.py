@@ -3704,9 +3704,9 @@ class VoiceAssistant:
                 )
             if safe_response is None:
                 text = (
-                    "这次处理流程没有正确完成，所以我先停下了。请再试一次。"
+                    "我听懂了，可是这次没能把这些事情安排好，所以先停下了。"
                     if self._looks_zh(user_text)
-                    else "I could not finish processing that correctly, so I stopped. Please try again."
+                    else "I understood, but I could not arrange those things correctly this time, so I stopped."
                 )
                 safe_response = self._host_speech_response(
                     text,
@@ -5725,6 +5725,20 @@ class VoiceAssistant:
                 "retryable": bool(metadata.get("retryable")),
             }
         execution_started = failure_facts.get("execution_started") is True
+        understanding_completed = bool(
+            resolution.goal_association is not None
+            or resolution.fast_plan is not None
+            or resolution.terminal_plan is not None
+        )
+        failure_domain = str(metadata.get("failure_domain") or "")
+        failure_stage = str(metadata.get("failure_stage") or "")
+        failure_facts.setdefault("user_input_understood", understanding_completed)
+        failure_facts.setdefault(
+            "user_should_repeat",
+            not understanding_completed
+            and failure_stage in {"gateway", "goal_interpretation"}
+            and failure_domain != "model_contract",
+        )
         phase = (
             "after one or more requested actions were attempted but did not complete"
             if execution_started
@@ -5743,8 +5757,12 @@ class VoiceAssistant:
             "failure facts: location_not_found means the provider could not identify the "
             "requested place, not that weather itself was unavailable or the network failed. "
             "Say simply what failed in natural childlike language, preserve the honest "
-            "no-guess/no-forced-motion boundary, and invite one "
-            "retry when retryable. Return only a JSON object with one field named text.\n\n"
+            "no-guess/no-forced-motion boundary. If user_input_understood is true, never "
+            "say that Chromie did not hear or understand the request. If user_should_repeat "
+            "is false, do not ask the user to repeat the same words; say that Chromie "
+            "understood but could not arrange or complete the requested work this time. "
+            "Invite one retry only when user_should_repeat or the trusted facts explicitly "
+            "make a user retry useful. Return only a JSON object with one field named text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
             f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"
