@@ -12,9 +12,16 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from shared.chromie_contracts.soridormi_body_contract import (
-    normalize_soridormi_body_contract,
-)
+try:
+    from chromie_contracts.soridormi_body_contract import (
+        normalize_soridormi_body_contract,
+    )
+except ModuleNotFoundError as exc:  # Repository-checkout fallback.
+    if exc.name != "chromie_contracts":
+        raise
+    from shared.chromie_contracts.soridormi_body_contract import (
+        normalize_soridormi_body_contract,
+    )
 
 from .models import CapabilityRegistry, ToolCapability
 
