@@ -569,7 +569,7 @@ class HostSettingsSnapshot:
             ready_greeting_fallback_text=_text(
                 values,
                 "ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT",
-                "嗨，我醒啦！",
+                "我醒啦，今天也一起开心吧！",
             ),
             ready_greeting_language=(
                 _text(values, "ORCH_RUNTIME_READY_GREETING_LANGUAGE", "zh-CN")

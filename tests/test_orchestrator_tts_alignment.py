@@ -109,12 +109,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"local_period":"morning"', prompt)
         self.assertIn('"utc_offset":"+08:00"', prompt)
         self.assertIn("Do not quote the exact clock time", prompt)
-        self.assertIn("vary the greeting naturally", prompt)
+        self.assertIn("quiet grounding", prompt)
         self.assertIn("Speak only in zh-CN", prompt)
         self.assertIn("not a device or an adult professional", prompt)
         self.assertIn("family's six-year-old secretary", prompt)
         self.assertIn("Use no vocative, addressee noun", prompt)
-        self.assertIn("greet the room with only a general or time-of-day greeting", prompt)
+        self.assertIn("spontaneous first-person delight", prompt)
+        self.assertIn("Do not default to a formal morning, afternoon, or evening salutation", prompt)
+        self.assertIn("a cheerful first-person wake-up line is preferred", prompt)
+        self.assertNotIn("greet the room with only a general or time-of-day greeting", prompt)
         self.assertIn("Return only a JSON object", prompt)
         self.assertIn("Do not explain the task", prompt)
 
@@ -210,7 +213,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant.runtime_ready_greeting_num_predict = 32
@@ -285,7 +288,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant.runtime_ready_greeting_num_predict = 32
@@ -334,14 +337,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         text, source = await assistant._generate_runtime_ready_greeting()
 
-        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_suppresses_separate_thinking_field(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant.runtime_ready_greeting_num_predict = 32
@@ -399,7 +402,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant.runtime_ready_greeting_num_predict = 32
@@ -449,14 +452,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         text, source = await assistant._generate_runtime_ready_greeting()
 
-        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "嗨，我醒啦！"
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_model = "qwen3:4b"
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant.runtime_ready_greeting_num_predict = 32
@@ -488,7 +491,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         text, source = await assistant._generate_runtime_ready_greeting()
 
-        self.assertEqual(text, "嗨，我醒啦！")
+        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:

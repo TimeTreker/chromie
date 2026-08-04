@@ -2498,6 +2498,90 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(decision.fast_speech)
         self.assertEqual(interpreter.stages, ["primary_interpreter"])
 
+
+    async def test_exact_capability_with_fast_model_hint_skips_quality_intent_review(self) -> None:
+        class ExactHintInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="quality-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    pending_work_fast_speech_repair_enabled=True,
+                )
+                self.calls: list[tuple[str, str]] = []
+
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.calls.append((stage, str(payload.get("model") or "")))
+                if stage == "fast_speech_repair":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"好呀，我先准备一下。",'
+                                '"purpose":"acknowledge","commitment":"prelude_only",'
+                                '"claim_state":"none","claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                if stage == "fast_speech_semantic_review":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"好呀，我先准备一下。",'
+                                '"purpose":"acknowledge","commitment":"prelude_only",'
+                                '"claim_state":"none","claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                if stage == "intent_review":
+                    self.fail("an exact catalog capability must not require quality-model intent review")
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action",'
+                            '"intent":"soridormi.walk_forward|speed=quick",'
+                            '"confidence":0.95}'
+                        )
+                    }
+                }
+
+        interpreter = ExactHintInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="快点往前走。",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "route": "robot_action",
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertEqual(
+            decision.metadata["non_authoritative_capability_intent_hint"],
+            "speed=quick",
+        )
+        self.assertIsNotNone(decision.fast_speech)
+        self.assertNotIn("intent_review", [stage for stage, _ in interpreter.calls])
+        self.assertTrue(
+            all(
+                model == "quick-model"
+                for stage, model in interpreter.calls
+                if stage in {"fast_speech_repair", "fast_speech_semantic_review"}
+            )
+        )
+
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -2556,7 +2640,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             speech_schema["properties"]["claimed_capability_ids"]["maxItems"],
             0,
         )
-        self.assertEqual(payload["model"], "quality-model")
+        self.assertEqual(payload["model"], "quick-model")
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
 

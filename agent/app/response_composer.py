@@ -6,7 +6,7 @@ import logging
 import copy
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
@@ -75,7 +75,7 @@ class ResponseComposerModelOutput(BaseModel):
     # Keep the DTO fail-soft for policy-off and compatibility callers. The
     # resolver makes this field decoder-required and non-null whenever Social
     # Attention is enabled and reviewed candidates are available.
-    social_attention_plan: SkipValidation[SocialAttentionPlan | None] = None
+    social_attention_plan: SocialAttentionPlan | None = None
     lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
@@ -315,6 +315,20 @@ class ResponseComposerResolver:
                 validated_social_behavior_count = (
                     len(social_plan.behaviors) if social_plan is not None else 0
                 )
+                if (
+                    attempt == 0
+                    and model_social_decision == "express"
+                    and validated_social_decision == "none"
+                    and social_reasons
+                ):
+                    raise ValueError(
+                        "social_attention decision=express lost every proposed "
+                        "member during deterministic validation: "
+                        + "; ".join(social_reasons)
+                        + ". Revise to another eligible untargeted behavior, "
+                        "speech_expression.mode=adapt, or an explicit "
+                        "decision=none with a concrete scene reason."
+                    )
                 response_plan, lane_coordination, lane_reasons = (
                     self._reconcile_lane_coordination(
                         response_plan=model_output.response_plan,
@@ -1356,7 +1370,10 @@ class ResponseComposerResolver:
             "meaning requires a correction. Use the authoritative language and "
             "natural six-year-old family-secretary perspective without reciting "
             "identity facts. Social Attention remains optional auxiliary expression "
-            "under the supplied policy.\n\n"
+            "under the supplied policy. When Social Attention is enabled and candidates "
+            "exist, return a structurally complete decision: decision=express requires "
+            "at least one supplied behavior or speech_expression.mode=adapt; a reason "
+            "alone is invalid.\n\n"
             + repair
             + "Return JSON with response_plan, social_attention_plan, lane_coordination=[], confidence, "
             "and rationale only."
@@ -1807,7 +1824,7 @@ class ResponseComposerResolver:
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
             f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
-            "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. When policy is off or the candidate list is empty, return social_attention_plan=null. "
+            "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. decision=express is structurally valid only when it contains at least one supplied body behavior or speech_expression.mode=adapt. A reason alone is not expression. When a requested action already owns a capability, do not duplicate that same capability as auxiliary Social Attention. If a proposed body expression conflicts with primary Activity, choose another eligible untargeted candidate, adapt the response style, or return decision=none with a concrete scene reason. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             "For a retained completed external-result Goal, treat delivered evidence-bound dialogue as the only supplied factual projection. Preserve every measurement and condition from the immutable plan and that dialogue exactly; do not substitute, infer, or embellish external details. The newest user turn remains the conversational target: when it is a reaction, feeling, acknowledgement, evaluation, or practical decision, respond to that act first and use prior facts only as useful support. Never replace the current intent with a replay of the old answer. Omit supporting detail when a direct judgment is sufficient. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
@@ -1953,5 +1970,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, and delivery_role directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. Safe-read work requires one adequate acknowledgement across the whole current turn and no pre_action. If playback-started current-turn speech already adequately provided it, response_plan.immediate may be null; otherwise author the missing supplement or correction. Runtime starts any new acknowledgement in parallel with the lookup, and the Host imposes no fixed wording-length limit. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap across speaking, activity, and optional social_attention lanes, with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages or social behaviors. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, and delivery_role directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. Safe-read work requires one adequate acknowledgement across the whole current turn and no pre_action. If playback-started current-turn speech already adequately provided it, response_plan.immediate may be null; otherwise author the missing supplement or correction. Runtime starts any new acknowledgement in parallel with the lookup, and the Host imposes no fixed wording-length limit. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap across speaking, activity, and optional social_attention lanes, with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages or social behaviors. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. decision=express requires at least one supplied behavior or speech_expression.mode=adapt. Never repeat a primary user-requested capability as auxiliary Social Attention; use another eligible behavior, speech adaptation, or decision=none. Return only the corrected JSON object."
         )

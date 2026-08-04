@@ -239,7 +239,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_TEXT"], "")
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT"],
-            "嗨，我醒啦！",
+            "我醒啦，今天也一起开心吧！",
         )
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")

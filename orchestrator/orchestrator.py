@@ -3110,10 +3110,16 @@ class VoiceAssistant:
         resolution: CognitiveRuntimeResolution,
     ) -> dict[str, Any]:
         terminal = resolution.terminal_plan
+        interaction = resolution.interaction_response
         return {
             "mode": resolution.mode,
             "status": resolution.status,
             "lane": resolution.lane,
+            "interaction_response_constructed": interaction is not None,
+            "provider_request_count": (
+                len(interaction.skills) if interaction is not None else 0
+            ),
+            "provider_dispatch_possible": interaction is not None,
             "plan_id": terminal.plan_id if terminal is not None else None,
             "planner_tier": terminal.planner_tier if terminal is not None else None,
             "disposition": terminal.disposition if terminal is not None else None,
@@ -5739,6 +5745,21 @@ class VoiceAssistant:
             and failure_stage in {"gateway", "goal_interpretation"}
             and failure_domain != "model_contract",
         )
+        interaction_constructed = resolution.interaction_response is not None
+        failure_facts.setdefault(
+            "interaction_response_constructed", interaction_constructed
+        )
+        failure_facts.setdefault(
+            "provider_request_count",
+            len(resolution.interaction_response.skills)
+            if interaction_constructed
+            else 0,
+        )
+        if not execution_started and not interaction_constructed:
+            failure_facts.setdefault(
+                "no_motion_reason",
+                "no_trusted_interaction_response_was_constructed",
+            )
         phase = (
             "after one or more requested actions were attempted but did not complete"
             if execution_started
@@ -5761,6 +5782,9 @@ class VoiceAssistant:
             "say that Chromie did not hear or understand the request. If user_should_repeat "
             "is false, do not ask the user to repeat the same words; say that Chromie "
             "understood but could not arrange or complete the requested work this time. "
+            "When provider_request_count is zero, do not imply that Chromie tried to move; "
+            "the action never reached her body provider. Explain only that she understood "
+            "but could not get the actions arranged, using natural childlike language. "
             "Invite one retry only when user_should_repeat or the trusted facts explicitly "
             "make a user retry useful. Return only a JSON object with one field named text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
@@ -8315,15 +8339,19 @@ class VoiceAssistant:
             "the prompt. Do not mention readiness, startup, initialization, systems, "
             "services, models, being an assistant, or operational status. Do not "
             "introduce yourself, repeat your name or age, or ask what help is required. "
-            "Use the supplied local period to vary the greeting naturally across the "
-            "day. A broad time-of-day greeting is allowed only when grounded by that "
-            "context. Do not quote the exact clock time, calendar date, or weekday. "
+            "Use the supplied local period only as quiet grounding, not as a command "
+            "to announce the time of day. Prefer the spontaneous first-person delight "
+            "of a six-year-old who has just opened her eyes, such as happily saying that "
+            "she is awake and looking forward to being together. Do not default to a "
+            "formal morning, afternoon, or evening salutation. Do not quote the exact "
+            "clock time, calendar date, or weekday. "
             "Do not invent meals, hunger, sleepiness, weather, or another personal "
             "state. Do not ask a question or end mid-clause. "
             "No individual family member has been identified at startup. Use no "
             "vocative, addressee noun, personal name, kinship term, social category, "
-            "or relationship label at all; greet the room with only a general or "
-            "time-of-day greeting. Return only a JSON "
+            "or relationship label at all. Speak naturally into the shared room without "
+            "naming an addressee; a cheerful first-person wake-up line is preferred over "
+            "a formal greeting. Return only a JSON "
             "object with one field named text. The text value is the complete spoken "
             "sentence, normally four to twelve Chinese characters and never more "
             "than twenty-four characters. Prefer a complete greeting over filling "

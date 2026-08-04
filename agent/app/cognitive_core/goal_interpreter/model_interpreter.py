@@ -447,7 +447,17 @@ def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
         return ""
     if value.startswith("capability:"):
         value = value.split(":", 1)[1].strip()
-    return value if value in capability_ids else ""
+    if value in capability_ids:
+        return value
+    # Small fast models sometimes append a non-authoritative semantic hint to
+    # an otherwise exact catalog identity, for example ``skill.id|speed=quick``.
+    # Accept only an exact supplied ID before the separator. The suffix is audit
+    # context only: it is never executable arguments or execution authority.
+    if "|" in value:
+        prefix = value.split("|", 1)[0].strip()
+        if prefix in capability_ids:
+            return prefix
+    return ""
 
 
 
@@ -1364,7 +1374,7 @@ class OllamaGoalInterpreter:
         )
         mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
         return {
-            "model": self.review_model or self.model,
+            "model": self.model,
             "stream": False,
             "think": False,
             "format": {
@@ -1436,7 +1446,7 @@ class OllamaGoalInterpreter:
         ]
         mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
         return {
-            "model": self.review_model or self.model,
+            "model": self.model,
             "stream": False,
             "think": False,
             "format": {
@@ -2249,6 +2259,14 @@ class OllamaGoalInterpreter:
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned capability/skill id in route field; goal interpreter normalized capability route"
         elif intent_capability_id:
+            if "|" in route_from_intent:
+                metadata = parsed.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                metadata["non_authoritative_capability_intent_hint"] = (
+                    route_from_intent.split("|", 1)[1].strip()[:160]
+                )
+                parsed["metadata"] = metadata
             parsed["route"] = _route_for_capability_id(intent_capability_id, request)
             parsed["intent"] = f"capability:{intent_capability_id}"
             parsed["reason"] = (

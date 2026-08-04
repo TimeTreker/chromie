@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from pydantic import ValidationError
+
 from agent.app.goal_association import (
     GoalAssociationModelOutput,
     GoalAssociationResolver,
@@ -14,6 +16,8 @@ from agent.app.response_composer import (
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
+from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 
 
 class ResponseComposerCoordinationRepairTests(unittest.TestCase):
@@ -133,6 +137,71 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         self.assertTrue(reasons)
         assert reconciled.immediate is not None
         self.assertIsNone(reconciled.immediate.coordination_id)
+
+    def test_malformed_social_express_is_not_silently_downgraded(self) -> None:
+        with self.assertRaises(ValidationError):
+            ResponseComposerModelOutput.model_validate(
+                {
+                    "response_plan": {
+                        "final": {
+                            "text": "好呀。",
+                            "speech_act": "acknowledge",
+                            "commitment_state": "completed",
+                            "must_not_claim_completion": False,
+                            "covers_goal_ids": ["goal-chat"],
+                        }
+                    },
+                    "social_attention_plan": {
+                        "decision": "express",
+                        "reason": "The scene feels friendly.",
+                    },
+                }
+            )
+
+    def test_social_speech_adaptation_is_a_real_expression_member(self) -> None:
+        output = ResponseComposerModelOutput.model_validate(
+            {
+                "response_plan": {
+                    "final": {
+                        "text": "好呀。",
+                        "speech_act": "acknowledge",
+                        "commitment_state": "completed",
+                        "must_not_claim_completion": False,
+                        "covers_goal_ids": ["goal-chat"],
+                    }
+                },
+                "social_attention_plan": {
+                    "decision": "express",
+                    "purpose": "engagement",
+                    "speech_expression": {
+                        "mode": "adapt",
+                        "style": "warm",
+                        "pacing": "normal",
+                        "reason": "Stay gently engaged without a target-dependent gesture.",
+                    },
+                },
+            }
+        )
+
+        assert output.social_attention_plan is not None
+        self.assertEqual(output.social_attention_plan.decision, "express")
+        self.assertEqual(output.social_attention_plan.speech_expression.mode, "adapt")
+
+    def test_failed_composition_reports_zero_provider_requests(self) -> None:
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="robot_action",
+            fallback_reason="response composition invalid",
+            metadata={"failure_stage": "response_composer"},
+        )
+
+        summary = VoiceAssistant._cognitive_resolution_summary(resolution)
+
+        self.assertFalse(summary["interaction_response_constructed"])
+        self.assertEqual(summary["provider_request_count"], 0)
+        self.assertFalse(summary["provider_dispatch_possible"])
+
 
 
 class GoalAndCoverageRegressionTests(unittest.TestCase):
