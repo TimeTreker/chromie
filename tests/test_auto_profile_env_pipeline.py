@@ -232,6 +232,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("Operator mode: voice_mujoco", completed.stdout)
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "voice_mujoco")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "1")
+        self.assertEqual(values["ORCH_ACTION_DRY_RUN"], "false")
         self.assertIn("robot_action", values["ORCH_COGNITIVE_APPLY_LANES"]
         )
         self.assertEqual(manifest["active_operator_mode"], "voice_mujoco")

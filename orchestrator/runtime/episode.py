@@ -70,6 +70,10 @@ class EpisodeAgentRecord(BaseModel):
 class EpisodeSkillResultRecord(CapabilityIdentityModel):
     request_id: str
     status: str
+    provider_id: str | None = None
+    execution_mode: str | None = None
+    no_motion: bool | None = None
+    recommendation_only: bool | None = None
     reason_code: str | None = None
     message: str = ""
 
@@ -395,16 +399,30 @@ class EpisodeRecorder:
         execution_status = "not_executed"
         if execution is not None:
             execution_status = execution.status
-            skill_results = [
-                EpisodeSkillResultRecord(
-                    request_id=result.request_id,
-                    capability_id=result.capability_id,
-                    status=result.status,
-                    reason_code=result.reason_code,
-                    message=result.message,
+            for result in execution.results:
+                output = result.output if isinstance(result.output, dict) else {}
+                mode = str(output.get("mode") or "").strip() or None
+                no_motion = output.get("no_motion")
+                recommendation_only = output.get("recommendation_only")
+                skill_results.append(
+                    EpisodeSkillResultRecord(
+                        request_id=result.request_id,
+                        capability_id=result.capability_id,
+                        status=result.status,
+                        provider_id=result.provider_id,
+                        execution_mode=mode,
+                        no_motion=(
+                            no_motion if isinstance(no_motion, bool) else None
+                        ),
+                        recommendation_only=(
+                            recommendation_only
+                            if isinstance(recommendation_only, bool)
+                            else None
+                        ),
+                        reason_code=result.reason_code,
+                        message=result.message,
+                    )
                 )
-                for result in execution.results
-            ]
         return EpisodeTurnRecord(
             sid=session_id,
             turn_index=turn_index,

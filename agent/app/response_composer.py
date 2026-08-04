@@ -698,6 +698,36 @@ class ResponseComposerResolver:
                 "spoken response must use the authoritative English language"
             )
 
+    @staticmethod
+    def _has_effectful_goal_context(
+        context: dict[str, Any] | None,
+    ) -> bool:
+        if not isinstance(context, dict):
+            return False
+
+        def contains_effectful_goal(items: Any) -> bool:
+            if not isinstance(items, list):
+                return False
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                metadata = item.get("metadata")
+                if (
+                    isinstance(metadata, dict)
+                    and str(metadata.get("responsibility_kind") or "").strip()
+                    == "executable_action"
+                ):
+                    return True
+            return False
+
+        if contains_effectful_goal(context.get("active_goal_snapshots")):
+            return True
+        association = context.get("goal_association_resolution")
+        return bool(
+            isinstance(association, dict)
+            and contains_effectful_goal(association.get("new_goals"))
+        )
+
     @classmethod
     def _requires_effectful_semantic_review(
         cls,
@@ -709,12 +739,19 @@ class ResponseComposerResolver:
             if isinstance(context, dict)
             else None
         )
-        return bool(
-            plan.disposition in {"execute", "mixed"}
-            and plan.steps
-            and isinstance(execution_capabilities, list)
-            and bool(execution_capabilities)
+        has_non_read_execution = bool(
+            isinstance(execution_capabilities, list)
+            and execution_capabilities
             and not cls._is_safe_read_plan(plan, context)
+        )
+        return bool(
+            plan.goal_ids
+            and plan.disposition
+            in {"execute", "mixed", "clarify", "unavailable", "refused"}
+            and (
+                cls._has_effectful_goal_context(context)
+                or has_non_read_execution
+            )
         )
 
     @staticmethod
@@ -1635,6 +1672,8 @@ class ResponseComposerResolver:
             "social-attention decision under the supplied DTO schema. Do not add "
             "facts or task steps.\n\n"
             f"Authoritative user turn:\n{request.text}\n\n"
+            "Authoritative effectful Goal context JSON:\n"
+            f"{self._bounded(request.context.get('active_goal_snapshots') or request.context.get('goal_association_resolution') or {}, 7000)}\n\n"
             "Speech already delivered in this current turn JSON:\n"
             f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
             "Immutable CanonicalPlan JSON:\n"
@@ -1666,12 +1705,20 @@ class ResponseComposerResolver:
             "states into ordinary speech.\n\n"
             "When the Plan contains unavailable, refused, or clarification outcomes, "
             "state the limitation or question naturally instead of promising the whole "
-            "request. When current-turn speech already gave an adequate generic "
-            "acknowledgement, do not repeat it. Use concrete everyday wording that "
-            "sounds like Chromie, not customer service or a machine status message. "
-            "Never guarantee that an effectful action will be completed safely. Use "
-            "semantic reasoning, not phrase matching. Preserve valid goal coverage and "
-            "the explicit social-attention decision.\n\n"
+            "request. If the Plan has no executable steps, speech must not narrate, role-play, "
+            "or imply that any requested physical action is happening. If the spoken text "
+            "asks the user to approve an action or supported subset, its typed speech_act "
+            "must be ask_confirmation and commitment_state must be waiting_for_user, and the "
+            "immutable Plan must itself require confirmation; otherwise remove the approval "
+            "question and state the supported and unsupported scope without implying execution. "
+            "The typed speech_act and commitment_state must match the actual communicative "
+            "function of the sentence. Do not tell the user to wait while Chromie learns a new "
+            "physical ability during the current turn. When current-turn speech already gave an "
+            "adequate generic acknowledgement, do not repeat it. Use concrete everyday wording "
+            "that sounds like Chromie, not customer service or a machine status message. Never "
+            "guarantee that an effectful action will be completed safely. Use semantic reasoning, "
+            "not phrase matching. Preserve valid goal coverage and the explicit social-attention "
+            "decision.\n\n"
             f"Authoritative user turn:\n{request.text}\n\n"
             "Speech already delivered in this current turn JSON:\n"
             f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"

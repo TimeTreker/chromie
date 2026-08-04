@@ -827,6 +827,81 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("internal safety checks", review_prompt)
         self.assertIn("do not repeat it", review_prompt)
 
+    def test_effectful_clarification_is_semantically_reviewed_without_steps(self):
+        canonical = CanonicalPlan(
+            plan_id="clarify-unsupported-show",
+            planner_tier="deep",
+            disposition="clarify",
+            coverage="partial",
+            confidence=1.0,
+            goal_ids=["goal-show"],
+            steps=[],
+            unresolved=["jumping and running are unsupported"],
+        )
+        unsafe = {
+            "response_plan": {
+                "final": {
+                    "text": "好呀，我正在边跳边跑，还唱着歌呢！你看到了吗？",
+                    "speech_act": "ask_clarification",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-show"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "The candidate narrates the requested performance.",
+        }
+        reviewed = {
+            "response_plan": {
+                "final": {
+                    "text": "我还不会蹦跳、跑步和唱歌呢。要不要换成我会做的动作？",
+                    "speech_act": "ask_clarification",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-show"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "The revised response states the limitation without role-play.",
+        }
+        ollama = ScriptedOllama([unsafe, reviewed])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "goal_association_resolution": {
+                            "new_goals": [
+                                {
+                                    "goal_id": "goal-show",
+                                    "metadata": {
+                                        "responsibility_kind": "executable_action"
+                                    },
+                                }
+                            ]
+                        },
+                        "execution_capabilities": [],
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        stage = result.composition.response_plan.final  # type: ignore[union-attr]
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(
+            stage.text,
+            "我还不会蹦跳、跑步和唱歌呢。要不要换成我会做的动作？",
+        )
+        review_prompt = ollama.prompts[1][0]
+        self.assertIn("no executable steps", review_prompt)
+        self.assertIn("role-play", review_prompt)
+        self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
+
     def test_safe_read_acknowledgement_is_required_at_decoder_boundary(self):
         canonical = plan(
             disposition="execute",

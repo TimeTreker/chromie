@@ -208,13 +208,10 @@ class ConfirmationDialogue:
         normalized = _normalize_reply(text)
         pending = self._pending
         if pending is None:
-            if normalized in _OPERATIONAL_INTERRUPT_PHRASES:
-                return ConfirmationResolution(decision="not_confirmation")
-            if normalized in _AFFIRMATIVE_PHRASES or normalized in _NEGATIVE_PHRASES:
-                return ConfirmationResolution(
-                    decision="no_pending",
-                    message="There is no action waiting for confirmation.",
-                )
+            # Without a bound pending request, an affirmative or negative reply is
+            # ordinary conversation context, not a confirmation event. Let Goal
+            # Association interpret it instead of emitting a Host-authored status
+            # sentence in the wrong language or conversational frame.
             return ConfirmationResolution(decision="not_confirmation")
 
         self._pending = None

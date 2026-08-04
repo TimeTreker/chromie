@@ -75,6 +75,12 @@ class EpisodeRecorderTests(unittest.TestCase):
                         request_id="walk-1",
                         skill_id="soridormi.walk_velocity",
                         status="completed",
+                        provider_id="soridormi.mcp",
+                        output={
+                            "mode": "sim",
+                            "no_motion": False,
+                            "recommendation_only": False,
+                        },
                     )
                 ],
             )
@@ -99,6 +105,11 @@ class EpisodeRecorderTests(unittest.TestCase):
                 second_episode.turns[1].execution.skill_results[0].status,
                 "completed",
             )
+            recorded_result = second_episode.turns[1].execution.skill_results[0]
+            self.assertEqual(recorded_result.provider_id, "soridormi.mcp")
+            self.assertEqual(recorded_result.execution_mode, "sim")
+            self.assertFalse(recorded_result.no_motion)
+            self.assertFalse(recorded_result.recommendation_only)
 
             lines = recorder.log_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(lines), 2)

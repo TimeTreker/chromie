@@ -60,7 +60,7 @@ cannot be replaced from `.env.local`.
 |---|---|---|
 | `services` | `scripts/start_services.sh` | Docker services and non-embodied chat/tool apply lanes; no Soridormi skills. |
 | `speech` | `scripts/start_orchestrator.sh` | Microphone, conversation, and safe-read tools without embodied skills. |
-| `voice_mujoco` | `scripts/start_chromie.sh` and the voice-to-MuJoCo wrapper | Full maintained voice plus Soridormi/MuJoCo apply lanes; action execution remains dry-run unless an acceptance profile explicitly owns otherwise. |
+| `voice_mujoco` | `scripts/start_chromie.sh` and the voice-to-MuJoCo wrapper | Full maintained voice plus Soridormi/MuJoCo apply lanes. Named Soridormi skills execute in the simulator; the removed legacy action path remains disabled rather than being used as a dry-run substitute. |
 | `qualification` | `scripts/run_target_evidence_closure.py` | Source-bound acceptance with timing and cognitive evidence enabled. |
 
 Every maintained mode keeps Goal-driven `apply`, disables the legacy direct-LLM
@@ -488,6 +488,13 @@ principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
 [`chromie_mind.md`](chromie_mind.md).
+
+`episodes.jsonl` is an append-only observability artifact. The realtime Host
+writes it only after an interaction has produced a response/execution record; it
+is not loaded into Goal Interpretation, Goal Association, planning, response
+composition, conversation memory, or capability execution. The maintained reader
+is the explicit offline evaluator below, so deleting or disabling episode recording
+does not remove Chromie's live conversational memory or reasoning context.
 
 Episode snapshots can be scored and mined offline:
 

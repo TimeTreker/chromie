@@ -564,12 +564,14 @@ def validate_goal_responsibility_outcomes(
 def coordinated_action_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return Goals explicitly bound as coordinated action collections.
+    """Return model-authored effectful Goals requiring semantic coverage audit.
 
-    Goal Association, rather than the Host, authors the ``action_list`` type or
-    splits one source utterance into several independently observable Goals.
-    The Host uses those structured facts only to require a bounded model
-    completeness audit; it does not infer actions or select Capabilities.
+    Goal Association, rather than the Host, declares ``responsibility_kind`` and
+    authors any ``action_list`` binding or sibling Goal split. The Host uses only
+    those typed facts to require an independent model completeness audit; it does
+    not infer actions, parse user wording, or select Capabilities. Auditing every
+    executable-action Goal prevents a generic movement step from being accepted as
+    exact completion of a richer physical responsibility such as object handling.
     """
 
     goal_ids: set[str] = set()
@@ -583,6 +585,13 @@ def coordinated_action_goal_ids(
         source_text = " ".join(str(goal.get("source_text") or "").strip().split())
         if source_text:
             source_groups.setdefault(source_text, set()).add(goal_id)
+        metadata = goal.get("metadata")
+        if (
+            isinstance(metadata, dict)
+            and str(metadata.get("responsibility_kind") or "").strip()
+            == "executable_action"
+        ):
+            goal_ids.add(goal_id)
         goal_object = goal.get("object")
         if not isinstance(goal_object, dict):
             continue

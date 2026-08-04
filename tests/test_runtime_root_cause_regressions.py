@@ -13,6 +13,7 @@ from agent.app.planner_contract import (
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
     planner_coverage_review_response_schema,
+    coordinated_action_goal_ids,
     validate_goal_responsibility_outcomes,
 )
 from agent.app.response_composer import ResponseComposerResolver
@@ -80,6 +81,28 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             branches[1]["properties"]["uncovered_requirements"]["minItems"],
             1,
         )
+
+    def test_single_model_authored_executable_goal_requires_coverage_audit(self) -> None:
+        goal_ids = coordinated_action_goal_ids(
+            [
+                {
+                    "goal_id": "goal-fetch-water",
+                    "description": "Bring the user a cup of water.",
+                    "metadata": {"responsibility_kind": "executable_action"},
+                    "object": {
+                        "bindings": {
+                            "item": {
+                                "name": "item",
+                                "entity_type": "object",
+                                "value": "water",
+                            }
+                        }
+                    },
+                }
+            ]
+        )
+
+        self.assertEqual(goal_ids, {"goal-fetch-water"})
 
     def test_planner_schema_requires_confirmation_for_material_adjustment(self) -> None:
         schema = canonical_plan_response_schema(
@@ -337,7 +360,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(joke_outcome["oneOf"])
 
-    async def test_core_clarify_authority_cannot_become_a_new_goal(self) -> None:
+    async def test_preassociation_clarify_is_advisory_to_goal_association(self) -> None:
         ollama = _SequenceOllama(
             [
                 {
@@ -346,29 +369,26 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "clarification": "",
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
-                },
-                {
-                    "decision": "clarify",
-                    "new_goals": [],
-                    "clarification": "What did you mean by F?",
-                    "confidence": 0.9,
-                    "reason_summary": "The admitted turn is insufficiently clear.",
-                },
+                }
             ]
         )
         resolution = await GoalAssociationResolver(ollama).resolve(  # type: ignore[arg-type]
             _clarify_request()
         )
 
-        self.assertEqual(resolution.new_goals, [])
         self.assertEqual(resolution.associations, [])
-        self.assertEqual(resolution.clarification, "What did you mean by F?")
-        self.assertEqual(len(ollama.schemas), 2)
+        self.assertEqual(resolution.clarification, "")
+        self.assertEqual(len(resolution.new_goals), 1)
+        self.assertEqual(
+            resolution.new_goals[0].description,
+            "Respond naturally to F.",
+        )
+        self.assertEqual(len(ollama.schemas), 1)
         self.assertEqual(
             ollama.schemas[0]["properties"]["decision"]["enum"],
-            ["clarify"],
+            ["create_goals", "clarify"],
         )
-        self.assertEqual(
+        self.assertGreater(
             ollama.schemas[0]["properties"]["new_goals"]["maxItems"],
             0,
         )

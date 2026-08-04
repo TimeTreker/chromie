@@ -53,7 +53,14 @@ class ConfirmationDialogueTests(unittest.TestCase):
         self.assertEqual(resolution.confirmed_request_ids, {"nod-1"})
         self.assertEqual(resolution.response, pending.response)
         self.assertEqual(resolution.fingerprint, pending.fingerprint)
-        self.assertEqual(replay.decision, "no_pending")
+        self.assertEqual(replay.decision, "not_confirmation")
+
+    def test_affirmative_without_pending_confirmation_reaches_goal_association(self) -> None:
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+
+        self.assertEqual(dialogue.resolve("yes").decision, "not_confirmation")
+        self.assertEqual(dialogue.resolve("好的").decision, "not_confirmation")
+        self.assertEqual(dialogue.resolve("no").decision, "not_confirmation")
 
     def test_operational_stop_without_pending_confirmation_reaches_goal_interpreter(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
@@ -88,7 +95,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
                 )
                 self.assertIsNone(resolution.response)
                 self.assertIsNone(dialogue.pending)
-                self.assertEqual(dialogue.resolve("yes").decision, "no_pending")
+                self.assertEqual(dialogue.resolve("yes").decision, "not_confirmation")
 
     def test_denial_and_ambiguous_reply_never_return_request(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
