@@ -241,9 +241,21 @@ class ResponseStage(BaseModel):
     covers_task_ids: list[str] = Field(default_factory=list)
     covers_goal_ids: list[str] = Field(default_factory=list)
     claims: list[str] = Field(default_factory=list)
+    coordination_id: str | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+    delivery_role: Literal[
+        "response",
+        "activity_companion",
+        "performance",
+    ] = Field(
+        default="response",
+        exclude_if=lambda value: value == "response",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("text", "speech_act", mode="before")
+    @field_validator("text", "speech_act", "coordination_id", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -282,6 +294,14 @@ class ResponseStage(BaseModel):
         ):
             raise ValueError(
                 "terminal claims require must_not_claim_completion=false"
+            )
+        if self.coordination_id and self.delivery_role == "response":
+            raise ValueError(
+                "coordinated speech requires activity_companion or performance role"
+            )
+        if not self.coordination_id and self.delivery_role != "response":
+            raise ValueError(
+                "non-response delivery roles require coordination_id"
             )
         return self
 

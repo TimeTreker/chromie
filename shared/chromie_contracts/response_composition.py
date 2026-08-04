@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .execution_lanes import LaneCoordinationGroup
 from .interaction import reject_forbidden_low_level_fields
 from .goal import GoalAssociationResolution
 from .plan import CanonicalPlan
@@ -51,6 +52,7 @@ class CoordinatedResponsePlan(BaseModel):
     canonical_plan: CanonicalPlan
     response_plan: ResponsePlan
     social_attention_plan: SocialAttentionPlan | None = None
+    lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -119,6 +121,93 @@ class CoordinatedResponsePlan(BaseModel):
         ):
             missing = sorted(known_goals - covered_goals)
             raise ValueError("response composition does not cover all plan goals: " + ",".join(missing))
+
+        coordination_by_id = {
+            item.coordination_id: item for item in self.lane_coordination
+        }
+        if len(coordination_by_id) != len(self.lane_coordination):
+            raise ValueError("lane coordination IDs must be unique")
+        plan_steps = {step.step_id: step for step in plan.steps}
+        coordinated_activity_steps: set[str] = set()
+        for group in self.lane_coordination:
+            for step_id in group.activity_step_ids:
+                step = plan_steps.get(step_id)
+                if step is None:
+                    raise ValueError(
+                        "lane coordination references unknown activity step: "
+                        + step_id
+                    )
+                if step_id in coordinated_activity_steps:
+                    raise ValueError(
+                        "activity step belongs to more than one lane coordination group: "
+                        + step_id
+                    )
+                coordinated_activity_steps.add(step_id)
+                if step.timing != "parallel":
+                    raise ValueError(
+                        "cross-lane activity steps must use timing=parallel: "
+                        + step_id
+                    )
+
+        coordinated_speech_ids: set[str] = set()
+        for stage in stages:
+            coordination_id = str(stage.coordination_id or "").strip()
+            if not coordination_id:
+                continue
+            group = coordination_by_id.get(coordination_id)
+            if group is None:
+                raise ValueError(
+                    "response stage references unknown lane coordination: "
+                    + coordination_id
+                )
+            if "speaking" not in group.lanes:
+                raise ValueError(
+                    "response stage coordination requires the speaking lane: "
+                    + coordination_id
+                )
+            if (
+                stage.speech_act.casefold() == "ask_confirmation"
+                or stage.commitment_state == "waiting_for_user"
+            ):
+                raise ValueError(
+                    "confirmation and waiting speech cannot overlap effect execution"
+                )
+            coordinated_speech_ids.add(coordination_id)
+
+        coordinated_social_ids: set[str] = set()
+        if self.social_attention_plan is not None:
+            for behavior in self.social_attention_plan.behaviors:
+                coordination_id = str(behavior.coordination_id or "").strip()
+                if not coordination_id:
+                    continue
+                group = coordination_by_id.get(coordination_id)
+                if group is None:
+                    raise ValueError(
+                        "social behavior references unknown lane coordination: "
+                        + coordination_id
+                    )
+                if "social_attention" not in group.lanes:
+                    raise ValueError(
+                        "social behavior coordination requires the social_attention lane: "
+                        + coordination_id
+                    )
+                coordinated_social_ids.add(coordination_id)
+
+        for group in self.lane_coordination:
+            lane_set = set(group.lanes)
+            if "speaking" in lane_set and group.coordination_id not in coordinated_speech_ids:
+                raise ValueError(
+                    "speaking lane coordination requires one coordinated response stage: "
+                    + group.coordination_id
+                )
+            if (
+                "social_attention" in lane_set
+                and group.coordination_id not in coordinated_social_ids
+            ):
+                raise ValueError(
+                    "social_attention lane coordination requires one coordinated behavior: "
+                    + group.coordination_id
+                )
 
         if plan.disposition == "execute":
             if self.response_plan.final is not None:

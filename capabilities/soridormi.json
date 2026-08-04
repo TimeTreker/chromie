@@ -702,7 +702,52 @@
               "skills": {
                 "type": "array",
                 "items": {
-                  "type": "object"
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "skill_id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "body_lane": {
+                      "type": "string",
+                      "enum": [
+                        "subtle_expression",
+                        "locomotion",
+                        "whole_body",
+                        "safety"
+                      ]
+                    },
+                    "can_run_parallel": {
+                      "type": "boolean"
+                    },
+                    "exclusive_group": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "resource_claims": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "parameters_schema": {
+                      "type": "object"
+                    },
+                    "execution_constraints": {
+                      "type": "object"
+                    }
+                  },
+                  "additionalProperties": true
                 }
               }
             },

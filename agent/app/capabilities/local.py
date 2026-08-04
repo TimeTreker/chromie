@@ -65,9 +65,21 @@ def chromie_manifests() -> list[AgentManifest]:
                 output_schema={"type": "object", "properties": {"spoken": {"type": "boolean"}}},
                 effects=["user_interaction", "audio_output"],
                 safety_class="low_risk_action",
-                execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="chromie_audio", timeout_s=10.0, idempotent=False, side_effect_free=False),
+                execution=ExecutionPolicy(can_run_parallel=True, exclusive_group="chromie.audio", timeout_s=10.0, idempotent=False, side_effect_free=False),
                 default_failure_policy=FailurePolicy(strategy="skip"),
-                llm_hints={"when_to_use": "Use to explain plans, progress, or results to the user."},
+                llm_hints={
+                    "when_to_use": "Use to explain plans, progress, or results to the user.",
+                    "execution_lane": "speaking",
+                    "can_run_parallel": True,
+                    "exclusive_group": "chromie.audio",
+                    "resource_claims": ["audio_output"],
+                    "execution_constraints": {
+                        "parallel_allowed_with_lanes": [
+                            "activity",
+                            "social_attention",
+                        ]
+                    },
+                },
             ),
             ToolCapability(
                 name="chromie.ask_confirmation",

@@ -418,3 +418,22 @@ python scripts/check_docs.py
 Live Soridormi integration changes must include Soridormi-side validation and
 Chromie acceptance evidence. A Chromie green test alone does not prove robot
 motion safety.
+
+## Body-lane concurrency contract
+
+Soridormi is a peer Capability Provider beneath Chromie's Activity execution
+lane. A live named skill may declare `body_lane` as `subtle_expression`,
+`locomotion`, `whole_body`, or `safety`, together with `can_run_parallel`, an
+exclusive group, and resource claims. Chromie preserves and validates these
+provider declarations; it does not assign body lanes from capability IDs.
+
+Walking and blinking may overlap only when Soridormi advertises nonconflicting
+body lanes and resources and its safety authority accepts both. Two locomotion
+commands remain conflicting even when both independently claim parallel
+support. Cross-provider speech overlap is coordinated by Chromie's Speaking and
+Activity lanes; Soridormi never owns Chromie's audio meaning or playback.
+
+The current Chromie runtime supports best-effort parallel batches. A later
+Soridormi/Chromie contract is required for prepared members, a synchronized
+start barrier, atomic bundle cancellation, and measured overlap evidence. See
+[Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).

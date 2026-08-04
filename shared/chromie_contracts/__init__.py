@@ -49,6 +49,13 @@ from .interaction import (
     output_schema_sha256,
     validate_output_schema_declaration,
 )
+from .execution_lanes import (
+    ChromieExecutionLane,
+    LaneCoordinationFailurePolicy,
+    LaneCoordinationGroup,
+    LaneCoordinationRelation,
+    LaneCoordinationStartPolicy,
+)
 from .execution_outcome import (
     ExecutionAggregateStatus,
     ExecutionEvidence,
@@ -242,6 +249,11 @@ __all__ = [
     "output_schema_declaration_error",
     "output_schema_sha256",
     "validate_output_schema_declaration",
+    "ChromieExecutionLane",
+    "LaneCoordinationFailurePolicy",
+    "LaneCoordinationGroup",
+    "LaneCoordinationRelation",
+    "LaneCoordinationStartPolicy",
     "ExecutionAggregateStatus",
     "ExecutionEvidence",
     "ExecutionEvidenceStatus",

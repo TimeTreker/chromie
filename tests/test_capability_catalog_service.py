@@ -78,6 +78,10 @@ class _Invoker:
                         },
                         "available": True,
                         "requires_confirmation": True,
+                        "body_lane": "locomotion",
+                        "can_run_parallel": True,
+                        "exclusive_group": "soridormi.base_motion",
+                        "resource_claims": ["base_motion", "balance_control"],
                     },
                     {
                         "skill_id": "blink_eyes",
@@ -93,6 +97,10 @@ class _Invoker:
                         "effects": ["visual_expression"],
                         "safety_class": "low_risk_action",
                         "requires_confirmation": False,
+                        "body_lane": "subtle_expression",
+                        "can_run_parallel": True,
+                        "exclusive_group": "soridormi.eye_expression",
+                        "resource_claims": ["eye_expression"],
                     }
                 ],
             }
@@ -356,6 +364,22 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(blink["prompt_tier"], "common")
         self.assertFalse(blink["prompt_tier_locked"])
         self.assertEqual(blink["prompt_tier_source"], "preset")
+        self.assertEqual(blink["hints"]["execution_lane"], "activity")
+        self.assertEqual(blink["hints"]["body_lane"], "subtle_expression")
+        self.assertTrue(blink["parallel_metadata_declared"])
+        self.assertEqual(blink["exclusive_group"], "soridormi.eye_expression")
+        self.assertEqual(blink["resource_claims"], ["eye_expression"])
+        walk = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "soridormi.walk_forward"
+        )
+        self.assertEqual(walk["hints"]["body_lane"], "locomotion")
+        self.assertEqual(walk["exclusive_group"], "soridormi.base_motion")
+        self.assertEqual(
+            walk["resource_claims"],
+            ["base_motion", "balance_control"],
+        )
 
     async def test_prompt_tiers_are_loaded_from_preset_data(self) -> None:
         catalog = CapabilityCatalog(

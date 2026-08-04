@@ -379,6 +379,21 @@ class CognitiveEvidenceRecorder:
                 if composition and composition.social_attention_plan
                 else None
             ),
+            "lane_coordination": (
+                [
+                    {
+                        "coordination_id": item.coordination_id,
+                        "lanes": list(item.lanes),
+                        "activity_step_ids": list(item.activity_step_ids),
+                        "relation": item.relation,
+                        "start_policy": item.start_policy,
+                        "failure_policy": item.failure_policy,
+                    }
+                    for item in coordinated.lane_coordination
+                ]
+                if coordinated is not None
+                else []
+            ),
             "safe_read_semantic_review": (
                 dict(composition.metadata.get("safe_read_semantic_review") or {})
                 if composition
@@ -743,6 +758,8 @@ class CanonicalPlanRuntimeAdapter:
             return False
         if timing != "parallel" or not social_definition.can_run_parallel:
             return True
+        if social_definition.metadata.get("parallel_metadata_declared") is not True:
+            return True
         social_group = str(social_definition.exclusive_group or "")
         social_resources = {
             str(item)
@@ -751,6 +768,8 @@ class CanonicalPlanRuntimeAdapter:
         }
         for definition in primary_definitions.values():
             if not definition.can_run_parallel:
+                return True
+            if definition.metadata.get("parallel_metadata_declared") is not True:
                 return True
             primary_group = str(definition.exclusive_group or "")
             if social_group and primary_group and social_group == primary_group:
@@ -804,6 +823,8 @@ class CanonicalPlanRuntimeAdapter:
                     "wait_for_playback_start": True,
                     "playback_start_required_for_delivery": True,
                     "planless_direct_response": True,
+                    "execution_lane": "speaking",
+                    "delivery_role": "response",
                 },
             )
         ]
@@ -904,6 +925,7 @@ class CanonicalPlanRuntimeAdapter:
                                     ),
                                     "reason": behavior.reason,
                                     "social_attention_policy_mode": policy_mode,
+                                    "execution_lane": "social_attention",
                                 },
                             )
                             skills.append(request)
@@ -929,6 +951,12 @@ class CanonicalPlanRuntimeAdapter:
             "response_composition": composition.model_dump(
                 mode="json", exclude_none=True
             ),
+            "execution_lanes": {
+                "social_attention": "proposal_and_auxiliary_execution",
+                "speaking": "response_delivery",
+                "activity": "idle",
+            },
+            "lane_coordination_groups": [],
             "planning_result": "direct_response",
             "capability_decision": "respond",
             "goal_ids": goal_ids,
@@ -1021,6 +1049,15 @@ class CanonicalPlanRuntimeAdapter:
                     confirmation_goal_ids.update(step.source_goal_ids)
 
         response_plan = composition.response_plan
+        lane_coordination_by_id = {
+            item.coordination_id: item
+            for item in composition.lane_coordination
+        }
+        activity_coordination_by_step_id = {
+            step_id: item
+            for item in composition.lane_coordination
+            for step_id in item.activity_step_ids
+        }
         stage_items = [
             ("immediate", response_plan.immediate),
             ("pre_action", response_plan.pre_action),
@@ -1214,6 +1251,8 @@ class CanonicalPlanRuntimeAdapter:
                             "operational_text_source": "llm_wording_runtime_validated",
                             "runtime_confirmation_required": False,
                             "safe_read_micro_ack": safe_read_speech_optional,
+                            "coordination_id": stage.coordination_id,
+                            "delivery_role": stage.delivery_role,
                         }
                     ]
                 else:
@@ -1238,6 +1277,8 @@ class CanonicalPlanRuntimeAdapter:
                             bool(confirmation_goal_ids)
                             and stage in confirmation_stages
                         ),
+                        "coordination_id": stage.coordination_id,
+                        "delivery_role": stage.delivery_role,
                     }
                     for phase, stage in stage_items
                     if stage is not None
@@ -1253,6 +1294,8 @@ class CanonicalPlanRuntimeAdapter:
                     "covers_goal_ids": stage.covers_goal_ids,
                     "claims": stage.claims,
                     "source": "goal_driven_response_composer",
+                    "coordination_id": stage.coordination_id,
+                    "delivery_role": stage.delivery_role,
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1261,6 +1304,12 @@ class CanonicalPlanRuntimeAdapter:
         speech: list[InteractionSpeech] = []
         for projected in projected_speech_stages:
             phase = str(projected["phase"])
+            coordination_id = str(projected.get("coordination_id") or "").strip()
+            coordination = lane_coordination_by_id.get(coordination_id)
+            coordinated_speech = bool(
+                coordination is not None and "speaking" in coordination.lanes
+            )
+            playback_barrier = not safe_read_parallel and not coordinated_speech
             speech_metadata = {
                 "source": projected["source"],
                 "phase": phase,
@@ -1274,10 +1323,26 @@ class CanonicalPlanRuntimeAdapter:
                 "canonical_plan_id": plan.plan_id,
                 "canonical_plan_fingerprint": fingerprint,
                 "claims": projected["claims"],
-                "wait_for_playback_start": not safe_read_parallel,
-                "playback_start_required_for_delivery": not safe_read_parallel,
+                "execution_lane": "speaking",
+                "delivery_role": projected.get("delivery_role", "response"),
+                "wait_for_playback_start": playback_barrier,
+                "playback_start_required_for_delivery": playback_barrier,
             }
-            if safe_read_parallel:
+            if coordinated_speech and coordination is not None:
+                speech_metadata.update(
+                    {
+                        "coordination_id": coordination.coordination_id,
+                        "lane_coordination_relation": coordination.relation,
+                        "lane_start_policy": coordination.start_policy,
+                        "lane_failure_policy": coordination.failure_policy,
+                        "parallel_with_activity": "activity" in coordination.lanes,
+                        "parallel_with_social_attention": (
+                            "social_attention" in coordination.lanes
+                        ),
+                        "playback_start_required_for_effects": False,
+                    }
+                )
+            elif safe_read_parallel:
                 speech_metadata.update(
                     {
                         "safe_read_micro_ack": safe_read_speech_optional,
@@ -1298,7 +1363,7 @@ class CanonicalPlanRuntimeAdapter:
                     text=str(projected["text"]),
                     timing=(
                         "parallel"
-                        if safe_read_parallel
+                        if safe_read_parallel or coordinated_speech
                         else "immediate"
                         if phase == "immediate"
                         else "sequential"
@@ -1311,6 +1376,32 @@ class CanonicalPlanRuntimeAdapter:
         skills: list[SkillRequest] = []
         for step in plan.steps:
             definition = self.interaction_runtime.skill_definition(step.skill_id)
+            coordination = activity_coordination_by_step_id.get(step.step_id)
+            if coordination is not None:
+                if not definition.can_run_parallel:
+                    raise ValueError(
+                        "cross-lane activity capability is not parallel-safe: "
+                        + step.skill_id
+                    )
+                if definition.metadata.get("parallel_metadata_declared") is not True:
+                    raise ValueError(
+                        "cross-lane activity capability lacks explicit parallel metadata: "
+                        + step.skill_id
+                    )
+            coordination_metadata = (
+                {
+                    "coordination_id": coordination.coordination_id,
+                    "lane_coordination_relation": coordination.relation,
+                    "lane_start_policy": coordination.start_policy,
+                    "lane_failure_policy": coordination.failure_policy,
+                    "parallel_with_speech": "speaking" in coordination.lanes,
+                    "parallel_with_social_attention": (
+                        "social_attention" in coordination.lanes
+                    ),
+                }
+                if coordination is not None
+                else {}
+            )
             digest = hashlib.sha256(
                 f"{fingerprint}|{step.step_id}".encode("utf-8")
             ).hexdigest()[:20]
@@ -1348,7 +1439,12 @@ class CanonicalPlanRuntimeAdapter:
                             definition.metadata.get("safety_class") or ""
                         ) not in {"safe_read", "planning_only"},
                         "retryable_safe_read": safe_read_parallel,
-                        "parallel_with_speech": safe_read_parallel,
+                        "execution_lane": "activity",
+                        "parallel_with_speech": (
+                            safe_read_parallel
+                            or bool(coordination_metadata.get("parallel_with_speech"))
+                        ),
+                        **coordination_metadata,
                         "canonical_timing": step.timing,
                         "effective_timing": (
                             "parallel" if safe_read_parallel else step.timing
@@ -1435,6 +1531,28 @@ class CanonicalPlanRuntimeAdapter:
                                 f"resource_conflict:{behavior.skill_id}"
                             )
                             continue
+                        coordination_id = str(
+                            behavior.coordination_id or ""
+                        ).strip()
+                        coordination = lane_coordination_by_id.get(
+                            coordination_id
+                        )
+                        coordination_metadata = (
+                            {
+                                "coordination_id": coordination.coordination_id,
+                                "lane_coordination_relation": coordination.relation,
+                                "lane_start_policy": coordination.start_policy,
+                                "lane_failure_policy": coordination.failure_policy,
+                                "parallel_with_speech": (
+                                    "speaking" in coordination.lanes
+                                ),
+                                "parallel_with_activity": (
+                                    "activity" in coordination.lanes
+                                ),
+                            }
+                            if coordination is not None
+                            else {}
+                        )
                         digest = hashlib.sha256(
                             f"{fingerprint}|social|{index}|{behavior.skill_id}".encode(
                                 "utf-8"
@@ -1469,6 +1587,8 @@ class CanonicalPlanRuntimeAdapter:
                                     ),
                                     "reason": behavior.reason,
                                     "social_attention_policy_mode": policy_mode,
+                                    "execution_lane": "social_attention",
+                                    **coordination_metadata,
                                 },
                             )
                         )
@@ -1518,6 +1638,15 @@ class CanonicalPlanRuntimeAdapter:
             "response_composition": composition.model_dump(
                 mode="json", exclude_none=True
             ),
+            "execution_lanes": {
+                "social_attention": "proposal_and_auxiliary_execution",
+                "speaking": "response_delivery",
+                "activity": "provider_work",
+            },
+            "lane_coordination_groups": [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in composition.lane_coordination
+            ],
             "planning_result": (
                 "composed_plan"
                 if plan.disposition in {"execute", "mixed"}

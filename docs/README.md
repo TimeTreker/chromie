@@ -77,6 +77,7 @@ When documents disagree, correct the lower-authority document.
 | Which facts belong to behavior, architecture-policy, or generated-artifact tests? | `docs/TEST_OWNERSHIP.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
+| How do Social Attention, Speaking, Activity, and Soridormi body lanes coordinate concurrently? | `docs/EXECUTION_LANES_AND_COORDINATION.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |
@@ -102,6 +103,7 @@ in order:
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
+- [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 - [Acceptance and Evidence](ACCEPTANCE.md)
 - [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md)
@@ -177,6 +179,7 @@ mechanical-contract owner.
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
+- [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
 - [Interaction Agent and Capability Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)

@@ -175,3 +175,11 @@ The native structured Agent path now emits Trusted Capability Runtime requests
 directly, while the host registry remains the final provider and execution
 authority.
 Future catalog-alignment work must not bypass either policy layer.
+## Soridormi body-lane metadata
+
+Live `soridormi.skill.list` entries may declare `body_lane` as
+`subtle_expression`, `locomotion`, `whole_body`, or `safety`, together with
+`can_run_parallel`, `exclusive_group`, and `resource_claims`. Chromie preserves
+these provider declarations for planning and runtime validation. It never
+assigns a body lane from a skill name or user phrase. See
+[Execution Lanes and Coordination](../docs/EXECUTION_LANES_AND_COORDINATION.md).

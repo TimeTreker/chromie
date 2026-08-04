@@ -23,6 +23,7 @@ from .schema import AgentRunRequest
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from chromie_contracts.execution_lanes import LaneCoordinationGroup
     from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.response_composition import (
@@ -43,6 +44,7 @@ try:
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+    from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.response_composition import (
@@ -74,6 +76,7 @@ class ResponseComposerModelOutput(BaseModel):
     # resolver makes this field decoder-required and non-null whenever Social
     # Attention is enabled and reviewed candidates are available.
     social_attention_plan: SkipValidation[SocialAttentionPlan | None] = None
+    lane_coordination: list[LaneCoordinationGroup] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     rationale: str = ""
 
@@ -327,6 +330,7 @@ class ResponseComposerResolver:
                     canonical_plan=plan,
                     response_plan=model_output.response_plan,
                     social_attention_plan=social_plan,
+                    lane_coordination=model_output.lane_coordination,
                     confidence=model_output.confidence,
                     rationale=model_output.rationale,
                     metadata={
@@ -1123,6 +1127,10 @@ class ResponseComposerResolver:
                     plan=None,
                     context=request.context,
                 )
+                if output.lane_coordination:
+                    raise ValueError(
+                        "planless direct responses cannot declare cross-lane coordination"
+                    )
                 composition = DirectResponseComposition(
                     composition_id=self._direct_composition_id(
                         request, association
@@ -1334,7 +1342,7 @@ class ResponseComposerResolver:
             "identity facts. Social Attention remains optional auxiliary expression "
             "under the supplied policy.\n\n"
             + repair
-            + "Return JSON with response_plan, social_attention_plan, confidence, "
+            + "Return JSON with response_plan, social_attention_plan, lane_coordination=[], confidence, "
             "and rationale only."
         )
 
@@ -1617,7 +1625,7 @@ class ResponseComposerResolver:
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
             f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
-            "Compose one ResponsePlan and one explicit social-attention decision. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. When policy is off or the candidate list is empty, return social_attention_plan=null. "
+            "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             "For a retained completed external-result Goal, treat delivered evidence-bound dialogue as the only supplied factual projection. Preserve every measurement and condition from the immutable plan and that dialogue exactly; do not substitute, infer, or embellish external details. The newest user turn remains the conversational target: when it is a reaction, feeling, acknowledgement, evaluation, or practical decision, respond to that act first and use prior facts only as useful support. Never replace the current intent with a replay of the old answer. Omit supporting detail when a direct judgment is sufficient. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
@@ -1630,10 +1638,11 @@ class ResponseComposerResolver:
             "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. This is semantic conversational judgment, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
             "For a pending safe_read or external_read capability, ensure the user receives one adequate natural everyday acknowledgement before the result. When current-turn delivered speech already adequately acknowledged that same pending work, set response_plan.immediate=null rather than saying it again. When no adequate acknowledgement was delivered, or the earlier one needs supplementation or correction, emit exactly one natural everyday immediate acknowledgement. The Host does not impose a character, word, or sentence-count style limit. For a fresh external read, say naturally that Chromie is checking the relevant source. For chromie.memory.retrieve_verified_tool_result, say naturally that Chromie recently checked the exact subject and is retrieving that result, with certainty no stronger than the supplied index metadata. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
+            "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, speaking delivers model-authored communication, and activity executes non-speech provider work. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy exact CanonicalPlan step IDs into activity_step_ids, and only when those steps already use timing=parallel under compatible provider metadata. A coordinated response stage must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
-            "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, social_attention_plan, confidence, and rationale only."
+            "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, social_attention_plan, lane_coordination, confidence, and rationale only."
         )
 
     def _safe_read_semantic_review_prompt(
@@ -1754,7 +1763,7 @@ class ResponseComposerResolver:
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's Response Composer. Coordinate truthful language expression and an explicit social-attention decision around an immutable CanonicalPlan using a scene-specific purpose. When policy is enabled and reviewed candidates exist, always choose decision=none or decision=express instead of omitting the responsibility. "
+            "You are Chromie's Response Composer. Coordinate truthful language expression, optional social-attention proposals, and typed speaking/activity overlap around an immutable CanonicalPlan using one Cognitive Core. When policy is enabled and reviewed candidates exist, always choose decision=none or decision=express instead of omitting the responsibility. "
             "You do not plan tasks, mutate goals, execute, authorize, or claim unobserved completion. Return JSON only."
         )
 
@@ -1762,5 +1771,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. Safe-read work requires one adequate acknowledgement across the whole current turn and no pre_action. If playback-started current-turn speech already adequately provided it, response_plan.immediate may be null; otherwise author the missing supplement or correction. Runtime starts any new acknowledgement in parallel with the lookup, and the Host imposes no fixed wording-length limit. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, and delivery_role directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. Safe-read work requires one adequate acknowledgement across the whole current turn and no pre_action. If playback-started current-turn speech already adequately provided it, response_plan.immediate may be null; otherwise author the missing supplement or correction. Runtime starts any new acknowledgement in parallel with the lookup, and the Host imposes no fixed wording-length limit. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap across speaking, activity, and optional social_attention lanes, with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages or social behaviors. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. Return only the corrected JSON object."
         )

@@ -23,6 +23,19 @@ validated response stages described below are accepted post-evidence contract
 work, not implementation claims created by this documentation update. Current
 behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
 
+
+## One Core and three execution lanes
+
+The Goal-Driven Cognitive Core remains the single semantic authority while the
+maintained runtime coordinates three concurrent lanes: Social-Attention
+proposals, Speaking execution, and Activity execution. These lanes do not own
+independent Goals or personalities. Response Composer may author explicit
+best-effort lane coordination around parallel Canonical Plan steps; provider
+metadata and the Trusted Capability Runtime remain authoritative for actual
+overlap. Soridormi is a peer Capability Provider below Activity and owns its
+subtle-expression, locomotion/whole-body, and physical safety arbitration. See
+[Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
+
 ## 1. Purpose
 
 Chromie has migrated its maintained semantic-planning path from a skill-routed

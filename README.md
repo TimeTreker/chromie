@@ -45,6 +45,11 @@ experience artifacts. See
 > memory, and future integrations remain peer Capability Providers selected only
 > by planning from exact registered semantic scope. See
 > [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
+> Chromie also has three concurrent coordination lanes beneath the one Cognitive
+> Core: Social-Attention proposals, Speaking execution, and Activity execution.
+> Soridormi remains a peer Capability Provider beneath Activity and owns its
+> subtle-expression, locomotion/whole-body, and safety arbitration. See
+> [Execution Lanes and Coordination](docs/EXECUTION_LANES_AND_COORDINATION.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
 
@@ -58,6 +63,7 @@ Host Orchestrator
         -> Goal Association -> model-authored Agent Skill selection and bounded projection disclosure
         -> Fast Planner -> terminal Deep Planner when needed
         -> prospective Response Composer -> strict InteractionResponse
+        -> Social-Attention Proposal / Speaking / Activity coordination lanes
         -> Trusted Capability Runtime (legacy code name: Skill Runtime)
         -> named capability -> Soridormi MCP
         -> structured results and traces

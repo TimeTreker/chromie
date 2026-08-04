@@ -556,11 +556,34 @@ class CapabilityCatalog:
                         "can_run_parallel",
                         execution_contract.get("can_run_parallel"),
                     )
+                    upstream_metadata = item.get("metadata")
+                    if not isinstance(upstream_metadata, dict):
+                        upstream_metadata = {}
+                    body_lane = str(
+                        item.get("body_lane")
+                        or execution_contract.get("body_lane")
+                        or upstream_metadata.get("body_lane")
+                        or ""
+                    ).strip()
+                    if body_lane and body_lane not in {
+                        "subtle_expression",
+                        "locomotion",
+                        "whole_body",
+                        "safety",
+                    }:
+                        raise ValueError(
+                            f"Soridormi skill {upstream_id!r} has invalid "
+                            f"body_lane {body_lane!r}"
+                        )
                     exclusive_group = (
                         str(
                             item.get("exclusive_group")
                             or execution_contract.get("exclusive_group")
-                            or ""
+                            or (
+                                f"soridormi.body.{body_lane}"
+                                if body_lane
+                                else ""
+                            )
                         ).strip()
                         or None
                     )
@@ -581,9 +604,6 @@ class CapabilityCatalog:
                             f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
                         )
 
-                    upstream_metadata = item.get("metadata")
-                    if not isinstance(upstream_metadata, dict):
-                        upstream_metadata = {}
                     semantic_scope = upstream_metadata.get("semantic_scope")
                     if not isinstance(semantic_scope, dict):
                         semantic_scope = {}
@@ -634,12 +654,16 @@ class CapabilityCatalog:
                             "safety_sensitive": item.get("safety_sensitive"),
                             "semantic_scope": dict(semantic_scope),
                             "resource_contract": dict(resource_contract),
+                            "execution_lane": "activity",
+                            "body_lane": body_lane or None,
                         },
                         metadata={
                             "upstream_skill_id": upstream_id,
                             "version": item.get("version"),
                             "semantic_scope": dict(semantic_scope),
                             "resource_contract": dict(resource_contract),
+                            "execution_lane": "activity",
+                            "body_lane": body_lane or None,
                         },
                         can_run_parallel=(
                             bool(can_run_parallel)
@@ -649,6 +673,7 @@ class CapabilityCatalog:
                         parallel_metadata_declared=(
                             can_run_parallel is not None
                             or exclusive_group is not None
+                            or bool(body_lane)
                             or bool(resource_claims)
                             or bool(execution_constraints)
                         ),

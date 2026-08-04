@@ -271,3 +271,18 @@ context with different provider deployment metadata and require the same
 Chromie plan. Soridormi-specific tests then verify that each backend realizes or
 safely rejects the semantic request according to its own controller and safety
 contract.
+
+## Relationship to Chromie's execution lanes
+
+Social Attention is Chromie's proposal lane, not Soridormi's expression
+controller. It decides whether a bounded social behavior would be appropriate;
+Response Composer may coordinate that proposal with Speaking and parallel
+Activity. The Activity lane materializes the accepted exact capability request,
+and Soridormi decides whether the attached body can safely execute it.
+
+For overlap with a primary activity, both the Social Attention capability and
+every primary capability must explicitly declare parallel metadata. Soridormi
+may additionally declare `body_lane=subtle_expression` for blink, bounded gaze,
+or another compatible overlay, while locomotion capabilities declare their own
+body lane and resource claims. Chromie does not infer those declarations from
+names or phrases. See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).

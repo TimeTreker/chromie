@@ -133,13 +133,17 @@ class SocialAttentionBehavior(CapabilityIdentityModel):
     timing: SocialAttentionSkillTiming = "parallel"
     social_function: str | None = None
     reason: str | None = None
+    coordination_id: str | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
 
     @field_validator("args")
     @classmethod
     def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
-    @field_validator("social_function", "reason")
+    @field_validator("social_function", "reason", "coordination_id")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         normalized = " ".join((value or "").strip().split())

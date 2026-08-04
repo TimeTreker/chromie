@@ -203,11 +203,30 @@ class SkillRegistry:
                 "can_run_parallel",
                 execution_contract.get("can_run_parallel", True),
             )
+            upstream_metadata = item.get("metadata")
+            if not isinstance(upstream_metadata, dict):
+                upstream_metadata = {}
+            body_lane = str(
+                item.get("body_lane")
+                or execution_contract.get("body_lane")
+                or upstream_metadata.get("body_lane")
+                or ""
+            ).strip()
+            if body_lane and body_lane not in {
+                "subtle_expression",
+                "locomotion",
+                "whole_body",
+                "safety",
+            }:
+                raise ValueError(
+                    f"Soridormi skill {upstream_id!r} has invalid body_lane "
+                    f"{body_lane!r}"
+                )
             exclusive_group = (
                 str(
                     item.get("exclusive_group")
                     or execution_contract.get("exclusive_group")
-                    or ""
+                    or (f"soridormi.body.{body_lane}" if body_lane else "")
                 ).strip()
                 or "soridormi.robot_motion"
             )
@@ -229,9 +248,6 @@ class SkillRegistry:
                     f"Soridormi skill {upstream_id!r} resource_claims must be a list"
                 )
 
-            upstream_metadata = item.get("metadata")
-            if not isinstance(upstream_metadata, dict):
-                upstream_metadata = {}
             execution_constraints = item.get(
                 "execution_constraints",
                 execution_contract.get("execution_constraints", {}),
@@ -288,6 +304,17 @@ class SkillRegistry:
                         for value in resource_claims
                         if str(value).strip()
                     ],
+                    "execution_lane": "activity",
+                    "body_lane": body_lane or None,
+                    "parallel_metadata_declared": bool(
+                        "can_run_parallel" in item
+                        or "can_run_parallel" in execution_contract
+                        or "exclusive_group" in item
+                        or "exclusive_group" in execution_contract
+                        or body_lane
+                        or resource_claims
+                        or execution_constraints
+                    ),
                     "execution_constraints": dict(execution_constraints),
                     "output_contract": "chromie_soridormi_named_skill_v1",
                     "behavior_domains": [
@@ -1454,6 +1481,14 @@ class SkillRuntime:
                 "covers_goal_ids",
                 "canonical_plan_id",
                 "canonical_plan_fingerprint",
+                "execution_lane",
+                "coordination_id",
+                "delivery_role",
+                "lane_coordination_relation",
+                "lane_start_policy",
+                "lane_failure_policy",
+                "parallel_with_activity",
+                "parallel_with_social_attention",
             )
             if key in speech_metadata
         }
@@ -2020,7 +2055,14 @@ def local_speech_definition() -> SkillDefinition:
         can_run_parallel=True,
         exclusive_group="chromie.audio",
         cancellation_domains=("output",),
-        metadata={"cancellation_granularity": "global_domain"},
+        metadata={
+            "cancellation_granularity": "global_domain",
+            "effects": ["user_interaction", "audio_output"],
+            "safety_class": "low_risk_action",
+            "execution_lane": "speaking",
+            "parallel_metadata_declared": True,
+            "resource_claims": ["audio_output"],
+        },
     )
 
 
