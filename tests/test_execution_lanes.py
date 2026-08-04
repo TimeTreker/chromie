@@ -10,6 +10,7 @@ from orchestrator.runtime.skill_runtime import (
     RuntimeAuthorization,
     SkillDefinition,
     SkillRegistry,
+    SkillResult,
     SkillRuntime,
     local_speech_definition,
 )
@@ -67,8 +68,31 @@ def _definition(
             "parallel_metadata_declared": True,
             "resource_claims": resources,
             "execution_lane": "activity",
+            "provider_local_activity_compilation": skill_id.startswith("soridormi."),
         },
     )
+
+
+class _GroupedBodyProvider(MockSkillProvider):
+    def __init__(self, *, delay_s: float = 0.0) -> None:
+        super().__init__("body", delay_s=delay_s)
+        self.group_calls: list[list[str]] = []
+
+    async def execute_group(self, items):
+        self.group_calls.append([request.request_id for request, _, _ in items])
+        if self.delay_s:
+            await asyncio.sleep(self.delay_s)
+        return [
+            SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="completed",
+                provider_id=self.provider_id,
+                output={"completed": True},
+            )
+            for request, definition, _ in items
+        ]
 
 
 class _InteractionRuntimeView:
@@ -289,7 +313,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             local_speech_definition().provider_id,
             delay_s=0.08,
         )
-        body_provider = MockSkillProvider("body", delay_s=0.08)
+        body_provider = _GroupedBodyProvider(delay_s=0.08)
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
 
@@ -303,7 +327,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertLess(elapsed, 0.20)
         self.assertEqual(len(speech_provider.calls), 1)
-        self.assertEqual(len(body_provider.calls), 2)
+        self.assertEqual(body_provider.calls, [])
+        self.assertEqual(body_provider.group_calls, [[
+            response.skills[0].request_id,
+            response.skills[1].request_id,
+        ]])
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
             "speaking",
@@ -319,10 +347,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             [
                 {
                     "skill_id": "walk_forward",
-                    "can_run_parallel": True,
-                    "body_lane": "locomotion",
-                    "exclusive_group": "soridormi.base_motion",
-                    "resource_claims": ["base_motion", "balance_control"],
+                    "concurrency": {
+                        "ability_class": "locomotion_whole_body",
+                        "control_coupling": "primary_body_controller",
+                        "write_resources": ["body.primary_motion"],
+                    },
                     "parameters_schema": {
                         "type": "object",
                         "properties": {},
@@ -331,10 +360,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 },
                 {
                     "skill_id": "blink_eyes",
-                    "can_run_parallel": True,
-                    "body_lane": "subtle_expression",
-                    "exclusive_group": "soridormi.eye_expression",
-                    "resource_claims": ["eye_expression"],
+                    "concurrency": {
+                        "ability_class": "subtle_expression",
+                        "control_coupling": "independent_output",
+                        "write_resources": ["visual.eyes"],
+                    },
                     "parameters_schema": {
                         "type": "object",
                         "properties": {},
@@ -350,6 +380,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(blink.can_run_parallel)
         self.assertEqual(walk.metadata["body_lane"], "locomotion")
         self.assertEqual(blink.metadata["body_lane"], "subtle_expression")
+        self.assertEqual(walk.metadata["resource_claims"], ["body.primary_motion"])
+        self.assertEqual(blink.metadata["resource_claims"], ["visual.eyes"])
         self.assertNotEqual(walk.exclusive_group, blink.exclusive_group)
 
 

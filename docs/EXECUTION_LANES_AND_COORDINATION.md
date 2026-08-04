@@ -43,58 +43,64 @@ Social Attention proposes socially appropriate behavior; it does not directly
 operate the body. Speaking delivers model-authored communication; it is not a
 separate conversational agent.
 
-## Soridormi body lanes
+## Soridormi embodied compilation contract
 
-Soridormi is a peer Capability Provider beneath Chromie's Activity lane. For
-safe body concurrency, Soridormi may advertise these body-lane identities:
+Soridormi is a peer Capability Provider beneath Chromie's Activity lane. It
+does not own user meaning, Goals, or cognitive planning. Chromie's Cognitive
+Planner selects exact semantic capabilities first; the Runtime Coordinator then
+groups exact same-provider body members for deterministic embodied compilation.
+
+Soridormi's canonical live declaration is the nested `concurrency` object:
+
+```json
+{
+  "skill_id": "walk_forward",
+  "concurrency": {
+    "ability_class": "locomotion_whole_body",
+    "control_coupling": "primary_body_controller",
+    "write_resources": ["body.primary_motion"],
+    "safety_preemption": "safe_hold"
+  }
+}
+```
+
+```json
+{
+  "skill_id": "blink_eyes",
+  "concurrency": {
+    "ability_class": "subtle_expression",
+    "control_coupling": "independent_output",
+    "write_resources": ["visual.eyes"],
+    "parallel_safe_with": ["locomotion_whole_body"]
+  }
+}
+```
+
+Chromie preserves `ability_class`, `control_coupling`, exact provider resource
+names, locomotion envelopes, and safety-preemption policy. It never assigns
+those values from a skill name or user phrase. Flattened `body_lane` and
+`resource_claims` fields are compatibility projections only; the nested
+provider contract remains authoritative.
+
+When a parallel batch contains multiple exact Soridormi body capabilities, the
+Trusted Capability Runtime does not start them as independent physical calls.
+It asks the provider adapter to execute one provider-local group:
 
 ```text
-Soridormi
-├── subtle_expression
-├── locomotion
-├── whole_body
-└── safety
+exact planner-selected body members
+  -> soridormi.activity.compile
+  -> Soridormi resource/controller/safety validation
+  -> soridormi.activity.execute
+  -> per-member authoritative evidence
 ```
 
-Typical ownership:
+`compile` is deterministic embodied compilation, not cognitive planning. It may
+reject duplicate resources, two primary locomotion members, an unsafe overlay,
+or unavailable body state. It does not decide whether Chromie should walk,
+blink, look, speak, or sing.
 
-| Body lane | Examples | Typical resource claims |
-|---|---|---|
-| `subtle_expression` | blink, eye expression, bounded gaze, small compatible gestures | `eye_expression`, `head_overlay` |
-| `locomotion` | walk, turn, bounded base motion | `base_motion`, `balance_control` |
-| `whole_body` | recovery, jump, coordinated full-body performance | `whole_body`, `balance_control` |
-| `safety` | emergency stop, fall recovery, collision response | provider-defined safety authority |
-
-The body-lane name is provider evidence, not a Host rule. Chromie never infers
-`blink -> subtle_expression` or `walk -> locomotion` from capability names or
-user phrases. Soridormi must explicitly declare `body_lane`, resource claims,
-parallel safety, and an exclusive group in its live skill catalog.
-
-Example provider declarations:
-
-```json
-{
-  "id": "walk_forward",
-  "body_lane": "locomotion",
-  "can_run_parallel": true,
-  "exclusive_group": "soridormi.base_motion",
-  "resource_claims": ["base_motion", "balance_control"]
-}
-```
-
-```json
-{
-  "id": "blink_eyes",
-  "body_lane": "subtle_expression",
-  "can_run_parallel": true,
-  "exclusive_group": "soridormi.eye_expression",
-  "resource_claims": ["eye_expression"]
-}
-```
-
-Those declarations allow walking and blinking to overlap when Soridormi's
-safety authority accepts them. They still prevent two conflicting locomotion
-skills from running together.
+Speech remains a peer Chromie Speaking-lane execution linked through the same
+`coordination_id`. Soridormi never owns speech meaning or playback.
 
 ## Lane-coordination contract
 
@@ -178,18 +184,20 @@ The maintained runtime:
 1. validates all coordination references and lane membership;
 2. requires referenced activity steps to be parallel Canonical Plan steps;
 3. keeps ordinary pre-action speech behind the playback-start barrier;
-4. emits coordinated speech, activity, and social-expression requests as
-   parallel Trusted Capability Runtime requests;
-5. requires explicit provider parallel metadata for Social Attention overlap;
-6. rejects conflicting exclusive groups or resource claims;
-7. records lane membership and coordination IDs in interaction evidence; and
-8. reconciles each Goal only from capability-specific outcome evidence.
+4. runs Speaking and peer-provider Activity work as a best-effort parallel
+   batch;
+5. groups compatible same-provider Soridormi body members into one deterministic
+   embodied compilation and execution;
+6. requires explicit provider concurrency metadata for Social Attention overlap;
+7. maps Soridormi aggregate member evidence back to the original request IDs and
+   Goal-owning steps;
+8. records lane membership and coordination IDs in interaction evidence; and
+9. reconciles each Goal only from its own capability-specific outcome evidence.
 
-The Trusted Capability Runtime currently starts compatible parallel requests as
-one asynchronous batch. This provides best-effort overlap, not synchronized
-start-time proof. A future coordinated-bundle contract may add prepared states,
-a shared monotonic start barrier, bundle cancellation, member criticality, and
-measured overlap.
+Cross-provider Speaking/body start remains best-effort. Inside Soridormi, body
+members are compiled and cancelled as one provider-local physical activity. A
+future cross-provider contract may add prepared states, a shared monotonic start
+barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
 ## Singing
 

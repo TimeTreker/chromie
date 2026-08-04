@@ -181,6 +181,347 @@ class SoridormiNamedSkillAdapter:
             ),
         )
 
+    async def execute_group(
+        self,
+        items: list[
+            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+        ],
+    ) -> list[SkillResult]:
+        """Compile and execute exact same-provider body members as one activity.
+
+        Chromie's Cognitive Planner has already selected every semantic
+        capability. This adapter performs no planning: it assembles the exact
+        requests under one ``coordination_id`` and asks Soridormi's deterministic
+        embodied compiler to validate resources, controller coupling, and safety.
+        """
+
+        if len(items) < 2:
+            raise ValueError("Soridormi body activity requires at least two members")
+        coordination_ids = {
+            str(request.metadata.get("coordination_id") or "").strip()
+            for request, _, _ in items
+            if str(request.metadata.get("coordination_id") or "").strip()
+        }
+        if len(coordination_ids) > 1:
+            raise ValueError(
+                "Soridormi body activity members have different coordination_id values"
+            )
+        coordination_id = (
+            next(iter(coordination_ids))
+            if coordination_ids
+            else f"{items[0][2].interaction_id}:body"
+        )
+
+        members: list[dict[str, Any]] = []
+        for request, definition, _ in items:
+            upstream_skill_id = str(
+                definition.metadata.get("upstream_skill_id")
+                or request.skill_id.removeprefix("soridormi.")
+            )
+            members.append(
+                {
+                    "member_id": request.request_id,
+                    "skill_id": upstream_skill_id,
+                    "parameters": dict(request.args),
+                    "optional": self._optional_auxiliary_member(request),
+                }
+            )
+
+        first_request, first_definition, first_context = items[0]
+        compiled = await self._invoke_activity_tool(
+            "soridormi.activity.compile",
+            "soridormi.activity.create_plan",
+            {
+                "coordination_id": coordination_id,
+                "members": members,
+                "chromie_intent": {
+                    **self._chromie_intent_payload(
+                        first_request,
+                        first_definition,
+                        first_context,
+                        upstream_skill_id="body_activity",
+                    ),
+                    "request_ids": [
+                        request.request_id for request, _, _ in items
+                    ],
+                    "source_component": "chromie_runtime_coordinator",
+                },
+            },
+        )
+        compile_failure = self._group_failure_results(
+            items,
+            compiled,
+            stage="compile",
+        )
+        if compile_failure is not None:
+            return compile_failure
+
+        activity_id = str(
+            compiled.output.get("compiled_activity_id")
+            or compiled.output.get("plan_id")
+            or ""
+        ).strip()
+        if not activity_id:
+            return self._group_terminal_results(
+                items,
+                status="failed",
+                reason_code="invalid_compiler_response",
+                message="Soridormi compiler response has no compiled_activity_id",
+            )
+        shared_state = first_context.provider_state
+        shared_state.update(
+            {
+                "provider_activity_id": activity_id,
+                "coordination_id": coordination_id,
+            }
+        )
+        for _, _, context in items[1:]:
+            context.provider_state = shared_state
+
+        monitored = await self.invoker.invoke(
+            "soridormi.safety.monitor_motion",
+            {
+                "coordination_id": coordination_id,
+                "compiled_activity_id": activity_id,
+            },
+            context=ToolInvocationContext(allow_safety_controls=True),
+        )
+        monitor_failure = self._group_failure_results(
+            items,
+            monitored,
+            stage="monitor",
+        )
+        if monitor_failure is not None:
+            return monitor_failure
+        if monitored.output.get("ok") is not True:
+            return self._group_terminal_results(
+                items,
+                status="refused",
+                reason_code="safety_monitor_refused",
+                message=str(
+                    monitored.output.get("event")
+                    or "Soridormi safety monitor refused body activity"
+                ),
+                output=monitored.output,
+            )
+
+        group_confirmed = all(
+            not (request.requires_confirmation or definition.requires_confirmation)
+            or context.confirmed
+            for request, definition, context in items
+        )
+        executed = await self._invoke_activity_tool(
+            "soridormi.activity.execute",
+            "soridormi.activity.execute_plan",
+            {"compiled_activity_id": activity_id, "plan_id": activity_id},
+            context=ToolInvocationContext(
+                allow_side_effects=True,
+                confirmed=group_confirmed,
+                trusted_preflight_authorized=group_confirmed,
+                safety_monitor_active=True,
+            ),
+        )
+        execute_failure = self._group_failure_results(
+            items,
+            executed,
+            stage="execute",
+        )
+        if execute_failure is not None:
+            return execute_failure
+        return self._member_results_from_activity(
+            items,
+            executed.output,
+            activity_id=activity_id,
+            coordination_id=coordination_id,
+        )
+
+    @staticmethod
+    def _optional_auxiliary_member(request: SkillRequest) -> bool:
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        source_goal_ids = metadata.get("source_goal_ids") or []
+        return bool(
+            metadata.get("source") == "social_attention_plan"
+            and metadata.get("auxiliary_social_attention") is True
+            and not any(str(value).strip() for value in source_goal_ids)
+        )
+
+    async def _invoke_activity_tool(
+        self,
+        canonical_tool: str,
+        compatibility_tool: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        outcome = await self.invoker.invoke(
+            canonical_tool,
+            args,
+            context=context,
+        )
+        if outcome.status == "success" or not self._tool_is_unavailable(outcome):
+            return outcome
+        compatibility_args = dict(args)
+        if canonical_tool.endswith(".execute"):
+            compatibility_args = {
+                "plan_id": str(
+                    args.get("compiled_activity_id")
+                    or args.get("plan_id")
+                    or ""
+                )
+            }
+        return await self.invoker.invoke(
+            compatibility_tool,
+            compatibility_args,
+            context=context,
+        )
+
+    @staticmethod
+    def _tool_is_unavailable(outcome: ToolCallOutcome) -> bool:
+        text = " ".join(
+            str(value or "")
+            for value in (
+                outcome.error,
+                outcome.output.get("error") if isinstance(outcome.output, dict) else "",
+                outcome.output.get("message") if isinstance(outcome.output, dict) else "",
+            )
+        ).casefold()
+        return outcome.status != "success" and any(
+            marker in text
+            for marker in (
+                "unknown tool",
+                "tool not found",
+                "unsupported tool",
+                "method not found",
+            )
+        )
+
+    @staticmethod
+    def _group_terminal_results(
+        items: list[
+            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+        ],
+        *,
+        status: str,
+        reason_code: str,
+        message: str,
+        output: dict[str, Any] | None = None,
+    ) -> list[SkillResult]:
+        return [
+            SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status=status,
+                provider_id=SoridormiNamedSkillAdapter.provider_id,
+                output=dict(output or {}),
+                reason_code=reason_code,
+                message=message,
+            )
+            for request, definition, _ in items
+        ]
+
+    def _group_failure_results(
+        self,
+        items: list[
+            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+        ],
+        outcome: ToolCallOutcome,
+        *,
+        stage: str,
+    ) -> list[SkillResult] | None:
+        if outcome.status == "success":
+            return None
+        status = "timed_out" if outcome.status == "timeout" else "failed"
+        return self._group_terminal_results(
+            items,
+            status=status,
+            reason_code=f"activity_{stage}_{outcome.status}",
+            message=outcome.error or f"Soridormi activity {stage} failed",
+            output=outcome.output,
+        )
+
+    def _member_results_from_activity(
+        self,
+        items: list[
+            tuple[SkillRequest, SkillDefinition, SkillExecutionContext]
+        ],
+        output: dict[str, Any],
+        *,
+        activity_id: str,
+        coordination_id: str,
+    ) -> list[SkillResult]:
+        aggregate_status = str(output.get("status") or "").strip()
+        member_results = output.get("member_results")
+        if not isinstance(member_results, dict):
+            member_results = {}
+        mode = str(output.get("mode") or "")
+        results: list[SkillResult] = []
+        for request, definition, _ in items:
+            raw = member_results.get(request.request_id)
+            if not isinstance(raw, dict):
+                results.append(
+                    SkillResult(
+                        request_id=request.request_id,
+                        skill_id=request.skill_id,
+                        skill_version=definition.version,
+                        status="failed",
+                        provider_id=self.provider_id,
+                        reason_code="activity_member_result_missing",
+                        message=(
+                            "Soridormi activity omitted evidence for this exact member"
+                        ),
+                        metadata={
+                            "provider_activity_id": activity_id,
+                            "coordination_id": coordination_id,
+                            "aggregate_status": aggregate_status,
+                        },
+                    )
+                )
+                continue
+            raw_status = str(raw.get("status") or "").strip()
+            completed = raw.get("completed") is True or raw_status == "completed"
+            cancelled = raw.get("cancelled") is True or raw_status == "cancelled"
+            status = "completed" if completed else "cancelled" if cancelled else "failed"
+            upstream_skill_id = str(
+                definition.metadata.get("upstream_skill_id")
+                or request.skill_id.removeprefix("soridormi.")
+            )
+            reason_code = str(raw.get("reason_code") or "").strip() or None
+            summary = str(
+                raw.get("summary")
+                or raw.get("message")
+                or output.get("summary")
+                or ""
+            )
+            results.append(
+                SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=definition.version,
+                    status=status,
+                    provider_id=self.provider_id,
+                    output={
+                        "completed": completed,
+                        "skill_id": str(raw.get("skill_id") or upstream_skill_id),
+                        "mode": mode,
+                        "no_motion": raw.get("no_motion") is True,
+                        "recommendation_only": raw.get("recommendation_only") is True,
+                        "summary": summary,
+                    },
+                    metadata={
+                        "provider_activity_id": activity_id,
+                        "coordination_id": coordination_id,
+                        "aggregate_status": aggregate_status,
+                        "member_status": raw_status or status,
+                        "optional": raw.get("optional") is True,
+                        "degraded": aggregate_status == "completed_with_degradation",
+                    },
+                    reason_code=reason_code if status != "completed" else None,
+                    message="" if status == "completed" else summary,
+                )
+            )
+        return results
+
     @staticmethod
     def _trusted_named_skill_preflight(
         request: SkillRequest,
@@ -364,11 +705,25 @@ class SoridormiNamedSkillAdapter:
         definition: SkillDefinition,
         context: SkillExecutionContext,
     ) -> None:
-        outcome = await self.invoker.invoke(
-            "soridormi.motion.cancel",
-            {},
-            context=ToolInvocationContext(allow_safety_controls=True),
-        )
+        activity_id = str(
+            context.provider_state.get("provider_activity_id") or ""
+        ).strip()
+        if activity_id:
+            outcome = await self.invoker.invoke(
+                "soridormi.activity.cancel",
+                {
+                    "compiled_activity_id": activity_id,
+                    "plan_id": activity_id,
+                    "reason": context.cancellation_reason_code,
+                },
+                context=ToolInvocationContext(allow_safety_controls=True),
+            )
+        else:
+            outcome = await self.invoker.invoke(
+                "soridormi.motion.cancel",
+                {},
+                context=ToolInvocationContext(allow_safety_controls=True),
+            )
         if outcome.status != "success":
             message = outcome.error or f"cancel returned {outcome.status}"
             logger.warning(

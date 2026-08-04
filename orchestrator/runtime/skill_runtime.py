@@ -21,6 +21,9 @@ from shared.chromie_contracts.interaction import (
     InteractionSpeech,
     reject_forbidden_low_level_fields,
 )
+from shared.chromie_contracts.soridormi_body_contract import (
+    normalize_soridormi_body_contract,
+)
 
 SkillRequest = CapabilityRequest
 SkillResult = CapabilityResult
@@ -199,37 +202,16 @@ class SkillRegistry:
                 "timeout_s",
                 execution_contract.get("timeout_s", 30.0),
             )
-            can_run_parallel = item.get(
-                "can_run_parallel",
-                execution_contract.get("can_run_parallel", True),
-            )
+            body_contract = normalize_soridormi_body_contract(item)
+            can_run_parallel = body_contract["can_run_parallel"]
+            body_lane = body_contract["body_lane"]
+            exclusive_group = body_contract["exclusive_group"]
+            resource_claims = body_contract["resource_claims"]
+            execution_constraints = body_contract["execution_constraints"]
+            canonical_concurrency = body_contract["canonical_concurrency"]
             upstream_metadata = item.get("metadata")
             if not isinstance(upstream_metadata, dict):
                 upstream_metadata = {}
-            body_lane = str(
-                item.get("body_lane")
-                or execution_contract.get("body_lane")
-                or upstream_metadata.get("body_lane")
-                or ""
-            ).strip()
-            if body_lane and body_lane not in {
-                "subtle_expression",
-                "locomotion",
-                "whole_body",
-                "safety",
-            }:
-                raise ValueError(
-                    f"Soridormi skill {upstream_id!r} has invalid body_lane "
-                    f"{body_lane!r}"
-                )
-            exclusive_group = (
-                str(
-                    item.get("exclusive_group")
-                    or execution_contract.get("exclusive_group")
-                    or (f"soridormi.body.{body_lane}" if body_lane else "")
-                ).strip()
-                or "soridormi.robot_motion"
-            )
             input_schema = (
                 item.get("parameters_schema")
                 or item.get("input_schema")
@@ -239,24 +221,6 @@ class SkillRegistry:
                 raise ValueError(
                     f"Soridormi skill {upstream_id!r} input schema must be an object"
                 )
-            resource_claims = item.get(
-                "resource_claims",
-                execution_contract.get("resource_claims", []),
-            )
-            if not isinstance(resource_claims, list):
-                raise ValueError(
-                    f"Soridormi skill {upstream_id!r} resource_claims must be a list"
-                )
-
-            execution_constraints = item.get(
-                "execution_constraints",
-                execution_contract.get("execution_constraints", {}),
-            )
-            if not isinstance(execution_constraints, dict):
-                raise ValueError(
-                    f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
-                )
-
             imported[skill_id] = SkillDefinition(
                 skill_id=skill_id,
                 version=str(item.get("version") or version),
@@ -284,6 +248,7 @@ class SkillRegistry:
                 cancellation_domains=(
                     ("embodied_motion",)
                     if "physical_motion" in effects
+                    or body_contract["provider_local_activity_compilation"]
                     else ()
                 ),
                 metadata={
@@ -291,7 +256,9 @@ class SkillRegistry:
                     "effects": effects,
                     "safety_class": safety_class,
                     "cancellation_granularity": (
-                        "global_domain"
+                        "provider_activity"
+                        if body_contract["provider_local_activity_compilation"]
+                        else "global_domain"
                         if "physical_motion" in effects
                         else "request"
                     ),
@@ -299,22 +266,18 @@ class SkillRegistry:
                     "fallback": item.get("fallback"),
                     "hardware_enabled": item.get("hardware_enabled"),
                     "provider_managed_safety_monitor": True,
-                    "resource_claims": [
-                        str(value)
-                        for value in resource_claims
-                        if str(value).strip()
-                    ],
+                    "resource_claims": list(resource_claims),
                     "execution_lane": "activity",
-                    "body_lane": body_lane or None,
-                    "parallel_metadata_declared": bool(
-                        "can_run_parallel" in item
-                        or "can_run_parallel" in execution_contract
-                        or "exclusive_group" in item
-                        or "exclusive_group" in execution_contract
-                        or body_lane
-                        or resource_claims
-                        or execution_constraints
-                    ),
+                    "body_lane": body_lane,
+                    "ability_class": body_contract["ability_class"],
+                    "control_coupling": body_contract["control_coupling"],
+                    "concurrency": dict(canonical_concurrency),
+                    "parallel_metadata_declared": body_contract[
+                        "parallel_metadata_declared"
+                    ],
+                    "provider_local_activity_compilation": body_contract[
+                        "provider_local_activity_compilation"
+                    ],
                     "execution_constraints": dict(execution_constraints),
                     "output_contract": "chromie_soridormi_named_skill_v1",
                     "behavior_domains": [
@@ -373,6 +336,7 @@ class SkillExecutionContext(BaseModel):
     provider_started: bool = False
     cancellation_scope: CancellationScope = "none"
     cancellation_reason_code: str = "cancelled"
+    provider_state: dict[str, Any] = Field(default_factory=dict)
     trace: SkillTrace
 
 
@@ -453,7 +417,7 @@ class SkillRuntime:
         self._active: dict[
             tuple[str, str],
             tuple[
-                asyncio.Task[SkillResult],
+                asyncio.Task[Any],
                 SkillRequest,
                 SkillDefinition,
                 SkillExecutionContext,
@@ -1096,7 +1060,16 @@ class SkillRuntime:
             ] = {}
             for item in provider_cancel_items:
                 _, request, definition, context = item
-                if self._provider_cancellation_is_global(definition):
+                provider_activity_id = str(
+                    context.provider_state.get("provider_activity_id") or ""
+                ).strip()
+                if provider_activity_id:
+                    group_key = (
+                        "provider_activity",
+                        definition.provider_id,
+                        provider_activity_id,
+                    )
+                elif self._provider_cancellation_is_global(definition):
                     group_key = (
                         "global_domain",
                         definition.provider_id,
@@ -1539,68 +1512,478 @@ class SkillRuntime:
             raise ValueError(f"skill {request.skill_id!r} requires an active safety monitor")
         return request, definition
 
+    @staticmethod
+    def _provider_group_key(
+        request: SkillRequest,
+        definition: SkillDefinition,
+    ) -> tuple[str, str] | None:
+        if definition.metadata.get("provider_local_activity_compilation") is not True:
+            return None
+        coordination_id = str(
+            request.metadata.get("coordination_id") or ""
+        ).strip()
+        args_metadata = request.args.get("metadata")
+        if not coordination_id and isinstance(args_metadata, dict):
+            coordination_id = str(
+                args_metadata.get("coordination_id") or ""
+            ).strip()
+        return (
+            definition.provider_id,
+            coordination_id or "__parallel_body_batch__",
+        )
+
     async def _run_parallel(
         self,
         interaction_id: str,
         items: list[tuple[SkillRequest, SkillDefinition]],
         authorization: RuntimeAuthorization,
     ) -> tuple[list[SkillResult], list[SkillTrace]]:
-        tasks = [
-            asyncio.create_task(
-                self._run_one(
-                    interaction_id,
+        grouped_indices: dict[tuple[str, str], list[int]] = {}
+        for index, (request, definition) in enumerate(items):
+            provider = self._providers[definition.provider_id]
+            group_key = self._provider_group_key(request, definition)
+            if group_key is None or not callable(
+                getattr(provider, "execute_group", None)
+            ):
+                continue
+            grouped_indices.setdefault(group_key, []).append(index)
+
+        jobs: list[tuple[list[int], asyncio.Task[Any]]] = []
+        consumed: set[int] = set()
+        for indices in grouped_indices.values():
+            if len(indices) < 2:
+                continue
+            consumed.update(indices)
+            group_items = [items[index] for index in indices]
+            jobs.append(
+                (
+                    indices,
+                    asyncio.create_task(
+                        self._run_provider_group(
+                            interaction_id,
+                            group_items,
+                            authorization,
+                        )
+                    ),
+                )
+            )
+        for index, (request, definition) in enumerate(items):
+            if index in consumed:
+                continue
+            jobs.append(
+                (
+                    [index],
+                    asyncio.create_task(
+                        self._run_one(
+                            interaction_id,
+                            request,
+                            definition,
+                            authorization,
+                        )
+                    ),
+                )
+            )
+
+        try:
+            job_results = await asyncio.gather(*(task for _, task in jobs))
+        except asyncio.CancelledError:
+            for _, task in jobs:
+                task.cancel()
+            job_results = await asyncio.shield(
+                asyncio.gather(
+                    *(task for _, task in jobs),
+                    return_exceptions=True,
+                )
+            )
+
+        ordered: dict[int, tuple[SkillResult, SkillTrace]] = {}
+        for (indices, _), outcome in zip(jobs, job_results, strict=True):
+            if isinstance(outcome, BaseException):
+                if not isinstance(outcome, asyncio.CancelledError):
+                    raise outcome
+                pairs = [
+                    self._cancelled_pair(
+                        interaction_id,
+                        items[index][0],
+                        items[index][1],
+                        reason_code="cancelled",
+                        message="skill execution was cancelled",
+                    )
+                    for index in indices
+                ]
+            elif len(indices) == 1:
+                pairs = [outcome]
+            else:
+                pairs = list(outcome)
+            if len(pairs) != len(indices):
+                raise RuntimeError(
+                    "provider-local group returned a different number of results "
+                    "than scheduled requests"
+                )
+            for index, pair in zip(indices, pairs, strict=True):
+                ordered[index] = pair
+
+        completed = [ordered[index] for index in range(len(items))]
+        return [item[0] for item in completed], [item[1] for item in completed]
+
+    @staticmethod
+    def _cancelled_pair(
+        interaction_id: str,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        *,
+        reason_code: str,
+        message: str,
+        scope: CancellationScope = "none",
+    ) -> tuple[SkillResult, SkillTrace]:
+        finished_at = datetime.now(timezone.utc)
+        trace = SkillTrace(
+            interaction_id=interaction_id,
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            provider_id=definition.provider_id,
+            status="cancelled",
+            events=[
+                SkillTraceEvent(type="validated"),
+                SkillTraceEvent(
+                    type="cancelled",
+                    message=message,
+                    data={
+                        "reason_code": reason_code,
+                        "cancellation_scope": scope,
+                    },
+                ),
+            ],
+            finished_at=finished_at,
+        )
+        result = SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            skill_version=definition.version,
+            status="cancelled",
+            provider_id=definition.provider_id,
+            reason_code=reason_code,
+            message=message,
+            trace_id=trace.trace_id,
+            started_at=trace.started_at,
+            finished_at=finished_at,
+        )
+        return result, trace
+
+    async def _run_provider_group(
+        self,
+        interaction_id: str,
+        items: list[tuple[SkillRequest, SkillDefinition]],
+        authorization: RuntimeAuthorization,
+    ) -> list[tuple[SkillResult, SkillTrace]]:
+        if len(items) < 2:
+            raise ValueError("provider-local execution group requires at least two items")
+        provider_ids = {definition.provider_id for _, definition in items}
+        if len(provider_ids) != 1:
+            raise ValueError("provider-local execution group spans multiple providers")
+        provider_id = next(iter(provider_ids))
+        provider = self._providers[provider_id]
+        execute_group = getattr(provider, "execute_group", None)
+        if not callable(execute_group):
+            raise ValueError(
+                f"provider {provider_id!r} does not implement execute_group"
+            )
+
+        shared_state: dict[str, Any] = {
+            "provider_group_request_ids": [request.request_id for request, _ in items]
+        }
+        traces: list[SkillTrace] = []
+        contexts: list[SkillExecutionContext] = []
+        for request, definition in items:
+            trace = SkillTrace(
+                interaction_id=interaction_id,
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                provider_id=provider_id,
+                events=[SkillTraceEvent(type="validated")],
+            )
+            context = SkillExecutionContext(
+                interaction_id=interaction_id,
+                confirmed=request.request_id in authorization.confirmed_request_ids,
+                safety_monitor_active=authorization.safety_monitor_active,
+                provider_state=shared_state,
+                trace=trace,
+            )
+            traces.append(trace)
+            contexts.append(context)
+
+        async with self._active_lock:
+            cancellation_rules = [
+                rule
+                for (request, definition) in items
+                if (
+                    rule := self._matching_cancellation_rule(
+                        interaction_id,
+                        request,
+                        definition,
+                    )
+                )
+                is not None
+            ]
+            if cancellation_rules:
+                scope = max(
+                    (rule.effective_scope for rule in cancellation_rules),
+                    key=self._scope_priority,
+                )
+                interaction_scheduled = self._scheduled.get(interaction_id)
+                if interaction_scheduled is not None:
+                    for request, _ in items:
+                        interaction_scheduled.pop(request.request_id, None)
+                return [
+                    self._cancelled_pair(
+                        interaction_id,
+                        request,
+                        definition,
+                        reason_code="cancelled_before_start",
+                        message=(
+                            "provider-local body activity was cancelled before start "
+                            f"by scope={scope}"
+                        ),
+                        scope=scope,
+                    )
+                    for request, definition in items
+                ]
+
+        async def invoke() -> list[SkillResult]:
+            async with self._resource_arbiter.claim(
+                can_run_parallel=True,
+                exclusive_group=f"{provider_id}.compiled_body_activity",
+            ):
+                async with self._active_lock:
+                    for trace, context in zip(traces, contexts, strict=True):
+                        context.provider_started = True
+                        trace.events.append(SkillTraceEvent(type="started"))
+                return await execute_group(
+                    [
+                        (request, definition, context)
+                        for (request, definition), context in zip(
+                            items,
+                            contexts,
+                            strict=True,
+                        )
+                    ]
+                )
+
+        task = asyncio.create_task(invoke())
+        active_keys = [
+            (interaction_id, request.request_id) for request, _ in items
+        ]
+        async with self._active_lock:
+            for active_key, (request, definition), context in zip(
+                active_keys,
+                items,
+                contexts,
+                strict=True,
+            ):
+                self._active[active_key] = (
+                    task,
                     request,
                     definition,
-                    authorization,
+                    context,
                 )
+
+        timeout_s = max(
+            (request.timeout_ms or definition.timeout_ms) / 1000.0
+            for request, definition in items
+        )
+        results: list[SkillResult]
+        try:
+            results = await asyncio.wait_for(task, timeout=timeout_s)
+            active_scopes = [
+                context.cancellation_scope
+                for context in contexts
+                if context.cancellation_scope != "none"
+            ]
+            if active_scopes:
+                scope = max(active_scopes, key=self._scope_priority)
+                cancel_error = await self._cancel_provider(
+                    provider,
+                    items[0][0],
+                    items[0][1],
+                    contexts[0],
+                )
+                results = self._group_terminal_results(
+                    items,
+                    status="failed" if cancel_error else "cancelled",
+                    reason_code=(
+                        f"cancellation_failed_{scope}"
+                        if cancel_error
+                        else f"cancelled_{scope}"
+                    ),
+                    message=(
+                        "provider-local body activity returned after cancellation"
+                        + (
+                            f"; provider cancellation failed: {cancel_error}"
+                            if cancel_error
+                            else ""
+                        )
+                    ),
+                )
+        except TimeoutError:
+            cancel_error = await self._cancel_provider(
+                provider,
+                items[0][0],
+                items[0][1],
+                contexts[0],
+            )
+            results = self._group_terminal_results(
+                items,
+                status="timed_out",
+                reason_code="timeout",
+                message=(
+                    f"provider-local body activity exceeded {timeout_s:.3f}s timeout"
+                    + (
+                        f"; provider cancellation failed: {cancel_error}"
+                        if cancel_error
+                        else ""
+                    )
+                ),
+            )
+        except asyncio.CancelledError:
+            cancel_error = await asyncio.shield(
+                self._cancel_provider(
+                    provider,
+                    items[0][0],
+                    items[0][1],
+                    contexts[0],
+                )
+            )
+            results = self._group_terminal_results(
+                items,
+                status="failed" if cancel_error else "cancelled",
+                reason_code=(
+                    "cancellation_failed_current_interaction"
+                    if cancel_error
+                    else "cancelled"
+                ),
+                message=(
+                    "provider-local body activity was cancelled"
+                    + (
+                        f"; provider cancellation failed: {cancel_error}"
+                        if cancel_error
+                        else ""
+                    )
+                ),
+            )
+        except Exception as exc:
+            results = self._group_terminal_results(
+                items,
+                status="failed",
+                reason_code="provider_error",
+                message=str(exc) or exc.__class__.__name__,
+            )
+        finally:
+            async with self._active_lock:
+                interaction_scheduled = self._scheduled.get(interaction_id)
+                for active_key, (request, _) in zip(
+                    active_keys,
+                    items,
+                    strict=True,
+                ):
+                    self._active.pop(active_key, None)
+                    if interaction_scheduled is not None:
+                        interaction_scheduled.pop(request.request_id, None)
+
+        results = self._normalize_group_results(items, results)
+        finished_at = datetime.now(timezone.utc)
+        pairs: list[tuple[SkillResult, SkillTrace]] = []
+        for result, trace, (_, definition) in zip(
+            results,
+            traces,
+            items,
+            strict=True,
+        ):
+            result.trace_id = trace.trace_id
+            if result.started_at is None:
+                result.started_at = trace.started_at
+            if result.finished_at is None:
+                result.finished_at = finished_at
+            trace.status = result.status
+            trace.finished_at = result.finished_at
+            trace.events.append(
+                SkillTraceEvent(
+                    type=result.status,
+                    message=result.message,
+                    data={
+                        "reason_code": result.reason_code,
+                        "provider_local_group": True,
+                        "provider_activity_id": shared_state.get(
+                            "provider_activity_id"
+                        ),
+                    },
+                )
+            )
+            pairs.append((result, trace))
+        return pairs
+
+    @staticmethod
+    def _group_terminal_results(
+        items: list[tuple[SkillRequest, SkillDefinition]],
+        *,
+        status: str,
+        reason_code: str,
+        message: str,
+    ) -> list[SkillResult]:
+        return [
+            SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status=status,
+                provider_id=definition.provider_id,
+                reason_code=reason_code,
+                message=message,
             )
             for request, definition in items
         ]
-        try:
-            completed = await asyncio.gather(*tasks)
-        except asyncio.CancelledError:
-            for task in tasks:
-                task.cancel()
-            completed_or_errors = await asyncio.shield(
-                asyncio.gather(*tasks, return_exceptions=True)
+
+    @classmethod
+    def _normalize_group_results(
+        cls,
+        items: list[tuple[SkillRequest, SkillDefinition]],
+        results: Any,
+    ) -> list[SkillResult]:
+        if not isinstance(results, list):
+            return cls._group_terminal_results(
+                items,
+                status="failed",
+                reason_code="invalid_group_result",
+                message="provider-local execution group did not return a result list",
             )
-            completed = []
-            for (
-                request,
-                definition,
-            ), item in zip(items, completed_or_errors, strict=True):
-                if isinstance(item, asyncio.CancelledError):
-                    finished_at = datetime.now(timezone.utc)
-                    trace = SkillTrace(
-                        interaction_id=interaction_id,
-                        request_id=request.request_id,
-                        skill_id=request.skill_id,
-                        provider_id=definition.provider_id,
-                        status="cancelled",
-                        events=[
-                            SkillTraceEvent(type="validated"),
-                            SkillTraceEvent(type="cancelled"),
-                        ],
-                        finished_at=finished_at,
-                    )
-                    result = SkillResult(
-                        request_id=request.request_id,
-                        skill_id=request.skill_id,
-                        skill_version=definition.version,
-                        status="cancelled",
-                        provider_id=definition.provider_id,
-                        reason_code="cancelled",
-                        message="skill execution was cancelled",
-                        trace_id=trace.trace_id,
-                        started_at=trace.started_at,
-                        finished_at=finished_at,
-                    )
-                    completed.append((result, trace))
-                    continue
-                if isinstance(item, BaseException):
-                    raise item
-                completed.append(item)
-        return [item[0] for item in completed], [item[1] for item in completed]
+        by_request_id: dict[str, SkillResult] = {}
+        for result in results:
+            if not isinstance(result, SkillResult):
+                continue
+            if result.request_id in by_request_id:
+                return cls._group_terminal_results(
+                    items,
+                    status="failed",
+                    reason_code="invalid_group_result",
+                    message="provider-local execution group returned duplicate request IDs",
+                )
+            by_request_id[result.request_id] = result
+        normalized: list[SkillResult] = []
+        for request, definition in items:
+            result = by_request_id.get(request.request_id)
+            if result is None:
+                result = SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=definition.version,
+                    status="failed",
+                    provider_id=definition.provider_id,
+                    reason_code="member_result_missing",
+                    message=(
+                        "provider-local body activity omitted evidence for this member"
+                    ),
+                )
+            normalized.append(result)
+        return normalized
 
     async def _run_one(
         self,

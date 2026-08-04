@@ -2200,6 +2200,19 @@
     },
     {
       "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "SkillRuntime._run_provider_group",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map a provider-local compiled activity exception into explicit failed member results without authorizing partial or unvalidated body work.",
+      "review_status": "reviewed",
+      "body_sha256": "65e69adc6024803552320727c8f3c87bbb6ede7b4083d708713a77455b453e0c",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
       "symbol": "SkillRuntime.execute",
       "ordinal": 1,
       "classification": "fail_closed_boundary",

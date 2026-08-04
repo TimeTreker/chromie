@@ -419,21 +419,38 @@ Live Soridormi integration changes must include Soridormi-side validation and
 Chromie acceptance evidence. A Chromie green test alone does not prove robot
 motion safety.
 
-## Body-lane concurrency contract
+## Deterministic body-activity compilation contract
 
 Soridormi is a peer Capability Provider beneath Chromie's Activity execution
-lane. A live named skill may declare `body_lane` as `subtle_expression`,
-`locomotion`, `whole_body`, or `safety`, together with `can_run_parallel`, an
-exclusive group, and resource claims. Chromie preserves and validates these
-provider declarations; it does not assign body lanes from capability IDs.
+lane. Chromie's Cognitive Planner selects exact semantic capabilities and their
+parallel relationship. The Host does not reinterpret those choices, and
+Soridormi does not become a second cognitive agent.
 
-Walking and blinking may overlap only when Soridormi advertises nonconflicting
-body lanes and resources and its safety authority accepts both. Two locomotion
-commands remain conflicting even when both independently claim parallel
-support. Cross-provider speech overlap is coordinated by Chromie's Speaking and
-Activity lanes; Soridormi never owns Chromie's audio meaning or playback.
+Live skills publish a canonical nested `concurrency` contract containing
+`ability_class`, `control_coupling`, exact `write_resources`, optional
+locomotion envelopes, and safety preemption. Chromie preserves those provider
+declarations and never derives them from names or phrases.
 
-The current Chromie runtime supports best-effort parallel batches. A later
-Soridormi/Chromie contract is required for prepared members, a synchronized
-start barrier, atomic bundle cancellation, and measured overlap evidence. See
-[Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
+When multiple exact Soridormi members share one parallel batch or
+`coordination_id`, the Trusted Capability Runtime groups them at the provider
+boundary and calls:
+
+```text
+soridormi.activity.compile
+soridormi.safety.monitor_motion
+soridormi.activity.execute
+```
+
+Soridormi deterministically validates and composes the physical members. It may
+reject incompatible resources or stop the activity for safety. Its aggregate
+member results are mapped back to the original Chromie request IDs so successful
+walking cannot falsely prove that gaze or blinking also succeeded.
+
+Cross-provider speech remains owned by Chromie's Speaking lane and starts
+best-effort in parallel with the compiled body activity. Provider-local body
+cancellation uses `soridormi.activity.cancel`; physical emergency interruption
+remains Soridormi-authoritative.
+
+Still open: synchronized cross-provider start, measured overlap, first-class
+`degraded`/`skipped_optional` result states, and a genuine singing capability.
+See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).

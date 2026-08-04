@@ -175,11 +175,17 @@ The native structured Agent path now emits Trusted Capability Runtime requests
 directly, while the host registry remains the final provider and execution
 authority.
 Future catalog-alignment work must not bypass either policy layer.
-## Soridormi body-lane metadata
+## Soridormi embodied concurrency metadata
 
-Live `soridormi.skill.list` entries may declare `body_lane` as
-`subtle_expression`, `locomotion`, `whole_body`, or `safety`, together with
-`can_run_parallel`, `exclusive_group`, and `resource_claims`. Chromie preserves
-these provider declarations for planning and runtime validation. It never
-assigns a body lane from a skill name or user phrase. See
+Live `soridormi.skill.list` entries publish a canonical nested `concurrency`
+object. It declares `ability_class`, `control_coupling`, exact
+`write_resources`, optional locomotion envelopes, and safety-preemption policy.
+Chromie preserves that object verbatim and exposes bounded flattened scheduling
+fields only as a compatibility adapter. It never assigns physical semantics from
+a skill name or user phrase.
+
+Multiple exact Soridormi members selected for one parallel group are compiled
+through `soridormi.activity.compile` and executed as one provider-local body
+activity. The Cognitive Planner still selects every semantic capability; the
+provider compiler only validates and composes physical execution. See
 [Execution Lanes and Coordination](../docs/EXECUTION_LANES_AND_COORDINATION.md).

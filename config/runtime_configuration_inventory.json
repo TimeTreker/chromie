@@ -466,6 +466,46 @@
     {
       "boolean": true,
       "category": "service_internal",
+      "key": "AGENT_EXTERNAL_INFORMATION_ENABLED",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_EXTERNAL_INFORMATION_TOKEN",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_EXTERNAL_INFORMATION_URL",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "service_internal",
       "key": "AGENT_FAST_PLANNER_ENABLED",
       "owners": [
         ".env.common",
@@ -4817,10 +4857,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 145,
       "public_choice": 9,
-      "service_internal": 242
+      "service_internal": 246
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 453
+    "total_keys": 457
   }
 }

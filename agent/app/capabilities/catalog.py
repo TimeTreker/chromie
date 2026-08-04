@@ -12,6 +12,10 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
+from shared.chromie_contracts.soridormi_body_contract import (
+    normalize_soridormi_body_contract,
+)
+
 from .models import CapabilityRegistry, ToolCapability
 
 logger = logging.getLogger("chromie.agent.capability_catalog")
@@ -552,58 +556,16 @@ class CapabilityCatalog:
                         raise ValueError(
                             f"Soridormi skill {upstream_id!r} input schema must be an object"
                         )
-                    can_run_parallel = item.get(
-                        "can_run_parallel",
-                        execution_contract.get("can_run_parallel"),
-                    )
+                    body_contract = normalize_soridormi_body_contract(item)
+                    can_run_parallel = body_contract["can_run_parallel"]
+                    body_lane = body_contract["body_lane"]
+                    exclusive_group = body_contract["exclusive_group"]
+                    resource_claims = body_contract["resource_claims"]
+                    execution_constraints = body_contract["execution_constraints"]
+                    canonical_concurrency = body_contract["canonical_concurrency"]
                     upstream_metadata = item.get("metadata")
                     if not isinstance(upstream_metadata, dict):
                         upstream_metadata = {}
-                    body_lane = str(
-                        item.get("body_lane")
-                        or execution_contract.get("body_lane")
-                        or upstream_metadata.get("body_lane")
-                        or ""
-                    ).strip()
-                    if body_lane and body_lane not in {
-                        "subtle_expression",
-                        "locomotion",
-                        "whole_body",
-                        "safety",
-                    }:
-                        raise ValueError(
-                            f"Soridormi skill {upstream_id!r} has invalid "
-                            f"body_lane {body_lane!r}"
-                        )
-                    exclusive_group = (
-                        str(
-                            item.get("exclusive_group")
-                            or execution_contract.get("exclusive_group")
-                            or (
-                                f"soridormi.body.{body_lane}"
-                                if body_lane
-                                else ""
-                            )
-                        ).strip()
-                        or None
-                    )
-                    resource_claims = item.get(
-                        "resource_claims",
-                        execution_contract.get("resource_claims", []),
-                    )
-                    if not isinstance(resource_claims, list):
-                        raise ValueError(
-                            f"Soridormi skill {upstream_id!r} resource_claims must be a list"
-                        )
-                    execution_constraints = item.get(
-                        "execution_constraints",
-                        execution_contract.get("execution_constraints", {}),
-                    )
-                    if not isinstance(execution_constraints, dict):
-                        raise ValueError(
-                            f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
-                        )
-
                     semantic_scope = upstream_metadata.get("semantic_scope")
                     if not isinstance(semantic_scope, dict):
                         semantic_scope = {}
@@ -655,7 +617,10 @@ class CapabilityCatalog:
                             "semantic_scope": dict(semantic_scope),
                             "resource_contract": dict(resource_contract),
                             "execution_lane": "activity",
-                            "body_lane": body_lane or None,
+                            "body_lane": body_lane,
+                            "ability_class": body_contract["ability_class"],
+                            "control_coupling": body_contract["control_coupling"],
+                            "concurrency": dict(canonical_concurrency),
                         },
                         metadata={
                             "upstream_skill_id": upstream_id,
@@ -663,26 +628,20 @@ class CapabilityCatalog:
                             "semantic_scope": dict(semantic_scope),
                             "resource_contract": dict(resource_contract),
                             "execution_lane": "activity",
-                            "body_lane": body_lane or None,
+                            "body_lane": body_lane,
+                            "ability_class": body_contract["ability_class"],
+                            "control_coupling": body_contract["control_coupling"],
+                            "concurrency": dict(canonical_concurrency),
+                            "provider_local_activity_compilation": body_contract[
+                                "provider_local_activity_compilation"
+                            ],
                         },
-                        can_run_parallel=(
-                            bool(can_run_parallel)
-                            if can_run_parallel is not None
-                            else None
-                        ),
-                        parallel_metadata_declared=(
-                            can_run_parallel is not None
-                            or exclusive_group is not None
-                            or bool(body_lane)
-                            or bool(resource_claims)
-                            or bool(execution_constraints)
-                        ),
-                        exclusive_group=exclusive_group,
-                        resource_claims=[
-                            str(value)
-                            for value in resource_claims
-                            if str(value).strip()
+                        can_run_parallel=bool(can_run_parallel),
+                        parallel_metadata_declared=body_contract[
+                            "parallel_metadata_declared"
                         ],
+                        exclusive_group=exclusive_group,
+                        resource_claims=list(resource_claims),
                         execution_constraints=dict(execution_constraints),
                     )
                     live[capability_id] = self._apply_prompt_tier_policy(

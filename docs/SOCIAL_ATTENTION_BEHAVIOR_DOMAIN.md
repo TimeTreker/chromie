@@ -281,8 +281,10 @@ Activity. The Activity lane materializes the accepted exact capability request,
 and Soridormi decides whether the attached body can safely execute it.
 
 For overlap with a primary activity, both the Social Attention capability and
-every primary capability must explicitly declare parallel metadata. Soridormi
-may additionally declare `body_lane=subtle_expression` for blink, bounded gaze,
-or another compatible overlay, while locomotion capabilities declare their own
-body lane and resource claims. Chromie does not infer those declarations from
-names or phrases. See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
+every primary capability must carry Soridormi's explicit nested `concurrency`
+contract. Blink may be an `independent_output`, bounded gaze a
+`body_command_overlay`, and a large gesture `standalone_body_motion`; all remain
+subtle-expression semantics but have different physical coupling. Chromie does
+not infer those declarations from names or phrases. Compatible members are sent
+through one Soridormi embodied compilation rather than independent motor calls.
+See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
