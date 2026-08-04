@@ -183,6 +183,31 @@ class SemanticRouteRepairOutput(BaseModel):
         return self
 
 
+def _validate_missing_ability_output_against_catalog(
+    output: SemanticRouteRepairOutput,
+    request: RouteRequest,
+) -> None:
+    """Keep a missing-ability request distinct from available capabilities."""
+
+    if (
+        output.intent != "missing_or_unsupported_ability"
+        or output.metadata is None
+    ):
+        return
+    available_ids = _capability_ids_from_request(request)
+    collisions = sorted(
+        item.ability_id
+        for item in output.metadata.desired_abilities
+        if item.ability_id in available_ids
+    )
+    if collisions:
+        raise ValueError(
+            "missing ability_id must describe the absent user-facing ability, "
+            "not reuse an available capability_id: "
+            + ", ".join(collisions)
+        )
+
+
 PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability",
     "capability:",
@@ -1743,6 +1768,8 @@ class OllamaGoalInterpreter:
             _compact_verified_tool_memory_index(request.context),
             max_chars=1600,
         )
+        mind = request.context.get("mind", {})
+        global_context = _goal_interpretation_global_context_section(mind)
         return {
             "model": model or self.review_model or self.model,
             "stream": False,
@@ -1753,6 +1780,9 @@ class OllamaGoalInterpreter:
                 {
                     "role": "system",
                     "content": (
+                        "Global Context Group:\n"
+                        f"{global_context}\n\n"
+                        "Current Job:\n"
                         "Repair one semantic route from the latest user turn. "
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
                         "First understand the requested outcome independently of the catalog, then compare that outcome with exact supplied ability descriptions. "
@@ -1775,7 +1805,14 @@ class OllamaGoalInterpreter:
                         "Use tool only when the model selects an exact supplied external-read Capability. "
                         "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
                         "Never substitute the nearest topical Capability merely because it shares an entity or binding such as a location, date, number, or person. "
-                        "When the requested outcome is clear but no exact supplied Capability can perform the required lookup or action, do not ask for parameters that cannot make an absent ability executable and do not imply that Chromie will check. Return route=clarify, intent=missing_or_unsupported_ability, one brief truthful speak_first sentence in the user's language, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. "
+                        "Use the terminal missing-ability result only when the latest user turn itself asks Chromie for a clear lookup, recommendation, or action that no exact supplied Capability can perform. "
+                        "A bare location, preference, entity name, correction, or other context statement is not a missing ability by itself; retain chat so Goal Association can decide whether it continues an earlier Goal or is independent. "
+                        "When the requested outcome is clear but no exact supplied Capability can perform it, do not ask for parameters that cannot make an absent ability executable and do not imply that Chromie will check. "
+                        "Return route=clarify, intent=missing_or_unsupported_ability, one brief truthful speak_first sentence in the user's language, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. "
+                        "The missing ability_id names the absent user-facing ability. It must not equal or reuse any capability_id in Supplied abilities JSON; for example, a restaurant request must not be recorded as chromie.weather.lookup merely because both use a location. "
+                        "The terminal speak_first is the complete final response for this turn. It must not ask a follow-up question, request a location or preference, or end with a question mark. "
+                        "Apply the owner-approved identity and personality from Global Context naturally. Chromie should sound like herself: a warm six-year-old child in her family, not customer service, an adult operator, or a software error message. "
+                        "Prefer simple learning language such as '我现在还没学会这个呢' over formal system language such as '我无法直接查询'. Chromie may warmly hope to learn the ability later, but must not claim that learning has started or guarantee that the ability will be added. "
                         "Use intent=clarify_uncertain_request only when the user's meaning itself remains genuinely underdetermined, or when one exact supplied Capability exists but requires a user-provided binding before provider resolution. Never pair route=chat with a clarification intent. "
                         "No analysis, rationale, actions, markdown, or fields outside the declared schema."
                     ),
@@ -2642,6 +2679,7 @@ class OllamaGoalInterpreter:
             minimal = SemanticRouteRepairOutput.model_validate(
                 _extract_json_object(content)
             )
+            _validate_missing_ability_output_against_catalog(minimal, request)
             repaired_decision = finalize_decision(
                 RouteDecision(
                     route=minimal.route,
