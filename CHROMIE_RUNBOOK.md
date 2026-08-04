@@ -316,6 +316,21 @@ curl -fsS \
 When neither token is configured, diagnostic endpoints intentionally return
 HTTP 503.
 
+### 6.1 Collect a cross-repository debug bundle
+
+Immediately after reproducing a Chromie/Soridormi problem, while the paired stack
+and any failed containers still exist, run:
+
+```bash
+./scripts/collect_debug_bundle.sh
+```
+
+The archive is written to `~/Downloads`. It contains the paired launcher logs
+from `.chromie/voice-mujoco/logs/`, fresh logs plus runtime state/ports for every
+Docker container whose name contains `soridormi` (including
+`soridormi-runtime-mcp`), and stopped-container logs while Docker still retains
+them. Runtime environment files are redacted before inclusion.
+
 ## 7. Automated tests
 
 ```bash
