@@ -350,21 +350,6 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_pending_fast_speech",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Suppress unreviewed or invalid pending-work speech so dynamic wording cannot invent unsupported facts, abilities, or side tasks; preserve only a reviewed replacement that satisfies the pre-plan claim contract.",
-      "review_status": "reviewed",
-      "body_sha256": "ae885e19e611f570beccb226ab6eca3bef6dea90b3c6c9f05eb5af75277e5dd4",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter._repair_missing_fast_speech",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -430,6 +415,21 @@
       "failure_signals": [
         "diagnostic",
         "return"
+      ]
+    },
+    {
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter._review_pending_fast_speech",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Suppress unreviewed or invalid pending-work speech so dynamic wording cannot invent unsupported facts, abilities, or side tasks; preserve only a reviewed replacement that satisfies the pre-plan claim contract.",
+      "review_status": "reviewed",
+      "body_sha256": "ae885e19e611f570beccb226ab6eca3bef6dea90b3c6c9f05eb5af75277e5dd4",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
       ]
     },
     {
@@ -2105,6 +2105,33 @@
       "body_sha256": "9988e036c2f148982f0c2224d24bf671bc270358cacea2827ddc918a8aee2965",
       "failure_signals": [
         "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/runtime_ready_greeting.py",
+      "symbol": "RuntimeReadyGreetingCoordinator._orient",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Fail open after recording an orientation callback failure so startup speech is not forced and the live microphone can still open.",
+      "review_status": "reviewed",
+      "body_sha256": "7fff9b5e551f07630a30f3cb83d454c9bab3e4d9102b78125a9d56ee879b4f11",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/runtime_ready_greeting.py",
+      "symbol": "execute_default_runtime_ready_orientation",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Try only exact startup-orientation capabilities and retain diagnostic evidence when one candidate is unavailable without authorizing a replacement outside the bounded list.",
+      "review_status": "reviewed",
+      "body_sha256": "14aa24a1aa0ee5170f90c519875730b32bc64b518bfabe00cfed93753edd02e8",
+      "failure_signals": [
+        "diagnostic"
       ]
     },
     {

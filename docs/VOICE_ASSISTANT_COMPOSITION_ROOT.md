@@ -13,21 +13,25 @@ into Host rules or physical safety out of Soridormi.
 
 ## Completed first extraction set
 
-The runtime-ready greeting playback lifecycle is owned by
+The runtime-ready orientation and optional greeting lifecycle is owned by
 `RuntimeReadyGreetingCoordinator` in
 `orchestrator/runtime/runtime_ready_greeting.py`.
 
 Its explicit inputs are:
 
 - an immutable eligibility and timeout policy;
-- an injected model/configuration greeting generator;
+- an injected bounded non-verbal orientation callback;
+- an optional model/configuration greeting generator;
 - validated-text and TTS scheduling callables;
 - playback-start waiter access and the current playback order.
 
-Its outputs are deterministic side effects only: optional scheduling, bounded
+Its outputs are deterministic side effects only: one optional untargeted
+startup-orientation dispatch, optional speech scheduling, bounded
 playback-start/completion waiting, diagnostic logs, and fail-open release to the
-microphone loop. It cannot create a conversation turn, interpret user intent,
-authorize a Capability, or alter Soridormi safety.
+microphone loop. The orientation callback may use only exact maintained Social
+Attention capabilities and provider-declared schemas. It cannot create a
+conversation turn, infer a person or room state, interpret user intent, weaken
+confirmation, or alter Soridormi safety.
 
 `VoiceAssistant._announce_runtime_ready` is now a delegation wrapper. Wording
 generation remains behind the existing validated LLM boundary, while scheduling

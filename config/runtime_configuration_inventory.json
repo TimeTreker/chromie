@@ -3780,6 +3780,15 @@
       ]
     },
     {
+      "boolean": true,
+      "category": "profile_constant",
+      "key": "ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED",
+      "owners": [
+        ".env.common",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
       "boolean": false,
       "category": "profile_constant",
       "key": "ORCH_RUNTIME_READY_GREETING_TEXT",
@@ -4855,12 +4864,12 @@
     "category_counts": {
       "acceptance_override": 57,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 145,
+      "profile_constant": 146,
       "public_choice": 9,
       "service_internal": 246
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 457
+    "total_keys": 458
   }
 }

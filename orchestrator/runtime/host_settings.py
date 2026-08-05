@@ -360,6 +360,7 @@ class PlaybackSettings:
     fast_audio_cache_dir: Path
     fast_audio_cache_revision: str
     ready_greeting_enabled: bool
+    ready_greeting_speech_enabled: bool
     ready_greeting_text: str
     ready_greeting_fallback_text: str
     ready_greeting_language: str
@@ -563,13 +564,16 @@ class HostSettingsSnapshot:
             ready_greeting_enabled=_bool(
                 values, "ORCH_RUNTIME_READY_GREETING_ENABLED", True
             ),
+            ready_greeting_speech_enabled=_bool(
+                values, "ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED", False
+            ),
             ready_greeting_text=_text(
                 values, "ORCH_RUNTIME_READY_GREETING_TEXT", ""
             ),
             ready_greeting_fallback_text=_text(
                 values,
                 "ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT",
-                "我醒啦，今天也一起开心吧！",
+                "",
             ),
             ready_greeting_language=(
                 _text(values, "ORCH_RUNTIME_READY_GREETING_LANGUAGE", "zh-CN")

@@ -341,19 +341,19 @@ a short natural fallback. The Host may log that thinking was suppressed and how
 many characters were discarded, but it does not log or speak the private reasoning
 content itself.
 
-A wake-up greeting is one short sentence, not a monologue. The model receives
-grounded local time context and should vary the wording naturally across the
-morning, afternoon, evening, and late night. It may use a broad grounded period
-such as `早呀` or `晚上好`, but it must not quote the exact clock, date, or
-weekday; repeat Chromie's name or age; or invent weather, hunger, sleepiness, a
-nearby person's identity, or a relationship. A fixed configured sentence is an
-explicit operator choice, and the fixed fallback is used only after bounded
-generation attempts fail. Natural examples at different times are:
+Startup readiness is not a compulsory spoken greeting. The maintained default is
+one quiet, untargeted, capability-grounded orientation followed by attentive
+listening. It may use only a provider-declared Social Attention capability that
+is currently available, requires no confirmation, and accepts the exact bounded
+arguments supplied by the Host startup policy. It does not target a person,
+claim to inspect the room, or infer nearby people, weather, meals, feelings, or
+other environmental facts.
 
-```text
-早呀，我醒啦！
-晚上好呀！
-```
+Startup speech is an explicit operator opt-in. When enabled, it still uses one
+validated short sentence and the existing playback barrier, but silence is a
+complete and preferred startup result. A missing orientation capability or
+provider failure remains silent and fail-open; it must never trigger a body
+failure apology or a synthetic character slogan.
 
 Task analysis such as `First, the user wants me to...` is internal failure evidence,
 never a candidate spoken response.

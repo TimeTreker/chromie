@@ -96,6 +96,7 @@ class RuntimeReadyGreetingCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 audio_input_mode="device",
                 audio_output_mode="device",
                 timeout_ms=1000,
+                speech_enabled=True,
             ),
             generate_greeting=lambda: asyncio.sleep(
                 0,
@@ -130,6 +131,7 @@ class RuntimeReadyGreetingCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 audio_input_mode="device",
                 audio_output_mode="device",
                 timeout_ms=1000,
+                speech_enabled=True,
             ),
             generate_greeting=lambda: asyncio.sleep(0, result=("", "unavailable")),
             is_valid_text=lambda text: bool(text),
@@ -154,6 +156,7 @@ class RuntimeReadyGreetingCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 audio_input_mode="device",
                 audio_output_mode="device",
                 timeout_ms=1000,
+                speech_enabled=True,
             ),
             generate_greeting=lambda: asyncio.sleep(0, result=("嗨！", "test")),
             is_valid_text=lambda text: bool(text),
@@ -171,6 +174,86 @@ class RuntimeReadyGreetingCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await coordinator.announce()
+
+
+    async def test_silent_orientation_runs_without_generating_speech(self) -> None:
+        calls: list[str] = []
+
+        async def orient():
+            calls.append("orient")
+            return {
+                "status": "completed",
+                "capability_id": "soridormi.express_attention",
+            }
+
+        async def generate() -> tuple[str, str]:
+            calls.append("generate")
+            return "不该说话。", "test"
+
+        coordinator = RuntimeReadyGreetingCoordinator(
+            policy=RuntimeReadyGreetingPolicy(
+                enabled=True,
+                audio_input_mode="device",
+                audio_output_mode="device",
+                timeout_ms=1000,
+                orientation_enabled=True,
+                orientation_timeout_ms=1000,
+                speech_enabled=False,
+            ),
+            generate_greeting=generate,
+            is_valid_text=lambda _text: True,
+            schedule_text=lambda _text: asyncio.sleep(0, result={}),
+            playback_start_key=lambda generation, order, session_id: (
+                generation,
+                order,
+                session_id,
+            ),
+            playback_start_waiters={},
+            next_playback_order=lambda: 0,
+            execute_orientation=orient,
+        )
+
+        await coordinator.announce()
+
+        self.assertEqual(calls, ["orient"])
+
+    async def test_orientation_failure_does_not_force_startup_speech(self) -> None:
+        generated = False
+
+        async def orient():
+            raise RuntimeError("provider unavailable")
+
+        async def generate() -> tuple[str, str]:
+            nonlocal generated
+            generated = True
+            return "不该说话。", "test"
+
+        coordinator = RuntimeReadyGreetingCoordinator(
+            policy=RuntimeReadyGreetingPolicy(
+                enabled=True,
+                audio_input_mode="device",
+                audio_output_mode="device",
+                timeout_ms=1000,
+                orientation_enabled=True,
+                orientation_timeout_ms=1000,
+                speech_enabled=False,
+            ),
+            generate_greeting=generate,
+            is_valid_text=lambda _text: True,
+            schedule_text=lambda _text: asyncio.sleep(0, result={}),
+            playback_start_key=lambda generation, order, session_id: (
+                generation,
+                order,
+                session_id,
+            ),
+            playback_start_waiters={},
+            next_playback_order=lambda: 0,
+            execute_orientation=orient,
+        )
+
+        await coordinator.announce()
+
+        self.assertFalse(generated)
 
 
 if __name__ == "__main__":

@@ -148,6 +148,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
+        assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_timeout_ms = 1000
         assistant.audio_input_mode = "device"
@@ -497,6 +498,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
+        assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_timeout_ms = 1000
         assistant.audio_input_mode = "stdin"

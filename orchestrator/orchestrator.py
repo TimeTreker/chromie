@@ -94,6 +94,7 @@ from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingCoordinator,
     RuntimeReadyGreetingPolicy,
+    execute_default_runtime_ready_orientation,
 )
 from orchestrator.runtime.session import now_ms
 from shared.chromie_runtime.accelerator_telemetry import (
@@ -8791,12 +8792,50 @@ class VoiceAssistant:
         async def schedule_text(text: str) -> dict[str, Any]:
             return await self.schedule_tts_text(text, session_id=None)
 
+        cognition_settings = getattr(
+            getattr(self, "host_settings", None), "cognition", None
+        )
+        orientation_enabled = bool(
+            getattr(self, "enable_soridormi_skills", False)
+            and getattr(cognition_settings, "social_attention_mode", "off") == "on"
+        )
+
+        async def execute_orientation() -> dict[str, Any]:
+            return await execute_default_runtime_ready_orientation(
+                self.interaction_runtime,
+                enable_soridormi_skills=getattr(
+                    self, "enable_soridormi_skills", False
+                ),
+                social_attention_mode=getattr(
+                    cognition_settings, "social_attention_mode", "off"
+                ),
+            )
+
         return RuntimeReadyGreetingCoordinator(
             policy=RuntimeReadyGreetingPolicy(
                 enabled=self.runtime_ready_greeting_enabled,
                 audio_input_mode=self.audio_input_mode,
                 audio_output_mode=self.audio_output_mode,
                 timeout_ms=self.runtime_ready_greeting_timeout_ms,
+                orientation_enabled=orientation_enabled,
+                orientation_timeout_ms=min(
+                    5000, self.runtime_ready_greeting_timeout_ms
+                ),
+                speech_enabled=bool(
+                    getattr(
+                        getattr(
+                            getattr(self, "host_settings", None),
+                            "playback",
+                            None,
+                        ),
+                        "ready_greeting_speech_enabled",
+                        getattr(
+                            self,
+                            "runtime_ready_greeting_speech_enabled",
+                            False,
+                        ),
+                    )
+                ),
             ),
             generate_greeting=self._generate_runtime_ready_greeting,
             is_valid_text=self.is_valid_tts_text,
@@ -8804,10 +8843,11 @@ class VoiceAssistant:
             playback_start_key=self.playback_start_key,
             playback_start_waiters=getattr(self, "playback_start_waiters", {}),
             next_playback_order=lambda: getattr(self, "next_playback_order", 0),
+            execute_orientation=execute_orientation,
         )
 
     async def _announce_runtime_ready(self) -> None:
-        """Delegate startup speech and playback barriers to one collaborator."""
+        """Delegate startup orientation and optional speech to one collaborator."""
 
         await self._build_runtime_ready_greeting_coordinator().announce()
 
