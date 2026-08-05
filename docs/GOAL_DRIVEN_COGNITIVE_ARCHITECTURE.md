@@ -816,16 +816,22 @@ It may produce:
 Deep Planner and single-goal Fast Planner use the shared flat
 `PlannerModelOutput` boundary. Multi-goal Fast Planner uses the decoder-tight
 `FastPlannerMultiGoalPlanOutput` boundary. In every case, the planner model owns
-all semantic plan fields: disposition, coverage, Agent Skill selection,
-capability steps, step identifiers, arguments, ordering, goal ownership, per-goal outcomes,
-response content, and satisfaction judgments.
+all semantic plan fields: capability choice, arguments, ordering, the
+`steps[].source_goal_ids` ownership judgment, per-goal disposition and response
+content, coverage, and satisfaction judgments.
 
 For complete multi-goal planning, per-goal outcomes form an exact object keyed
 by every authoritative Goal Association ID. The key is the identity; an outcome
-value cannot repeat or replace it. After validation, the host may only add the
-canonical identity envelope and convert the goal-keyed object to the ordered
-canonical outcome list. It must not compile, infer, or repair semantic plan
-content from the user utterance.
+value cannot repeat or replace it. `goal_outcomes.*.step_ids` and the top-level
+aggregate disposition are redundant transport projections of the model-authored
+step ownership and per-goal dispositions. The Host may mechanically normalize
+those cross-references so nonexistent or stale IDs cannot discard an otherwise
+coherent plan. It cannot create a step, choose a capability, or assign an
+unowned Goal: an `execute` outcome with no model-authored owned step remains
+invalid and returns to model repair. After validation, the Host adds the
+canonical identity envelope and converts the goal-keyed object to the ordered
+canonical outcome list; it does not infer semantic plan content from the user
+utterance.
 
 `plan_relation` and `user_confirmation_required` are typed semantic decisions
 at the model boundary. A safe adjustment or alternative must be executable and

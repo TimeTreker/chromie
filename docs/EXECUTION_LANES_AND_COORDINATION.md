@@ -233,11 +233,19 @@ barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
 ## Singing
 
-Speaking and singing belong to the Speaking lane, but ordinary TTS is not proof
-of a singing capability. Chromie may claim singing only when an exact vocal
-Capability Provider advertises and completes a suitable contract, for example
-`chromie.vocal.perform`. Until then, Chromie may speak or recite text but must
-not claim melodic performance.
+Speaking and singing belong to the Speaking lane, including when the user embeds
+the vocal request inside a compound body command such as walking while singing.
+Lane classification follows the channel that completes the outcome, not the
+sentence's verb form or the surrounding robot-action route. Singing must never
+be reclassified as `express_attention` or another body action merely because it
+is coordinated with motion.
+
+Ordinary TTS is not proof of a singing capability. Chromie may claim singing
+only when an exact vocal Capability Provider advertises and completes a suitable
+contract, for example `chromie.vocal.perform`. Until then, Chromie may speak or
+recite text but must not claim melodic performance; it should report the missing
+vocal capability or offer a clearly labeled alternative while leaving requested
+body actions independently planable.
 
 ## Self-concept boundary
 

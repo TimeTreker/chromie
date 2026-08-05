@@ -945,7 +945,19 @@ class GoalAssociationResolverTests(unittest.TestCase):
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["executable_action", "spoken_response", "executable_action"],
         )
-        self.assertIn("directly requested spoken performance", ollama.prompts[1][0])
+        review_prompt, review_kwargs = ollama.prompts[1]
+        self.assertIn("No previous Goal DTO is supplied", review_prompt)
+        self.assertNotIn("DTO to review JSON", review_prompt)
+        self.assertIn("channel that completes", review_prompt)
+        self.assertIn("vocal performance", review_prompt)
+        self.assertEqual(
+            review_kwargs["prompt_family"],
+            "goal_association.semantic_resegmentation",
+        )
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_fresh_goal_resegmentation",
+        )
 
     def test_associates_followup_before_creating_new_goal(self):
         ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal.", "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})

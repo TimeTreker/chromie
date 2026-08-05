@@ -695,6 +695,9 @@ class GoalAssociationResolver:
                     request.sid,
                     ",".join(review_triggers),
                 )
+                fresh_resegmentation = (
+                    "multi_embodied_responsibility_review" in review_triggers
+                )
                 reviewed = await self.ollama.generate(
                     self._build_semantic_review_prompt(
                         request=request,
@@ -703,10 +706,17 @@ class GoalAssociationResolver:
                         raw=review_candidate,
                         triggers=review_triggers,
                     ),
-                    system=self._semantic_review_system_prompt(output_type),
+                    system=self._semantic_review_system_prompt(
+                        output_type,
+                        fresh_resegmentation=fresh_resegmentation,
+                    ),
                     options=generation_options,
                     response_format=response_schema,
-                    prompt_family="goal_association.semantic_review",
+                    prompt_family=(
+                        "goal_association.semantic_resegmentation"
+                        if fresh_resegmentation
+                        else "goal_association.semantic_review"
+                    ),
                     turn_id=request.sid,
                     attempt=3,
                 )
@@ -741,7 +751,11 @@ class GoalAssociationResolver:
                 review_metadata["semantic_review"] = {
                     "attempted": True,
                     "succeeded": True,
-                    "strategy": "model_owned_goal_association_review",
+                    "strategy": (
+                        "model_owned_fresh_goal_resegmentation"
+                        if fresh_resegmentation
+                        else "model_owned_goal_association_review"
+                    ),
                     "triggers": review_triggers,
                     "attempt_count": 1,
                 }
@@ -1454,40 +1468,73 @@ class GoalAssociationResolver:
             else "decision, associations, new_goals, referent_updates, "
             "resolved_references, clarification, confidence, and reason_summary"
         )
+        fresh_resegmentation = (
+            "multi_embodied_responsibility_review" in triggers
+        )
+        review_input = (
+            "No previous Goal DTO is supplied for this review. Reconstruct the "
+            "segmentation independently from the authoritative user turn so an "
+            "earlier completion-modality label cannot anchor the result. Do not "
+            "try to preserve an earlier description, ordering, or responsibility_kind.\n\n"
+            if fresh_resegmentation
+            else (
+                "DTO to review JSON:\n"
+                f"{self._bounded_json(raw, 6000)}\n\n"
+            )
+        )
         return (
-            f"Independently review this model-authored {contract_name} DTO and "
+            f"Independently review this model-authored {contract_name} boundary and "
             "return the complete final JSON object. The Host supplied only typed "
             f"review triggers {self._bounded_json(triggers, 800)}. A trigger is "
             "not proof that any semantic choice is wrong. "
             "Use semantic reasoning over the authoritative user turn and bounded "
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
+            "Classify responsibility_kind by the channel that completes the human "
+            "outcome, not by grammar, verb choice, command framing, or the surrounding "
+            "robot-action route. Locomotion, manipulation, posture, gaze, and facial "
+            "or body expression are executable_action because a body provider must "
+            "perform them. Authored vocal or textual performance is spoken_response "
+            "because Chromie's speaking channel completes it. Singing, humming, "
+            "recitation, jokes, and spoken role-play remain spoken_response even when "
+            "the user requests them during a walk or alongside a gesture. Never map a "
+            "vocal performance to express_attention or another body capability.\n\n"
             "Keep or create a fresh spoken_response Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
             "decision, or other direct conversational act, even when a retained Goal "
             "supplies the topic or evidence. Do not replay the retained task as the "
-            "current responsibility. Keep separate Goals when the user truly requested an independently "
-            "satisfiable direct spoken or text response in addition to capability "
-            "work, such as a song, joke, or unrelated social answer. When a "
-            "spoken_response item merely phrases, reports, explains, or interprets "
-            "the evidence acquired by a capability_dependent item, the capability "
-            "Goal owns that delivery: remove the redundant spoken Goal and preserve "
-            "the complete requested outcome and correct semantic bindings in the "
-            "capability Goal. Never invent, copy, or repair an entity by character "
-            "pattern; resolve it from the user meaning and supplied discourse. "
-            "Persona and wording are expression concerns, not extra Goals. A mere acknowledgement, confirmation, promise of willingness, or progress prelude for an executable request is owned by Response Composer and must not become a spoken_response Goal. Simultaneous, ordered, or performance framing does not merge independently observable outcomes into one Goal: movement, subtle expression, and a directly requested spoken performance remain separate responsibilities when each can succeed or fail on its own. Preserve their temporal relationship for planning rather than consolidating their meanings. Directly authored singing, humming, recitation, jokes, or other spoken performance is spoken_response, not an information resource acquisition. For embodied work, independently review whether movement, acquiring or manipulating an object, and returning are separate observable responsibilities; keep each separate when it could succeed or fail without the others. Identity shapes expression only and never proves that a physical responsibility is available.\n\n"
-            "A location named directly in the final authoritative user turn must remain a complete verbatim contiguous binding value in the user's language. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, copy the indirect user surface into resolved_references.surface_form, and retain the supplied referent's canonical value.\n\n"
+            "current responsibility. Keep separate Goals when the user truly requested "
+            "an independently satisfiable direct spoken or text response in addition "
+            "to capability work, such as a song, joke, or unrelated social answer. "
+            "When a spoken_response item merely phrases, reports, "
+            "explains, or interprets evidence acquired by a capability_dependent item, "
+            "the capability Goal owns that delivery. Persona and wording are expression "
+            "concerns, not extra Goals. A mere acknowledgement, confirmation, promise "
+            "of willingness, or progress prelude for executable work is owned by "
+            "Response Composer and is not a Goal. Identity shapes expression only and "
+            "never proves that a physical responsibility is available. Simultaneous or ordered framing does "
+            "not merge independently observable outcomes. Preserve each responsibility "
+            "exactly once and preserve its temporal relationship in the descriptions "
+            "without making one Goal claim completion of its siblings. For embodied "
+            "work, independently review whether movement, acquiring or manipulating an "
+            "object, and returning are separate observable responsibilities; keep each "
+            "separate when it can succeed or fail independently.\n\n"
+            "A location named directly in the final authoritative user turn must remain "
+            "a complete verbatim contiguous binding value in the user's language. Never "
+            "translate, transliterate, shorten, or expand it. Do not ask for provider "
+            "canonicalization or extra administrative detail merely because the name "
+            "could match more than one real place; downstream capability resolution owns "
+            "that ambiguity. Clarify only when the intended location is genuinely "
+            "underdetermined. For an indirect location, "
+            "copy the supplied referent_id into both the location binding and "
+            "resolved_references and retain the supplied canonical value.\n\n"
             "Existing Goal bindings are provenance-stable at this contract. An "
-            "association may update only its description and lifecycle relation; "
-            "it cannot rewrite typed material bindings. If the current user meaning "
-            "changes a material entity or parameter, preserve the earlier Goal and "
-            "its evidence, then return decision=create_goals with one fully bound "
-            "replacement Goal for the corrected responsibility. The model decides "
-            "whether meaning actually changed. Do not infer a correction from words, "
-            "syntax, or binding inequality alone. If the newly salient entity has a "
-            "supplied referent ID, emit a valid correct update targeting it; otherwise "
-            "use introduce rather than fabricating a referent ID or emitting an "
-            "invalid correction.\n\n"
+            "association may update only its description and lifecycle relation; it "
+            "cannot rewrite typed material bindings. If current meaning changes a "
+            "material entity or parameter, preserve the earlier Goal and create one "
+            "fully bound replacement Goal. Do not infer a correction from words, "
+            "syntax, or binding inequality alone; decide from user meaning and supplied "
+            "discourse evidence.\n\n"
             "The Host is asking for a semantic judgment, not prescribing merge or "
             "separation. Preserve every genuinely independent responsibility, all "
             "valid associations, and all valid discourse updates. Return only JSON "
@@ -1500,9 +1547,8 @@ class GoalAssociationResolver:
             f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-            "DTO to review JSON:\n"
-            f"{self._bounded_json(raw, 6000)}\n\n"
-            "Tool-result contents are intentionally absent. Do not use remembered "
+            + review_input
+            + "Tool-result contents are intentionally absent. Do not use remembered "
             "capability results to decide Goal structure or claim completion.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1512,6 +1558,8 @@ class GoalAssociationResolver:
         output_type: (
             type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
         ),
+        *,
+        fresh_resegmentation: bool = False,
     ) -> str:
         contract_name = (
             "Goal Segmentation"
@@ -1520,11 +1568,19 @@ class GoalAssociationResolver:
         )
         return (
             f"You are Chromie's independent semantic reviewer for the "
-            f"{contract_name} boundary. Decide with model reasoning whether "
-            "responsibilities are genuinely independent and whether an existing "
-            "Goal relation preserves authoritative material bindings. "
-            "Return only the complete final DTO as JSON. The Host owns validation, "
-            "IDs, lifecycle, and persistence and does not make this semantic choice."
+            f"{contract_name} boundary. "
+            + (
+                "Perform a fresh segmentation from the authoritative user turn; "
+                "no earlier Goal labels are evidence and none are available to copy. "
+                if fresh_resegmentation
+                else "Review the supplied DTO without assuming it is correct. "
+            )
+            + "Decide with model reasoning whether responsibilities are genuinely "
+            "independent and classify each by its completion channel. An authored "
+            "vocal performance belongs to spoken_response even when coordinated "
+            "with embodied work. Return only the complete final DTO as JSON. The "
+            "Host owns validation, IDs, lifecycle, and persistence and does not make "
+            "this semantic choice."
         )
 
     @staticmethod

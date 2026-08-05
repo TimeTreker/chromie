@@ -184,9 +184,17 @@ clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
 are rejected. Every new Goal also declares the completion modality
 `responsibility_kind`: `executable_action`, `spoken_response`,
-`capability_dependent`, or `other`. The eventual spoken delivery of a capability
-result remains part of that capability-dependent Goal rather than becoming a
-duplicate response Goal. The endpoint itself does not mutate task state,
+`capability_dependent`, or `other`. Completion modality is determined by the
+channel that satisfies the user-visible outcome, not by whether the wording is a
+verb, appears inside a robot command, or is simultaneous with body motion. A
+directly requested vocal performance is therefore `spoken_response`; locomotion,
+posture, gaze, and body expression are `executable_action`. For suspicious
+multi-responsibility outputs that label every sibling as executable, the Agent
+runs a fresh semantic resegmentation from the authoritative user turn without
+showing the first DTO, preventing an earlier label from anchoring the review.
+The eventual spoken delivery of a capability result remains part of that
+capability-dependent Goal rather than becoming a duplicate response Goal. The
+endpoint itself does not mutate task state,
 authorize side effects, alter Cognitive Core interpretation output, or execute plans. The unified host uses its result
 in `report_only` observation or authoritative `apply`, and only the host may
 atomically commit the validated association.
@@ -236,9 +244,14 @@ Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
 are normalized back to the normal speed and surfaced through `speak_first`.
-Requests to sing or joke while walking may be represented as a `chromie.speak`
-skill plus the walking skill, so the same motion safety normalization still
-applies. When
+Requests to joke, recite, or otherwise author speech while walking use a
+`spoken_response` Goal coordinated with the walking step; `chromie.speak` is a
+Response Composer transport and is never a planner step. A request to sing still
+belongs to the Speaking lane, but it may be claimed as singing only when a
+registered vocal-performance capability can provide that evidence. The planner
+must otherwise report the limitation or propose an explicit alternative rather
+than substituting a body action or ordinary TTS. The same motion safety
+normalization still applies to the walking step. When
 native speech metadata includes `wait_for_playback_start=true`, the host speech
 provider completes that speech request only after playback has started or the
 configured wait times out; this lets the following sequential body skill begin

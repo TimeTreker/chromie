@@ -2902,30 +2902,60 @@ def _normalize_redundant_planner_response_fields(
     *,
     expected_goal_ids_for_turn: list[str],
 ) -> dict[str, Any]:
-    """Normalize duplicate response fields without inventing semantics.
+    """Normalize transport redundancy without inventing planning semantics.
 
-    Planner models occasionally place the exact response only inside the sole
-    per-Goal outcome while omitting the same required top-level transport field,
-    or omit outcome disposition/coverage that are already explicit at the top
-    level.  The Host may copy those identical structural facts; it may not choose
-    a capability, rewrite a Goal, or synthesize response content.
+    ``steps[].source_goal_ids`` is the model's semantic ownership judgment.
+    ``goal_outcomes.*.step_ids`` and the top-level disposition repeat that same
+    judgment as cross-reference and aggregate transport fields. Models regularly
+    produce stale or nonexistent step references even when capability choice,
+    arguments, and source ownership are otherwise coherent. Rebuild only those
+    redundant fields from the model-authored step ownership; never choose a
+    capability, add a step, or assign an unowned Goal. An execute outcome with no
+    owned step therefore remains invalid and must be repaired by the model.
     """
 
-    normalized = dict(raw)
+    normalized = copy.deepcopy(raw)
     outcomes = normalized.get("goal_outcomes")
     if not isinstance(outcomes, dict):
         return normalized
 
+    expected = list(dict.fromkeys(expected_goal_ids_for_turn))
+    expected_set = set(expected)
+    owned_step_ids: dict[str, list[str]] = {goal_id: [] for goal_id in expected}
+    steps = normalized.get("steps")
+    ownership_is_usable = isinstance(steps, list)
+    seen_step_ids: set[str] = set()
+    if ownership_is_usable:
+        for item in steps:
+            if not isinstance(item, dict):
+                ownership_is_usable = False
+                break
+            step_id = " ".join(str(item.get("step_id") or "").strip().split())
+            source_goal_ids = item.get("source_goal_ids")
+            if (
+                not step_id
+                or step_id in seen_step_ids
+                or not isinstance(source_goal_ids, list)
+            ):
+                ownership_is_usable = False
+                break
+            seen_step_ids.add(step_id)
+            for raw_goal_id in source_goal_ids:
+                goal_id = " ".join(str(raw_goal_id or "").strip().split())
+                if goal_id in expected_set and step_id not in owned_step_ids[goal_id]:
+                    owned_step_ids[goal_id].append(step_id)
+
     normalized_outcomes: dict[str, Any] = {}
-    for goal_id, value in outcomes.items():
+    for raw_goal_id, value in outcomes.items():
+        goal_id = str(raw_goal_id)
         if not isinstance(value, dict):
-            normalized_outcomes[str(goal_id)] = value
+            normalized_outcomes[goal_id] = value
             continue
-        outcome = dict(value)
+        outcome = copy.deepcopy(value)
         response_text = str(outcome.get("response_text") or "").strip()
-        step_ids = outcome.get("step_ids")
+        owned = owned_step_ids.get(goal_id, []) if ownership_is_usable else []
         if not outcome.get("disposition"):
-            if isinstance(step_ids, list) and step_ids:
+            if owned:
                 outcome["disposition"] = "execute"
             elif response_text:
                 outcome["disposition"] = "respond"
@@ -2935,15 +2965,36 @@ def _normalize_redundant_planner_response_fields(
             and outcome.get("disposition") in {"execute", "respond"}
         ):
             outcome["coverage"] = "complete"
-        normalized_outcomes[str(goal_id)] = outcome
+        if ownership_is_usable and outcome.get("disposition") == "execute":
+            outcome["step_ids"] = list(owned)
+        elif outcome.get("disposition") == "respond":
+            outcome["step_ids"] = []
+        normalized_outcomes[goal_id] = outcome
     normalized["goal_outcomes"] = normalized_outcomes
+
+    if set(normalized_outcomes) == expected_set and expected_set:
+        dispositions = {
+            str(item.get("disposition") or "")
+            for item in normalized_outcomes.values()
+            if isinstance(item, dict)
+        }
+        if "" not in dispositions:
+            aggregate = (
+                "mixed"
+                if dispositions == {"execute", "respond"}
+                else next(iter(dispositions))
+                if len(dispositions) == 1
+                else ""
+            )
+            if aggregate:
+                normalized["disposition"] = aggregate
 
     if (
         normalized.get("disposition") == "respond"
         and not str(normalized.get("response_text") or "").strip()
-        and len(expected_goal_ids_for_turn) == 1
+        and len(expected) == 1
     ):
-        sole = normalized_outcomes.get(expected_goal_ids_for_turn[0])
+        sole = normalized_outcomes.get(expected[0])
         if isinstance(sole, dict):
             response_text = str(sole.get("response_text") or "").strip()
             if response_text:

@@ -383,6 +383,124 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
         self.assertEqual(outcome.coverage, "complete")
 
 
+    def test_step_outcome_links_follow_model_authored_step_ownership(self):
+        output = validate_planner_model_output(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "walk-step",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15.0},
+                        "timing": "sequential",
+                        "source_goal_ids": ["goal-walk"],
+                    },
+                    {
+                        "step_id": "blink-step",
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "timing": "sequential",
+                        "source_goal_ids": ["goal-blink"],
+                    },
+                ],
+                "goal_outcomes": {
+                    "goal-walk": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "step_ids": ["walk-step"],
+                        "satisfaction": exact_satisfaction(["goal-walk"]),
+                    },
+                    "goal-sing": {
+                        "disposition": "respond",
+                        "coverage": "complete",
+                        "response_text": "啦啦啦，今天一起向前走。",
+                        "step_ids": ["walk-step"],
+                        "satisfaction": exact_satisfaction(["goal-sing"]),
+                    },
+                    "goal-blink": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "step_ids": ["ghost-step"],
+                        "satisfaction": exact_satisfaction(["goal-blink"]),
+                    },
+                },
+                "goal_satisfaction": exact_satisfaction(
+                    ["goal-walk", "goal-sing", "goal-blink"]
+                ),
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [],
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            },
+            planner_tier="fast",
+            expected_goal_ids_for_turn=[
+                "goal-walk",
+                "goal-sing",
+                "goal-blink",
+            ],
+        )
+
+        self.assertEqual(output.disposition, "mixed")
+        self.assertEqual(output.goal_outcomes["goal-walk"].step_ids, ["walk-step"])
+        self.assertEqual(output.goal_outcomes["goal-sing"].step_ids, [])
+        self.assertEqual(output.goal_outcomes["goal-blink"].step_ids, ["blink-step"])
+
+    def test_transport_normalization_does_not_assign_an_unowned_execute_goal(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "execute goal outcome requires complete coverage and step_ids",
+        ):
+            validate_planner_model_output(
+                {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "confidence": 1.0,
+                    "response_text": "",
+                    "steps": [
+                        {
+                            "step_id": "walk-step",
+                            "capability_id": "soridormi.walk_forward",
+                            "args": {"duration_s": 15.0},
+                            "timing": "sequential",
+                            "source_goal_ids": ["goal-walk"],
+                        }
+                    ],
+                    "goal_outcomes": {
+                        "goal-walk": {
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "response_text": "",
+                            "step_ids": ["walk-step"],
+                            "satisfaction": exact_satisfaction(["goal-walk"]),
+                        },
+                        "goal-unowned": {
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "response_text": "",
+                            "step_ids": ["invented"],
+                            "satisfaction": exact_satisfaction(["goal-unowned"]),
+                        },
+                    },
+                    "goal_satisfaction": exact_satisfaction(
+                        ["goal-walk", "goal-unowned"]
+                    ),
+                    "escalation_reason": "",
+                    "unresolved": [],
+                    "parameter_resolutions": [],
+                    "plan_relation": "exact",
+                    "user_confirmation_required": False,
+                },
+                planner_tier="fast",
+                expected_goal_ids_for_turn=["goal-walk", "goal-unowned"],
+            )
+
+
 class FastPlannerResolverTests(unittest.TestCase):
     def test_simple_blink_produces_complete_direct_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
@@ -1693,8 +1811,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 ["goal-action", "goal-answer"]
             ),
         )
-        repaired = {**initial, "disposition": "mixed"}
-        ollama = ScriptedOllama([initial, repaired])
+        ollama = ScriptedOllama([initial])
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
@@ -1706,13 +1823,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "mixed")
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertNotIn("contract_repair_succeeded", plan.metadata)
         first_schema = ollama.prompts[0][1]["response_format"]
-        repair_schema = ollama.prompts[1][1]["response_format"]
         self.assertIn("execute", first_schema["properties"]["disposition"]["enum"])
-        self.assertEqual(
-            repair_schema["properties"]["disposition"]["enum"], ["mixed"]
-        )
 
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"capability_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}

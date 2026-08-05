@@ -508,7 +508,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             },
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        ollama = SequencedOllama([invalid, repaired])
+        ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
@@ -517,13 +517,12 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "execute")
-        self.assertEqual([item.step_ids for item in plan.goal_outcomes], [["walk"], ["blink"]])
-        repair_prompt = ollama.prompts[1][0]
-        self.assertIn("goal satisfaction score is inconsistent with status", repair_prompt)
-        self.assertIn("execute goal outcome requires complete coverage and step_ids", repair_prompt)
-        self.assertIn("top-level disposition must match per-goal outcome dispositions", repair_prompt)
-        self.assertIn("regenerate one fresh complete object", repair_prompt)
-        self.assertIn("Previous Deep Planner model output JSON, when doing a semantic runtime replan:\nnull", repair_prompt)
+        self.assertEqual(
+            [item.step_ids for item in plan.goal_outcomes],
+            [["walk"], ["blink"]],
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(plan.metadata["contract_repair_attempted"])
 
     def test_contract_repair_exposes_missing_mixed_response_text(self):
         goal_ids = ["goal-blink", "goal-joke"]
@@ -1396,19 +1395,15 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 }
             },
         }
-        ollama = SequencedOllama([invalid, revised])
+        ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(req)
         )
 
         self.assertEqual(plan.goal_outcomes[0].step_ids, ["blink"])
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "execute goal outcome requires complete coverage and step_ids",
-            ollama.prompts[1][0],
-        )
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(plan.metadata["contract_repair_attempted"])
 
     def test_invented_internal_goal_is_rejected_and_revised(self):
         context = {
