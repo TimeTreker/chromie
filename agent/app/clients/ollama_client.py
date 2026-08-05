@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
+import sys
 import time
 from typing import Any, Literal
 
@@ -13,6 +15,7 @@ import httpx
 
 try:
     from chromie_runtime.llm_diagnostics import (
+        PrefixCacheTracker,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
@@ -20,6 +23,7 @@ try:
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.llm_diagnostics import (
+        PrefixCacheTracker,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
@@ -113,6 +117,9 @@ def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
 
 
 
+_PREFIX_CACHE_TRACKER = PrefixCacheTracker()
+
+
 class OllamaClient:
     TRACE_MODULE = TraceModule(
         name="agent.ollama",
@@ -171,17 +178,40 @@ class OllamaClient:
         system: str | None = None,
         options: dict[str, Any] | None = None,
         response_format: ResponseFormat = "text",
+        prompt_family: str | None = None,
+        turn_id: str | None = None,
+        attempt: int | None = None,
     ) -> str | dict[str, Any]:
         request_options = self._effective_options(options)
         response_format_label = (
             "json_schema" if isinstance(response_format, dict) else response_format
         )
+        family = str(prompt_family or self.purpose).strip() or self.purpose
+        snapshot = runtime_tracer.current_snapshot()
+        trace_id = (
+            str(snapshot.trace.get("trace_id") or "")
+            if snapshot is not None
+            else ""
+        )
+        start_probe = _PREFIX_CACHE_TRACKER.begin(
+            purpose=self.purpose,
+            prompt_family=family,
+            model=self.model,
+            system=system,
+            prompt=prompt,
+            trace_id=trace_id or None,
+            turn_id=turn_id,
+            attempt=attempt,
+        )
+        call_id = str(start_probe.fields["call_id"])
+        logger.info("%s", start_probe.render())
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
             operation="generate",
             kind="model_call",
             attributes={
                 "purpose": self.purpose,
+                "prompt_family": family,
                 "model": self.model,
                 "response_format": response_format_label,
                 "timeout_ms": self.timeout_ms,
@@ -189,14 +219,46 @@ class OllamaClient:
                 "system_chars": len(system or ""),
                 "num_ctx": request_options.get("num_ctx"),
                 "num_predict": request_options.get("num_predict"),
+                "llm_call_id": call_id,
+                "attempt": attempt,
             },
         ) as span:
-            result = await self._generate(
-                prompt,
-                system=system,
-                options=request_options,
-                response_format=response_format,
-            )
+            finish_probe = None
+            try:
+                result = await self._generate(
+                    prompt,
+                    system=system,
+                    options=request_options,
+                    response_format=response_format,
+                    prefix_probe_call_id=call_id,
+                )
+            finally:
+                active_error = sys.exc_info()[1]
+                if active_error is None:
+                    finish_probe = _PREFIX_CACHE_TRACKER.finish(
+                        call_id,
+                        status="completed",
+                    )
+                else:
+                    cancelled = isinstance(active_error, asyncio.CancelledError)
+                    failure = (
+                        llm_failure_metadata(active_error)
+                        if isinstance(active_error, Exception)
+                        else {"failure_class": "cancelled"}
+                    )
+                    finish_probe = _PREFIX_CACHE_TRACKER.finish(
+                        call_id,
+                        status="cancelled" if cancelled else "failed",
+                        error_type=type(active_error).__name__,
+                        failure_class=str(failure.get("failure_class") or ""),
+                    )
+                if finish_probe is not None:
+                    logger.info("%s", finish_probe.render())
+            if finish_probe is not None:
+                span.set_attribute(
+                    "prompt_eval_duration_ms",
+                    finish_probe.fields.get("prompt_eval_duration_ms"),
+                )
             if isinstance(result, str):
                 span.set_attribute("response_chars", len(result))
             elif isinstance(result, dict):
@@ -210,6 +272,7 @@ class OllamaClient:
         system: str | None = None,
         options: dict[str, Any] | None = None,
         response_format: ResponseFormat = "text",
+        prefix_probe_call_id: str | None = None,
     ) -> str | dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
@@ -389,6 +452,8 @@ class OllamaClient:
                 response.text[:2000],
             )
             data = response.json()
+            if prefix_probe_call_id:
+                _PREFIX_CACHE_TRACKER.record_response(prefix_probe_call_id, data)
 
             text = str(data.get("response") or "").strip()
 

@@ -872,8 +872,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.steps, [])
         self.assertIn("source_goal_ids", plan.metadata["initial_validation_errors"])
-        self.assertTrue(plan.metadata["repair_raw_output"])
-        self.assertNotIn("source_goal_ids", plan.metadata["repair_raw_output"])
+        repair_ref = plan.metadata["repair_raw_output_ref"]
+        self.assertGreater(repair_ref["chars"], 0)
+        self.assertTrue(repair_ref["digest"].startswith("sha256:"))
+        self.assertNotIn("initial_raw_output", plan.metadata)
+        self.assertNotIn("repair_raw_output", plan.metadata)
 
     def test_live_blink_and_joke_speech_step_repairs_to_mixed_respond_outcome(self):
         goal_ids = ["goal-blink", "goal-joke"]

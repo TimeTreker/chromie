@@ -21,7 +21,7 @@ ResponseCompositionPhase = Literal["pre_execution"]
 
 def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
     payload = json.dumps(
-        resolution.model_dump(mode="json", exclude_none=True),
+        resolution.prompt_projection(),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -31,7 +31,7 @@ def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
 
 def canonical_plan_fingerprint(plan: CanonicalPlan) -> str:
     payload = json.dumps(
-        plan.model_dump(mode="json", exclude_none=True),
+        plan.prompt_projection(),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),

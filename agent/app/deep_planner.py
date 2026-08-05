@@ -22,15 +22,18 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.llm_diagnostics import cognition_text_reference
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
     coordinated_action_goal_ids,
     expected_goal_ids,
+    goal_association_prompt_projection,
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
@@ -179,6 +182,13 @@ class DeepPlannerResolver:
                     ),
                     options=generation_options,
                     response_format=active_response_schema,
+                    prompt_family=(
+                        "deep_planner.revision"
+                        if feedback
+                        else "deep_planner.primary"
+                    ),
+                    turn_id=request.sid,
+                    attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
@@ -225,10 +235,11 @@ class DeepPlannerResolver:
                     )
                     logger.warning(
                         "deep_planner_contract_repair_start sid=%s attempt=%s "
-                        "validation_errors=%s raw_output=%s",
+                        "validation_errors=%s raw_output_ref=%s raw_output=%s",
                         request.sid,
                         attempt + 1,
                         initial_validation_errors,
+                        cognition_text_reference(initial_raw_output),
                         self._bounded(initial_raw_output, 5000),
                     )
                     feedback = self._merge_feedback(
@@ -240,6 +251,22 @@ class DeepPlannerResolver:
                         }],
                     )
                     continue
+                logger.warning(
+                    "deep_planner_contract_failure_evidence sid=%s "
+                    "initial_raw_output_ref=%s repair_raw_output_ref=%s "
+                    "initial_raw_output=%s repair_raw_output=%s",
+                    request.sid,
+                    cognition_text_reference(initial_raw_output),
+                    cognition_text_reference(
+                        raw if contract_repair_attempted else None
+                    ),
+                    self._bounded(initial_raw_output, 5000)
+                    if initial_raw_output is not None
+                    else "",
+                    self._bounded(raw, 5000)
+                    if contract_repair_attempted and raw is not None
+                    else "",
+                )
                 integrity_metadata = cognitive_integrity_metadata(stage="deep_planner", exc=exc, request=request)
                 return self._clarify(
                     plan_id,
@@ -255,12 +282,12 @@ class DeepPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output": self._bounded(initial_raw_output, 5000)
-                        if initial_raw_output is not None
-                        else "",
-                        "repair_raw_output": self._bounded(raw, 5000)
-                        if contract_repair_attempted and raw is not None
-                        else "",
+                        "initial_raw_output_ref": cognition_text_reference(
+                            initial_raw_output
+                        ),
+                        "repair_raw_output_ref": cognition_text_reference(
+                            raw if contract_repair_attempted else None
+                        ),
                         **integrity_metadata,
                     },
                 )
@@ -404,12 +431,8 @@ class DeepPlannerResolver:
                     "validation_feedback": errors,
                     "contract_schema": "DeepPlannerModelOutput",
                     "canonical_contract": "CanonicalPlan",
-                    "initial_raw_output": self._bounded(previous_raw, 5000)
-                    if previous_raw is not None
-                    else "",
-                    "repair_raw_output": self._bounded(raw, 5000)
-                    if raw is not None
-                    else "",
+                    "initial_raw_output_ref": cognition_text_reference(previous_raw),
+                    "repair_raw_output_ref": cognition_text_reference(raw),
                 },
                 attempts=attempt + 1,
             )
@@ -807,7 +830,7 @@ class DeepPlannerResolver:
         )
         fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
         goals = context.get("active_goal_snapshots") or []
-        association = context.get("goal_association_resolution") or {}
+        association = goal_association_prompt_projection(context)
         grounding = canonical_goal_grounding(context)
         runtime_feedback = context.get("runtime_validator_feedback") or []
         combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]

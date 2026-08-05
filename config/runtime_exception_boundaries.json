@@ -539,7 +539,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "d523c60a25abfa42b014ff8c8f6001fdf554373258d2b95688c821ae47a047b4",
+      "body_sha256": "0fc5563270cba64ecf05a5ec660e2bd762e08931f63207d93c5fc8835bee50da",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -582,7 +582,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "4e2429413883e7853ae1deb975a2cba9ff023de04dce38a08da7e87394464f9f",
+      "body_sha256": "b2675e118f9289fa6c5fc2e32e9146b370218c06c32ba9b29fd3e5c5b4348a6e",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -625,7 +625,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "7edabdceb564534d42c54eb22e47ddb2d86d90fc1072b05a35dcbe5a332606aa",
+      "body_sha256": "9b5d489cdcb5d47cf7f384c8f008c7e93127177947b448f912aef6de4d619a32",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -694,7 +694,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "90ed59ab8940e8740c77e654dd159ee4e5f19d45ac6e5919c40f3318d4b314c4",
+      "body_sha256": "0ff878f8e65603dce20aa358f6fdf9b6cd64dbffdbb37363e1fe5314b485f9e2",
       "failure_signals": [
         "continue",
         "diagnostic",

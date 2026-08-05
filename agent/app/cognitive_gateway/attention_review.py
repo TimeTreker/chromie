@@ -101,6 +101,9 @@ class AttentionReviewer:
                 system=self._system_prompt(),
                 options=options,
                 response_format=self._response_schema(),
+                prompt_family="cognitive_gateway_attention_review.primary",
+                turn_id=request.turn_id,
+                attempt=1,
             )
             if not isinstance(raw, dict):
                 raise ValueError("attention model did not return a JSON object")
@@ -124,6 +127,9 @@ class AttentionReviewer:
                     system=self._system_prompt(),
                     options=options,
                     response_format=self._response_schema(),
+                    prompt_family="cognitive_gateway_attention_review.repair",
+                    turn_id=request.turn_id,
+                    attempt=2,
                 )
                 if not isinstance(repaired, dict):
                     raise ValueError(
@@ -178,6 +184,9 @@ class AttentionReviewer:
                 system=self._system_prompt(),
                 options=options,
                 response_format=self._response_schema(),
+                prompt_family="cognitive_gateway_attention_review.suppression_review",
+                turn_id=request.turn_id,
+                attempt=1,
             )
             if not isinstance(reconsidered_raw, dict):
                 raise ValueError(

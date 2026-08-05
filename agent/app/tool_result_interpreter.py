@@ -99,6 +99,9 @@ class ToolResultInterpreter:
                     "num_predict": self.num_predict,
                 },
                 response_format=self._response_schema(request),
+                prompt_family="tool_result_interpreter.primary",
+                turn_id=request.sid,
+                attempt=1,
             )
             output = ToolResultModelOutput.model_validate(raw)
             effectful_reviewed = False
@@ -113,6 +116,9 @@ class ToolResultInterpreter:
                         "num_predict": self.num_predict,
                     },
                     response_format=self._response_schema(request),
+                    prompt_family="tool_result_interpreter.effectful_review",
+                    turn_id=request.sid,
+                    attempt=1,
                 )
                 if not isinstance(reviewed, dict):
                     raise ValueError(

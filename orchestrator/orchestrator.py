@@ -4268,7 +4268,7 @@ class VoiceAssistant:
             return
         started_ms = now_ms()
         composition_context = dict(context)
-        composition_context["canonical_plan_resolution"] = plan.model_dump(mode="json")
+        composition_context["canonical_plan_resolution"] = plan.prompt_projection()
         self.session_log(
             session_id,
             "response_composer_report_started: plan_id=%s disposition=%s goals=%s",
@@ -4355,7 +4355,7 @@ class VoiceAssistant:
         if self.deep_planner_mode != "report_only":
             return
         deep_context = dict(context)
-        deep_context["fast_plan_resolution"] = plan.model_dump(mode="json")
+        deep_context["fast_plan_resolution"] = plan.prompt_projection()
         deep_started_ms = now_ms()
         self.session_log(session_id, "deep_planner_report_started: fast_plan_id=%s reason=%s",
                          plan.plan_id, plan.escalation_reason or "unspecified")
@@ -7190,9 +7190,7 @@ class VoiceAssistant:
                     "social_interaction_style"
                 )
                 or {},
-                "canonical_plan_resolution": plan.model_dump(
-                    mode="json", exclude_none=True
-                ),
+                "canonical_plan_resolution": plan.prompt_projection(),
             },
         )
         try:

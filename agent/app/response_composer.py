@@ -17,11 +17,15 @@ from .cognitive_identity import (
     bounded_identity_json,
     bounded_personality_json,
 )
-from .planner_contract import evidence_bound_dialogue
+from .planner_contract import (
+    evidence_bound_dialogue,
+    goal_association_prompt_projection,
+)
 from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.llm_diagnostics import cognition_text_reference
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from chromie_contracts.execution_lanes import LaneCoordinationGroup
     from chromie_contracts.goal import GoalAssociationResolution
@@ -44,6 +48,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
     from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -198,6 +203,13 @@ class ResponseComposerResolver:
                         "num_predict": self.num_predict,
                     },
                     response_format=response_schema,
+                    prompt_family=(
+                        "response_composer.repair"
+                        if contract_repair_attempted
+                        else "response_composer.primary"
+                    ),
+                    turn_id=request.sid,
+                    attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
@@ -224,6 +236,9 @@ class ResponseComposerResolver:
                             "num_predict": self.num_predict,
                         },
                         response_format=response_schema,
+                        prompt_family="response_composer.safe_read_review",
+                        turn_id=request.sid,
+                        attempt=1,
                     )
                     if not isinstance(reviewed, dict):
                         raise ValueError(
@@ -263,6 +278,9 @@ class ResponseComposerResolver:
                             "num_predict": self.num_predict,
                         },
                         response_format=response_schema,
+                        prompt_family="response_composer.effectful_review",
+                        turn_id=request.sid,
+                        attempt=1,
                     )
                     if not isinstance(reviewed, dict):
                         raise ValueError(
@@ -504,6 +522,24 @@ class ResponseComposerResolver:
                 )
                 if fallback is not None:
                     return fallback
+                logger.warning(
+                    "response_composer_contract_failure_evidence sid=%s "
+                    "initial_raw_output_ref=%s repair_raw_output_ref=%s "
+                    "initial_raw_output=%s repair_raw_output=%s",
+                    request.sid,
+                    cognition_text_reference(
+                        previous_raw if contract_repair_attempted else None
+                    ),
+                    cognition_text_reference(
+                        raw if contract_repair_attempted else None
+                    ),
+                    self._bounded(previous_raw, 5000)
+                    if contract_repair_attempted and previous_raw is not None
+                    else "",
+                    self._bounded(raw, 5000)
+                    if contract_repair_attempted and raw is not None
+                    else "",
+                )
                 return ResponseCompositionResolution(
                     status="model_unavailable",
                     reason_summary="Response composition model output was unavailable or invalid.",
@@ -524,12 +560,12 @@ class ResponseComposerResolver:
                         ),
                         "effectful_semantic_review_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output": self._bounded(previous_raw, 5000)
-                        if contract_repair_attempted and previous_raw is not None
-                        else "",
-                        "repair_raw_output": self._bounded(raw, 5000)
-                        if contract_repair_attempted and raw is not None
-                        else "",
+                        "initial_raw_output_ref": cognition_text_reference(
+                            previous_raw if contract_repair_attempted else None
+                        ),
+                        "repair_raw_output_ref": cognition_text_reference(
+                            raw if contract_repair_attempted else None
+                        ),
                         **integrity_metadata,
                         **failure,
                     },
@@ -1094,7 +1130,7 @@ class ResponseComposerResolver:
 
         if contains_effectful_goal(context.get("active_goal_snapshots")):
             return True
-        association = context.get("goal_association_resolution")
+        association = goal_association_prompt_projection(context)
         return bool(
             isinstance(association, dict)
             and contains_effectful_goal(association.get("new_goals"))
@@ -1478,6 +1514,13 @@ class ResponseComposerResolver:
                         "num_predict": self.num_predict,
                     },
                     response_format=response_schema,
+                    prompt_family=(
+                        "response_composer.direct_repair"
+                        if repair_attempted
+                        else "response_composer.direct_primary"
+                    ),
+                    turn_id=request.sid,
+                    attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
@@ -1694,7 +1737,7 @@ class ResponseComposerResolver:
             f"User turn: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n\n"
             "Validated Goal Association JSON:\n"
-            f"{self._bounded(association.model_dump(mode='json', exclude_none=True), 7000)}\n\n"
+            f"{self._bounded(association.prompt_projection(), 7000)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded((request.history or [])[-8:], 3600)}\n\n"
             "Current-turn delivered speech JSON:\n"
@@ -2274,7 +2317,7 @@ class ResponseComposerResolver:
         return (
             f"User turn:\n{request.text}\n\n"
             f"Language hint: {request.language or 'auto'}\n\n"
-            f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
+            f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.prompt_projection(), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
@@ -2353,13 +2396,13 @@ class ResponseComposerResolver:
             "facts or task steps.\n\n"
             f"Authoritative user turn:\n{request.text}\n\n"
             "Authoritative effectful Goal context JSON:\n"
-            f"{self._bounded(request.context.get('active_goal_snapshots') or request.context.get('goal_association_resolution') or {}, 7000)}\n\n"
+            f"{self._bounded(request.context.get('active_goal_snapshots') or goal_association_prompt_projection(request.context), 7000)}\n\n"
             "Speech already delivered in this current turn JSON:\n"
             f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
             "Fast speech already scheduled in this current turn JSON (de-duplication only):\n"
             f"{self._bounded(self._scheduled_turn_speech(request.context), 2400)}\n\n"
             "Immutable CanonicalPlan JSON:\n"
-            f"{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
+            f"{self._bounded(plan.prompt_projection(), 14000)}\n\n"
             "Candidate Response Composer DTO JSON:\n"
             f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
             "Return only the complete ResponseComposerModelOutput JSON object."
@@ -2409,7 +2452,7 @@ class ResponseComposerResolver:
             "Pending execution Capability semantics JSON:\n"
             f"{self._bounded(request.context.get('execution_capabilities') or [], 6000)}\n\n"
             "Immutable CanonicalPlan JSON:\n"
-            f"{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
+            f"{self._bounded(plan.prompt_projection(), 14000)}\n\n"
             "Candidate Response Composer DTO JSON:\n"
             f"{self._bounded(candidate.model_dump(mode='json'), 7000)}\n\n"
             "Return only the complete ResponseComposerModelOutput JSON object."

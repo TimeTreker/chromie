@@ -1941,7 +1941,7 @@ class GoalDrivenRuntimeCoordinator:
         *,
         path_classification: str,
     ) -> dict[str, Any]:
-        payload = plan.model_dump(mode="json", exclude_none=True)
+        payload = plan.prompt_projection()
         if path_classification != "contract_failure":
             return payload
         metadata = dict(payload.get("metadata") or {})
@@ -2298,8 +2298,8 @@ class GoalDrivenRuntimeCoordinator:
                 (association.metadata or {}).get("status") or "resolved"
             )
             planning_context = dict(context)
-            planning_context["goal_association_resolution"] = association.model_dump(
-                mode="json", exclude_none=True
+            planning_context["goal_association_resolution"] = (
+                association.prompt_projection()
             )
 
             if association_status not in {"resolved", "needs_clarification"}:
@@ -2428,7 +2428,7 @@ class GoalDrivenRuntimeCoordinator:
                     composition_context = dict(planning_context)
                     composition_context[
                         "direct_goal_association_resolution"
-                    ] = association.model_dump(mode="json", exclude_none=True)
+                    ] = association.prompt_projection()
                     composition_context["execution_capabilities"] = []
                     recent_auxiliary_evidence = getattr(
                         self.adapter,
@@ -2709,8 +2709,8 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             composition_context = dict(planning_context)
-            composition_context["canonical_plan_resolution"] = terminal_plan.model_dump(
-                mode="json", exclude_none=True
+            composition_context["canonical_plan_resolution"] = (
+                terminal_plan.prompt_projection()
             )
             composition_context["execution_capabilities"] = [
                 {

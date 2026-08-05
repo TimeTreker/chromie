@@ -1741,7 +1741,10 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
         self.assertTrue(result.metadata["contract_repair_attempted"])
         self.assertFalse(result.metadata["contract_repair_succeeded"])
-        self.assertIn("continues", result.metadata["initial_raw_output"])
+        initial_ref = result.metadata["initial_raw_output_ref"]
+        self.assertGreater(initial_ref["chars"], 0)
+        self.assertRegex(initial_ref["digest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertNotIn("initial_raw_output", result.metadata)
         self.assertEqual(result.associations, [])
         self.assertTrue(result.clarification)
 

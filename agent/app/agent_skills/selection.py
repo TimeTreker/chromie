@@ -152,6 +152,9 @@ class AgentSkillSelectionService:
                     "num_predict": self.num_predict,
                 },
                 response_format=schema,
+                prompt_family="agent_skill_selection.primary",
+                turn_id=request.turn_id,
+                attempt=1,
             )
             return self._validate_output(
                 initial_raw,
@@ -218,6 +221,9 @@ class AgentSkillSelectionService:
                     "num_predict": self.num_predict,
                 },
                 response_format=schema,
+                prompt_family="agent_skill_selection.repair",
+                turn_id=request.turn_id,
+                attempt=2,
             )
             resolution = self._validate_output(
                 repaired_raw,

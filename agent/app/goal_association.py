@@ -24,9 +24,11 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.llm_diagnostics import cognition_text_reference
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
@@ -609,6 +611,9 @@ class GoalAssociationResolver:
                 system=self._system_prompt(output_type),
                 options=generation_options,
                 response_format=response_schema,
+                prompt_family="goal_association.primary",
+                turn_id=request.sid,
+                attempt=1,
             )
             if not isinstance(raw, dict):
                 raise ValueError("goal-association response is not a JSON object")
@@ -644,6 +649,9 @@ class GoalAssociationResolver:
                     system=self._repair_system_prompt(output_type),
                     options=generation_options,
                     response_format=response_schema,
+                    prompt_family="goal_association.repair",
+                    turn_id=request.sid,
+                    attempt=2,
                 )
                 if not isinstance(repaired, dict):
                     raise ValueError("goal-association repair response is not a JSON object")
@@ -698,6 +706,9 @@ class GoalAssociationResolver:
                     system=self._semantic_review_system_prompt(output_type),
                     options=generation_options,
                     response_format=response_schema,
+                    prompt_family="goal_association.semantic_review",
+                    turn_id=request.sid,
+                    attempt=3,
                 )
                 if not isinstance(reviewed, dict):
                     raise OllamaGenerationError(
@@ -752,7 +763,8 @@ class GoalAssociationResolver:
                 "goal_association_inference_failed sid=%s error_type=%s error=%s "
                 "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s "
                 "repair_attempted=%s semantic_review_attempted=%s "
-                "initial_validation_errors=%s initial_raw=%s repair_raw=%s "
+                "initial_validation_errors=%s initial_raw_ref=%s repair_raw_ref=%s "
+                "semantic_review_raw_ref=%s initial_raw=%s repair_raw=%s "
                 "semantic_review_raw=%s",
                 request.sid,
                 type(exc).__name__,
@@ -764,6 +776,9 @@ class GoalAssociationResolver:
                 repair_attempted,
                 semantic_review_attempted,
                 initial_validation_error,
+                cognition_text_reference(initial_raw),
+                cognition_text_reference(repair_raw),
+                cognition_text_reference(semantic_review_raw),
                 self._bounded_json(initial_raw, 4000) if initial_raw is not None else "",
                 self._bounded_json(repair_raw, 4000) if repair_raw is not None else "",
                 (
@@ -790,15 +805,11 @@ class GoalAssociationResolver:
             }
             if initial_validation_error:
                 metadata["initial_validation_errors"] = initial_validation_error
-            if initial_raw is not None:
-                metadata["initial_raw_output"] = self._bounded_json(initial_raw, 4000)
-            if repair_raw is not None:
-                metadata["repair_raw_output"] = self._bounded_json(repair_raw, 4000)
-            if semantic_review_raw is not None:
-                metadata["semantic_review_raw_output"] = self._bounded_json(
-                    semantic_review_raw,
-                    4000,
-                )
+            metadata["initial_raw_output_ref"] = cognition_text_reference(initial_raw)
+            metadata["repair_raw_output_ref"] = cognition_text_reference(repair_raw)
+            metadata["semantic_review_raw_output_ref"] = cognition_text_reference(
+                semantic_review_raw
+            )
             if optional_referent_recovery:
                 metadata["optional_contract_recovery"] = {
                     "field": "referent_updates",

@@ -215,6 +215,44 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
             any("ollama_request_rejected" in line for line in error_logs.output)
         )
 
+
+    async def test_prefix_probe_finishes_a_preflight_rejection(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "4.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "256",
+            },
+            clear=False,
+        ), mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient"
+        ) as client_class, self.assertLogs(
+            "chromie.agent.ollama", level="INFO"
+        ) as logs:
+            with self.assertRaises(OllamaGenerationError):
+                await OllamaClient(
+                    base_url="http://chromie-llm:11434",
+                    model="test-model",
+                    purpose="fast_planner",
+                ).generate(
+                    "x" * 4000,
+                    system="y" * 1000,
+                    options={"num_ctx": 1024, "num_predict": 512},
+                    prompt_family="fast_planner.primary",
+                    turn_id="turn-probe",
+                    attempt=1,
+                )
+
+        client_class.assert_not_called()
+        rendered = "\n".join(logs.output)
+        self.assertIn("llm_prefix_probe_start", rendered)
+        self.assertIn("prompt_family=fast_planner.primary", rendered)
+        self.assertIn("turn_id=turn-probe", rendered)
+        self.assertIn("llm_prefix_probe_finish", rendered)
+        self.assertIn("status=failed", rendered)
+        self.assertIn("failure_class=prompt_budget_exceeded", rendered)
+        self.assertIn("prompt_eval_duration_ms=null", rendered)
+
     async def test_generate_classifies_timeout_as_infrastructure_not_architecture(
         self,
     ) -> None:

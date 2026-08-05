@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -240,3 +244,244 @@ def _format_value(value: Any) -> str:
     if any(ch.isspace() for ch in text):
         return repr(text)
     return text
+
+
+_PREFIX_WINDOWS = (256, 512, 1024, 2048, 4096)
+
+
+def cognition_text_reference(value: Any) -> dict[str, Any]:
+    """Return a stable non-content reference for diagnostic model text.
+
+    Any retained model text remains confined to the diagnostic channel.
+    Prompt-facing state may carry this compact reference so a failure can be
+    correlated with the matching log record without replaying the output.
+    """
+
+    if value is None:
+        return {"chars": 0, "digest": ""}
+    if isinstance(value, str):
+        text = value
+    else:
+        text = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+    return {
+        "chars": len(text),
+        "digest": "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+
+
+def _optional_ns_to_ms(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return round(int(value) / 1_000_000, 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def _prefix_proxy(system: str | None, prompt: str | None) -> str:
+    # This is a raw request-character proxy, not Ollama's final templated token
+    # sequence. The explicit separator prevents an ambiguous concatenation.
+    return f"system\0{system or ''}\0prompt\0{prompt or ''}"
+
+
+def _prefix_digests(value: str) -> dict[int, str]:
+    return {
+        window: hashlib.sha256(value[:window].encode("utf-8")).hexdigest()
+        for window in _PREFIX_WINDOWS
+        if len(value) >= window
+    }
+
+
+@dataclass(frozen=True)
+class PrefixCacheProbe:
+    event: str
+    fields: dict[str, Any]
+
+    def render(self) -> str:
+        return f"{self.event}: " + " ".join(
+            f"{key}={_format_value(value)}" for key, value in self.fields.items()
+        )
+
+
+@dataclass
+class _PrefixHistory:
+    call_id: str
+    sequence: int
+    model: str
+    purpose: str
+    prompt_family: str
+    proxy_chars: int
+    full_digest: str
+    window_digests: dict[int, str]
+
+
+@dataclass
+class _PendingPrefixCall:
+    history: _PrefixHistory
+    started_monotonic: float
+    response_data: dict[str, Any] | None = None
+
+
+class PrefixCacheTracker:
+    """Measure request-prefix stability without assuming cache semantics.
+
+    Calls are registered before preflight or transport begins. Consequently a
+    failed first attempt remains part of the observed sequence and a later
+    repair cannot be misattributed to the previous turn. Prompt families are
+    supplied by call sites when one OllamaClient purpose owns multiple prompt
+    shapes.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._sequence = 0
+        self._last_call: _PrefixHistory | None = None
+        self._last_by_family: dict[tuple[str, str], _PrefixHistory] = {}
+        self._pending: dict[str, _PendingPrefixCall] = {}
+
+    def begin(
+        self,
+        *,
+        purpose: str,
+        prompt_family: str,
+        model: str,
+        system: str | None,
+        prompt: str | None,
+        trace_id: str | None = None,
+        turn_id: str | None = None,
+        attempt: int | None = None,
+    ) -> PrefixCacheProbe:
+        proxy = _prefix_proxy(system, prompt)
+        window_digests = _prefix_digests(proxy)
+        full_digest = hashlib.sha256(proxy.encode("utf-8")).hexdigest()
+        family_key = (model, prompt_family)
+        with self._lock:
+            self._sequence += 1
+            sequence = self._sequence
+            call_id = f"llmcall_{sequence:08d}"
+            previous_call = self._last_call
+            previous_family = self._last_by_family.get(family_key)
+            common_lower_bound = 0
+            if previous_family is not None:
+                for window in _PREFIX_WINDOWS:
+                    if (
+                        window_digests.get(window)
+                        and window_digests.get(window)
+                        == previous_family.window_digests.get(window)
+                    ):
+                        common_lower_bound = window
+                    else:
+                        break
+            history = _PrefixHistory(
+                call_id=call_id,
+                sequence=sequence,
+                model=model,
+                purpose=purpose,
+                prompt_family=prompt_family,
+                proxy_chars=len(proxy),
+                full_digest=full_digest,
+                window_digests=window_digests,
+            )
+            self._last_call = history
+            self._last_by_family[family_key] = history
+            self._pending[call_id] = _PendingPrefixCall(
+                history=history,
+                started_monotonic=time.perf_counter(),
+            )
+        return PrefixCacheProbe(
+            event="llm_prefix_probe_start",
+            fields={
+                "call_id": call_id,
+                "sequence": sequence,
+                "purpose": purpose,
+                "prompt_family": prompt_family,
+                "model": model,
+                "trace_id": trace_id,
+                "turn_id": turn_id,
+                "attempt": attempt,
+                "probe_kind": "raw_system_prompt_character_proxy",
+                "proxy_chars": len(proxy),
+                "proxy_digest": "sha256:" + full_digest,
+                "family_seen_before": previous_family is not None,
+                "exact_proxy_repeat": (
+                    previous_family is not None
+                    and previous_family.proxy_chars == len(proxy)
+                    and previous_family.full_digest == full_digest
+                ),
+                "common_prefix_lower_bound_chars": (
+                    common_lower_bound if previous_family is not None else None
+                ),
+                "calls_since_same_family": (
+                    sequence - previous_family.sequence
+                    if previous_family is not None
+                    else None
+                ),
+                "previous_call_id": (previous_call.call_id if previous_call else None),
+                "previous_purpose": (previous_call.purpose if previous_call else None),
+                "previous_prompt_family": (
+                    previous_call.prompt_family if previous_call else None
+                ),
+                "previous_model": (previous_call.model if previous_call else None),
+            },
+        )
+
+    def record_response(self, call_id: str, data: dict[str, Any] | None) -> None:
+        with self._lock:
+            pending = self._pending.get(call_id)
+            if pending is not None:
+                pending.response_data = dict(data or {})
+
+    def finish(
+        self,
+        call_id: str,
+        *,
+        status: str,
+        error_type: str | None = None,
+        failure_class: str | None = None,
+    ) -> PrefixCacheProbe | None:
+        with self._lock:
+            pending = self._pending.pop(call_id, None)
+        if pending is None:
+            return None
+        data = pending.response_data or {}
+        elapsed_ms = round(
+            (time.perf_counter() - pending.started_monotonic) * 1000.0, 3
+        )
+        history = pending.history
+        return PrefixCacheProbe(
+            event="llm_prefix_probe_finish",
+            fields={
+                "call_id": call_id,
+                "sequence": history.sequence,
+                "purpose": history.purpose,
+                "prompt_family": history.prompt_family,
+                "model": history.model,
+                "status": status,
+                "error_type": error_type,
+                "failure_class": failure_class,
+                "elapsed_ms": elapsed_ms,
+                "prompt_eval_count": data.get("prompt_eval_count"),
+                "prompt_eval_duration_ms": _optional_ns_to_ms(
+                    data.get("prompt_eval_duration")
+                ),
+                "load_duration_ms": _optional_ns_to_ms(data.get("load_duration")),
+                "eval_count": data.get("eval_count"),
+                "eval_duration_ms": _optional_ns_to_ms(data.get("eval_duration")),
+                "total_duration_ms": _optional_ns_to_ms(data.get("total_duration")),
+            },
+        )
+
+    def reset(self) -> None:
+        """Clear process-local state for deterministic unit tests."""
+
+        with self._lock:
+            self._sequence = 0
+            self._last_call = None
+            self._last_by_family.clear()
+            self._pending.clear()

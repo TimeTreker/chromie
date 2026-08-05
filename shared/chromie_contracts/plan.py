@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -334,6 +335,55 @@ class CanonicalPlan(BaseModel):
     @classmethod
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
+    def prompt_projection(self) -> dict[str, Any]:
+        """Return the closed semantic Plan projection permitted in prompts.
+
+        Runtime and diagnostic metadata remain on the authoritative Plan object.
+        Downstream model stages receive typed semantic fields plus the two
+        material plan-policy values they must preserve.
+        """
+
+        payload = self.model_dump(
+            mode="json",
+            exclude={"metadata", "steps", "goal_outcomes"},
+            exclude_none=True,
+        )
+        payload["steps"] = [
+            item.model_dump(mode="json", exclude={"metadata"}, exclude_none=True)
+            for item in self.steps
+        ]
+        payload["goal_outcomes"] = [
+            item.model_dump(mode="json", exclude={"metadata"}, exclude_none=True)
+            for item in self.goal_outcomes
+        ]
+        allowed_metadata: dict[str, Any] = {}
+        relation = self.metadata.get("plan_relation")
+        if relation in {"exact", "safe_adjustment", "alternative"}:
+            allowed_metadata["plan_relation"] = relation
+        confirmation = self.metadata.get("user_confirmation_required")
+        if isinstance(confirmation, bool):
+            allowed_metadata["user_confirmation_required"] = confirmation
+        path_classification = self.metadata.get("path_classification")
+        if path_classification in {
+            "terminal",
+            "semantic_escalation",
+            "contract_failure",
+            "coverage_review_failure",
+        }:
+            allowed_metadata["path_classification"] = path_classification
+        if allowed_metadata:
+            payload["metadata"] = allowed_metadata
+        serialized = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(serialized) > 65_536:
+            raise ValueError("Canonical Plan prompt projection exceeds 65536 UTF-8 bytes")
+        return payload
 
     def outcome_for_goal(self, goal_id: str) -> GoalPlanOutcome | None:
         return next((item for item in self.goal_outcomes if item.goal_id == goal_id), None)

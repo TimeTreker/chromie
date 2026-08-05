@@ -20,6 +20,7 @@ from .cognitive_identity import (
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
+    goal_association_prompt_projection,
     coordinated_action_goal_ids,
     evidence_bound_dialogue,
     expected_goal_ids,
@@ -41,9 +42,11 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.llm_diagnostics import cognition_text_reference
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
@@ -223,6 +226,13 @@ class FastPlannerResolver:
                     ),
                     options=options,
                     response_format=active_response_schema,
+                    prompt_family=(
+                        "fast_planner.repair"
+                        if contract_repair_attempted
+                        else "fast_planner.primary"
+                    ),
+                    turn_id=request.sid,
+                    attempt=attempt + 1,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
@@ -291,12 +301,30 @@ class FastPlannerResolver:
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                     )
                     logger.warning(
-                        "fast_planner_contract_repair_start sid=%s validation_errors=%s raw_output=%s",
+                        "fast_planner_contract_repair_start sid=%s validation_errors=%s "
+                        "raw_output_ref=%s raw_output=%s",
                         request.sid,
                         initial_validation_errors,
+                        cognition_text_reference(initial_raw_output),
                         self._bounded(initial_raw_output, 4000),
                     )
                     continue
+                logger.warning(
+                    "fast_planner_contract_failure_evidence sid=%s "
+                    "initial_raw_output_ref=%s repair_raw_output_ref=%s "
+                    "initial_raw_output=%s repair_raw_output=%s",
+                    request.sid,
+                    cognition_text_reference(initial_raw_output),
+                    cognition_text_reference(
+                        raw if contract_repair_attempted else None
+                    ),
+                    self._bounded(initial_raw_output, 4000)
+                    if initial_raw_output is not None
+                    else "",
+                    self._bounded(raw, 4000)
+                    if contract_repair_attempted and raw is not None
+                    else "",
+                )
                 integrity_metadata = cognitive_integrity_metadata(stage="fast_planner", exc=exc, request=request)
                 return self._escalation(
                     plan_id,
@@ -312,12 +340,12 @@ class FastPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output": self._bounded(initial_raw_output, 4000)
-                        if initial_raw_output is not None
-                        else "",
-                        "repair_raw_output": self._bounded(raw, 4000)
-                        if contract_repair_attempted and raw is not None
-                        else "",
+                        "initial_raw_output_ref": cognition_text_reference(
+                            initial_raw_output
+                        ),
+                        "repair_raw_output_ref": cognition_text_reference(
+                            raw if contract_repair_attempted else None
+                        ),
                         **integrity_metadata,
                     },
                 )
@@ -542,7 +570,7 @@ class FastPlannerResolver:
         )
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
-        association = context.get("goal_association_resolution") or {}
+        association = goal_association_prompt_projection(context)
         route = request.route_decision
         advisory = {
             "route": route.route,

@@ -24,7 +24,15 @@ class _FakeOllama:
         self.prompts: list[str] = []
         self.response_formats: list[Any] = []
 
-    async def generate(self, prompt: str, *, system=None, options=None, response_format="text") -> dict[str, Any]:
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        system=None,
+        options=None,
+        response_format="text",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         self.prompts.append(prompt)
         self.response_formats.append(response_format)
         index = min(len(self.prompts) - 1, len(self.payloads) - 1)

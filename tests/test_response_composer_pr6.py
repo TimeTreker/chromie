@@ -344,8 +344,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.status, "model_unavailable")
         self.assertTrue(result.metadata["contract_repair_attempted"])
-        self.assertTrue(result.metadata["initial_raw_output"])
-        self.assertTrue(result.metadata["repair_raw_output"])
+        self.assertGreater(result.metadata["initial_raw_output_ref"]["chars"], 0)
+        self.assertGreater(result.metadata["repair_raw_output_ref"]["chars"], 0)
+        self.assertNotIn("initial_raw_output", result.metadata)
+        self.assertNotIn("repair_raw_output", result.metadata)
         self.assertEqual(len(ollama.prompts), 2)
 
     def test_coordination_invariant_failure_gets_one_bounded_repair(self):

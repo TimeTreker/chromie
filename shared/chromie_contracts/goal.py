@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -296,3 +297,72 @@ class GoalAssociationResolution(BaseModel):
                 "resolution must contain associations, new_goals, referent_updates, or clarification"
             )
         return self
+
+    def prompt_projection(self) -> dict[str, Any]:
+        """Return the closed semantic projection permitted in later prompts.
+
+        Diagnostic metadata is deliberately excluded at every nested level.
+        New Goal metadata keeps only the typed responsibility classification
+        consumed by planner contracts. The final byte ceiling is a fail-closed
+        guard against accidental prompt-state growth, not a semantic compactor.
+        """
+
+        associations = [
+            item.model_dump(mode="json", exclude={"metadata"}, exclude_none=True)
+            for item in self.associations
+        ]
+        new_goals: list[dict[str, Any]] = []
+        for goal in self.new_goals:
+            payload = goal.model_dump(
+                mode="json",
+                exclude={"metadata"},
+                exclude_none=True,
+            )
+            responsibility_kind = str(
+                (goal.metadata or {}).get("responsibility_kind") or ""
+            ).strip()
+            if responsibility_kind:
+                payload["metadata"] = {
+                    "responsibility_kind": responsibility_kind
+                }
+            new_goals.append(payload)
+        referent_updates: list[dict[str, Any]] = []
+        for update in self.referent_updates:
+            payload = update.model_dump(
+                mode="json",
+                exclude={"referent"},
+                exclude_none=True,
+            )
+            if update.referent is not None:
+                payload["referent"] = update.referent.model_dump(
+                    mode="json",
+                    exclude={"metadata"},
+                    exclude_none=True,
+                )
+            referent_updates.append(payload)
+        projection = {
+            "schema_version": self.schema_version,
+            "turn_id": self.turn_id,
+            "associations": associations,
+            "new_goals": new_goals,
+            "referent_updates": referent_updates,
+            "resolved_references": [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in self.resolved_references
+            ],
+            "clarification": self.clarification,
+            "confidence": self.confidence,
+            "reason_summary": self.reason_summary,
+        }
+        serialized = json.dumps(
+            projection,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(serialized) > 65_536:
+            raise ValueError(
+                "Goal Association prompt projection exceeds 65536 UTF-8 bytes"
+            )
+        return projection

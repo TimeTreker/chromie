@@ -15,6 +15,11 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.interaction import CapabilityIdentityModel
 
 try:
+    from chromie_contracts.goal import GoalAssociationResolution
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.goal import GoalAssociationResolution
+
+try:
     from chromie_contracts.plan import (
         CanonicalPlan,
         GoalOutcomeDisposition,
@@ -382,6 +387,144 @@ class PlannerModelOutput(BaseModel):
                     "top-level disposition must match per-goal outcome dispositions"
                 )
         return self
+
+
+def goal_association_prompt_projection(
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Return the closed Goal Association projection permitted in prompts.
+
+    The maintained runtime supplies a validated ``GoalAssociationResolution``.
+    Tests and compatibility callers may provide an older partial dictionary, so
+    the dictionary path uses the same explicit allowlist without inventing
+    missing fields or accepting diagnostic metadata.
+    """
+
+    raw = (context or {}).get("goal_association_resolution")
+    if raw is None:
+        return {}
+    if isinstance(raw, GoalAssociationResolution):
+        return raw.prompt_projection()
+    if not isinstance(raw, dict):
+        raise ValueError("goal_association_resolution must be an object")
+
+    top_level_keys = (
+        "schema_version",
+        "turn_id",
+        "clarification",
+        "confidence",
+        "reason_summary",
+    )
+    association_keys = (
+        "schema_version",
+        "association_id",
+        "relationship",
+        "target_goal_ids",
+        "confidence",
+        "reason_summary",
+        "ambiguity_summary",
+        "goal_update",
+        "resolved_gap_ids",
+        "requires_replan",
+    )
+    goal_keys = (
+        "schema_version",
+        "goal_id",
+        "version",
+        "description",
+        "source_text",
+        "beneficiary",
+        "object",
+        "constraints",
+        "success_criteria",
+        "resource_responsibility",
+    )
+    projection = {key: copy.deepcopy(raw[key]) for key in top_level_keys if key in raw}
+    projection["associations"] = [
+        {key: copy.deepcopy(item[key]) for key in association_keys if key in item}
+        for item in raw.get("associations") or []
+        if isinstance(item, dict)
+    ]
+    goals: list[dict[str, Any]] = []
+    for item in raw.get("new_goals") or []:
+        if not isinstance(item, dict):
+            continue
+        goal = {key: copy.deepcopy(item[key]) for key in goal_keys if key in item}
+        metadata = item.get("metadata")
+        responsibility_kind = (
+            str(metadata.get("responsibility_kind") or "").strip()
+            if isinstance(metadata, dict)
+            else ""
+        )
+        if responsibility_kind:
+            goal["metadata"] = {"responsibility_kind": responsibility_kind}
+        goals.append(goal)
+    projection["new_goals"] = goals
+    referent_keys = (
+        "schema_version",
+        "referent_id",
+        "entity_type",
+        "canonical_value",
+        "aliases",
+        "scope_kind",
+        "scope_ids",
+        "status",
+        "confidence",
+        "source_turn_id",
+        "source_goal_ids",
+        "supersedes_referent_ids",
+        "reason_summary",
+    )
+    update_keys = (
+        "operation",
+        "target_referent_ids",
+        "confidence",
+        "reason_summary",
+    )
+    referent_updates: list[dict[str, Any]] = []
+    for item in raw.get("referent_updates") or []:
+        if not isinstance(item, dict):
+            continue
+        update = {key: copy.deepcopy(item[key]) for key in update_keys if key in item}
+        referent = item.get("referent")
+        if isinstance(referent, dict):
+            update["referent"] = {
+                key: copy.deepcopy(referent[key])
+                for key in referent_keys
+                if key in referent
+            }
+        referent_updates.append(update)
+    projection["referent_updates"] = referent_updates
+    resolved_reference_keys = (
+        "surface_form",
+        "entity_type",
+        "resolved_value",
+        "source",
+        "referent_id",
+        "confidence",
+        "reason_summary",
+    )
+    projection["resolved_references"] = [
+        {
+            key: copy.deepcopy(item[key])
+            for key in resolved_reference_keys
+            if key in item
+        }
+        for item in raw.get("resolved_references") or []
+        if isinstance(item, dict)
+    ]
+    serialized = json.dumps(
+        projection,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    if len(serialized) > 65_536:
+        raise ValueError(
+            "Goal Association prompt projection exceeds 65536 UTF-8 bytes"
+        )
+    return projection
 
 
 def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
