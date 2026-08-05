@@ -177,6 +177,16 @@ A provider confirmation requirement remains authoritative. Lane coordination
 cannot weaken confirmation, capability availability, argument validation,
 resource conflict checks, or provider safety.
 
+Response presentation is not execution authority. Malformed optional
+`lane_coordination` members are pruned before DTO validation when their lane
+membership or activity references cannot be reconciled with the immutable
+Canonical Plan. A presentation-only failure must not cancel an otherwise valid
+pure Activity Plan. After one bounded model repair, a non-confirmation
+`execute` Plan may reuse an exact model-authored current-turn acknowledgement
+as its existing playback-start barrier and continue to the Trusted Capability
+Runtime. This fail-soft path never invents speech, selects a Capability, removes
+confirmation, or applies to mixed, clarification, or confirmation-bound Plans.
+
 ## Runtime behavior
 
 The maintained runtime:

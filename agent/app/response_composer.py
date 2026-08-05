@@ -35,6 +35,7 @@ try:
     )
     from chromie_contracts.semantic_task import (
         ResponsePlan,
+        ResponseStage,
         pending_action_stage_direction_claims,
     )
     from chromie_contracts.social_attention import (
@@ -56,6 +57,7 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.semantic_task import (
         ResponsePlan,
+        ResponseStage,
         pending_action_stage_direction_claims,
     )
     from shared.chromie_contracts.social_attention import (
@@ -473,6 +475,15 @@ class ResponseComposerResolver:
                     previous_raw = raw
                     initial_validation_errors = self._validation_error_json(exc)
                     continue
+                fallback = self._primary_activity_fail_soft_composition(
+                    request=request,
+                    plan=plan,
+                    composition_id=composition_id,
+                    failure=exc,
+                    contract_repair_attempted=contract_repair_attempted,
+                )
+                if fallback is not None:
+                    return fallback
                 return ResponseCompositionResolution(
                     status="model_unavailable",
                     reason_summary="Response composition model output was unavailable or invalid.",
@@ -504,6 +515,134 @@ class ResponseComposerResolver:
                     },
                 )
         raise AssertionError("unreachable")
+
+    @classmethod
+    def _primary_activity_fail_soft_composition(
+        cls,
+        *,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        composition_id: str,
+        failure: Exception,
+        contract_repair_attempted: bool,
+    ) -> ResponseCompositionResolution | None:
+        """Preserve a validated pure execution Plan after presentation-only failure.
+
+        Response Composer owns wording and optional lane presentation; it does not
+        own the already validated Capability Plan.  When a pure, non-confirmation
+        execution Plan has one model-authored current-turn acknowledgement already
+        queued or playback-started, reuse that exact utterance as the existing
+        delivery/effect barrier instead of discarding the Activity Plan because an
+        optional composition DTO remained malformed.
+
+        The adapter never invents speech, chooses a Capability, weakens confirmation,
+        or bypasses playback.  Mixed/clarification/confirmation-bound Plans remain
+        fail-closed because their outstanding communicative responsibilities cannot
+        be reconstructed mechanically.
+        """
+
+        if (
+            plan.disposition != "execute"
+            or not plan.steps
+            or cls._confirmation_required(plan, request.context)
+            or plan.waiting_goal_ids()
+            or any(
+                outcome.disposition != "execute"
+                for outcome in plan.goal_outcomes
+            )
+        ):
+            return None
+        reusable = cls._reusable_turn_speech(request.context)
+        if not reusable:
+            return None
+        candidate = next(
+            (
+                item
+                for item in reversed(reusable)
+                if str(item.get("route") or "").strip() in {"", "robot_action"}
+                and str(item.get("text") or "").strip()
+            ),
+            None,
+        )
+        if candidate is None:
+            return None
+        stage = ResponseStage(
+            text=str(candidate["text"]),
+            speech_act="acknowledge",
+            commitment_state="heard",
+            must_not_claim_completion=True,
+            reuse_current_turn_speech=True,
+            covers_goal_ids=list(plan.goal_ids),
+        )
+        response_plan = ResponsePlan(pre_action=stage)
+        cls._validate_reused_turn_speech(
+            response_plan,
+            context=request.context,
+        )
+        cls._validate_pending_response_contract(
+            response_plan,
+            plan=plan,
+            context=request.context,
+        )
+        social_plan = SocialAttentionPlan(
+            decision="none",
+            reason=(
+                "Optional expression was omitted because response composition "
+                "failed while the validated primary activity was preserved."
+            ),
+            metadata={
+                "authority": "advisory",
+                "fail_soft_primary_activity": True,
+                "auxiliary_social_attention": True,
+                "execution_permitted": False,
+            },
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id=composition_id,
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=response_plan,
+            social_attention_plan=social_plan,
+            lane_coordination=[],
+            confidence=0.0,
+            rationale=(
+                "Reused an existing model-authored acknowledgement so an optional "
+                "presentation failure could not cancel the validated primary activity."
+            ),
+            metadata={
+                "authority": "advisory",
+                "resolver": "response_composer",
+                "task_plan_immutable": True,
+                "fail_soft_primary_activity": True,
+                "reused_current_turn_speech": True,
+                "original_failure_type": type(failure).__name__,
+                "original_failure": str(failure)[:300],
+                "contract_repair_attempted": contract_repair_attempted,
+            },
+        )
+        logger.warning(
+            "response_composer_primary_activity_fail_soft sid=%s plan_id=%s "
+            "failure_type=%s",
+            request.sid,
+            plan.plan_id,
+            type(failure).__name__,
+        )
+        return ResponseCompositionResolution(
+            status="resolved",
+            composition=composition,
+            reason_summary=(
+                "Validated primary activity was preserved by reusing existing "
+                "current-turn acknowledgement speech."
+            ),
+            metadata={
+                "authority": "advisory",
+                "resolver": "response_composer",
+                "fail_soft_primary_activity": True,
+                "contract_repair_attempted": contract_repair_attempted,
+                "original_failure_type": type(failure).__name__,
+            },
+        )
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -1003,16 +1142,17 @@ class ResponseComposerResolver:
                     ResponseComposerResolver._confirmation_required(plan, context)
                 )
                 if isinstance(commitment, dict):
-                    commitment["enum"] = (
-                        ["waiting_for_user"]
-                        if confirmation_required
-                        else [
+                    if confirmation_required:
+                        commitment["enum"] = ["waiting_for_user"]
+                    elif plan.disposition == "execute":
+                        commitment["enum"] = ["none", "heard", "evaluating"]
+                    else:
+                        commitment["enum"] = [
                             "none",
                             "heard",
                             "evaluating",
                             "waiting_for_user",
                         ]
-                    )
                 if isinstance(must_not_claim, dict):
                     must_not_claim["const"] = True
                 if (
@@ -1640,16 +1780,86 @@ class ResponseComposerResolver:
         groups = normalized.get("lane_coordination")
         if not isinstance(groups, list) or not groups:
             return normalized
-        valid_groups = [item for item in groups if isinstance(item, dict)]
+        allowed_lanes = {"speaking", "activity", "social_attention"}
+        parallel_step_ids = {
+            step.step_id for step in plan.steps if step.timing == "parallel"
+        }
+
+        def values_list(value: Any) -> list[Any]:
+            if isinstance(value, list):
+                return value
+            if isinstance(value, str):
+                return [value]
+            return []
+
+        raw_activity_group_count = sum(
+            1
+            for item in groups
+            if isinstance(item, dict)
+            and "activity"
+            in {
+                str(value).strip()
+                for value in values_list(item.get("lanes"))
+            }
+        )
+        valid_groups: list[dict[str, Any]] = []
+        for item in groups:
+            if not isinstance(item, dict):
+                continue
+            coordination_id = " ".join(
+                str(item.get("coordination_id") or "").strip().split()
+            )
+            if not coordination_id:
+                continue
+            lanes: list[str] = []
+            for value in values_list(item.get("lanes")):
+                lane = str(value).strip()
+                if lane in allowed_lanes and lane not in lanes:
+                    lanes.append(lane)
+            activity_ids: list[str] = []
+            if "activity" in lanes:
+                for value in values_list(item.get("activity_step_ids")):
+                    step_id = str(value).strip()
+                    if (
+                        step_id
+                        and step_id in parallel_step_ids
+                        and step_id not in activity_ids
+                    ):
+                        activity_ids.append(step_id)
+                if (
+                    not activity_ids
+                    and raw_activity_group_count == 1
+                    and parallel_step_ids
+                    and len(parallel_step_ids) == len(plan.steps)
+                ):
+                    activity_ids = [
+                        step.step_id
+                        for step in plan.steps
+                        if step.step_id in parallel_step_ids
+                    ]
+                if not activity_ids:
+                    lanes = [lane for lane in lanes if lane != "activity"]
+            if len(lanes) < 2:
+                continue
+            cleaned = {
+                "coordination_id": coordination_id,
+                "relation": "parallel",
+                "lanes": lanes,
+                "start_policy": "best_effort_parallel",
+                "failure_policy": "independent",
+                "reason_summary": " ".join(
+                    str(item.get("reason_summary") or "").strip().split()
+                ),
+            }
+            if "activity" in lanes:
+                cleaned["activity_step_ids"] = activity_ids
+            valid_groups.append(cleaned)
         activity_groups = [
             item
             for item in valid_groups
             if "activity" in {
                 str(value).strip() for value in item.get("lanes") or []
             }
-        ]
-        parallel_step_ids = [
-            step.step_id for step in plan.steps if step.timing == "parallel"
         ]
         if (
             len(activity_groups) == 1
@@ -1658,7 +1868,11 @@ class ResponseComposerResolver:
         ):
             group = activity_groups[0]
             if not group.get("activity_step_ids"):
-                group["activity_step_ids"] = list(parallel_step_ids)
+                group["activity_step_ids"] = [
+                    step.step_id
+                    for step in plan.steps
+                    if step.step_id in parallel_step_ids
+                ]
 
         respond_goal_ids = {
             outcome.goal_id
@@ -2031,7 +2245,10 @@ class ResponseComposerResolver:
             "You are Chromie's independent pre-execution claim reviewer. Use model "
             "reasoning to keep speech childlike, truthful, and strictly bounded by "
             "the immutable Plan and supplied Capability semantics. Identity affects "
-            "expression only, never ability. Host code does not inspect wording or "
+            "expression only, never ability. At this boundary no pending body action "
+            "has started. Judge the ordinary sentence meaning, not only typed fields: "
+            "wording that places Chromie already inside an ongoing movement must be "
+            "rewritten prospectively before approval. Host code does not inspect wording or "
             "make the semantic judgment. Return JSON only."
         )
 

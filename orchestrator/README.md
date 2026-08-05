@@ -246,7 +246,10 @@ FastSpeech objects remain parseable but not playable: immediate audio requires
 an allowed `purpose`, a non-terminal `commitment`,
 `must_not_claim_completion=true`, and text that passes the completion-claim
 guard. Physical work is limited to a safety prelude or confirmation, never an
-execution claim. The queued dynamic utterance is projected into Response
+execution claim. At the fast-speech review boundary the body action has not
+started, so the ordinary wording must remain prospective; typed
+`claim_state=none` cannot excuse a sentence that says Chromie is already inside
+an ongoing movement. The queued dynamic utterance is projected into Response
 Composer context as a non-evidentiary current-turn commitment. If it already
 serves the required acknowledgement, the Composer copies the exact text with
 `reuse_current_turn_speech=true`; Runtime reuses the existing TTS event and its

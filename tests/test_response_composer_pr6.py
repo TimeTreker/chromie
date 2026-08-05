@@ -435,6 +435,11 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 },
             ],
         )
+        stage = schema["$defs"]["ResponseStage"]
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["none", "heard", "evaluating"],
+        )
 
     def test_confirmation_bound_mixed_schema_requires_pending_approval_stage(self):
         canonical = CanonicalPlan(
@@ -545,6 +550,76 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
             output["response_plan"]["pre_action"]["text"],
         )
+
+    def test_pure_activity_reuses_fast_speech_when_composer_repair_stays_invalid(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-walk"],
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                }
+            ],
+        )
+        invalid = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "好，我准备往前走十五秒。",
+                    "speech_act": "acknowledge",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "reuse_current_turn_speech": True,
+                    "covers_goal_ids": ["goal-walk"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "confidence": 1.0,
+            "rationale": "The model incorrectly marked ordinary acknowledgement as waiting.",
+        }
+        context = {
+            "execution_capabilities": [
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "safety_class": "physical_motion",
+                    "requires_confirmation": False,
+                }
+            ],
+            "scheduled_turn_speech": [
+                {
+                    "status": "scheduled",
+                    "stage": "fast_first",
+                    "route": "robot_action",
+                    "text": "好，我准备往前走十五秒。",
+                    "speech_event_id": "speech-walk",
+                    "generation": 4,
+                    "orders": [9],
+                }
+            ],
+        }
+        ollama = FakeOllama(invalid)
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(canonical, context=context)
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertTrue(result.metadata["fail_soft_primary_activity"])
+        assert result.composition is not None
+        self.assertEqual(
+            [step.skill_id for step in result.composition.canonical_plan.steps],
+            ["soridormi.walk_forward"],
+        )
+        stage = result.composition.response_plan.pre_action
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(stage.commitment_state, "heard")
+        self.assertTrue(stage.reuse_current_turn_speech)
+        self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
+        self.assertEqual(len(ollama.prompts), 4)
 
     def test_confirmation_bound_mixed_completion_claim_repairs_before_language_check(self):
         canonical = CanonicalPlan(

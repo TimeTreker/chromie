@@ -325,6 +325,31 @@ def weather_definition() -> SkillDefinition:
     )
 
 
+def walk_definition() -> SkillDefinition:
+    return SkillDefinition(
+        skill_id="soridormi.walk_forward",
+        provider_id="soridormi.mcp",
+        description="Walk forward for a bounded duration.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "duration_s": {"type": "number", "minimum": 0.1, "maximum": 30}
+            },
+            "required": ["duration_s"],
+            "additionalProperties": False,
+        },
+        output_schema=TEST_SKILL_OUTPUT_SCHEMA,
+        available=True,
+        requires_confirmation=False,
+        interruptible=True,
+        can_run_parallel=False,
+        metadata={
+            "safety_class": "physical_motion",
+            "effects": ["physical_motion"],
+        },
+    )
+
+
 class GoalDrivenRuntimeTests(unittest.TestCase):
     def run_resolution(
         self,
@@ -1017,6 +1042,87 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(metadata["reused_speech_generation"], 6)
         self.assertEqual(metadata["reused_speech_orders"], [11])
         self.assertEqual(response.speech[0].text, fast_text)
+
+    def test_physical_activity_reuses_scheduled_fast_speech_and_keeps_skill(self):
+        plan = CanonicalPlan(
+            plan_id="plan-walk-reuse",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-walk"],
+            goal_summary="Walk forward for fifteen seconds.",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                }
+            ],
+        )
+        fast_text = "好，我准备往前走十五秒。"
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-walk-reuse",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                pre_action=ResponseStage(
+                    text=fast_text,
+                    speech_act="acknowledge",
+                    commitment_state="heard",
+                    must_not_claim_completion=True,
+                    reuse_current_turn_speech=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.0,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([walk_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-walk-reuse",
+                language="zh-CN",
+                context={
+                    "scheduled_turn_speech": [
+                        {
+                            "event_id": "speech_event_walk_reuse",
+                            "status": "scheduled",
+                            "text": fast_text,
+                            "generation": 7,
+                            "orders": [12],
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(
+            response.skills[0].capability_id,
+            "soridormi.walk_forward",
+        )
+        self.assertEqual(len(response.speech), 1)
+        self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_effects"]
+        )
+        self.assertTrue(
+            response.speech[0].metadata["reuse_current_turn_speech"]
+        )
 
     def test_safe_read_may_start_silently_without_delivery_barrier(self):
         plan = CanonicalPlan(

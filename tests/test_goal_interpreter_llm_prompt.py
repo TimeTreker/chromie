@@ -2368,6 +2368,9 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("claim_state=none", repair_rendered)
         self.assertIn("Review meaning, not keywords", review_rendered)
         self.assertIn("Preserve the valid acknowledgement", review_rendered)
+        self.assertIn("the body action definitely has not started", review_rendered)
+        self.assertIn("ordinary sentence meaning", review_rendered)
+        self.assertIn("rewrite it prospectively", review_rendered)
         self.assertEqual(len(interpreter.payloads), 3)
 
     async def test_robot_action_fast_speech_reviewer_cannot_remove_valid_speech(self) -> None:

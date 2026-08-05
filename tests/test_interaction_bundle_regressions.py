@@ -138,6 +138,42 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         assert reconciled.immediate is not None
         self.assertIsNone(reconciled.immediate.coordination_id)
 
+    def test_activity_ids_without_activity_lane_are_removed_before_dto_validation(
+        self,
+    ) -> None:
+        plan = self._mixed_plan()
+        raw = {
+            "response_plan": {
+                "immediate": {
+                    "text": "小星星，亮晶晶。",
+                    "speech_act": "perform",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-song"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "lane_coordination": [
+                {
+                    "coordination_id": "coord-invalid-activity-reference",
+                    "lanes": ["speaking", "social_attention"],
+                    "activity_step_ids": ["step-move"],
+                }
+            ],
+            "confidence": 1.0,
+            "rationale": "Optional coordination included an invalid activity reference.",
+        }
+
+        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
+            raw,
+            plan=plan,
+        )
+        output = ResponseComposerModelOutput.model_validate(normalized)
+
+        self.assertEqual(len(output.lane_coordination), 1)
+        self.assertEqual(output.lane_coordination[0].activity_step_ids, [])
+        self.assertNotIn("activity", output.lane_coordination[0].lanes)
+
     def test_malformed_social_express_is_not_silently_downgraded(self) -> None:
         with self.assertRaises(ValidationError):
             ResponseComposerModelOutput.model_validate(

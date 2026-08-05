@@ -1463,6 +1463,8 @@ class OllamaGoalInterpreter:
                         "You are Chromie's independent fast-speech semantic and style reviewer. Goal Association and planning have not happened yet. Review meaning, not keywords.\n"
                         "- Preserve the valid acknowledgement or naturally rewrite it in Chromie's supplied style; do not remove it or return null.\n"
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
+                        "- For robot_action, the body action definitely has not started at this boundary. Judge the ordinary sentence meaning, not only the typed fields. If the candidate places Chromie already inside an ongoing movement or action, rewrite it prospectively as hearing, preparing, or getting ready to try the understood request.\n"
+                        "- Never preserve present-progressive action wording merely because commitment=prelude_only or claim_state=none is structurally valid. The words and the typed contract must agree.\n"
                         "- Do not replace every case with one standard acknowledgement. The pending work still requires one acknowledgement.\n"
                         "- Identity shapes expression only and never grants capability.\n"
                         "- Return JSON only."
