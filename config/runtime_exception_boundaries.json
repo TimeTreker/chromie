@@ -354,9 +354,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Preserve a structurally valid pending-work acknowledgement when review is unavailable or invalid, while rejecting any reviewed replacement that violates the pre-plan claim contract.",
+      "contract": "Suppress unreviewed or invalid pending-work speech so dynamic wording cannot invent unsupported facts, abilities, or side tasks; preserve only a reviewed replacement that satisfies the pre-plan claim contract.",
       "review_status": "reviewed",
-      "body_sha256": "663d55afddc61e814727089b8317da8411e4d5c195ae91729b607e48d43fdf72",
+      "body_sha256": "ae885e19e611f570beccb226ab6eca3bef6dea90b3c6c9f05eb5af75277e5dd4",
       "failure_signals": [
         "diagnostic",
         "return",

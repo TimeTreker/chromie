@@ -187,6 +187,21 @@ as its existing playback-start barrier and continue to the Trusted Capability
 Runtime. This fail-soft path never invents speech, selects a Capability, removes
 confirmation, or applies to mixed, clarification, or confirmation-bound Plans.
 
+Optional Social Attention is likewise not execution authority. A model output
+that selects `decision=express` but contains neither a valid body behavior nor
+`speech_expression.mode=adapt` is normalized to an explicit `decision=none`
+before nested DTO validation. The empty auxiliary expression is dropped while
+the immutable mixed or Activity Plan remains available to Runtime.
+
+Every pending-work fast acknowledgement (`tool`, `robot_action`, `deep_thought`,
+and `memory`) receives an independent semantic review before playback. Persona
+may shape wording but may not invent another errand, destination, person, object,
+household activity, or unsupported ability. Before provider evidence exists,
+fast speech may say that Chromie will check, but may not predict weather,
+measurements, conditions, recommendations, or results. If review is unavailable
+or invalid, the dynamic utterance is suppressed so the Host can use its bounded
+low-commitment cached fallback.
+
 ## Runtime behavior
 
 The maintained runtime:

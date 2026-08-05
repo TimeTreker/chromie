@@ -80,6 +80,7 @@ REVIEW_STAGES = {
     "semantic_route_repair",
     "capability_grounding_review",
     "fast_speech_repair",
+    "fast_speech_semantic_review",
 }
 
 
@@ -1395,8 +1396,10 @@ class OllamaGoalInterpreter:
                         "- Do not change route, intent, metadata, tool arguments, capabilities, or safety policy.\n\n"
                         "Authority Boundary:\n"
                         "- This is before authoritative Goals, Plans, authorization, execution, and results.\n"
-                        "- The speech may commit to checking, considering, or arranging the understood pending work, but it must not semantically claim a result, authorized or started motion, memory commit, safe completion, or completed responsibility.\n"
-                        "- Identity and personality shape voice only; they never prove ability.\n- For read-only work, mention only exact model-authored bindings already present in the interpretation decision.\n"
+                        "- The speech may commit to checking, considering, or arranging only the understood pending work, but it must not semantically claim a result, authorized or started motion, memory commit, safe completion, or completed responsibility.\n"
+                        "- Do not add any task, errand, destination, person, object, household activity, or physical action that the user did not request and the interpretation decision did not select.\n"
+                        "- Do not predict weather, measurements, conditions, recommendations, conclusions, or other external facts before matching provider evidence exists.\n"
+                        "- Identity and personality shape voice only; they never prove ability or create another responsibility.\n- For read-only work, mention only exact model-authored bindings already present in the interpretation decision.\n"
                         "- Set claim_state=none and leave claimed_capability_ids and claimed_goal_ids empty.\n"
                         "- Return one natural sentence; do not return null.\n\n"
                         "Style Boundary:\n"
@@ -1463,6 +1466,8 @@ class OllamaGoalInterpreter:
                         "You are Chromie's independent fast-speech semantic and style reviewer. Goal Association and planning have not happened yet. Review meaning, not keywords.\n"
                         "- Preserve the valid acknowledgement or naturally rewrite it in Chromie's supplied style; do not remove it or return null.\n"
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
+                        "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Remove every invented side task, errand, destination, person, object, household activity, or physical action, even when it sounds caring or fits the personality.\n"
+                        "- Before provider evidence exists, remove every guessed weather condition, measurement, recommendation, conclusion, or result. Acknowledging that Chromie will check is allowed; guessing what she will find is not.\n"
                         "- For robot_action, the body action definitely has not started at this boundary. Judge the ordinary sentence meaning, not only the typed fields. If the candidate places Chromie already inside an ongoing movement or action, rewrite it prospectively as hearing, preparing, or getting ready to try the understood request.\n"
                         "- Never preserve present-progressive action wording merely because commitment=prelude_only or claim_state=none is structurally valid. The words and the typed contract must agree.\n"
                         "- Do not replace every case with one standard acknowledgement. The pending work still requires one acknowledgement.\n"
@@ -2456,8 +2461,17 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
+        """Require semantic review for every pending-work acknowledgement.
+
+        Structural FastSpeech fields cannot prove that ordinary wording stayed
+        within the user's request. Tool, memory, and deep-thought acknowledgements
+        can invent unsupported facts or side errands just as embodied speech can
+        invent started motion. When semantic review is disabled or fails, suppress
+        the dynamic utterance so the Host may use its low-commitment cached fallback.
+        """
+
         target_route = _pending_work_fast_speech_target_route(decision)
-        if target_route != "robot_action":
+        if target_route not in FAST_SPEECH_ROUTE_CONTRACTS:
             return decision
         candidate = decision.fast_speech
         if not _fast_speech_matches_route_contract(target_route, candidate):
@@ -2475,14 +2489,13 @@ class OllamaGoalInterpreter:
         if candidate is None:
             return decision
         if not self.slow_review_recovery_enabled:
-            metadata = dict(decision.metadata or {})
-            metadata["fast_speech_review"] = {
-                "stage": "fast_speech_semantic_review_disabled",
-                "model_reviewed": False,
-                "speech_selected": True,
-                "preserved_valid_candidate": True,
-            }
-            return decision.model_copy(update={"metadata": metadata})
+            return _decision_without_goal_interpretation_fast_speech(
+                decision,
+                reason_suffix=(
+                    "unreviewed pending-work fast speech suppressed"
+                ),
+                stage="fast_speech_semantic_review_disabled",
+            )
         logger.info(
             "goal_interpreter_fast_speech_review_start route=%s intent=%s sid=%s",
             decision.route,
@@ -2513,15 +2526,19 @@ class OllamaGoalInterpreter:
                 decision.intent,
                 exc,
             )
-            metadata = dict(decision.metadata or {})
-            metadata["fast_speech_review"] = {
-                "stage": "fast_speech_semantic_review_failed",
-                "model_reviewed": False,
-                "speech_selected": True,
-                "preserved_valid_candidate": True,
-                "error_type": type(exc).__name__,
-            }
-            return decision.model_copy(update={"metadata": metadata})
+            suppressed = _decision_without_goal_interpretation_fast_speech(
+                decision,
+                reason_suffix="invalid pending-work fast speech suppressed",
+                stage="fast_speech_semantic_review_failed",
+            )
+            metadata = dict(suppressed.metadata or {})
+            review = metadata.get("fast_speech_review")
+            if not isinstance(review, dict):
+                review = {}
+            review["error_type"] = type(exc).__name__
+            review["fail_closed_to_cached_fallback"] = True
+            metadata["fast_speech_review"] = review
+            return suppressed.model_copy(update={"metadata": metadata})
         reviewed_decision = _decision_with_goal_interpretation_fast_speech(
             decision,
             reviewed,

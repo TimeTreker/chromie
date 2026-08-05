@@ -2238,15 +2238,23 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
             async def _chat(self, payload: dict) -> dict:
                 system = str(payload["messages"][0].get("content") or "")
-                stage = "fast_speech_repair" if "fast-speech repairer" in system else "primary_interpreter"
+                if "independent fast-speech semantic and style reviewer" in system:
+                    stage = "fast_speech_semantic_review"
+                elif "fast-speech repairer" in system:
+                    stage = "fast_speech_repair"
+                else:
+                    stage = "primary_interpreter"
                 self.stages.append(stage)
-                if stage == "fast_speech_repair":
+                if stage in {"fast_speech_repair", "fast_speech_semantic_review"}:
                     return {
                         "message": {
                             "content": (
                                 '{"fast_speech":{"text":"好的，我查一下重庆今天的天气。",'
                                 '"purpose":"acknowledge_and_check",'
                                 '"commitment":"checking_only",'
+                                '"claim_state":"none",'
+                                '"claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],'
                                 '"must_not_claim_completion":true}}'
                             )
                         }
@@ -2285,7 +2293,14 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.fast_speech.text, "好的，我查一下重庆今天的天气。")
         self.assertEqual(decision.fast_speech.commitment, "checking_only")
         self.assertIn("fast_speech_repair", decision.metadata)
-        self.assertEqual(interpreter.stages, ["primary_interpreter", "fast_speech_repair"])
+        self.assertEqual(
+            interpreter.stages,
+            [
+                "primary_interpreter",
+                "fast_speech_repair",
+                "fast_speech_semantic_review",
+            ],
+        )
 
     async def test_robot_action_fast_speech_repair_stays_generic_before_planning(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
@@ -2373,7 +2388,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("rewrite it prospectively", review_rendered)
         self.assertEqual(len(interpreter.payloads), 3)
 
-    async def test_robot_action_fast_speech_reviewer_cannot_remove_valid_speech(self) -> None:
+    async def test_fast_speech_review_failure_suppresses_dynamic_candidate(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2416,12 +2431,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             RouteRequest(text="往前走。", language="zh-CN")
         )
 
-        self.assertIsNotNone(decision.fast_speech)
-        assert decision.fast_speech is not None
-        self.assertEqual(decision.fast_speech.text, "嗯。")
+        self.assertIsNone(decision.fast_speech)
+        self.assertFalse(decision.metadata["fast_speech_review"]["speech_selected"])
         self.assertTrue(
             decision.metadata["fast_speech_review"][
-                "preserved_valid_candidate"
+                "fail_closed_to_cached_fallback"
             ]
         )
 
@@ -2470,7 +2484,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(decision.fast_speech)
         self.assertEqual(interpreter.calls, 1)
 
-    async def test_tool_route_existing_fast_speech_does_not_repair(self) -> None:
+    async def test_tool_route_existing_fast_speech_is_semantically_reviewed(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2481,15 +2495,30 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.stages: list[str] = []
 
-            async def _chat(self, payload: dict) -> dict:
-                self.stages.append("primary_interpreter")
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.stages.append(stage)
+                if stage == "fast_speech_semantic_review":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"好呀，我只帮你查重庆今天的天气。",'
+                                '"purpose":"acknowledge_and_check",'
+                                '"commitment":"checking_only",'
+                                '"claim_state":"none",'
+                                '"claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],'
+                                '"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
                 return {
                     "message": {
                         "content": (
                             '{"route":"tool","intent":"weather_query","confidence":0.95,'
-                            '"fast_speech":{"text":"好的，我查一下重庆今天的天气。",'
+                            '"fast_speech":{"text":"今天应该挺暖和，我先去厨房看看有没有热汤。",'
                             '"purpose":"acknowledge_and_check","commitment":"checking_only",'
-                            '"must_not_claim_completion":true},'
+                            '"claim_state":"none","claimed_capability_ids":[],'
+                            '"claimed_goal_ids":[],"must_not_claim_completion":true},'
                             '"metadata":{"tool_name":"weather",'
                             '"weather_query":{"location":"重庆","date":"today","units":"metric"}}}'
                         )
@@ -2501,7 +2530,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "tool")
         self.assertIsNotNone(decision.fast_speech)
-        self.assertEqual(interpreter.stages, ["primary_interpreter"])
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "好呀，我只帮你查重庆今天的天气。")
+        self.assertEqual(
+            interpreter.stages,
+            ["quick_intent", "fast_speech_semantic_review"],
+        )
 
 
     async def test_exact_capability_with_fast_model_hint_skips_quality_intent_review(self) -> None:

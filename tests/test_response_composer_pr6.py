@@ -200,6 +200,55 @@ class ResponseCompositionContractTests(unittest.TestCase):
 
 
 class ResponseComposerResolverTests(unittest.TestCase):
+    def test_empty_express_social_attention_downgrades_without_canceling_plan(self):
+        canonical = plan(goals=["goal-chat"] )
+        output = {
+            "response_plan": {
+                "final": {
+                    "text": "你好。",
+                    "speech_act": "inform",
+                    "commitment_state": "completed",
+                    "must_not_claim_completion": False,
+                    "covers_goal_ids": ["goal-chat"],
+                }
+            },
+            "social_attention_plan": {
+                "decision": "express",
+                "behaviors": [],
+                "speech_expression": {"mode": "none"},
+                "confidence": 0.8,
+            },
+            "lane_coordination": [],
+            "confidence": 0.9,
+            "rationale": "Respond normally.",
+        }
+        result = asyncio.run(
+            ResponseComposerResolver(FakeOllama(output)).resolve(
+                request(
+                    canonical,
+                    context={
+                        "social_attention_candidates": [
+                            {
+                                "capability_id": "soridormi.blink_eyes",
+                                "available": True,
+                                "interaction_executable": True,
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        assert result.composition is not None
+        assert result.composition.social_attention_plan is not None
+        self.assertEqual(result.composition.social_attention_plan.decision, "none")
+        self.assertTrue(
+            result.composition.social_attention_plan.metadata.get(
+                "canonicalized_empty_expression"
+            )
+        )
+
     def test_live_bare_response_stage_list_repairs_under_exact_schema(self):
         canonical = plan(
             disposition="execute",

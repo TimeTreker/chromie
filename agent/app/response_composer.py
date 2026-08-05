@@ -201,6 +201,7 @@ class ResponseComposerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
+                raw = self._canonicalize_optional_social_attention_payload(raw)
                 raw = self._canonicalize_lane_coordination_payload(raw, plan=plan)
                 model_output = ResponseComposerModelOutput.model_validate(raw)
                 if self._is_safe_read_plan(plan, request.context):
@@ -229,6 +230,9 @@ class ResponseComposerResolver:
                             "safe-read semantic review output is not a JSON object"
                         )
                     raw = reviewed
+                    reviewed = self._canonicalize_optional_social_attention_payload(
+                        reviewed
+                    )
                     reviewed = self._canonicalize_lane_coordination_payload(
                         reviewed, plan=plan
                     )
@@ -265,6 +269,9 @@ class ResponseComposerResolver:
                             "effectful semantic review output is not a JSON object"
                         )
                     raw = reviewed
+                    reviewed = self._canonicalize_optional_social_attention_payload(
+                        reviewed
+                    )
                     reviewed = self._canonicalize_lane_coordination_payload(
                         reviewed, plan=plan
                     )
@@ -1745,6 +1752,57 @@ class ResponseComposerResolver:
             }
         ), reasons
 
+
+    @staticmethod
+    def _canonicalize_optional_social_attention_payload(
+        raw: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Fail soft when an optional express decision contains no expression.
+
+        Social Attention is auxiliary presentation, never execution authority. A
+        model output that chooses ``express`` but supplies neither a body behavior
+        nor ``speech_expression.mode=adapt`` has no executable semantic member.
+        Normalize only that empty shape to an explicit ``none`` decision before
+        nested Pydantic validation, preserving the immutable primary Plan.
+        """
+
+        normalized = copy.deepcopy(raw)
+        value = normalized.get("social_attention_plan")
+        if not isinstance(value, dict):
+            return normalized
+        if str(value.get("decision") or "").strip() != "express":
+            return normalized
+        behaviors = value.get("behaviors")
+        has_behavior = isinstance(behaviors, list) and any(
+            isinstance(item, dict) for item in behaviors
+        )
+        speech_expression = value.get("speech_expression")
+        speech_mode = (
+            str(speech_expression.get("mode") or "").strip()
+            if isinstance(speech_expression, dict)
+            else ""
+        )
+        if has_behavior or speech_mode == "adapt":
+            return normalized
+        confidence = value.get("confidence")
+        if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+            confidence = 0.0
+        confidence = min(1.0, max(0.0, float(confidence)))
+        normalized["social_attention_plan"] = {
+            "decision": "none",
+            "purpose": "neutral_presence",
+            "confidence": confidence,
+            "reason": (
+                "Optional social expression was omitted because the model selected "
+                "express without an executable behavior or speech adaptation."
+            ),
+            "metadata": {
+                "canonicalized_empty_expression": True,
+                "authority": "advisory",
+                "auxiliary_social_attention": True,
+            },
+        }
+        return normalized
 
     @staticmethod
     def _raw_response_stages(response_plan: Any) -> list[dict[str, Any]]:
