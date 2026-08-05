@@ -22,6 +22,9 @@ class _State:
     def record_agent_result(self, *args, **kwargs):
         self.agent_results.append((args, kwargs))
 
+    def active_task_snapshots(self):
+        return []
+
 
 class _InteractionRuntime:
     def __init__(self):
@@ -40,7 +43,8 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant.enable_agent = True
         assistant.enable_interaction_response = True
         assistant.cognitive_fallback_policy = "fail_closed"
-        assistant.cognitive_apply_lanes = frozenset({"chat", "robot_action", "mixed"})
+        assistant.cognitive_apply_lanes = frozenset({"chat", "memory", "robot_action", "tool"})
+        assistant.fast_first_response_enabled = False
         assistant.conversation_state = _State()
         assistant.interaction_runtime = _InteractionRuntime()
         assistant.cognitive_evidence = type("Evidence", (), {"record": lambda *args, **kwargs: None})()

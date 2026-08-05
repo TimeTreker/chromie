@@ -107,6 +107,19 @@ class SemanticRouteRepairMetadata(BaseModel):
     )
 
 
+class CapabilityGroundingRepairAction(BaseModel):
+    """One model-proposed action that remains subject to catalog validation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str = Field(min_length=1, max_length=200)
+    args: dict[str, Any] = Field(default_factory=dict)
+    sequence: int = Field(default=0, ge=0, le=31)
+    timing: Literal["sequential", "parallel"] = "sequential"
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str | None = Field(default=None, min_length=1, max_length=160)
+
+
 class SemanticRouteRepairOutput(BaseModel):
     """Bounded semantic repair DTO with an honest missing-ability terminal."""
 
@@ -118,6 +131,9 @@ class SemanticRouteRepairOutput(BaseModel):
     speak_first: str | None = Field(default=None, min_length=1, max_length=240)
     limitation: str | None = Field(default=None, min_length=1, max_length=220)
     metadata: SemanticRouteRepairMetadata | None = None
+    actions: list[CapabilityGroundingRepairAction] = Field(
+        default_factory=list, max_length=8
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -173,7 +189,11 @@ class SemanticRouteRepairOutput(BaseModel):
     @model_validator(mode="after")
     def validate_missing_ability_terminal(self) -> "SemanticRouteRepairOutput":
         is_missing = self.intent == "missing_or_unsupported_ability"
+        if self.actions and self.route != "robot_action":
+            raise ValueError("actions are allowed only for route=robot_action")
         if is_missing:
+            if self.actions:
+                raise ValueError("missing ability output must not contain actions")
             if self.route != "clarify":
                 raise ValueError(
                     "missing_or_unsupported_ability requires route=clarify"
@@ -1843,7 +1863,7 @@ class OllamaGoalInterpreter:
                         "Repair one semantic route from the latest user turn. "
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
                         "First understand the requested outcome independently of the catalog, then compare that outcome with exact supplied ability descriptions. "
-                        "Return route, intent, and confidence, plus limitation and metadata only for a terminal missing-ability result. "
+                        "Return route, intent, and confidence. For robot_action, actions may contain exact supplied capability IDs with typed args, sequence, timing, and confidence. Limitation and metadata are allowed only for a terminal missing-ability result. "
                         "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
                         "A standalone greeting or thanks remains chat, but social framing attached "
                         "to a substantive request must not replace the substantive lane. "
@@ -1860,7 +1880,7 @@ class OllamaGoalInterpreter:
                         "real-world matches might exist; the selected Capability must resolve the supplied value "
                         "or report its own ambiguity. "
                         "Use tool only when the model selects an exact supplied external-read Capability. "
-                        "For an exact executable body capability, use robot_action and intent=capability:<exact supplied id>. "
+                        "For one exact executable body capability, use robot_action and intent=capability:<exact supplied id>. For a compound body request, include one ordered action per exact supplied capability and use a semantic compound intent. "
                         "Never substitute the nearest topical Capability merely because it shares an entity or binding such as a location, date, number, or person. "
                         "Use the terminal missing-ability result only when the latest user turn itself asks Chromie for a clear lookup, recommendation, or action that no exact supplied Capability can perform. "
                         "A bare location, preference, entity name, correction, or other context statement is not a missing ability by itself; retain chat so Goal Association can decide whether it continues an earlier Goal or is independent. "
@@ -1871,7 +1891,7 @@ class OllamaGoalInterpreter:
                         "Apply the owner-approved identity and personality from Global Context naturally. Chromie should sound like herself: a warm six-year-old child in her family, not customer service, an adult operator, or a software error message. "
                         "Prefer simple learning language such as '我现在还没学会这个呢。' over formal system language such as '我无法直接查询'. The final spoken order is apology first, then this limitation. Chromie may warmly hope to learn the ability later, but must not claim that learning has started or guarantee that the ability will be added. "
                         "Use intent=clarify_uncertain_request only when the user's meaning itself remains genuinely underdetermined, or when one exact supplied Capability exists but requires a user-provided binding before provider resolution. Never pair route=chat with a clarification intent. "
-                        "No analysis, rationale, actions, markdown, or fields outside the declared schema."
+                        "No analysis, hidden rationale, markdown, or fields outside the declared schema. Actions are proposals only and must use exact supplied capability IDs."
                     ),
                 },
                 {
@@ -2442,6 +2462,10 @@ class OllamaGoalInterpreter:
                         if minimal.metadata is not None
                         else {}
                     ),
+                    actions=[
+                        action.model_dump(mode="json", exclude_none=True)
+                        for action in minimal.actions
+                    ],
                     source="llm",
                 ),
                 request,
@@ -2774,6 +2798,10 @@ class OllamaGoalInterpreter:
                         if minimal.metadata is not None
                         else {}
                     ),
+                    actions=[
+                        action.model_dump(mode="json", exclude_none=True)
+                        for action in minimal.actions
+                    ],
                     source="llm",
                 ),
                 request,

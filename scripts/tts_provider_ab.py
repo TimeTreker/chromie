@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -45,6 +46,38 @@ def immutable_software_revision(value: str) -> bool:
     )
 
 
+_SOURCE_HASH_EXCLUDED_PARTS = {
+    ".git",
+    ".chromie",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+}
+
+
+def _source_tree_revision(repository: Path) -> str:
+    """Return an immutable identity for a source archive without Git metadata."""
+
+    digest = hashlib.sha256()
+    for path in sorted(repository.rglob("*"), key=lambda item: item.as_posix()):
+        relative = path.relative_to(repository)
+        if any(part in _SOURCE_HASH_EXCLUDED_PARTS for part in relative.parts):
+            continue
+        if path.suffix in {".pyc", ".pyo"} or not (path.is_file() or path.is_symlink()):
+            continue
+        encoded_path = relative.as_posix().encode("utf-8")
+        digest.update(len(encoded_path).to_bytes(8, "big"))
+        digest.update(encoded_path)
+        if path.is_symlink():
+            content = ("symlink:" + os.readlink(path)).encode("utf-8")
+        else:
+            content = path.read_bytes()
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return f"sha256:{digest.hexdigest()}"
+
+
 def source_state(repository: Path) -> dict[str, Any]:
     def git(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -55,12 +88,20 @@ def source_state(repository: Path) -> dict[str, Any]:
             text=True,
         )
 
-    revision = git("rev-parse", "HEAD")
-    status = git("status", "--porcelain", "--untracked-files=normal")
+    revision = git("rev-parse", "--verify", "HEAD")
+    if revision.returncode == 0 and revision.stdout.strip():
+        status = git("status", "--porcelain", "--untracked-files=normal")
+        return {
+            "repository": repository.resolve().name,
+            "revision": revision.stdout.strip(),
+            "revision_source": "git",
+            "dirty": status.returncode != 0 or bool(status.stdout.strip()),
+        }
     return {
         "repository": repository.resolve().name,
-        "revision": revision.stdout.strip() if revision.returncode == 0 else None,
-        "dirty": status.returncode != 0 or bool(status.stdout.strip()),
+        "revision": _source_tree_revision(repository),
+        "revision_source": "source_tree",
+        "dirty": False,
     }
 
 

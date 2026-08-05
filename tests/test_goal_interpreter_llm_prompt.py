@@ -14,10 +14,59 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _raw_interpreter_output_summary,
     is_allowed_model_ignore,
 )
+from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
+    def test_semantic_repair_accepts_typed_catalog_action_proposals(self) -> None:
+        output = SemanticRouteRepairOutput.model_validate(
+            {
+                "route": "robot_action",
+                "intent": "compound_body_request",
+                "confidence": 0.94,
+                "actions": [
+                    {
+                        "capability_id": "soridormi.nod_head",
+                        "args": {"count": 1},
+                        "sequence": 0,
+                        "timing": "sequential",
+                        "confidence": 0.96,
+                    },
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "sequence": 1,
+                        "timing": "sequential",
+                        "confidence": 0.95,
+                    },
+                ],
+            }
+        )
+
+        self.assertEqual(
+            [action.capability_id for action in output.actions],
+            ["soridormi.nod_head", "soridormi.blink_eyes"],
+        )
+        self.assertEqual(output.actions[1].args, {"count": 2})
+
+    def test_semantic_repair_rejects_actions_outside_robot_action_lane(self) -> None:
+        with self.assertRaisesRegex(ValueError, "route=robot_action"):
+            SemanticRouteRepairOutput.model_validate(
+                {
+                    "route": "chat",
+                    "intent": "greeting",
+                    "confidence": 0.9,
+                    "actions": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "args": {},
+                            "confidence": 0.9,
+                        }
+                    ],
+                }
+            )
+
     def test_missing_ability_alias_is_canonicalized_before_branch_validation(self) -> None:
         output = SemanticRouteRepairOutput.model_validate(
             {
@@ -1398,7 +1447,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.confidence, 0.0)
         self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
 
-    async def test_llm_interrupt_output_falls_back_to_chat(self) -> None:
+    async def test_llm_interrupt_output_reports_interpretation_unavailable(self) -> None:
         class InterruptInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
@@ -1429,15 +1478,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        decision = await interpreter.route(request)
-
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertFalse(decision.interrupt_current)
-        self.assertTrue(decision.needs_agent)
-        self.assertIn("conversation_agent", decision.agents)
-        self.assertIn("deterministic-only route interrupt", decision.reason or "")
+        with self.assertRaisesRegex(InterpretationUnavailableError, 'deterministic-only route interrupt'):
+            await interpreter.route(request)
 
     async def test_deterministic_only_llm_mistake_uses_review_model(self) -> None:
         class ReviewInterpreter(OllamaGoalInterpreter):
@@ -1498,11 +1540,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 }
 
         interpreter = ReviewInterpreter()
-        decision = await interpreter.route(RouteRequest(text="What's your name?"))
-
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertIn("slow repair disabled", decision.reason or "")
+        with self.assertRaisesRegex(InterpretationUnavailableError, 'slow repair disabled'):
+            await interpreter.route(RouteRequest(text="What's your name?"))
         self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model"])
 
     async def test_review_model_can_recover_invalid_interrupt_to_robot_action(self) -> None:
@@ -1644,27 +1683,23 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 }
 
         interpreter = ReviewFailureInterpreter()
-        decision = await interpreter.route(
+        with self.assertRaisesRegex(InterpretationUnavailableError, 'deterministic-only route interrupt'):
+            await interpreter.route(
             RouteRequest(
-                text="你能摇头吗",
-                language="zh-CN",
-                context={
-                    "common_ability_catalog": [
-                        {
-                            "capability_id": "soridormi.shake_no",
-                            "interaction_executable": True,
-                            "available": True,
-                            "score": 0.86,
-                        }
-                    ]
-                },
+            text="你能摇头吗",
+            language="zh-CN",
+            context={
+            "common_ability_catalog": [
+            {
+            "capability_id": "soridormi.shake_no",
+            "interaction_executable": True,
+            "available": True,
+            "score": 0.86,
+            }
+            ]
+            },
             )
-        )
-
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertIn("deterministic-only route interrupt", decision.reason or "")
+            )
 
     async def test_fast_repair_model_recovers_when_review_model_fails(self) -> None:
         class RepairInterpreter(OllamaGoalInterpreter):
@@ -2193,7 +2228,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("repaired placeholder capability intent", decision.reason or "")
         self.assertEqual(len(interpreter.payloads), 2)
 
-    async def test_placeholder_capability_repair_failure_falls_back_to_chat(self) -> None:
+    async def test_placeholder_capability_repair_failure_reports_unavailable(self) -> None:
         class PlaceholderInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2217,12 +2252,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 }
 
         interpreter = PlaceholderInterpreter()
-        decision = await interpreter.route(RouteRequest(text="Hello, how are you."))
-
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertIn("placeholder capability intent", decision.reason or "")
-
+        with self.assertRaisesRegex(InterpretationUnavailableError, 'placeholder capability intent'):
+            await interpreter.route(RouteRequest(text="Hello, how are you."))
 
     async def test_tool_route_missing_fast_speech_is_repaired_by_interpreter_llm(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):

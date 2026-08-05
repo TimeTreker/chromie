@@ -135,7 +135,7 @@ raw motor, joint, torque, or policy outputs. Chromie's own TaskGraph remains the
 global user/task graph above that body DAG.
 
 For the staged Chromie-side implementation plan, see
-`docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
+`docs/AGENT_SKILLS_ARCHITECTURE.md`.
 
 ## Next Routing Targets
 

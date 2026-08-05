@@ -71,7 +71,7 @@ class DocumentationAuthorityTests(unittest.TestCase):
         self.assertLessEqual(len(core), ratchets["max_core_reading_path"])
         self.assertEqual(len(core), len(set(core)))
         self.assertLessEqual(
-            len(list(ROOT.rglob("*.md"))),
+            len(check_docs.markdown_files()),
             ratchets["max_markdown_files"],
         )
         self.assertLessEqual(

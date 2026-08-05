@@ -156,12 +156,12 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             }
         ]
         self.assertTrue(
-            all(row["owner"] == "legacy_agent_pipeline" for row in excluded_rows)
+            all(row["owner"] == "goal_driven_runtime" for row in excluded_rows)
         )
         self.assertTrue(
             all(
                 row["fallback"]
-                == "not_applicable_before_authority_acquisition"
+                == "fail_closed_without_legacy_reentry"
                 for row in excluded_rows
             )
         )

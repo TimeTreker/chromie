@@ -27,7 +27,10 @@ from .agent_skill import (
     SelectedAgentSkill,
 )
 from .route import MemoryUpdateProposal, RouteDecision, RouteItem, RouteRequest
-from .core_interpretation import CoreInterpretationResult
+from .core_interpretation import (
+    CoreInterpretationResult,
+    CoreInterpretationUnavailable,
+)
 from .agent import AgentRequest, AgentResult, SpeechItem
 from .action import ActionCommand, ActionResult
 from .interaction import (

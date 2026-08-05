@@ -1,1167 +1,174 @@
 # Chromie Roadmap
-This document is the authority for delivery order and milestone exit criteria.
-The stable mission is defined in
-[Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
-are tracked in [Status](docs/STATUS.md).
 
-## Completed prerequisite — Restore Canonical Local Gate Reproducibility
-
-The documented dependency-light test contract is reproducible again. The
-2026-07-31 canonical run installed `requirements-test.txt`, passed repository
-policy, test-ownership, Ruff, Mypy, and documentation gates, then passed 1,656
-primary tests plus 20 legacy Agent tests. The repair declared `pytest`, made the
-Router-removal check ignore cache-only residue while still rejecting maintained
-Router content, moved generated runtime configuration behind explicit startup,
-and repaired the existing four-file Mypy ratchet without ignores or scope
-removal.
-
-## Optional target validation — Retain a Supervised Physical Voice Loop
-
-Physical microphone and room-acoustic evidence remains useful for the stricter
-`supervised_physical_pilot` profile, but it is not the default semantic or audio
-qualification path and never requires the operator to speak. The maintained
-closed-loop runner generates Chinese and English speech with Chromie's TTS,
-plays or loopback-captures it, transcribes it with Chromie's ASR, and correlates
-the result with the exact delivered speech. `capture=acoustic` exercises the
-physical speaker-to-microphone path; `capture=auto` prefers the system monitor.
-
-A supervised human-voice run may still be retained when specifically needed to
-claim real-user microphone behavior, accent robustness, or room interaction. It
-is optional for `source_bound_development` and cannot substitute for the
-Gateway/Core, Agent Skill/weather, Social Attention, MuJoCo, LAN, or source
-identity evidence owned by the active target profile.
-
-See [End-to-End Benchmark Execution](docs/E2E_BENCHMARK_EXECUTION.md) and
-[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
-
-## Active Issue — Close Current-Revision Target Evidence
-
-Close the default `source_bound_development` target-evidence profile. It must retain reviewed
-current-revision Gateway/Core, Agent Skill/weather, Social Attention, paired
-MuJoCo, and second-machine LAN evidence. That profile explicitly does not
-require physical voice or robot evidence.
-
-Only after that evidence closes, qualify and finish one semantic Issue at a time.
-The source-verifiable sustainability line is implemented and ratcheted:
-grounded direct responses, ordinary overlapping-result delivery, exact exception
-review, typed Host/service configuration, playback/input extraction, maintained
-modes, package-owned typing scope, specialized documentation ownership,
-revision-bound source qualification, session-memory recall, comprehensive hybrid
-collection, bilingual closed-loop scenarios, strict CI status, provider-PCM
-latency milestones, ordered incremental Host playback, and consent-bound durable
-profile memory.
-
-The active evidence Issue is not closed. A clean maintained environment must
-still execute the pinned Ruff/Mypy/full-suite gate, and target qualification
-still owns response latency, shared-GPU load, Gateway/Core, Social Attention,
-provider, audio, simulator, LAN, robot, and release claims.
-
-Arbitrary file, method, boolean, or document counts are not substitute exit
-criteria. Every Issue refreshes its baseline, preserves public behavior and
-safety ownership, and proves a measurable reduction at its own boundary.
-
-## Queued behavior Issue — Reduce Time to First Grounded Response
-
-The first post-evidence behavior Issue is the reproduced response-latency
-problem. Complete non-effectful `spoken_response` Goals should not invoke Fast
-or Deep Planner merely to transport speech. Complete bounded capability work
-should terminate at Fast Planner when valid. Deep Planner should run only for a
-recorded semantic, dependency, context, or safety/resource reason that requires
-the wider planning boundary, or a structured semantic/plan validation rejection
-whose failure contract explicitly requires broader reasoning. Technical Fast
-failure remains visible through bounded repair or explicitly classified
-recovery. Confidence alone neither authorizes a bypass nor forces escalation.
-
-The existing response-composition owner must accept the explicitly planless
-branch without a dummy Plan or second authority. Complete `fast_speech` and
-`ResponseStage` values may run early only after Host validation. Result arrival
-first updates evidence: dedicated safety/control may interrupt output, ordinary
-results wait for ordered delivery, and internal-only evidence needs no speech.
-A newer ordinary turn or barge-in must not cancel independent work or erase its
-later result obligation.
-
-The comparative review reinforces existing Chromie owners rather than adding
-speech/action lanes, event planes, ledgers, fixed model slots, or framework
-dependencies. Goal/task state, `ExecutionOutcomeBundle`, Runtime Trace,
-Soridormi task events, reviewed Agent Skill promotion, and the Chromie/Soridormi
-feasibility boundary already own those meanings. Semantic end-of-turn and
-speculative generation remain evidence-gated later input work; bounded
-two-request model concurrency requires shared-GPU proof; incremental PCM remains
-with the playback-delivery lifecycle Issue.
-
-Implementation status (2026-08-03): source implementation is complete. A typed
-planless branch bypasses unnecessary planners, downstream stages reuse the
-planner's exact Agent Skill selection, ordinary overlapping results wait for a
-safe speech opening and deliver once, completed stages use the ordered delivery
-lifecycle, and provider PCM enters playback before the provider end message.
-Runtime evidence distinguishes TTS request, stream start, first provider PCM,
-stream end, and actual playback start. The remaining exit criteria are retained
-warm/cold and shared-GPU measurements on the current revision; source checks do
-not manufacture those target claims.
-
-Detailed problem evidence, scope, non-goals, and exit criteria are in
-[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
-
-## Completed architecture correction — Router removal
-
-The independent Router service and compatibility authority are removed. Input
-normalization, protective reflex, attention review, context assembly, and turn
-admission belong to Cognitive Gateway. Ordinary semantic interpretation, goal
-association, capability intent, planning handoff, and response intent belong to
-the Goal-Driven Cognitive Core. The Host retains only validation, authorization,
-safety, commitment, scheduling, evidence, and execution boundaries.
-
-The closure audit also removed stale startup and documentation references and
-added a repository guard against reintroducing a Router service or first-class
-Router architecture. Historical Git and regression provenance may still mention
-the former component, but no current architecture or production dependency may
-do so.
-
-The final closure audit also removed stale 8091 developer-tool/configuration contracts, integrated-container tests, Router-named metadata/provenance fields, and unused Host-authored weather acknowledgement composition. The maintained full test entrypoint and Benchmark checks must pass before the Social Attention benchmark expansion begins.
-
-## Completed final core-principle audit
-
-The post-plan audit found and corrected remaining code/architecture drift rather
-than treating plan completion as proof of principle compliance:
-
-- removed Host-owned conditional deep-thinking delegation and re-enableable
-  phrase/regex motion and pose agents;
-- made memory meaning a typed model-authored proposal;
-- removed catalog phrase-action boosts, weather-specific Host route repair, and
-  conversation follow-up/new-topic phrase classification;
-- routed the legacy weather ToolAgent through the common trusted local-tool
-  boundary instead of a direct Provider call;
-- removed Host-authored semantic correction, route-specific Core exception
-  classification, static ontology speech templates, and fixed deep-thinking
-  wording;
-- completed canonical `capability_id`/`capability_ids` output across current
-  prompts, DTOs, task proposals, traces, scenarios, and qualification artifacts,
-  while retaining bounded historical readers;
-- strengthened the canonical repository policy checker so these boundaries fail
-  closed if reintroduced.
-
-The audit found no maintained Benchmark path implementing semantic answers or
-runtime policy, and no current Chromie semantic branch depending on simulator
-versus physical backend identity. See
-[Final Core-Principle Audit](docs/FINAL_CORE_PRINCIPLE_AUDIT.md).
-
-The semantic-authority audit remains closed. The newly active proof and
-repository-simplification Issues do not reopen Router or Host semantic
-authority; they address current evidence and maintenance risk.
-
-## Open evidence issue — Qualify Cognitive Gateway Decomposition and Core Entry
-
-The Goal-Driven Cognitive Turn Loop, Gateway decomposition, and Core entry are
-implemented. This evidence Issue remains open for source-bound qualification and
-the final post-evidence audit:
-
-- [x] expose explicit contracts and implementations for Input Normalization,
-  Protective Reflex, Attention Review, Context Assembly, and Turn Admission;
-- [x] perform bounded Attention Review and final admission before ordinary Goal
-  Interpretation;
-- [x] make an admitted immutable `UserTurnEnvelope` the required normal input to
-  the Cognitive Core API;
-- [x] move addressedness suppression out of the authoritative Goal Interpretation
-  path and retain fail-open direct/unclear-speech behavior;
-- [x] confine `RouteDecision` to a digest-bound internal compatibility projection
-  while the Goal-driven Runtime consumes `CoreInterpretationResult`;
-- [x] keep stop, cancel, emergency, silence, and unusable-input handling
-  deterministic and evidence-bound;
-- [x] fail closed with a speech-only operational response when Core
-  interpretation fails, rather than invoking an independent direct-LLM fallback;
-- [x] implement digest-bound runtime identity capture, Gateway/Core live-service
-  text execution, deterministic stop/tool-continuity gates, MuJoCo provenance and
-  safe-idle verification, Provider-start-bound active-Goal cancellation, and one
-  fail-closed qualification report;
-- [x] require a fingerprint-bound human-review record before Issue closure;
-- [x] provide one maintained resumable qualification workflow that records exact
-  commands/logs, fingerprints every artifact, creates only a pending review, and
-  delegates final closure to the fail-closed verifier;
-- [x] run a read-only fail-fast preflight before evidence collection and reject
-  dirty paired repositories, manifest/revision drift, unhealthy Agent state,
-  non-idle Soridormi state, or missing/mismatched endpoint source identity;
-- [ ] retain a clean source-bound live-text bundle from the deployed services and
-  review the ambient, stop, direct-question, and tool-follow-up behavior;
-- [ ] retain a clean paired-source MuJoCo bundle with endpoint-reported Soridormi
-  revision, compound named-skill execution, and explicit pre/post safe idle;
-- [ ] retain an active-goal cancellation run that proves started Provider work,
-  semantic Goal ownership, trusted cancellation, and final safe idle;
-- [ ] complete and approve the fingerprint-bound qualitative review;
-- [ ] complete the final repository-wide authority and documentation audit after
-  the retained evidence is available.
-
-`Issue: Social Attention Baseline Qualification` is paused, not cancelled. It
-resumes only after the Gateway/Core path above is the deployed single semantic
-authority. Benchmark remains an evaluator and must not supply cognition or
-Runtime behavior policy.
-The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
-
-## Completed implementation track — Grounded and Weather Agent Skills
-
-The executable Capability terminology, passive read-only Agent Skill
-contract/Loader, independent model-authored discovery/selection, role-specific
-progressive disclosure, Plan provenance, grounded external-information method,
-and weather specialization are implemented and automatically verified. Both
-required engineering safeguards are also complete.
-
-`Issue: Make Runtime Failure Paths Explicit` replaced production assertions and
-silent failure ambiguity with explicit classified behavior. `Issue: Establish
-Repository Engineering Policy Checks` now enforces those invariants together
-with local-only Compose publication, removed architecture authority, passive
-Agent Skills, model-authored Skill selection, safe Python execution, and
-model-contract actuation boundaries. See
-[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md) and
-[Repository Engineering Policies](docs/REPOSITORY_ENGINEERING_POLICIES.md).
-
-Canonical Plans now retain exact content-free Agent Skill provenance: selection
-and disclosure identity, selecting planner role, Skill/version, package,
-projection, and disclosure digests, explicit relevant Goal IDs, model rationale,
-and confidence. Deep Plans preserve ordered Fast Planner provenance before
-appending their own. Plan fingerprints and replay summaries retain that identity,
-while execution still authorizes only registered `capability_id` steps.
-
-The repository-owned root now contains `chromie.grounded-external-information`
-and its `chromie.weather-information` specialization. Both expose all five role
-projections, remain execution-authority-free, fit configured disclosure budgets,
-and preserve provider adaptation inside the Weather Capability adapter. Real
-model selection and live weather execution remain target-evidence work.
-
-The high-signal Ruff gate, initial four-file Mypy ratchet, test-ownership guard,
-typed ASR settings boundary, VoiceAssistant greeting collaborator, and
-documentation-authority mapping are implemented. That first engineering intake
-is complete. The 2026-07-31 re-audit opened a second proof-first simplification
-intake. These slices do not retire the larger composition, configuration,
-failure-surface, type-coverage, or documentation-simplification backlog. Open
-live and deployment evidence remains governed by the owning qualification
-documents; local target validation of loopback exposure remains separate.
-
-The accepted design is defined in
-[docs/AGENT_SKILLS_ARCHITECTURE.md](docs/AGENT_SKILLS_ARCHITECTURE.md),
-and the semantic delivery slices and closure criteria are defined in
-[docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md](docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
-
-Objective:
-
-> Let LLM-driven Agents discover and use owner-approved reusable task methods to
-> generate better Plans, while making `capability_id` and Trusted Capability
-> Runtime the canonical executable vocabulary and preserving the existing
-> registry, provider authority, evidence boundaries, and the rule that thinking
-> belongs to the LLM.
-
-Locked boundaries:
-
-- an Agent owns semantic decisions within its assigned responsibility;
-- an Agent Skill is passive task knowledge with no Goal, state loop,
-  provider registration, permission, confirmation exemption, or execution
-  authority;
-- a Plan is the current situation-specific model proposal;
-- a Capability is the atomic executable contract;
-- Skill candidate retrieval may narrow context, but final selection is
-  model-authored and typed;
-- Skill packages cannot execute scripts or create a second capability registry;
-- executable steps use canonical `capability_id`; legacy `skill_id` is accepted
-  only at explicit compatibility boundaries and conflicting dual fields fail
-  closed;
-- Agent Skill identity uses `agent_skill_id`;
-- weather is the first vertical slice, built on a reusable grounded-external-
-  information Skill;
-- Benchmarks evaluate Skill selection, Plan quality, grounding, and failure
-  behavior without choosing Skills for the runtime.
-
-Semantic delivery order:
-
-- migrate executable contracts from canonical `skill_id` usage to
-  `capability_id` with bounded legacy readers;
-- establish Agent Skill contracts and `agent_skill_id`;
-- add a secure read-only owner-approved Agent Skill registry and loader;
-- add model-authored discovery and selection;
-- add Agent-specific progressive disclosure;
-- bind selected Skill provenance to Canonical Plans without changing execution
-  authority;
-- implement grounded external information and weather Skills;
-- add trace, experience, module, integration, and E2E evidence;
-- remove legacy aliases only after retained artifacts and external callers have
-  migrated.
-
-Completed implementation slices:
-
-- canonical executable `capability_id` terminology with bounded legacy readers;
-- strict passive Agent Skill contracts and a repository-owned read-only Loader;
-- bounded model-authored no/one/multi-Skill discovery and selection with exact
-  registry/Goal validation, one repair, and optional no-Skill degradation;
-- Agent-specific progressive disclosure across the five maintained model roles,
-  with exact package/projection digest checks, omission-not-truncation budgets,
-  forged-context removal, and content-free trace metadata;
-- content-free Canonical Plan Skill provenance with exact planner role,
-  selection/disclosure identity, package/projection/disclosure digests, Goal
-  relevance, deterministic Fast-to-Deep inheritance, and unchanged Capability
-  execution authority.
-
-Completed domain implementation slices:
-
-- `chromie.grounded-external-information` for authoritative bindings, exact
-  verified-memory versus fresh reads, freshness, truthful pending speech, typed
-  failure interpretation, and grounded explanation;
-- `chromie.weather-information` as its weather specialization for canonical
-  location/time/aspect scope, exact weather-memory matching, weather lookup, and
-  result interpretation.
-
-The typed ASR service configuration boundary is implemented: one immutable startup snapshot now owns parsing, validation, backend projection, and safe diagnostics while generated runtime/profile precedence remains authoritative. The remaining service migration map is maintained in [Service Configuration Boundaries](docs/SERVICE_CONFIGURATION_BOUNDARIES.md).
-
-The VoiceAssistant sustainability line is complete in source: immutable Host
-settings own maintained configuration, playback and input/session transports are
-extracted behind checked collaborators, provider PCM enters ordered playback
-incrementally, and structure ratchets hold the composition root at 187 methods,
-one property, 409 constructor lines, and 139 initialized attributes. See
-[VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md).
-
-The canonical source gate, generated-speech bilingual closed loop, comprehensive
-collector, and optional physical-voice verifier are implemented. Physical voice
-and hot-plug observation remain optional target claims; they are not blockers for
-the active **Close Current-Revision Target Evidence** profile.
-
-Exit criteria:
-
-- Agent, Agent Skill, Plan, and Capability are distinct in contracts and
-  traces;
-- new executable Plans and traces use `capability_id`, while retained
-  `skill_id` artifacts remain readable;
-- Skill selection is model-authored and observable;
-- malformed, unapproved, duplicate, or path-escaping packages fail closed;
-- Agents receive bounded projections rather than the complete Skill library;
-- Plans record exact Skill ID, version, projection, and digest;
-- execution still references only registered Capabilities and crosses Trusted
-  Runtime/provider validation;
-- grounded external information and weather Skills pass the maintained
-  Chongqing/Neixiang, verified-memory, stale-memory, failure, and generic Goal-
-  reference scenarios;
-- automated, live-text, and live-tool evidence are reported separately;
-- architecture, contributor, status, roadmap, and operational documentation
-  agree.
-
-## Chromie Benchmark Suite
-
-The completed Benchmark Suite foundation is described in
-[docs/CHROMIE_BENCHMARK_SUITE.md](docs/CHROMIE_BENCHMARK_SUITE.md) and
-[docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md](docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md).
-
-Completed foundation: manifest/inventory, common scenario/result contracts,
-module/integration runners, deployment-neutral runtime component adapters, and
-the first reviewed Social Attention dataset.
-
-Completed Social Attention dataset milestone:
-
-- 128 reviewed cases across 16 non-duplicate everyday, safety, mode, style,
-  bilingual, ASR-ambiguity, and historical-regression cohorts;
-- declared minimum coverage for style, mode, politeness, and language axes;
-- acceptable behavior regions always retain `none` as valid;
-- fixed gesture expectations, backend/calibration leakage, off/report-only
-  execution leakage, stillness violations, and near-duplicate inputs fail closed;
-- dataset validation, common-contract normalization, inventory, and focused tests
-  run through the CI-safe Benchmark entrypoint.
-
-Completed end-to-end execution and evidence-profile milestone:
-
-- the same normalized semantic case runs unchanged across replay, model-only,
-  deployed text, virtual audio, MuJoCo simulation, and supervised physical profiles;
-- profiles cap execution claims and require correlated evidence, timing markers,
-  supervision, safe-idle evidence, and human approval as appropriate;
-- timeout and adapter failure retain partial evidence and artifacts without
-  promoting incomplete evidence;
-- automatic qualification reports remain explicitly non-release-qualified.
-
-Completed stress and behavior-distribution milestone:
-
-- six versioned workloads cover long sessions, repetition/cooldown, interruption,
-  concurrency, provider degradation/recovery, and synthetic multi-user isolation;
-- seeded sample plans declare session count, concurrency, participants, E2E
-  evidence profile, and run conditions without changing semantic scenarios;
-- reports expose sample counts, confidence intervals, evidence/status, primary
-  success, behavior distributions, duplicate cues, explicit violation families,
-  latency p50/p95, and session drift;
-- comparison shows model, Prompt, MindProfile, provider, and code deltas without
-  selecting a winner or creating Runtime quotas.
-
-Completed Benchmark Suite foundation closure:
-
-- maintained scenario sources are referenced through one authoritative migration
-  manifest with inventory/normalization parity and explicit compatibility removal
-  gates;
-- the Benchmark-native scenario entrypoint runs existing deterministic suites
-  without changing their IDs, paths, or evidence claims;
-- episode-derived candidates can be indexed, deduplicated, reviewed in a separate
-  fingerprint-bound record, varied through review-only authoring briefs, and
-  promoted into deterministic regressions only after explicit approval;
-- no Benchmark workflow edits production Prompts, personality, safety, Runtime
-  policy, or release qualification.
-
-The Benchmark infrastructure issue is complete. Future work uses the suite to
-collect real model/service/MuJoCo/physical evidence and to promote reviewed gaps,
-not to add another evaluation-policy layer.
-
-Paused issue — Social Attention Baseline Qualification:
-
-- [x] define the versioned qualification identity and deterministic hard gates;
-- [x] record launcher-effective model topology, MindProfile, style, authority,
-  lanes, provider, hardware, and sample count;
-- [x] add first-party E2E adapter boundaries and semantic cohort selectors;
-- [x] distinguish proposal, Host materialization, Provider acceptance/completion,
-  and safe-idle evidence;
-- [x] generate fail-closed hard-gate reports without adding Runtime behavior policy;
-- [x] require homogeneous launcher-effective mode/style runs and complete,
-  non-duplicated 128-case bundle coverage;
-- [ ] connect maintained live-model and authoritative live-service harnesses;
-- [ ] retain the current 128-case default-model baseline and reviewed qualitative samples;
-- [ ] retain selected MuJoCo evidence, classify earliest error boundaries, and promote reviewed regressions.
-
-## Implemented engineering sustainability issue — Secure Local Runtime Exposure
-
-A repository-wide external review identified useful engineering improvements in
-local network exposure, failure-path clarity, executable policy enforcement,
-static analysis, test ownership, configuration structure, Orchestrator
-maintainability, and documentation authority. The accepted recommendations,
-constraints, explicit non-goals, dependency order, and Issue closure criteria are
-maintained in
-[Repository Engineering Sustainability Plan](docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
-
-The first named Issue is implemented and automatically verified: all maintained
-Compose host publications are loopback-bound, a dependency-light checker guards
-maintained source, the supported launcher audits the fully resolved Compose
-configuration before startup, and the maintained full gate passes 1,545 primary
-tests plus 20 legacy Agent tests. Local target acceptance proving localhost
-access, failed LAN access, and unchanged container networking remains open and
-must not be inferred from automated evidence.
-
-`Issue: Make Runtime Failure Paths Explicit` is also implemented and
-automatically verified. Maintained runtime and generated-environment invariants
-no longer depend on `assert`; silent cleanup and optional compatibility paths are
-classified; state-changing malformed semantic operations fail before mutation;
-and evidence loss remains observable. The audit is maintained in
-[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
-
-The repository engineering policy checker, Agent Skill Plan provenance,
-domain Skills, initial Ruff/Mypy ratchets, test-ownership modernization, typed
-ASR configuration boundary, first VoiceAssistant collaborator extraction, and
-documentation-authority mapping are implemented. The second proof-first
-simplification intake is active. Independent Gateway/Core and other retained
-evidence tracks remain open under their owning qualification documents.
-
-The program deliberately excludes a big-bang `VoiceAssistant` rewrite, whole-tree
-strict typing, blanket removal of source-level tests, Git LFS for the current
-small audio footprint, and unmeasured hard resource limits in the main
-qualification profile.
-
-## Planning model
-
-Chromie plans and reports work by the problem being solved, the capability being
-qualified, and the evidence required for the product claim. Sequential milestone
-codes are not part of the current project model.
-
-- Only one code implementation Issue is active at a time; independent retained-evidence tracks may remain open.
-- A milestone closes only when its implementation and required evidence exist.
-- Default-off experimental work is not release support.
-- Documents, tools, tests, and evidence classes use semantic problem, capability,
-  and evidence names rather than numbered milestone or implementation-stage labels.
-- Future work must preserve the ownership and safety boundaries in the charter.
+Chromie is in active development. This roadmap owns delivery order and exit
+criteria; current implementation and evidence state live in
+[docs/STATUS.md](docs/STATUS.md).
+
+The current focus is a **Goal-driven single semantic authority**. The Cognitive
+Gateway owns ingress, protective reflexes, and attention admission. The
+Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
+association, planning, response composition, and outcome reconciliation.
+Provider and Host boundaries remain the only authorities for effects.
+
+Sequential milestone codes are not part of the current project model. Work is
+organized by capability, risk, and retained evidence.
+
+## Current priorities
+
+1. Keep every admitted non-operational turn on one Goal-driven semantic path.
+   Interpretation failure must remain an explicit unavailable outcome; it must
+   never be converted into plausible chat, tool, memory, or motion intent.
+2. Preserve exact capability identity from model proposal through trusted
+   validation, authorization, execution, and evidence. Agent Skills may teach
+   reasoning methods but never authorize effects.
+3. Close source-bound and target-bound evidence separately. A passing source
+   gate does not prove GPU, microphone, speaker, simulator, or physical-provider
+   behavior.
+4. Reduce compatibility surfaces only after the maintained path has equivalent
+   retained evidence. Compatibility code must be gated, named, and unable to
+   re-enter after Goal-driven authority has been selected.
+5. Keep documentation, benchmarks, static analysis, configuration ownership,
+   and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations
 
-Earlier incremental work is represented by two completed capability foundations:
+Completed foundations are represented by capabilities and evidence, not by
+sequential milestone numbers. Earlier incremental work is represented by two completed foundation groups:
 
-| Foundation | Included outcomes | State |
-|---|---|---|
-| Realtime interaction foundation | Five-service runtime, host audio/VAD/playback, deterministic routing, contracts, generated configuration, GPU and target tooling | Implemented and automatically verified; some target evidence remains open |
-| Structured embodiment foundation | Native interaction, Trusted Capability Runtime, Soridormi named capabilities, TaskGraphs, confirmation, cancellation, bounded scheduling, traces, and MuJoCo integration | Implemented and automatically verified locally and in simulation |
+- **Local interaction foundation:** Compose-based services, ASR/TTS contracts,
+  bounded session state, playback ordering, barge-in, deterministic stop and
+  cancellation, and simulator integration.
+- **Goal-driven control-plane foundation:** Cognitive Gateway admission,
+  immutable turn envelopes, Core-owned Goal Interpretation, Goal Association,
+  Fast and Deep Planner contracts, Response Composer, Trusted Capability
+  Runtime validation, outcome evidence, and fail-closed execution.
 
-Historical Git commits retain their original messages. Current source, tests,
-documentation, and evidence indexes use capability- and issue-oriented names.
+These foundations are maintained only while their automated contracts remain
+passing.
 
-## Completed phase - Text-to-MuJoCo interaction closure
+## Active source work
 
-### Objective
+### Semantic authority closure
 
-Prove the deterministic text-input path through Goal Interpretation, native `/interaction`,
-Trusted Capability Runtime, Soridormi named capabilities, MuJoCo execution, and safe-idle
-recovery.
-
-This phase is complete. The retained `text-mujoco` evidence proves a compound
-text request is routed into ordered walking, nodding, and turning skills, all
-executed by Soridormi in MuJoCo, with the simulator returning to safe idle. The
-automatic synthetic and virtual-microphone matrices remain retained regression
-evidence for the broader voice pipeline.
-
-Physical microphone recognition and speaker quality are deliberately excluded
-from this closure. They remain an audio-device validation track for any future
-release claim that includes real voice input/output support.
-
-### Exit criteria
-
-- `./scripts/run_tests.sh` passes from the evaluated revision;
-- automatic `synthetic` and `virtual-mic` matrices pass all seven cases;
-- the deployed text-to-MuJoCo check passes against live Soridormi MCP and MuJoCo;
-- retained text evidence shows ordered `walk_velocity`, `nod_yes`, and
-  `turn_in_place` execution plus safe idle;
-- exact Chromie and Soridormi revisions are retained;
-
-This closure does not claim robust human ASR, physical microphone/speaker
-quality, production robot support, verified Jetson packaging, or unattended
-operation.
-
-## Open evidence track - Physical audio validation
-
-Physical voice validation is no longer a blocker for text-to-MuJoCo interaction
-closure. Before claiming support for real microphone and speaker operation, retain a clean supervised bundle, operator review, and
-release evidence that cover microphone choice, room noise, ASR recognition,
-audible output, barge-in, request-bound approval and denial, cancellation, stop,
-and simulator recovery.
-
-## Open evidence track - SenseVoice ASR hardening
-
-The supported ASR path is sherpa-onnx SenseVoice final-utterance
-transcription with `ASR_MODE=final`. The Orchestrator continues to own
-microphone capture, VAD, utterance boundaries, timeout handling, and barge-in.
-The ASR service owns only complete-utterance transcription.
-
-The objective is reliable local realtime speech operation for Chromie, not
-unbounded ASR scope growth. The maintained architecture and evidence plan are
-documented in [SenseVoice ASR](docs/SENSEVOICE_ASR.md).
-
-Exit criteria before widening voice-device or profile support:
-
-- the pinned SenseVoice dependency and model have immutable provenance and
-  maintained-profile coverage;
-- English, Chinese, mixed-command, noisy-room, and physical-microphone
-  benchmarks show acceptable recognition quality and latency for the intended
-  deployment profile;
-- stop, cancel, emergency, silence, unusable-audio, confirmation, timeout, and
-  barge-in semantics remain unchanged;
-- CPU fallback and maintained CUDA profiles fail clearly when model files or
-  providers are unavailable;
-- retained evidence uses the four-axis status vocabulary and does not turn a
-  benchmark into release readiness.
-
-## Open engineering track — CosyVoice quality and interruption resilience
-
-Chromie's framework-neutral TTS contract remains intact, but the maintained
-default is now Fun-CosyVoice3 0.5B. OuteTTS is an explicit low-resource fallback
-and Qwen3-TTS remains the principal comparison backend. The default change was
-made because repeated Oute Chinese diagnostics remained unnatural and one live
-case leaked enrollment text, while CosyVoice led ordinary first-audio and RTF in
-two equivalent isolated comparisons.
-
-Current work is not another provider-selection exercise. It is to make the
-selected default operationally strong:
-
-- retain a Mandarin-focused blinded listening set for tones, polyphonic words,
-  numbers, units, names, technical terms, code switching, and dialogue;
-- reduce the hard-cancellation cold-reload tail without allowing stale audio;
-- measure p50/p95 latency, RTF, GPU memory, queueing, and recovery while the
-  maintained ASR and cognitive services share the host;
-- keep the authorized reference, runtime, weights, cache identity, and evidence
-  bound to exact digests;
-- preserve explicit `--tts-backend oute` and `--tts-backend qwen3` rollback
-  paths through the same contract.
-
-Completion criteria:
-
-- default startup validates the committed voice catalog and reports the exact CosyVoice
-  provider/model identity;
-- application health and no-playback warm synthesis pass before microphone
-  startup;
-- cancellation never emits stale audio, and recovery meets an accepted bound;
-- Mandarin listening and term-correctness results are retained with source and
-  hardware context;
-- the full automated suite, provider matrix checks, documentation validation,
-  and fallback-path tests pass.
-
-See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
-
-## Implemented architecture correction — Embodiment-independent Social Attention
-
-Chromie should decide social intent, style, and optional semantic expression
-without knowing whether Soridormi currently targets a simulator or a physical
-robot. Soridormi remains responsible for backend selection, body-specific
-control, calibration, safety, and execution evidence. Social Attention
-frequency and intensity should come from Chromie's owner-approved mind profile
-and live interaction context rather than deployment mode.
-
-The authoritative decision, migration sequence, and acceptance criteria are in
-[Social Attention Behavior Domain](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
-
-Implemented scope:
-
-- Social Attention architecture documentation and regression guards are finalized;
-- MindProfile approval and Social Attention health defaults are reconciled across
-  contracts, runtime, tests, and documentation;
-- calibration and embodiment-specific argument ownership live entirely in
-  Soridormi/provider contracts;
-- backend identity and calibrated yaw/pitch details are absent from model-facing
-  Social Attention contracts;
-- public modes are `off`, `report_only`, and `on`, with maintained default `on`;
-- the static Chromie ability ontology has no simulator-only or hardware-only
-  lifecycle states and does not activate provider body skills from Host mode;
-- the live provider catalog supplies effective confirmation requirements, while
-  material alternatives and post-interrupt physical resume use backend-neutral
-  Host confirmation rules;
-- owner-approved courtesy, expressiveness, initiative, restraint, cooldown, and
-  repetition guidance lives in `MindProfile.social_interaction_style`;
-- candidate discovery, model prompting, and Host materialization are independent
-  of provider backend identity;
-- explicit user actions remain primary goals, while auxiliary expression is
-  parallel-only and may not delay speech, urgent work, stop, or emergency paths;
-- contract and file-backed backend-parity scenarios cover stable named-skill and
-  semantic-argument behavior.
-
-The legacy Host-generated deep-thought body gesture and its coordinator bypass
-are deleted. Backend identity and calibrated body arguments are absent from the
-model-facing Social Attention boundary. Remaining work is retained live Soridormi
-interaction evidence and the full release-quality regression gate.
-
-## Implemented architecture foundation - Goal continuity and proposal evidence
-
-The former proposal-merge and semantic-task-continuity migration tracks are
-subsumed by the single Goal-driven Cognitive Core. The maintained authorities
-are [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-and [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md).
-
-Current maintained behavior:
-
-- Goal Association owns semantic continuity, reference resolution, correction,
-  clarification, cancellation, and versioned Goal updates;
-- Fast or terminal Deep Planning produces a canonical Plan with complete Goal
-  coverage before effectful execution;
-- fast Goal Interpretation output and proposal-ledger records are advisory
-  evidence surfaces, not a second semantic authority or executable commitment;
-- the Host validates identities, versions, schemas, confirmation, authorization,
-  scheduling, cancellation, and evidence without inventing user meaning;
-- the Trusted Capability Runtime executes only exact Plan-bound requests, while
-  Soridormi owns embodied feasibility, safety, monitoring, stop, and recovery;
-- outcome reconciliation joins exact plan/request/result evidence before the
-  model-owned final response may make a completion claim.
-
-Obsolete standalone proposal and pre-Core planning documents were removed
-because they described a Router-era staged migration or Goal-Interpreter-selected
-plans and could be mistaken for current architecture.
-Historical implementation provenance remains available in Git history.
-
-## Implemented contract track - Cognitive Gateway decomposition
-
-Chromie's settled ingress boundary is the
-[Cognitive Gateway](docs/COGNITIVE_GATEWAY.md), not a renamed brain or a
-cosmetic rename of `chromie-agent`. The Gateway owns Input Normalization,
-Protective Reflex, Attention Review, Context Assembly, and Turn Admission. The
-Goal-Driven Cognitive Core owns goal meaning, planning, delegation, outcome
-reconciliation, and response composition.
-
-The logical ingress contract is implemented. A frozen version 1
-`UserTurnEnvelope` preserves immutable input, quality, attention, reflex,
-source/freshness context references, admission, and stable correlation. The
-host builds and dual-records it across current interaction paths, projects only
-admitted envelopes into Core, and applies local deterministic stop or
-suppression before ordinary cognition. The shared reflex contract is also used
-by Goal Interpretation compatibility rules; pending approval is revoked before the first
-await and a later utterance cannot preempt the active reflex lifecycle.
-Fixed cancellation scopes, active/queued dispatch receipts, and the dedicated
-Soridormi E-stop dispatch path are implemented and automatically verified.
-The cognitive path also resolves named Goals to exact plan/runtime bindings,
-dispatches `specific_goal`, atomically reconciles validated receipts into Goal
-state, and rebuilds unaffected pending confirmation work as a fresh child plan
-and token. Broad fixed-reflex receipts now reconcile request-level cancellation,
-partial work, provider uncertainty, Host-preflight cancellation, conservative
-confirmation revocation, and provider widening into canonical Goal state through
-one durable transaction. The five physical Gateway modules and their contracts are now implemented
-and automatically verified. Retained E-stop, safe-idle, live-text, and MuJoCo
-evidence remains open.
-
-Maintained Gateway/Core closure criteria:
-
-- the implemented `UserTurnEnvelope` continues to preserve original input,
-  normalized evidence, quality, attention, context provenance, admission,
-  reflex outcome, and turn correlation without embedding a Gateway-authored
-  normal intent or plan;
-- the five logical Gateway modules have explicit contracts and tests, even
-  when several are co-deployed in one host process;
-- stop, cancel, emergency, silence, and unusable-input controls remain
-  deterministic, while dedicated E-stop claims require trusted provider and
-  safe-idle evidence;
-- Attention Review emits only a bounded admission finding, fails open for
-  direct or unclear speech, and cannot authorize effects;
-- normal goal interpretation, semantic triage, affordance grounding, planning,
-  execution reconciliation, and final response are owned by one Core authority;
-- the versioned `RouteDecision` name may remain as a bounded internal Core
-  contract, but there is no independent `/route` API, Router client, service,
-  container, or Goal Interpreter host/port/URL compatibility surface;
-- focused contract tests, deterministic-safety General Ability Level A,
-  retained live-text, cancellation, simulator safe-idle, and documentation
-  checks pass without overstating microphone or physical-robot evidence.
-
-## Implemented architecture track - Cognitive Turn Loop closure
-
-The complete manager-owned lifecycle is defined in
-[Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md). Its host/runtime baseline is
-implemented around Goal Association, Fast/terminal Deep planning, canonical
-validation, confirmation, prospective composition, Trusted Capability Runtime, tools,
-memory, and Soridormi integration:
-
-1. the versioned `UserTurnEnvelope` and behavior-preserving Core compatibility
-   adapter retain the canonical admitted input;
-2. committed requests match immutable plan ID/fingerprint, step, skill,
-   arguments, timing, goal ownership, and output-schema digest;
-3. trusted `SkillResult`/`SkillTrace` records join into an immutable
-   `ExecutionOutcomeBundle`;
-4. exact per-goal success, partial completion, failure, refusal, timeout,
-   cancellation, and `not_run` states commit atomically;
-5. only bounded schema-validated provider observations may enter outcome
-   response composition;
-6. the current post-execution composer returns speech only with exact
-   goal/evidence references;
-7. cancellation and newer-turn preemption retain evidence while suppressing
-   stale final speech;
-8. a recoverable embodied retry uses a fresh-confirmed, independently
-   fingerprinted child plan over only the failed recoverable subset.
-
-Exit criteria before treating the implemented loop as target-qualified:
-
-- one stable turn identity reaches Gateway, Core, execution, reconciliation,
-  final response, and retained evidence;
-- an absent runtime result is `not_run`, never inferred completion;
-- multi-goal success and failure remain independently reportable;
-- prospective planner or pre-action speech is never treated as result
-  evidence;
-- unknown or stale plan, goal, step, request, evidence, and fingerprint
-  references fail closed;
-- model-visible outputs pass a declared schema and bounded low-level-field
-  projection; retained evidence preserves a digest when projection is denied;
-- the post-execution response schedules no skills or actions and remains a
-  conservative language-matched status path;
-- cancellation and newer-turn preemption cannot play a stale final response;
-- focused tests, relevant General Ability Level A, the full suite, and
-  documentation checks pass for the final source revision;
-- provider-backed live-text, simulator, microphone, E-stop, safe-idle, and
-  physical-robot behavior remain separate evidence claims.
-
-## Target-evidence closure track
-
-The earlier named implementation backlog is complete. Current development
-evidence is coordinated, but not yet closed, through the source-bound profiles
-and resumable workflow defined in
-[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md).
-
-The default `source_bound_development` profile requires:
-
-- clean Gateway/Core live-text, cancellation, paired MuJoCo, and approved review;
-- positive live Agent Skill selection with provider-backed weather evidence;
-- all reviewed Social Attention mode/style slices and qualitative approval;
-- loopback-local and second-machine LAN exposure proof.
-
-The stricter `supervised_physical_pilot` profile additionally requires supervised
-physical voice and robot evidence. Simulation and automatic tests cannot satisfy
-those physical claims. Every closure report remains `release_qualified=false`;
-release approval is separate from evidence collection.
+- Keep `chat`, `memory`, `tool`, and trusted `robot_action` turns on the
+  Goal-driven apply path for profiles that enable those lanes.
+- Fail closed when a mapped lane is disabled or unsupported; do not resume the
+  legacy Agent planner for the same turn.
+- Keep emergency compatibility endpoints disabled by default and protected by
+  service and per-turn authority gates.
+- Remove the remaining compatibility planner only after retained replay and live
+  evidence show no required rollback dependency.
 
 Exit criteria:
 
-- all required reports match the initialized clean revision;
-- human reviews match exact artifact digests and approve every declared check;
-- required track eligibility fields pass without promotion from weaker evidence;
-- finalization runs from the same clean revision;
-- current Status, Checkpoint, Runbook, Acceptance, and qualification documents
-  point to the same workflow and do not retain duplicate active procedures.
+- the semantic-authority matrix has exactly one owner per entry point;
+- excluded lanes produce typed no-action outcomes;
+- no authoritative failure enters another semantic planner;
+- current docs and profiles describe the same lane policy.
 
-## Implemented evaluation track - General ability acceptance reconstruction
+### Interpretation and capability grounding
 
-The behavior test framework is being reconstructed so Chromie is evaluated by
-general robot abilities, not by one pasted user sentence at a time.
+- Treat non-empty interpretation failure as `interpretation_unavailable`.
+- Permit semantic repair to return only strictly typed, catalog-backed action
+  proposals for `robot_action`.
+- Revalidate capability IDs, argument schemas, confidence, confirmation policy,
+  resources, and effect envelopes after every model stage.
+- Expand general-ability scenarios rather than phrase-specific routing rules.
 
-The detailed design and staged implementation plan are maintained in
-[General Ability Test Reconstruction](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
+Exit criteria:
 
-Exit criteria before using this track as the default behavior-quality gate:
+- no fallback invents an ordinary semantic lane;
+- compound body requests retain ordered exact capabilities;
+- missing abilities remain honest terminal outcomes;
+- behavior scenarios cover unavailable, repair, and rejection paths.
 
-- the general ability manifest groups representative Level A and live text
-  probes by reusable ability class;
-- `python scripts/general_ability_acceptance.py --mode check` validates the
-  manifest and all referenced deterministic scenarios;
-- `--mode level-a` reports ability-class coverage and evidence level without
-  overstating live behavior;
-- live text preview and simulator execution runs retain partial summaries,
-  per-case progress, and useful failure causes instead of hanging silently;
-- failures require a root-cause report that names the earliest wrong boundary;
-- status, acceptance, release, and coding-agent reports cite exact evidence
-  levels rather than saying only that the project was "tested";
-- `python scripts/check_docs.py` and the relevant focused test groups pass.
+### Structural simplification
 
-## Implemented tooling track - Developer usability tools
+The maintained component and failure contracts are
+[VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md) and
+[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
-### Objective
+- Decompose the Orchestrator composition root without raising existing method,
+  property, initializer, exception-boundary, or direct-model-call ratchets.
+- Remove import-time global logging configuration from library modules.
+- Keep configuration parsing inside typed settings owners.
+- Delete transient implementation plans once their durable contracts have moved
+  to canonical architecture or policy documents.
 
-Make the existing Chromie stack easier to inspect, diagnose, and support before
-adding new control-plane architecture or physical capability scope.
+Exit criteria:
 
-The first implementation focus is a dependency-light CLI that can report the
-configured deployment mode, validate generated configuration, inspect risky
-feature gates, probe required services, verify capability manifests, inspect
-retained trace artifacts, and prepare evidence metadata without overstating
-release claims.
+- structural ratchets decrease or remain unchanged;
+- no deleted document has an incoming link;
+- every specialized document has a component, operator, or mechanical owner.
 
-The detailed plan is maintained in
-[Developer Usability Tools Plan](docs/DEVELOPER_USABILITY_TOOLS.md).
+### Reproducible verification
 
-### Sequence
+- Run repository policy, test ownership, static analysis, configuration,
+  runtime structure, documentation, benchmark, unit, and legacy compatibility
+  checks from one canonical entry point.
+- Pin third-party GitHub Actions by immutable commit SHA.
+- Record source identity from Git when available and from a deterministic source
+  tree digest for archives.
+- Continue rejecting mutable runtime images and model artifacts for publishable
+  provenance while allowing clearly labeled local-development aliases.
 
-1. document the milestone and command contract before implementation;
-2. add a standard-library CLI skeleton exposed first as
-   `python -m tools.chromie_cli`;
-3. implement `status`, `config show`, and `config validate`;
-4. implement `doctor` for environment, files, service reachability, optional
-   Soridormi, and host audio checks;
-5. implement `capability check` for manifest provenance, duplicates, feature
-   gate consistency, and forbidden low-level controls;
-6. add evidence-bundle preflight that labels automated, simulator, target GPU,
-   physical audio, and hardware evidence separately;
-7. document the trace schema and implement retained-artifact `trace view`;
-8. defer `trace explain` until causal explanation semantics are stable.
+Exit criteria:
 
-### Exit criteria
+- a clean dependency-complete environment passes `./scripts/run_tests.sh`;
+- source archives can produce immutable run metadata without `.git`;
+- release provenance contains resolved image and model digests.
 
-- the CLI runs without package installation as
-  `python -m tools.chromie_cli`;
-- Level A tests cover command parsing, exit codes, configuration validation,
-  doctor result classification, manifest safety checks, retained-trace
-  filtering, and evidence preflight;
-- `doctor` reports skipped, warning, failure, and pass states deterministically;
-- service and provider failures include clear causes instead of being hidden by
-  fallback behavior;
-- evidence tooling preserves the four-axis status vocabulary and does not turn
-  automated, dry-run, or no-motion output into target validation or release
-  readiness;
-- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+## Open evidence track - Physical audio validation
 
-### Selective ecosystem alignment
+Physical audio remains an evidence task, not a source-code assumption. Retain:
 
-Chromie will absorb external Agent-framework ideas only when they solve a concrete
-project problem. The accepted Agent Skills architecture adopts a separate,
-read-only, owner-approved `SKILL.md`-style cognitive-content library with model-
-authored selection and progressive disclosure. It does **not** add arbitrary
-script execution, automatic provider registration, a second execution registry,
-or a package-install command. Typed capability manifests, live provider schemas,
-Trusted Capability Runtime, and Soridormi remain execution-authoritative.
-Internal compatibility aliases may retain legacy Skill Runtime names, but current model-facing and evidence contracts use Trusted Capability Runtime terminology. Third-party
-installation and broader interoperability remain deferred until a concrete use
-case and explicit review justify them.
+- intelligible microphone-to-ASR utterances in supported languages;
+- first audible TTS latency and uninterrupted playback evidence;
+- barge-in, stop-talking, and recovery behavior under real devices;
+- device identity, sample rate, provider revision, and correlated trace IDs.
 
-## Completed phase - Robust simulation and provider readiness
+Source tests may validate collectors and schemas, but only target runs can close
+this track.
 
-This milestone is complete for the high-level provider contract. The historical
-provider-readiness evidence used Soridormi revision
-`4afb4bc6411db4a4194e97349d9466a62efd2f24`, which supplied live no-motion
-`sim`, `hardware_shadow`, and `hardware_dry_run` profiles plus test-only fault
-injection. All three profiles pass conformance and parity, and the live
-16-scenario fault matrix passes its terminal-state, latency, and safe-idle
-checks.
+## Target-evidence closure track
 
-The provider-readiness run used a local macOS ARM64 MCP endpoint and did not
-command MuJoCo actuators or physical hardware. Separate Linux RTX 5090
-Voice-to-MuJoCo automated evidence now passes; supervised physical audio and
-real-hardware evidence remain separate release tracks.
+Use [docs/TARGET_EVIDENCE_CLOSURE.md](docs/TARGET_EVIDENCE_CLOSURE.md) for the
+coordinated workflow. Required retained evidence includes:
 
-### Objective
+- current source identity and clean-state declaration;
+- profile and provider identity;
+- Gateway-to-Core-to-planner contract smoke results;
+- simulator or hardware capability receipts;
+- failure, cancellation, and recovery evidence;
+- benchmark and latency summaries with explicit exclusions.
 
-Prove that the system fails safely under non-ideal conditions and that a
-physical provider can replace the simulator provider without changing
-Chromie's model-facing semantics.
-
-This combines the former “robust simulation” and “hardware-neutral
-commissioning contract” proposals because fault behavior and provider
-conformance must be designed and verified together.
-
-### Work
-
-- add Soridormi-owned fault injection for latency, jitter, dropped status,
-  timeout, unavailable skills, blocked paths, partial execution, restart, and
-  monitor failure;
-- add Chromie integration cases for provider timeout, disconnect, malformed
-  result, cancellation races, and safe user-facing fallback;
-- define repeatable scenario batches and thresholds for success, timeout,
-  cancellation latency, and safe idle;
-- stabilize versioned named-capability request, progress, terminal status, and error
-  semantics;
-- define provider conformance tests shared by simulator and physical backends;
-- add shadow and dry-run commissioning modes;
-- define calibration, timing, health, stop, recovery, and evidence requirements;
-- keep device drivers and physical safety implementation in Soridormi.
-
-### Exit criteria
-
-- every versioned fault scenario ends in its expected terminal state;
-- no injected failure bypasses confirmation, cancellation, stop, or emergency
-  policy;
-- simulator providers pass the provider conformance suite;
-- a no-motion physical-provider skeleton passes the same contract tests;
-- shadow and dry-run modes produce comparable, replayable traces;
-- no model-facing contract contains device-specific low-level controls;
-- a commissioning checklist is sufficient to select the first reference robot.
+A run that cannot execute a required target gate must report it as unavailable,
+not passed.
 
 ## Future phase - Physical pilot preparation
 
-### Objective
-
-Select and prepare one explicitly supported robot configuration for a
-progressive, supervised rollout. Until the candidate identity, independent
-emergency stop, and no-motion prerequisites are reviewed, development remains
-in preparation and does not authorize physical motion.
-
-This phase has two coordinated tracks:
-
-1. **Brain/body task boundary.** Chromie prepares global, user-facing
-   TaskGraphs that submit structured embodied goals to Soridormi and monitor
-   Soridormi's task events. This keeps navigation, approach, gesture,
-   recovery, and future manipulation goals above the low-level robot boundary.
-   It does not authorize physical motion.
-2. **Soridormi high-level task and skill enrichment.** Soridormi should declare
-   and implement the next safe body-side task types first, in no-motion or
-   simulator-backed form, before Chromie broadens routing or any motion-control
-   model training begins. Near-term task types are `navigate_to_location`,
-   `approach_target`, `look_at_target`, `perform_gesture`, and
-   `recover_safe_idle`, with preview, submit, event, cancellation, refusal, and
-   safe-idle semantics.
-3. **Reference robot candidate gate.** The versioned, machine-readable
-   candidate manifest pins hardware and software identity, defines one bounded
-   low-risk skill, records exclusions, and fails closed on missing safety or
-   calibration evidence.
-
-The task-agent boundary exists to keep the project on target: Chromie remains
-the local-first voice and decision control plane, while Soridormi remains the
-embodied planner/executor. Rich embodied requests should be represented as
-structured Soridormi goals, not translated by Chromie into raw or low-level
-body controls.
-
-Model-assisted routing supports this boundary but does not own it. The small
-Goal Interpreter model may propose routes for normal requests, but deterministic controls,
-catalog constraints, schema validation, runtime authorization, and Soridormi
-provider checks remain the authority.
-
-### Sequence
-
-1. keep the Chromie/Soridormi task contract aligned with Soridormi's
-   authoritative manifest;
-2. enrich Soridormi's high-level task and skill surface in no-motion or
-   simulator-backed mode before training motion-control models or adding real
-   physical execution;
-3. validate task-capability inspection, preview, submit, event monitoring,
-   refusal, blocked-subsystem reporting, timeout, and cancellation semantics
-   without claiming motion, including a no-motion bridge acceptance gate that
-   checks capabilities before preview or submit;
-4. add Chromie routing and TaskGraph tests for the enriched Soridormi task
-   types while preserving explicit named-skill routing for simple bounded
-   commands;
-5. no-motion health and state inspection for the selected candidate;
-6. shadow recommendations;
-7. dry-run with operator approval;
-8. one low-risk skill at limited speed and workspace;
-9. supervised cancellation, stop, emergency stop, and recovery;
-10. bounded multi-skill TaskGraphs;
-11. narrowly scoped physical prerelease.
-
-### Exit criteria
-
-- exact hardware, firmware, sensors, drivers, and Soridormi revision are pinned;
-- Chromie can submit structured Soridormi task goals with stable idempotency
-  keys, monitor terminal task events, and fail closed on Soridormi refusal,
-  failure, timeout, cancellation, blocked subsystems, or unsafe
-  recommendations;
-- model-assisted routing remains advisory and cannot bypass deterministic
-  controls, capability availability, confirmation, runtime policy, provider
-  refusal, or physical-motion gates;
-- the enriched Soridormi task surface has retained no-motion or simulator
-  evidence before Chromie treats it as routable for rich embodied requests;
-- the candidate verifier reports `selected_for_pilot=true` while continuing to
-  report `physical_motion_authorized=false`;
-- referenced safety, procedure, provider-manifest, and calibration evidence
-  files stay inside the evidence root, the provider manifest revision matches
-  the candidate, and calibration hashes match;
-- calibration and latency measurements are retained;
-- physical stop and recovery evidence is reviewed;
-- communication loss and stale-command cases fail closed;
-- the release names one supported configuration and all exclusions.
-
-Motion-control model training is explicitly later work. It requires a selected
-target body or simulator, retained calibration and telemetry, task-level
-acceptance metrics, and Soridormi-owned safety envelopes.
+Physical pilot work starts only after simulator behavior, source verification,
+and target evidence are current. The pilot must progress through shadow,
+dry-run, bounded single-capability, supervised composition, and broader use.
+Each widening requires explicit stop/recovery proof and operator rollback.
 
 ## Later work
 
-Perception providers, privacy-controlled durable memory, longer recovery-aware
-tasks, distributed observability, verified Jetson packaging, additional robot
-platforms, and broader autonomy are candidates only after the physical pilot.
+- richer perception and social-attention providers;
+- durable memory with explicit consent, retention, inspection, and deletion;
+- additional local information providers;
+- provider-neutral multi-robot capability composition;
+- publication and signed release artifacts after a release target exists.
 
-## Anti-drift checks
+## Anti-drift review
 
-Before accepting major work, ask:
+Before accepting work, ask:
 
-1. Does it close the active milestone or a documented engineering blocker?
-2. Is the behavior owned by Chromie or Soridormi according to the charter?
-3. Does it preserve deterministic controls and fail-closed authorization?
-4. Is the required evidence level explicit?
-5. Does it avoid binding the model-facing contract to one robot?
-
-If the answer is no, defer the work or revise its scope.
-
-## Implemented architecture track - Goal-driven cognitive runtime
-
-### Objective
-
-Maintain [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-as the cognitive constitution for current and future Goal Interpretation, Agent, planning,
-continuity, response, and social-interaction work.
-
-The architecture changes the primary planning question from “which skill matches
-this utterance?” to “what existing or new user goals are present, and what
-verifiable plan completely satisfies them?”
-
-This track is implemented through PR8 with dependency-light automated evidence.
-The unified runtime is authoritative in lane-gated `apply`: the common safe
-base owns `chat,tool`, and the maintained Soridormi launcher widens ownership to
-`chat,robot_action,tool`. Both fail closed after ownership acquisition and preserve
-explicit rollback controls. Retained live-text and MuJoCo target evidence
-remain open.
-
-### Delivery sequence
-
-1. **Implemented (Level A):** Goal contracts and bounded active-goal projection.
-2. **Implemented in the unified apply pipeline (Level A):** Goal association before new-goal segmentation.
-3. **Implemented in the unified apply pipeline (Level A):** Canonical plans and complete-coverage Fast Planner.
-4. **Implemented in the unified apply pipeline (Level A):** Full-registry Deep Planner with bounded same-tier replanning.
-5. **Implemented in the unified apply pipeline (Level A):** Consequence-aware parameter resolution and goal satisfaction reporting.
-6. **Implemented in the unified apply pipeline (Level A):** Multi-goal response composition and model-driven social attention.
-7. **Implemented with Level A evidence; target evidence open:** Unified runtime
-   migration, per-lane apply/rollback, atomic Goal-state commit, bounded host
-   replan, evidence tooling, and cognitive text-to-MuJoCo entry point.
-8. **Implemented with Level A evidence; target evidence open:** Single semantic
-   authority, adapter-only exact Goal Interpretation actions, emergency-only legacy planner
-   with non-empty matching-turn claims, exact Goal Association schema, and strict
-   source/evidence provenance checks.
-9. **Implemented; diagnostic functional run complete; latency and target evidence open:** Fast Planner
-   multi-goal terminal contract with decoder-compatible empty escalation versus
-   complete outcome-map semantics, simple common-catalog mixed planning,
-   explicit recovery diagnostics, pending-action claim discipline, and retained
-   latency qualification. The final hardened July 21 working tree passed a
-   4/4 simulator-backed Fast-tier functional run with execution and safe idle,
-   but its 40.321-second median misses the 15.46-second target; three warm runs,
-   clean paired-source, and endpoint-revision provenance remain open. See
-   [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
-
-10. **Implemented with Level A evidence; target evidence open:** User-outcome
-    acceptance with stable observable behavior events and hard LLM integrity
-    gates, plus a model-authored Social Attention behavior domain that can
-    coordinate contextual language and auxiliary body expression. See
-    [User-Outcome Acceptance Framework](docs/USER_OUTCOME_ACCEPTANCE.md) and
-    [Social Attention Behavior Domain](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
-
-The Deep Planner does not return semantic work to the Fast Planner. Both tiers
-share capability and validation primitives and output the same canonical plan
-contract.
-
-### Required development method
-
-Each behavioral implementation must follow
-[Scenario-Driven Development](docs/SCENARIO_DRIVEN_DEVELOPMENT.md): retain the
-interaction or requirement as a scenario, demonstrate the failing boundary,
-implement the architectural correction, pass the retained scenario and full
-regression gates, and state the evidence level.
-
-### Exit criteria
-
-- goal association occurs before creation of new goals;
-- one turn can modify existing goals and create independent new goals;
-- Fast Planner executes only complete high-confidence coverage or escalates;
-- simple common-catalog multi-goal execute, respond, and mixed requests terminate
-  at Fast Planner from a complete model-authored semantic plan, while the host
-  adds only canonical identity and validation; semantic escalation remains valid
-  and distinct from contract failure;
-- Deep Planner produces a final canonical plan without returning to Fast Planner;
-- partial or unconfirmed alternatives never execute;
-- information gaps remain attached to the original goal across turns;
-- explicit user tasks remain authoritative while response language and auxiliary Social Attention expression are coherently coordinated;
-- all execution passes the same deterministic validator;
-- retained Level A scenario coverage and user-outcome observation checks pass;
-- critical LLM timeout or truncation cannot be hidden by fallback;
-- live-text and MuJoCo evidence are retained before target behavior is claimed.
-
-This track does not replace the current physical pilot or audio evidence tracks.
-It must preserve existing deterministic stop, authorization, provider, evidence,
-and release boundaries.
-
-## Implemented architecture track - Runtime observability
-
-### Objective
-
-Establish [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md)
-as the common contract for architecture-independent execution timing, incident
-scene reconstruction, and data-loop evidence correlation.
-
-Runtime Trace must describe the modules that actually participated in an
-interaction rather than encoding a fixed Router/Planner/Execution pipeline.
-Each module declares stable metadata and emits generic trace items through a
-shared framework. Completed traces retain raw timing evidence and reproducible
-summaries for critical-path, inclusive/exclusive-time, parallelism, and
-user-observable latency analysis.
-
-### Delivery sequence
-
-1. **Implemented:** Common Runtime Trace envelope, module descriptor, item
-   lifecycle, timing, hierarchy, links, modes, privacy, and summary contracts.
-2. **Implemented with focused automated evidence:** Shared tracing library with
-   monotonic timing, wall-clock correlation, `contextvars` propagation,
-   sync/async spans, bounded attributes, distributed carriers/fragments, and
-   immutable finalization.
-3. **Implemented with partial coverage:** Goal-driven coordinator, canonical
-   plan adapter, Orchestrator-to-Agent cognitive calls, Goal Association, Fast
-   and Deep Planning, Response Composer, and Ollama model calls emit generic
-   module-owned trace items without changing semantic behavior.
-4. **Implemented with focused automated evidence:** Execution, action-provider,
-   VAD/ASR, TTS/playback, queue/resource, session lifecycle, first audible, and
-   optional provider-reported first-motion instrumentation.
-5. **Implemented for the initial cognitive path:** Topology-aware summaries,
-   inclusive/exclusive module time, parallelism, optional interaction-trace
-   Runtime Events, and active trace attachment to cognitive-integrity incidents.
-   Critical-path output is an explicitly versioned interval/topology
-   approximation until broader dependency instrumentation exists.
-6. **Implemented:** Deterministic normal-path
-   sampling, latency-threshold escalation, detached session summaries, idle and
-   process-restart abandonment recovery, cross-artifact correlation, and
-   non-blocking accelerator resource observations.
-7. **Implemented; environment evidence open:** Reproducible retained-trace
-   latency distributions and explicit baseline-versus-candidate regression
-   gates with evidence-class, environment, revision-cleanliness, and sample-count
-   qualification. Real simulator/hardware baselines and approved thresholds must
-   still be collected on the claimed target.
-
-Exit criteria require the trace schema to remain independent of the current
-module graph, disabled tracing to preserve behavior with negligible overhead,
-critical failures to retain correlated timing evidence, and data-loop status to
-remain truthful about local capture versus cloud delivery.
-
-### Goal-driven runtime checkpoint
-
-PR1 through PR6 define and automatically verify Goal contracts, continuity-before-creation association, Canonical Plans, complete-coverage Fast Planning, terminal Deep Planning, bounded same-tier revision, parameter resolution, Goal Satisfaction, response composition, and independent Social Attention.
-
-PR7 unifies those stages under one host runtime with `off`, `report_only`, and
-lane-gated `apply`. PR8 makes the unified runtime the single semantic authority
-for applied lanes, constrains Goal Association at the model boundary, and
-reduces the old CapabilityAgent planner to a gated emergency path requiring a
-non-empty matching-turn claim. All applied plans still pass existing trusted
-preparation, confirmation, Trusted Capability Runtime, and provider boundaries. Goal-state
-updates are atomic, and technical failures after authority acquisition fail
-closed rather than becoming hidden success or a second semantic plan.
-Operational details and evidence commands are maintained in
-[Goal-Driven Cognitive Runtime Rollout](docs/COGNITIVE_RUNTIME_ROLLOUT.md).
-
-This checkpoint is implemented and automatically verified only. Retained live-text and MuJoCo evidence must still be collected before target validation is claimed.
-
-### Completed: compatibility semantic identity closure
-
-- Removed legacy CapabilityAgent substitution of one provider skill for another.
-- Removed cross-schema yaw/pitch conversion and clamping from Chromie.
-- Added a static authority guard and regression test requiring exact selected
-  skill identity and arguments to survive compatibility planning.
+- Does it close the active milestone represented by the current priority and its
+  exit criteria, rather than only one visible example?
+- Is the behavior owned by Chromie or Soridormi, and is that boundary preserved?
+- Is the required evidence level explicit: source, simulator, target, or
+  physical pilot?
+- Does it preserve one Goal-driven semantic authority and trusted effect
+  authorization?
+- Does it reduce or clearly bound compatibility and documentation surface?

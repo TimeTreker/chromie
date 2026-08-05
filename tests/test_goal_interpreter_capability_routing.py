@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
+from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
@@ -83,27 +84,8 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "rules_only"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ):
-            decision = await main.interpret_turn(RouteRequest(text="Move forward."))
-
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertNotIn("capability_agent", decision.agents)
-        self.assertEqual(
-            [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "quick_intent"],
-        )
-        self.assertEqual(
-            decision.metadata["task_list"][0]["task_type"],
-            "speech.answer",
-        )
-        self.assertEqual(
-            decision.metadata["route_merge"]["strategy"],
-            "safety_filter_then_quick_intent",
-        )
-        self.assertEqual(decision.metadata["route_merge"]["task_proposal_count"], 1)
-        self.assertEqual(decision.metadata["route_merge"]["final_route"], "chat")
-        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "quick_intent")
-        self.assertEqual(decision.metadata["route_merge"]["task_count"], 1)
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'catalog_and_rules_no_match'):
+                await main.interpret_turn(RouteRequest(text="Move forward."))
 
     async def test_hybrid_deep_thought_for_direct_motion_keeps_model_route(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -458,12 +440,10 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "rules_only"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ):
-            decision = await main.interpret_turn(RouteRequest(text="Turn your head left."))
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'catalog_and_rules_no_match'):
+                await main.interpret_turn(RouteRequest(text="Turn your head left."))
 
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.source, "fallback")
-
-    async def test_hybrid_mode_does_not_use_legacy_phrase_rules_after_llm_fallback(self) -> None:
+    async def test_hybrid_mode_reports_unavailable_after_llm_fallback(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="turn left", matched=False)
@@ -484,16 +464,13 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="turn left"))
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'llm unavailable'):
+                await main.interpret_turn(RouteRequest(text="turn left"))
+            self.assertEqual(goal_interpreter.calls, 1)
+            assert goal_interpreter.request is not None
+            self.assertEqual(goal_interpreter.request.context["candidate_capabilities"], [])
 
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
-        assert goal_interpreter.request is not None
-        self.assertEqual(goal_interpreter.request.context["candidate_capabilities"], [])
-
-    async def test_hybrid_mode_ignores_query_matches_after_llm_fallback(self) -> None:
+    async def test_hybrid_mode_does_not_reinterpret_query_matches_after_llm_fallback(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -528,21 +505,9 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="What's your name?"))
-
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
-        self.assertNotIn("capability_agent", decision.agents)
-        self.assertNotIn("conversation_agent", decision.agents)
-        self.assertIn("Goal Interpreter model unavailable", decision.reason or "")
-        self.assertIn("delegating to deep_thought", decision.reason or "")
-        self.assertEqual(decision.candidate_capabilities, [])
-        self.assertNotIn(
-            "task.execute_skill",
-            [item["task_type"] for item in decision.metadata["task_list"]],
-        )
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'llm unavailable'):
+                await main.interpret_turn(RouteRequest(text="What's your name?"))
+            self.assertEqual(goal_interpreter.calls, 1)
 
     async def test_main_validator_rejects_generic_llm_robot_action(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -578,15 +543,11 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'llm_robot_action_missing_catalog_skill'):
+                await main.interpret_turn(
                 RouteRequest(text="I mean, do you know if the sun is round or rectangular?")
-            )
-
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.source, "fallback")
-        self.assertNotIn("capability_agent", decision.agents)
-        self.assertIn("llm_robot_action_missing_catalog_skill", decision.reason or "")
+                )
+            self.assertEqual(goal_interpreter.calls, 1)
 
     async def test_stop_now_is_priority_interrupt(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -775,12 +736,8 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main, "capability_catalog", _Catalog(result)), patch.object(
             main.settings, "mode", "rules_only"
         ):
-            decision = await main.interpret_turn(RouteRequest(text="Tell me a joke."))
-
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertNotEqual(decision.intent, "capability:chromie.speak")
-        self.assertIn("conversation_agent", decision.agents)
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'catalog_and_rules_no_match'):
+                await main.interpret_turn(RouteRequest(text="Tell me a joke."))
 
     async def test_hybrid_interpreter_uses_common_catalog_snapshot_for_semantic_recovery(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -1502,15 +1459,9 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="Hello."))
-
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertIn("conversation_agent", decision.agents)
-        self.assertNotIn("capability_agent", decision.agents)
-        self.assertIn("llm_robot_action_missing_catalog_skill", decision.reason or "")
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'llm_robot_action_missing_catalog_skill'):
+                await main.interpret_turn(RouteRequest(text="Hello."))
+            self.assertEqual(goal_interpreter.calls, 1)
 
     async def test_hybrid_interpreter_accepts_exact_robot_action_from_compact_catalog(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -1665,27 +1616,11 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'deterministic-only route interrupt'):
+                await main.interpret_turn(
                 RouteRequest(text="please walk forward for 10 seconds and blink your eyes")
-            )
-
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertFalse(decision.interrupt_current)
-        self.assertTrue(decision.needs_agent)
-        self.assertIn("conversation_agent", decision.agents)
-        self.assertIn("speaker_agent", decision.agents)
-        self.assertIn("deterministic-only route interrupt", decision.reason or "")
-        self.assertEqual(
-            [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "quick_intent"],
-        )
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["speech.answer"],
-        )
+                )
+            self.assertEqual(goal_interpreter.calls, 1)
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_discourse_marker(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -1722,17 +1657,9 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="Go ahead and sing a song for me."))
-
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertEqual(decision.source, "fallback")
-        self.assertFalse(decision.interrupt_current)
-        self.assertIn("deterministic-only route interrupt", decision.reason or "")
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["speech.answer"],
-        )
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'deterministic-only route interrupt'):
+                await main.interpret_turn(RouteRequest(text="Go ahead and sing a song for me."))
+            self.assertEqual(goal_interpreter.calls, 1)
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_appearance_statement(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -1769,22 +1696,11 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'deterministic-only route interrupt'):
+                await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
+            self.assertEqual(goal_interpreter.calls, 1)
 
-        self.assertEqual(goal_interpreter.calls, 1)
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertEqual(decision.source, "fallback")
-        self.assertFalse(decision.interrupt_current)
-        self.assertIn("conversation_agent", decision.agents)
-        self.assertIn("speaker_agent", decision.agents)
-        self.assertIn("deterministic-only route interrupt", decision.reason or "")
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["speech.answer"],
-        )
-
-    async def test_llm_fallback_delegates_social_compliment_without_catalog_motion(self) -> None:
+    async def test_llm_fallback_reports_unavailable_without_catalog_motion(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1819,18 +1735,10 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'goal_interpreter_error:ReadTimeout'):
+                await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
-        self.assertEqual(decision.source, "fallback")
-        self.assertIn("delegating to deep_thought", decision.reason or "")
-        self.assertEqual(
-            [item["task_type"] for item in decision.metadata["task_list"]],
-            ["cognition.delegate_deep_thought", "cognition.deep_think"],
-        )
-
-    async def test_fast_goal_interpreter_fallback_delegates_to_deep_thought_without_phrase_rules(self) -> None:
+    async def test_fast_goal_interpreter_fallback_reports_unavailable_without_phrase_rules(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1865,16 +1773,12 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "goal_interpreter", goal_interpreter):
-            decision = await main.interpret_turn(
+            with self.assertRaisesRegex(InterpretationUnavailableError, 'goal_interpreter_error:ReadTimeout'):
+                await main.interpret_turn(
                 RouteRequest(
-                    text="Please think carefully and split the work to add long-term memory to Chromie."
+                text="Please think carefully and split the work to add long-term memory to Chromie."
                 )
-            )
-
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
-        self.assertEqual(decision.source, "fallback")
-        self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
+                )
 
     async def test_hybrid_interpreter_does_not_synthesize_actions_with_semantic_parser(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main

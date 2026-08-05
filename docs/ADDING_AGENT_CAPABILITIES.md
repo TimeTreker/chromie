@@ -37,7 +37,7 @@ An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent
 Skill does not add an executable capability, provider, permission, or route. See
 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) and
-[Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md).
+[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
 ## Resource-provider capabilities
 

@@ -83,7 +83,6 @@ CURRENT_FILES = (
     Path("docs/ACCEPTANCE.md"),
     Path("docs/CONFIGURATION.md"),
     Path("docs/USER_OUTCOME_ACCEPTANCE.md"),
-    Path("docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md"),
     Path("tools/chromie_cli/env.py"),
     Path("tools/chromie_cli/doctor.py"),
     Path("scripts/test_matrix.py"),

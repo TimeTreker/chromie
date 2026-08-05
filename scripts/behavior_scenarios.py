@@ -61,6 +61,7 @@ from shared.chromie_contracts.response_composition import (
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
+from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
@@ -1026,7 +1027,10 @@ async def _run_goal_interpretation_turn(
     language: str | None,
     context: dict[str, Any] | None,
     stub: dict[str, Any],
-) -> tuple[RouteDecision, _GoalInterpretationLlm | _ScriptedGoalInterpreter]:
+) -> tuple[
+    RouteDecision | InterpretationUnavailableError,
+    _GoalInterpretationLlm | _ScriptedGoalInterpreter,
+]:
     from agent.app.cognitive_core.goal_interpreter import engine as main
 
     interpreter = _scenario_goal_interpreter_from_stub(
@@ -1055,14 +1059,50 @@ async def _run_goal_interpretation_turn(
             snapshot=_goal_interpretation_snapshot_from_stub(stub_scenario),
         ),
     ), patch.object(main, "goal_interpreter", interpreter):
-        decision = await main.interpret_turn(
-            RouteRequest(
-                text=text,
-                language=language,
-                context=dict(context or {}),
+        try:
+            decision = await main.interpret_turn(
+                RouteRequest(
+                    text=text,
+                    language=language,
+                    context=dict(context or {}),
+                )
             )
-        )
+        except InterpretationUnavailableError as exc:
+            decision = exc
     return decision, interpreter
+
+
+def _evaluate_interpretation_unavailable_expectations(
+    *,
+    expect: dict[str, Any],
+    unavailable: InterpretationUnavailableError,
+    llm_calls: int,
+    llm_stages: list[str],
+) -> list[str]:
+    errors: list[str] = []
+    _expect_equal(
+        errors,
+        "status",
+        "interpretation_unavailable",
+        expect.get("status"),
+    )
+    _expect_equal(errors, "llm_calls", llm_calls, expect.get("llm_calls"))
+    expected_stages = _tuple_of_strings(expect.get("llm_stages"))
+    if expected_stages and list(expected_stages) != list(llm_stages):
+        errors.append(
+            f"llm_stages={list(llm_stages)!r}, expected {list(expected_stages)!r}"
+        )
+    reason_contains = _tuple_of_strings(expect.get("failure_reason_contains"))
+    for phrase in reason_contains:
+        if phrase not in unavailable.reason:
+            errors.append(
+                f"failure reason missing {phrase!r}: {unavailable.reason!r}"
+            )
+    if expect.get("status") != "interpretation_unavailable":
+        errors.append(
+            "unexpected interpretation_unavailable outcome: " + unavailable.reason
+        )
+    return errors
 
 
 async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
@@ -1076,6 +1116,24 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
         context=context,
         stub=scenario.stub,
     )
+
+    if isinstance(decision, InterpretationUnavailableError):
+        errors = _evaluate_interpretation_unavailable_expectations(
+            expect=scenario.expect,
+            unavailable=decision,
+            llm_calls=interpreter.calls,
+            llm_stages=interpreter.stages,
+        )
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "actual": {
+                "status": "interpretation_unavailable",
+                "reason": decision.reason,
+                "llm_calls": interpreter.calls,
+                "llm_stages": list(interpreter.stages),
+            },
+        }
 
     task_types = _task_types_from_decision(decision)
     errors = _evaluate_goal_interpretation_expectations(
@@ -1685,6 +1743,28 @@ async def evaluate_cognitive_core_dialogue_scenario(
             stub=stub,
         )
         expect = turn.get("expect") or {}
+        if isinstance(decision, InterpretationUnavailableError):
+            errors = _evaluate_interpretation_unavailable_expectations(
+                expect=expect if isinstance(expect, dict) else {},
+                unavailable=decision,
+                llm_calls=interpreter.calls,
+                llm_stages=interpreter.stages,
+            )
+            all_errors.extend(f"{turn_id}: {error}" for error in errors)
+            turn_reports.append(
+                {
+                    "id": turn_id,
+                    "ok": not errors,
+                    "errors": errors,
+                    "actual": {
+                        "status": "interpretation_unavailable",
+                        "reason": decision.reason,
+                        "llm_calls": interpreter.calls,
+                        "llm_stages": list(interpreter.stages),
+                    },
+                }
+            )
+            continue
         errors = _evaluate_goal_interpretation_expectations(
             scenario,
             decision=decision,

@@ -66,9 +66,10 @@ does not create a global settings object spanning services.
 
 The Agent, ASR, TTS, maintained Host, and shared-runtime policy boundaries are
 source-complete and mechanically enforced by
-`scripts/check_service_configuration_ownership.py`. The generated configuration
-inventory classifies 453 keys across profiles, validation overrides, service
-internals, and the eight public choices; no compatibility aliases remain.
+`scripts/check_service_configuration_ownership.py`. The generated inventory is
+owned by `scripts/runtime_configuration_inventory.py`; documentation does not
+copy its changing key counts. Both checks must pass whenever configuration is
+added, renamed, removed, or re-owned.
 
 Standalone factories retained for focused tests must still instantiate their
 own typed settings objects. Maintained service composition passes one startup
@@ -76,4 +77,4 @@ snapshot inward. Physical startup, device behavior, provider loading, and
 profile-specific operational proof remain target evidence rather than source
 configuration work.
 
-See [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md).
+See [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).

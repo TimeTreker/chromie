@@ -13,7 +13,7 @@ from ...settings import (
     GoalInterpreterSettings as Settings,
     goal_interpreter_settings as settings,
 )
-from .fallback import fallback_decision
+from .fallback import InterpretationUnavailableError, fallback_decision
 from .model_interpreter import (
     OllamaGoalInterpreter,
     _is_placeholder_capability_intent,
@@ -30,13 +30,6 @@ from .schema import (
 )
 
 
-
-
-
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-)
 logger = logging.getLogger("chromie.agent.goal_interpreter")
 PROMPT_CATALOG_COMMON_LIMIT = 48
 PROMPT_CATALOG_ALL_LIMIT = 96
@@ -1330,40 +1323,6 @@ async def _review_priority_interrupt(
     )
 
 
-def _deep_planner_goal_interpreter_unavailable_decision(
-    request: RouteRequest,
-    result: CapabilityCatalogResult,
-    *,
-    llm_decision: RouteDecision,
-) -> RouteDecision | None:
-    reason_parts = [
-        "Goal Interpreter model unavailable; delegating to deep_thought instead of deterministic semantic routing",
-        f"catalog_version={result.catalog_version}",
-    ]
-    if llm_decision.reason:
-        reason_parts.append(f"llm_fallback_reason={llm_decision.reason}")
-    return finalize_decision(
-        RouteDecision(
-            route="deep_thought",
-            agents=[
-                "deepthinking_agent",
-                "speaker_agent",
-            ],
-            intent="deep_planner_goal_interpreter_unavailable",
-            confidence=0.50,
-            language=request.language or "auto",
-            priority="normal",
-            needs_agent=True,
-            should_speak=True,
-            candidate_capabilities=result.matches,
-            reason="; ".join(reason_parts),
-            source="fallback",
-            metadata={"thinking_ack_allowed": False},
-        ),
-        request,
-        source="fallback",
-    )
-
 
 async def interpret_turn(request: RouteRequest) -> RouteDecision:
     start = time.perf_counter()
@@ -1473,13 +1432,9 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
                         source="fallback",
                     )
                 else:
-                    decision = _deep_planner_goal_interpreter_unavailable_decision(
-                        request,
-                        catalog_result,
-                        llm_decision=llm_decision,
+                    raise InterpretationUnavailableError(
+                        llm_decision.reason or "Goal Interpreter unavailable"
                     )
-                    if decision is None:
-                        decision = llm_decision
 
         if decision is None:
             reason = (

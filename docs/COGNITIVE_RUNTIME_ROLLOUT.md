@@ -169,21 +169,22 @@ listed in `ORCH_COGNITIVE_APPLY_LANES`. Goal Interpreter routes `chat`, `clarify
 `deep_thought` map to the `chat` lane; `robot_action`, `tool`, and `memory`
 retain their lane names.
 
-A mapped lane that is not enabled remains on the existing routed Agent path,
-selected before Goal-driven authority acquisition. An enabled lane still
-applies only after all trusted validation and response-composition gates pass.
+A mapped lane that is not enabled fails closed before Goal Association. It does
+not enter the retained CapabilityAgent planner or any other semantic fallback.
+An enabled lane still applies only after all trusted validation and
+response-composition gates pass.
 
 Initial recommended lanes:
 
 ```env
-ORCH_COGNITIVE_APPLY_LANES=chat,tool
+ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 ```
 
-The common safe base applies `chat,tool`. The maintained Soridormi launcher
-widens the set to `chat,robot_action,tool` after enabling the trusted provider.
-The tool lane is constrained to registered schema-validated local providers and
-evidence-bound outcome composition. Memory remains outside apply until its own
-retained live scenarios prove authorization, result truthfulness, and rollback.
+The common safe base applies `chat,memory,tool`. The maintained Soridormi
+launcher widens the set to `chat,memory,robot_action,tool` after enabling the
+trusted provider. The tool and memory lanes remain constrained to registered,
+schema-validated capabilities, explicit authorization, and evidence-bound
+outcome composition.
 
 ## 4. Lane classification
 
@@ -208,11 +209,11 @@ input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
 has acquired semantic authority.
 
 A route whose mapped semantic lane is excluded by
-`ORCH_COGNITIVE_APPLY_LANES` remains on the routed Agent path before authority
-acquisition. Once Goal Association begins in authoritative `apply`, any model,
-composition, terminal-lane, trusted-runtime, or Goal-state commit failure
-produces truthful no-action speech and no effectful skill. It does not fall
-through to the legacy CapabilityAgent planner.
+`ORCH_COGNITIVE_APPLY_LANES` produces a typed fail-closed Host response before
+Goal Association and does not enter the legacy CapabilityAgent planner. Once
+Goal Association begins in authoritative `apply`, any model, composition,
+terminal-lane, trusted-runtime, or Goal-state commit failure produces truthful
+no-action speech and no effectful skill.
 
 The legacy CapabilityAgent semantic planner is retained only as an explicit
 emergency compatibility path. It requires disabled or non-authoritative
@@ -494,7 +495,7 @@ The first implementation used one plan-shaped envelope with an optional inner
 terminal map. Five warm runs produced 20/20 Fast contract failures, mandatory
 Deep recovery, a 22.87-second median cognitive runtime, and only 3.9 percent
 improvement over the 23.79-second baseline. The revised implementation in
-[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 requires a complete model-authored semantic plan with every authoritative goal
 outcome, step cross-reference, and satisfaction field decoder-required. The host
 no longer compiles semantic plan fields. Automated evidence is green; repeated
@@ -545,7 +546,7 @@ Review:
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,tool
+ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
@@ -555,7 +556,7 @@ Retain successful and failure cases before widening lanes.
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool
+ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
@@ -570,7 +571,7 @@ The text-to-MuJoCo checker uses the unified PR8 authority path by default:
 python scripts/interaction_text_mujoco_check.py \
   "Walk forward for five seconds, then nod." \
   --cognitive-runtime \
-  --cognitive-apply-lanes chat,robot_action,tool \
+  --cognitive-apply-lanes chat,memory,robot_action,tool \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker \
@@ -603,7 +604,7 @@ required.
 Remove the affected route before rollout:
 
 ```env
-ORCH_COGNITIVE_APPLY_LANES=chat,tool
+ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool
 ```
 
 A routed `robot_action` turn is then excluded before Goal-driven authority

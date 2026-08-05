@@ -27,7 +27,7 @@ added, remove or merge an equivalent item in the same change or record the
 exception in the active Issue.
 
 After evidence closure, follow the semantic Issue order in
-`docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md`. Do not use file length,
+`ROADMAP.md` and `docs/REPOSITORY_ENGINEERING_POLICIES.md`. Do not use file length,
 method count, or document count as mechanical gates; extract or consolidate only
 when ownership, independent testing, configuration authority, or failure
 semantics become clearer.

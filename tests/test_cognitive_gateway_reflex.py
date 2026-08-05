@@ -558,7 +558,9 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             events.index("confirmation_scope_cancelled"),
             events.index("record_user_turn"),
         )
-        self.assertEqual(turn["approval_during_provider_cancel"], ["no_pending"])
+        self.assertEqual(
+            turn["approval_during_provider_cancel"], ["not_confirmation"]
+        )
         cancelled = turn["metadata"]["reflex_outcome"]["metadata"][
             "cancelled_confirmation"
         ]

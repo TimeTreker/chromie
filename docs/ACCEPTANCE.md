@@ -241,7 +241,7 @@ ability class after the fix.
 ### Fast Planner multi-goal qualification
 
 The repository implements the accepted
-[Fast Planner multi-goal contract](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).
 Its component-specific `multi_goal_daily_life` qualification uses
 `--assertion-scope full` and must prove more than 4/4 user-outcome success. The simple retained matrix must terminate with
 `planner_tier=fast`, omit Deep Planner invocation, contain no Fast
@@ -283,7 +283,7 @@ LLM is not used as the pass/fail judge during regression runs.
 The target organization, common case contract, distribution metrics, and staged
 rollout are defined in the
 [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) and its
-[Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md). Benchmark
+[Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md). Benchmark
 failures must be fixed through general model, prompt, context, contract,
 architecture, or provider improvements; they must not introduce phrase-specific
 Host behavior rules.

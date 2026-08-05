@@ -56,16 +56,16 @@ When documents disagree, correct the lower-authority document.
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How do Agents, Agent Skills, Plans, and Capabilities differ? | `docs/AGENT_SKILLS_ARCHITECTURE.md` |
-| What is the Agent Skills implementation issue and delivery order? | `docs/AGENT_SKILLS_IMPLEMENTATION_PLAN.md` |
+| Where is current Agent Skill delivery work tracked? | `ROADMAP.md` and `docs/STATUS.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
 | How is the active Gateway/Core migration qualified against live services and MuJoCo? | `docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md` |
-| What is the implementation contract for terminal Fast Planner multi-goal planning? | `docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md` |
+| What governs terminal Fast Planner multi-goal planning? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` and `docs/API_REFERENCE.md` |
 | Which component owns semantic planning for each entrypoint? | `docs/SEMANTIC_AUTHORITY.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | Which tests use exact fixture truth and which require reviewed semantic judgment? | `docs/CHROMIE_BENCHMARK_SUITE.md` Section 7.3 |
-| What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
-| Which evidence-first stabilization and post-evidence simplification Issues are accepted, ordered, deferred, or rejected? | `docs/REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md` |
+| Where is remaining benchmark delivery work tracked? | `ROADMAP.md` |
+| Which structural simplification and evidence work remains? | `ROADMAP.md` |
 | How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |
 | Which stable source, architecture, Agent Skill, contract, and local deployment rules are executable? | `docs/REPOSITORY_ENGINEERING_POLICIES.md` |
 | Which Python static-analysis ratchets are active? | `docs/STATIC_ANALYSIS.md` |
@@ -82,7 +82,7 @@ When documents disagree, correct the lower-authority document.
 | How are semantic goals preserved and revised across turns? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
-| Where should a new collaborator resume? | `docs/HANDOFF.md` |
+| Where should a new collaborator resume? | `DEVELOPMENT_CHECKPOINT.md` |
 | How are development artifacts packaged? | `docs/RELEASE.md` |
 | What changed? | `CHANGELOG.md` |
 
@@ -163,13 +163,10 @@ mechanical-contract owner.
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
-- [Agent Skills Implementation Plan](AGENT_SKILLS_IMPLEMENTATION_PLAN.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
-- [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
-- [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
 - [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
 - [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
@@ -181,20 +178,15 @@ mechanical-contract owner.
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
-- [Interaction Agent and Capability Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)
 - [Chromie Mind, Principles, and Experience](chromie_mind.md)
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
-- [Agent Capability Registry](agent_capability_registry.md)
 - [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
 - [TaskGraph](agent_task_graph.md)
 - [Trace Schema](RUNTIME_OBSERVABILITY.md)
-- [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
-- [Chromie/Soridormi Proposal Boundary Plan](CHROMIE_SORIDORMI_PROPOSAL_BOUNDARY_PLAN.md)
-- [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
 - [SenseVoice ASR](SENSEVOICE_ASR.md)
 - [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)
 - [Conversation State](conversation_state.md)
@@ -208,7 +200,7 @@ mechanical-contract owner.
 - [Deployment](DEPLOYMENT.md)
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [User Manual](USER_MANUAL.md)
-- [Project Handoff](HANDOFF.md)
+- [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
 - [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)
@@ -222,8 +214,6 @@ mechanical-contract owner.
 
 ## Governance
 
-- [Final Core-Principle Audit](FINAL_CORE_PRINCIPLE_AUDIT.md)
-- [Repository Engineering Sustainability Plan](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
 - [Runtime Failure Paths](RUNTIME_FAILURE_PATHS.md)
 - [Service Configuration Boundaries](SERVICE_CONFIGURATION_BOUNDARIES.md)
 - [VoiceAssistant Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md)

@@ -205,7 +205,7 @@ def fixture_case_session_ids(index: int, case_id: str) -> list[str]:
 
 GOAL_DRIVEN_OVERRIDE_TEXT = (
     "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
-    "ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool\n"
+    "ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool\n"
     "ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed\n"
     "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0\n"
     "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
@@ -365,7 +365,7 @@ def write_live_voice_fixture(root: Path) -> None:
         "ORCH_AUDIO_INPUT_MODE=device\n"
         "ORCH_AUDIO_OUTPUT_MODE=device\n"
         "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
-        "ORCH_COGNITIVE_APPLY_LANES=chat,tool\n"
+        "ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool\n"
         "ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed\n"
         "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0\n"
         "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
@@ -883,7 +883,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
             text = path.read_text(encoding="utf-8")
             self.assertIn("ORCH_ENABLE_SORIDORMI_SKILLS=0", text)
-            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,tool", text)
+            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,memory,tool", text)
             self.assertIn(f"ORCH_COGNITIVE_RUN_IDENTITY_PATH={identity}", text)
 
     def test_host_speaker_player_uses_pw_play_when_available(self) -> None:
@@ -965,7 +965,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             self.assertIn("ORCH_AUDIO_OUTPUT_MODE=discard", text)
             self.assertIn("ORCH_MIN_AUDIO_MS=250", text)
             self.assertIn("ORCH_COGNITIVE_RUNTIME_MODE=apply", text)
-            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool", text)
+            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool", text)
             self.assertIn("ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed", text)
             self.assertIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0", text)
             self.assertIn("cognitive-runtime.jsonl", text)

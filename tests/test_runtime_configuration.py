@@ -210,7 +210,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["TTS_CANDIDATE_REQUEST_TIMEOUT_SEC"], "60")
         self.assertEqual(values["TTS_PYTORCH_ALLOC_CONF"], "expandable_segments:True")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
-        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat,tool")
+        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat,memory,tool")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")

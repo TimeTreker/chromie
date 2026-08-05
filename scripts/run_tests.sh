@@ -17,8 +17,10 @@ python scripts/check_host_configuration_ownership.py
 python scripts/check_service_configuration_ownership.py
 python scripts/check_runtime_structure.py
 python scripts/check_docs.py
+./scripts/benchmark_check.sh
 
-python -m unittest discover -s tests -v
+LOG_LEVEL=WARNING AGENT_LOG_LEVEL=WARNING AGENT_GOAL_INTERPRETER_LOG_LEVEL=WARNING \
+  python -m unittest discover -s tests
 
 # The original Agent tests use plain pytest-style functions but do not depend on
 # pytest fixtures. Run them directly so the default suite stays dependency-light.

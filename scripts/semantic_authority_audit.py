@@ -85,14 +85,14 @@ def audit() -> dict[str, Any]:
         }
     ]
     for row in excluded_rows:
-        if row.get("owner") != "legacy_agent_pipeline":
+        if row.get("owner") != "goal_driven_runtime":
             errors.append(
-                "excluded mapped lane does not remain on the legacy Agent path: "
+                "excluded mapped lane can re-enter a second semantic authority: "
                 f"{row.get('entrypoint')}"
             )
-        if row.get("fallback") != "not_applicable_before_authority_acquisition":
+        if row.get("fallback") != "fail_closed_without_legacy_reentry":
             errors.append(
-                "excluded mapped lane is not identified as pre-acquisition: "
+                "excluded mapped lane does not fail closed: "
                 f"{row.get('entrypoint')}"
             )
 
@@ -107,6 +107,31 @@ def audit() -> dict[str, Any]:
         for key, value in maintained_defaults.items():
             if f"{key}={value}" not in text:
                 errors.append(f"{relative} does not maintain {key}={value}")
+
+    required_apply_lanes_by_profile = {
+        ".env.common": {"chat", "memory", "tool"},
+        "env/modes/speech.env": {"chat", "memory", "tool"},
+        "env/modes/services.env": {"chat", "memory", "tool"},
+        "env/modes/voice_mujoco.env": {"chat", "memory", "robot_action", "tool"},
+        "env/modes/qualification.env": {"chat", "memory", "robot_action", "tool"},
+    }
+    for relative, required_apply_lanes in required_apply_lanes_by_profile.items():
+        text = _read(relative)
+        line = next(
+            (
+                item
+                for item in text.splitlines()
+                if item.startswith("ORCH_COGNITIVE_APPLY_LANES=")
+            ),
+            "",
+        )
+        lanes = {item.strip() for item in line.partition("=")[2].split(",") if item.strip()}
+        missing = sorted(required_apply_lanes - lanes)
+        if missing:
+            errors.append(
+                f"{relative} leaves maintained semantic lanes outside the Goal-driven runtime: "
+                + ", ".join(missing)
+            )
 
     launcher = _read("scripts/start_chromie.sh")
     for key, value in maintained_defaults.items():

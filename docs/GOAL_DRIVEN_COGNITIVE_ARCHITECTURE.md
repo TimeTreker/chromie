@@ -774,7 +774,7 @@ combinations may terminate as `mixed`; goals requiring more than one skill,
 clarification, unavailable or refused judgment, material alternatives, rare
 capabilities, or broader context escalate. Contract failure is not semantic
 escalation. The implemented contract and qualification matrix are defined in
-[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
 ### 8.2 Deep Planner
 

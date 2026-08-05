@@ -1,10 +1,14 @@
 {
   "schema_version": 1,
-  "id": "factual_sun_round_rules_only_no_motion",
+  "id": "factual_sun_round_rules_only_fails_closed",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Rules-only fallback must not treat weak factual word overlap such as round/hot as a physical turn action.",
-  "tags": ["factual", "rules-only", "no-motion"],
+  "description": "Rules-only mode must fail closed when no deterministic rule can interpret a factual request; weak catalog overlap must never invent chat or motion semantics.",
+  "tags": [
+    "factual",
+    "rules-only",
+    "no-motion"
+  ],
   "input": {
     "text": "I think the sun is hot and round, do you agree with me?",
     "language": "en-US"
@@ -14,7 +18,12 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "conversation_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 4,
       "capabilities": [
         {
@@ -29,11 +38,11 @@
     }
   },
   "expect": {
-    "route": "chat",
-    "intent": "general_conversation",
-    "source": "fallback",
-    "task_types_include": ["speech.answer"],
-    "task_types_forbid": ["task.execute_skill"],
-    "llm_calls": 0
+    "status": "interpretation_unavailable",
+    "failure_reason_contains": [
+      "catalog_and_rules_no_match"
+    ],
+    "llm_calls": 0,
+    "llm_stages": []
   }
 }

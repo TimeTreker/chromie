@@ -115,11 +115,9 @@ semantic answer authority.
 In the current compatibility topology, the Orchestrator first maps Goal Interpreter
 routes to semantic lanes: `chat`, `clarify`, and `deep_thought` map to `chat`;
 `robot_action`, `tool`, and `memory` retain their lane names; everything else
-maps to `unsupported`. A mapped lane excluded by
-`ORCH_COGNITIVE_APPLY_LANES` stays on the existing routed Agent path before the
-Goal-driven Runtime starts. Exact Goal Interpretation actions on that path are still
-adapter-only, and the old CapabilityAgent semantic planner still needs its
-explicit emergency gates and turn claim. This compatibility lane mapping does
+maps to `unsupported`. A mapped lane excluded by `ORCH_COGNITIVE_APPLY_LANES` fails closed before the
+Goal-driven Runtime starts. It does not enter the retained CapabilityAgent
+semantic planner, regardless of emergency-gate state. This lane mapping does
 not make the Cognitive Gateway the owner of goal meaning.
 
 Once Goal Association begins under authoritative `apply`, there is no
@@ -141,7 +139,7 @@ emergency-fallback tests while adding boundary tests that establish:
 - Goal-driven failures never emit a `legacy_fallback` status;
 - allowlisted mapped lanes at apply and post-interrupt entrypoints name
   Goal-driven Runtime as their only authority after acquisition, while
-  excluded mapped lanes retain the pre-acquisition Agent path;
+  excluded mapped lanes fail closed without legacy semantic re-entry;
 - maintained profiles use `apply`, `fail_closed`, and disabled legacy gates.
 
 Run the dependency-light audit with:

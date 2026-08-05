@@ -5,7 +5,7 @@ import secrets
 import time
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 
 from .settings import Settings, agent_service_settings as settings
 from .agents import AgentServices
@@ -34,7 +34,10 @@ try:
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
     )
-    from chromie_contracts.core_interpretation import CoreInterpretationResult
+    from chromie_contracts.core_interpretation import (
+        CoreInterpretationResult,
+        CoreInterpretationUnavailable,
+    )
     from chromie_contracts.route import RouteDecision as SharedRouteDecision
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -54,7 +57,10 @@ except ImportError:  # pragma: no cover
         AgentSkillSelectionRequest,
         AgentSkillSelectionResolution,
     )
-    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+    from shared.chromie_contracts.core_interpretation import (
+        CoreInterpretationResult,
+        CoreInterpretationUnavailable,
+    )
     from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -85,6 +91,7 @@ from .cognitive_core.goal_interpreter import (
     initialize_goal_interpreter,
     interpret_turn,
 )
+from .cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
 from .task_graph import (
     ExecutionTrace,
     TaskGraph,
@@ -634,10 +641,11 @@ async def review_cognitive_gateway_attention(
 @app.post(
     "/cognitive-core/interpret",
     response_model=CoreInterpretationResult,
+    responses={503: {"model": CoreInterpretationUnavailable}},
 )
 async def interpret_cognitive_turn(
     request: CoreTurnRequest,
-) -> CoreInterpretationResult:
+) -> CoreInterpretationResult | JSONResponse:
     """Interpret one already-admitted immutable turn inside the Core."""
     envelope = request.turn_envelope
     context = dict(request.context_snapshot.context)
@@ -646,14 +654,27 @@ async def interpret_cognitive_turn(
         mode="json"
     )
     context["gateway_admission_complete"] = True
-    decision = await interpret_turn(
-        CoreRouteRequest(
-            sid=envelope.session_id,
-            text=envelope.normalized_input.text,
-            language=envelope.normalized_input.language,
-            context=context,
+    try:
+        decision = await interpret_turn(
+            CoreRouteRequest(
+                sid=envelope.session_id,
+                text=envelope.normalized_input.text,
+                language=envelope.normalized_input.language,
+                context=context,
+            )
         )
-    )
+    except InterpretationUnavailableError as exc:
+        unavailable = CoreInterpretationUnavailable(
+            turn_id=envelope.turn_id,
+            session_id=envelope.session_id,
+            failure_class="goal_interpreter_unavailable",
+            retryable=True,
+            reason=exc.reason,
+        )
+        return JSONResponse(
+            status_code=503,
+            content=unavailable.model_dump(mode="json"),
+        )
     projection = SharedRouteDecision.model_validate(
         decision.model_dump(mode="json")
     )

@@ -1494,7 +1494,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cognitive-apply-lanes",
-        default="chat,robot_action,tool",
+        default="chat,memory,robot_action,tool",
         help="Comma-separated goal-driven apply lanes for live-text cases.",
     )
     parser.add_argument(

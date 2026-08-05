@@ -10,6 +10,30 @@ from .route import RouteDecision, RouteName
 from .user_turn import UserTurnEnvelope, normalize_turn_text
 
 
+class CoreInterpretationUnavailable(BaseModel):
+    """Typed non-semantic outcome when the Core cannot interpret a turn.
+
+    This result deliberately carries no lane, intent, plan, or compatibility
+    projection.  Callers must not reinterpret it as ordinary chat.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    status: Literal["interpretation_unavailable"] = "interpretation_unavailable"
+    turn_id: str = Field(min_length=1, max_length=160)
+    session_id: str = Field(min_length=1, max_length=160)
+    authority: Literal["goal_driven_cognitive_core"] = "goal_driven_cognitive_core"
+    failure_class: str = Field(min_length=1, max_length=120)
+    retryable: bool = True
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("turn_id", "session_id", "failure_class", "reason", mode="before")
+    @classmethod
+    def normalize_unavailable_fields(cls, value: str) -> str:
+        return normalize_turn_text(str(value or ""))
+
+
 class CoreInterpretationResult(BaseModel):
     """Core-owned semantic interpretation with an isolated legacy projection.
 

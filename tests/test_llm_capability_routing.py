@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
-from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
+from agent.app.cognitive_core.goal_interpreter.fallback import (
+    InterpretationUnavailableError,
+    fallback_decision,
+)
 from agent.app.cognitive_core.goal_interpreter.engine import _validate_llm_capability_decision
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
@@ -80,11 +83,11 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
             source="llm",
         )
 
-        result = _validate_llm_capability_decision(request, decision, catalog_result())
-
-        self.assertEqual(result.source, "fallback")
-        self.assertEqual(result.route, "chat")
-        self.assertIn("placeholder_capability_intent", result.reason or "")
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "placeholder_capability_intent",
+        ):
+            _validate_llm_capability_decision(request, decision, catalog_result())
 
     def test_non_executable_robot_selection_is_left_for_agent_planning(self) -> None:
         request = RouteRequest(text="Walk forward at 0.15 speed for 5 seconds.")
@@ -123,11 +126,11 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
     def test_fallback_never_routes_catalog_planning_tool_as_robot_action(self) -> None:
         request = RouteRequest(text="Walk forward.")
 
-        result = fallback_decision(request, reason="catalog_and_rules_no_match")
-
-        self.assertEqual(result.route, "chat")
-        self.assertEqual(result.intent, "general_conversation")
-        self.assertEqual(result.source, "fallback")
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "catalog_and_rules_no_match",
+        ):
+            fallback_decision(request, reason="catalog_and_rules_no_match")
 
 
 if __name__ == "__main__":

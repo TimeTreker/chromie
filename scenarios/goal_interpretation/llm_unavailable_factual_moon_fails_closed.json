@@ -1,10 +1,14 @@
 {
   "schema_version": 1,
-  "id": "llm_unavailable_factual_moon_delegates",
+  "id": "llm_unavailable_factual_moon_fails_closed",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "When the quick LLM is unavailable, factual moon wording with weak motion overlap delegates to deep thought instead of executing a catalog motion.",
-  "tags": ["factual", "llm-unavailable", "no-motion"],
+  "description": "When the quick interpreter is unavailable, factual moon wording fails closed instead of being reassigned to chat, deep thought, or a catalog motion.",
+  "tags": [
+    "factual",
+    "llm-unavailable",
+    "no-motion"
+  ],
   "input": {
     "text": "I think the moon is not round. Do you agree with me?",
     "language": "en-US"
@@ -14,7 +18,12 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "conversation_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 4,
       "capabilities": [
         {
@@ -29,7 +38,10 @@
     },
     "llm_decision": {
       "route": "chat",
-      "agents": ["conversation_agent", "speaker_agent"],
+      "agents": [
+        "conversation_agent",
+        "speaker_agent"
+      ],
       "intent": "general_conversation",
       "confidence": 0.45,
       "language": "en-US",
@@ -38,12 +50,13 @@
     }
   },
   "expect": {
-    "route": "deep_thought",
-    "intent": "deep_planner_goal_interpreter_unavailable",
-    "source": "fallback",
-    "task_types_include": ["cognition.deep_think"],
-    "task_types_forbid": ["task.execute_skill"],
-    "metadata_json_contains": ["Goal Interpreter model unavailable", "delegating to deep_thought"],
-    "llm_calls": 1
+    "status": "interpretation_unavailable",
+    "failure_reason_contains": [
+      "invalid_goal_interpreter_response"
+    ],
+    "llm_calls": 1,
+    "llm_stages": [
+      "quick_intent"
+    ]
   }
 }

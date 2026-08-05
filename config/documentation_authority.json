@@ -70,8 +70,8 @@
   "schema_version": "1.0",
   "surface_ratchets": {
     "max_core_reading_path": 15,
-    "max_docs_root_markdown_files": 73,
-    "max_markdown_files": 116
+    "max_docs_root_markdown_files": 59,
+    "max_markdown_files": 102
   },
   "specialized_ownership": {
     "entrypoint_paths": [

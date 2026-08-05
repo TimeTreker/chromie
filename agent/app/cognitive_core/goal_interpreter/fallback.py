@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import re
-
 from .schema import RouteDecision, RouteRequest, detect_language, finalize_decision
 
 
-def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "").strip().lower())
+class InterpretationUnavailableError(RuntimeError):
+    """Raised when semantic interpretation did not produce a valid result."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = " ".join(str(reason or "interpretation unavailable").split())
+        super().__init__(self.reason)
+
 
 
 def fallback_decision(request: RouteRequest, *, reason: str | None = None) -> RouteDecision:
-    """Safe default when rules and LLM routing cannot produce a valid route.
+    """Handle empty input or report that semantic interpretation is unavailable.
 
-    This fallback intentionally avoids semantic regex routing. Outside the
-    emergency/noise filter, ordinary intent must come from model routing or a
-    deeper model handoff, not a phrase table.
+    Non-empty input must never be assigned a plausible semantic lane merely
+    because model inference, validation, or catalog grounding failed.
     """
 
     lang = request.language or detect_language(request.text)
@@ -34,16 +36,6 @@ def fallback_decision(request: RouteRequest, *, reason: str | None = None) -> Ro
         )
         return finalize_decision(route, request, source="fallback")
 
-    route = RouteDecision(
-        route="chat",
-        agents=["conversation_agent", "speaker_agent"],
-        intent="general_conversation",
-        confidence=0.45,
-        language=lang,
-        priority="normal",
-        needs_agent=True,
-        should_speak=True,
-        reason=reason or "Fallback to general chat",
-        source="fallback",
+    raise InterpretationUnavailableError(
+        reason or "Goal Interpreter did not produce a valid semantic result"
     )
-    return finalize_decision(route, request, source="fallback")

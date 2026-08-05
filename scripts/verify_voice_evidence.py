@@ -815,7 +815,7 @@ def verify_bundle(
     required_semantic_overrides = {
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
         "ORCH_COGNITIVE_APPLY_LANES": (
-            "chat,tool" if live_voice_profile else "chat,robot_action,tool"
+            "chat,memory,tool" if live_voice_profile else "chat,memory,robot_action,tool"
         ),
         "ORCH_COGNITIVE_FALLBACK_POLICY": "fail_closed",
         "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED": "0",

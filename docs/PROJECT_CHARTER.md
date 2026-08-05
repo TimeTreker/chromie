@@ -15,7 +15,7 @@ The intended user experience is:
 natural speech
 -> Cognitive Gateway: normalize, apply protective reflexes, and review attention
 -> Goal-Driven Cognitive Core: understand goals, decompose, plan, and coordinate
--> validated speech and named-skill requests
+-> validated speech and typed capability requests
 -> trusted execution
 -> observable completion, failure, cancellation, or recovery
 -> concise spoken feedback
@@ -80,7 +80,7 @@ A successful Chromie release lets an operator:
 
 - authorize its own side effects;
 - bypass confirmation or safety policy;
-- act as the sole authority for route, capability, or physical execution
+- bypass Core semantic authority, Host authorization, or provider execution
   decisions;
 - send raw motor, joint, actuator, torque, controller-array, or bus commands;
 - decide deterministic operational controls;
@@ -112,7 +112,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 ## Engineering principles
 
 1. **High-level contracts stay stable.** Simulation and physical providers
-   should implement the same named-skill and result semantics. Chromie's
+   should implement the same capability and result semantics. Chromie's
    cognitive, personality, and Social Attention policies must not branch on
    whether the active Soridormi provider is simulated or physical. Backend
    selection, body adaptation, calibration, and physical safety remain below
@@ -142,8 +142,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 6. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
    the deterministic operational filter. Normal conversation, tool, memory,
    robot-action, and deep-thought intent must come from bounded model
-   understanding and contract validation, or else clarify, delegate to deeper
-   reasoning, or fail closed.
+   understanding and contract validation. When valid meaning cannot be
+   established, the Core returns a typed unavailable, clarification, or refusal
+   outcome; it never invents an ordinary lane.
 7. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
 8. **Evidence is part of the product.** Implemented, automatically verified,
@@ -192,9 +193,14 @@ without weakening the others:
 New features that do not help close the current milestone, remove a documented
 blocker, or strengthen one of these outcomes should normally wait.
 
-## Detailed brain/body decisions
+## Detailed architecture owners
 
-The stable mission above is authoritative. Detailed implementation boundaries
-for task-agent integration and proposal-derived embodiment are maintained in
-[Chromie and Soridormi Task-Agent Implementation Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
-and [Chromie/Soridormi Proposal Boundary Plan](CHROMIE_SORIDORMI_PROPOSAL_BOUNDARY_PLAN.md).
+The stable mission above is authoritative. Current semantic, execution, and
+brain/body contracts are maintained in:
+
+- [Cognitive Gateway](COGNITIVE_GATEWAY.md);
+- [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md);
+- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md);
+- [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md);
+- [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md);
+- [Single Semantic Authority](SEMANTIC_AUTHORITY.md).

@@ -34,6 +34,14 @@ evidence and does not authorize side effects. The Orchestrator still
 validates schemas, authorization, confirmation, resource conflicts, commitment,
 and trusted execution evidence before any effectful request runs.
 
+A successful interpretation returns HTTP `200` with `CoreInterpretationResult`.
+When a non-empty admitted turn cannot be interpreted after the bounded model
+path, the endpoint returns HTTP `503` with
+`CoreInterpretationUnavailable`. That result carries turn identity and a typed
+failure reason but no invented route, intent, action, or compatibility
+projection. Callers must surface or handle that unavailable result; they must
+not reinterpret it as generic chat.
+
 The implementation may use fast and review models, but it must reason from
 meaning, context, active goals, and capability descriptions. Production code
 must not use phrase tables, regular-expression intent routing, scenario IDs, or

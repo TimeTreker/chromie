@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "id": "voice_log_chinese_blink_llm_unavailable_delegates",
+  "id": "voice_log_chinese_blink_llm_unavailable_fails_closed",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, the fast Goal Interpreter must delegate to deep_thought instead of letting catalog scores execute or select a skill.",
+  "description": "When quick interpretation is unavailable for a Chinese blink request, the Core reports interpretation unavailable and does not select a motion from catalog scores.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -22,7 +22,11 @@
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
-      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "suggested_agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
       "catalog_version": 15,
       "capabilities": [
         {
@@ -45,7 +49,10 @@
     },
     "llm_decision": {
       "route": "chat",
-      "agents": ["conversation_agent", "speaker_agent"],
+      "agents": [
+        "conversation_agent",
+        "speaker_agent"
+      ],
       "intent": "general_conversation",
       "confidence": 0.45,
       "language": "zh-CN",
@@ -54,13 +61,13 @@
     }
   },
   "expect": {
-    "route": "deep_thought",
-    "intent": "deep_planner_goal_interpreter_unavailable",
-    "source": "fallback",
-    "task_types_include": ["cognition.deep_think"],
-    "task_types_forbid": ["task.execute_skill", "task.execute_robot_action"],
-    "metadata_json_contains": ["candidate_count", "delegating to deep_thought"],
-    "metadata_json_forbid": ["\"selected_stage\": \"quick_intent\"", "\"final_route\": \"robot_action\""],
-    "llm_calls": 1
+    "status": "interpretation_unavailable",
+    "failure_reason_contains": [
+      "llm unavailable"
+    ],
+    "llm_calls": 1,
+    "llm_stages": [
+      "quick_intent"
+    ]
   }
 }

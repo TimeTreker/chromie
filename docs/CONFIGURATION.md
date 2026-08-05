@@ -374,7 +374,7 @@ canonical plan copy, and its fingerprint remain host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the Trusted Capability Runtime. Code fallback is `apply`. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,robot_action,tool`. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the Goal Interpreter effect envelope, and every executable step still requires a trusted provider. Disabled-lane and route-effect escalation fail closed without entering the legacy planner. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat,memory,tool` in the common safe base. `tool` is limited to explicitly registered, schema-validated, safe read-only local providers. `scripts/start_chromie.sh` additionally enables `robot_action` after registering the trusted Soridormi provider, yielding `chat,memory,robot_action,tool`. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the Goal Interpreter effect envelope, and every executable step still requires a trusted provider. Disabled-lane and route-effect escalation fail closed without entering the legacy planner. |
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
 | `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; explicit rollback-only direct-LLM/legacy CapabilityAgent compatibility gate. Every maintained operator mode sets `0`. Even when manually enabled, it cannot take authority for a route already inside a Goal-driven `apply` lane. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
@@ -423,10 +423,10 @@ task creation. This prevents an ordinary side conversation routed through
 needed. ResponsePlan immediate speech is accepted only when its task scope,
 commitment, and evidence claims are consistent with trusted host task state.
 The common profile runs the unified Goal-driven Runtime in authoritative
-`apply` mode for `chat,tool`. The standalone continuity resolver remains off
+`apply` mode for `chat,memory,tool`. The standalone continuity resolver remains off
 because continuity is an integrated stage of the unified runtime. The maintained
 Soridormi launcher additionally enables `robot_action`, yielding
-`chat,robot_action,tool`; neither profile enables the legacy semantic fallback.
+`chat,memory,robot_action,tool`; neither profile enables the legacy semantic fallback.
 
 
 Goal Interpretation observability logs are intentionally split into safe summaries and explicit debug output.

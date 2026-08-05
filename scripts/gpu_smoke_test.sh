@@ -198,47 +198,12 @@ run_step "Check Agent HTTP health" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS"
 run_step "Check Ollama model registry" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:11434/api/tags || true
 
 check_control_plane_http() {
-  python3 - <<'PY'
-import json
-import urllib.request
-
-def post(url, payload):
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
-
-route = post(
-    "http://127.0.0.1:8092/cognitive-core/interpret",
-    {"sid": "gpu-smoke-control", "text": "turn left", "language": "en-US", "context": {}},
-)
-assert route.get("route") == "chat", route
-assert route.get("intent") == "general_conversation", route
-assert route.get("actions") == [], route
-
-agent = post(
-    "http://127.0.0.1:8092/run",
-    {
-        "sid": "gpu-smoke-control",
-        "text": "turn left",
-        "route_decision": route,
-        "language": "en-US",
-        "context": {"robot_state": {"emergency_stop": False}},
-        "history": [],
-    },
-)
-assert agent.get("status") == "ok", agent
-assert agent.get("actions") == [], agent
-assert agent.get("speak_immediate"), agent
-print(json.dumps({"route": route, "agent": agent}, ensure_ascii=False))
-PY
+  python3 scripts/control_plane_smoke.py \
+    --base-url http://127.0.0.1:8092 \
+    --timeout-seconds "$SMOKE_TIMEOUT_SECONDS"
 }
 
-run_step "Run deployed Cognitive Core-to-Agent safe chat control-plane round trip" check_control_plane_http || true
+run_step "Run deployed Gateway-to-Core-to-Fast-Planner control-plane round trip" check_control_plane_http || true
 
 check_asr_websocket() {
   docker exec -i chromie-asr python - <<'PY'

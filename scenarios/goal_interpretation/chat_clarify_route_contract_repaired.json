@@ -4,14 +4,22 @@
   "suite": "goal_interpretation",
   "level": "integration",
   "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must be semantically repaired instead of being sent to the conversation lane unchanged.",
-  "tags": ["goal-interpretation-contract", "semantic-repair", "clarify", "model-authority"],
+  "tags": [
+    "goal-interpretation-contract",
+    "semantic-repair",
+    "clarify",
+    "model-authority"
+  ],
   "input": {
     "text": "Make that one colder.",
     "language": "en-US"
   },
   "stub": {
     "interpretation_mode": "hybrid",
-    "catalog": {"catalog_version": 75, "capabilities": []},
+    "catalog": {
+      "catalog_version": 75,
+      "capabilities": []
+    },
     "llm_script": [
       {
         "stage": "quick_intent",
@@ -27,8 +35,7 @@
         "decision": {
           "route": "clarify",
           "intent": "ambiguous_reference",
-          "confidence": 0.45,
-          "language": "en-US"
+          "confidence": 0.45
         }
       }
     ]
@@ -38,8 +45,16 @@
     "intent": "ambiguous_reference",
     "source": "llm",
     "llm_calls": 2,
-    "llm_stages": ["quick_intent", "semantic_route_repair"],
-    "task_types_include": ["speech.ask_clarification"],
-    "metadata_json_contains": ["semantic_route_repair", "route_name_intent_mismatch"]
+    "llm_stages": [
+      "quick_intent",
+      "semantic_route_repair"
+    ],
+    "task_types_include": [
+      "speech.ask_clarification"
+    ],
+    "metadata_json_contains": [
+      "semantic_route_repair",
+      "route_name_intent_mismatch"
+    ]
   }
 }

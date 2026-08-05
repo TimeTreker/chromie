@@ -71,7 +71,7 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
         self.assertIn("must not ask a follow-up question", system_text)
         self.assertIn("我现在还没学会这个呢", system_text)
         self.assertIn("localized apology", system_text)
-        self.assertIn("plus limitation and metadata", system_text)
+        self.assertIn("Limitation and metadata are allowed only", system_text)
         self.assertIn("我无法直接查询", system_text)
         self.assertIn("must not claim that learning has started", system_text)
 

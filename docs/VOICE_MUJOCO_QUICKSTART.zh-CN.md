@@ -71,7 +71,7 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 3. 启动 Chromie ASR、TTS、Ollama 和 Agent（含内嵌 Goal Interpreter）；
 4. 验证 Soridormi capability contract；
 5. 启动主机 Orchestrator，并打开麦克风和扬声器；
-6. 启用统一 Goal-driven Runtime，对 `chat,robot_action,tool` 使用权威
+6. 启用统一 Goal-driven Runtime，对 `chat,memory,robot_action,tool` 使用权威
    `apply`，同时关闭旧 CapabilityAgent 语义回退。
 
 看到下面的信息后即可说话：
@@ -185,7 +185,7 @@ ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool
+ORCH_COGNITIVE_APPLY_LANES=chat,memory,robot_action,tool
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0
 ```

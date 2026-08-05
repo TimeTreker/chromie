@@ -45,8 +45,7 @@
         "decision": {
           "route": "clarify",
           "intent": "clarify_headset_reference",
-          "confidence": 0.45,
-          "language": "zh-CN"
+          "confidence": 0.45
         }
       }
     ]
@@ -61,7 +60,12 @@
       "intent_review",
       "semantic_route_repair"
     ],
-    "task_types_include": ["speech.ask_clarification"],
-    "task_types_forbid": ["cognition.deep_think", "task.execute_skill"]
+    "task_types_include": [
+      "speech.ask_clarification"
+    ],
+    "task_types_forbid": [
+      "cognition.deep_think",
+      "task.execute_skill"
+    ]
   }
 }

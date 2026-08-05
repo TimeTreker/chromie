@@ -186,8 +186,8 @@ For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
 | Mode | Key setting | State |
 |---|---|---|
 | Compatibility voice | cognitive runtime off, explicit legacy path | Emergency rollback only |
-| Goal-driven speech | cognitive apply on, `chat,tool` lanes, Soridormi skills off | Common safe base |
-| Goal-driven MuJoCo | cognitive apply on, `chat,robot_action,tool`, Soridormi skills on | Maintained simulator launcher |
+| Goal-driven speech | cognitive apply on, `chat,memory,tool` lanes, Soridormi skills off | Common safe base |
+| Goal-driven MuJoCo | cognitive apply on, `chat,memory,robot_action,tool`, Soridormi skills on | Maintained simulator launcher |
 | Physical robot | commissioned Soridormi plus physical gates | Experimental, unsupported |
 
 Effectful providers and physical gates remain default-off in the common safe

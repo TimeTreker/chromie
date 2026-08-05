@@ -329,13 +329,14 @@ def check_project_direction(errors: list[str]) -> None:
 
     roadmap = ROADMAP.read_text(encoding="utf-8")
     for heading in (
+        "## Current priorities",
         "## Completed foundations",
-        "## Completed phase - Text-to-MuJoCo interaction closure",
+        "## Active source work",
         "## Open evidence track - Physical audio validation",
-        "## Completed phase - Robust simulation and provider readiness",
         "## Target-evidence closure track",
         "## Future phase - Physical pilot preparation",
         "## Later work",
+        "## Anti-drift review",
     ):
         if heading not in roadmap:
             errors.append(f"ROADMAP.md is missing {heading!r}")

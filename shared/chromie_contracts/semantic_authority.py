@@ -106,17 +106,15 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "orchestrator.handle_routed_text/apply "
                 "(mapped lane excluded)"
             ),
-            "owner": "legacy_agent_pipeline",
+            "owner": "goal_driven_runtime",
             "role": "authoritative",
             "selection": (
-                "mapped route lane is not in ORCH_COGNITIVE_APPLY_LANES, before "
-                "Goal-driven authority acquisition"
+                "mapped route lane is not in ORCH_COGNITIVE_APPLY_LANES"
             ),
             "planner_path": (
-                "existing routed Agent path; exact Goal Interpretation actions remain "
-                "adapter-only"
+                "no planner is entered; the Host emits a typed fail-closed response"
             ),
-            "fallback": "not_applicable_before_authority_acquisition",
+            "fallback": "fail_closed_without_legacy_reentry",
         },
         {
             "entrypoint": "orchestrator.handle_routed_text/report_only",
@@ -158,16 +156,15 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "post_interrupt_correction/compatibility "
                 "(mapped lane excluded)"
             ),
-            "owner": "legacy_agent_pipeline",
+            "owner": "goal_driven_runtime",
             "role": "authoritative",
             "selection": (
                 "corrected mapped route lane is not in "
-                "ORCH_COGNITIVE_APPLY_LANES, before Goal-driven authority acquisition"
+                "ORCH_COGNITIVE_APPLY_LANES"
             ),
             "planner_path": (
-                "existing post-interrupt Agent path; exact Goal Interpretation actions remain "
-                "adapter-only and physical resume stays locked"
+                "no planner is entered; the Host fails closed and physical resume stays locked"
             ),
-            "fallback": "not_applicable_before_authority_acquisition",
+            "fallback": "fail_closed_without_legacy_reentry",
         },
     ]

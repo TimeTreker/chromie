@@ -697,7 +697,7 @@ def configure_workflow_environment(args: argparse.Namespace, case_dir: Path) -> 
     os.environ["ORCH_DISCARD_PLAYBACK_REALTIME"] = "0"
     os.environ["ORCH_EVENT_LOG_PATH"] = str(case_dir / "session-events.jsonl")
     os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
-    os.environ["ORCH_COGNITIVE_APPLY_LANES"] = "chat,tool"
+    os.environ["ORCH_COGNITIVE_APPLY_LANES"] = "chat,memory,tool"
     os.environ["ORCH_COGNITIVE_FALLBACK_POLICY"] = "fail_closed"
     os.environ["ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED"] = "0"
     os.environ["ORCH_ENABLE_TASK_CONTEXT_STORE"] = "0"

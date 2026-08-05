@@ -67,7 +67,7 @@ Required invariants no longer depend on `assert`, which Python removes under
 
 ## Audited boundaries
 
-The audit covered:
+The maintained audit covers:
 
 - `agent/app/` model, Goal Association, TaskGraph, and compatibility schema paths;
 - `orchestrator/` interaction, conversation state, cancellation, recovery,
@@ -77,20 +77,20 @@ The audit covered:
 - `asr/` and maintained `tts/` optional protocol/telemetry parsing;
 - `scripts/generate_runtime_env.py`, which is part of every supported launch.
 
-The 2026-07-31 re-audit found 141 remaining `except Exception` handlers: 85 in
-Orchestrator, 53 in Agent, and 3 in shared runtime, including 57 in
-`orchestrator/orchestrator.py`. The current policy checker rejects trivially
-silent broad handlers, but it does not maintain a complete reviewed
-classification for every remaining symbol. The earlier statement that every
-remaining handler was already intentional was therefore stronger than the
-mechanical evidence.
+Broad-handler counts are intentionally not copied into this document. Source
+counts change with implementation and are not a reviewed classification. The
+dependency-light repository checker rejects trivially silent broad handlers,
+while each changed handler must demonstrate one explicit outcome:
 
-The queued
-[broad exception Issue](REPOSITORY_ENGINEERING_SUSTAINABILITY_PLAN.md)
-will inventory each handler and require one explicit outcome: narrow/re-raise,
-typed failure mapping, fail-closed containment, or expected cleanup that
-preserves the primary failure and records a diagnostic. Stable enforcement must
-remain centralized in the dependency-light checker documented by
+- narrow and re-raise;
+- map to a typed failure;
+- fail closed at a trust boundary; or
+- contain expected cleanup without replacing the primary failure, while
+  recording a bounded diagnostic.
+
+The active structural-simplification work in the
+[Roadmap](../ROADMAP.md#structural-simplification) owns further narrowing. Stable
+enforcement remains centralized in
 [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md).
 
 ## Automatic evidence
@@ -110,10 +110,8 @@ tracks.
 
 ## Post-evidence narrowing audit
 
-The classification above records the completed first audit, not proof that
-every remaining broad catch is permanently optimal. The current tree contains
-141 `except Exception` handlers across `orchestrator/`, `agent/`, and `shared/`.
-After the source-bound runtime baseline closes, each handler must retain an
-explicit reviewed classification and regression boundary. Model, provider,
-execution, cancellation, state, and evidence paths take priority; expected
-cleanup may stay contained when it cannot replace the primary failure.
+The first audit established the classification above; it did not prove that
+every broad catch is permanently optimal. Future changes to model, provider,
+execution, cancellation, state, or evidence paths must narrow or type the
+failure where possible. Expected cleanup may remain contained only when it
+cannot replace the primary failure and remains diagnosable.

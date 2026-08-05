@@ -5,7 +5,10 @@ import unittest
 from unittest.mock import patch
 
 from agent.app.cognitive_core.goal_interpreter.config import goal_interpretation_mode_from_env
-from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
+from agent.app.cognitive_core.goal_interpreter.fallback import (
+    InterpretationUnavailableError,
+    fallback_decision,
+)
 from agent.app.cognitive_core.goal_interpreter.rules import route_by_priority_rules
 from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
 
@@ -99,16 +102,17 @@ class GoalInterpreterCoreTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertIsNone(route_by_priority_rules(RouteRequest(sid="s-command", text=text)))
 
-    def test_rules_only_fallback_routes_unknown_text_to_chat(self) -> None:
+    def test_rules_only_no_match_reports_interpretation_unavailable(self) -> None:
         request = RouteRequest(sid="s3", text="tell me something unusual")
 
         self.assertIsNone(route_by_priority_rules(request))
-        decision = fallback_decision(request, reason="rules_only_no_match")
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.source, "fallback")
-        self.assertTrue(decision.needs_agent)
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "rules_only_no_match",
+        ):
+            fallback_decision(request, reason="rules_only_no_match")
 
-    def test_fallback_does_not_semantically_route_non_chat_lanes(self) -> None:
+    def test_fallback_never_assigns_a_semantic_lane_to_non_empty_input(self) -> None:
         cases = (
             "Remember that my favorite color is blue.",
             "Can you check whether it will rain today?",
@@ -116,15 +120,24 @@ class GoalInterpreterCoreTests(unittest.TestCase):
         )
         for text in cases:
             with self.subTest(text=text):
-                decision = fallback_decision(
-                    RouteRequest(sid="fallback-semantic", text=text),
-                    reason="goal_interpreter_error:ReadTimeout",
-                )
+                with self.assertRaisesRegex(
+                    InterpretationUnavailableError,
+                    "goal_interpreter_error:ReadTimeout",
+                ):
+                    fallback_decision(
+                        RouteRequest(sid="fallback-semantic", text=text),
+                        reason="goal_interpreter_error:ReadTimeout",
+                    )
 
-                self.assertEqual(decision.route, "chat")
-                self.assertEqual(decision.intent, "general_conversation")
-                self.assertEqual(decision.source, "fallback")
-                self.assertTrue(decision.needs_agent)
+    def test_fallback_still_ignores_empty_input(self) -> None:
+        decision = fallback_decision(
+            RouteRequest(sid="empty", text="  "),
+            reason="rules_only_no_match",
+        )
+
+        self.assertEqual(decision.route, "ignore")
+        self.assertEqual(decision.intent, "empty_input")
+        self.assertFalse(decision.needs_agent)
 
 
     def test_route_decision_preserves_fast_speech_contract(self) -> None:

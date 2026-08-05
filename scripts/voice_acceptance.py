@@ -2363,7 +2363,7 @@ def write_override_file(
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
         "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
         "ORCH_COGNITIVE_APPLY_LANES": (
-            "chat,robot_action,tool" if enable_soridormi else "chat,tool"
+            "chat,memory,robot_action,tool" if enable_soridormi else "chat,memory,tool"
         ),
         "ORCH_COGNITIVE_FALLBACK_POLICY": "fail_closed",
         "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED": "0",

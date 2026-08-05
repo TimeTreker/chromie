@@ -3853,13 +3853,62 @@ class VoiceAssistant:
             or not self.enable_interaction_response
             or decision.interrupt_current
             or decision.route in {"interrupt", "ignore"}
-            or cognitive_lane not in getattr(
-                self,
-                "cognitive_apply_lanes",
-                frozenset({"chat"}),
-            )
         ):
             return False, decision
+
+        apply_lanes = getattr(
+            self,
+            "cognitive_apply_lanes",
+            frozenset({"chat", "memory", "robot_action", "tool"}),
+        )
+        if cognitive_lane not in apply_lanes:
+            resolution = CognitiveRuntimeResolution(
+                mode="apply",
+                status="error",
+                lane=(
+                    cognitive_lane
+                    if cognitive_lane in {"chat", "memory", "robot_action", "tool"}
+                    else "unsupported"
+                ),
+                fallback_reason="mapped_lane_not_enabled_for_apply",
+                metadata={
+                    "failure_stage": "authority_boundary",
+                    "failure_class": "mapped_lane_not_enabled_for_apply",
+                    "failure_domain": "cognitive_runtime",
+                    "architecture_attribution": "host_runtime",
+                    "retryable": False,
+                    "mapped_lane": cognitive_lane,
+                    "configured_apply_lanes": sorted(apply_lanes),
+                },
+            )
+            summary = self._cognitive_resolution_summary(resolution)
+            metadata = dict(decision.metadata or {})
+            metadata["cognitive_runtime_resolution"] = summary
+            metadata["cognitive_runtime_mode"] = "apply"
+            decision = decision.model_copy(update={"metadata": metadata})
+            safe_response = self._agent_exception_safe_response(
+                decision, user_text=user_text
+            )
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route=decision.route,
+                intent=decision.intent,
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": "goal_driven_cognitive_runtime",
+                        "semantic_task_resolution_authoritative": True,
+                        "cognitive_runtime_resolution": summary,
+                    },
+                    turn_envelope,
+                ),
+            )
+            self.conversation_state.record_agent_result(session_id, safe_response)
+            self._record_cognitive_runtime_evidence(
+                resolution, session_id=session_id, user_text=user_text
+            )
+            self._launch_interaction(safe_response, session_id)
+            return True, decision
 
         core_fast_first_scheduled, fast_first_hedge = (
             await _start_fast_first_delivery(
@@ -6196,7 +6245,8 @@ class VoiceAssistant:
             return False
         runtime_mode = str(getattr(self, "cognitive_runtime_mode", "apply") or "apply")
         apply_lanes = set(getattr(self, "cognitive_apply_lanes", set()) or set())
-        return runtime_mode != "apply" or decision.route not in apply_lanes
+        mapped_lane = self._cognitive_lane_from_route(decision)
+        return runtime_mode != "apply" or mapped_lane not in apply_lanes
 
     def _launch_direct_llm_compatibility_or_fail_closed(
         self,

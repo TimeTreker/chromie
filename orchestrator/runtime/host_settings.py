@@ -433,7 +433,7 @@ class HostSettingsSnapshot:
             for item in _raw(
                 values,
                 "ORCH_COGNITIVE_APPLY_LANES",
-                "chat,robot_action,tool",
+                "chat,memory,robot_action,tool",
             ).split(",")
             if item.strip()
         )

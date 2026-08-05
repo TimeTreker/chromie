@@ -120,8 +120,14 @@ class TTSProviderABTests(unittest.TestCase):
         self.assertEqual(
             metadata["chromie_source"]["repository"], ROOT.resolve().name
         )
-        self.assertRegex(metadata["chromie_source"]["revision"], r"^[0-9a-f]{40}$")
-        self.assertIsInstance(metadata["chromie_source"]["dirty"], bool)
+        source = metadata["chromie_source"]
+        self.assertIn(source["revision_source"], {"git", "source_tree"})
+        if source["revision_source"] == "git":
+            self.assertRegex(source["revision"], r"^[0-9a-f]{40}$")
+        else:
+            self.assertRegex(source["revision"], r"^sha256:[0-9a-f]{64}$")
+            self.assertFalse(source["dirty"])
+        self.assertIsInstance(source["dirty"], bool)
 
 
 if __name__ == "__main__":

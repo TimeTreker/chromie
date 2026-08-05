@@ -218,7 +218,7 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                 return json.dumps(
                     {
                         "response": json.dumps(
-                            {"text": "我刚才没查成功，不能乱说。你再问我一次吧。"},
+                            {"text": "我刚才没查成功，不能乱说，请再问我一次吧。"},
                             ensure_ascii=False,
                         ),
                         "done_reason": "stop",
@@ -365,7 +365,7 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
                         "response": json.dumps(
                             {
                                 "text": (
-                                    "刚才两个动作都没成功，我没有硬来。你再说一次吧。"
+                                    "刚才两个动作都没成功，所以我没有硬来，请再说一次吧。"
                                 )
                             },
                             ensure_ascii=False,
