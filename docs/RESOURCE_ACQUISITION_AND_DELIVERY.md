@@ -24,10 +24,14 @@ acquire something the user needs
 → prove the complete outcome
 ```
 
-The requested resource may be physical or informational:
+The requested resource may be physical or informational. The stable top-level
+contract remains `AcquireAndDeliverResource`; an explicit semantic variant makes
+the two user-facing responsibilities visible without changing provider matching:
 
 ```text
 AcquireAndDeliverResource Goal
+├── fetch_and_deliver_object
+└── fetch_and_deliver_information
                │
                ▼
       Goal-driven Planner
@@ -75,6 +79,7 @@ separate technical surface without changing Chromie's Mind.
 ```json
 {
   "responsibility_type": "acquire_and_deliver_resource",
+  "responsibility_variant": "fetch_and_deliver_object",
   "resource": {
     "kind": "physical_object",
     "description": "a bottle of water",
@@ -99,6 +104,7 @@ Information example:
 ```json
 {
   "responsibility_type": "acquire_and_deliver_resource",
+  "responsibility_variant": "fetch_and_deliver_information",
   "resource": {
     "kind": "information",
     "description": "good nearby restaurant recommendations",
@@ -125,6 +131,11 @@ Information example:
 }
 ```
 
+The stable `responsibility_type` preserves compatibility with existing Capability
+semantic scopes. `responsibility_variant` is a semantic subtype, not a Provider,
+Capability ID, or hidden routing instruction. Legacy payloads that omit it are
+normalized from `resource.kind`; an explicit mismatched variant is rejected.
+
 The semantic contract forbids provider IDs, capability IDs, coordinates, grasp
 poses, websites, search engines, execution mode, and implementation plans.
 Those belong downstream.
@@ -137,7 +148,9 @@ or supplies missing information for a resource responsibility.
 A fetch-and-deliver request is one Goal when navigation, locating, grasping,
 carrying, returning, and handover are provider-owned stages of one user outcome.
 Likewise, external search, evidence retrieval, evaluation, and natural
-explanation are one information-resource Goal.
+explanation are one `fetch_and_deliver_information` Goal. Weather is in this
+variant, while the Planner still selects the exact `chromie.weather.lookup`
+Capability rather than a generic hidden router.
 
 Separate Goals are still required for independently requested outcomes. For
 example, “bring the book and tell me a joke” contains one physical resource Goal

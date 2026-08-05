@@ -238,6 +238,7 @@ class ResponseStage(BaseModel):
     speech_act: str = Field(default="inform", min_length=1)
     commitment_state: CommitmentState = "none"
     must_not_claim_completion: bool = True
+    reuse_current_turn_speech: bool = False
     covers_task_ids: list[str] = Field(default_factory=list)
     covers_goal_ids: list[str] = Field(default_factory=list)
     claims: list[str] = Field(default_factory=list)
@@ -295,6 +296,15 @@ class ResponseStage(BaseModel):
             raise ValueError(
                 "terminal claims require must_not_claim_completion=false"
             )
+        if self.reuse_current_turn_speech:
+            if not self.must_not_claim_completion or self.commitment_state in terminal:
+                raise ValueError(
+                    "reused current-turn speech may acknowledge pending work only"
+                )
+            if self.coordination_id or self.delivery_role != "response":
+                raise ValueError(
+                    "reused current-turn speech must remain an uncoordinated response"
+                )
         if self.coordination_id and self.delivery_role == "response":
             raise ValueError(
                 "coordinated speech requires activity_companion or performance role"

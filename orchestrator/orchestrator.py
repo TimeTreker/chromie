@@ -176,6 +176,113 @@ def trace_session_async(module: TraceModule, operation: str, session_arg: str):
     return decorate
 
 
+async def _start_fast_first_delivery(
+    assistant: Any,
+    decision: RouteDecision,
+    user_text: str,
+    session_id: str,
+) -> tuple[bool, asyncio.Task[dict[str, Any]] | None]:
+    """Prefer model-authored immediate speech; use cached audio only on failure."""
+
+    dynamic_scheduled = await assistant._schedule_fast_first_response(
+        decision,
+        user_text,
+        session_id,
+    )
+    hedge_task = None
+    if not dynamic_scheduled:
+        hedge_task = assistant._start_fast_first_audio_hedge(
+            decision,
+            user_text,
+            session_id,
+        )
+    return dynamic_scheduled, hedge_task
+
+
+def _selected_capability_ids(decision: RouteDecision) -> list[str]:
+    """Return exact capabilities selected before planning or provider dispatch."""
+
+    selected: list[str] = []
+
+    def add(value: Any, *, require_capability_prefix: bool = False) -> None:
+        text = str(value or "").strip()
+        has_prefix = text.startswith("capability:")
+        if require_capability_prefix and not has_prefix:
+            return
+        if has_prefix:
+            text = text.split(":", 1)[1].strip()
+        if text and text not in selected:
+            selected.append(text)
+
+    add(decision.intent, require_capability_prefix=True)
+    for action in decision.actions or []:
+        add(getattr(action, "capability_id", None))
+    for route_item in decision.routes or []:
+        add(
+            getattr(route_item, "intent", None),
+            require_capability_prefix=True,
+        )
+        for action in getattr(route_item, "actions", None) or []:
+            add(getattr(action, "capability_id", None))
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    for item in metadata.get("task_list") or []:
+        if isinstance(item, dict):
+            add(item.get("capability_id") or item.get("skill_id"))
+    return selected
+
+
+def _context_with_scheduled_fast_speech(
+    context: dict[str, Any],
+    decision: RouteDecision,
+    *,
+    scheduled: bool,
+) -> dict[str, Any]:
+    """Project queued fast speech into downstream composition context.
+
+    A scheduled utterance is not provider evidence and does not prove that the
+    user heard it.  It is nevertheless a current-turn communicative commitment
+    that the Response Composer must avoid repeating while TTS starts.  The
+    playback lifecycle remains the authority for delivered speech.
+    """
+
+    projected = dict(context)
+    if not scheduled:
+        return projected
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    fast_first = metadata.get("fast_first_response")
+    if not isinstance(fast_first, dict):
+        return projected
+    text = " ".join(str(fast_first.get("text") or "").strip().split())
+    if not text:
+        return projected
+    fast_speech = decision.fast_speech
+    projected["scheduled_turn_speech"] = [
+        {
+            "status": "scheduled",
+            "stage": "fast_first",
+            "text": text,
+            "route": decision.route,
+            "intent": decision.intent,
+            "purpose": (
+                str(fast_speech.purpose or "")
+                if fast_speech is not None
+                else "pending_work_acknowledgement"
+            ),
+            "commitment": (
+                str(fast_speech.commitment or "")
+                if fast_speech is not None
+                else ""
+            ),
+            "speech_event_id": fast_first.get("speech_event_id"),
+            "generation": fast_first.get("generation"),
+            "orders": list(fast_first.get("orders") or []),
+            "external_fact_evidence": False,
+            "completion_evidence": False,
+        }
+    ]
+    return projected
+
+
 class VoiceAssistant:
     def __init__(self):
         # Parse the maintained Host configuration surface exactly once. Runtime
@@ -978,9 +1085,9 @@ class VoiceAssistant:
             "hedge_ms": self.fast_first_audio_hedge_ms,
         }
         decision.metadata = metadata
-        # The cached cue owns the immediate acknowledgement for this turn. Keep
-        # the Goal Interpreter's dynamic wording as audit metadata, but do not let the
-        # downstream Agent repeat it after the hedge fires.
+        # This cached cue is a last-resort latency fallback used only when the
+        # model-authored fast response could not be scheduled. Once it fires, do
+        # not let a later compatibility field repeat the acknowledgement.
         if decision.speak_first:
             metadata["goal_interpretation_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
             decision.speak_first = None
@@ -1889,6 +1996,98 @@ class VoiceAssistant:
             if isinstance(metadata, dict)
             else None
         )
+        if (
+            isinstance(metadata, dict)
+            and metadata.get("reuse_current_turn_speech") is True
+        ):
+            raw_generation = metadata.get("reused_speech_generation")
+            raw_orders = metadata.get("reused_speech_orders")
+            event_id = str(metadata.get("reused_speech_event_id") or "").strip()
+            try:
+                generation = int(raw_generation)
+            except (TypeError, ValueError):
+                return {
+                    "scheduled": False,
+                    "reason": "reused_speech_missing_generation",
+                    "reused": True,
+                }
+            orders = [
+                int(item)
+                for item in (raw_orders if isinstance(raw_orders, list) else [])
+                if isinstance(item, int)
+            ]
+            if not orders:
+                return {
+                    "scheduled": False,
+                    "reason": "reused_speech_missing_orders",
+                    "reused": True,
+                }
+
+            def current_status() -> str:
+                events = self._playback_state().turn_speech_events.get(
+                    str(session_id or ""),
+                    [],
+                )
+                for item in reversed(events):
+                    if event_id and str(item.get("event_id") or "") != event_id:
+                        continue
+                    if int(item.get("generation") or -1) != generation:
+                        continue
+                    item_orders = item.get("orders")
+                    if not isinstance(item_orders, list) or orders[0] not in item_orders:
+                        continue
+                    return str(item.get("status") or "")
+                return ""
+
+            status = current_status()
+            playback_started = status in {
+                "playback_started",
+                "playback_completed",
+            }
+            playback_barrier = metadata.get("wait_for_playback_start") is True
+            if playback_barrier and not playback_started:
+                default_playback_timeout_ms = int(
+                    getattr(
+                        getattr(
+                            getattr(self, "host_settings", None),
+                            "playback",
+                            None,
+                        ),
+                        "playback_start_timeout_ms",
+                        20000,
+                    )
+                )
+                try:
+                    timeout_ms = int(
+                        metadata.get(
+                            "playback_start_timeout_ms",
+                            default_playback_timeout_ms,
+                        )
+                    )
+                except (TypeError, ValueError):
+                    timeout_ms = default_playback_timeout_ms
+                playback_started = await self.wait_for_playback_start(
+                    generation=generation,
+                    order=orders[0],
+                    session_id=session_id,
+                    timeout_s=max(0.001, timeout_ms / 1000.0),
+                )
+                playback_started = playback_started or current_status() in {
+                    "playback_started",
+                    "playback_completed",
+                }
+            return {
+                "scheduled": True,
+                "reused": True,
+                "speech_event_id": event_id or None,
+                "generation": generation,
+                "order": orders[0],
+                "orders": orders,
+                "chunks": len(orders),
+                "playback_started": playback_started,
+                "status": current_status() or status or "scheduled",
+            }
+
         scheduled = await self.schedule_tts_text(str(args.get("text") or ""), session_id)
         if (
             isinstance(metadata, dict)
@@ -3050,6 +3249,8 @@ class VoiceAssistant:
                     "intent": decision.intent,
                     "text": text,
                     "chunks": scheduled.get("chunks", 1),
+                    "order": scheduled.get("order"),
+                    "orders": orders,
                     "generation": scheduled.get("generation"),
                     "speech_event_id": (
                         speech_event.get("event_id")
@@ -3659,21 +3860,24 @@ class VoiceAssistant:
         ):
             return False, decision
 
-        fast_first_hedge = self._start_fast_first_audio_hedge(
-            decision, user_text, session_id
-        )
-        core_fast_first_scheduled = False
-        if fast_first_hedge is None and decision.fast_speech is not None:
-            core_fast_first_scheduled = await self._schedule_fast_first_response(
+        core_fast_first_scheduled, fast_first_hedge = (
+            await _start_fast_first_delivery(
+                self,
                 decision,
                 user_text,
                 session_id,
             )
+        )
+        runtime_context = _context_with_scheduled_fast_speech(
+            context,
+            decision,
+            scheduled=core_fast_first_scheduled,
+        )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
             user_text=user_text,
             session_id=session_id,
-            context=context,
+            context=runtime_context,
             decision=decision,
             core_interpretation=core_interpretation,
             record_evidence=False,
@@ -4841,16 +5045,21 @@ class VoiceAssistant:
             )
             return
 
-        fast_first_hedge = self._start_fast_first_audio_hedge(
-            decision,
-            user_text,
-            session_id,
+        fast_first_scheduled, fast_first_hedge = (
+            await _start_fast_first_delivery(
+                self,
+                decision,
+                user_text,
+                session_id,
+            )
         )
-        fast_first_scheduled = bool(
-            (decision.metadata or {}).get("fast_first_response_scheduled")
+        fast_first_context = _context_with_scheduled_fast_speech(
+            context,
+            decision,
+            scheduled=fast_first_scheduled,
         )
         agent_context = self._legacy_agent_authority_context(
-            context,
+            fast_first_context,
             session_id=session_id,
             decision=decision,
             reason=f"orchestrator_{self.cognitive_runtime_mode}_agent_path",
@@ -4908,11 +5117,12 @@ class VoiceAssistant:
                         request.requires_confirmation,
                         json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
                     )
-                fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+                hedge_scheduled = await self._settle_fast_first_audio_hedge(
                     fast_first_hedge,
                     decision=decision,
                     session_id=session_id,
                 )
+                fast_first_scheduled = fast_first_scheduled or hedge_scheduled
                 if await self._stage_interaction_confirmation(
                     response,
                     session_id,
@@ -4947,11 +5157,12 @@ class VoiceAssistant:
                 len(result.speak_after),
                 result.requires_confirmation,
             )
-            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+            hedge_scheduled = await self._settle_fast_first_audio_hedge(
                 fast_first_hedge,
                 decision=decision,
                 session_id=session_id,
             )
+            fast_first_scheduled = fast_first_scheduled or hedge_scheduled
             if result.actions:
                 locked_actions = []
                 locked_ids = []
@@ -4984,11 +5195,12 @@ class VoiceAssistant:
                 reset_playback=not fast_first_scheduled,
             )
         except Exception as exc:
-            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+            hedge_scheduled = await self._settle_fast_first_audio_hedge(
                 fast_first_hedge,
                 decision=decision,
                 session_id=session_id,
             )
+            fast_first_scheduled = fast_first_scheduled or hedge_scheduled
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
             logger.warning("Agent failed; selecting fail-closed fallback policy: %s", exc, exc_info=True)
             safe_response = self._agent_exception_safe_response(
@@ -5731,8 +5943,10 @@ class VoiceAssistant:
                 "retryable": bool(metadata.get("retryable")),
             }
         execution_started = failure_facts.get("execution_started") is True
+        selected_capability_ids = _selected_capability_ids(decision)
         understanding_completed = bool(
-            resolution.goal_association is not None
+            selected_capability_ids
+            or resolution.goal_association is not None
             or resolution.fast_plan is not None
             or resolution.terminal_plan is not None
         )
@@ -5749,16 +5963,86 @@ class VoiceAssistant:
         failure_facts.setdefault(
             "interaction_response_constructed", interaction_constructed
         )
-        failure_facts.setdefault(
-            "provider_request_count",
+        provider_request_count = (
             len(resolution.interaction_response.skills)
             if interaction_constructed
-            else 0,
+            else 0
+        )
+        failure_facts.setdefault("provider_request_count", provider_request_count)
+        failure_facts.setdefault(
+            "selected_capability_ids", selected_capability_ids
+        )
+        failure_facts.setdefault(
+            "exact_capability_selected", bool(selected_capability_ids)
+        )
+        failure_facts.setdefault(
+            "capability_available_at_interpretation", bool(selected_capability_ids)
+        )
+        missing_ability = (
+            decision.intent == "missing_or_unsupported_ability"
+            or bool((decision.metadata or {}).get("desired_abilities"))
+        )
+        if selected_capability_ids:
+            missing_ability = False
+        failure_facts.setdefault("missing_ability", missing_ability)
+        failure_facts.setdefault(
+            "provider_dispatch_started", execution_started or provider_request_count > 0
+        )
+        failure_facts.setdefault(
+            "failure_before_provider_dispatch",
+            not execution_started and provider_request_count == 0,
+        )
+        failure_facts.setdefault(
+            "system_retry_possible", bool(failure_facts.get("retryable"))
+        )
+        failure_facts.setdefault(
+            "user_action_required", bool(failure_facts.get("user_should_repeat"))
         )
         if not execution_started and not interaction_constructed:
             failure_facts.setdefault(
                 "no_motion_reason",
                 "no_trusted_interaction_response_was_constructed",
+            )
+        if (
+            failure_facts.get("failure_before_provider_dispatch") is True
+            and failure_facts.get("exact_capability_selected") is True
+        ):
+            if language.startswith("zh"):
+                if decision.route == "tool":
+                    text = "刚才没把查询安排好，所以还没开始查。"
+                elif decision.route == "robot_action":
+                    text = "刚才没把动作安排好，所以还没开始动。"
+                else:
+                    text = "刚才没把这件事安排好，所以还没开始。"
+            else:
+                if decision.route == "tool":
+                    text = (
+                        "I could not arrange the lookup correctly, so it did not "
+                        "start."
+                    )
+                elif decision.route == "robot_action":
+                    text = (
+                        "I could not arrange the action correctly, so it did not "
+                        "start."
+                    )
+                else:
+                    text = (
+                        "I could not arrange that work correctly, so it did not "
+                        "start."
+                    )
+            response = self._host_speech_response(
+                text,
+                style="warning",
+                source="host_pre_dispatch_capability_failure",
+            )
+            return response.model_copy(
+                update={
+                    "metadata": {
+                        **response.metadata,
+                        "failure_facts": failure_facts,
+                        "semantic_fallback": True,
+                    }
+                }
             )
         phase = (
             "after one or more requested actions were attempted but did not complete"
@@ -5782,11 +6066,16 @@ class VoiceAssistant:
             "say that Chromie did not hear or understand the request. If user_should_repeat "
             "is false, do not ask the user to repeat the same words; say that Chromie "
             "understood but could not arrange or complete the requested work this time. "
-            "When provider_request_count is zero, do not imply that Chromie tried to move; "
-            "the action never reached her body provider. Explain only that she understood "
-            "but could not get the actions arranged, using natural childlike language. "
-            "Invite one retry only when user_should_repeat or the trusted facts explicitly "
-            "make a user retry useful. Return only a JSON object with one field named text.\n\n"
+            "When provider_request_count is zero, do not imply that Chromie tried to move, "
+            "query, or contact a provider; the request failed before dispatch. Explain only "
+            "that she understood but could not get the work arranged this time. When "
+            "exact_capability_selected or capability_available_at_interpretation is true, "
+            "the ability exists: never say Chromie cannot do it, does not know how, has not "
+            "learned it, or lacks the ability. Do not turn an internal arrangement failure "
+            "into a weather, network, or provider failure. system_retry_possible describes "
+            "an internal property and never by itself asks the user to repeat or approve. "
+            "Invite one retry only when user_action_required is true. Return only a JSON "
+            "object with one field named text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
             f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"

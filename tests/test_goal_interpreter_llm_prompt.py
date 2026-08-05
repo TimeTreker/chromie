@@ -331,7 +331,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("not final goal meaning", prompt)
         self.assertIn("Return calibrated confidence", prompt)
         self.assertIn("fast_speech", prompt)
-        self.assertIn("process acknowledgement", prompt)
+        self.assertIn("fast_speech acknowledgement", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
@@ -2364,13 +2364,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Identity and personality shape voice only", repair_rendered)
         self.assertIn("Do not use a universal or canned acknowledgement", repair_rendered)
-        self.assertIn("fast_speech=null", repair_rendered)
+        self.assertIn("do not return null", repair_rendered)
         self.assertIn("claim_state=none", repair_rendered)
         self.assertIn("Review meaning, not keywords", review_rendered)
-        self.assertIn("preserved, naturally rewritten", review_rendered)
+        self.assertIn("Preserve the valid acknowledgement", review_rendered)
         self.assertEqual(len(interpreter.payloads), 3)
 
-    async def test_robot_action_fast_speech_reviewer_may_choose_silence(self) -> None:
+    async def test_robot_action_fast_speech_reviewer_cannot_remove_valid_speech(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2413,11 +2413,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             RouteRequest(text="往前走。", language="zh-CN")
         )
 
-        self.assertIsNone(decision.fast_speech)
-        self.assertFalse(decision.speak_first)
-        self.assertEqual(
-            decision.metadata["fast_speech_review"]["speech_selected"],
-            False,
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "嗯。")
+        self.assertTrue(
+            decision.metadata["fast_speech_review"][
+                "preserved_valid_candidate"
+            ]
         )
 
     async def test_tool_route_missing_fast_speech_does_not_add_interpreter_latency_by_default(self) -> None:
@@ -2626,11 +2628,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("must not semantically claim", rendered)
         self.assertIn("Goal Association and planning have not happened yet", rendered)
-        self.assertIn("silence is a valid choice", rendered)
+        self.assertIn("silence is not valid here", rendered)
         self.assertIn("never phrase matching", rendered)
         self.assertIn("purpose=acknowledge_and_check", rendered)
         self.assertIn("commitment=checking_only", rendered)
-        speech_schema = payload["format"]["properties"]["fast_speech"]["anyOf"][1]
+        speech_schema = payload["format"]["properties"]["fast_speech"]
         self.assertEqual(
             speech_schema["properties"]["purpose"]["enum"],
             ["acknowledge_and_check"],

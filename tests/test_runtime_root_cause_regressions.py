@@ -565,6 +565,60 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             context=delivered_context,
         )
 
+        scheduled_context = {
+            **context,
+            "scheduled_turn_speech": [
+                {
+                    "event_id": "speech_event_scheduled",
+                    "stage": "fast_first",
+                    "purpose": "acknowledge_and_check",
+                    "status": "scheduled",
+                    "text": "好呀，我帮你看看重庆一会儿的天气。",
+                    "generation": 3,
+                    "orders": [8],
+                }
+            ],
+        }
+        reused_plan = ResponsePlan(
+            immediate=ResponseStage(
+                text="好呀，我帮你看看重庆一会儿的天气。",
+                speech_act="acknowledge",
+                commitment_state="evaluating",
+                must_not_claim_completion=True,
+                reuse_current_turn_speech=True,
+                covers_goal_ids=["goal-weather"],
+            )
+        )
+        ResponseComposerResolver._validate_safe_read_acknowledgement(
+            reused_plan,
+            plan=plan,
+            context=scheduled_context,
+            language="zh-CN",
+        )
+        ResponseComposerResolver._validate_pending_response_contract(
+            reused_plan,
+            plan=plan,
+            context=scheduled_context,
+        )
+        ResponseComposerResolver._validate_reused_turn_speech(
+            reused_plan,
+            context=scheduled_context,
+        )
+        with self.assertRaisesRegex(ValueError, "must copy one exact"):
+            ResponseComposerResolver._validate_reused_turn_speech(
+                ResponsePlan(
+                    immediate=ResponseStage(
+                        text="我换句话再说一遍。",
+                        speech_act="acknowledge",
+                        commitment_state="evaluating",
+                        must_not_claim_completion=True,
+                        reuse_current_turn_speech=True,
+                        covers_goal_ids=["goal-weather"],
+                    )
+                ),
+                context=scheduled_context,
+            )
+
     def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
         from agent.app.deep_planner import DeepPlannerResolver
 

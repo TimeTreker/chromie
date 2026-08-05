@@ -601,6 +601,7 @@ class GoalAssociationResolver:
         repair_attempted = False
         contract_repair_succeeded = False
         semantic_review_attempted = False
+        optional_referent_recovery: list[dict[str, Any]] = []
 
         try:
             raw = await self.ollama.generate(
@@ -611,6 +612,8 @@ class GoalAssociationResolver:
             )
             if not isinstance(raw, dict):
                 raise ValueError("goal-association response is not a JSON object")
+            raw, recovered = self._drop_invalid_optional_referent_introductions(raw)
+            optional_referent_recovery.extend(recovered)
             initial_raw = raw
             try:
                 resolution = await self._validate_contract_output(
@@ -644,6 +647,10 @@ class GoalAssociationResolver:
                 )
                 if not isinstance(repaired, dict):
                     raise ValueError("goal-association repair response is not a JSON object")
+                repaired, recovered = (
+                    self._drop_invalid_optional_referent_introductions(repaired)
+                )
+                optional_referent_recovery.extend(recovered)
                 repair_raw = repaired
                 resolution = await self._validate_contract_output(
                     repaired,
@@ -701,6 +708,10 @@ class GoalAssociationResolver:
                         architecture_attribution="not_evaluated",
                         retryable=True,
                     )
+                reviewed, recovered = (
+                    self._drop_invalid_optional_referent_introductions(reviewed)
+                )
+                optional_referent_recovery.extend(recovered)
                 semantic_review_raw = reviewed
                 resolution = await self._validate_contract_output(
                     reviewed,
@@ -788,6 +799,13 @@ class GoalAssociationResolver:
                     semantic_review_raw,
                     4000,
                 )
+            if optional_referent_recovery:
+                metadata["optional_contract_recovery"] = {
+                    "field": "referent_updates",
+                    "strategy": "drop_invalid_unreferenced_introduce",
+                    "dropped_count": len(optional_referent_recovery),
+                    "entries": optional_referent_recovery,
+                }
             return GoalAssociationResolution(
                 turn_id=turn_id,
                 clarification=self._safe_clarification(
@@ -804,11 +822,67 @@ class GoalAssociationResolver:
                 ),
                 metadata=metadata,
             )
+        if optional_referent_recovery:
+            metadata = dict(resolution.metadata)
+            metadata["optional_contract_recovery"] = {
+                "field": "referent_updates",
+                "strategy": "drop_invalid_unreferenced_introduce",
+                "dropped_count": len(optional_referent_recovery),
+                "entries": optional_referent_recovery,
+            }
+            resolution = resolution.model_copy(update={"metadata": metadata})
         return self._validate(
             resolution,
             candidate_goals=candidate_goals,
             request=request,
         )
+
+    @staticmethod
+    def _drop_invalid_optional_referent_introductions(
+        raw: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Drop only semantically empty, unscoped optional introductions.
+
+        Referent corrections, focus changes, retirements, and introductions with
+        actual entity content remain contract-authoritative and still fail closed.
+        A model-added ``introduce`` item with neither an entity type nor canonical
+        value cannot ground any Goal binding and must not discard otherwise valid
+        Goals.
+        """
+
+        normalized = copy.deepcopy(raw)
+        updates = normalized.get("referent_updates")
+        if not isinstance(updates, list):
+            return normalized, []
+        kept: list[Any] = []
+        dropped: list[dict[str, Any]] = []
+        for index, item in enumerate(updates):
+            if not isinstance(item, dict):
+                kept.append(item)
+                continue
+            operation = str(item.get("operation") or "").strip()
+            entity_type = str(item.get("entity_type") or "").strip()
+            canonical_value = str(item.get("canonical_value") or "").strip()
+            target_referent_ids = item.get("target_referent_ids") or []
+            target_goal_ids = item.get("target_goal_ids") or []
+            if (
+                operation == "introduce"
+                and not entity_type
+                and not canonical_value
+                and not target_referent_ids
+                and not target_goal_ids
+            ):
+                dropped.append(
+                    {
+                        "path": f"referent_updates[{index}]",
+                        "operation": "introduce",
+                        "reason": "missing_entity_type_and_canonical_value",
+                    }
+                )
+                continue
+            kept.append(item)
+        normalized["referent_updates"] = kept
+        return normalized, dropped
 
     async def _validate_contract_output(
         self,
@@ -1727,7 +1801,13 @@ class GoalAssociationResolver:
                     name: binding_map[name]
                     for name in resource_item.source_binding_names
                 }
+                responsibility_variant = (
+                    "fetch_and_deliver_object"
+                    if resource_item.resource_kind == "physical_object"
+                    else "fetch_and_deliver_information"
+                )
                 resource_responsibility = AcquireAndDeliverResource(
+                    responsibility_variant=responsibility_variant,
                     resource=ResourceDescriptor(
                         kind=resource_item.resource_kind,
                         description=resource_item.resource_description,

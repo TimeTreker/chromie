@@ -73,6 +73,44 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 delivery_mode="physical_handover",
             )
 
+
+    def test_responsibility_variant_is_explicit_and_backward_compatible(self) -> None:
+        information = AcquireAndDeliverResource(
+            resource=ResourceDescriptor(
+                kind="information",
+                description="Chongqing weather tomorrow",
+            ),
+            source=ResourceSource(
+                status="provider_resolved",
+                description="current weather information",
+            ),
+            delivery_mode="spoken_explanation",
+        )
+        self.assertEqual(
+            information.responsibility_type,
+            "acquire_and_deliver_resource",
+        )
+        self.assertEqual(
+            information.responsibility_variant,
+            "fetch_and_deliver_information",
+        )
+
+        legacy_payload = information.model_dump(mode="json")
+        legacy_payload.pop("responsibility_variant")
+        restored = AcquireAndDeliverResource.model_validate(legacy_payload)
+        self.assertEqual(
+            restored.responsibility_variant,
+            "fetch_and_deliver_information",
+        )
+
+        with self.assertRaises(ValidationError):
+            AcquireAndDeliverResource.model_validate(
+                {
+                    **information.model_dump(mode="json"),
+                    "responsibility_variant": "fetch_and_deliver_object",
+                }
+            )
+
     def test_absent_resource_contract_does_not_change_legacy_goal_serialization(self) -> None:
         goal = SemanticGoal(
             description="Tell the user a joke.",
@@ -135,6 +173,10 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         self.assertIsNotNone(responsibility)
         assert responsibility is not None
         self.assertEqual(responsibility.resource.kind, "physical_object")
+        self.assertEqual(
+            responsibility.responsibility_variant,
+            "fetch_and_deliver_object",
+        )
         self.assertEqual(
             responsibility.source.bindings["source_location"]["value"],
             "100 meters ahead",

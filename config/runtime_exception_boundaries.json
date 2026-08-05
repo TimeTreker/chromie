@@ -354,12 +354,13 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Suppress unreviewed or invalid model-authored immediate speech and return a typed decision without authorizing semantic claims.",
+      "contract": "Preserve a structurally valid pending-work acknowledgement when review is unavailable or invalid, while rejecting any reviewed replacement that violates the pre-plan claim contract.",
       "review_status": "reviewed",
-      "body_sha256": "d9f86eb0dd19008afbd2781909460021669525eb1088b88d9e815564b6dfd165",
+      "body_sha256": "663d55afddc61e814727089b8317da8411e4d5c195ae91729b607e48d43fdf72",
       "failure_signals": [
         "diagnostic",
-        "return"
+        "return",
+        "state_update"
       ]
     },
     {
@@ -368,11 +369,12 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Attempt bounded model-authored repair for required pending-work speech and retain explicit missing-speech diagnostics without authorizing result or completion claims.",
       "review_status": "reviewed",
-      "body_sha256": "75b310f93601f02e439e078f72874201ff124f56ecd5d500ca23598087d0d029",
+      "body_sha256": "9d1381da3649d1ec385c2294b8def37140729e0ce69f535c6e39a821e3bb351d",
       "failure_signals": [
-        "diagnostic"
+        "diagnostic",
+        "state_update"
       ]
     },
     {
@@ -623,7 +625,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "877fa3a241a2c70b2ab618bbe773061f8be217646bded99eb029080c39bd65c7",
+      "body_sha256": "7edabdceb564534d42c54eb22e47ddb2d86d90fc1072b05a35dcbe5a332606aa",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1631,7 +1633,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "fa391efdfe1bbc3eaa5eb912e5b17478861308f972e76e78fd86ea9913b2a26d",
+      "body_sha256": "581f8caa7798f5b89c1879ef6464ab11e438b6890160569b535a402140af1c72",
       "failure_signals": [
         "diagnostic",
         "return",

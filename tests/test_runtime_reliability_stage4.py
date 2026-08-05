@@ -277,6 +277,61 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("verified_result_available", session.payload["prompt"])
 
 
+
+    async def test_pre_dispatch_selected_weather_capability_never_becomes_missing_ability(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        self._configure_model_generation(assistant)
+        assistant.failure_response_model = "gemma4:e2b"
+        assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.session_log = MethodType(lambda self, *args: None, assistant)
+
+        async def unexpected_session(self: VoiceAssistant) -> None:
+            del self
+            raise AssertionError("pre-dispatch failure must use the trusted host response")
+
+        assistant.get_http_session = MethodType(unexpected_session, assistant)
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="error",
+            lane="tool",
+            fallback_reason="goal association contract failed",
+            metadata={
+                "failure_stage": "goal_association",
+                "failure_class": "structured_output_validation",
+                "failure_domain": "model_contract",
+                "retryable": True,
+            },
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            confidence=0.95,
+            metadata={},
+        )
+
+        response = await assistant._compose_cognitive_failure_response(
+            resolution,
+            decision,
+            user_text="帮我查一下重庆明天是晴天还是阴天。",
+            session_id="weather-pre-dispatch",
+        )
+
+        assert response is not None
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertEqual(response.metadata["source"], "host_pre_dispatch_capability_failure")
+        self.assertIn("还没开始查", spoken)
+        self.assertNotIn("不会", spoken)
+        self.assertNotIn("没学会", spoken)
+        facts = response.metadata["failure_facts"]
+        self.assertEqual(
+            facts["selected_capability_ids"],
+            ["chromie.weather.lookup"],
+        )
+        self.assertTrue(facts["capability_available_at_interpretation"])
+        self.assertTrue(facts["failure_before_provider_dispatch"])
+        self.assertFalse(facts["missing_ability"])
+        self.assertFalse(facts["user_action_required"])
+
     async def test_quality_model_phrases_post_execution_failure_facts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)

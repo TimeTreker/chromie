@@ -1489,6 +1489,180 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
+
+    async def test_fast_first_delivery_prefers_dynamic_speech_then_cache_fallback(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        calls: list[str] = []
+
+        async def schedule_dynamic(
+            self: VoiceAssistant,
+            decision: RouteDecision,
+            user_text: str,
+            session_id: str,
+        ) -> bool:
+            del decision, user_text, session_id
+            calls.append("dynamic")
+            return True
+
+        def start_hedge(
+            self: VoiceAssistant,
+            decision: RouteDecision,
+            user_text: str,
+            session_id: str,
+        ) -> None:
+            del decision, user_text, session_id
+            calls.append("cache")
+            return None
+
+        assistant._schedule_fast_first_response = MethodType(
+            schedule_dynamic, assistant
+        )
+        assistant._start_fast_first_audio_hedge = MethodType(
+            start_hedge, assistant
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            language="zh-CN",
+        )
+
+        scheduled, hedge = await orchestrator_module._start_fast_first_delivery(
+            assistant,
+            decision,
+            "帮我查重庆明天的天气。",
+            "sid-dynamic",
+        )
+
+        self.assertTrue(scheduled)
+        self.assertIsNone(hedge)
+        self.assertEqual(calls, ["dynamic"])
+
+        async def miss_dynamic(
+            self: VoiceAssistant,
+            decision: RouteDecision,
+            user_text: str,
+            session_id: str,
+        ) -> bool:
+            del self, decision, user_text, session_id
+            calls.append("dynamic-miss")
+            return False
+
+        sentinel = object()
+
+        def fallback_hedge(
+            self: VoiceAssistant,
+            decision: RouteDecision,
+            user_text: str,
+            session_id: str,
+        ) -> object:
+            del self, decision, user_text, session_id
+            calls.append("cache-fallback")
+            return sentinel
+
+        assistant._schedule_fast_first_response = MethodType(
+            miss_dynamic, assistant
+        )
+        assistant._start_fast_first_audio_hedge = MethodType(
+            fallback_hedge, assistant
+        )
+        scheduled, hedge = await orchestrator_module._start_fast_first_delivery(
+            assistant,
+            decision,
+            "帮我查重庆明天的天气。",
+            "sid-fallback",
+        )
+
+        self.assertFalse(scheduled)
+        self.assertIs(hedge, sentinel)
+        self.assertEqual(calls[-2:], ["dynamic-miss", "cache-fallback"])
+
+    def test_scheduled_fast_speech_is_projected_for_downstream_deduplication(self) -> None:
+        decision = RouteDecision(
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            language="zh-CN",
+            fast_speech={
+                "text": "好嘛，我帮你看看重庆明天的天气。",
+                "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
+                "must_not_claim_completion": True,
+            },
+            metadata={
+                "fast_first_response": {
+                    "text": "好嘛，我帮你看看重庆明天的天气。",
+                    "generation": 4,
+                    "orders": [9],
+                    "speech_event_id": "speech_event_weather",
+                }
+            },
+        )
+
+        context = orchestrator_module._context_with_scheduled_fast_speech(
+            {"history": []},
+            decision,
+            scheduled=True,
+        )
+
+        self.assertEqual(len(context["scheduled_turn_speech"]), 1)
+        item = context["scheduled_turn_speech"][0]
+        self.assertEqual(item["status"], "scheduled")
+        self.assertEqual(item["orders"], [9])
+        self.assertFalse(item["external_fact_evidence"])
+        self.assertFalse(item["completion_evidence"])
+
+    async def test_interaction_speech_reuses_fast_first_audio_without_resynthesis(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        event = assistant._register_turn_speech_event(
+            session_id="sid-reuse",
+            generation=2,
+            orders=[5],
+            text="好，我帮你查一下。",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            commitment="checking_only",
+        )
+        self.assertIsNotNone(event)
+        assert event is not None
+        event["status"] = "playback_started"
+
+        async def fail_if_resynthesized(
+            self: VoiceAssistant, text: str, session_id: str | None
+        ) -> dict[str, Any]:
+            del self, text, session_id
+            raise AssertionError("reused speech must not schedule TTS again")
+
+        assistant.schedule_tts_text = MethodType(
+            fail_if_resynthesized,
+            assistant,
+        )
+        result = await assistant._schedule_interaction_speech(
+            {
+                "text": "好，我帮你查一下。",
+                "metadata": {
+                    "session_id": "sid-reuse",
+                    "reuse_current_turn_speech": True,
+                    "reused_speech_event_id": event["event_id"],
+                    "reused_speech_generation": 2,
+                    "reused_speech_orders": [5],
+                    "wait_for_playback_start": True,
+                },
+            }
+        )
+
+        self.assertTrue(result["scheduled"])
+        self.assertTrue(result["reused"])
+        self.assertTrue(result["playback_started"])
+        self.assertEqual(result["order"], 5)
+
     def test_cognitive_core_exception_does_not_semantically_classify_embodied_text(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 

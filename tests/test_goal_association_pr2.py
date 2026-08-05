@@ -126,6 +126,81 @@ class GoalAssociationModelOutputTests(unittest.TestCase):
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+
+    def test_empty_optional_referent_introduction_does_not_discard_weather_goal(self):
+        ollama = FakeOllama(
+            {
+                "decision": "create_goals",
+                "new_goals": [
+                    {
+                        "description": "Check Chongqing weather tomorrow.",
+                        "responsibility_kind": "capability_dependent",
+                        "bindings": [
+                            {
+                                "name": "location",
+                                "entity_type": "place",
+                                "value": "重庆",
+                                "confidence": 1.0,
+                            },
+                            {
+                                "name": "date",
+                                "entity_type": "date",
+                                "value": "明天",
+                                "confidence": 1.0,
+                            },
+                        ],
+                        "resource_responsibility": {
+                            "resource_kind": "information",
+                            "resource_description": "重庆明天的天气",
+                            "source_status": "provider_resolved",
+                            "source_description": "current weather information",
+                            "source_binding_names": ["location", "date"],
+                            "recipient_description": "requester",
+                            "delivery_mode": "spoken_explanation",
+                        },
+                    }
+                ],
+                "referent_updates": [
+                    {
+                        "operation": "introduce",
+                        "target_referent_ids": [],
+                        "target_goal_ids": [],
+                        "confidence": 1.0,
+                    }
+                ],
+                "resolved_references": [],
+                "clarification": "",
+                "confidence": 1.0,
+                "reason_summary": "One information acquisition responsibility.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "帮我查一下重庆明天是晴天还是阴天。",
+                    route="tool",
+                    intent="capability:chromie.weather.lookup",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(
+            responsibility.responsibility_variant,
+            "fetch_and_deliver_information",
+        )
+        self.assertEqual(
+            responsibility.source.bindings["location"]["value"],
+            "重庆",
+        )
+        recovery = result.metadata["optional_contract_recovery"]
+        self.assertEqual(recovery["dropped_count"], 1)
+        self.assertEqual(len(ollama.prompts), 1)
+
     def test_preassociation_clarify_route_does_not_force_goal_loss(self):
         ollama = FakeOllama(
             {

@@ -24,11 +24,14 @@ User request
   -> model-owned response composition reports the grounded outcome
 ```
 
-Before Goals and Plans exist, fast speech is optional and must use
-`claim_state=none` with no claimed Goal or Capability IDs. It may acknowledge the
-process naturally, but it must not claim a selected Capability, execution, or
-result. The Provider returns structured evidence; Goal reconciliation and the
-model-owned response boundary determine what may be said afterward.
+Before Goals and Plans exist, pending tool, planning, memory, or embodied work
+requires one natural fast acknowledgement. It must use `claim_state=none` with no
+claimed Goal or Capability IDs. It may acknowledge the process naturally, but it
+must not claim a selected Capability, execution, or result. If the later Response
+Composer judges that acknowledgement sufficient, it references the exact existing
+utterance with `reuse_current_turn_speech=true`; Runtime does not synthesize it a
+second time. The Provider returns structured evidence; Goal reconciliation and
+the model-owned response boundary determine what may be said afterward.
 
 An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent

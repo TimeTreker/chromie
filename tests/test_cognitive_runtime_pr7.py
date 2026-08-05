@@ -940,6 +940,84 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.metadata["personality_expression"]["core_traits"],
         )
 
+    def test_safe_read_reuses_scheduled_fast_speech_without_duplicate_audio(self):
+        plan = CanonicalPlan(
+            plan_id="plan-weather-reuse",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=["goal-weather"],
+            goal_summary="Check Chongqing weather.",
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆", "date": "tomorrow"},
+                    "source_goal_ids": ["goal-weather"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-weather",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["weather"],
+                }
+            ],
+        )
+        fast_text = "好嘛，我帮你看看重庆明天的天气。"
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-weather-reuse",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                immediate=ResponseStage(
+                    text=fast_text,
+                    speech_act="acknowledge",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    reuse_current_turn_speech=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.97,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([weather_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-weather-reuse",
+                language="zh-CN",
+                context={
+                    "scheduled_turn_speech": [
+                        {
+                            "event_id": "speech_event_weather_reuse",
+                            "status": "scheduled",
+                            "text": fast_text,
+                            "generation": 6,
+                            "orders": [11],
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(len(response.speech), 1)
+        metadata = response.speech[0].metadata
+        self.assertTrue(metadata["reuse_current_turn_speech"])
+        self.assertEqual(
+            metadata["reused_speech_event_id"],
+            "speech_event_weather_reuse",
+        )
+        self.assertEqual(metadata["reused_speech_generation"], 6)
+        self.assertEqual(metadata["reused_speech_orders"], [11])
+        self.assertEqual(response.speech[0].text, fast_text)
+
     def test_safe_read_may_start_silently_without_delivery_barrier(self):
         plan = CanonicalPlan(
             plan_id="plan-weather-silent",

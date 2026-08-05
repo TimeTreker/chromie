@@ -218,15 +218,19 @@ independently schema-valid `fast_speech` or `ResponseStage` only after Host
 validation authorizes it against the applicable turn/Goal correlation,
 commitment or evidence state, claim guards, and cancellation generation. It
 need not wait for unrelated later response fields. The stages have distinct
-truth requirements. For dynamic fast speech, the Core model owns whether to
-speak and the exact wording under the owner-approved mind and style context. An
-independent semantic/style review may preserve, rewrite, or remove the candidate.
-The typed `claim_state`, `claimed_capability_ids`, and `claimed_goal_ids` carry
-claim authority; before Goals and Plans exist they must be `none`, empty, and
-empty. The Host validates those typed fields, turn correlation, internal-token
-safety, and lifecycle state. It must not infer conversational meaning from a
-phrase blacklist or replace invalid ordinary speech with a canned sentence;
-failed review means silence.
+truth requirements. For pending tool, planning, memory, or embodied work, the
+Core model owns the exact dynamic fast-speech wording under the owner-approved
+mind and style context, but silence is not a valid outcome once that pending
+responsibility is confidently selected. An independent semantic/style review may
+preserve or rewrite a candidate; it may not erase a structurally valid required
+acknowledgement merely by selecting silence. The typed `claim_state`,
+`claimed_capability_ids`, and `claimed_goal_ids` carry claim authority; before
+Goals and Plans exist they must be `none`, empty, and empty. The Host validates
+those typed fields, turn correlation, internal-token safety, and lifecycle state.
+It must not infer conversational meaning from a phrase blacklist or replace
+invalid ordinary speech with a universal canned sentence. A bounded model repair
+is attempted first; the pre-generated cache is only a transport-safe last-resort
+latency fallback when dynamic speech cannot be scheduled.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable
@@ -362,8 +366,9 @@ the Core should emit one typed, non-terminal `fast_speech` process
 acknowledgement. If the first interpretation omits that field, one bounded Core
 repair may add it without changing the chosen route, bindings, or safety policy.
 The Host validates and schedules that Core-authored speech before the slow
-runtime when no valid cached acknowledgement already owns the fast-first slot.
-It does not invent or rewrite the sentence.
+runtime. A valid cached acknowledgement is used only when dynamic speech is
+missing, invalid, or cannot be scheduled. The Host does not invent or rewrite
+the model-authored sentence.
 
 Chromie may say she is checking something only when a real tool call will be made
 with validated arguments. For safe reads, the acknowledgement and the read start
@@ -371,7 +376,11 @@ without serializing the read behind TTS synthesis or playback. A valid cached cu
 remains the lowest-latency presentation path; on a cache miss, the typed Core
 speech prevents a long silent wait for planning, lookup, and final composition.
 Final speech still comes from Response Composer and must not duplicate the
-acknowledgement. Host code validates capability safety, arguments, truth state,
+acknowledgement. When the existing acknowledgement already covers pending work,
+the Composer copies its exact text into a typed stage with
+`reuse_current_turn_speech=true`; Runtime reuses the existing TTS event and
+playback barrier without scheduling duplicate audio. Host code validates
+capability safety, arguments, truth state,
 concurrency, and evidence binding. Physical or externally effectful work uses
 only a safety prelude or confirmation request before execution and keeps its
 confirmation and delivery barriers.

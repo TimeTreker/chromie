@@ -1090,6 +1090,23 @@ class CanonicalPlanRuntimeAdapter:
             and plan.disposition == "execute"
             and executable_goal_ids == set(plan.goal_ids)
         )
+        reusable_turn_speech: dict[str, dict[str, Any]] = {}
+        if isinstance(context, dict):
+            for key in ("delivered_turn_speech", "scheduled_turn_speech"):
+                values = context.get(key)
+                if not isinstance(values, list):
+                    continue
+                for item in values:
+                    if not isinstance(item, dict):
+                        continue
+                    text = " ".join(str(item.get("text") or "").strip().split())
+                    status = str(item.get("status") or "").strip()
+                    if text and status in {
+                        "scheduled",
+                        "playback_started",
+                        "playback_completed",
+                    }:
+                        reusable_turn_speech[text] = dict(item)
         omitted_pre_execution_speech_phases: list[str] = []
         projected_speech_stages: list[dict[str, Any]] = []
         if effectful_pre_execution:
@@ -1253,6 +1270,9 @@ class CanonicalPlanRuntimeAdapter:
                             "safe_read_micro_ack": safe_read_speech_optional,
                             "coordination_id": stage.coordination_id,
                             "delivery_role": stage.delivery_role,
+                            "reuse_current_turn_speech": (
+                                stage.reuse_current_turn_speech
+                            ),
                         }
                     ]
                 else:
@@ -1279,6 +1299,9 @@ class CanonicalPlanRuntimeAdapter:
                         ),
                         "coordination_id": stage.coordination_id,
                         "delivery_role": stage.delivery_role,
+                        "reuse_current_turn_speech": (
+                            stage.reuse_current_turn_speech
+                        ),
                     }
                     for phase, stage in stage_items
                     if stage is not None
@@ -1296,6 +1319,9 @@ class CanonicalPlanRuntimeAdapter:
                     "source": "goal_driven_response_composer",
                     "coordination_id": stage.coordination_id,
                     "delivery_role": stage.delivery_role,
+                    "reuse_current_turn_speech": (
+                        stage.reuse_current_turn_speech
+                    ),
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1328,6 +1354,33 @@ class CanonicalPlanRuntimeAdapter:
                 "wait_for_playback_start": playback_barrier,
                 "playback_start_required_for_delivery": playback_barrier,
             }
+            if projected.get("reuse_current_turn_speech") is True:
+                normalized_text = " ".join(
+                    str(projected.get("text") or "").strip().split()
+                )
+                reused = reusable_turn_speech.get(normalized_text)
+                if reused is None:
+                    raise ValueError(
+                        "response stage requested current-turn speech reuse but "
+                        "no exact scheduled or delivered utterance exists"
+                    )
+                raw_orders = reused.get("orders")
+                if not isinstance(raw_orders, list):
+                    raw_orders = []
+                speech_metadata.update(
+                    {
+                        "reuse_current_turn_speech": True,
+                        "reused_speech_event_id": reused.get("event_id")
+                        or reused.get("speech_event_id"),
+                        "reused_speech_status": reused.get("status"),
+                        "reused_speech_generation": reused.get("generation"),
+                        "reused_speech_orders": [
+                            int(item)
+                            for item in raw_orders
+                            if isinstance(item, int)
+                        ],
+                    }
+                )
             if coordinated_speech and coordination is not None:
                 speech_metadata.update(
                     {
