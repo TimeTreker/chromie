@@ -12,6 +12,7 @@ Guidance for coding agents working on Chromie.
 6. `README.md` and the relevant component README
 7. `docs/ACCEPTANCE.md` — required validation level
 8. `docs/README.md` — documentation ownership and update rules
+9. `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
@@ -43,6 +44,12 @@ semantics become clearer.
 - Inspect implementation and tests before editing documentation or behavior.
 - For user-visible robot weirdness, diagnose the root architectural or
   interaction-policy cause before changing prompts or phrasing.
+- A defect fix is not complete when only a patch is produced. Every delivery
+  must explain the observed failure, expected contract, evidence used, earliest
+  responsible boundary, confirmed root cause, and the mechanism by which the
+  change restores the contract. Distinguish the initiating trigger, root cause,
+  downstream symptoms, contributing conditions, and remaining evidence gaps.
+  Report the focused regression and broader validation that support the claim.
 - Do not submit symptom-only interaction fixes. Before changing behavior for a
   user-reported robot problem, write or report the observed turn, the expected
   contract, the evidence or trace used, the earliest component that went wrong,

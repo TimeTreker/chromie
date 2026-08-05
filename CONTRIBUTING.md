@@ -63,6 +63,40 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   its owner, supported lifetime, validation, and the overlapping surface it
   replaces or why none can be removed. Report before/after counts when one of
   these repository surfaces grows.
+- Treat defect analysis, implementation, explanation, and verification as one
+  deliverable. A patch without a causal explanation is incomplete, even when
+  the code is correct.
+
+## Required defect-fix report
+
+Every user-reported or internally discovered defect fix must include a concise,
+evidence-grounded report with all of the following:
+
+1. **Observed failure and impact.** State what happened, what should have
+   happened, and which user or system outcome was affected.
+2. **Reproduction and evidence.** Identify the retained scenario, trace, log,
+   failing test, or deterministic code path that demonstrates the defect.
+3. **Expected contract and owner.** Name the contract that was violated and the
+   component responsible for enforcing it.
+4. **Root cause at the earliest responsible boundary.** Explain the causal chain
+   from the initiating trigger to the first incorrect decision or state
+   transition. Distinguish the root cause from downstream symptoms, unrelated
+   failures, and contributing conditions.
+5. **Fix mechanism.** Explain why the chosen change restores the violated
+   contract, why it belongs at that boundary, and which behavior intentionally
+   remains unchanged. Listing changed files or describing the diff is not a
+   substitute for this explanation.
+6. **Regression and evidence.** Show the pre-fix failure where practical, the
+   focused post-fix regression, the broader gates run, and the highest evidence
+   level actually reached. State any simulator, service, audio, or physical
+   evidence still missing.
+7. **Operational impact.** Report safety, compatibility, rollout, rollback,
+   configuration, and documentation consequences when applicable.
+
+A plausible story is not a root-cause finding. Each material claim must be tied
+to retained evidence or clearly marked as an inference that still needs proof.
+The final delivery may include a patch, commit, or pull request, but none of
+those artifacts replaces the required explanation.
 
 ## Tests
 
@@ -93,8 +127,9 @@ verified, target validated, and release ready.
 
 A useful pull request description includes:
 
-- the problem and ownership boundary;
-- implementation summary;
+- the observed failure, violated contract, and ownership boundary;
+- the evidence-backed root cause at the earliest responsible boundary;
+- the fix mechanism and why it restores the contract;
 - safety impact;
 - feature-gate/default changes;
 - tests and target evidence;

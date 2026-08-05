@@ -14,6 +14,8 @@ The required loop is:
 interaction or requirement
 → retained scenario
 → failing reproduction
+→ root cause at the earliest responsible boundary
+→ explained fix mechanism
 → design and implementation
 → passing scenario
 → full regression
@@ -209,16 +211,41 @@ For a reported behavioral defect:
 2. Remove private or irrelevant data.
 3. Create the smallest scenario that reproduces the failure across the earliest
    incorrect boundary.
-4. When the report is "slow," retain and score the complete stage timeline so
+4. Name the violated contract and the component responsible for enforcing it.
+5. Establish the causal chain from the initiating trigger to the earliest wrong
+   decision or state transition. Separate the root cause from downstream
+   symptoms, unrelated failures, and contributing conditions.
+6. Explain the fix mechanism: why the proposed change belongs at that boundary,
+   how it restores the contract, and what behavior remains unchanged.
+7. When the report is "slow," retain and score the complete stage timeline so
    model generation, validation, repair, TTS synthesis, and playback are not
    conflated.
-5. Verify that the scenario fails on the current evaluated revision.
-6. Implement the architectural fix.
-7. Verify the new scenario and all existing scenarios.
-8. Record the evidence level honestly.
+8. Verify that the scenario fails on the current evaluated revision.
+9. Implement the architectural fix.
+10. Verify the new scenario and all existing scenarios.
+11. Record the evidence level honestly.
 
 A patch should not claim to fix a live behavior if only an unrelated unit test
-was added.
+was added. A patch is also incomplete when it omits the causal explanation or
+only restates the changed code.
+
+### 7.1 Required repair record
+
+The retained defect report must contain:
+
+- observed and expected behavior;
+- reproduction evidence and evaluated revision;
+- violated contract and owning component;
+- earliest responsible boundary and evidence-backed root cause;
+- the trigger-to-failure causal chain;
+- the fix mechanism and intended scope;
+- pre-fix and post-fix scenario results;
+- broader regression gates and the exact evidence ceiling;
+- unresolved assumptions or evidence gaps.
+
+When evidence supports only a hypothesis, label it as an inference and retain the
+next test needed to confirm or reject it. Do not present correlation, a nearby
+error, or the last visible symptom as the root cause.
 
 ## 8. Model mocking policy
 
@@ -319,6 +346,8 @@ A behavioral change is not complete until:
 
 - the originating scenario is retained;
 - it failed before the fix or is an explicit new requirement;
+- the retained report explains the evidence-backed root cause and fix mechanism
+  in plain language rather than only describing the diff;
 - it passes after the fix;
 - existing scenario and general-ability gates pass;
 - documentation and status claims are updated;

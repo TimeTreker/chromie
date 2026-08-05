@@ -135,25 +135,31 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    truthful embodied speech, or valid end-to-end evidence. Do not tune Chromie
    only to pass the last visible sentence while leaving the underlying ability
    brittle.
-4. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
+4. **Fixes explain causality, not only diffs.** Every defect repair must state
+   the observed failure, expected contract, earliest responsible boundary,
+   evidence-backed root cause, and the mechanism by which the change restores
+   the contract. The explanation must distinguish the initiating trigger, root
+   cause, downstream symptoms, contributing conditions, and evidence limits. A
+   patch without this explanation and regression evidence is incomplete.
+5. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.
-5. **Operational controls stay deterministic.** Stop, cancel, emergency,
+6. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
-6. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
+7. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
    the deterministic operational filter. Normal conversation, tool, memory,
    robot-action, and deep-thought intent must come from bounded model
    understanding and contract validation. When valid meaning cannot be
    established, the Core returns a typed unavailable, clarification, or refusal
    outcome; it never invents an ordinary lane.
-7. **Simulation precedes hardware.** Logical closure, failure handling, and
+8. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
-8. **Evidence is part of the product.** Implemented, automatically verified,
+9. **Evidence is part of the product.** Implemented, automatically verified,
    target validated, and release ready are separate states.
-9. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
+10. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct gates.
-10. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
+11. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
-11. **Benchmarks evaluate intelligence; they do not implement it.** Cognitive,
+12. **Benchmarks evaluate intelligence; they do not implement it.** Cognitive,
    personality, planning, and Social Attention choices remain model reasoning
    problems expressed through general prompts, bounded context, and contracts.
    Benchmark cases define acceptable behavior regions, hard safety and evidence
@@ -162,7 +168,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or other Host rules that imitate intelligence merely to pass visible cases.
    LLMs may generate candidate scenarios and qualitative critique, but reviewed
    contracts and retained evidence remain authoritative for acceptance.
-12. **Agent Skills teach; capabilities execute.** An Agent may select and
+13. **Agent Skills teach; capabilities execute.** An Agent may select and
    combine owner-approved Agent Skills to inform a Plan, but a Skill has no
    independent Goal, provider registration, permission, confirmation exemption,
    or execution authority. All effects still use exact registered capabilities,
