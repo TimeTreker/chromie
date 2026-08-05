@@ -9,6 +9,7 @@ import logging
 import math
 import os
 import re
+import threading
 import time
 import unicodedata
 from datetime import datetime
@@ -3824,7 +3825,7 @@ class VoiceAssistant:
         coordinator until trusted runtime cancellation closure is available.
         """
 
-        return self.conversation_state.apply_goal_association_resolution(
+        results = self.conversation_state.apply_goal_association_resolution(
             association,
             sid=sid,
             user_text=user_text,
@@ -3833,6 +3834,47 @@ class VoiceAssistant:
             source=source,
             atomic=True,
         )
+        created = [
+            item
+            for item in results
+            if item.get("applied") is True
+            and item.get("operation") == "create"
+        ]
+        if created:
+            try:
+                snapshot = self.conversation_state.snapshot()
+                task_contexts = snapshot.get("task_contexts")
+                active_task_contexts = snapshot.get("active_task_contexts")
+                active_goals = self.conversation_state.active_goal_snapshots(
+                    limit=self.conversation_state.max_pending_tasks
+                )
+                current_thread = threading.current_thread()
+                logger.info(
+                    "goal_state_counts_after_create: created_goals=%s "
+                    "task_contexts=%s active_tasks=%s active_goals=%s "
+                    "thread=%s is_main_thread=%s",
+                    len(created),
+                    len(task_contexts) if isinstance(task_contexts, list) else 0,
+                    (
+                        len(active_task_contexts)
+                        if isinstance(active_task_contexts, list)
+                        else 0
+                    ),
+                    len(active_goals),
+                    current_thread.name,
+                    current_thread is threading.main_thread(),
+                )
+            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+                # Observability must never turn a committed Goal creation into
+                # a failed user turn.
+                logger.warning(
+                    "goal_state_count_log_failed: created_goals=%s "
+                    "error_type=%s error=%s",
+                    len(created),
+                    type(exc).__name__,
+                    exc,
+                )
+        return results
 
     async def _try_apply_cognitive_runtime(
         self,

@@ -48,6 +48,8 @@ PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)"
 )
+_LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
+_LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
 
 class PlannerCoverageReview(BaseModel):
@@ -1015,19 +1017,90 @@ def _normalized_material_value(value: Any) -> Any:
     return value
 
 
-def _goal_binding_map(goal: dict[str, Any]) -> dict[str, Any]:
+def _normalized_entity_type(value: Any) -> str:
+    """Normalize a model-authored binding type without inferring semantics."""
+
+    return "_".join(
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace("-", "_")
+        .split()
+    )
+
+
+def _list_literal_items(value: str) -> list[str]:
+    """Project one typed list literal into its representation-level items."""
+
+    normalized = " ".join(str(value or "").strip().split())
+    if not normalized:
+        return []
+    return [
+        item
+        for part in _LIST_LITERAL_SEPARATOR_RE.split(normalized)
+        if (item := " ".join(part.strip().split()))
+    ]
+
+
+def _material_values_equal(
+    left: Any,
+    right: Any,
+    *,
+    list_compatible: bool = False,
+) -> bool:
+    """Compare material values while tolerating only declared shape aliases.
+
+    Goal Association may serialize a binding whose ``entity_type`` is ``list``
+    as a delimiter-separated string, while a Capability schema correctly
+    requires the executable argument to be a JSON array. That is a wire-shape
+    difference, not a semantic contradiction. No arbitrary prose is split:
+    list compatibility is enabled only by the typed binding or by an already
+    structured list on the other side of a parameter-resolution comparison.
+    """
+
+    if isinstance(left, dict) and isinstance(right, dict):
+        left_by_key = {str(key): value for key, value in left.items()}
+        right_by_key = {str(key): value for key, value in right.items()}
+        if left_by_key.keys() != right_by_key.keys():
+            return False
+        return all(
+            _material_values_equal(
+                left_by_key[key],
+                right_by_key[key],
+                list_compatible=(
+                    isinstance(left_by_key[key], list)
+                    or isinstance(right_by_key[key], list)
+                ),
+            )
+            for key in left_by_key
+        )
+
+    if list_compatible:
+        if isinstance(left, str):
+            left = _list_literal_items(left)
+        if isinstance(right, str):
+            right = _list_literal_items(right)
+    return _normalized_material_value(left) == _normalized_material_value(right)
+
+
+def _goal_binding_map(goal: dict[str, Any]) -> dict[str, dict[str, Any]]:
     goal_object = goal.get("object")
     if not isinstance(goal_object, dict):
         return {}
     raw_bindings = goal_object.get("bindings")
     if not isinstance(raw_bindings, dict):
         return {}
-    bindings: dict[str, Any] = {}
+    bindings: dict[str, dict[str, Any]] = {}
     for raw_name, raw_binding in raw_bindings.items():
         name = " ".join(str(raw_name or "").strip().split())
         if not name or not isinstance(raw_binding, dict) or "value" not in raw_binding:
             continue
-        bindings[name] = raw_binding.get("value")
+        bindings[name] = {
+            "entity_type": _normalized_entity_type(
+                raw_binding.get("entity_type")
+            ),
+            "value": raw_binding.get("value"),
+        }
     return bindings
 
 
@@ -1052,7 +1125,7 @@ def validate_goal_binding_argument_grounding(
     if output.disposition not in {"execute", "mixed"}:
         return
 
-    bindings_by_goal: dict[str, dict[str, Any]] = {}
+    bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
@@ -1069,26 +1142,37 @@ def validate_goal_binding_argument_grounding(
         if not claimed_goal_ids:
             continue
 
-        required: dict[str, Any] = {}
+        required: dict[str, dict[str, Any]] = {}
         for goal_id in claimed_goal_ids:
-            for name, value in bindings_by_goal[goal_id].items():
+            for name, binding in bindings_by_goal[goal_id].items():
                 if (
                     name in required
-                    and _normalized_material_value(required[name])
-                    != _normalized_material_value(value)
+                    and not _material_values_equal(
+                        required[name]["value"],
+                        binding["value"],
+                        list_compatible=(
+                            required[name]["entity_type"] in _LIST_ENTITY_TYPES
+                            or binding["entity_type"] in _LIST_ENTITY_TYPES
+                        ),
+                    )
                 ):
                     raise ValueError(
                         "one executable step cannot satisfy conflicting authoritative "
                         f"Goal bindings for {name!r}"
                     )
-                required[name] = value
+                required[name] = binding
 
-        for name, expected in required.items():
+        for name, binding in required.items():
             if name not in step.args:
                 continue
             actual = step.args[name]
-            if _normalized_material_value(actual) != _normalized_material_value(
-                expected
+            expected = binding["value"]
+            if not _material_values_equal(
+                actual,
+                expected,
+                list_compatible=(
+                    binding["entity_type"] in _LIST_ENTITY_TYPES
+                ),
             ):
                 raise ValueError(
                     "planner step argument contradicts authoritative Goal binding: "
@@ -1102,16 +1186,21 @@ def validate_goal_binding_argument_grounding(
                     "verified-memory retrieval requires material_args containing "
                     "the authoritative Goal bindings"
                 )
-            for name, expected in required.items():
+            for name, binding in required.items():
                 if name not in material_args:
                     raise ValueError(
                         "verified-memory retrieval omitted authoritative Goal binding: "
                         f"{name!r}"
                     )
                 actual = material_args[name]
-                if _normalized_material_value(
-                    actual
-                ) != _normalized_material_value(expected):
+                expected = binding["value"]
+                if not _material_values_equal(
+                    actual,
+                    expected,
+                    list_compatible=(
+                        binding["entity_type"] in _LIST_ENTITY_TYPES
+                    ),
+                ):
                     raise ValueError(
                         "verified-memory retrieval contradicts authoritative Goal "
                         f"binding: material_args.{name}={actual!r}, "
@@ -1357,7 +1446,14 @@ def validate_explicit_numeric_parameter_grounding(
                     f"{resolution_location(resolution)} has "
                     f"resolution={resolution.value!r}, step={step.args[resolution.parameter]!r}"
                 )
-        elif resolution.value != step.args[resolution.parameter]:
+        elif not _material_values_equal(
+            resolution.value,
+            step.args[resolution.parameter],
+            list_compatible=(
+                isinstance(resolution.value, list)
+                or isinstance(step.args[resolution.parameter], list)
+            ),
+        ):
             raise ValueError(
                 "parameter resolution value must equal the executable step argument: "
                 f"{resolution_location(resolution)}"
