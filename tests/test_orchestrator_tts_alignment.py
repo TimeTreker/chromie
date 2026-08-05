@@ -2829,6 +2829,27 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(assistant.split_tts_text(text), [text])
 
+    def test_failure_speech_contract_rejects_incomplete_sentence(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: " ".join(str(text).strip().split()),
+            assistant,
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
+            assistant,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "incomplete sentence"):
+            assistant._validate_spoken_text_contract(
+                "I understood what you need, but I couldn't get it ready this",
+                purpose="cognitive failure response",
+                max_chars=72,
+                one_sentence=True,
+                require_terminal_punctuation=True,
+                language="en-US",
+            )
+
     def test_tts_splitter_does_not_make_tiny_fragment_without_sentence_boundary(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.tts_text_chunking_enabled = True

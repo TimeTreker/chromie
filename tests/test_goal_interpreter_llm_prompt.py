@@ -2935,6 +2935,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.intent, "missing_or_unsupported_ability")
+        self.assertTrue((decision.speak_first or "").startswith("对不起呀，"))
         self.assertIn("餐厅搜索和推荐能力", decision.speak_first or "")
         self.assertEqual(decision.actions, [])
         self.assertEqual(
@@ -3038,6 +3039,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             payload["format"]["$defs"]["SemanticRouteRepairMetadata"]["properties"],
         )
         self.assertIn("speak_first", payload["format"]["properties"])
+        self.assertIn("limitation", payload["format"]["properties"])
 
     async def test_standalone_greeting_remains_chat_after_focused_review(self) -> None:
         class GreetingInterpreter(OllamaGoalInterpreter):

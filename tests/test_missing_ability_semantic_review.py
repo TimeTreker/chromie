@@ -6,6 +6,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
     SemanticRouteRepairOutput,
     _payload_message_texts,
+    _semantic_route_spoken_text,
     _validate_missing_ability_output_against_catalog,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import (
@@ -69,8 +70,37 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
         self.assertIn("must not equal or reuse any capability_id", system_text)
         self.assertIn("must not ask a follow-up question", system_text)
         self.assertIn("我现在还没学会这个呢", system_text)
+        self.assertIn("localized apology", system_text)
+        self.assertIn("plus limitation and metadata", system_text)
         self.assertIn("我无法直接查询", system_text)
         self.assertIn("must not claim that learning has started", system_text)
+
+
+    def test_missing_ability_speech_places_apology_before_limitation(self) -> None:
+        output = SemanticRouteRepairOutput.model_validate(
+            {
+                "route": "clarify",
+                "intent": "missing_or_unsupported_ability",
+                "confidence": 1.0,
+                "limitation": "我现在还没学会怎么帮你找好吃的餐厅呢。",
+                "metadata": {
+                    "desired_abilities": [
+                        {
+                            "ability_id": "local.restaurant_recommendation",
+                            "intent": "查找并推荐用户附近的优质餐厅",
+                            "status": "missing_ability",
+                            "confidence": 1.0,
+                            "reason": "当前没有餐厅搜索能力。",
+                        }
+                    ]
+                },
+            }
+        )
+
+        self.assertEqual(
+            _semantic_route_spoken_text(output, language="zh-CN"),
+            "对不起呀，我现在还没学会怎么帮你找好吃的餐厅呢。",
+        )
 
     def test_missing_ability_id_cannot_reuse_available_weather_capability(self) -> None:
         request = RouteRequest(
@@ -93,7 +123,7 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
                 "route": "clarify",
                 "intent": "missing_or_unsupported_ability",
                 "confidence": 1.0,
-                "speak_first": "这个我还没学会呢，希望以后能学会再帮你。",
+                "limitation": "我现在还没学会怎么帮你找好吃的餐厅呢。",
                 "metadata": {
                     "desired_abilities": [
                         {

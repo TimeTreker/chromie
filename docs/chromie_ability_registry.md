@@ -58,6 +58,10 @@ The ontology never writes the sentence spoken to the user.
 - normal answers, clarification, confirmation, progress, unavailable, and
   failure speech belong to Response Composer or the bounded model-owned speech
   path;
+- a terminal missing-ability response states the model-authored limitation only
+  after a localized Host-owned apology, so an honest capability boundary is not
+  delivered as a blunt refusal; it still must not ask for unusable parameters or
+  promise that the ability is already being learned;
 - final factual speech waits for trusted Evidence;
 - the Host may schedule, cancel, validate, and deliver speech, but it does not
   select wording from ontology templates.

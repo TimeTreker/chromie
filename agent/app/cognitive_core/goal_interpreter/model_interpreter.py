@@ -116,6 +116,7 @@ class SemanticRouteRepairOutput(BaseModel):
     intent: str = Field(min_length=1, max_length=120)
     confidence: float = Field(ge=0.0, le=1.0)
     speak_first: str | None = Field(default=None, min_length=1, max_length=240)
+    limitation: str | None = Field(default=None, min_length=1, max_length=220)
     metadata: SemanticRouteRepairMetadata | None = None
 
     @model_validator(mode="before")
@@ -159,6 +160,14 @@ class SemanticRouteRepairOutput(BaseModel):
         }
         if has_desired_abilities or intent in missing_aliases:
             normalized["intent"] = "missing_or_unsupported_ability"
+            # Compatibility for one release boundary: older models authored the
+            # limitation directly in speak_first.  Treat it as the limitation body
+            # so the Host can still place a localized apology before it.
+            if not str(normalized.get("limitation") or "").strip():
+                legacy = str(normalized.get("speak_first") or "").strip()
+                if legacy:
+                    normalized["limitation"] = legacy
+                    normalized["speak_first"] = None
         return normalized
 
     @model_validator(mode="after")
@@ -169,19 +178,55 @@ class SemanticRouteRepairOutput(BaseModel):
                 raise ValueError(
                     "missing_or_unsupported_ability requires route=clarify"
                 )
-            if not str(self.speak_first or "").strip():
+            if not str(self.limitation or "").strip():
                 raise ValueError(
-                    "missing_or_unsupported_ability requires truthful speak_first"
+                    "missing_or_unsupported_ability requires truthful limitation"
+                )
+            if str(self.speak_first or "").strip():
+                raise ValueError(
+                    "missing_or_unsupported_ability speech is Host-composed from limitation"
+                )
+            if str(self.limitation or "").rstrip().endswith(("?", "？")):
+                raise ValueError(
+                    "missing_or_unsupported_ability limitation must not ask a question"
                 )
             if self.metadata is None or not self.metadata.desired_abilities:
                 raise ValueError(
                     "missing_or_unsupported_ability requires desired_abilities"
                 )
-        elif self.metadata is not None:
-            raise ValueError(
-                "desired_abilities metadata is allowed only for missing ability"
-            )
+        else:
+            if self.metadata is not None:
+                raise ValueError(
+                    "desired_abilities metadata is allowed only for missing ability"
+                )
+            if self.limitation is not None:
+                raise ValueError(
+                    "limitation is allowed only for missing ability"
+                )
         return self
+
+
+def _semantic_route_spoken_text(
+    output: SemanticRouteRepairOutput,
+    *,
+    language: str | None,
+) -> str | None:
+    """Compose the terminal limitation with an apology before the limitation.
+
+    The limitation remains model-authored.  The apology order is Host-owned so a
+    missing ability cannot be stated as a blunt refusal merely because a model
+    omitted social courtesy.
+    """
+
+    if output.intent != "missing_or_unsupported_ability":
+        return output.speak_first
+    limitation = " ".join(str(output.limitation or "").strip().split())
+    if not limitation:
+        return None
+    language_code = str(language or "").strip().lower()
+    if language_code.startswith("zh"):
+        return "对不起呀，" + limitation.lstrip("，, ")
+    return "I'm sorry, " + limitation.lstrip(", ")
 
 
 def _validate_missing_ability_output_against_catalog(
@@ -1798,7 +1843,7 @@ class OllamaGoalInterpreter:
                         "Repair one semantic route from the latest user turn. "
                         "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
                         "First understand the requested outcome independently of the catalog, then compare that outcome with exact supplied ability descriptions. "
-                        "Return route, intent, and confidence, plus speak_first and metadata only for a terminal missing-ability result. "
+                        "Return route, intent, and confidence, plus limitation and metadata only for a terminal missing-ability result. "
                         "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
                         "A standalone greeting or thanks remains chat, but social framing attached "
                         "to a substantive request must not replace the substantive lane. "
@@ -1820,11 +1865,11 @@ class OllamaGoalInterpreter:
                         "Use the terminal missing-ability result only when the latest user turn itself asks Chromie for a clear lookup, recommendation, or action that no exact supplied Capability can perform. "
                         "A bare location, preference, entity name, correction, or other context statement is not a missing ability by itself; retain chat so Goal Association can decide whether it continues an earlier Goal or is independent. "
                         "When the requested outcome is clear but no exact supplied Capability can perform it, do not ask for parameters that cannot make an absent ability executable and do not imply that Chromie will check. "
-                        "Return route=clarify, intent=missing_or_unsupported_ability, one brief truthful speak_first sentence in the user's language, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. "
+                        "Return route=clarify, intent=missing_or_unsupported_ability, one brief truthful limitation in the user's language, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. The Host places a localized apology before limitation, so omit speak_first and do not put another apology inside limitation. "
                         "The missing ability_id names the absent user-facing ability. It must not equal or reuse any capability_id in Supplied abilities JSON; for example, a restaurant request must not be recorded as chromie.weather.lookup merely because both use a location. "
-                        "The terminal speak_first is the complete final response for this turn. It must not ask a follow-up question, request a location or preference, or end with a question mark. "
+                        "The terminal limitation states only what Chromie has not learned yet and is the body of the complete final response. It must not ask a follow-up question, request a location or preference, or end with a question mark. "
                         "Apply the owner-approved identity and personality from Global Context naturally. Chromie should sound like herself: a warm six-year-old child in her family, not customer service, an adult operator, or a software error message. "
-                        "Prefer simple learning language such as '我现在还没学会这个呢' over formal system language such as '我无法直接查询'. Chromie may warmly hope to learn the ability later, but must not claim that learning has started or guarantee that the ability will be added. "
+                        "Prefer simple learning language such as '我现在还没学会这个呢。' over formal system language such as '我无法直接查询'. The final spoken order is apology first, then this limitation. Chromie may warmly hope to learn the ability later, but must not claim that learning has started or guarantee that the ability will be added. "
                         "Use intent=clarify_uncertain_request only when the user's meaning itself remains genuinely underdetermined, or when one exact supplied Capability exists but requires a user-provided binding before provider resolution. Never pair route=chat with a clarification intent. "
                         "No analysis, rationale, actions, markdown, or fields outside the declared schema."
                     ),
@@ -2389,7 +2434,9 @@ class OllamaGoalInterpreter:
                     intent=minimal.intent,
                     confidence=minimal.confidence,
                     language=request.language or "auto",
-                    speak_first=minimal.speak_first,
+                    speak_first=_semantic_route_spoken_text(
+                        minimal, language=request.language
+                    ),
                     metadata=(
                         minimal.metadata.model_dump(mode="json")
                         if minimal.metadata is not None
@@ -2719,7 +2766,9 @@ class OllamaGoalInterpreter:
                     intent=minimal.intent,
                     confidence=minimal.confidence,
                     language=request.language or "auto",
-                    speak_first=minimal.speak_first,
+                    speak_first=_semantic_route_spoken_text(
+                        minimal, language=request.language
+                    ),
                     metadata=(
                         minimal.metadata.model_dump(mode="json")
                         if minimal.metadata is not None

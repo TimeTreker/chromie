@@ -282,6 +282,17 @@ class ResponseComposerResolver:
                         "status=success",
                         request.sid,
                     )
+                repaired_response_plan, mixed_coverage_reasons = (
+                    self._repair_mixed_execution_coverage(
+                        model_output.response_plan,
+                        plan=plan,
+                        context=request.context,
+                    )
+                )
+                if mixed_coverage_reasons:
+                    model_output = model_output.model_copy(
+                        update={"response_plan": repaired_response_plan}
+                    )
                 self._validate_social_attention_decision(
                     model_output.social_attention_plan,
                     context=request.context,
@@ -381,6 +392,7 @@ class ResponseComposerResolver:
                         "task_plan_immutable": True,
                         "social_attention_validation_reasons": social_reasons,
                         "lane_coordination_validation_reasons": lane_reasons,
+                        "mixed_coverage_repair_reasons": mixed_coverage_reasons,
                         "social_attention_policy": {
                             "mode": social_attention_mode,
                             "execution_enabled": social_attention_mode == "on",
@@ -458,6 +470,7 @@ class ResponseComposerResolver:
                         "effectful_semantic_review_succeeded": (
                             effectful_semantic_review_succeeded
                         ),
+                        "mixed_coverage_repair_reasons": mixed_coverage_reasons,
                     },
                 )
             except Exception as exc:
@@ -751,6 +764,111 @@ class ResponseComposerResolver:
         return [
             *cls._delivered_turn_speech(context),
             *cls._scheduled_turn_speech(context),
+        ]
+
+    @classmethod
+    def _repair_mixed_execution_coverage(
+        cls,
+        response_plan: ResponsePlan,
+        *,
+        plan: CanonicalPlan,
+        context: dict[str, Any] | None,
+    ) -> tuple[ResponsePlan, list[str]]:
+        """Reuse reviewed current-turn speech for uncovered mixed execute Goals.
+
+        A mixed response can legitimately use one stage for a requested spoken
+        outcome and a separate, already scheduled fast acknowledgement for the
+        pending Activity.  Response Composer sometimes covers only the spoken
+        Goal, which must not cancel the immutable validated Activity Plan.  This
+        adapter may only reuse an exact scheduled/playback-started robot-action
+        utterance; it never invents speech, changes a Capability, or covers a
+        non-execute Goal mechanically.
+        """
+
+        if (
+            plan.disposition != "mixed"
+            or not plan.steps
+            or cls._confirmation_required(plan, context)
+            or plan.waiting_goal_ids()
+        ):
+            return response_plan, []
+        execute_goal_ids = set(plan.executable_goal_ids())
+        if not execute_goal_ids:
+            return response_plan, []
+        stages = [
+            stage
+            for stage in (
+                response_plan.immediate,
+                response_plan.pre_action,
+                *response_plan.progress,
+                response_plan.final,
+            )
+            if stage is not None
+        ]
+        covered = {
+            goal_id
+            for stage in stages
+            for goal_id in stage.covers_goal_ids
+        }
+        missing = set(plan.goal_ids) - covered
+        if not missing:
+            return response_plan, []
+        if not missing.issubset(execute_goal_ids):
+            return response_plan, []
+        non_execute_goal_ids = set(plan.goal_ids) - execute_goal_ids
+        if not non_execute_goal_ids.issubset(covered):
+            return response_plan, []
+
+        reusable = cls._reusable_turn_speech(context)
+        candidate = next(
+            (
+                item
+                for item in reversed(reusable)
+                if str(item.get("route") or "").strip() in {"", "robot_action"}
+                and str(item.get("text") or "").strip()
+            ),
+            None,
+        )
+        if candidate is None:
+            return response_plan, []
+        candidate_text = " ".join(str(candidate["text"]).strip().split())
+        ordered_missing = [goal_id for goal_id in plan.goal_ids if goal_id in missing]
+
+        for field_name in ("immediate", "pre_action"):
+            stage = getattr(response_plan, field_name)
+            if (
+                stage is not None
+                and stage.reuse_current_turn_speech
+                and " ".join(stage.text.strip().split()) == candidate_text
+            ):
+                updated_ids = list(
+                    dict.fromkeys([*stage.covers_goal_ids, *ordered_missing])
+                )
+                repaired = response_plan.model_copy(
+                    update={
+                        field_name: stage.model_copy(
+                            update={"covers_goal_ids": updated_ids}
+                        )
+                    }
+                )
+                return repaired, [
+                    "mixed_execute_goal_coverage_extended_from_reused_turn_speech"
+                ]
+
+        if response_plan.pre_action is not None:
+            return response_plan, []
+        stage = ResponseStage(
+            text=candidate_text,
+            speech_act="acknowledge",
+            commitment_state="heard",
+            must_not_claim_completion=True,
+            reuse_current_turn_speech=True,
+            covers_goal_ids=ordered_missing,
+        )
+        repaired = response_plan.model_copy(update={"pre_action": stage})
+        cls._validate_reused_turn_speech(repaired, context=context)
+        return repaired, [
+            "mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"
         ]
 
     @classmethod

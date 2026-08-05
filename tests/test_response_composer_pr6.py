@@ -670,6 +670,101 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
         self.assertEqual(len(ollama.prompts), 4)
 
+    def test_mixed_plan_reuses_fast_speech_for_uncovered_execute_goal(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-fast-coverage",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-walk", "goal-spoken"],
+            goal_summary="Walk while delivering one requested spoken response.",
+            response_text="去影",
+            steps=[
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-spoken",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "去影",
+                },
+            ],
+        )
+        model_output = {
+            "response_plan": {
+                "immediate": {
+                    "text": "去影",
+                    "speech_act": "response",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-spoken"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "lane_coordination": [],
+            "confidence": 1.0,
+            "rationale": "The model covered only the requested spoken outcome.",
+        }
+        context = {
+            "execution_capabilities": [
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "safety_class": "physical_motion",
+                    "requires_confirmation": False,
+                }
+            ],
+            "scheduled_turn_speech": [
+                {
+                    "status": "scheduled",
+                    "stage": "fast_first",
+                    "route": "robot_action",
+                    "text": "好，我准备往前走十五秒。",
+                    "speech_event_id": "speech-mixed-walk",
+                    "generation": 3,
+                    "orders": [4],
+                }
+            ],
+        }
+        ollama = ScriptedOllama([model_output, model_output])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(canonical, context=context)
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        assert result.composition is not None
+        self.assertEqual(
+            result.composition.response_plan.immediate.covers_goal_ids,
+            ["goal-spoken"],
+        )
+        pre_action = result.composition.response_plan.pre_action
+        self.assertIsNotNone(pre_action)
+        assert pre_action is not None
+        self.assertEqual(pre_action.covers_goal_ids, ["goal-walk"])
+        self.assertTrue(pre_action.reuse_current_turn_speech)
+        self.assertEqual(pre_action.text, "好，我准备往前走十五秒。")
+        self.assertIn(
+            "mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech",
+            result.metadata["mixed_coverage_repair_reasons"],
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+
     def test_confirmation_bound_mixed_completion_claim_repairs_before_language_check(self):
         canonical = CanonicalPlan(
             plan_id="plan-mixed-adjustment-repair",

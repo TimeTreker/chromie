@@ -6054,7 +6054,7 @@ class VoiceAssistant:
             f"{phase}. The facts below are authoritative. "
             "Do not diagnose beyond them and do not change them. Sound like a smart, "
             "warm six-year-old girl, not a service status page or an adult engineer. "
-            f"Speak only in {language}. Use one or two short natural sentences. "
+            f"Speak only in {language}. Use one short, complete natural sentence. "
             "Do not mention models, planners, schemas, validation, services, APIs, "
             "internal tools, evidence labels, or system components. Do not claim any "
             "successful lookup, movement, or verified result that the facts do not prove. "
@@ -6086,7 +6086,7 @@ class VoiceAssistant:
             "prompt": prompt,
             "stream": False,
             "think": False,
-            "format": self._spoken_text_response_schema(max_chars=72),
+            "format": self._spoken_text_response_schema(max_chars=120),
             "keep_alive": self.host_settings.model_generation.keep_alive,
             "options": {
                 "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
@@ -6121,7 +6121,9 @@ class VoiceAssistant:
             text = self._decode_spoken_text_envelope(
                 data,
                 purpose="cognitive failure response",
-                max_chars=72,
+                max_chars=120,
+                one_sentence=True,
+                require_terminal_punctuation=True,
                 language=language,
             )
             cjk_count = sum(
@@ -8503,6 +8505,7 @@ class VoiceAssistant:
         purpose: str,
         max_chars: int,
         one_sentence: bool = False,
+        require_terminal_punctuation: bool = False,
         language: str | None = None,
     ) -> str:
         raw = str(text or "")
@@ -8520,6 +8523,8 @@ class VoiceAssistant:
             sentence_endings = re.findall(r"[.!?。！？]+", normalized)
             if len(sentence_endings) > 1:
                 raise RuntimeError(f"{purpose} returned more than one sentence")
+        if require_terminal_punctuation and not re.search(r"[.!?。！？]$", normalized):
+            raise RuntimeError(f"{purpose} returned an incomplete sentence")
         language_code = str(language or "").strip().lower()
         if language_code.startswith("zh") and not re.search(
             r"[\u3400-\u4dbf\u4e00-\u9fff]",
@@ -8535,6 +8540,7 @@ class VoiceAssistant:
         purpose: str,
         max_chars: int,
         one_sentence: bool = False,
+        require_terminal_punctuation: bool = False,
         language: str | None = None,
         suppressed_thinking_chars: int = 0,
     ) -> str:
@@ -8572,6 +8578,7 @@ class VoiceAssistant:
             purpose=purpose,
             max_chars=max_chars,
             one_sentence=one_sentence,
+            require_terminal_punctuation=require_terminal_punctuation,
             language=language,
         )
 

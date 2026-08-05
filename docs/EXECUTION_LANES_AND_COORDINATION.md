@@ -187,6 +187,13 @@ as its existing playback-start barrier and continue to the Trusted Capability
 Runtime. This fail-soft path never invents speech, selects a Capability, removes
 confirmation, or applies to mixed, clarification, or confirmation-bound Plans.
 
+For a non-confirmation `mixed` Plan, the requested spoken outcome and the
+pending Activity acknowledgement may occupy separate ResponsePlan stages. If
+the model covers all non-execute Goals but omits only execute Goal coverage, the
+Host may reuse an exact independently reviewed current-turn `robot_action` fast
+utterance as `pre_action` coverage. It may not invent text, cover a clarification
+or unavailable Goal mechanically, or change the immutable Capability Plan.
+
 Optional Social Attention is likewise not execution authority. A model output
 that selects `decision=express` but contains neither a valid body behavior nor
 `speech_expression.mode=adapt` is normalized to an explicit `decision=none`
