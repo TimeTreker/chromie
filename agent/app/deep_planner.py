@@ -915,6 +915,40 @@ class DeepPlannerResolver:
             "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, annotations, local field mappings, or hidden reasoning."
         )
 
+    @staticmethod
+    def _normalize_execute_transport_speech(raw: dict[str, Any]) -> dict[str, Any]:
+        """Remove planner-owned speech only from execute-only transport fields.
+
+        The strict planner contract still rejects non-empty ``response_text`` on
+        execute outcomes.  Deep Planner models nevertheless sometimes duplicate
+        a pre-execution acknowledgement or premature completion claim into those
+        fields after otherwise producing a valid executable plan.  Response
+        Composer owns that transport speech, so the Deep Planner adapter removes
+        only the redundant execute-field copies before contract validation.
+        Respond outcomes and confirmation-bound adjusted plans remain untouched.
+        """
+
+        normalized = copy.deepcopy(raw)
+        outcomes = normalized.get("goal_outcomes")
+        if isinstance(outcomes, dict):
+            for value in outcomes.values():
+                if not isinstance(value, dict):
+                    continue
+                disposition = str(value.get("disposition") or "").strip()
+                step_ids = value.get("step_ids")
+                if not disposition and isinstance(step_ids, list) and step_ids:
+                    disposition = "execute"
+                if disposition == "execute":
+                    value["response_text"] = ""
+        if (
+            normalized.get("disposition") == "execute"
+            and normalized.get("plan_relation", "exact") == "exact"
+            and isinstance(normalized.get("steps"), list)
+            and normalized.get("steps")
+        ):
+            normalized["response_text"] = ""
+        return normalized
+
     def _normalize(
         self,
         raw: dict[str, Any],
@@ -924,7 +958,7 @@ class DeepPlannerResolver:
         expected_goal_ids_for_turn: list[str],
     ) -> dict[str, Any]:
         model_output = validate_planner_model_output(
-            raw,
+            self._normalize_execute_transport_speech(raw),
             planner_tier="deep",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
         )

@@ -661,6 +661,53 @@ class DeepPlannerResolverTests(unittest.TestCase):
         outcome = schema["$defs"]["PlannerModelGoalOutcome"]
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
 
+    def test_deep_adapter_removes_execute_transport_speech_before_validation(self):
+        resolver = DeepPlannerResolver(SequencedOllama([]), FullCatalog())
+        normalized = resolver._normalize(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Walk forward for 15 seconds.",
+                "response_text": "好的，我现在开始走。",
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15},
+                        "source_goal_ids": ["goal-action"],
+                    }
+                ],
+                "goal_outcomes": {
+                    "goal-action": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "已经执行完成。",
+                        "step_ids": ["walk"],
+                    }
+                },
+                "goal_satisfaction": {
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-action"],
+                    "unmet_goal_ids": [],
+                    "unmet_requirements": [],
+                },
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            },
+            request=request(goal_ids=["goal-action"]),
+            plan_id="plan-transport-normalization",
+            expected_goal_ids_for_turn=["goal-action"],
+        )
+
+        self.assertEqual(normalized["response_text"], "")
+        self.assertEqual(normalized["goal_outcomes"][0]["response_text"], "")
+        self.assertEqual(
+            normalized["steps"][0]["capability_id"],
+            "soridormi.walk_forward",
+        )
+
     def test_model_outcome_rejects_execute_response_text_before_materialization(self):
         with self.assertRaisesRegex(
             ValueError, "execute goal outcome must not carry response_text"

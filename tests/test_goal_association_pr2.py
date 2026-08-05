@@ -869,6 +869,84 @@ class GoalAssociationResolverTests(unittest.TestCase):
         ]
         self.assertIn("responsibility_kind", goal_schema["required"])
 
+    def test_three_executable_actions_trigger_review_and_preserve_spoken_performance(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": (
+                        "Walk forward for 15 seconds while singing and blinking."
+                    ),
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "duration",
+                            "entity_type": "time_duration",
+                            "value": "15 seconds",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Sing while walking forward.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+                {
+                    "description": "Blink eyes while walking forward.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Walk forward for 15 seconds.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "duration",
+                            "entity_type": "time_duration",
+                            "value": "15 seconds",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Sing while walking forward.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+                {
+                    "description": "Blink eyes while walking forward.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([initial, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.metadata["semantic_review"]["triggers"],
+            ["multi_embodied_responsibility_review"],
+        )
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["executable_action", "spoken_response", "executable_action"],
+        )
+        self.assertIn("directly requested spoken performance", ollama.prompts[1][0])
+
     def test_associates_followup_before_creating_new_goal(self):
         ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal.", "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))

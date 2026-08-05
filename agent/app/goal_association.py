@@ -1032,6 +1032,15 @@ class GoalAssociationResolver:
         )
         if executable_goal_count == 1:
             triggers.append("embodied_responsibility_decomposition")
+        elif executable_goal_count >= 3:
+            # Three or more model-authored effectful responsibilities cross the
+            # same bounded-complexity threshold used by planner coverage audit.
+            # A semantic review is required because one responsibility may
+            # actually belong to the spoken-response lane (for example, a
+            # directly requested performance) even when the first pass labels
+            # every sibling as executable.  The Host does not reclassify any
+            # Goal here; it only asks the model to review its own segmentation.
+            triggers.append("multi_embodied_responsibility_review")
         if (
             isinstance(model_output, GoalAssociationModelOutput)
             and model_output.decision == "create_goals"
