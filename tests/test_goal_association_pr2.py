@@ -348,6 +348,125 @@ class GoalAssociationResolverTests(unittest.TestCase):
             },
         )
 
+    def test_invalid_typed_compound_uses_fresh_model_owned_resegmentation(self):
+        invalid = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走15秒。",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [
+                        {
+                            "name": "duration",
+                            "entity_type": "time_duration",
+                            "value": "15秒",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "边走边唱歌。",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "同时眨眼睛。",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        resegmented = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "向前走15秒。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [
+                        {
+                            "name": "duration",
+                            "entity_type": "time_duration",
+                            "value": "15秒",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "边走边唱歌。",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "同时眨眼睛。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([invalid, resegmented])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
+                    language="zh-CN",
+                    route="robot_action",
+                    intent="capability:soridormi.walk_forward",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        repair_prompt, repair_kwargs = ollama.prompts[1]
+        self.assertEqual(
+            repair_kwargs["prompt_family"],
+            "goal_association.typed_execution_resegmentation",
+        )
+        self.assertIn("No previous Goal DTO is supplied", repair_prompt)
+        self.assertIn("invalid_typed_execution_contract", repair_prompt)
+        self.assertIn("The only valid typed tuples are", repair_prompt)
+        self.assertNotIn('"responsibility_kind":"capability_dependent"', repair_prompt)
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "model_owned_fresh_typed_resegmentation",
+        )
+        self.assertEqual(
+            [
+                (
+                    goal.metadata["responsibility_kind"],
+                    goal.metadata["execution_lane"],
+                    goal.metadata["output_mode"],
+                    goal.metadata["provider_required"],
+                )
+                for goal in result.new_goals
+            ],
+            [
+                ("executable_action", "activity", "body_action", True),
+                ("spoken_response", "speaking", "singing", True),
+                ("executable_action", "activity", "body_action", True),
+            ],
+        )
+
     def test_empty_optional_referent_introduction_does_not_discard_weather_goal(self):
         ollama = FakeOllama(
             {

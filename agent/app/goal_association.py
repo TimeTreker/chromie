@@ -7,6 +7,7 @@ import logging
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from .clients.ollama_client import (
     OllamaClient,
@@ -109,6 +110,27 @@ _VOCAL_OUTPUT_MODES = frozenset(
     }
 )
 _MODE_SPECIFIC_VOCAL_OUTPUTS = _VOCAL_OUTPUT_MODES - {"speech"}
+_FRESH_RESEGMENTATION_TRIGGERS = frozenset(
+    {
+        "multi_embodied_responsibility_review",
+        "invalid_typed_execution_contract",
+    }
+)
+_EXECUTION_CONTRACT_PROMPT = (
+    "The only valid typed tuples are "
+    "executable_action/activity/body_action/true; "
+    "executable_action/activity/media_playback/true; "
+    "capability_dependent/activity/capability_work/true; "
+    "spoken_response/speaking/speech/false; "
+    "spoken_response/speaking/<mode-specific-vocal>/true; and "
+    "other/none/other/false. Never use capability_dependent merely because an "
+    "exact provider is required: provider_required describes evidence need, while "
+    "the human completion mode determines responsibility_kind."
+)
+
+
+def _execution_contract_error(message: str) -> PydanticCustomError:
+    return PydanticCustomError("goal_execution_contract", message)
 
 
 GoalAssociationModelRelationship = Literal[
@@ -469,48 +491,58 @@ class GoalAssociationModelGoal(BaseModel):
 
         if self.responsibility_kind == "spoken_response":
             if lane != "speaking" or mode not in _VOCAL_OUTPUT_MODES:
-                raise ValueError(
+                raise _execution_contract_error(
                     "spoken_response requires execution_lane=speaking and a vocal output_mode"
                 )
         elif self.responsibility_kind == "executable_action":
             if lane != "activity" or mode not in {"body_action", "media_playback"}:
-                raise ValueError(
+                raise _execution_contract_error(
                     "executable_action requires activity lane and body_action or media_playback"
                 )
             if not provider_required:
-                raise ValueError("executable_action requires provider_required=true")
+                raise _execution_contract_error(
+                    "executable_action requires provider_required=true"
+                )
         elif self.responsibility_kind == "capability_dependent":
             if lane != "activity" or mode != "capability_work":
-                raise ValueError(
+                raise _execution_contract_error(
                     "capability_dependent requires activity lane and capability_work"
                 )
             if not provider_required:
-                raise ValueError("capability_dependent requires provider_required=true")
+                raise _execution_contract_error(
+                    "capability_dependent requires provider_required=true"
+                )
         else:
             if lane != "none" or mode != "other" or provider_required:
-                raise ValueError(
+                raise _execution_contract_error(
                     "other responsibility requires execution_lane=none, output_mode=other, "
                     "and provider_required=false"
                 )
 
         if mode in _VOCAL_OUTPUT_MODES and lane != "speaking":
-            raise ValueError("vocal output_mode requires execution_lane=speaking")
+            raise _execution_contract_error(
+                "vocal output_mode requires execution_lane=speaking"
+            )
         if mode in {"body_action", "media_playback", "capability_work"} and lane != "activity":
-            raise ValueError("activity output_mode requires execution_lane=activity")
+            raise _execution_contract_error(
+                "activity output_mode requires execution_lane=activity"
+            )
         if mode == "other" and lane != "none":
-            raise ValueError("output_mode=other requires execution_lane=none")
+            raise _execution_contract_error(
+                "output_mode=other requires execution_lane=none"
+            )
         if mode in _MODE_SPECIFIC_VOCAL_OUTPUTS and not provider_required:
-            raise ValueError(
+            raise _execution_contract_error(
                 "mode-specific vocal output requires provider_required=true; ordinary "
                 "speech delivery is not evidence for that mode"
             )
         if mode == "speech" and provider_required:
-            raise ValueError(
+            raise _execution_contract_error(
                 "ordinary speech uses Chromie's maintained Speaking delivery path and "
                 "must set provider_required=false"
             )
         if self.resource_responsibility is not None and lane == "speaking":
-            raise ValueError(
+            raise _execution_contract_error(
                 "a normal vocal performance is not resource acquisition or delivery"
             )
         return self
@@ -736,6 +768,7 @@ class GoalAssociationResolver:
         initial_validation_error = ""
         repair_attempted = False
         contract_repair_succeeded = False
+        contract_repair_strategy = ""
         semantic_review_attempted = False
         optional_referent_recovery: list[dict[str, Any]] = []
 
@@ -764,29 +797,60 @@ class GoalAssociationResolver:
             except (ValidationError, ValueError) as exc:
                 repair_attempted = True
                 initial_validation_error = self._validation_error_json(exc)
+                fresh_typed_resegmentation = (
+                    self._is_execution_contract_validation_error(exc)
+                )
+                contract_repair_strategy = (
+                    "model_owned_fresh_typed_resegmentation"
+                    if fresh_typed_resegmentation
+                    else "schema_constrained_model_revision"
+                )
                 logger.warning(
                     "goal_association_contract_repair_start sid=%s validation_errors=%s "
-                    "raw_output=%s",
+                    "strategy=%s raw_output=%s",
                     request.sid,
                     initial_validation_error,
+                    contract_repair_strategy,
                     self._bounded_json(raw, 4000),
                 )
-                repaired = await self.ollama.generate(
-                    self._build_repair_prompt(
-                        request=request,
-                        candidate_goals=candidate_goals,
-                        turn_id=turn_id,
-                        output_type=output_type,
-                        raw=raw,
-                        validation_error=initial_validation_error,
-                    ),
-                    system=self._repair_system_prompt(output_type),
-                    options=generation_options,
-                    response_format=response_schema,
-                    prompt_family="goal_association.repair",
-                    turn_id=request.sid,
-                    attempt=2,
-                )
+                if fresh_typed_resegmentation:
+                    repaired = await self.ollama.generate(
+                        self._build_semantic_review_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            output_type=output_type,
+                            raw={},
+                            triggers=["invalid_typed_execution_contract"],
+                        ),
+                        system=self._semantic_review_system_prompt(
+                            output_type,
+                            fresh_resegmentation=True,
+                        ),
+                        options=generation_options,
+                        response_format=response_schema,
+                        prompt_family=(
+                            "goal_association.typed_execution_resegmentation"
+                        ),
+                        turn_id=request.sid,
+                        attempt=2,
+                    )
+                else:
+                    repaired = await self.ollama.generate(
+                        self._build_repair_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                            raw=raw,
+                            validation_error=initial_validation_error,
+                        ),
+                        system=self._repair_system_prompt(output_type),
+                        options=generation_options,
+                        response_format=response_schema,
+                        prompt_family="goal_association.repair",
+                        turn_id=request.sid,
+                        attempt=2,
+                    )
                 if not isinstance(repaired, dict):
                     raise ValueError("goal-association repair response is not a JSON object")
                 repaired, recovered = (
@@ -805,7 +869,7 @@ class GoalAssociationResolver:
                 repair_metadata["contract_repair"] = {
                     "attempted": True,
                     "succeeded": True,
-                    "strategy": "schema_constrained_model_revision",
+                    "strategy": contract_repair_strategy,
                     "attempt_count": 1,
                 }
                 resolution = resolution.model_copy(update={"metadata": repair_metadata})
@@ -879,7 +943,7 @@ class GoalAssociationResolver:
                     review_metadata["contract_repair"] = {
                         "attempted": True,
                         "succeeded": True,
-                        "strategy": "schema_constrained_model_revision",
+                        "strategy": contract_repair_strategy,
                         "attempt_count": 1,
                     }
                 review_metadata["semantic_review"] = {
@@ -1220,6 +1284,30 @@ class GoalAssociationResolver:
             default=str,
         )[:6000]
 
+    @staticmethod
+    def _is_execution_contract_validation_error(exc: Exception) -> bool:
+        """Return true only when every defect is a typed Goal tuple mismatch.
+
+        The Host does not repair or reclassify the semantic fields. It uses this
+        distinction only to choose a fresh model-owned resegmentation that omits
+        the invalid DTO, avoiding repair anchoring on mutually inconsistent typed
+        labels. Missing fields and unrelated schema defects still use the normal
+        exact-error repair path.
+        """
+
+        if not isinstance(exc, ValidationError):
+            return False
+        errors = exc.errors(include_url=False)
+        if not errors:
+            return False
+        for error in errors:
+            location = tuple(error.get("loc") or ())
+            if not location or location[0] != "new_goals":
+                return False
+            if error.get("type") != "goal_execution_contract":
+                return False
+        return True
+
 
     @staticmethod
     def _response_schema(
@@ -1464,7 +1552,9 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, and provider_required. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
+            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, and provider_required. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. "
+            f"{_EXECUTION_CONTRACT_PROMPT} "
+            "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
@@ -1576,7 +1666,9 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. "
+            + _EXECUTION_CONTRACT_PROMPT
+            + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1605,8 +1697,8 @@ class GoalAssociationResolver:
             else "decision, associations, new_goals, referent_updates, "
             "resolved_references, clarification, confidence, and reason_summary"
         )
-        fresh_resegmentation = (
-            "multi_embodied_responsibility_review" in triggers
+        fresh_resegmentation = bool(
+            _FRESH_RESEGMENTATION_TRIGGERS.intersection(triggers)
         )
         review_input = (
             "No previous Goal DTO is supplied for this review. Reconstruct the "
@@ -1639,7 +1731,8 @@ class GoalAssociationResolver:
             "with provider_required=true; an ordinary social reply or joke normally "
             "uses output_mode=speech and provider_required=false. Never map a vocal "
             "performance to express_attention, media playback, or another body "
-            "capability, and never use ordinary speech as evidence for singing.\n\n"
+            "capability, and never use ordinary speech as evidence for singing. "
+            f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
             "Keep or create a fresh spoken_response Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
             "decision, or other direct conversational act, even when a retained Goal "

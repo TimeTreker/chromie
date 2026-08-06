@@ -19,7 +19,9 @@ remains available in Git history.
 - Split vocal Goal semantics into typed completion modality, lane, output mode,
   and exact-provider need. Mode-specific vocal performance now fails closed
   instead of being completed by generic response text, ordinary TTS, media, or
-  body behavior.
+  body behavior. Mutually inconsistent typed Goal tuples now trigger a fresh
+  model-owned resegmentation from the authoritative turn without supplying the
+  invalid DTO as semantic evidence.
 
 ### Verification and reproducibility
 
