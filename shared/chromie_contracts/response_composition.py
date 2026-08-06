@@ -154,13 +154,13 @@ class CoordinatedResponsePlan(BaseModel):
             coordination_id = str(stage.coordination_id or "").strip()
             if not coordination_id:
                 continue
-            group = coordination_by_id.get(coordination_id)
-            if group is None:
+            coordination_group = coordination_by_id.get(coordination_id)
+            if coordination_group is None:
                 raise ValueError(
                     "response stage references unknown lane coordination: "
                     + coordination_id
                 )
-            if "speaking" not in group.lanes:
+            if "speaking" not in coordination_group.lanes:
                 raise ValueError(
                     "response stage coordination requires the speaking lane: "
                     + coordination_id
@@ -180,13 +180,13 @@ class CoordinatedResponsePlan(BaseModel):
                 coordination_id = str(behavior.coordination_id or "").strip()
                 if not coordination_id:
                     continue
-                group = coordination_by_id.get(coordination_id)
-                if group is None:
+                coordination_group = coordination_by_id.get(coordination_id)
+                if coordination_group is None:
                     raise ValueError(
                         "social behavior references unknown lane coordination: "
                         + coordination_id
                     )
-                if "social_attention" not in group.lanes:
+                if "social_attention" not in coordination_group.lanes:
                     raise ValueError(
                         "social behavior coordination requires the social_attention lane: "
                         + coordination_id
