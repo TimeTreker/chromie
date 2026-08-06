@@ -1703,7 +1703,8 @@
         "scripts/preflight_cognitive_gateway_core_qualification.py",
         "scripts/run_agent_skill_weather_qualification.py",
         "scripts/run_cognitive_gateway_core_qualification.py",
-        "scripts/run_target_evidence_closure.py"
+        "scripts/run_target_evidence_closure.py",
+        "scripts/vocal_issue_closure.py"
       ]
     },
     {
@@ -4234,6 +4235,7 @@
         "scripts/provider_fault_matrix.py",
         "scripts/run_cognitive_gateway_core_qualification.py",
         "scripts/run_target_evidence_closure.py",
+        "scripts/vocal_issue_closure.py",
         "scripts/voice_acceptance.py"
       ]
     },
