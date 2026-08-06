@@ -486,11 +486,10 @@ writes `route.json`, `interaction_response.json`,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
 records the Chromie checkout revision/version/clean state, Soridormi manifest,
 the user-supplied declared paired checkout and its clean state, selected
-semantic path, and apply lanes. `--soridormi-repo` does not prove which source
-the MCP endpoint executes. Target validation additionally requires an
-endpoint-reported Soridormi source revision matching the clean paired checkout
-and manifest; the current runner records no such endpoint revision, so its new
-summaries remain diagnostic. It fails if
+semantic path, and apply lanes. `--soridormi-repo` alone does not prove which
+source the MCP endpoint executes. When the live Soridormi status reports
+`source_revision`, the runner records it; Level C target validation requires it
+to match the clean paired checkout. It fails if
 Trusted Capability Runtime execution fails, if the simulator does not return to safe idle,
 or, when assertion flags are supplied, if the ordered Soridormi skills or
 expected arguments do not match. Use `--no-speaker` for headless automation;
@@ -500,6 +499,41 @@ runner uses a 120s per-Soridormi-skill diagnostic timeout by default; pass
 compact debug lines for route, staged task list, skills, speech count, and
 errors before the JSON summary. The runner refuses non-`sim` Soridormi modes
 unless `--allow-non-sim` is supplied under separate supervision.
+
+### Vocal Goal/Planner Issue #1 closure
+
+After committing the vocal semantic and canonical-gate patches, run the exact
+retained closure workflow from a clean Chromie checkout with a clean paired
+Soridormi checkout and the deployed Agent/TTS/Soridormi simulator services:
+
+```bash
+python scripts/vocal_issue_closure.py \
+  --soridormi-repo ../soridormi
+```
+
+The runner executes `./scripts/run_tests.sh`, captures the running image/model
+identity, submits the original Chinese walk/sing/blink turn through the
+maintained Goal-driven path, executes the body members in Soridormi/MuJoCo, and
+then validates the retained evidence. Closure requires exactly one typed
+Speaking/singing Goal, at least two typed Activity/body Goals, parallel walking
+and blinking requests with the preserved 15-second duration, an
+`unavailable` or `refused` singing outcome with no executable step, completed
+Soridormi results for the exact configured walk and blink capabilities, matching
+clean Chromie/Soridormi revisions, and safe idle before and after execution.
+Ordinary TTS, media playback, Social Attention, or a body result may not be
+recorded as singing evidence.
+
+The output lives under `.chromie/acceptance/vocal-issue-1/<id>/` and includes
+canonical/live logs, runtime identity, the underlying text-to-MuJoCo bundle,
+`closure_summary.json`, and its SHA-256 sidecar. `issue_comment.md` is written
+only after every closure condition passes; a failed run writes
+`closure_failure.md` instead. A zero exit status makes Issue #1 eligible to
+close for its declared Level A/C scope only. Add `--close-issue` to let an
+authenticated GitHub CLI close `TimeTreker/chromie#1` after the evidence passes;
+the runner refuses that mutation when `closure_eligible=false`. It does not
+validate a singing provider, physical microphone/speaker quality, physical
+robot behavior, or release readiness. `--skip-canonical-gate` is diagnostic-only
+and can never produce closure-eligible evidence.
 
 Use `--reject-internal-speech` when investigating planner/TTS leakage. For the
 known ASR-style walk typo regression, run:

@@ -114,9 +114,11 @@ Exit criteria:
   variants pass focused and general-ability source tests;
 - Planner output contains no unknown step reference and no body/media
   substitution for singing;
-- the canonical source gate passes on the same revision;
-- the highest available live trace reaches real body dispatch or returns exact
-  per-Goal unavailability without claiming singing; and
+- `scripts/vocal_issue_closure.py` reports `closure_eligible=true` from one clean
+  revision after the canonical source gate, exact typed Goal/Plan validation,
+  real Soridormi/MuJoCo walking and blinking completion, exact singing
+  unavailability or refusal, matching source identity, and safe-idle recovery;
+  and
 - target audio or robot behavior is claimed only from retained target evidence.
 
 ### Conditional vocal-hosting review

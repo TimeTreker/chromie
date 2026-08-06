@@ -22,43 +22,19 @@ from orchestrator.runtime.memory import (
 
 if TYPE_CHECKING:
     from orchestrator.runtime.host_settings import ConversationSettings
-
-try:
-    from chromie_contracts.discourse import (
-        DiscourseReferent,
-        DiscourseReferentUpdate,
-        ResolvedDiscourseReference,
-    )
-    from chromie_contracts.goal import (
-        ActiveGoalSnapshot,
-        GoalAssociationResolution,
-        stable_goal_operation_id,
-    )
-    from chromie_contracts.execution_outcome import (
-        ExecutionOutcomeBundle,
-        execution_outcome_fingerprint,
-    )
-    from chromie_contracts.reflex import CancellationDispatchReceipt
-    from chromie_contracts.semantic_task import (
-        InformationGap,
-        SemanticGoal,
-        SemanticTaskOperation,
-        TaskContextSnapshot,
-    )
-except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.discourse import (
         DiscourseReferent,
         DiscourseReferentUpdate,
         ResolvedDiscourseReference,
     )
+    from shared.chromie_contracts.execution_outcome import (
+        ExecutionOutcomeBundle,
+        execution_outcome_fingerprint,
+    )
     from shared.chromie_contracts.goal import (
         ActiveGoalSnapshot,
         GoalAssociationResolution,
         stable_goal_operation_id,
-    )
-    from shared.chromie_contracts.execution_outcome import (
-        ExecutionOutcomeBundle,
-        execution_outcome_fingerprint,
     )
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
     from shared.chromie_contracts.semantic_task import (
@@ -67,6 +43,51 @@ except ImportError:  # pragma: no cover - repository development path
         SemanticTaskOperation,
         TaskContextSnapshot,
     )
+else:
+    try:
+        from chromie_contracts.discourse import (
+            DiscourseReferent,
+            DiscourseReferentUpdate,
+            ResolvedDiscourseReference,
+        )
+        from chromie_contracts.execution_outcome import (
+            ExecutionOutcomeBundle,
+            execution_outcome_fingerprint,
+        )
+        from chromie_contracts.goal import (
+            ActiveGoalSnapshot,
+            GoalAssociationResolution,
+            stable_goal_operation_id,
+        )
+        from chromie_contracts.reflex import CancellationDispatchReceipt
+        from chromie_contracts.semantic_task import (
+            InformationGap,
+            SemanticGoal,
+            SemanticTaskOperation,
+            TaskContextSnapshot,
+        )
+    except ImportError:  # pragma: no cover - repository development path
+        from shared.chromie_contracts.discourse import (
+            DiscourseReferent,
+            DiscourseReferentUpdate,
+            ResolvedDiscourseReference,
+        )
+        from shared.chromie_contracts.execution_outcome import (
+            ExecutionOutcomeBundle,
+            execution_outcome_fingerprint,
+        )
+        from shared.chromie_contracts.goal import (
+            ActiveGoalSnapshot,
+            GoalAssociationResolution,
+            stable_goal_operation_id,
+        )
+        from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+        from shared.chromie_contracts.semantic_task import (
+            InformationGap,
+            SemanticGoal,
+            SemanticTaskOperation,
+            TaskContextSnapshot,
+        )
 
 
 _DONE_TASK_STATUSES = {"done", "failed", "refused", "timed_out", "cancelled", "canceled", "expired", "superseded"}

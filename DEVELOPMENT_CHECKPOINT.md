@@ -79,11 +79,22 @@ mechanism is now implemented on this patch line:
 - one Planner ownership representation remains authoritative for redundant step
   references.
 
-Next, run the complete canonical source gate, the retained walk/sing/blink
-episode, generalized vocal/media scenarios, and the highest safe current-revision
-live trace. The live result must either dispatch the independent body members and
-report exact vocal unavailability or carry mode-specific provider evidence. A
-focused unit pass does not prove singing, speaker output, MuJoCo motion, or
+Next, close the active defect only through the combined source/live gate from
+clean paired Chromie and Soridormi checkouts with the deployed Agent, TTS, and
+Soridormi simulator services:
+
+```bash
+python scripts/vocal_issue_closure.py \
+  --soridormi-repo ../soridormi \
+  --close-issue
+```
+
+The command must report `closure_eligible=true`. It runs the canonical source
+gate on that revision and retains the exact walk/sing/blink trace. The live
+result must dispatch and complete the independent walking and blinking members,
+return exact singing unavailability or refusal with no executable singing step,
+match the clean Soridormi endpoint/checkout revision, and return to safe idle.
+A focused unit pass does not prove singing, speaker output, MuJoCo motion, or
 physical robot behavior.
 
 Do not begin TTS/playback migration, neutral capability-ID indirection, or a

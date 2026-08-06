@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 import os
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
-try:
-    from chromie_contracts.social_attention import (
-        SocialAttentionMode,
-        normalize_social_attention_mode,
-    )
-except ImportError:  # pragma: no cover
+if TYPE_CHECKING:
     from shared.chromie_contracts.social_attention import (
         SocialAttentionMode,
         normalize_social_attention_mode,
     )
+else:
+    try:
+        from chromie_contracts.social_attention import (
+            SocialAttentionMode,
+            normalize_social_attention_mode,
+        )
+    except ImportError:  # pragma: no cover
+        from shared.chromie_contracts.social_attention import (
+            SocialAttentionMode,
+            normalize_social_attention_mode,
+        )
 
 
 def _goal_interpretation_mode_from_env() -> str:

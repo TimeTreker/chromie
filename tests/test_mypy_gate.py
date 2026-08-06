@@ -114,6 +114,8 @@ class MypyGateTests(unittest.TestCase):
         ):
             self.assertIn(setting, text)
         self.assertNotIn("ignore_errors = True", text)
+        self.assertIn("explicit_package_bases = True", text)
+        self.assertNotIn("mypy_path = shared", text)
         self.assertNotIn("follow_imports = skip", text)
 
     def test_test_dependencies_pin_mypy(self) -> None:
