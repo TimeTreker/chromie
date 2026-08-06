@@ -30,13 +30,17 @@ remains available in Git history.
   contain `.git`, while retaining Git revision and dirty-state metadata for
   development checkouts.
 - Added benchmark integrity checks to the canonical test entrypoint.
-- Stabilized the incremental Mypy package identity so repository-source
-  `shared.chromie_contracts` and the Agent container's installed
-  `chromie_contracts` compatibility path are not analyzed as duplicate modules.
+- Restored the incremental Mypy gate to its last dependency-complete, verified
+  four-file baseline after an unexecuted package-scope expansion exposed 169
+  pre-existing type errors in CI. Package expansion remains separate cleanup
+  work and may return only after the complete added scope passes.
 - Added a fail-closed vocal Issue #1 closure runner that binds the canonical gate,
   deployment identity, exact typed Goal/Plan evidence, Soridormi/MuJoCo body
   completion, honest singing unavailability, and optional authenticated Issue
-  closure to one clean revision.
+  closure to one clean revision. The runner now understands the canonical keyed
+  `goal_outcomes` map, reuses or starts the maintained headless paired stack,
+  stops before downstream work when a prerequisite fails, and retains the exact
+  command error instead of a generic failure label.
 - Pinned third-party GitHub Actions by commit and added Python 3.11/3.12 CI
   coverage for the GPU-free control plane.
 - Reduced default unit-test console noise while preserving warnings and errors.

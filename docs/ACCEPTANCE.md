@@ -511,10 +511,16 @@ python scripts/vocal_issue_closure.py \
   --soridormi-repo ../soridormi
 ```
 
-The runner executes `./scripts/run_tests.sh`, captures the running image/model
-identity, submits the original Chinese walk/sing/blink turn through the
-maintained Goal-driven path, executes the body members in Soridormi/MuJoCo, and
-then validates the retained evidence. Closure requires exactly one typed
+The runner executes `./scripts/run_tests.sh`, then checks the maintained paired
+deployment. By default `--deployment-mode auto` reuses a ready stack or starts
+the repository-owned headless stack with current images; `reuse` forbids
+startup and `start` forces a clean lifecycle restart. It captures the running
+image/model identity only after readiness, submits the original Chinese
+walk/sing/blink turn through the maintained Goal-driven path, executes the body
+members in Soridormi/MuJoCo, and then validates the retained evidence. Use
+`--rebuild-no-cache` when cached images are not acceptable and
+`--keep-deployment` only when the started stack must remain available after the
+run. Closure requires exactly one typed
 Speaking/singing Goal, at least two typed Activity/body Goals, parallel walking
 and blinking requests with the preserved 15-second duration, an
 `unavailable` or `refused` singing outcome with no executable step, completed
@@ -523,8 +529,12 @@ clean Chromie/Soridormi revisions, and safe idle before and after execution.
 Ordinary TTS, media playback, Social Attention, or a body result may not be
 recorded as singing evidence.
 
-The output lives under `.chromie/acceptance/vocal-issue-1/<id>/` and includes
-canonical/live logs, runtime identity, the underlying text-to-MuJoCo bundle,
+A failed canonical gate stops before deployment startup; a failed deployment or
+runtime-identity capture stops before the live request. The retained report
+includes the exact subprocess error rather than only `capture failed` or
+`summary missing`. The output lives under
+`.chromie/acceptance/vocal-issue-1/<id>/` and includes canonical/live logs,
+runtime identity, the underlying text-to-MuJoCo bundle,
 `closure_summary.json`, and its SHA-256 sidecar. `issue_comment.md` is written
 only after every closure condition passes; a failed run writes
 `closure_failure.md` instead. A zero exit status makes Issue #1 eligible to

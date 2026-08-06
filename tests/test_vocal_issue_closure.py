@@ -9,6 +9,7 @@ from pathlib import Path
 from orchestrator.runtime.evidence_identity import canonical_json_sha256
 from scripts.vocal_issue_closure import (
     _build_live_command,
+    _deployment_start_command,
     _failure_summary,
     build_parser,
     validate_closure_summary,
@@ -105,24 +106,21 @@ def passing_summary() -> dict:
                         "source_goal_ids": ["goal-blink"],
                     },
                 ],
-                "goal_outcomes": [
-                    {
-                        "goal_id": "goal-walk",
+                "goal_outcomes": {
+                    "goal-walk": {
                         "disposition": "execute",
                         "step_ids": ["step-walk"],
                     },
-                    {
-                        "goal_id": "goal-sing",
+                    "goal-sing": {
                         "disposition": "unavailable",
                         "step_ids": [],
                         "unresolved": ["no singing-capable provider"],
                     },
-                    {
-                        "goal_id": "goal-blink",
+                    "goal-blink": {
                         "disposition": "execute",
                         "step_ids": ["step-blink"],
                     },
-                ],
+                },
             },
         },
         "interaction_response": {
@@ -184,7 +182,7 @@ class VocalIssueClosureTests(unittest.TestCase):
 
     def test_generic_respond_cannot_close_singing(self) -> None:
         summary = passing_summary()
-        singing = summary["cognitive_runtime"]["terminal_plan"]["goal_outcomes"][1]
+        singing = summary["cognitive_runtime"]["terminal_plan"]["goal_outcomes"]["goal-sing"]
         singing["disposition"] = "respond"
         singing["response_text"] = "我唱给你听。"
 
@@ -354,6 +352,36 @@ class VocalIssueClosureTests(unittest.TestCase):
         self.assertTrue(parsed.grant_confirmation)
         self.assertFalse(parsed.speaker)
         self.assertEqual(parsed.skill_timeout_s, 180.0)
+
+    def test_deployment_auto_mode_is_default_and_builds_headless_stack(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["--soridormi-repo", "../soridormi"])
+        self.assertEqual(args.deployment_mode, "auto")
+        command = _deployment_start_command(
+            soridormi_repo=Path("../soridormi"),
+            rebuild_no_cache=False,
+        )
+        self.assertIn("--build", command)
+        self.assertIn("--no-viewer", command)
+        self.assertIn("--keep-running", command)
+        rebuilt = _deployment_start_command(
+            soridormi_repo=Path("../soridormi"),
+            rebuild_no_cache=True,
+        )
+        self.assertIn("--rebuild-no-cache", rebuilt)
+        self.assertNotIn("--build", rebuilt)
+
+    def test_legacy_list_outcomes_remain_readable_during_evidence_migration(self) -> None:
+        summary = passing_summary()
+        keyed = summary["cognitive_runtime"]["terminal_plan"]["goal_outcomes"]
+        summary["cognitive_runtime"]["terminal_plan"]["goal_outcomes"] = [
+            {"goal_id": goal_id, **outcome}
+            for goal_id, outcome in keyed.items()
+        ]
+
+        errors = self.validate(summary)
+
+        self.assertEqual(errors, [])
 
     def test_close_issue_is_explicit_opt_in(self) -> None:
         parser = build_parser()

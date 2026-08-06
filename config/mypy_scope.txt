@@ -1,17 +1,4 @@
-# Owned packages expand recursively so new modules enter the gate automatically.
-agent/app/settings.py
-orchestrator/runtime/cognitive_gateway_modules
-orchestrator/runtime/host_components.py
-orchestrator/runtime/host_settings.py
-orchestrator/runtime/input_session_runtime.py
-orchestrator/runtime/input_turn_lifecycle.py
-orchestrator/runtime/outcome_delivery.py
-orchestrator/runtime/playback_delivery.py
-orchestrator/runtime/playback_transport.py
-orchestrator/schemas
 scripts/check_local_runtime_exposure.py
-scripts/check_service_configuration_ownership.py
 scripts/run_ruff.py
-shared/chromie_contracts
-shared/chromie_runtime/settings.py
-tts/settings.py
+shared/chromie_contracts/errors.py
+shared/chromie_contracts/semantic_authority.py

@@ -19,6 +19,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -97,6 +98,165 @@ def _run(
     return completed
 
 
+def _completed_detail(
+    completed: subprocess.CompletedProcess[str],
+    *,
+    max_chars: int = 4000,
+) -> str:
+    text = "\n".join(
+        part.strip()
+        for part in (completed.stdout, completed.stderr)
+        if part and part.strip()
+    )
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def _tail_text(path: Path, *, max_chars: int = 6000) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def _deployment_start_command(
+    *,
+    soridormi_repo: Path,
+    rebuild_no_cache: bool,
+) -> list[str]:
+    command = [
+        "./scripts/start_voice_mujoco.sh",
+        "--soridormi-repo",
+        str(soridormi_repo),
+        "--no-viewer",
+        "--keep-running",
+    ]
+    command.append("--rebuild-no-cache" if rebuild_no_cache else "--build")
+    return command
+
+
+def _ensure_deployment(
+    *,
+    mode: str,
+    soridormi_repo: Path,
+    output_dir: Path,
+    timeout_s: float,
+    rebuild_no_cache: bool,
+) -> tuple[subprocess.Popen[str] | None, dict[str, Any], list[str]]:
+    """Reuse a ready paired stack or start one and wait for its maintained status gate."""
+
+    status_log = output_dir / "deployment_status.log"
+    initial = _run(["./scripts/status_voice_mujoco.sh"], log_path=status_log)
+    if initial.returncode == 0 and mode != "start":
+        return None, {
+            "status": "ready",
+            "mode": "reused",
+            "status_log": str(status_log),
+        }, []
+    if mode == "reuse":
+        detail = _completed_detail(initial) or "paired voice/MuJoCo stack is not ready"
+        return None, {
+            "status": "failed",
+            "mode": "reuse",
+            "status_log": str(status_log),
+            "error": detail,
+        }, [detail]
+
+    _run(
+        ["./scripts/stop_voice_mujoco.sh"],
+        log_path=output_dir / "deployment_prestart_stop.log",
+    )
+    launch_log = output_dir / "deployment_start.log"
+    command = _deployment_start_command(
+        soridormi_repo=soridormi_repo,
+        rebuild_no_cache=rebuild_no_cache,
+    )
+    launch_handle = launch_log.open("w", encoding="utf-8")
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            text=True,
+            stdout=launch_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        launch_handle.close()
+        detail = f"cannot start paired voice/MuJoCo deployment: {exc}"
+        return None, {
+            "status": "failed",
+            "mode": "started",
+            "launch_log": str(launch_log),
+            "error": detail,
+        }, [detail]
+    launch_handle.close()
+
+    deadline = time.monotonic() + max(30.0, timeout_s)
+    last_status = initial
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            detail = _tail_text(launch_log) or (
+                f"paired deployment launcher exited with {process.returncode}"
+            )
+            return process, {
+                "status": "failed",
+                "mode": "started",
+                "returncode": process.returncode,
+                "launch_log": str(launch_log),
+                "status_log": str(status_log),
+                "error": detail,
+            }, [detail]
+        time.sleep(5.0)
+        last_status = _run(
+            ["./scripts/status_voice_mujoco.sh"],
+            log_path=status_log,
+        )
+        if last_status.returncode == 0:
+            return process, {
+                "status": "ready",
+                "mode": "started",
+                "launch_log": str(launch_log),
+                "status_log": str(status_log),
+            }, []
+
+    detail = (
+        "timed out waiting for paired voice/MuJoCo deployment; "
+        + (_completed_detail(last_status) or _tail_text(launch_log))
+    ).strip()
+    return process, {
+        "status": "failed",
+        "mode": "started",
+        "launch_log": str(launch_log),
+        "status_log": str(status_log),
+        "error": detail,
+    }, [detail]
+
+
+def _stop_started_deployment(
+    process: subprocess.Popen[str],
+    *,
+    output_dir: Path,
+) -> None:
+    _run(
+        ["./scripts/stop_voice_mujoco.sh"],
+        log_path=output_dir / "deployment_stop.log",
+    )
+    try:
+        process.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+
+
 def _git_text(*args: str) -> str:
     completed = subprocess.run(
         ["git", *args],
@@ -127,14 +287,22 @@ def _goal_signature(goal: dict[str, Any]) -> tuple[str, str, str, bool]:
 
 
 def _outcomes_by_goal(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Read the canonical keyed outcome map, with bounded legacy-list support."""
+
     outcomes = plan.get("goal_outcomes")
-    if not isinstance(outcomes, list):
-        return {}
-    return {
-        str(item.get("goal_id") or ""): item
-        for item in outcomes
-        if isinstance(item, dict) and str(item.get("goal_id") or "")
-    }
+    if isinstance(outcomes, dict):
+        return {
+            str(goal_id): item
+            for goal_id, item in outcomes.items()
+            if str(goal_id).strip() and isinstance(item, dict)
+        }
+    if isinstance(outcomes, list):
+        return {
+            str(item.get("goal_id") or ""): item
+            for item in outcomes
+            if isinstance(item, dict) and str(item.get("goal_id") or "")
+        }
+    return {}
 
 
 def _steps_by_id(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -596,6 +764,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--runtime-identity", type=Path, default=DEFAULT_RUNTIME_IDENTITY)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--deployment-mode",
+        choices=("auto", "reuse", "start"),
+        default="auto",
+        help=(
+            "auto reuses a ready paired stack or starts one; reuse requires an "
+            "already-ready stack; start always launches the maintained headless stack."
+        ),
+    )
+    parser.add_argument(
+        "--deployment-timeout-s",
+        type=float,
+        default=1800.0,
+        help="Maximum time to wait for the paired voice/MuJoCo stack to become ready.",
+    )
+    parser.add_argument(
+        "--rebuild-no-cache",
+        action="store_true",
+        help="When starting the stack, rebuild repository-owned images without cache.",
+    )
+    parser.add_argument(
+        "--keep-deployment",
+        action="store_true",
+        help="Leave a stack started by this command running after evidence collection.",
+    )
     parser.add_argument("--walk-capability", default="soridormi.walk_velocity")
     parser.add_argument("--blink-capability", default="soridormi.blink_eyes")
     parser.add_argument("--timeout-s", type=float, default=1200.0)
@@ -644,98 +837,169 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = Path(args.output_dir or DEFAULT_OUTPUT_ROOT / _acceptance_id())
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    soridormi_repo = Path(args.soridormi_repo).expanduser().resolve()
+
+    validation_errors: list[str] = []
+    validation_details: dict[str, Any] = {}
+    deployment_process: subprocess.Popen[str] | None = None
+    deployment_report: dict[str, Any] = {
+        "status": "not_run",
+        "mode": args.deployment_mode,
+    }
 
     gate_log = output_dir / "canonical_gate.log"
     if args.skip_canonical_gate:
         gate_status = "skipped"
-        gate_returncode = None
-        gate_log.write_text("canonical gate skipped by operator\n", encoding="utf-8")
+        gate_returncode: int | None = None
+        gate_detail = "canonical gate skipped by operator"
+        gate_log.write_text(gate_detail + "\n", encoding="utf-8")
+        validation_errors.append(
+            "canonical gate was skipped; diagnostic evidence cannot close Issue #1"
+        )
     else:
         gate = _run(["./scripts/run_tests.sh"], log_path=gate_log)
         gate_returncode = gate.returncode
         gate_status = "passed" if gate.returncode == 0 else "failed"
+        gate_detail = _completed_detail(gate)
+        if gate.returncode != 0:
+            validation_errors.append(
+                "canonical gate failed: "
+                + (gate_detail or f"return code {gate.returncode}")
+            )
 
     runtime_identity_path = Path(args.runtime_identity).expanduser().resolve()
     identity_log = output_dir / "runtime_identity.log"
-    build_env_returncode = 0
-    if not args.reuse_runtime_identity:
-        build_env = _run(
-            ["./scripts/build_runtime_env.sh"],
-            log_path=output_dir / "build_runtime_env.log",
-        )
-        build_env_returncode = build_env.returncode
-        if build_env.returncode != 0:
-            print(build_env.stderr or build_env.stdout, file=sys.stderr)
-        identity = _run(
-            [
-                sys.executable,
-                "scripts/capture_runtime_identity.py",
-                "--output",
-                str(runtime_identity_path),
-            ],
-            log_path=identity_log,
-        )
-        identity_returncode = identity.returncode
-    else:
-        identity_returncode = 0 if runtime_identity_path.is_file() else 1
-        identity_log.write_text(
-            f"reused runtime identity: {runtime_identity_path}\n",
-            encoding="utf-8",
-        )
-
+    build_env_returncode: int | None = None
+    identity_returncode: int | None = None
     identity_errors: list[str] = []
     runtime_identity_payload: dict[str, Any] = {}
-    if identity_returncode == 0:
-        identity_errors, runtime_identity_payload = validate_runtime_identity(
-            runtime_identity_path,
-            expected_chromie_revision=revision,
-        )
-    else:
-        identity_errors.append("runtime identity capture failed")
-    expected_identity_sha256 = str(
-        runtime_identity_payload.get("identity_sha256") or ""
-    ).strip()
+    expected_identity_sha256 = ""
+    live_returncode: int | None = None
+    live_detail = ""
+    live_summary_path = output_dir / "live" / "summary.json"
 
-    live_dir = output_dir / "live"
-    command = _build_live_command(
-        agent_url=args.agent_url,
-        soridormi_mcp_url=args.soridormi_mcp_url,
-        manifest=Path(args.manifest).expanduser().resolve(),
-        soridormi_repo=Path(args.soridormi_repo).expanduser().resolve(),
-        live_dir=live_dir,
-        runtime_identity_path=runtime_identity_path,
-        conversation_id=f"vocal-issue-1-{_acceptance_id()}",
-        timeout_s=args.timeout_s,
-        skill_timeout_s=args.skill_timeout_s,
-        speaker=args.speaker,
-    )
-    live = _run(command, log_path=output_dir / "live_run.log")
+    try:
+        if gate_status == "passed":
+            deployment_process, deployment_report, deployment_errors = (
+                _ensure_deployment(
+                    mode=args.deployment_mode,
+                    soridormi_repo=soridormi_repo,
+                    output_dir=output_dir,
+                    timeout_s=args.deployment_timeout_s,
+                    rebuild_no_cache=args.rebuild_no_cache,
+                )
+            )
+            validation_errors.extend(
+                f"deployment: {item}" for item in deployment_errors
+            )
 
-    live_summary_path = live_dir / "summary.json"
-    validation_errors: list[str] = []
-    validation_details: dict[str, Any] = {}
-    if live_summary_path.is_file():
-        live_summary = _read_json(live_summary_path)
-        validation_errors, validation_details = validate_closure_summary(
-            live_summary,
-            expected_chromie_revision=revision,
-            expected_walk_capability=args.walk_capability,
-            expected_blink_capability=args.blink_capability,
-            expected_runtime_identity_sha256=expected_identity_sha256 or None,
-        )
-    else:
-        validation_errors.append("live runner did not retain summary.json")
+            if not deployment_errors:
+                if not args.reuse_runtime_identity:
+                    build_env = _run(
+                        ["./scripts/build_runtime_env.sh"],
+                        log_path=output_dir / "build_runtime_env.log",
+                    )
+                    build_env_returncode = build_env.returncode
+                    if build_env.returncode != 0:
+                        detail = _completed_detail(build_env)
+                        validation_errors.append(
+                            "runtime environment generation failed: "
+                            + (detail or f"return code {build_env.returncode}")
+                        )
+                    else:
+                        identity = _run(
+                            [
+                                sys.executable,
+                                "scripts/capture_runtime_identity.py",
+                                "--output",
+                                str(runtime_identity_path),
+                            ],
+                            log_path=identity_log,
+                        )
+                        identity_returncode = identity.returncode
+                        if identity.returncode != 0:
+                            detail = _completed_detail(identity)
+                            identity_errors.append(
+                                "runtime identity capture failed: "
+                                + (detail or f"return code {identity.returncode}")
+                            )
+                else:
+                    build_env_returncode = 0
+                    identity_returncode = 0 if runtime_identity_path.is_file() else 1
+                    identity_log.write_text(
+                        f"reused runtime identity: {runtime_identity_path}\n",
+                        encoding="utf-8",
+                    )
+                    if identity_returncode != 0:
+                        identity_errors.append(
+                            f"reused runtime identity does not exist: {runtime_identity_path}"
+                        )
 
-    validation_errors = [*identity_errors, *validation_errors]
+                if identity_returncode == 0 and not identity_errors:
+                    identity_errors, runtime_identity_payload = validate_runtime_identity(
+                        runtime_identity_path,
+                        expected_chromie_revision=revision,
+                    )
+                validation_errors.extend(identity_errors)
+                expected_identity_sha256 = str(
+                    runtime_identity_payload.get("identity_sha256") or ""
+                ).strip()
+
+                if not identity_errors and identity_returncode == 0:
+                    live_dir = output_dir / "live"
+                    command = _build_live_command(
+                        agent_url=args.agent_url,
+                        soridormi_mcp_url=args.soridormi_mcp_url,
+                        manifest=Path(args.manifest).expanduser().resolve(),
+                        soridormi_repo=soridormi_repo,
+                        live_dir=live_dir,
+                        runtime_identity_path=runtime_identity_path,
+                        conversation_id=f"vocal-issue-1-{_acceptance_id()}",
+                        timeout_s=args.timeout_s,
+                        skill_timeout_s=args.skill_timeout_s,
+                        speaker=args.speaker,
+                    )
+                    live = _run(command, log_path=output_dir / "live_run.log")
+                    live_returncode = live.returncode
+                    live_detail = _completed_detail(live)
+                    live_summary_path = live_dir / "summary.json"
+                    if live_summary_path.is_file():
+                        live_summary = _read_json(live_summary_path)
+                        live_validation_errors, validation_details = (
+                            validate_closure_summary(
+                                live_summary,
+                                expected_chromie_revision=revision,
+                                expected_walk_capability=args.walk_capability,
+                                expected_blink_capability=args.blink_capability,
+                                expected_runtime_identity_sha256=(
+                                    expected_identity_sha256 or None
+                                ),
+                            )
+                        )
+                        validation_errors.extend(live_validation_errors)
+                    else:
+                        validation_errors.append(
+                            "live runner did not retain summary.json: "
+                            + (live_detail or f"return code {live.returncode}")
+                        )
+                    if live.returncode != 0 and not live_detail:
+                        validation_errors.append(
+                            f"live runner failed with return code {live.returncode}"
+                        )
+    finally:
+        if deployment_process is not None and not args.keep_deployment:
+            _stop_started_deployment(deployment_process, output_dir=output_dir)
+
     closure_eligible = bool(
         gate_status == "passed"
+        and deployment_report.get("status") == "ready"
         and build_env_returncode == 0
         and identity_returncode == 0
-        and live.returncode == 0
+        and live_returncode == 0
         and not validation_errors
     )
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "issue": "TimeTreker/chromie#1",
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "chromie_revision": revision,
@@ -744,12 +1008,16 @@ def main(argv: list[str] | None = None) -> int:
         "canonical_gate": {
             "status": gate_status,
             "returncode": gate_returncode,
+            "error": gate_detail if gate_status != "passed" else None,
             "log": str(gate_log),
         },
+        "deployment": deployment_report,
         "runtime_identity": {
             "status": (
                 "passed"
                 if identity_returncode == 0 and not identity_errors
+                else "not_run"
+                if identity_returncode is None
                 else "failed"
             ),
             "build_env_returncode": build_env_returncode,
@@ -760,8 +1028,15 @@ def main(argv: list[str] | None = None) -> int:
             "log": str(identity_log),
         },
         "live_run": {
-            "status": "passed" if live.returncode == 0 else "failed",
-            "returncode": live.returncode,
+            "status": (
+                "passed"
+                if live_returncode == 0
+                else "not_run"
+                if live_returncode is None
+                else "failed"
+            ),
+            "returncode": live_returncode,
+            "error": live_detail if live_returncode not in {None, 0} else None,
             "summary": str(live_summary_path),
             "log": str(output_dir / "live_run.log"),
         },
@@ -794,6 +1069,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{closure_report_sha256}  {report_path.name}\n",
         encoding="utf-8",
     )
+
     issue_close_returncode: int | None = None
     if closure_eligible:
         comment = _issue_comment(

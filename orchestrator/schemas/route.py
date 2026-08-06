@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
-if TYPE_CHECKING:
+try:
+    from chromie_contracts.interaction import OptionalCapabilityIdentityModel
+    from chromie_contracts.route import MemoryUpdateProposal
+except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import OptionalCapabilityIdentityModel
     from shared.chromie_contracts.route import MemoryUpdateProposal
-else:
-    try:
-        from chromie_contracts.interaction import OptionalCapabilityIdentityModel
-        from chromie_contracts.route import MemoryUpdateProposal
-    except ImportError:  # pragma: no cover - repository development path
-        from shared.chromie_contracts.interaction import (
-            OptionalCapabilityIdentityModel,
-        )
-        from shared.chromie_contracts.route import MemoryUpdateProposal
 
 RouteName = Literal["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"]
 Priority = Literal["low", "normal", "high", "urgent"]

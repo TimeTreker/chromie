@@ -55,8 +55,13 @@ whole-tree error suppression.
 
 The current baseline contains four files. The mechanism is implemented and the
 pinned Mypy 2.3.0 command passes that scope on the 2026-07-31 maintained tree
-without ignores or scope removal, but four files are not meaningful package
-coverage.
+without ignores, but four files are not meaningful package coverage. An August
+2 package/file expansion was committed from an environment that did not contain
+the pinned Mypy executable. The first dependency-complete Python 3.11/3.12 CI
+run proved that expanded scope had 169 pre-existing errors, so it was not a
+valid ratchet expansion. The scope is therefore restored to the last verified
+contract rather than suppressing those errors or falsely treating them as new
+vocal-Issue regressions.
 
 After the existing gate is clean, the queued expansion replaces file-by-file
 contract entries with all 23 current Python files under

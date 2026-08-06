@@ -37,7 +37,9 @@ and operator rollback evidence shows that no maintained profile depends on it.
 
 - Run `python scripts/vocal_issue_closure.py --soridormi-repo ../soridormi`
   from clean paired checkouts and retain its passing closure bundle before
-  closing the typed vocal Goal and Planner defect.
+  closing the typed vocal Goal and Planner defect. The default auto lifecycle
+  reuses a ready stack or starts the maintained headless deployment; failed
+  source, deployment, identity, or live stages remain separately reported.
 - Qualify an exact Chromie vocal capability contract and keep ordinary TTS
   evidence distinct from singing evidence.
 - Keep the vocal-hosting decision deferred until a measured synchronization,

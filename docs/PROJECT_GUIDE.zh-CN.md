@@ -102,7 +102,7 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 - **开放证据**：干净的 live-text、active cancellation、MuJoCo safe-idle、
   人工语义审核和来源身份必须按目标 profile 一起判断，历史成功不能代替当前证据。
 - **已完成工程边界**：Host typed settings、playback/input lifecycle、受支持配置
-  收缩、package 级 Mypy 扩展和文档表面收缩已经实现；它们不是新的待办架构。
+  收缩和文档表面收缩已经实现。Mypy 仍保持最后一个实际通过的四文件增量基线；未经依赖完整环境验证的 package 级扩展已撤回，并作为独立清理工作等待整个新增范围先通过。
 - **可选物理验证**：默认 profile 不要求物理语音或实体机器人。只有需要对应
   支持声明时，才运行 supervised 麦克风/扬声器或实体机器人验收。
 - **实体准备与试点**：未来选择参考机器人后，从身份、安全、网络和无动作检查，

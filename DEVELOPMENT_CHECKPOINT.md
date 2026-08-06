@@ -89,8 +89,10 @@ python scripts/vocal_issue_closure.py \
   --close-issue
 ```
 
-The command must report `closure_eligible=true`. It runs the canonical source
-gate on that revision and retains the exact walk/sing/blink trace. The live
+The command must report `closure_eligible=true`. Its default deployment mode
+reuses a ready paired stack or starts the maintained headless stack with current
+images, then captures identity and retains the exact walk/sing/blink trace. A
+failed prerequisite stops the later stages and records its exact error. The live
 result must dispatch and complete the independent walking and blinking members,
 return exact singing unavailability or refusal with no executable singing step,
 match the clean Soridormi endpoint/checkout revision, and return to safe idle.

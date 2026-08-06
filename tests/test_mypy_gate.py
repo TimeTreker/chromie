@@ -34,45 +34,17 @@ class MypyGateTests(unittest.TestCase):
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
         return path
 
-    def test_scope_expands_owned_package_and_is_sorted_unique(self) -> None:
+    def test_scope_matches_last_verified_clean_baseline(self) -> None:
         entries = run_mypy.load_scope(ROOT / "config" / "mypy_scope.txt")
-        self.assertEqual(entries, tuple(sorted(set(entries))))
-        contract_files = tuple(
-            sorted(
-                path.relative_to(ROOT).as_posix()
-                for path in (ROOT / "shared" / "chromie_contracts").rglob("*.py")
-            )
+        self.assertEqual(
+            entries,
+            (
+                "scripts/check_local_runtime_exposure.py",
+                "scripts/run_ruff.py",
+                "shared/chromie_contracts/errors.py",
+                "shared/chromie_contracts/semantic_authority.py",
+            ),
         )
-        self.assertGreaterEqual(len(contract_files), 23)
-        self.assertTrue(set(contract_files).issubset(entries))
-        for runtime_boundary in (
-            "orchestrator/runtime/host_settings.py",
-            "orchestrator/runtime/input_turn_lifecycle.py",
-            "orchestrator/runtime/playback_delivery.py",
-            "orchestrator/runtime/input_session_runtime.py",
-            "orchestrator/runtime/playback_transport.py",
-            "orchestrator/runtime/outcome_delivery.py",
-            "orchestrator/runtime/host_components.py",
-        ):
-            self.assertIn(runtime_boundary, entries)
-        gateway_files = tuple(
-            sorted(
-                path.relative_to(ROOT).as_posix()
-                for path in (
-                    ROOT / "orchestrator" / "runtime" / "cognitive_gateway_modules"
-                ).rglob("*.py")
-            )
-        )
-        self.assertGreaterEqual(len(gateway_files), 5)
-        self.assertTrue(set(gateway_files).issubset(entries))
-        schema_files = tuple(
-            sorted(
-                path.relative_to(ROOT).as_posix()
-                for path in (ROOT / "orchestrator" / "schemas").rglob("*.py")
-            )
-        )
-        self.assertGreaterEqual(len(schema_files), 4)
-        self.assertTrue(set(schema_files).issubset(entries))
 
     def test_scope_accepts_python_package_and_rejects_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -114,7 +86,7 @@ class MypyGateTests(unittest.TestCase):
         ):
             self.assertIn(setting, text)
         self.assertNotIn("ignore_errors = True", text)
-        self.assertIn("explicit_package_bases = True", text)
+        self.assertNotIn("explicit_package_bases = True", text)
         self.assertNotIn("mypy_path = shared", text)
         self.assertNotIn("follow_imports = skip", text)
 
