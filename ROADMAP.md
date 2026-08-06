@@ -8,7 +8,10 @@ The current focus is a **Goal-driven single semantic authority**. The Cognitive
 Gateway owns ingress, protective reflexes, and attention admission. The
 Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
 association, planning, response composition, and outcome reconciliation.
-Provider and Host boundaries remain the only authorities for effects.
+Provider and Host boundaries remain the only authorities for effects. The
+approved platform direction keeps interaction and semantic orchestration in
+Chromie while moving platform-facing body, vocal, media, and device execution
+behind a two-container Soridormi runtime and platform-provider boundary.
 
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
@@ -18,16 +21,21 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Preserve exact capability identity from model proposal through trusted
+2. Repair vocal semantics before further execution work: singing and humming
+   are Speaking outcomes, media playback is Activity, and neither may be
+   replaced by a body gesture, generic TTS claim, or invalid resource Goal.
+3. Preserve exact capability identity from model proposal through trusted
    validation, authorization, execution, and evidence. Agent Skills may teach
    reasoning methods but never authorize effects.
-3. Close source-bound and target-bound evidence separately. A passing source
+4. Establish the Chromie-to-Soridormi execution boundary without moving Goal
+   meaning, confirmation, or user-level cancellation semantics out of Chromie.
+5. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-4. Reduce compatibility surfaces only after the maintained path has equivalent
+6. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-5. Keep documentation, benchmarks, static analysis, configuration ownership,
+7. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations
@@ -82,14 +90,89 @@ Exit criteria:
 - missing abilities remain honest terminal outcomes;
 - behavior scenarios cover unavailable, repair, and rejection paths.
 
+### Chromie-Soridormi execution-boundary migration
+
+This is an ordered set of Issue-sized changes, not a new milestone numbering
+system. Each Issue must land with its own root-cause explanation, compatibility
+plan, tests, and evidence ceiling. Do not combine the sequence into one large
+rewrite.
+
+1. **Repair vocal-mode Goal and Planner semantics.** Introduce typed lane and
+   output-mode judgments sufficient to distinguish speech, expressive speech,
+   recitation, singing, humming, body action, and media playback. Reproduce the
+   retained Chinese walk/sing/blink episode. Goal Association must regenerate a
+   suspicious compound decomposition from authoritative context rather than
+   copy the prior DTO; vocal Goals cannot carry invented resource
+   responsibilities; Planner outcome references cannot name nonexistent steps.
+2. **Define the immutable Chromie-to-Soridormi execution envelope.** Specify
+   authorization identity, Goal ownership, vocal/activity members, timing
+   relation, confirmation state, deadline, cancellation scope, prepared/start
+   states, and normalized per-member evidence. Chromie owns semantic validation
+   and authorization; Soridormi owns provider-local execution.
+3. **Introduce the Soridormi Execution Runtime facade.** Route existing body
+   capabilities through the new envelope without changing behavior. Keep the
+   current path as an explicit compatibility adapter until replay, cancellation,
+   and MuJoCo evidence match.
+4. **Move vocal execution and TTS behind Soridormi.** Add provider-declared vocal
+   modes, streaming audio, timing marks, interruption, and delivery receipts.
+   Ordinary expressive TTS must not advertise singing unless the selected
+   provider has mode-specific evidence.
+5. **Move media playback behind Soridormi as Activity capabilities.** Implement
+   play, pause, resume, seek, stop, volume, and completion evidence independently
+   from Speaking. Vocal and media streams may share a mixer but not a semantic
+   lifecycle.
+6. **Move platform audio and sensor adaptation into the Soridormi Platform
+   Provider.** Chromie receives normalized audio streams and retains VAD, ASR,
+   Gateway, and user-level barge-in semantics. No Chromie module should retain
+   ALSA, device-index, robot-SDK, or simulator-specific adaptation.
+7. **Add provider-local multimodal coordination.** Support prepare/start/cancel
+   for compatible body, vocal, and media members with a monotonic barrier,
+   resource declarations, per-member failure policy, and measured overlap
+   evidence. Do not claim atomic or synchronized execution before this Issue.
+8. **Slim the Chromie Interaction Orchestrator.** Remove direct TTS synthesis,
+   PCM output, media, body-provider, and platform-device ownership while
+   preserving session lifecycle, VAD/ASR coordination, Gateway/Core dispatch,
+   confirmation, cancellation semantics, and evidence correlation. Structural
+   ratchets must decrease.
+9. **Qualify the migrated boundary and remove compatibility paths.** Run source,
+   live-service, virtual/physical audio, MuJoCo, cancellation, recovery, and
+   latency evidence against the same revision before deleting old dispatch or
+   playback adapters.
+
+Migration exit criteria:
+
+- Chromie contains no simulator, robot, sound-device, TTS-backend, or media-
+  backend selection logic;
+- Soridormi exposes one stable execution contract and one private platform
+  contract across MuJoCo and physical providers;
+- singing, ordinary speech, and media playback have distinct typed semantics
+  and mode-specific evidence;
+- user-level stop/cancel meaning remains in Chromie while Soridormi supplies
+  exact execution receipts;
+- body, vocal, and media members can be coordinated without duplicate planners
+  or unknown step ownership; and
+- current-revision target traces prove the migrated path before compatibility is
+  removed.
+
+### Deferred interaction issue - speech-start barge-in
+
+Record but do not implement this inside the execution-boundary Issues: VAD
+currently invalidates playback after a complete accepted utterance, not at first
+speech onset. A later Issue will add reversible speech-start ducking or pause,
+echo/noise confirmation, and resume/abort behavior without cancelling Goals or
+body work at the acoustic stage. Its implementation should follow the audio-
+ownership contract so it is not built twice during migration.
+
 ### Structural simplification
 
 The maintained component and failure contracts are
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md) and
 [Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
 
-- Decompose the Orchestrator composition root without raising existing method,
-  property, initializer, exception-boundary, or direct-model-call ratchets.
+- Decompose the Orchestrator composition root along the approved Chromie
+  Interaction Orchestrator and Soridormi Execution Runtime boundary without
+  raising existing method, property, initializer, exception-boundary, or
+  direct-model-call ratchets.
 - Remove import-time global logging configuration from library modules.
 - Keep configuration parsing inside typed settings owners.
 - Delete transient implementation plans once their durable contracts have moved
@@ -166,7 +249,9 @@ Before accepting work, ask:
 
 - Does it close the active milestone represented by the current priority and its
   exit criteria, rather than only one visible example?
-- Is the behavior owned by Chromie or Soridormi, and is that boundary preserved?
+- Is the behavior owned by the Cognitive Core, Chromie Interaction
+  Orchestrator, Soridormi Execution Runtime, or Soridormi Platform Provider, and
+  is that boundary preserved?
 - Is the required evidence level explicit: source, simulator, target, or
   physical pilot?
 - Does it preserve one Goal-driven semantic authority and trusted effect

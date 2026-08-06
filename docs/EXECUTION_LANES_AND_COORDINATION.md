@@ -2,59 +2,94 @@
 
 ## Status
 
-Chromie has one Goal-Driven Cognitive Core and three concurrent coordination
+Chromie has one Goal-Driven Cognitive Core and three semantic coordination
 lanes:
 
 ```text
 Chromie Cognitive Core
 ├── Social-Attention Proposal Lane
-├── Speaking Execution Lane
-└── Activity Execution Lane
-      └── Capability Providers
-          ├── Soridormi
-          ├── External Information
-          ├── Weather
-          ├── Memory
-          └── future providers
+├── Speaking Lane
+│     └── platform-neutral Vocal Plan
+└── Activity Lane
+      └── platform-neutral Capability Plan
 ```
 
-The shared contracts and maintained runtime now support explicit best-effort
-coordination across those lanes. This is not a second brain, a second planner,
-or a provider-selection shortcut. Goal meaning, Goal Association, planning, and
-response meaning remain owned by the one Cognitive Core.
+The approved target execution boundary is:
 
-The current implementation provides best-effort parallel start through the
-Trusted Capability Runtime. It does not yet claim a synchronized cross-provider
-start barrier, atomic multi-provider cancellation, or verified temporal-overlap
-evidence. Those require a later runtime contract and provider support.
+```text
+Chromie Interaction Orchestrator
+├── validates authorization, confirmation, cancellation scope, and Goal binding
+├── dispatches platform-neutral vocal and activity requests
+└── correlates provider evidence with the active interaction
+                 │
+                 ▼
+Soridormi Execution Runtime
+├── body execution
+├── vocal execution: speech, expressive speech, recitation, singing, humming
+├── media execution: music, recordings, and sound effects
+├── provider-local preparation, scheduling, synchronization, and cancellation
+└── normalized per-member execution evidence
+                 │
+                 ▼
+Soridormi Platform Provider
+└── MuJoCo, physical robot, desktop audio, sensors, and device drivers
+```
+
+External-information and memory capabilities may remain platform-neutral peer
+providers when they do not depend on a robot platform. Platform-facing body,
+vocal, media, sensor, and device adaptation must converge behind Soridormi.
+
+This target is an approved architecture direction, not a claim about current
+implementation. At the current revision, TTS synthesis and playback are still
+owned by the Chromie Host, Soridormi mainly executes body capabilities, and
+cross-provider start is best effort. Migration must preserve current behavior
+until equivalent receipts, cancellation, and target evidence exist.
 
 ## Ownership
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
-| Social-Attention Proposal Lane | bounded social proposals such as attention, natural blink, gaze, acknowledgement, or restraint | independent speech meaning, Goal creation, motor authorization |
-| Speaking Execution Lane | TTS, playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality or semantic planning |
-| Activity Execution Lane | exact provider calls, task execution, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
-| Soridormi | embodied feasibility, body-lane arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
+| Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, vocal mode, and temporal intent | device selection, synthesis, motor control, provider internals |
+| Social-Attention Proposal Lane | bounded social proposals such as attention, natural blink, gaze, acknowledgement, or restraint | independent speech meaning, Goal creation, execution authorization |
+| Speaking Lane | the communicative outcome and a typed vocal plan such as speech, recitation, singing, or humming | audio-device selection, synthesis implementation, or a false performance claim |
+| Activity Lane | exact capability work such as body action, media playback, information lookup, or device control | Goal meaning, raw device commands, or provider-local scheduling |
+| Chromie Interaction Orchestrator | session and turn lifecycle, VAD/ASR coordination, Gateway/Core dispatch, confirmation and cancellation semantics, authorization, high-level lane relation, and end-to-end evidence correlation | TTS synthesis, PCM device playback, motor control, or platform adaptation |
+| Soridormi Execution Runtime | provider-local compilation, preparation, execution, resource arbitration, time coordination, cancellation, recovery, and normalized evidence for platform-facing capabilities | user meaning, Goal mutation, response authorship, or widening authorization |
+| Soridormi Platform Provider | simulator or hardware adaptation, microphone and speaker devices, sensors, controllers, drivers, calibration, state estimation, and hardware safety | cognitive planning or user-facing semantics |
 
 The Activity lane executes work for Goals; it does not own those Goals.
 Social Attention proposes socially appropriate behavior; it does not directly
-operate the body. Speaking delivers model-authored communication; it is not a
-separate conversational agent.
+operate the body. Speaking describes how Chromie communicates; it is not a
+separate conversational agent. Soridormi executes authorized outcomes but never
+decides what the user meant.
 
-## Soridormi embodied compilation contract
+## Soridormi execution-runtime and platform-provider contract
 
-Soridormi is a peer Capability Provider beneath Chromie's Activity lane. It
-does not own user meaning, Goals, or cognitive planning. Chromie's Cognitive
-Planner selects exact semantic capabilities first; the Runtime Coordinator then
-groups exact same-provider body members for deterministic embodied compilation.
+The target Soridormi project has two logical containers:
 
-Soridormi's canonical live declaration is the nested `concurrency` object:
+```text
+soridormi-runtime
+= stable high-level capability execution, resource and safety coordination,
+  multimodal preparation, cancellation, recovery, and evidence
+
+soridormi-platform
+= exactly one active simulator or physical-platform adapter, including device
+  drivers, audio devices, sensors, calibration, and hardware safety
+```
+
+Chromie's Planner selects exact semantic capabilities and preserves user-level
+timing. It does not select a motor controller, TTS backend, sound device, robot
+SDK, or simulator implementation. The Chromie authorization boundary validates
+the request and sends an immutable execution envelope. Soridormi may reject an
+unsupported or unsafe envelope, but it cannot reinterpret the Goal or silently
+substitute a different user outcome.
+
+The existing body declaration remains useful inside the wider Soridormi runtime.
+For example:
 
 ```json
 {
-  "skill_id": "walk_forward",
+  "capability_id": "body.walk_forward",
   "concurrency": {
     "ability_class": "locomotion_whole_body",
     "control_coupling": "primary_body_controller",
@@ -66,7 +101,7 @@ Soridormi's canonical live declaration is the nested `concurrency` object:
 
 ```json
 {
-  "skill_id": "blink_eyes",
+  "capability_id": "expression.blink_eyes",
   "concurrency": {
     "ability_class": "subtle_expression",
     "control_coupling": "independent_output",
@@ -76,15 +111,12 @@ Soridormi's canonical live declaration is the nested `concurrency` object:
 }
 ```
 
-Chromie preserves `ability_class`, `control_coupling`, exact provider resource
-names, locomotion envelopes, and safety-preemption policy. It never assigns
-those values from a skill name or user phrase. Flattened `body_lane` and
-`resource_claims` fields are compatibility projections only; the nested
-provider contract remains authoritative.
+Vocal and media providers must declare equivalent capability and resource facts,
+for example supported vocal modes, streaming support, timing marks, audio-output
+claims, interruption behavior, and whether a prepared start is available.
+Chromie must not infer those facts from a capability name or user phrase.
 
-When a parallel batch contains multiple exact Soridormi body capabilities, the
-Trusted Capability Runtime does not start them as independent physical calls.
-It asks the provider adapter to execute one provider-local group:
+During migration, the maintained body path may continue to use:
 
 ```text
 exact planner-selected body members
@@ -94,13 +126,14 @@ exact planner-selected body members
   -> per-member authoritative evidence
 ```
 
-`compile` is deterministic embodied compilation, not cognitive planning. It may
-reject duplicate resources, two primary locomotion members, an unsafe overlay,
-or unavailable body state. It does not decide whether Chromie should walk,
-blink, look, speak, or sing.
+`compile` is deterministic execution compilation, not cognitive planning. The
+same principle will later cover body, vocal, and media members in one
+provider-local execution group. A shared start barrier or atomic cancellation
+may be claimed only after Soridormi publishes and proves that contract.
 
-Speech remains a peer Chromie Speaking-lane execution linked through the same
-`coordination_id`. Soridormi never owns speech meaning or playback.
+Speech meaning remains owned by Chromie. The target moves vocal synthesis and
+playback execution into Soridormi; it does not move response authorship,
+personality, Goal meaning, or user-level interruption semantics there.
 
 ## Lane-coordination contract
 
@@ -211,13 +244,13 @@ low-commitment cached fallback.
 
 ## Runtime behavior
 
-The maintained runtime:
+The maintained runtime currently:
 
 1. validates all coordination references and lane membership;
 2. requires referenced activity steps to be parallel Canonical Plan steps;
 3. keeps ordinary pre-action speech behind the playback-start barrier;
-4. runs Speaking and peer-provider Activity work as a best-effort parallel
-   batch;
+4. runs Chromie-owned Speaking playback and peer-provider Activity work as a
+   best-effort parallel batch;
 5. groups compatible same-provider Soridormi body members into one deterministic
    embodied compilation and execution;
 6. requires explicit provider concurrency metadata for Social Attention overlap;
@@ -226,26 +259,86 @@ The maintained runtime:
 8. records lane membership and coordination IDs in interaction evidence; and
 9. reconciles each Goal only from its own capability-specific outcome evidence.
 
-Cross-provider Speaking/body start remains best-effort. Inside Soridormi, body
-members are compiled and cancelled as one provider-local physical activity. A
-future cross-provider contract may add prepared states, a shared monotonic start
-barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
+The target runtime keeps items 1, 8, and 9 in Chromie, while Soridormi assumes
+provider-local preparation, execution, resource arbitration, synchronization,
+and cancellation for body, vocal, and media output. The migration must not claim
+synchronized start until prepared-state and monotonic-start evidence exists.
 
-## Singing
+## Vocal modes, singing, and TTS
 
-Speaking and singing belong to the Speaking lane, including when the user embeds
-the vocal request inside a compound body command such as walking while singing.
-Lane classification follows the channel that completes the outcome, not the
-sentence's verb form or the surrounding robot-action route. Singing must never
-be reclassified as `express_attention` or another body action merely because it
-is coordinated with motion.
+Speaking is a semantic lane with multiple execution modes. The first contract
+change must represent at least:
 
-Ordinary TTS is not proof of a singing capability. Chromie may claim singing
-only when an exact vocal Capability Provider advertises and completes a suitable
-contract, for example `chromie.vocal.perform`. Until then, Chromie may speak or
-recite text but must not claim melodic performance; it should report the missing
-vocal capability or offer a clearly labeled alternative while leaving requested
-body actions independently planable.
+```text
+speech
+expressive_speech
+recitation
+singing
+humming
+nonverbal_vocalization
+```
+
+A TTS provider may support only a subset. Expressive speech proves control over
+speech prosody; it does not by itself prove stable singing, melody following, or
+rhythmic lyric alignment. Soridormi must advertise supported modes and return
+mode-specific execution evidence. Chromie may request only a declared mode and
+may claim completion only from matching evidence.
+
+Singing and humming remain Speaking-lane outcomes even when coordinated with
+walking or blinking. Classification follows the output channel that completes
+the responsibility, not the sentence's verb form or a surrounding
+`robot_action` route. Singing must never become `express_attention`, a body
+motion, media playback, or a generic acknowledgement.
+
+The immediate semantic fix must also close the failure exposed by the retained
+compound scenario:
+
+- Goal Association must emit separate independently satisfiable Goals for body
+  motion, vocal performance, and expression;
+- a vocal Goal must not carry `resource_responsibility` merely because it needs
+  an execution provider;
+- semantic review of a suspicious compound decomposition must regenerate from
+  the authoritative turn and typed context rather than copy the previous wrong
+  DTO;
+- Planner step ownership and per-goal step references must be mechanically
+  consistent, and no outcome may reference an unknown step ID;
+- unavailable singing must remain an honest per-goal outcome. Ordinary TTS,
+  media playback, blinking, or attention expression cannot be substituted and
+  described as singing.
+
+The target vocal request is platform-neutral, for example:
+
+```json
+{
+  "capability_id": "vocal.render",
+  "args": {
+    "mode": "singing",
+    "content": "...",
+    "accompaniment": "none"
+  }
+}
+```
+
+The exact public schema is owned by the implementation Issue and API review; the
+example establishes semantic separation, not a frozen wire format.
+
+## Media playback
+
+Playing an existing song, recording, or sound effect is not TTS and is not a
+Speaking outcome. It is an Activity capability, implemented by a media provider
+inside Soridormi Runtime and rendered through the active platform's audio
+output. `media.play` therefore has its own lifecycle, state, cancellation, and
+evidence even when it shares an audio mixer with vocal output.
+
+```text
+"清唱一首歌"       -> Speaking / vocal.render(mode=singing)
+"播放一首歌"       -> Activity / media.play
+"边走边清唱"       -> Speaking + Activity coordination
+"边走边播放音乐"   -> two Activity members coordinated by Soridormi
+```
+
+The shared mixer may duck, pause, or prioritize streams, but it cannot merge the
+semantic contracts or convert one into the other.
 
 ## Self-concept boundary
 
@@ -281,5 +374,10 @@ Acceptance requires:
 
 ### Walk, blink, and sing
 
-This remains partially unavailable until a genuine vocal-performance
-capability exists. The planner must not substitute ordinary speech for singing.
+The semantic contract requires three independent outcomes with one explicit
+parallel relation. Exact execution requires Soridormi evidence for walking and
+blinking plus matching `singing`-mode vocal evidence. Until a genuine singing
+provider is declared and validated, the singing outcome is unavailable; the
+planner must not substitute ordinary speech, media playback, or a body gesture.
+Whether independently executable body members may proceed must be explicit in
+the per-goal and coordination failure policy rather than inferred by the Host.
