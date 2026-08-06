@@ -22,8 +22,8 @@ natural speech
 ```
 
 Chromie should make this loop responsive, interruptible, understandable, and
-portable across simulators and physical platforms without exposing platform-
-specific devices, drivers, or low-level robot controls to a language model.
+portable across a simulator and later physical robots without exposing low-level
+robot controls to a language model.
 
 ## Product outcome
 
@@ -42,46 +42,30 @@ A successful Chromie release lets an operator:
 
 ### Chromie owns
 
-- interaction-side audio admission and meaning: VAD, ASR coordination, echo and
-  barge-in policy over normalized audio streams; device-specific microphone and
-  speaker adaptation belongs below Soridormi;
+- microphone capture, VAD, ASR coordination, playback, and barge-in;
 - the Cognitive Gateway ingress boundary: input normalization, deterministic
   protective reflexes for stop, cancel, emergency, silence, and unusable audio,
   and bounded attention/admission review; attention review cannot authorize
   effects and direct or unclear turns fail open to cognition;
 - conversation state and user-facing interaction semantics;
 - the Goal-Driven Cognitive Core: goal meaning and continuity, semantic
-  decomposition and planning, outcome reconciliation, response composition,
-  vocal-mode intent, and user-level temporal intent;
-- the Chromie Interaction Orchestrator: session and turn lifecycle, Gateway/Core
-  dispatch, confirmation and cancellation semantics, platform-neutral execution
-  requests, and end-to-end evidence correlation;
+  decomposition and planning, outcome reconciliation, and response composition;
 - native structured Agent output and strict model-facing contracts;
 - owner-approved Agent Skill discovery, bounded Agent projections, and
   selection provenance without granting Skill content execution authority;
-- the trusted authorization boundary for capability schema and policy validation,
-  confirmation, dispatch identity, cancellation-scope selection, and outcome
-  reconciliation; provider-local scheduling and device execution do not belong
-  here;
+- Trusted Capability Runtime validation, authorization, scheduling, timeout,
+  and cancellation; legacy `SkillRuntime`, `SkillRequest`, `SkillResult`, and
+  `skill_id` names remain only at explicit compatibility boundaries;
 - evidence capture, acceptance tooling, deployment configuration, and release
   packaging.
 
 ### Soridormi owns
 
-- the platform-independent Soridormi Execution Runtime for body, vocal, media,
-  and platform-perception capabilities;
-- provider-local compilation, preparation, scheduling, time synchronization,
-  resource arbitration, timeout, cancellation, stop, recovery, and per-member
-  execution evidence;
-- the Soridormi Platform Provider that maps stable internal contracts to MuJoCo,
-  a physical robot, or a desktop platform;
-- microphone, speaker, sensor, controller, and other device adaptation, including
-  drivers, calibration, state estimation, hardware safety, and commissioning;
-- execution-side safety and resource exclusivity across processes.
-
-The target Soridormi deployment has two logical containers: an execution-runtime
-container and one active platform-provider container. They may share one machine
-or accelerator, but the platform contract remains private to Soridormi.
+- embodied planning and execution;
+- simulator and physical providers;
+- robot resource exclusivity across processes;
+- motion monitoring, stop, emergency stop, and recovery;
+- device drivers, calibration, state estimation, and hardware commissioning.
 
 ### The language model may
 
@@ -125,32 +109,14 @@ The fast Goal Interpreter now runs inside the Agent-owned Goal-Driven Cognitive
 Core and receives only admitted `UserTurnEnvelope` projections. It does not own
 Gateway admission, Host authorization, execution, safety, or provider evidence.
 
-### Interaction and execution boundary
-
-The Chromie Interaction Orchestrator remains part of Chromie. It coordinates
-user interaction and cognitive lifecycle: which turn is active, which Goal is
-being confirmed or cancelled, what Chromie intends to say or do, and how
-provider-neutral execution receipts reconcile back to that interaction.
-
-The Soridormi Execution Runtime coordinates how the current platform performs
-authorized work. It may compile and synchronize body motion, vocal synthesis,
-media playback, and platform perception, but it cannot reinterpret a Goal,
-change response meaning, or widen an authorization. The Soridormi Platform
-Provider is the only layer that adapts MuJoCo, robot hardware, audio devices,
-sensor SDKs, or operating-system device identities.
-
-Chromie and Soridormi may later be deployed on one central computer, similar to
-a mixed-criticality centralized controller. Co-location does not erase the
-semantic, authorization, execution, or safety interfaces.
-
 ## Engineering principles
 
 1. **High-level contracts stay stable.** Simulation and physical providers
    should implement the same capability and result semantics. Chromie's
-   cognitive, personality, Social Attention, vocal-mode, and Activity policies
-   must not branch on whether the active Soridormi platform is simulated or
-   physical. Backend selection and all device adaptation remain private to
-   Soridormi.
+   cognitive, personality, and Social Attention policies must not branch on
+   whether the active Soridormi provider is simulated or physical. Backend
+   selection, body adaptation, calibration, and physical safety remain below
+   the Chromie semantic boundary.
 2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
    Outside deterministic operational controls, normal conversation, memory,
    tool, robot-action,
@@ -206,12 +172,8 @@ semantic, authorization, execution, or safety interfaces.
    combine owner-approved Agent Skills to inform a Plan, but a Skill has no
    independent Goal, provider registration, permission, confirmation exemption,
    or execution authority. All effects still use exact registered capabilities,
-   trusted authorization, and provider evidence. Skill retrieval may narrow
+   Trusted Capability Runtime validation, and provider evidence. Skill retrieval may narrow
    candidates; it must not become phrase-based semantic selection.
-14. **Centralize deployment, not authority.** Chromie and Soridormi may share a
-   host, accelerator, mixer, or release image, but semantic decisions remain in
-   Chromie, execution and platform adaptation remain in Soridormi, and safety or
-   authorization boundaries may not be bypassed for deployment convenience.
 
 ## Non-goals
 
@@ -246,6 +208,5 @@ brain/body contracts are maintained in:
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md);
 - [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md);
 - [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md);
-- [VoiceAssistant Composition Root](VOICE_ASSISTANT_COMPOSITION_ROOT.md);
 - [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md);
 - [Single Semantic Authority](SEMANTIC_AUTHORITY.md).

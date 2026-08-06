@@ -6,10 +6,7 @@ Chromie remains a development project. The maintained direction is a
 **Goal-driven single semantic authority**: the Cognitive Gateway owns ingress,
 protective reflexes, and attention admission; the Goal-driven Cognitive Core
 owns ordinary meaning, goals, planning, response composition, and outcome
-reconciliation. Trusted Host and provider boundaries authorize effects. The
-approved target keeps interaction orchestration in Chromie while moving
-platform-facing body, vocal, media, sensor, and device execution behind a
-Soridormi Execution Runtime plus private Platform Provider.
+reconciliation. Trusted Host and provider boundaries authorize effects.
 
 ## Current source state
 
@@ -22,8 +19,6 @@ Soridormi Execution Runtime plus private Platform Provider.
 | Source identity | Evidence metadata uses the Git commit in a checkout or a deterministic SHA-256 source-tree identity in an archive. | Archive and checkout forms are covered by unit tests. | Runtime provenance still requires resolved image and model digests. | Development only. |
 | Canonical verification | Repository, ownership, static-analysis, configuration, structure, documentation, benchmark, unit, and retained legacy checks are wired through `scripts/run_tests.sh`. GitHub Actions are pinned by immutable SHA. | The local audit environment verifies all dependency-available gates; unavailable pinned analyzers must remain reported as unavailable rather than passed. | CI and target profiles must be rerun from the final source revision. | Development only. |
 | Documentation surface | Historical audits, handoffs, proposal plans, implementation plans, and duplicate registries identified by the audit have been removed. Durable rules now live in the Charter, architecture, policies, status, roadmap, API, and component guides. | Local-link, index, ownership, terminology, and surface-ratchet checks enforce the reduced tree. | Not applicable. | Maintained development documentation. |
-| Chromie-Soridormi execution boundary | The target two-container Soridormi boundary and retained Chromie Interaction Orchestrator are documented. The current runtime has not migrated: Chromie still owns TTS/playback and Soridormi primarily owns body execution. | Documentation and existing contract tests can verify only current source consistency; they do not prove the target boundary. | No target validation exists for Soridormi-owned vocal/media execution, platform audio adaptation, or unified multimodal start/cancel. | Design approved; implementation not started. |
-| Vocal and singing semantics | Source prompts and tests attempt to keep vocal performance in Speaking, but the retained live compound episode remains open. The current Goal DTO still overloads completion modality, lane, and provider need, and no validated singing provider exists. | Focused tests exist, but they did not reproduce the final live failure and therefore are insufficient closure evidence. | No retained successful walk/blink/sing execution or singing-mode provider evidence. | Defect open; development only. |
 
 ## Compatibility state
 
@@ -39,29 +34,13 @@ and operator rollback evidence shows that no maintained profile depends on it.
 
 ## Open source issues
 
-The ordered implementation queue is owned by
-[Roadmap: Chromie-Soridormi execution-boundary migration](../ROADMAP.md#chromie-soridormi-execution-boundary-migration):
-
-1. repair vocal-mode Goal and Planner semantics, including the retained
-   walk/sing/blink failure;
-2. define the immutable Chromie-to-Soridormi execution and evidence envelope;
-3. introduce the Soridormi Execution Runtime facade for existing body work;
-4. migrate vocal/TTS execution;
-5. migrate media playback as Activity capabilities;
-6. move platform audio and sensor adaptation into Soridormi Platform Provider;
-7. add provider-local multimodal prepare/start/cancel coordination;
-8. slim the Chromie Interaction Orchestrator and remove direct execution; and
-9. close target evidence before deleting compatibility paths.
-
-Additional open work:
-
-- retain the deferred speech-start barge-in Issue without implementing it before
-  the audio ownership boundary is settled;
-- remove remaining compatibility planner code after equivalent retained
-  evidence exists;
-- keep dependency-complete Ruff and Mypy execution available in the maintained
-  CI environment; and
-- continue replacing development-only mutable runtime aliases with resolved
+- Reduce the Orchestrator composition root while preserving current structural
+  ratchets and exception boundaries.
+- Remove remaining compatibility planner code after equivalent retained
+  evidence exists.
+- Keep dependency-complete Ruff and Mypy execution available in the maintained
+  CI environment.
+- Continue replacing development-only mutable runtime aliases with resolved
   digests in publishable provenance rather than pretending local aliases are
   immutable.
 
@@ -69,9 +48,7 @@ Additional open work:
 
 - current-revision live Gateway/Core/Fast Planner smoke;
 - current-revision voice-to-MuJoCo interaction and cancellation receipts;
-- microphone intelligibility and first-audible TTS latency on the current path;
-- Soridormi-owned vocal streaming, media playback, interruption, delivery
-  receipts, and mode-specific singing evidence after migration;
+- microphone intelligibility and first-audible TTS latency;
 - shared-GPU warm/cold latency and contention behavior;
 - physical-provider commissioning, stop, recovery, and rollback;
 - resolved container and model artifact digests for any future publication.
