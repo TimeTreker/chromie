@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import subprocess
 import sys
@@ -127,6 +128,7 @@ def _deployment_start_command(
     *,
     soridormi_repo: Path,
     rebuild_no_cache: bool,
+    startup_timeout_s: float,
 ) -> list[str]:
     command = [
         "./scripts/start_voice_mujoco.sh",
@@ -134,6 +136,8 @@ def _deployment_start_command(
         str(soridormi_repo),
         "--no-viewer",
         "--keep-running",
+        "--startup-timeout-s",
+        str(max(1, math.ceil(startup_timeout_s))),
     ]
     command.append("--rebuild-no-cache" if rebuild_no_cache else "--build")
     return command
@@ -174,6 +178,7 @@ def _ensure_deployment(
     command = _deployment_start_command(
         soridormi_repo=soridormi_repo,
         rebuild_no_cache=rebuild_no_cache,
+        startup_timeout_s=timeout_s,
     )
     launch_handle = launch_log.open("w", encoding="utf-8")
     try:
@@ -777,7 +782,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--deployment-timeout-s",
         type=float,
         default=1800.0,
-        help="Maximum time to wait for the paired voice/MuJoCo stack to become ready.",
+        help=(
+            "Maximum time to launch and confirm the paired voice/MuJoCo stack; "
+            "the same budget is forwarded to the maintained launcher readiness waits."
+        ),
     )
     parser.add_argument(
         "--rebuild-no-cache",

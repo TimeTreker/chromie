@@ -17,6 +17,7 @@ from scripts.vocal_issue_closure import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
 REVISION = "a" * 40
 SORIDORMI_REVISION = "b" * 40
 WALK = "soridormi.walk_velocity"
@@ -360,16 +361,38 @@ class VocalIssueClosureTests(unittest.TestCase):
         command = _deployment_start_command(
             soridormi_repo=Path("../soridormi"),
             rebuild_no_cache=False,
+            startup_timeout_s=args.deployment_timeout_s,
         )
         self.assertIn("--build", command)
         self.assertIn("--no-viewer", command)
         self.assertIn("--keep-running", command)
+        timeout_index = command.index("--startup-timeout-s")
+        self.assertEqual(command[timeout_index + 1], "1800")
         rebuilt = _deployment_start_command(
             soridormi_repo=Path("../soridormi"),
             rebuild_no_cache=True,
+            startup_timeout_s=2400.25,
         )
         self.assertIn("--rebuild-no-cache", rebuilt)
         self.assertNotIn("--build", rebuilt)
+        timeout_index = rebuilt.index("--startup-timeout-s")
+        self.assertEqual(rebuilt[timeout_index + 1], "2401")
+
+    def test_paired_launcher_uses_forwarded_startup_timeout(self) -> None:
+        source = (ROOT / "scripts" / "start_voice_mujoco.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--startup-timeout-s)", source)
+        self.assertIn(
+            'wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent"',
+            source,
+        )
+        self.assertIn(
+            "ORCHESTRATOR_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_S))",
+            source,
+        )
+        self.assertNotIn('127.0.0.1 8092 420 "Chromie Agent"', source)
 
     def test_legacy_list_outcomes_remain_readable_during_evidence_migration(self) -> None:
         summary = passing_summary()

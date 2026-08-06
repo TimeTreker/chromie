@@ -15,6 +15,7 @@ FOLLOW_CAMERA=1
 BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_RUNNING=0
+STARTUP_TIMEOUT_S=420
 
 usage() {
   cat <<'USAGE'
@@ -35,6 +36,7 @@ Options:
   --follow-camera       Keep the viewer centered on the robot; default
   --no-follow-camera    Disable viewer follow camera
   --keep-running        Leave containers/simulator running after launcher exits
+  --startup-timeout-s N Maximum seconds for each startup readiness wait; default: 420
   -h, --help            Show this help
 USAGE
 }
@@ -51,10 +53,16 @@ while [ "$#" -gt 0 ]; do
     --follow-camera) FOLLOW_CAMERA=1; shift ;;
     --no-follow-camera) FOLLOW_CAMERA=0; shift ;;
     --keep-running) KEEP_RUNNING=1; shift ;;
+    --startup-timeout-s) STARTUP_TIMEOUT_S="${2:?--startup-timeout-s requires seconds}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[voice-mujoco][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if ! [[ "$STARTUP_TIMEOUT_S" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[voice-mujoco][error] --startup-timeout-s must be a positive integer; got: $STARTUP_TIMEOUT_S" >&2
+  exit 2
+fi
 
 if [ -d "$SORIDORMI_REPO" ]; then
   SORIDORMI_REPO="$(cd "$SORIDORMI_REPO" && pwd)"
@@ -129,6 +137,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "[voice-mujoco] Logs: $LOG_DIR"
+echo "[voice-mujoco] Startup readiness timeout: ${STARTUP_TIMEOUT_S}s"
 echo "[voice-mujoco] Starting Soridormi MuJoCo + runtime MCP..."
 : > "$SORIDORMI_LOG"
 
@@ -151,7 +160,7 @@ fi
 SORIDORMI_PID=$!
 echo "$SORIDORMI_PID" > "$SORIDORMI_PID_FILE"
 
-if ! wait_for_tcp 127.0.0.1 "$MCP_PORT" 420 "Soridormi MCP"; then
+if ! wait_for_tcp 127.0.0.1 "$MCP_PORT" "$STARTUP_TIMEOUT_S" "Soridormi MCP"; then
   tail -n 180 "$SORIDORMI_LOG" >&2 || true
   exit 1
 fi
@@ -168,13 +177,14 @@ ORCH_EVENT_LOG_PATH="$EVENT_LOG" \
 CHROMIE_PID=$!
 echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 
-wait_for_tcp 127.0.0.1 8092 420 "Chromie Agent"
-wait_for_tcp 127.0.0.1 9001 420 "Chromie ASR"
-wait_for_tcp 127.0.0.1 5000 420 "Chromie TTS"
-wait_for_tcp 127.0.0.1 11434 420 "Chromie Ollama"
+wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent"
+wait_for_tcp 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR"
+wait_for_tcp 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS"
+wait_for_tcp 127.0.0.1 11434 "$STARTUP_TIMEOUT_S" "Chromie Ollama"
 
 echo "[voice-mujoco] Waiting for Chromie Orchestrator..."
-for _ in $(seq 1 180); do
+ORCHESTRATOR_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_S))
+while (( SECONDS < ORCHESTRATOR_DEADLINE )); do
   if pgrep -f 'python -m orchestrator\.orchestrator' >/dev/null 2>&1; then
     echo "[voice-mujoco] Chromie Orchestrator is ready."
     break
