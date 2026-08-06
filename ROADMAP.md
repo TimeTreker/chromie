@@ -18,16 +18,20 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Preserve exact capability identity from model proposal through trusted
-   validation, authorization, execution, and evidence. Agent Skills may teach
-   reasoning methods but never authorize effects.
-3. Close source-bound and target-bound evidence separately. A passing source
+2. Repair vocal semantics inside the current architecture: singing, humming,
+   recitation, and authored vocal performance remain Speaking outcomes; playing
+   existing audio remains Activity. Ordinary TTS is not singing evidence.
+3. Preserve exact provider-prefixed capability identity from model proposal
+   through trusted validation, authorization, execution, and evidence. Backend
+   replacement stays behind that exact capability identity; do not introduce a
+   neutral late-binding alias merely to relocate implementation.
+4. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-4. Reduce compatibility surfaces only after the maintained path has equivalent
+5. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-5. Keep documentation, benchmarks, static analysis, configuration ownership,
+6. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations
@@ -81,6 +85,58 @@ Exit criteria:
 - compound body requests retain ordered exact capabilities;
 - missing abilities remain honest terminal outcomes;
 - behavior scenarios cover unavailable, repair, and rejection paths.
+
+### Vocal semantics and provider qualification
+
+Keep the maintained ownership boundary while closing the retained compound
+walk/sing/blink defect. Speaking, TTS synthesis, playback transport, echo
+handling, audible-delivery ordering, and user-level barge-in remain Chromie-
+owned. Soridormi remains a peer embodied Capability Provider beneath Activity.
+
+- Separate completion lane, output mode, and provider need in typed Goal and
+  Planner contracts.
+- Keep `singing`, `humming`, `recitation`, and other authored vocal performance
+  in Speaking even when coordinated with body work.
+- Keep playback of existing music, recordings, streams, and sound effects in
+  Activity with an exact media-provider capability identity.
+- Use an exact provider-prefixed vocal capability such as
+  `chromie.vocal.perform`; provider implementation may change behind the stable
+  identity, but the Planner-to-evidence identity must not.
+- Do not let ordinary expressive TTS advertise or close a singing outcome.
+- Do not attach resource-acquisition responsibility to ordinary vocal output.
+- Keep one authoritative Planner step-ownership representation and derive or
+  strictly validate redundant references.
+
+Exit criteria:
+
+- the retained Chinese walk/sing/blink episode and generalized vocal/media
+  variants pass focused and general-ability source tests;
+- Planner output contains no unknown step reference and no body/media
+  substitution for singing;
+- the canonical source gate passes on the same revision;
+- the highest available live trace reaches real body dispatch or returns exact
+  per-Goal unavailability without claiming singing; and
+- target audio or robot behavior is claimed only from retained target evidence.
+
+### Conditional vocal-hosting review
+
+Do not move TTS, playback, microphone, speaker, or media execution into
+Soridormi as part of the vocal semantic repair. Reopen the hosting decision only
+when retained evidence demonstrates at least one concrete blocker that the
+current peer-provider boundary cannot meet, such as:
+
+- frame-accurate viseme/body/audio synchronization required by a physical robot;
+- measured cross-boundary start skew outside a named acceptance budget;
+- measured cancel-to-silence latency outside a named barge-in budget;
+- unavoidable platform audio adaptation leaking into cognitive or semantic
+  code; or
+- shared accelerator or mixer contention that cannot be solved behind the
+  existing provider contract.
+
+Any such review is a separate architecture decision. It must update the Project
+Charter, `AGENTS.md`, capability contracts, Status, Roadmap, tests, and evidence
+plan in one coherent change. Co-location or a cockpit/ADAS analogy is not by
+ itself sufficient evidence.
 
 ### Structural simplification
 

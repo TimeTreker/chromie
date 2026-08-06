@@ -13,6 +13,13 @@ safety authority.
 The public runtime remains intentionally stable while internal responsibilities
 move behind narrow collaborators with explicit contracts and focused tests.
 
+TTS synthesis, playback transport, echo handling, audible-delivery ordering,
+and user-level barge-in remain Chromie-owned at the maintained boundary. The
+current vocal semantic defect must be fixed without relocating those
+responsibilities. A future hosting review requires retained evidence of a real
+latency, synchronization, platform-adaptation, or resource-contention blocker;
+co-location by itself is not an ownership argument.
+
 ## Extracted collaborators
 
 The root currently composes, among other collaborators:

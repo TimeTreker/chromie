@@ -65,14 +65,26 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-1. Decompose the Orchestrator composition root without raising structure
-   ratchets.
-2. Collect current-revision live service, voice-to-MuJoCo, latency, and
-   cancellation evidence.
-3. Remove the emergency compatibility semantic planner after equivalent replay
-   and live rollback evidence exists.
-4. Resolve future release images and models to digests when a publication target
-   is declared.
+The active Issue is the vocal Goal/Planner semantic repair only. Keep the current
+ownership boundary while implementing it:
+
+1. add typed completion-lane, output-mode, and provider-need judgments without
+   phrase-specific routing;
+2. keep singing, humming, and recitation in Speaking and existing-audio playback
+   in Activity;
+3. preserve exact provider-prefixed capability identity, using a Chromie-owned
+   vocal capability such as `chromie.vocal.perform`;
+4. reject invented vocal `resource_responsibility`, stale semantic-review
+   anchoring, and unknown Planner step references;
+5. run the retained walk/sing/blink episode, generalized vocal/media scenarios,
+   the general-ability class, and the canonical source gate; and
+6. retain live evidence honestly. A unit pass does not prove singing, speaker
+   output, MuJoCo motion, or physical robot behavior.
+
+Do not begin TTS/playback migration, neutral capability-ID indirection, or a
+Soridormi execution facade from this Issue. Revisit vocal hosting only through
+the separate evidence triggers in the Roadmap. After the vocal defect closes,
+resume Orchestrator simplification and current-revision target evidence work.
 
 ## Canonical owners
 

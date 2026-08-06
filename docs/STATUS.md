@@ -19,6 +19,7 @@ reconciliation. Trusted Host and provider boundaries authorize effects.
 | Source identity | Evidence metadata uses the Git commit in a checkout or a deterministic SHA-256 source-tree identity in an archive. | Archive and checkout forms are covered by unit tests. | Runtime provenance still requires resolved image and model digests. | Development only. |
 | Canonical verification | Repository, ownership, static-analysis, configuration, structure, documentation, benchmark, unit, and retained legacy checks are wired through `scripts/run_tests.sh`. GitHub Actions are pinned by immutable SHA. | The local audit environment verifies all dependency-available gates; unavailable pinned analyzers must remain reported as unavailable rather than passed. | CI and target profiles must be rerun from the final source revision. | Development only. |
 | Documentation surface | Historical audits, handoffs, proposal plans, implementation plans, and duplicate registries identified by the audit have been removed. Durable rules now live in the Charter, architecture, policies, status, roadmap, API, and component guides. | Local-link, index, ownership, terminology, and surface-ratchet checks enforce the reduced tree. | Not applicable. | Maintained development documentation. |
+| Vocal and media semantics | The maintained architecture keeps vocal output in Chromie Speaking and Soridormi as a peer embodied provider under Activity. Source prompts attempt to keep singing in Speaking, but the Goal DTO still overloads completion modality, lane, and provider need; no validated singing provider exists. | Existing focused tests do not yet close the retained live compound failure. A revised typed-contract regression and canonical source-gate run are open. | No retained successful walk/blink/sing trace or mode-specific singing evidence exists. | Defect open; development only. |
 
 ## Compatibility state
 
@@ -34,6 +35,13 @@ and operator rollback evidence shows that no maintained profile depends on it.
 
 ## Open source issues
 
+- Repair typed vocal Goal and Planner semantics for the retained walk/sing/blink
+  failure without moving TTS or playback ownership.
+- Qualify an exact Chromie vocal capability contract and keep ordinary TTS
+  evidence distinct from singing evidence.
+- Keep the vocal-hosting decision deferred until a measured synchronization,
+  cancellation-latency, platform-adaptation, or resource-contention blocker is
+  retained.
 - Reduce the Orchestrator composition root while preserving current structural
   ratchets and exception boundaries.
 - Remove remaining compatibility planner code after equivalent retained
