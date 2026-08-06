@@ -26,7 +26,13 @@ class RuntimeExceptionBoundaryInventoryTests(unittest.TestCase):
     def _write_inventory(root: Path, handlers: list[dict]) -> Path:
         path = root / "config" / "runtime_exception_boundaries.json"
         path.write_text(
-            json.dumps({"schema_version": "1.1", "handlers": handlers}),
+            json.dumps(
+                {
+                    "schema_version": "1.2",
+                    "body_hash_algorithm": "normalized_source_v1",
+                    "handlers": handlers,
+                }
+            ),
             encoding="utf-8",
         )
         return path
@@ -88,6 +94,41 @@ class RuntimeExceptionBoundaryInventoryTests(unittest.TestCase):
         )
         findings = audit_runtime_exception_boundaries(root, inventory_path=inventory)
         self.assertTrue(any("stale" in item.message for item in findings))
+    def test_wrong_hash_algorithm_fails(self) -> None:
+        root = self._root(
+            "def run():\n    try:\n        work()\n    except Exception:\n        return None\n"
+        )
+        handler = scan_broad_handlers(root)[0]
+        inventory = root / "config" / "runtime_exception_boundaries.json"
+        inventory.write_text(
+            json.dumps(
+                {
+                    "schema_version": "1.2",
+                    "body_hash_algorithm": "ast_dump_v1",
+                    "handlers": [
+                        {
+                            "path": handler.path,
+                            "symbol": handler.symbol,
+                            "ordinal": handler.ordinal,
+                            "classification": "fail_closed_boundary",
+                            "owner": "runtime",
+                            "contract": "Returns a typed failure.",
+                            "review_status": "reviewed",
+                            "body_sha256": handler.body_sha256,
+                            "failure_signals": list(handler.failure_signals),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        findings = audit_runtime_exception_boundaries(
+            root, inventory_path=inventory
+        )
+        self.assertTrue(
+            any("body_hash_algorithm" in item.message for item in findings)
+        )
+
     def test_changed_handler_body_requires_re_review(self) -> None:
         root = self._root(
             "def run():\n    try:\n        work()\n    except Exception:\n        return None\n"

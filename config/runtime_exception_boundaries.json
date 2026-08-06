@@ -1,5 +1,6 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
+  "body_hash_algorithm": "normalized_source_v1",
   "handlers": [
     {
       "path": "agent/app/agent_skills/selection.py",
@@ -9,7 +10,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "feec55855130c618830705c1115820b122e8ce5e4d4b06c6ab5bef18cc116ccc",
+      "body_sha256": "13e22ad09fc2a617df8464d9799afde8cb453848e6583cea57881a5dd181240e",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -24,7 +25,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "86b7c0a6a8800fd50b1223edd11593e746caf88de36cc504ac1e34d6b711c694",
+      "body_sha256": "5256d58854a9df9a5cd6566782fabc4482060df1d61cbbf3aaff649e6c950fbf",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -39,7 +40,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "e18d9791ffb690f16c25119c0464b9655fad376b2c4798ef2e07db77e7d1e988",
+      "body_sha256": "65e8e5e9d8a8d9fb364cff652d981e38b244629d34c0fce27ce6be9eed99c2d1",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -53,7 +54,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "3e9ef1670cbb57e80f84dfb0355aa0d317f5443a511d5f1766c580fd364e330b",
+      "body_sha256": "d4a0c65cbd70cab17f0c63d2f4b9f8a3d111789b5ab7ae258ccfdeb7f5474e9d",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -67,7 +68,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "34436b124132d186df351276e117618c4b468ee2bc3a5fce8fc12731ef108d43",
+      "body_sha256": "819124ddccfa37f71c7558ab6220c124c089a061b0109c9a4a98448d8682012c",
       "failure_signals": [
         "continue",
         "diagnostic"
@@ -81,7 +82,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "372fb08321a57884eb1b8260372859baeccf2614d50659eedb44c0b90d3a83d4",
+      "body_sha256": "26c5908e4e0c3ebd98d108f3b0950a3a4003c7b93d30768a8e96c6a779665cff",
       "failure_signals": [
         "continue",
         "diagnostic"
@@ -95,7 +96,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "042555f761b9a4735e535df3f44fe45760488dfd7107f4fae4d0b83717aa13ce",
+      "body_sha256": "2a097844f3283b1c807969aa43e97b1e43a9b892216f871ec53e0cf485a4e66b",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -109,7 +110,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "290bbe85bc7acf8106fc0e2a6dbe1d36da00c510917ee209b30d07dd96422c70",
+      "body_sha256": "9dc8d79f69a99b451079c167e015300a9c29ea2fdf612e7cce6b8c664774d1fd",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -123,7 +124,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "0cf5b419ab08f024bcb11b2a07cd459b0f5dd955ad413ff4c35f3fa053139c0a",
+      "body_sha256": "af4a9c34c0419cc41a6b71e8c9b52e49ee42090b0cbffb1a2eba4db0fc2ab614",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -138,7 +139,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "3d313bc2d8052ef1b495f5c46078fbd518166000dd7791ddb94315e88744b0c7",
+      "body_sha256": "c0215d99471b5aa166cd77b949cfa56c616ff086aa98cb297b268129a7c506d0",
       "failure_signals": [
         "diagnostic"
       ]
@@ -151,7 +152,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "d03d245b6809d60bc7ebe7423ee51cca5a49b08a1aaa171c21f6186fac95e86a",
+      "body_sha256": "e9b06f9a9aa9ffa256e6f896f650023d2786e0ccdcde8e77a4ef1b8dbb801338",
       "failure_signals": [
         "diagnostic"
       ]
@@ -164,7 +165,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "2591957680891e8a98f693417d84b21f2f4d362512de88dc771eb42fa040b7fa",
+      "body_sha256": "3b356a3966d365b3565f9e4031cacf80ed4803caf3b9c45b8d5ccaf28212afdb",
       "failure_signals": [
         "diagnostic"
       ]
@@ -177,7 +178,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "b68abc2d32d648506dbe8577891b89786bb8bbe93bc44ebc0e0af47979fb30fa",
+      "body_sha256": "b71228b5948a4048e21244cf6e5723f87427eb070e43465cb8610d80ed94009f",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -191,7 +192,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "6adbe610364c95c3189a4850e7358a8a7bbbc3e223f48a8c3a5b7d97905547b1",
+      "body_sha256": "1d9337b31d0a33f6e65334535785cc754feb790e5f6f36389d5863dbb59150d6",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -205,7 +206,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "04671d44b617147716773d89a39876531b7a83a0a152a324a6a26a5cb4e0c2c8",
+      "body_sha256": "8fba0480a8adff38be93bf97ccbebd883237c4dd14d611953a526e80da78a6c0",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",
@@ -220,7 +221,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "4db188ce721ac32117ca7b9588631e0e2fb64a409f3d17dcb0e23ef3b1faad03",
+      "body_sha256": "8646e8ae1a8742263f94a23388d1aadf163f9e57f68b1d803764e53f62e98f7d",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -234,7 +235,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "ecd040e4111d3772ca473ea25575ac11cd1cee716c4750a3a7fcc112c54fac69",
+      "body_sha256": "42ee73be3c595daf9400f1b49eedeb023345a1a7001104df7299f997ab51e36a",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -249,7 +250,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "c94e22fcf2f2650b04f100cc7983c0bd58f4fbff3adf308517af38979060926b",
+      "body_sha256": "3ea924133a7aaf997ea9a251911caba298d273aab239400ad1a77e4334933e5c",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -263,7 +264,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "4f43346f8269bc4f60c312183b32f525cc52f4741f35a0abc65a51d9fa5cde40",
+      "body_sha256": "1ed9c0cb49076f1658392c89fa275b6625c25b16d5d3f758cfd09662d888635b",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -277,7 +278,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "414cb808ec712076d74d9c02ace1a101c99aa2a445dbecddf6ba6962143812ed",
+      "body_sha256": "e1867c6dc27430ea6ba18b1504c0438295b3b362aec898d9b3ca6ff89dbc6f3b",
       "failure_signals": [
         "diagnostic"
       ]
@@ -290,7 +291,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "60c6c2949d1fea8a082a4caa558915c6771245cdf05b54c745db8a8fb4ea3662",
+      "body_sha256": "6f8f29e0fc9fa8ca00bef6ad81b6443abeb2c2b60e937138b9b0bb1f6210c413",
       "failure_signals": [
         "diagnostic"
       ]
@@ -303,7 +304,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "388a67836d10a2f99e201a362eee01fd8f611029c141585a9c1eb17354da90cb",
+      "body_sha256": "2224a743a721faf52551f80363c3c37b24f2586a2ef58479ee682409388a7af1",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -317,7 +318,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "46906fe4d87e69c01019d54b3d05aa80661594d2b8c0756a5d67ebd125da62fe",
+      "body_sha256": "70559a57f3273c0863225d8525978d781c3b600cf19148b6225ee92c209199aa",
       "failure_signals": [
         "diagnostic"
       ]
@@ -330,7 +331,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "af5199f9e7cb48cbaaaffdda26d139fcded398750a49bda6f6e6238da15bb801",
+      "body_sha256": "46ffdadeffcda1f5a71020a029d51e6c136274f92ece002f9eba0a3bb14a4ba8",
       "failure_signals": [
         "diagnostic"
       ]
@@ -343,7 +344,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "3d975564dcb835dca3fbc6376875ec8a71e134233aa3ad47baf030a8f36bfbb5",
+      "body_sha256": "a3e5c8db7a2aa6a6cdf39d62e52bdcb9d9c742c06e2bb65434989151635b4345",
       "failure_signals": [
         "diagnostic"
       ]
@@ -356,7 +357,7 @@
       "owner": "agent",
       "contract": "Attempt bounded model-authored repair for required pending-work speech and retain explicit missing-speech diagnostics without authorizing result or completion claims.",
       "review_status": "reviewed",
-      "body_sha256": "9d1381da3649d1ec385c2294b8def37140729e0ce69f535c6e39a821e3bb351d",
+      "body_sha256": "1e2bfe246d0bbb48ed6589778f02e9197df2f02eb84062b8d1dea24ff37aebd1",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -370,7 +371,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "56bc1c8d7950743cf90e55ac25b960b0c609be1d8467edaac2e4dc3b719970d1",
+      "body_sha256": "9dac72040c73fb182ddc700537231e4a48acd877a29f0790ff48d7d22e5b47af",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -384,7 +385,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "540b404e713e9f83639a403b9fafd879c50d69db2bc3e7422aa7e39b45fc402b",
+      "body_sha256": "168767ab6cf868bd5a5deff287ccdb8c6daf2aef05fc3043abddeb61814ae2a2",
       "failure_signals": [
         "diagnostic"
       ]
@@ -397,7 +398,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "07a686e23b1520012299d7e90442a9de14135a477dddcf11bdf9a13c77fcdc04",
+      "body_sha256": "4f16c37581e4bab984d2475d5116d055cf3aec893aef93d5dd4dec4a0e9e1a11",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -411,7 +412,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "3e33f18c3784f12736f60c804503b8d95a23b8d7dc492fcacba3facb44b95021",
+      "body_sha256": "5f487630825a1098bcc2db517027fb1638a537d398eb9e958c5e1b1f6ce31572",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -425,7 +426,7 @@
       "owner": "agent",
       "contract": "Suppress unreviewed or invalid pending-work speech so dynamic wording cannot invent unsupported facts, abilities, or side tasks; preserve only a reviewed replacement that satisfies the pre-plan claim contract.",
       "review_status": "reviewed",
-      "body_sha256": "ae885e19e611f570beccb226ab6eca3bef6dea90b3c6c9f05eb5af75277e5dd4",
+      "body_sha256": "c00d032e8a8c2ddf7bff1b827a24f9b1e86b94b8e7c67d5e555ceaea70d73f7c",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -440,7 +441,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1ccefabb5604a431ca103b030cfc1b0187d03ec838fe19cdf3096a7448321498",
+      "body_sha256": "589e1c97c60a15717928e041be17f8d5a12e41ac6cd1205750f366a1cbf7a510",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -455,7 +456,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "96c69608b5dbf107a676eda610d67009ed8c1aaa43c1525e3851e1a4ff58092c",
+      "body_sha256": "521d46f4f94411506d1f1eb1fb6dadd59f6dceed3bd2e5d2bb01713d49bea617",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -470,7 +471,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "c90d5bc0e7de2de79dc4104bdbec3736bca7480a6bd7643de35de568dfcebc8a",
+      "body_sha256": "2b7829a8016d3954e91985778cd95b8d306c2803c572512eae2e1ecea95d1766",
       "failure_signals": [
         "diagnostic"
       ]
@@ -483,7 +484,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "83edadc5aa9bffdaa69ca9b6c03a3b153e1ed3df4a19714c4eedb83fedf85229",
+      "body_sha256": "951b2b31c57e372838fca80959952b45d040ada9b10a5b51970cde4eb877e998",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -497,7 +498,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "828942ae9d6cb3f43e9c79e836462cfe750794807c427fb6e09a4e8e9c8eea05",
+      "body_sha256": "86542ba085f37a9915fdfbd51f14831c042328826bb5adce8c1c570f666b6dbd",
       "failure_signals": [
         "return",
         "state_update"
@@ -511,7 +512,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "66179f49fe6786f3f19d32726f438913846ff23b8d513c407ba482dd80fa9954",
+      "body_sha256": "3a4082ed012224dae08cbb5d65d6eb9194462c7921e84d00c88caf56aa71eecc",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -525,7 +526,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "43ec029c5312fd7225f35260bd2b22a3c8c07a23579170367406281a8068ab17",
+      "body_sha256": "ad8a01cf2c4abe8f699ecef6404066813525b4567de44de2372cdd723359b5c7",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -539,7 +540,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "0fc5563270cba64ecf05a5ec660e2bd762e08931f63207d93c5fc8835bee50da",
+      "body_sha256": "7037fa85d22dd3fc1d51bae4eeb24f69a56785ddecbee820604de45dda2a083e",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -555,7 +556,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9d4a9beaddee883c854fc174c105cdcd3b69ab955edf47f8f4cc0db2681e0708",
+      "body_sha256": "89dcf14bc9678ad6bcfe3e71e4478ee5db6abf024fb0e16630d12bcea404d26a",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -569,7 +570,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -582,7 +583,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b2675e118f9289fa6c5fc2e32e9146b370218c06c32ba9b29fd3e5c5b4348a6e",
+      "body_sha256": "13544a520c3d9c3d469e725346c0f328f4dc4187a13ecb4b6669402022e66ff3",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -598,7 +599,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e7e8d8578246675ea5b952c4939dc41a58472bd67dcd2dd02bf3674fc481eeab",
+      "body_sha256": "89b78e5324ae7812336703fa0517db76bcf9573ddd300545cfb74b0d07d25c32",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -612,7 +613,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -625,7 +626,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9b5d489cdcb5d47cf7f384c8f008c7e93127177947b448f912aef6de4d619a32",
+      "body_sha256": "a333ce480c04e5fa9bc4d0dd72db704ed4bbbad750d38ff4d56a56c5d131fd46",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -640,7 +641,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -653,7 +654,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "28a5784a2a946625a32f4c8a6365dd0f0c759e213c84b604374730502dc2c5a6",
+      "body_sha256": "a69594c2df956780b0fd0e7405ff84f2be21c8c63cd45ccf93c46364a3319840",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -667,7 +668,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "aabca7d231923e8671801ca8635d7a3d03907ff14c37e00b28a083be17d3c83a",
+      "body_sha256": "2a145a96a6f0d5b0c239711282d14900f29b9b0461e7fbc8dbef34e1798a59c1",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -681,7 +682,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "6acac26902ac7f77a5bfb523e06c13c292bebd889ea85a3fd5ccc1c82a9b6c57",
+      "body_sha256": "37554cecaec580a26a5da0cc105b17ca7d80cde7454a11745526ca01a578f160",
       "failure_signals": [
         "return"
       ]
@@ -694,7 +695,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "0ff878f8e65603dce20aa358f6fdf9b6cd64dbffdbb37363e1fe5314b485f9e2",
+      "body_sha256": "9115f40769c8f4032f1c7245b5a7b1f34d846f1f62bfb170455574d71f4eaf81",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -710,7 +711,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "755944b8191a1c787486ad98390463d0860965cbb757227401302b357844e6a8",
+      "body_sha256": "1b13dfef37887f83dd96aca6f0fe4ea6592806cb242427fe99a537a3cf2c40b9",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -726,7 +727,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -739,7 +740,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "07f6987e2d05c2ff031ac4a508c2ffe192d33badaf8e06fd365a8ca5b256b7fd",
+      "body_sha256": "ed79e043ac5fc364cddb7efacbdca6991c8aa8fabf5b03fc5d3e5d013bd9c0da",
       "failure_signals": [
         "diagnostic"
       ]
@@ -752,7 +753,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5b32c1b3b09d967775ebfe9c67bc2b3c7ce39baa73c38c5249a4a56fe247baf2",
+      "body_sha256": "a8ad96a64e45fea921687358f13809a48bb8184e273ae04ee0abb54227ecf1ff",
       "failure_signals": [
         "continue",
         "diagnostic"
@@ -766,7 +767,7 @@
       "owner": "agent",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "78612428601c9212d98680c0108312e7515af92c3eb96d31dbb5a8f44c066b8c",
+      "body_sha256": "c79d9441d7afbb5ded9696e2a0a8727e517067bead15d062ed727b73e7283d61",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -781,7 +782,7 @@
       "owner": "agent",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "78612428601c9212d98680c0108312e7515af92c3eb96d31dbb5a8f44c066b8c",
+      "body_sha256": "c79d9441d7afbb5ded9696e2a0a8727e517067bead15d062ed727b73e7283d61",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -796,7 +797,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e8b4a04fbad0d2a1fc09c02627981ebb51a574b362c6d8a657fa00a1d37c2621",
+      "body_sha256": "01d49c3edd6c011a2c93b7afbae3db6765bd173ff36e01c679a917257b5d975a",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -809,7 +810,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "34d5aabb6e1fa6add4fdcbed270c18d5bafc49135fe9a56eb65e4cad93ecc933",
+      "body_sha256": "2c8bbb84af5b800c23f25d51970c0cb4d49ef9557b3b5d125134b82b5d5922ab",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -824,7 +825,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "466a60dcb028112f24e2e55155b75060afd22e617a1c61e628cc4cee32c6a9ae",
+      "body_sha256": "8f455c0206e62dd42c98728184b0f62878ab00caeadd10cce46e064a2359408a",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -837,7 +838,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9f9bf845111d0038e06574fd49ba0a2fe480be7b6afa6598dd249e3ee437aba7",
+      "body_sha256": "7c21fefd826e45f90cb28f776043ef5fb4930fb9fabfb5b4e9ac986a90f974db",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -851,7 +852,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "cd7ece3c88c7fc4de135bb1874c09258a636e9048675041d973be09c5708660e",
+      "body_sha256": "4e0b2073558f5460833e8c120c738458e8814125f50be1da8f0beca0cdad910c",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -864,7 +865,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "3758dba48f99ce5a148aad1d0d4f0c9817c6a56a0b4c79884caeddde2a3fd54a",
+      "body_sha256": "c6a9c5af49859c62c23e24af88158f5caaf8940620430a0a5f00c554d689234a",
       "failure_signals": [
         "return"
       ]
@@ -877,7 +878,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "c6238971f92d203f31374dd8c772f896d64f0d8402b378e0b88c33ed69338de3",
+      "body_sha256": "8111eed9280a177970431434fc6161a728a985f752aa106ca0da37441857d6c6",
       "failure_signals": [
         "return"
       ]
@@ -890,7 +891,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b4803a06a91961fc1ca72b4c7b7155285485d25b1b6a07c76e1cb53371ed5f0c",
+      "body_sha256": "9b4f6e9fe3b6ab66da5a287bb807d0c0b8f75ff926b85ec74bd01a30df97b24f",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -905,7 +906,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b088797a4f611adc22f635dae891b031f8c8a9ae7c5f361859696e7b7d1b264f",
+      "body_sha256": "90e41fde25f9e643032285d29cd8949fd4038503944f5d5b054b4e972523b655",
       "failure_signals": [
         "raise",
         "state_update"
@@ -919,7 +920,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "6bdecc0a93ea42476248904b40ab63cd391c4e72db01db7bb2fba04a44df2bed",
+      "body_sha256": "3601443727e4a4e366c3ec83d126b28b3a2abd09f021e199692513e85346bd35",
       "failure_signals": [
         "raise"
       ]
@@ -932,7 +933,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "605657939919a4a23427dd71fcc5dbbfb836c373e0fe087bdc70302ba1c8b066",
+      "body_sha256": "8658c2645d06af2c60221987f6f97e4b6537366a80e6c7c3da4bd75f2464edf0",
       "failure_signals": [
         "diagnostic"
       ]
@@ -945,7 +946,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "4e5dc5e9626f3a5bc9249db315d89c4fe3b788175031678f8f95268781dff384",
+      "body_sha256": "2b13808c4a47e0ef92c09d898a0134d28ec2c9e3bc7efd9e931d34b3f15e9980",
       "failure_signals": [
         "diagnostic"
       ]
@@ -958,7 +959,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "194df11ac3f93319fb1fc68df3a514765e250aa1185785a61ebd76857e60367e",
+      "body_sha256": "ca6aa6aa01f26c20f75a45ee9b1afdab955660d2319594ef2e1c62b15c137a43",
       "failure_signals": []
     },
     {
@@ -969,7 +970,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "2ba5d07ed6888348029deb7277541a24f83175da5e31bf0fb96d8f6c8a585e3e",
+      "body_sha256": "9b53d7d67af521265e6868237630f3e01b7f44fb347a5987eb8b71b29407fde3",
       "failure_signals": [
         "state_update"
       ]
@@ -982,7 +983,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "040e7b66ee5494456361cd6062e203ba927d3200dd0f511b16419e3adea846a2",
+      "body_sha256": "8e7ad241a902bc068f21da54ca17ef9eafe150488384550e036204ac3af04563",
       "failure_signals": [
         "diagnostic"
       ]
@@ -995,7 +996,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "5f30261fec4e881d0e26613dea34d9045cee0c46c9147860ab8e531052bd4da0",
+      "body_sha256": "8c3551e305893ed2a4e41f1b2e90027ef23620335cef664199d4e24c491ba53b",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1009,7 +1010,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "65c053f7ec440dabfebd117063fed1539884791fcadcdf7f32d390fc3c61828d",
+      "body_sha256": "f0a9cdee9281f1284f6a5870b525cf2b669e96d6ba3fb73aa2412bdde54017c9",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1024,7 +1025,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "534726f2f5ab4962dde89c5fddf31f9aac455a704709fadcd635c311cf1ed967",
+      "body_sha256": "8143aee2ffbbab7721037b0d9546d6e3324976f3ad9becc44859c3e392a70b8b",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1039,7 +1040,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "106b67f36b02fc624eb1b72533564b1969d69d901e3a0540e57d18e7979c47fc",
+      "body_sha256": "c3aa4f6cdba522eea0f98acfc392ba4f8b76ecbfa50dcce2568096039e5850fc",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1053,7 +1054,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "3dcad11048614a60143d18bc8c2a1070723da090c08f16c49f83c2615e7c77ac",
+      "body_sha256": "2970f53433433ecabb396e5112b1c6a59491126348259d4343452235c5d833f0",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1067,7 +1068,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "0293019aa189527d5165fed3369f126752bdd95fc4942911d61afc073b0510b1",
+      "body_sha256": "c418275436b2423dc993256b7e33d99f27acea023b6af9f6228e2882addb291f",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1080,7 +1081,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "51e693de51d64c375a358ac2abe1353d3e5d9b8a66f8d814a8097e0e19ef4db8",
+      "body_sha256": "4bb7192d09b0d05e65ef9ddab2d9ae8701e017acebdaa7863a28db2fdfa77c79",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1094,7 +1095,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "82a5002aa210581cdb184849f5c043f3083c86a3a65d71398ad47221c9e9d270",
+      "body_sha256": "a4aba9e39e4a75d44baed625d7c75257f014e83aff1bc72fe37b10ec72dad03b",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1108,7 +1109,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "8d94bb4a13df4ea090f71c2fd660c15b49128d67ea1499eed1cb5b014c7a3d30",
+      "body_sha256": "765ca9a1d2c8357b44c78e316e7e4a1d6e5069f637171aa1f2f07de5493addc0",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1122,7 +1123,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "d0e6dfe21dd71a59349e936117876bb860ef132e7278b607304c343d8e715582",
+      "body_sha256": "24dbceb84c6feee4a6f168098250b2f38dd4f34a86f907e90f26bf1a9729a9bf",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1136,7 +1137,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "9fdb313bd2d0ff4d2ea2fbb1fb7ba35945118695dc03674d1d1472592e8656c4",
+      "body_sha256": "38d540e9f32d0faf72958441538581b1d83f7c453fbef15550aafe0dd543ce0a",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1150,7 +1151,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "4aa1968a3e11910d0bd847593ac533f281681a47b40e1e234031df99dbdb84a6",
+      "body_sha256": "6727e25a0c25804271fb68132a4696be1ab800ec45b3795b4b2802f251658786",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1164,7 +1165,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "968c0a2a32bf269533581c723bcfc76b1fc4558d0c2bb1145d965b30121080a0",
+      "body_sha256": "b50eadbe8673cb370ff47e93bca072f449a3dae38899728e51a49dada3fb0f38",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1178,7 +1179,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "85063049c517a16145933a8a7be56390a1e8ecddcd791aea2544ad106ea74dd7",
+      "body_sha256": "ebbb8888d41a8edf18f445aa52a55f533eaf3802405f7e2078300c1c8811471b",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1192,7 +1193,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "55e58531b034fbc8eae34609159cf7819a153452a8b23d1fe00f2799a540ac51",
+      "body_sha256": "d460378e1f5ffbce9dda8442afd7f0f23f9decee9555252eace3427214ffb320",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1206,7 +1207,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "dada5309014007c2abd9c4c88764e9b4746421e99057b207b781993ce2329785",
+      "body_sha256": "484717dfb7ba8dfdebec792e6fe2b549639799c63d5948b4418a9f56bd917955",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -1219,7 +1220,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "16f0661552b71b65ff26f8759e6db70e8c7bead3b9fbb3380d7bf5714052074a",
+      "body_sha256": "d16f6b0ea77c00cf169fd903d5693a82d67e865a2e75f9ad0f16ec2b059af2e7",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1233,7 +1234,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "83dc00b2cb30f5c79039d73aec164342f01eedc79efff6bf22ea4236f1e3d0ff",
+      "body_sha256": "fe43ec7060876eb4f8df62944a78439f1f2c26092900ea2f1907ec7d3f9aa831",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1248,7 +1249,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "c5d70d3f483f037186780e8b96df2a421dd800109f9a405a0814fbd6710037ef",
+      "body_sha256": "3134c98b2236f4bcc74916f66135cf5b277b5ad2e35c904496f2a7e6ed943a0e",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1261,7 +1262,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "42bc347a577a33ec6a7556391e1bbd3876085d5a3de5380ed56c66bdc477162f",
+      "body_sha256": "0adacc10be5f64af34a00dc01d8895f43a4dad2b33487b213bba856ef53f3dbb",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1274,7 +1275,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "a3d8773732fb2d9968ffb6d54b56a21a3cc998fb31ed861e730bed41ae0c3d05",
+      "body_sha256": "5da2c74c6b7259894a6a0a23671acebbb8706b90e1fdb320a9af58f9c48fa8f2",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1287,7 +1288,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "87255132072b04339ac76521c3abf22e1b34f51c800d08105eaa18380daec46f",
+      "body_sha256": "7951807a475189af727f8f2fab2fe9b95765aab334da4c60df09c6992332093b",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1300,7 +1301,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "2e0cdc08d2eb8fd6e62a59b52ab6bc02a4124a9017acd828038a4920db7a355f",
+      "body_sha256": "04249ecca17eb65cd0d979e4702ca8de5b9d0b122e32a426d9123f11f68b73b3",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1313,7 +1314,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "e8d8db1e30267ddd2a5f12582dd74b9d79a78e66b987342be5ebc9e19675754d",
+      "body_sha256": "0cac1bba398053705c9936c837efd787160cdac7ced2086c13162c65a51a3b5b",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1327,7 +1328,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "0e690ed0c604ddfaea5c322403560188ca435f02e6a78dc2ba06a467ef81adc4",
+      "body_sha256": "1531d3295d26f94f79319ec2268a064468001e0cf10f9eea8c7f14c5c710cc9b",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1341,7 +1342,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "7a685007e78327dffcbffe62e419108aff89dd53e2ed00c371a480e29f9574a3",
+      "body_sha256": "b24b898859319df3262a4476992c5ee368b182996efe96fa679f9258eb56a9a0",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1355,7 +1356,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "ef80e53fd56886ae6fba39d3da65e4b6f7e840c0f4c0848b7b78727fce8cb4c2",
+      "body_sha256": "070c6debbbe0c6759f430467a871f616013aeb46af565edd8d3bf15a9086ddb7",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -1370,7 +1371,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "c52163e73942cf05eb3bc4712fd384b4025e61b9e35e4022cc2da9b3fe53d2ea",
+      "body_sha256": "47c62b7f15ab9d5f9c3309e4a17363966e7141426f921ff2e6cdfd6a145d9057",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1385,7 +1386,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "976a9c58e3f04d6ea864b13f281af97410428a6096000340a2b3045c371169ea",
+      "body_sha256": "e10f26eb26bbe1f02379c69d4c04d8541802b9b1b09c4ab0390a0c75ebfb482a",
       "failure_signals": [
         "state_update"
       ]
@@ -1398,7 +1399,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "dcb548a31d676aa781829cae89840d26c0534d05e66963e07cd38833c86e6e4d",
+      "body_sha256": "22368c8b524ed90e0b260459ad578e1dc09b975c3df38451b19fa1362e062acd",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1412,7 +1413,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f2b8f2d4431370e2d1f66145a887e47002b7950e947d14b8ed7a80d2db35f6b5",
+      "body_sha256": "d4138255156b2dfbd4b54bb964d7c3f4ce605737b5a761c42b0a7c37fad3d018",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1426,7 +1427,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "7ea480ed1981608c1cd5da02375c362346bf8e335aa6407f7ce744dbf3b5097c",
+      "body_sha256": "16c667d293e56bb4bcd31cd357ccba6cf89491189d0c09db346b1bcf73ff7a52",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1440,7 +1441,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "3665dc123ef87f64f17580dad770c469def0b170579d953619a111324d6c8442",
+      "body_sha256": "cd599096be9e66ebea96c988f0609c9b2ab710047b3a3c21a63089cc4cb76883",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1453,7 +1454,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "2c308cde990695a3198978b680c47ca643b6aec4c8aabd3e31f8d6c5b796e372",
+      "body_sha256": "f82c2739b0c5b98df3c99859baee9e816cdc531e55704420308b2ee57b82c0f4",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1467,7 +1468,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5a9bfd5dbac703a812b8702a781acfeb54d98e8a1776f2b4041d97a467848fa0",
+      "body_sha256": "e31c98a4458f5e9b3b54b65f0487713f49c2936bda2fa08a25b49319bb6bef26",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1481,7 +1482,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "58ac17af411efb5f240ee0a0cbfb1cf8874417350db3d9bc169bb818d70917a4",
+      "body_sha256": "38da014ccdb2c6563ccde92312f5f987c8ae798e427b0dbc93ab9a76fa1a050a",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1495,7 +1496,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "18325cb988ed60212a9c8b9be4d309b01bf47457829eaa9b24b37e2e165e623b",
+      "body_sha256": "cc1f55296180d226afa3e79c1e8b90cb773bb0501a9da41ee6289700e855ff21",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1510,7 +1511,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "366e0ddb2e223022b83960d40dba01af1d7f43d7620c4654090314f16c41a54d",
+      "body_sha256": "fe216815b4bc0aa965c12c224e64486ae8ffe195f683d91da3fc6c849e040ae0",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1523,7 +1524,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "8ef99d7f9d39b6b0c21f350b469d78b668277b4060a9976ca149dc248ea7121e",
+      "body_sha256": "901f565678ff4ed2e6f640bd9087b2e67bccd119291b194df008d36e6f97e59c",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1536,7 +1537,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "f8e2493c048497dbf2b05f7888688d4d970bcdeca46396a0b2e0d432021e6b13",
+      "body_sha256": "6e483ebc0d1955b64cb812da8ee6400b020e5ba4f00155a72d5781aadb893f48",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1549,7 +1550,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "ebae9fbc85a94fa80f67a879b6eeb723524ebfa7b0ef7a050eaba7c21b8bf98a",
+      "body_sha256": "efa642f5b371085a93d3f418e5414b83a9c76bb89a2ba506bee17c57f2ccef00",
       "failure_signals": [
         "state_update"
       ]
@@ -1562,7 +1563,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1009773381015ec90cec91899240ec0826fee511eb2d683b772773fb25457600",
+      "body_sha256": "d115a8be9c13953b2c6383380876322ccf52828cf84c37364491d128ed31c98b",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",
@@ -1578,7 +1579,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "ebae9fbc85a94fa80f67a879b6eeb723524ebfa7b0ef7a050eaba7c21b8bf98a",
+      "body_sha256": "efa642f5b371085a93d3f418e5414b83a9c76bb89a2ba506bee17c57f2ccef00",
       "failure_signals": [
         "state_update"
       ]
@@ -1591,7 +1592,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1067d5ec2f0c12ce64ff48d88049086fba4171b9d8ee9a62d6e09d53931bc1da",
+      "body_sha256": "0aaf91670c22bd5465ccc228c5129957257b50a8b5c5ad4a97841c65a8200a0d",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -1604,7 +1605,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "780d9d87d550f826224998e8d90d21b6abf16d935e22e77f58a55438b9d4c9ff",
+      "body_sha256": "153a82c3731ce29e96d922946dcde4d57848620b4041b15653e8a71eaf3db6b3",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1618,7 +1619,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "0e0c57aa9f5996f54b608ecca959f38b66ac63e4f5606dfc043471c9e19d5a86",
+      "body_sha256": "b12d01f556f8f59d49dd8e94bc725d31f6c306a68e42eebc265800a45d48cea4",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1633,7 +1634,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "581f8caa7798f5b89c1879ef6464ab11e438b6890160569b535a402140af1c72",
+      "body_sha256": "51c2f87e8773d7ecfe69d0e9642ded4ed0758400f1d125dbe1184c4924f00c02",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1648,7 +1649,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "56f2371025b5036594b98f68d81ad0df14d6a163ae5c4443aeb30a2078f367cb",
+      "body_sha256": "9711d984ca5720ae2055980d6eb4c835be847693de12ee95f6ecbff72c29cc91",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1662,7 +1663,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "26c8a99a90557cb081a2f4927aedcf4a34a7a6c140954de17ee61bed13078dbe",
+      "body_sha256": "ee996a2d77d2fddf1450795f788672f6e4cc068156f0760239f70000f50cb6a1",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1675,7 +1676,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b3e983c68672bae1f2b136e17e3e26ba13598f11041903c9dc9eb4c2b328c938",
+      "body_sha256": "20c868d0a10fafd0b76c8b7fb37919e0c44deca3daf1120a742c13fad069dd8f",
       "failure_signals": []
     },
     {
@@ -1686,7 +1687,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1e11ccbc12ed1005c2d723c830d3dc621abad63b694fe47a480c37d90d46aa63",
+      "body_sha256": "6b2bd79472059acd8835ff6b6435300f77fcdbb56ba2191b4d91fd7dc1627a07",
       "failure_signals": [
         "return"
       ]
@@ -1699,7 +1700,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "debe8fb0bdc25725a80aed679628d20c63afb4931e5251705019d1892fab4ae2",
+      "body_sha256": "6152a1a1b61706036ec86b0914290876ccbb8fe4ca58ef80753354f5054f8bf2",
       "failure_signals": [
         "continue"
       ]
@@ -1712,7 +1713,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b3e983c68672bae1f2b136e17e3e26ba13598f11041903c9dc9eb4c2b328c938",
+      "body_sha256": "aaaf98d1d331802c0cf11f58f0bb72cabc05a5739a4b278cfff7c39b440f6aea",
       "failure_signals": []
     },
     {
@@ -1723,7 +1724,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "40d03dfdb118ce3ef335f53a551e8c4f414730d2092b2c7000a604dac2d11890",
+      "body_sha256": "26566bda6acc71b2483be1a6d16ec71888cc080036eb7ea1fff05a2331e5650e",
       "failure_signals": [
         "raise"
       ]
@@ -1736,7 +1737,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e5e8b8424b4810e5d630e98a12c74c5fe2ded04542f75b1261e48fda99d2e85e",
+      "body_sha256": "80d0299bc5c6906f652e06656174d714238856f0f20276eb3885103ec4d7cf7f",
       "failure_signals": [
         "return"
       ]
@@ -1749,7 +1750,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "5516b74622dc4c64c4809db18d00b8b60454e4609a25da83a23f926873c14856",
+      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -1762,7 +1763,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "78136335ce23910349a38bfdb0e916b610ca8e6e1a8f0677cbb90add44c224f4",
+      "body_sha256": "5804723a838f5d0ce439a4dc6b2a0a08c46e804ec6acd6b7375df3f745dcbbe4",
       "failure_signals": [
         "continue",
         "state_update"
@@ -1776,7 +1777,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "04b5dd48e70cd12711fa92d76947065cb347ce3e4bb3328211f45c530c7e1873",
+      "body_sha256": "c7a8c262dde05094c7a820c8b07aba806e02d5d444a71b2bc52386aafee42ffb",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -1789,7 +1790,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "4a23811f9f25d162b093720b58d3025e17b13756d7d9b2249d1f3703cf8f9a9c",
+      "body_sha256": "6f45de4ad3dbdb3185f903251a7db00dd4a66b3e0077576f39de0cff5ced405f",
       "failure_signals": [
         "raise"
       ]
@@ -1802,7 +1803,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "6d00b94739214bc3c738b9ed5b34182de602426bbce8192d94b5c1daeff04e13",
+      "body_sha256": "a1e3ed07354f4fda848aa202b2776122d170b25558e47b6904e16f207b62fb09",
       "failure_signals": [
         "bare_reraise",
         "state_update"
@@ -1816,7 +1817,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "0bb0948850646852b998db59f70b328b7f2c03cedcefdaf82e737f806987f9f3",
+      "body_sha256": "b9cb01f4551557755fbbfa4e1bd65ec439779275e104936fc84f098fe00dbe65",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -1830,7 +1831,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "42bab5d3b30da58e713fe554c860dc3cb19296e3d11cf2fa4aa29a680e9b57b1",
+      "body_sha256": "94601368e231e2849a38dca6bc23f308be356b20849d911b6216fe9aca266000",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1843,7 +1844,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "6bd7796c0588e004cb2bcc86c6e022ff6ca576a4f362c25d61b9e80329b82c8c",
+      "body_sha256": "661e03e65f6ea49f6c6476cb2bd0337d371f7db12ff764d0c6c1155283eefc73",
       "failure_signals": [
         "continue",
         "diagnostic"
@@ -1857,7 +1858,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "67ba6315996041c31ed4daf50883e3c67a4d2cf9c8d41a46291848982927052d",
+      "body_sha256": "06c86271a70b03841802bde79fa3dc6f3be5ec7515fde6a5e13f39b74702a02c",
       "failure_signals": [
         "break",
         "diagnostic",
@@ -1872,7 +1873,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "0f28c146eca604d37b4034a1fb6bc597b0c59d2fabc71ab723eeb4ab06d88bed",
+      "body_sha256": "e032019e3e44f855d59a8ba5683e9150c2d05fb2655a0d543e6dce35334ef801",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1885,7 +1886,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "3b774ac571e028d5de0898dc1050b711cb834a6cdc6afee397369fa81382170f",
+      "body_sha256": "35abd7764d0c4c801b1621c9695329690be406d1e27b70eb2f4d62f425161732",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1898,7 +1899,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "37cdd6c31515136edc276edd7ba6c564d77cd96e0ffd50fbfb3f50314bada8ca",
+      "body_sha256": "5cd1af7a0cb62872b97b1d528caa6ac0fee2220c406dcf268b5207040a1aa5cd",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1912,7 +1913,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "4da1992166a25a9b0a186a374652e8e205bcd10e1a159e538800c700678cb6c9",
+      "body_sha256": "c2a314c12f1d763663ad11668b4f7d3d23be0e6fda9b2303990d97511baf848e",
       "failure_signals": [
         "diagnostic"
       ]
@@ -1925,7 +1926,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "408cdc76266dd9d81b7b823a7d3a406ac49639cf4a88af06f127e48810ce1430",
+      "body_sha256": "33f08a44748e28a8ef2989a27aad7c092f3aea70962d5688208ed04c00c713c1",
       "failure_signals": [
         "bare_reraise",
         "diagnostic"
@@ -1939,7 +1940,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b847e9d5d17ab8b07b90813a143535412f765e351762257f473bc4aa2a44612d",
+      "body_sha256": "07f6ab372f607c8cd6d045cb3659728fe6de119730c36921c3bb943cd80f4aa5",
       "failure_signals": [
         "return"
       ]
@@ -1952,7 +1953,7 @@
       "owner": "orchestrator",
       "contract": "Reject malformed or unreadable durable profile state, clear in-memory entries, and retain a diagnostic without exposing unvalidated content.",
       "review_status": "reviewed",
-      "body_sha256": "a16f293da254a89abd8f15ebb5c30dd9936b9227525bc9c80f9ad7ed43dc6eab",
+      "body_sha256": "4ee327e79def70c3eb38a5b2ed8e4268a25ba49b786dddff6495d27bcfdaa479",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1966,7 +1967,7 @@
       "owner": "orchestrator",
       "contract": "Remove temporary output, retain a persistence diagnostic, and re-raise so the owning operation cannot claim durable success.",
       "review_status": "reviewed",
-      "body_sha256": "fc5865e7627366fab6aa024dbf8806aa6c8ee71ea9af172dd63e872e834f62e3",
+      "body_sha256": "6a1bedb8ce5ba1a5579f69f3f309684a1ca86340df014bed91ed961d22579d44",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",
@@ -1981,7 +1982,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e4c6d2a56a2e9c112245c99b79e7085a174aae82a3a036d294c37a87de72ebe1",
+      "body_sha256": "e1c6672c027d9a593fc5d662c0c88e7792824415885676abd487c11475721c02",
       "failure_signals": [
         "raise"
       ]
@@ -1994,7 +1995,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "dc44a935608f1ffb3485199112487387b21d537f56764cc983acd2b2ef752006",
+      "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
       "failure_signals": [
         "raise"
       ]
@@ -2007,7 +2008,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "6d261ba632b60b24b7855e481dc3e65c80075a14603003a3c758728c0c628d51",
+      "body_sha256": "c3cfe3446a78338f793b40437e28f8bd7ba3254765eb62d471562c12f137ecb5",
       "failure_signals": [
         "raise"
       ]
@@ -2020,7 +2021,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "621c22b66f2f4618415bedaea37b96aac71b338434e760a2e58aae1d941d2c9d",
+      "body_sha256": "c6733ab3e5b08c600b2f18a971668dbb7a224200660f3da55653fcbfc8d59b35",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2033,7 +2034,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "2256c961d701aa04657420f4cd30b50cf27785d40adfb3ba70ac0d26365dceb7",
+      "body_sha256": "831e3e0cb42b0444ea8e1f8d2de4e26cc793f97b4d70da8e1a0a447048cee516",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2046,7 +2047,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "33ee9010e1c71eaa955b65fb3e13cc05dcc2eb47d946ba3c8afef2d98c6916a3",
+      "body_sha256": "12443e5afd7bfd84231edd89b6b170cb61132b7f823da2a2b68b7cbebdfe48ad",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2059,7 +2060,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "c741e143de2f6b4b0d8015760d92f780aeae8cc337d61ed630d42941d8fdcda0",
+      "body_sha256": "df65152017cf4011978574f4659998b63211727bea5459359802b5135048d5b6",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2072,7 +2073,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "05c61102993362633728e6353514924e5bc4979e63fa0ea38d4c0c8378383d9f",
+      "body_sha256": "5050a9068e48b81709b970ab86cb6f7ca1684c791b0d0df615239bb21ed1d498",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -2087,7 +2088,7 @@
       "owner": "orchestrator",
       "contract": "Fail a provider stream into the ordered playback lifecycle, retain diagnostics, and never emit success for incomplete audio.",
       "review_status": "reviewed",
-      "body_sha256": "58d49835d17b611f75c2cdaf45ad8c6e2ae8ef30fd36239e2db53be2f0a33e7e",
+      "body_sha256": "af586156211a13087fb0b51cd7bfab85aabe133be4f732b1bfc7f99b9ece54c9",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -2102,7 +2103,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "9988e036c2f148982f0c2224d24bf671bc270358cacea2827ddc918a8aee2965",
+      "body_sha256": "e08662d773b03a34942570fbb400139e64edfd7b07aaf159685d43c02d2a85ce",
       "failure_signals": [
         "return"
       ]
@@ -2115,7 +2116,7 @@
       "owner": "orchestrator",
       "contract": "Fail open after recording an orientation callback failure so startup speech is not forced and the live microphone can still open.",
       "review_status": "reviewed",
-      "body_sha256": "7fff9b5e551f07630a30f3cb83d454c9bab3e4d9102b78125a9d56ee879b4f11",
+      "body_sha256": "28118a8e0ab3c51b76a0cf830c9d66f578dc26be00010d504e36bbe03089b550",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -2129,7 +2130,7 @@
       "owner": "orchestrator",
       "contract": "Try only exact startup-orientation capabilities and retain diagnostic evidence when one candidate is unavailable without authorizing a replacement outside the bounded list.",
       "review_status": "reviewed",
-      "body_sha256": "14aa24a1aa0ee5170f90c519875730b32bc64b518bfabe00cfed93753edd02e8",
+      "body_sha256": "0aec0c93e0598ee96c6f83c973e47bfea20c887e0238a6c66ae4a33e3e5d1954",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2142,7 +2143,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "55f254cb2e390ed2a3186f125b05e802417179e9df1927593d290cc1a2cc3d98",
+      "body_sha256": "55a864a343ade333d53c4607e8e811291be69a6003e294815a36ba6406939db6",
       "failure_signals": [
         "state_update"
       ]
@@ -2155,7 +2156,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "03b76c6692ac6e8d5191ce10bc999bc99b750a7595a4317664549e2af152fb69",
+      "body_sha256": "7195c1bb882c0c453f75430583f2b55cc7537a4a240a803206e4414f9e2b0c08",
       "failure_signals": [
         "diagnostic"
       ]
@@ -2168,7 +2169,7 @@
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "345b7adac0eca3ad34a4075989ea3d645e0085c751634ddb45834c83c94242c0",
+      "body_sha256": "2295a7779d3773fefb542227ff96efff0b858392c292847093a8a95aa7771546",
       "failure_signals": [
         "continue",
         "diagnostic"
@@ -2182,7 +2183,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "70a2d35dfaa06f4791ec27853ad2972ea72a121ef39535abe4f138a844473e6b",
+      "body_sha256": "76f03103cde88be44cab359e0b325234483cb8f7b7b78f9af1875e39868ad88b",
       "failure_signals": [
         "return"
       ]
@@ -2195,7 +2196,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "54a96c20e2272c6f3ad1985bf44f5ba9f2f66b28a639057daa8e14ba4d989b06",
+      "body_sha256": "db51771e88ff730d27111c8d9e1c25f1295cdf4e8ae6f4713c92db86bf83d268",
       "failure_signals": [
         "return"
       ]
@@ -2208,7 +2209,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "41f169e06d30ae33477ba5307b0537c546d0560653fb5f05dc21c8a4856936db",
+      "body_sha256": "c35e7ef341c49e1fe428695f68ce92d2b5c9d22745ea6c6f4439cd0ff601a0fa",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -2222,7 +2223,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9cd17b28ae2fe64606ca2c1ea976b88817c50936d2c199775c96b8b758e0734d",
+      "body_sha256": "1beb3f16d6883dca170e29f365a5e6a5695ec761786619e80ac9141458baa6ed",
       "failure_signals": [
         "state_update"
       ]
@@ -2235,7 +2236,7 @@
       "owner": "orchestrator",
       "contract": "Map a provider-local compiled activity exception into explicit failed member results without authorizing partial or unvalidated body work.",
       "review_status": "reviewed",
-      "body_sha256": "65e69adc6024803552320727c8f3c87bbb6ede7b4083d708713a77455b453e0c",
+      "body_sha256": "f5067b21ee039023d44286598eb0ffcb0aebe0bd0b223a362e27c895d58f0de1",
       "failure_signals": [
         "state_update"
       ]
@@ -2248,7 +2249,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "db08a7bfdd14e7cc2aebf0e253b28a6882c151bbfa6a878b7f5d58347d3e9031",
+      "body_sha256": "9dfd73f419e08e94596198f4154747eb2d91872f9aea5ea920686eab870d60c3",
       "failure_signals": [
         "bare_reraise"
       ]
@@ -2261,7 +2262,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "b71d8227c27e88788c6750eb8a95f25248269fab562f2c40c5068dd7cb7fb982",
+      "body_sha256": "1a5ad976a8230863b6ed37db0012c371da3ba12215b225f0574a6b0e7f27c56e",
       "failure_signals": [
         "state_update"
       ]
@@ -2274,7 +2275,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "467a49a1611161933724471785b3e97b6bd55ba87a9c197bf1892543565fdb17",
+      "body_sha256": "6fd4f0157704a70bf5b0664ea0bbbb1cb4556bf24d264feba1808370841c8f49",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -2288,7 +2289,7 @@
       "owner": "shared_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "e0d338f028276ef1dd16a821acc9472475ea568eeb09c0da36d58399627693cb",
+      "body_sha256": "24272e33af59c86b7d420350539e5921fe6fca798f26c1968c571e8126924fda",
       "failure_signals": [
         "state_update"
       ]
@@ -2301,7 +2302,7 @@
       "owner": "shared_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "aae4ae2f85dfa87f35b5e19f4bfec49b2ec3ea74025ac113d9cde0e337f87b88",
+      "body_sha256": "dda1082160c488f676ea0362044025bdf3f35dd5e9f4955e5ad8aa69b55b02ae",
       "failure_signals": [
         "state_update"
       ]
@@ -2314,7 +2315,7 @@
       "owner": "shared_runtime",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "2cbac1c85ca0364c40d25f2ae1146443983a1211ddbe07107342c4fa34b37102",
+      "body_sha256": "f44f5aa29b07b5d6156ada35d14a7fba0e19bd720a79d264afe0807f3d89a37d",
       "failure_signals": [
         "return",
         "state_update"
@@ -2328,12 +2329,12 @@
       "owner": "shared_runtime",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "a59e54d81c86313815fa073102b80c8b3e99e2e819b347266715295b3b8551c0",
+      "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
       ]
     }
   ],
-  "reviewed_at": "2026-08-03",
-  "review_contract": "Classification and exact handler body reviewed; any AST body or failure-signal change requires re-audit."
+  "reviewed_at": "2026-08-06",
+  "review_contract": "Classification and normalized source handler body reviewed; any handler body or failure-signal change requires re-audit."
 }

@@ -7,6 +7,7 @@ import argparse
 import ast
 import hashlib
 import json
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
@@ -19,6 +20,8 @@ RUNTIME_ROOTS = (
     "shared/chromie_runtime",
     "shared/chromie_contracts",
 )
+BODY_HASH_ALGORITHM = "normalized_source_v1"
+
 ALLOWED_CLASSIFICATIONS = frozenset(
     {
         "narrow_reraise",
@@ -61,9 +64,39 @@ def _is_broad(node: ast.AST | None) -> bool:
     return False
 
 
-def _handler_review(node: ast.ExceptHandler) -> tuple[str, tuple[str, ...]]:
+def _normalized_handler_source(node: ast.ExceptHandler, source: str) -> str:
+    """Return a Python-version-independent review fingerprint input.
+
+    ``ast.dump`` includes interpreter-version-specific AST fields, so inventories
+    generated under one supported Python release can reject unchanged source on
+    another. Hash the reviewed handler body from normalized source text instead.
+    This remains deliberately sensitive to any body edit while ignoring line
+    ending and trailing-whitespace differences.
+    """
+
+    if not node.body:
+        return ""
+    first = node.body[0]
+    last = node.body[-1]
+    if first.lineno is None or last.end_lineno is None:
+        raise ValueError("broad exception handler is missing source locations")
+    lines = source.splitlines()
+    segment = "\n".join(lines[first.lineno - 1 : last.end_lineno])
+    dedented = textwrap.dedent(segment)
+    normalized_lines = [line.rstrip() for line in dedented.splitlines()]
+    while normalized_lines and not normalized_lines[0]:
+        normalized_lines.pop(0)
+    while normalized_lines and not normalized_lines[-1]:
+        normalized_lines.pop()
+    return "\n".join(normalized_lines) + "\n"
+
+
+def _handler_review(
+    node: ast.ExceptHandler,
+    source: str,
+) -> tuple[str, tuple[str, ...]]:
     module = ast.Module(body=node.body, type_ignores=[])
-    normalized = ast.dump(module, annotate_fields=True, include_attributes=False)
+    normalized = _normalized_handler_source(node, source)
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
     signals: set[str] = set()
     for item in ast.walk(module):
@@ -93,8 +126,9 @@ def _handler_review(node: ast.ExceptHandler) -> tuple[str, tuple[str, ...]]:
 
 
 class _Visitor(ast.NodeVisitor):
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, source: str) -> None:
         self.path = path
+        self.source = source
         self.symbols: list[str] = []
         self.counts: dict[str, int] = {}
         self.handlers: list[BroadHandler] = []
@@ -122,7 +156,7 @@ class _Visitor(ast.NodeVisitor):
         if _is_broad(node.type):
             ordinal = self.counts.get(self.symbol, 0) + 1
             self.counts[self.symbol] = ordinal
-            body_sha256, failure_signals = _handler_review(node)
+            body_sha256, failure_signals = _handler_review(node, self.source)
             self.handlers.append(
                 BroadHandler(
                     path=self.path,
@@ -150,8 +184,9 @@ def scan_broad_handlers(root: Path) -> list[BroadHandler]:
     handlers: list[BroadHandler] = []
     for path in iter_runtime_python(root):
         relative = path.relative_to(root).as_posix()
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        visitor = _Visitor(relative)
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        visitor = _Visitor(relative, source)
         visitor.visit(tree)
         handlers.extend(visitor.handlers)
     return sorted(handlers)
@@ -170,13 +205,25 @@ def load_inventory(path: Path) -> tuple[dict[tuple[str, str, int], dict[str, Any
                 message=f"cannot load exception inventory: {type(exc).__name__}: {exc}",
             )
         ]
-    if payload.get("schema_version") != "1.1":
+    if payload.get("schema_version") != "1.2":
         findings.append(
             InventoryFinding(
                 path=path.as_posix(),
                 symbol="<inventory>",
                 line=0,
-                message="schema_version must be 1.1",
+                message="schema_version must be 1.2",
+            )
+        )
+    if payload.get("body_hash_algorithm") != BODY_HASH_ALGORITHM:
+        findings.append(
+            InventoryFinding(
+                path=path.as_posix(),
+                symbol="<inventory>",
+                line=0,
+                message=(
+                    "body_hash_algorithm must be "
+                    f"{BODY_HASH_ALGORITHM!r}"
+                ),
             )
         )
     entries = payload.get("handlers")

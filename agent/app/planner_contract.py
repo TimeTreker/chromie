@@ -725,7 +725,7 @@ def validate_goal_responsibility_outcomes(
             )
         if outcome.disposition != "respond":
             raise ValueError(
-                "ordinary speech goal must use disposition=respond and no "
+                "spoken_response goal must use disposition=respond and no "
                 f"executable step: {goal_id}"
             )
     for goal_id in sorted(provider_vocal_goal_ids):
