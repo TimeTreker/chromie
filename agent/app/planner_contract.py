@@ -453,13 +453,22 @@ def goal_association_prompt_projection(
             continue
         goal = {key: copy.deepcopy(item[key]) for key in goal_keys if key in item}
         metadata = item.get("metadata")
-        responsibility_kind = (
-            str(metadata.get("responsibility_kind") or "").strip()
+        projected_metadata = (
+            {
+                key: copy.deepcopy(metadata[key])
+                for key in (
+                    "responsibility_kind",
+                    "execution_lane",
+                    "output_mode",
+                    "provider_required",
+                )
+                if key in metadata
+            }
             if isinstance(metadata, dict)
-            else ""
+            else {}
         )
-        if responsibility_kind:
-            goal["metadata"] = {"responsibility_kind": responsibility_kind}
+        if projected_metadata:
+            goal["metadata"] = projected_metadata
         goals.append(goal)
     projection["new_goals"] = goals
     referent_keys = (
@@ -618,13 +627,25 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
     return result
 
 
+def _goal_execution_metadata(goal: dict[str, Any]) -> tuple[str, str, bool]:
+    metadata = goal.get("metadata")
+    if not isinstance(metadata, dict):
+        return "", "", False
+    return (
+        str(metadata.get("responsibility_kind") or "").strip(),
+        str(metadata.get("output_mode") or "").strip(),
+        bool(metadata.get("provider_required")),
+    )
+
+
 def planner_response_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return Goal Association-authored direct-response Goal IDs.
+    """Return direct Speaking Goals completed by ordinary authored speech.
 
-    This reads a typed semantic judgment made at Goal Association. It does not
-    classify user text or select a Capability.
+    Mode-specific vocal performance is deliberately excluded.  It remains in
+    the Speaking lane but requires exact provider evidence and cannot be closed
+    by a generic ``respond`` outcome.
     """
 
     result: set[str] = set()
@@ -632,11 +653,37 @@ def planner_response_goal_ids(
         if not isinstance(goal, dict):
             continue
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        metadata = goal.get("metadata")
+        responsibility_kind, output_mode, provider_required = (
+            _goal_execution_metadata(goal)
+        )
         if (
             goal_id
-            and isinstance(metadata, dict)
-            and metadata.get("responsibility_kind") == "spoken_response"
+            and responsibility_kind == "spoken_response"
+            and output_mode in {"", "speech"}
+            and not provider_required
+        ):
+            result.add(goal_id)
+    return result
+
+
+def planner_provider_vocal_goal_ids(
+    authoritative_goals: list[dict[str, Any]],
+) -> set[str]:
+    """Return Speaking Goals that require mode-specific provider evidence."""
+
+    result: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility_kind, output_mode, provider_required = (
+            _goal_execution_metadata(goal)
+        )
+        if (
+            goal_id
+            and responsibility_kind == "spoken_response"
+            and output_mode not in {"", "speech"}
+            and provider_required
         ):
             result.add(goal_id)
     return result
@@ -648,9 +695,11 @@ def validate_goal_responsibility_outcomes(
     authoritative_goals: list[dict[str, Any]],
     context: dict[str, Any] | None = None,
 ) -> None:
-    """Keep planner outcomes aligned with typed Goal completion modalities."""
+    """Keep planner outcomes aligned with typed Goal completion contracts."""
 
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
+    provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals)
+    speaking_goal_ids = response_goal_ids | provider_vocal_goal_ids
     capability_goal_ids: set[str] = set()
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
@@ -676,17 +725,29 @@ def validate_goal_responsibility_outcomes(
             )
         if outcome.disposition != "respond":
             raise ValueError(
-                "spoken_response goal must use disposition=respond and no "
+                "ordinary speech goal must use disposition=respond and no "
                 f"executable step: {goal_id}"
+            )
+    for goal_id in sorted(provider_vocal_goal_ids):
+        outcome = output.goal_outcomes.get(goal_id)
+        if outcome is None:
+            raise ValueError(
+                f"provider-required vocal goal requires an explicit outcome: {goal_id}"
+            )
+        if outcome.disposition in {"respond", "execute"}:
+            raise ValueError(
+                "provider-required vocal goal cannot be completed by response_text, "
+                "ordinary TTS, or an Activity step before an exact vocal Capability "
+                f"contract exists: {goal_id}"
             )
     invalid_steps = [
         step.step_id
         for step in output.steps
-        if response_goal_ids.intersection(step.source_goal_ids)
+        if speaking_goal_ids.intersection(step.source_goal_ids)
     ]
     if invalid_steps:
         raise ValueError(
-            "spoken_response goals cannot own executable planner steps: "
+            "Speaking goals cannot own Activity planner steps: "
             + ",".join(invalid_steps)
         )
     for goal_id in sorted(capability_goal_ids):

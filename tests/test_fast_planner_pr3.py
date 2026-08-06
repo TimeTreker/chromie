@@ -6,6 +6,7 @@ import unittest
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_contract import (
     PlannerModelOutput,
+    goal_association_prompt_projection,
     validate_external_response_evidence_boundary,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
@@ -205,6 +206,135 @@ def multi_goal_plan(
         "plan_relation": "exact",
         "user_confirmation_required": False,
     }
+
+
+class PlannerVocalResponsibilityTests(unittest.TestCase):
+    @staticmethod
+    def vocal_goal(*, output_mode: str, provider_required: bool) -> list[dict]:
+        return [
+            {
+                "goal_id": "goal-vocal",
+                "description": "Perform the requested vocal output.",
+                "metadata": {
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": output_mode,
+                    "provider_required": provider_required,
+                },
+            }
+        ]
+
+    def test_planner_projection_preserves_typed_vocal_metadata(self):
+        projection = goal_association_prompt_projection(
+            {
+                "goal_association_resolution": {
+                    "new_goals": self.vocal_goal(
+                        output_mode="singing",
+                        provider_required=True,
+                    )
+                }
+            }
+        )
+
+        self.assertEqual(
+            projection["new_goals"][0]["metadata"],
+            {
+                "responsibility_kind": "spoken_response",
+                "execution_lane": "speaking",
+                "output_mode": "singing",
+                "provider_required": True,
+            },
+        )
+
+    def test_generic_respond_cannot_close_singing_goal(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "respond",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "response_text": "啦啦啦。",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-vocal": {
+                        "disposition": "respond",
+                        "coverage": "complete",
+                        "response_text": "啦啦啦。",
+                        "step_ids": [],
+                    }
+                },
+                "goal_satisfaction": exact_satisfaction(["goal-vocal"]),
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot be completed by response_text",
+        ):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=self.vocal_goal(
+                    output_mode="singing",
+                    provider_required=True,
+                ),
+            )
+
+    def test_singing_goal_can_report_exact_unavailability(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "unavailable",
+                "coverage": "uncertain",
+                "confidence": 1.0,
+                "response_text": "",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-vocal": {
+                        "disposition": "unavailable",
+                        "coverage": "uncertain",
+                        "response_text": "",
+                        "unresolved": [
+                            "No registered provider advertises singing mode."
+                        ],
+                        "step_ids": [],
+                    }
+                },
+            }
+        )
+
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=self.vocal_goal(
+                output_mode="singing",
+                provider_required=True,
+            ),
+        )
+
+    def test_ordinary_speech_still_uses_respond_outcome(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "respond",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "response_text": "你好。",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-vocal": {
+                        "disposition": "respond",
+                        "coverage": "complete",
+                        "response_text": "你好。",
+                        "step_ids": [],
+                    }
+                },
+                "goal_satisfaction": exact_satisfaction(["goal-vocal"]),
+            }
+        )
+
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=self.vocal_goal(
+                output_mode="speech",
+                provider_required=False,
+            ),
+        )
 
 
 class CanonicalPlanContractTests(unittest.TestCase):

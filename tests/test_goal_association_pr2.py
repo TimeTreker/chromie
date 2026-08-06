@@ -5,12 +5,127 @@ import unittest
 
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
+    GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalAssociationResolver,
     GoalSegmentationModelOutput,
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
+
+
+class GoalExecutionContractTests(unittest.TestCase):
+    def test_singing_is_speaking_and_requires_mode_specific_provider(self):
+        goal = GoalAssociationModelGoal.model_validate(
+            {
+                "description": "边走边唱歌",
+                "responsibility_kind": "spoken_response",
+                "execution_lane": "speaking",
+                "output_mode": "singing",
+                "provider_required": True,
+                "bindings": [],
+            }
+        )
+
+        self.assertEqual(goal.execution_lane, "speaking")
+        self.assertEqual(goal.output_mode, "singing")
+        self.assertTrue(goal.provider_required)
+
+    def test_legacy_direct_response_maps_to_ordinary_speech_only(self):
+        goal = GoalAssociationModelGoal.model_validate(
+            {
+                "description": "Say hello",
+                "responsibility_kind": "spoken_response",
+                "bindings": [],
+            }
+        )
+
+        self.assertEqual(goal.execution_lane, "speaking")
+        self.assertEqual(goal.output_mode, "speech")
+        self.assertFalse(goal.provider_required)
+
+    def test_generic_speech_delivery_cannot_claim_singing(self):
+        with self.assertRaisesRegex(ValueError, "mode-specific vocal output"):
+            GoalAssociationModelGoal.model_validate(
+                {
+                    "description": "Sing a song",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": False,
+                    "bindings": [],
+                }
+            )
+
+    def test_vocal_mode_cannot_be_owned_by_activity(self):
+        with self.assertRaisesRegex(ValueError, "spoken_response requires"):
+            GoalAssociationModelGoal.model_validate(
+                {
+                    "description": "Hum a tune",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "activity",
+                    "output_mode": "humming",
+                    "provider_required": True,
+                    "bindings": [],
+                }
+            )
+
+    def test_vocal_goal_rejects_resource_responsibility(self):
+        with self.assertRaisesRegex(ValueError, "not resource acquisition"):
+            GoalAssociationModelGoal.model_validate(
+                {
+                    "description": "Sing a song",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": True,
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "a song",
+                        "source_status": "unknown",
+                        "recipient_description": "requester",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                }
+            )
+
+    def test_physical_delivery_keeps_resource_responsibility(self):
+        goal = GoalAssociationModelGoal.model_validate(
+            {
+                "description": "Bring the requester a bottle of water",
+                "responsibility_kind": "executable_action",
+                "execution_lane": "activity",
+                "output_mode": "body_action",
+                "provider_required": True,
+                "bindings": [],
+                "resource_responsibility": {
+                    "resource_kind": "physical_object",
+                    "resource_description": "a bottle of water",
+                    "source_status": "unknown",
+                    "recipient_description": "requester",
+                    "delivery_mode": "physical_handover",
+                },
+            }
+        )
+
+        self.assertIsNotNone(goal.resource_responsibility)
+
+    def test_live_decoder_schema_requires_typed_execution_fields(self):
+        schema = GoalAssociationResolver._response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+        )
+        required = set(schema["$defs"]["GoalAssociationModelGoal"]["required"])
+        self.assertTrue(
+            {
+                "responsibility_kind",
+                "execution_lane",
+                "output_mode",
+                "provider_required",
+            }.issubset(required)
+        )
 
 
 class FakeOllama:
@@ -126,6 +241,112 @@ class GoalAssociationModelOutputTests(unittest.TestCase):
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+
+    def test_compound_walk_sing_blink_is_freshly_resegmented_with_typed_modes(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前走15秒。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "边走边唱歌。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "同时眨眼睛。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "往前走15秒。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "边走边唱歌。",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+                {
+                    "description": "同时眨眼睛。",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([initial, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
+                    language="zh-CN",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_fresh_goal_resegmentation",
+        )
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
+        self.assertNotIn('"output_mode":"body_action"', ollama.prompts[1][0])
+        self.assertEqual(
+            [
+                (
+                    goal.metadata["execution_lane"],
+                    goal.metadata["output_mode"],
+                    goal.metadata["provider_required"],
+                )
+                for goal in result.new_goals
+            ],
+            [
+                ("activity", "body_action", True),
+                ("speaking", "singing", True),
+                ("activity", "body_action", True),
+            ],
+        )
+        self.assertIsNone(result.new_goals[1].resource_responsibility)
+        projection = result.prompt_projection()
+        self.assertEqual(
+            projection["new_goals"][1]["metadata"],
+            {
+                "responsibility_kind": "spoken_response",
+                "execution_lane": "speaking",
+                "output_mode": "singing",
+                "provider_required": True,
+            },
+        )
 
     def test_empty_optional_referent_introduction_does_not_discard_weather_goal(self):
         ollama = FakeOllama(
@@ -878,6 +1099,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         "Walk forward for 15 seconds while singing and blinking."
                     ),
                     "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "duration",
@@ -890,11 +1114,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 {
                     "description": "Sing while walking forward.",
                     "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "Blink eyes while walking forward.",
                     "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -906,6 +1136,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 {
                     "description": "Walk forward for 15 seconds.",
                     "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "duration",
@@ -918,11 +1151,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 {
                     "description": "Sing while walking forward.",
                     "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "singing",
+                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "Blink eyes while walking forward.",
                     "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -942,13 +1181,25 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ["multi_embodied_responsibility_review"],
         )
         self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "spoken_response", "executable_action"],
+            [
+                (
+                    goal.metadata["responsibility_kind"],
+                    goal.metadata["execution_lane"],
+                    goal.metadata["output_mode"],
+                    goal.metadata["provider_required"],
+                )
+                for goal in result.new_goals
+            ],
+            [
+                ("executable_action", "activity", "body_action", True),
+                ("spoken_response", "speaking", "singing", True),
+                ("executable_action", "activity", "body_action", True),
+            ],
         )
         review_prompt, review_kwargs = ollama.prompts[1]
         self.assertIn("No previous Goal DTO is supplied", review_prompt)
         self.assertNotIn("DTO to review JSON", review_prompt)
-        self.assertIn("channel that completes", review_prompt)
+        self.assertIn("channel and evidence that complete", review_prompt)
         self.assertIn("vocal performance", review_prompt)
         self.assertEqual(
             review_kwargs["prompt_family"],
@@ -1053,7 +1304,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description, responsibility_kind, bindings, and optional provider-neutral resource_responsibility only",
+            "Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only",
             ollama.prompts[1][0],
         )
 
@@ -1663,7 +1914,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "responsibility_kind", "bindings", "resource_responsibility"},
+            {"description", "responsibility_kind", "execution_lane", "output_mode", "provider_required", "bindings", "resource_responsibility"},
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(

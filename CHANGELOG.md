@@ -16,6 +16,10 @@ remains available in Git history.
   excluded mapped lanes fail closed without legacy semantic re-entry.
 - Kept emergency compatibility planning separately gated and unavailable to
   ordinary maintained turns.
+- Split vocal Goal semantics into typed completion modality, lane, output mode,
+  and exact-provider need. Mode-specific vocal performance now fails closed
+  instead of being completed by generic response text, ordinary TTS, media, or
+  body behavior.
 
 ### Verification and reproducibility
 

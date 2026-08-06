@@ -182,19 +182,19 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. Every new Goal also declares the completion modality
-`responsibility_kind`: `executable_action`, `spoken_response`,
-`capability_dependent`, or `other`. Completion modality is determined by the
-channel that satisfies the user-visible outcome, not by whether the wording is a
-verb, appears inside a robot command, or is simultaneous with body motion. A
-directly requested vocal performance is therefore `spoken_response`; locomotion,
-posture, gaze, and body expression are `executable_action`. For suspicious
-multi-responsibility outputs that label every sibling as executable, the Agent
-runs a fresh semantic resegmentation from the authoritative user turn without
-showing the first DTO, preventing an earlier label from anchoring the review.
-The eventual spoken delivery of a capability result remains part of that
-capability-dependent Goal rather than becoming a duplicate response Goal. The
-endpoint itself does not mutate task state,
+are rejected. Every new Goal also declares four typed completion facts.
+`responsibility_kind` is `executable_action`, `spoken_response`,
+`capability_dependent`, or `other`; `execution_lane` is `speaking`, `activity`,
+or `none`; `output_mode` distinguishes ordinary speech, expressive speech,
+recitation, singing, humming, nonverbal vocalization, body action, media
+playback, capability work, or other; and `provider_required` says whether an
+exact registered Capability Provider beyond ordinary authored speech delivery
+must return completion evidence. The live decoder schema requires all four
+fields, while retained legacy DTOs receive only a bounded compatibility mapping.
+Mode-specific vocal output remains Speaking but requires provider evidence; a
+generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
+delivery of a capability result remains part of that capability-dependent Goal
+rather than becoming a duplicate response Goal. The endpoint itself does not mutate task state,
 authorize side effects, alter Cognitive Core interpretation output, or execute plans. The unified host uses its result
 in `report_only` observation or authoritative `apply`, and only the host may
 atomically commit the validated association.

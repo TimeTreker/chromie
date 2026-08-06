@@ -318,13 +318,19 @@ class GoalAssociationResolution(BaseModel):
                 exclude={"metadata"},
                 exclude_none=True,
             )
-            responsibility_kind = str(
-                (goal.metadata or {}).get("responsibility_kind") or ""
-            ).strip()
-            if responsibility_kind:
-                payload["metadata"] = {
-                    "responsibility_kind": responsibility_kind
-                }
+            metadata = goal.metadata or {}
+            projected_metadata = {
+                key: metadata[key]
+                for key in (
+                    "responsibility_kind",
+                    "execution_lane",
+                    "output_mode",
+                    "provider_required",
+                )
+                if key in metadata
+            }
+            if projected_metadata:
+                payload["metadata"] = projected_metadata
             new_goals.append(payload)
         referent_updates: list[dict[str, Any]] = []
         for update in self.referent_updates:

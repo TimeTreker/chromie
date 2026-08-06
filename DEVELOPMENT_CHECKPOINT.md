@@ -65,21 +65,26 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-The active Issue is the vocal Goal/Planner semantic repair only. Keep the current
-ownership boundary while implementing it:
+The active Issue remains the vocal Goal/Planner semantic repair only. Its source
+mechanism is now implemented on this patch line:
 
-1. add typed completion-lane, output-mode, and provider-need judgments without
-   phrase-specific routing;
-2. keep singing, humming, and recitation in Speaking and existing-audio playback
-   in Activity;
-3. preserve exact provider-prefixed capability identity, using a Chromie-owned
-   vocal capability such as `chromie.vocal.perform`;
-4. reject invented vocal `resource_responsibility`, stale semantic-review
-   anchoring, and unknown Planner step references;
-5. run the retained walk/sing/blink episode, generalized vocal/media scenarios,
-   the general-ability class, and the canonical source gate; and
-6. retain live evidence honestly. A unit pass does not prove singing, speaker
-   output, MuJoCo motion, or physical robot behavior.
+- Goal Association separates completion modality, semantic lane, output mode,
+  and exact-provider need without phrase-specific routing;
+- mode-specific vocal performance remains Speaking and cannot be closed by
+  generic response text or ordinary TTS;
+- existing-audio playback remains Activity;
+- suspicious three-or-more-effect decompositions are freshly resegmented without
+  the previous DTO as semantic authority;
+- normal vocal Goals reject `resource_responsibility`; and
+- one Planner ownership representation remains authoritative for redundant step
+  references.
+
+Next, run the complete canonical source gate, the retained walk/sing/blink
+episode, generalized vocal/media scenarios, and the highest safe current-revision
+live trace. The live result must either dispatch the independent body members and
+report exact vocal unavailability or carry mode-specific provider evidence. A
+focused unit pass does not prove singing, speaker output, MuJoCo motion, or
+physical robot behavior.
 
 Do not begin TTS/playback migration, neutral capability-ID indirection, or a
 Soridormi execution facade from this Issue. Revisit vocal hosting only through

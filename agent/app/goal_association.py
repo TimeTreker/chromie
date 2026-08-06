@@ -85,6 +85,30 @@ GoalResponsibilityKind = Literal[
     "capability_dependent",
     "other",
 ]
+GoalExecutionLane = Literal["speaking", "activity", "none"]
+GoalOutputMode = Literal[
+    "speech",
+    "expressive_speech",
+    "recitation",
+    "singing",
+    "humming",
+    "nonverbal_vocalization",
+    "body_action",
+    "media_playback",
+    "capability_work",
+    "other",
+]
+_VOCAL_OUTPUT_MODES = frozenset(
+    {
+        "speech",
+        "expressive_speech",
+        "recitation",
+        "singing",
+        "humming",
+        "nonverbal_vocalization",
+    }
+)
+_MODE_SPECIFIC_VOCAL_OUTPUTS = _VOCAL_OUTPUT_MODES - {"speech"}
 
 
 GoalAssociationModelRelationship = Literal[
@@ -368,6 +392,27 @@ class GoalAssociationModelGoal(BaseModel):
             "depends on capability planning, or another semantic mode."
         ),
     )
+    execution_lane: GoalExecutionLane | None = Field(
+        default=None,
+        description=(
+            "The semantic completion lane: Speaking, Activity, or none for a "
+            "genuinely different responsibility."
+        ),
+    )
+    output_mode: GoalOutputMode | None = Field(
+        default=None,
+        description=(
+            "The requested completion mode. Vocal modes remain Speaking even when "
+            "coordinated with body work; media playback remains Activity."
+        ),
+    )
+    provider_required: bool | None = Field(
+        default=None,
+        description=(
+            "Whether an exact registered Capability Provider, beyond ordinary "
+            "Chromie-authored speech delivery, must produce evidence for this Goal."
+        ),
+    )
     bindings: list[GoalAssociationModelBinding] = Field(
         default_factory=list,
         max_length=12,
@@ -380,6 +425,95 @@ class GoalAssociationModelGoal(BaseModel):
         if isinstance(value, str):
             return " ".join(value.strip().split())
         return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_legacy_execution_contract(cls, value: Any) -> Any:
+        """Preserve old retained DTO fixtures while the decoder requires new fields.
+
+        The live structured-output schema marks all four fields as required below.
+        This bounded mapping exists only so historical replay/test payloads can be
+        read without becoming an alternate semantic router.
+        """
+
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        responsibility = str(normalized.get("responsibility_kind") or "other")
+        if normalized.get("execution_lane") is None:
+            normalized["execution_lane"] = {
+                "spoken_response": "speaking",
+                "executable_action": "activity",
+                "capability_dependent": "activity",
+                "other": "none",
+            }.get(responsibility, "none")
+        if normalized.get("output_mode") is None:
+            normalized["output_mode"] = {
+                "spoken_response": "speech",
+                "executable_action": "body_action",
+                "capability_dependent": "capability_work",
+                "other": "other",
+            }.get(responsibility, "other")
+        if normalized.get("provider_required") is None:
+            normalized["provider_required"] = responsibility in {
+                "executable_action",
+                "capability_dependent",
+            }
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_execution_contract(self) -> "GoalAssociationModelGoal":
+        lane = self.execution_lane
+        mode = self.output_mode
+        provider_required = bool(self.provider_required)
+
+        if self.responsibility_kind == "spoken_response":
+            if lane != "speaking" or mode not in _VOCAL_OUTPUT_MODES:
+                raise ValueError(
+                    "spoken_response requires execution_lane=speaking and a vocal output_mode"
+                )
+        elif self.responsibility_kind == "executable_action":
+            if lane != "activity" or mode not in {"body_action", "media_playback"}:
+                raise ValueError(
+                    "executable_action requires activity lane and body_action or media_playback"
+                )
+            if not provider_required:
+                raise ValueError("executable_action requires provider_required=true")
+        elif self.responsibility_kind == "capability_dependent":
+            if lane != "activity" or mode != "capability_work":
+                raise ValueError(
+                    "capability_dependent requires activity lane and capability_work"
+                )
+            if not provider_required:
+                raise ValueError("capability_dependent requires provider_required=true")
+        else:
+            if lane != "none" or mode != "other" or provider_required:
+                raise ValueError(
+                    "other responsibility requires execution_lane=none, output_mode=other, "
+                    "and provider_required=false"
+                )
+
+        if mode in _VOCAL_OUTPUT_MODES and lane != "speaking":
+            raise ValueError("vocal output_mode requires execution_lane=speaking")
+        if mode in {"body_action", "media_playback", "capability_work"} and lane != "activity":
+            raise ValueError("activity output_mode requires execution_lane=activity")
+        if mode == "other" and lane != "none":
+            raise ValueError("output_mode=other requires execution_lane=none")
+        if mode in _MODE_SPECIFIC_VOCAL_OUTPUTS and not provider_required:
+            raise ValueError(
+                "mode-specific vocal output requires provider_required=true; ordinary "
+                "speech delivery is not evidence for that mode"
+            )
+        if mode == "speech" and provider_required:
+            raise ValueError(
+                "ordinary speech uses Chromie's maintained Speaking delivery path and "
+                "must set provider_required=false"
+            )
+        if self.resource_responsibility is not None and lane == "speaking":
+            raise ValueError(
+                "a normal vocal performance is not resource acquisition or delivery"
+            )
+        return self
 
 
 class GoalSegmentationModelOutput(BaseModel):
@@ -1047,13 +1181,10 @@ class GoalAssociationResolver:
         if executable_goal_count == 1:
             triggers.append("embodied_responsibility_decomposition")
         elif executable_goal_count >= 3:
-            # Three or more model-authored effectful responsibilities cross the
-            # same bounded-complexity threshold used by planner coverage audit.
-            # A semantic review is required because one responsibility may
-            # actually belong to the spoken-response lane (for example, a
-            # directly requested performance) even when the first pass labels
-            # every sibling as executable.  The Host does not reclassify any
-            # Goal here; it only asks the model to review its own segmentation.
+            # A compound request with three or more model-authored effectful
+            # responsibilities is high-risk for grammar-driven misclassification.
+            # Ask the model to re-segment from authoritative context without
+            # treating the first DTO as evidence.
             triggers.append("multi_embodied_responsibility_review")
         if (
             isinstance(model_output, GoalAssociationModelOutput)
@@ -1126,8 +1257,14 @@ class GoalAssociationResolver:
                 if isinstance(node_properties, dict):
                     if "responsibility_kind" in node_properties:
                         node_required = node.setdefault("required", [])
-                        if "responsibility_kind" not in node_required:
-                            node_required.append("responsibility_kind")
+                        for field_name in (
+                            "responsibility_kind",
+                            "execution_lane",
+                            "output_mode",
+                            "provider_required",
+                        ):
+                            if field_name not in node_required:
+                                node_required.append(field_name)
                     target_ids = node_properties.get("target_goal_ids")
                     if isinstance(target_ids, dict):
                         target_ids["items"] = {
@@ -1327,7 +1464,7 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-            "Every new Goal must also declare responsibility_kind. Use executable_action for a user-visible physical or other effectful action; spoken_response only when the responsibility is completed directly from Chromie's authored speech or text without external evidence, including singing, telling a joke, or a social reply; capability_dependent when lookup, retrieval, computation, or another capability must determine completion; and other only when none of those meanings is accurate. This is the Goal's completion modality, not a capability choice. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
+            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, and provider_required. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
@@ -1346,7 +1483,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description, responsibility_kind, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A Speaking/vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -1439,7 +1576,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, bindings, and optional provider-neutral resource_responsibility only. executable_action is effectful work; spoken_response is direct authored speech or text, including spoken performance; capability_dependent requires capability planning; other is only for a genuinely different modality. Preserve resource_responsibility when the responsibility is to acquire and deliver a physical object or grounded information; never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1490,15 +1627,19 @@ class GoalAssociationResolver:
             "Use semantic reasoning over the authoritative user turn and bounded "
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
-            "Classify responsibility_kind by the channel that completes the human "
+            "Classify responsibility_kind, execution_lane, output_mode, and "
+            "provider_required by the channel and evidence that complete the human "
             "outcome, not by grammar, verb choice, command framing, or the surrounding "
             "robot-action route. Locomotion, manipulation, posture, gaze, and facial "
-            "or body expression are executable_action because a body provider must "
-            "perform them. Authored vocal or textual performance is spoken_response "
-            "because Chromie's speaking channel completes it. Singing, humming, "
-            "recitation, jokes, and spoken role-play remain spoken_response even when "
-            "the user requests them during a walk or alongside a gesture. Never map a "
-            "vocal performance to express_attention or another body capability.\n\n"
+            "or body expression are executable_action/activity/body_action because a "
+            "body provider must perform them. Playing existing audio is "
+            "executable_action/activity/media_playback. Authored vocal or textual "
+            "performance is spoken_response/speaking. Singing, humming, recitation, "
+            "expressive speech, and nonverbal vocalization are mode-specific outputs "
+            "with provider_required=true; an ordinary social reply or joke normally "
+            "uses output_mode=speech and provider_required=false. Never map a vocal "
+            "performance to express_attention, media playback, or another body "
+            "capability, and never use ordinary speech as evidence for singing.\n\n"
             "Keep or create a fresh spoken_response Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
             "decision, or other direct conversational act, even when a retained Goal "
@@ -1912,6 +2053,9 @@ class GoalAssociationResolver:
                         "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,
                         "responsibility_kind": item.responsibility_kind,
+                        "execution_lane": item.execution_lane,
+                        "output_mode": item.output_mode,
+                        "provider_required": item.provider_required,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)
                             for reference in resolved_references

@@ -231,6 +231,29 @@ members are compiled and cancelled as one provider-local physical activity. A
 future cross-provider contract may add prepared states, a shared monotonic start
 barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
+## Typed Goal completion contract
+
+Goal Association now projects four separate facts instead of overloading
+`responsibility_kind`:
+
+```text
+responsibility_kind  human completion modality
+execution_lane       speaking | activity | none
+output_mode          speech | expressive_speech | recitation | singing | humming
+                     | nonverbal_vocalization | body_action | media_playback
+                     | capability_work | other
+provider_required    exact provider evidence required beyond ordinary speech
+```
+
+The structured model schema requires all four fields. A bounded legacy mapping
+exists only for retained replay and old test DTOs; it does not select a lane from
+user wording. `output_mode=speech` uses the maintained Chromie response-delivery
+path with `provider_required=false`. Mode-specific vocal outputs use Speaking
+with `provider_required=true`; until an exact provider-prefixed vocal Capability
+exists, Planner must return a per-Goal unavailable, refused, or clarification
+outcome rather than generic `respond`. Activity, body, and media execution remain
+separate. A normal vocal Goal cannot carry `resource_responsibility`.
+
 ## Singing
 
 Speaking and singing belong to the Speaking lane, including when the user embeds

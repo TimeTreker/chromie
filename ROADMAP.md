@@ -93,8 +93,9 @@ walk/sing/blink defect. Speaking, TTS synthesis, playback transport, echo
 handling, audible-delivery ordering, and user-level barge-in remain Chromie-
 owned. Soridormi remains a peer embodied Capability Provider beneath Activity.
 
-- Separate completion lane, output mode, and provider need in typed Goal and
-  Planner contracts.
+- Typed Goal and Planner projections now separate completion modality,
+  execution lane, output mode, and exact-provider need; preserve this contract
+  through canonical and live evidence closure.
 - Keep `singing`, `humming`, `recitation`, and other authored vocal performance
   in Speaking even when coordinated with body work.
 - Keep playback of existing music, recordings, streams, and sound effects in
