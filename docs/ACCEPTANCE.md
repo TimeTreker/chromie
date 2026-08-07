@@ -20,10 +20,10 @@ A higher level does not replace lower-level regression tests.
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Merged `e3d57ff` diagnostic exercised generated speech through VAD, ASR, live Gateway/Core, TTS, and playback; its full matrix failed and is not clean closure evidence | Not applicable | Open: physical attempts remain unintelligible for the required utterance; generated speech is not a physical claim |
+| Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Clean `90aa72a` rebuilt comprehensive profile passed all mechanical voice/GPU checks with one independent-review skip; merged `a36444b` paired services remained healthy with clean logs | Not applicable | Open: physical attempts remain unintelligible for the required utterance; generated speech is not a physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
-| Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | `e3d57ff` live Gateway/Core/Fast-Planner greeting smoke passed; clean post-audit full-scenario evidence remains open | Source-bound MuJoCo verifier implemented; final-revision paired bundle open | Not claimed |
-| Interaction contracts and Trusted Capability Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
+| Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Clean rebuilt comprehensive model distribution passed its mechanical matrix; the independent semantic reviewer remains an explicit skip | Clean merged `a36444b` paired proof completed exact compound planning/execution and deterministic provider-start cancellation against Soridormi `fa8080d2` | Not claimed |
+| Interaction contracts and Trusted Capability Runtime | Yes | Text path | Clean merged-revision exact arguments, ordered execution, Goal reconciliation, cancellation, and safe-idle recovery passed | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | The `e3d57ff` diagnostic retained both Ollama models on the RTX 5090, non-empty TTS PCM, and 19/19 GPU-smoke passes; this is generated/service evidence, not physical listening | Not applicable | Historical RTX 5090 Oute evidence remains revision-bound; physical listening and comparative shared-resource target evidence remain open |
@@ -162,6 +162,43 @@ grounded, and ordered stories were complete and unique. That inspection does
 not substitute for or relabel the skipped external semantic adjudication.
 Generated speech and acoustic loopback do not prove a physical microphone,
 speaker, human pronunciation, or physical robot.
+
+### Final clean-main Level C proof
+
+After PRs #12 and #13 merged, the paired stack was rebuilt from clean Chromie
+`a36444b6fe870afc4604fc79e2d2f92bcda254a5` and clean Soridormi
+`fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83`. The retained runtime identity at
+`.chromie/acceptance/post-merge-audit-final/a36444b/runtime-identity.json` is
+complete and has SHA-256
+`4d1ba0381e8ea10a6e581f572b6c960d097e001f2aa4ff442fa55a9c00902ec9`.
+The evidence runner independently confirmed that the checkout, manifest,
+running endpoint, and declared upstream all identify that Soridormi revision.
+
+The natural-language compound scenario retained under
+`.chromie/acceptance/post-merge-audit-final/a36444b/compound/mujoco` passed with
+exact ordered `walk_velocity(vx_mps=0.2,duration_s=10)`,
+`nod_yes(count=2)`, and `turn_in_place` steps. All provider requests completed,
+all three Goals reconciled exactly, no internal planner language entered the
+response, and pre/post status remained standing safe-idle with no active task.
+
+The provider-start cancellation scenario under the adjacent
+`cancellation/mujoco` directory passed with `ok=true` and no errors. It observed
+the active `walk_velocity(vx_mps=0.2,duration_s=20)` provider request before
+injecting `Stop.`. The production Gateway selected the deterministic
+`current_interaction` reflex, dispatched it in 31.1 ms with zero provider or
+dispatch failures, received `cancelled_current_interaction`, reconciled the Goal
+as cancelled, suppressed stale completion speech, and verified safe idle with
+no active task. The interrupt transaction took 59.6 ms end to end. These are
+Level C simulator and trusted-runtime claims only.
+
+Post-scenario health and a 15-minute, 1,000-line-per-source log review found all
+paired endpoints ready and no fatal startup pattern in either launcher, ASR,
+TTS, Agent, Ollama, or Soridormi Runtime MCP output. The JSON WebSocket health
+probes generated no incomplete-handshake traceback. This closes the post-merge
+audit's clean merged-revision Level C requirement. Physical microphone,
+speaker, audible acoustic behavior, physical robot safety, real vocal/media
+providers, publishable artifact provenance, independent semantic adjudication,
+and release qualification remain open Level D or release evidence tracks.
 
 After the executable scenarios were aligned with the evidence-before-claim
 contract, the complete source gate passed: 102 benchmark tests, 2,095 maintained

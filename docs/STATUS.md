@@ -13,7 +13,7 @@ reconciliation. Trusted Host and provider boundaries authorize effects.
 | Area | Implementation | Automatic verification | Target validation | Release readiness |
 |---|---|---|---|---|
 | Core interpretation | Non-empty turns that cannot be interpreted now return a typed `interpretation_unavailable` outcome. They are not reassigned to chat or deep thought. | Contract, endpoint, fallback, behavior-scenario, and capability-routing tests cover unavailable and empty-input paths. | Clean `90aa72a` rebuilt-service evidence exercised the live RTX 5090 Gateway/Core/Planner path, all maintained deterministic scenarios, bilingual acoustic workflows, and selected synthetic voice cases. | Development only. |
-| Capability repair | Semantic repair can return strict ordered action proposals only for `robot_action`; every capability and argument remains subject to catalog and policy validation. Fast and Deep Planner decoder schemas bind each exact capability ID to its provider argument schema. Explicit numeric Goal values require matching step arguments plus Goal-bound `user_supplied` provenance, and bounded same-tier repair receives structured cross-field defects. | Schema, prompt, provider-argument, numeric-provenance, bounded-repair, compound-plan, and end-to-end routing tests cover exact velocity, duration, ordering, and rejection outside the action lane. | Candidate-tree headless MuJoCo diagnostics completed exact ordered compound execution and provider-start cancellation; clean merged-revision binding and physical execution remain open. | Development only. |
+| Capability repair | Semantic repair can return strict ordered action proposals only for `robot_action`; every capability and argument remains subject to catalog and policy validation. Fast and Deep Planner decoder schemas bind each exact capability ID to its provider argument schema. Explicit numeric Goal values require matching step arguments plus Goal-bound `user_supplied` provenance, and bounded same-tier repair receives structured cross-field defects. | Schema, prompt, provider-argument, numeric-provenance, bounded-repair, compound-plan, and end-to-end routing tests cover exact velocity, duration, ordering, and rejection outside the action lane. | Clean merged Chromie `a36444b` plus Soridormi `fa8080d2` completed exact ordered compound execution and provider-start deterministic cancellation in headless MuJoCo. Physical execution remains open. | Development only. |
 | Semantic authority | Maintained profiles include memory in Goal-driven apply lanes. A disabled or unsupported mapped lane is a Core-owned authoritative fail-closed boundary and cannot enter either ordinary or legacy planning. | Semantic-authority audit, profile configuration, Orchestrator, and behavior tests cover allowlisted and excluded lanes. | Clean `90aa72a` bilingual workflows retained correct session-memory recall, stable knowledge, tool follow-up, location correction, multipart grounding, and ordered playback under idle and shared GPU load. | Development only. |
 | Control-plane smoke | The smoke test builds an immutable Gateway/Core request and validates the current Core and Fast Planner contracts. It no longer uses the retired flat interpretation payload or ordinary `/run` planning. | Builder tests and shell syntax checks are source-verifiable. | Requires a running Agent service and configured model. | Development only. |
 | Source identity | Evidence metadata uses the Git commit in a checkout or a deterministic SHA-256 source-tree identity in an archive. | Archive and checkout forms are covered by unit tests. | Runtime provenance still requires resolved image and model digests. | Development only. |
@@ -63,9 +63,8 @@ and evidence; the stable Project Charter is not an incident log.
 
 The `90aa72a` comprehensive replay closes every row above whose remaining item
 was the final clean rebuilt scenario matrix or manual delivered-text inspection.
-The exact compound and provider-start-cancellation rows still require a repeat
-after the candidate is merged, because their retained simulator bundles were
-captured from the pre-commit candidate tree. Independent semantic adjudication,
+The later clean merged-revision paired proof closes the exact compound and
+provider-start-cancellation rows at Level C. Independent semantic adjudication,
 physical audio/robot proof, provider commissioning, publishable provenance, and
 release readiness remain open and must not be inferred from this closure.
 
@@ -130,6 +129,49 @@ The paired Soridormi repository-gate audit is merged on its `main` revision
 `fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83`. Chromie's generated capability
 snapshot and compatibility authority bind that exact revision; regeneration
 changed provenance only, not the exported capability contract.
+
+### Clean merged-revision paired closure
+
+Chromie PR #12 merged the audited implementation as
+`0b2d3564d0b7c798d2e76d50dac1584ddcc3e1bf`; PR #13 merged the WebSocket health
+probe repair. The final clean `main` revision is
+`a36444b6fe870afc4604fc79e2d2f92bcda254a5`. Both GitHub Python 3.11 and 3.12
+jobs passed for each PR. Soridormi PR #6 is merged as `fa8080d2`; its local
+container gate passed 728 full-suite tests with five target-only skips, 114 body
+tests with four target-only skips, 126 Task Agent tests, 90 static checks,
+governance, and compile-all.
+
+The paired stack was then rebuilt from both clean `main` checkouts. Its retained
+runtime identity is
+`.chromie/acceptance/post-merge-audit-final/a36444b/runtime-identity.json`
+(SHA-256
+`4d1ba0381e8ea10a6e581f572b6c960d097e001f2aa4ff442fa55a9c00902ec9`).
+It binds the running Chromie images to `a36444b`, the Soridormi checkout,
+manifest, and endpoint to exact revision `fa8080d2`, and runtime-profile
+fingerprint
+`7561f1b4aba4cba2369b643778af473acae1a9c245a33ca151928c8438db8e81`.
+
+The compound bundle under
+`.chromie/acceptance/post-merge-audit-final/a36444b/compound/mujoco` passed from
+natural text. Deep Planner produced exactly three sequential provider steps:
+`walk_velocity(vx_mps=0.2,duration_s=10)`, `nod_yes(count=2)`, and
+`turn_in_place`; all three Goals reconciled exactly and all provider results
+completed. Before and after status was standing, safe-idle, non-fallen,
+non-emergency, and without an active task. The cancellation bundle under the
+adjacent `cancellation/mujoco` directory also passed: the harness observed the
+20-second `walk_velocity` request after provider start, submitted `Stop.`, the
+Gateway dispatched the deterministic `current_interaction` cancellation in
+31.1 ms with zero provider or dispatch failures, the provider result returned
+`cancelled_current_interaction`, and the Goal reconciled to cancelled. Final
+status again reported standing safe-idle with no active task.
+
+Every paired endpoint remained healthy after both scenarios. Fifteen-minute log
+inspection found no fatal startup pattern, traceback, crash, or OOM in either
+launcher, ASR, TTS, Agent, Ollama, or Soridormi Runtime MCP logs. This closes
+the 2026-08-07 audit milestone at the highest safe automated level. It does not
+convert MuJoCo, generated TTS, or text input into physical microphone, speaker,
+robot, or release evidence; the comprehensive run's independent semantic-review
+skip also remains an explicit external evidence gap.
 
 ## Compatibility state
 

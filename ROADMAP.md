@@ -15,13 +15,14 @@ organized by capability, risk, and retained evidence.
 
 ## Current priorities
 
-1. Close the 2026-08-07 post-merge audit by merging the source-qualified
-   candidate and retaining clean merged-revision paired MuJoCo proof for exact
-   compound capability arguments plus provider-start cancellation. The
-   dependency-complete source gate and rebuilt clean generated-speech/GPU
-   profile are retained for `90aa72a`; the absent independent semantic reviewer
-   remains an explicit non-release gap. Hard semantic, delivery-evidence,
-   safety, provider, or provenance failures remain non-averageable blockers.
+1. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
+   Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
+   ordered MuJoCo execution, provider-start deterministic cancellation, and
+   safe-idle recovery. The dependency-complete source gate and rebuilt clean
+   generated-speech/GPU profile remain bound to `90aa72a`; the absent
+   independent semantic reviewer remains an explicit non-release gap. Hard
+   semantic, delivery-evidence, safety, provider, or provenance failures remain
+   non-averageable blockers.
 2. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
