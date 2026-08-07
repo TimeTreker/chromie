@@ -519,7 +519,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    def test_safe_read_response_schema_requires_model_authored_acknowledgement(self) -> None:
+    def test_pure_safe_read_response_schema_suppresses_dynamic_speech(self) -> None:
         plan = CanonicalPlan(
             plan_id="plan-weather-ack",
             planner_tier="fast",
@@ -557,36 +557,36 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         schema = ResponseComposerResolver._response_schema(plan, context)
         response_plan = schema["$defs"]["ResponsePlan"]
 
-        self.assertIn("immediate", response_plan["required"])
+        self.assertNotIn("immediate", response_plan["required"])
         self.assertEqual(
             response_plan["properties"]["immediate"],
-            {"$ref": "#/$defs/ResponseStage"},
+            {"type": "null"},
         )
         self.assertEqual(
             response_plan["properties"]["pre_action"],
             {"type": "null"},
         )
-        with self.assertRaisesRegex(ValueError, "requires one model-authored"):
-            ResponseComposerResolver._validate_safe_read_acknowledgement(
-                ResponsePlan(),
-                plan=plan,
-                context=context,
-                language="zh-CN",
-            )
         ResponseComposerResolver._validate_safe_read_acknowledgement(
-            ResponsePlan(
-                immediate=ResponseStage(
-                    text="我查一下天气预报。",
-                    speech_act="acknowledge",
-                    commitment_state="evaluating",
-                    must_not_claim_completion=True,
-                    covers_goal_ids=["goal-weather"],
-                )
-            ),
+            ResponsePlan(),
             plan=plan,
             context=context,
             language="zh-CN",
         )
+        with self.assertRaisesRegex(ValueError, "must not author dynamic"):
+            ResponseComposerResolver._validate_safe_read_acknowledgement(
+                ResponsePlan(
+                    immediate=ResponseStage(
+                        text="我查一下天气预报。",
+                        speech_act="acknowledge",
+                        commitment_state="evaluating",
+                        must_not_claim_completion=True,
+                        covers_goal_ids=["goal-weather"],
+                    )
+                ),
+                plan=plan,
+                context=context,
+                language="zh-CN",
+            )
 
         delivered_context = {
             **context,
@@ -607,11 +607,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         delivered_response_plan = delivered_schema["$defs"]["ResponsePlan"]
 
         self.assertNotIn("immediate", delivered_response_plan["required"])
-        self.assertTrue(
-            any(
-                branch.get("type") == "null"
-                for branch in delivered_response_plan["properties"]["immediate"]["anyOf"]
-            )
+        self.assertEqual(
+            delivered_response_plan["properties"]["immediate"],
+            {"type": "null"},
         )
         ResponseComposerResolver._validate_safe_read_acknowledgement(
             ResponsePlan(),
@@ -649,19 +647,20 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 covers_goal_ids=["goal-weather"],
             )
         )
-        ResponseComposerResolver._validate_safe_read_acknowledgement(
-            reused_plan,
-            plan=plan,
-            context=scheduled_context,
-            language="zh-CN",
-        )
+        with self.assertRaisesRegex(ValueError, "must not author dynamic"):
+            ResponseComposerResolver._validate_safe_read_acknowledgement(
+                reused_plan,
+                plan=plan,
+                context=scheduled_context,
+                language="zh-CN",
+            )
         ResponseComposerResolver._validate_pending_response_contract(
-            reused_plan,
+            ResponsePlan(),
             plan=plan,
             context=scheduled_context,
         )
         ResponseComposerResolver._validate_reused_turn_speech(
-            reused_plan,
+            ResponsePlan(),
             context=scheduled_context,
         )
         with self.assertRaisesRegex(ValueError, "must copy one exact"):

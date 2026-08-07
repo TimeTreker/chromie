@@ -483,13 +483,13 @@
           "rationale": "A chat route cannot inherit physical authority from a stale active projection of earlier motion goals, even if a model tries to replay them."
         },
         {
-          "key": "goal_interpretation/weather_pending_work_gets_fast_speech",
-          "rationale": "A safe-read route cannot leave the user silent merely because the first Core interpretation omitted its acknowledgement."
+          "key": "goal_interpretation/weather_pending_work_suppresses_dynamic_fast_speech",
+          "rationale": "A safe-read route must not let model-authored speech claim a result before trusted evidence exists; the generic Host cache owns optional latency presentation."
         }
       ],
       "live_text_cases": [
         {
-          "id": "beijing_rain_pending_acknowledgement",
+          "id": "beijing_rain_evidence_bound_result",
           "text": "今天北京下雨了没有？",
           "language": "zh-CN",
           "expected_routes": [
@@ -497,11 +497,8 @@
           ],
           "expect_no_skills": true,
           "require_speech": true,
-          "require_fast_speech": true,
-          "expected_fast_speech_purposes": [
-            "acknowledge_and_check"
-          ],
-          "description": "The reported Beijing rain question must leave the Core with a truthful immediate process acknowledgement before slower planning and lookup work."
+          "forbid_fast_speech": true,
+          "description": "The Beijing rain question must suppress model-authored pre-effect speech and reserve its dynamic answer for trusted lookup evidence."
         }
       ]
     },

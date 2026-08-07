@@ -136,13 +136,16 @@ reliability analysis.
 
 ## Interaction-response latency slices
 
-This section defines instrumentation and qualification requirements for the
-queued grounded-response latency Issue. First-valid-speech-commitment and
-first-PCM trace events do not exist in the current runtime and must be added
-before these slices can support a claim.
+This section defines the remaining instrumentation and qualification
+requirements for grounded-response latency. Direct/Fast/Deep path
+classification and Deep invocation reasons are implemented. TTS request,
+first-PCM, and playback timing exists in retained session evidence, but a
+correlated first-valid-speech-commitment trace boundary is still missing; these
+slices cannot support an end-to-end latency claim until that boundary and the
+model/repair timings below are retained together.
 
-That future response-latency qualification keeps semantically different request
-classes separate:
+Response-latency qualification must keep semantically different request classes
+separate:
 
 - direct non-effectful conversation, classified as a direct path with no
   planner invocation or planner-tier value;

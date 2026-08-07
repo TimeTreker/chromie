@@ -122,10 +122,21 @@ _VOCAL_OUTPUT_MODES = frozenset(
 _MODE_SPECIFIC_VOCAL_OUTPUTS = _VOCAL_OUTPUT_MODES - {"speech"}
 _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
     {
+        "invalid_action_collection_binding",
+        "invalid_location_binding_provenance",
+        "mixed_capability_and_spoken_responsibilities",
         "multi_embodied_responsibility_review",
         "invalid_typed_execution_contract",
     }
 )
+
+
+class GoalAssociationFreshResegmentationError(ValueError):
+    """A mechanical contract defect that must not anchor model repair."""
+
+    def __init__(self, message: str, *, trigger: str) -> None:
+        super().__init__(message)
+        self.trigger = trigger
 _EXECUTION_CONTRACT_PROMPT = (
     "The only valid typed tuples are "
     "executable_action/activity/body_action/true; "
@@ -135,7 +146,12 @@ _EXECUTION_CONTRACT_PROMPT = (
     "spoken_response/speaking/<mode-specific-vocal>/true; and "
     "other/none/other/false. Never use capability_dependent merely because an "
     "exact provider is required: provider_required describes evidence need, while "
-    "the human completion mode determines responsibility_kind. Every media_playback "
+    "the human completion mode determines responsibility_kind. Stable general "
+    "knowledge, reasoning, creative content, and an immediate conversational "
+    "reminder that Chromie can author without fresh external, private, or runtime "
+    "evidence are spoken_response. capability_dependent requires actual evidence "
+    "from a registered non-vocal capability; model knowledge is not by itself a "
+    "lookup or retrieval operation. Every media_playback "
     "Goal also requires one exact media_operation; every other Goal uses "
     "media_operation=none."
 )
@@ -826,12 +842,22 @@ class GoalAssociationResolver:
             except (ValidationError, ValueError) as exc:
                 repair_attempted = True
                 initial_validation_error = self._validation_error_json(exc)
-                fresh_typed_resegmentation = (
-                    self._is_execution_contract_validation_error(exc)
+                fresh_typed_resegmentation = self._is_execution_contract_validation_error(
+                    exc
+                )
+                fresh_semantic_trigger = (
+                    exc.trigger
+                    if isinstance(exc, GoalAssociationFreshResegmentationError)
+                    else ""
+                )
+                fresh_resegmentation = bool(
+                    fresh_typed_resegmentation or fresh_semantic_trigger
                 )
                 contract_repair_strategy = (
                     "model_owned_fresh_typed_resegmentation"
                     if fresh_typed_resegmentation
+                    else "model_owned_fresh_goal_resegmentation"
+                    if fresh_semantic_trigger
                     else "schema_constrained_model_revision"
                 )
                 logger.warning(
@@ -842,14 +868,19 @@ class GoalAssociationResolver:
                     contract_repair_strategy,
                     self._bounded_json(raw, 4000),
                 )
-                if fresh_typed_resegmentation:
+                if fresh_resegmentation:
+                    resegmentation_trigger = (
+                        "invalid_typed_execution_contract"
+                        if fresh_typed_resegmentation
+                        else fresh_semantic_trigger
+                    )
                     repaired = await self.ollama.generate(
                         self._build_semantic_review_prompt(
                             request=request,
                             candidate_goals=candidate_goals,
                             output_type=output_type,
                             raw={},
-                            triggers=["invalid_typed_execution_contract"],
+                            triggers=[resegmentation_trigger],
                         ),
                         system=self._semantic_review_system_prompt(
                             output_type,
@@ -859,6 +890,8 @@ class GoalAssociationResolver:
                         response_format=response_schema,
                         prompt_family=(
                             "goal_association.typed_execution_resegmentation"
+                            if fresh_typed_resegmentation
+                            else "goal_association.semantic_contract_resegmentation"
                         ),
                         turn_id=request.sid,
                         attempt=2,
@@ -881,7 +914,9 @@ class GoalAssociationResolver:
                         attempt=2,
                     )
                 if not isinstance(repaired, dict):
-                    raise ValueError("goal-association repair response is not a JSON object")
+                    raise ValueError(
+                        "goal-association repair response is not a JSON object"
+                    ) from exc
                 repaired, recovered = (
                     self._drop_invalid_optional_referent_introductions(repaired)
                 )
@@ -922,8 +957,8 @@ class GoalAssociationResolver:
                     request.sid,
                     ",".join(review_triggers),
                 )
-                fresh_resegmentation = (
-                    "multi_embodied_responsibility_review" in review_triggers
+                fresh_resegmentation = bool(
+                    _FRESH_RESEGMENTATION_TRIGGERS.intersection(review_triggers)
                 )
                 reviewed = await self.ollama.generate(
                     self._build_semantic_review_prompt(
@@ -1149,17 +1184,18 @@ class GoalAssociationResolver:
         model_output = output_type.model_validate(raw)
         collection_bindings = self._action_collection_bindings(model_output)
         if collection_bindings:
-            raise ValueError(
+            raise GoalAssociationFreshResegmentationError(
                 "new Goal bindings cannot contain action collections; emit one "
                 "new_goals item for every independently observable responsibility: "
-                + ", ".join(collection_bindings)
+                + ", ".join(collection_bindings),
+                trigger="invalid_action_collection_binding",
             )
         location_bindings = self._non_verbatim_explicit_location_bindings(
             model_output,
             request=request,
         )
         if location_bindings:
-            raise ValueError(
+            raise GoalAssociationFreshResegmentationError(
                 "a location binding must preserve explicit or referent-backed "
                 "provenance. For a directly named location, preserve a verbatim "
                 "contiguous span from the authoritative user turn and do not "
@@ -1167,7 +1203,8 @@ class GoalAssociationResolver:
                 "location, copy the supplied referent_id into both the location "
                 "binding and resolved_references, and copy the indirect user "
                 "surface into resolved_references.surface_form: "
-                + ", ".join(location_bindings)
+                + ", ".join(location_bindings),
+                trigger="invalid_location_binding_provenance",
             )
         return self._expand_model_output(
             model_output,
@@ -1582,7 +1619,7 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, provider_required, and media_operation. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. Media playback also requires one exact media_operation from play, pause, resume, seek, stop, volume, or status; every non-media Goal uses media_operation=none. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. "
+            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, provider_required, and media_operation. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent only when a lookup, retrieval, computation, or another non-vocal capability must supply fresh external, private, or runtime evidence for completion, and other only when no maintained lane applies. Stable general knowledge and reasoning already available to the language model remain spoken_response; do not relabel them as lookup or retrieval. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. Media playback also requires one exact media_operation from play, pause, resume, seek, stop, volume, or status; every non-media Goal uses media_operation=none. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
@@ -1730,6 +1767,21 @@ class GoalAssociationResolver:
         fresh_resegmentation = bool(
             _FRESH_RESEGMENTATION_TRIGGERS.intersection(triggers)
         )
+        mixed_responsibility_guidance = (
+            "For the mixed capability_dependent plus spoken_response trigger, "
+            "apply this independence test before returning JSON: if the capability "
+            "did not run, could the proposed spoken Goal still be truthfully and "
+            "fully completed? The generic act of answering a question, reporting, "
+            "summarizing, explaining, or recommending from that capability result "
+            "fails this test and must not be a separate Goal; return only the "
+            "capability_dependent Goal, whose delivery_mode owns the later speech. "
+            "Keep a spoken_response sibling only for independently satisfiable "
+            "content such as an unrelated joke, greeting, authored reminder, or "
+            "other answer that does not depend on the capability result. Do not "
+            "justify a second Goal merely as 'the subsequent verbal response'.\n\n"
+            if "mixed_capability_and_spoken_responsibilities" in triggers
+            else ""
+        )
         review_input = (
             "No previous Goal DTO is supplied for this review. Reconstruct the "
             "segmentation independently from the authoritative user turn so an "
@@ -1749,7 +1801,8 @@ class GoalAssociationResolver:
             "Use semantic reasoning over the authoritative user turn and bounded "
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
-            "Classify responsibility_kind, execution_lane, output_mode, "
+            + mixed_responsibility_guidance
+            + "Classify responsibility_kind, execution_lane, output_mode, "
             "provider_required, and media_operation by the channel and evidence "
             "that complete the human "
             "outcome, not by grammar, verb choice, command framing, or the surrounding "
@@ -1764,6 +1817,10 @@ class GoalAssociationResolver:
             "uses output_mode=speech and provider_required=false. Never map a vocal "
             "performance to express_attention, media playback, or another body "
             "capability, and never use ordinary speech as evidence for singing. "
+            "A direct answer from stable general knowledge or model reasoning, and "
+            "an immediate conversational reminder that needs no fresh external, "
+            "private, or runtime evidence, are spoken_response rather than "
+            "capability_dependent. "
             f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
             "Keep or create a fresh spoken_response Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "

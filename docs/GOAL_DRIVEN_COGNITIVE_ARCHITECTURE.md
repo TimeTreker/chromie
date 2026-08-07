@@ -1224,11 +1224,14 @@ The Host may schedule a complete, independently schema-valid `fast_speech` or
 turn/Goal correlation, commitment or evidence state, claim guards, and
 cancellation generation; it need not wait for unrelated later response fields.
 Raw model-token deltas, partial JSON, private reasoning, and incomplete
-sentences are not response contracts. The Core model owns the exact wording and
-may choose silence. Dynamic pre-Goal speech is independently reviewed against
-the owner-approved style context and must carry `claim_state=none` with empty
-capability and Goal claim IDs. The Host validates this typed authority and does
-not classify ordinary wording by keywords. An immediate acknowledgement may
+sentences are not response contracts. For eligible planning and embodied work,
+the Core model owns the exact dynamic wording and an independent review checks
+its ordinary meaning against the owner-approved style context. Dynamic pre-Goal
+speech must carry `claim_state=none` with empty capability and Goal claim IDs,
+but those typed fields are not sufficient evidence about sentence meaning.
+Tool and memory routes therefore suppress model-authored pre-effect speech; a
+generic Host cache may present a low-commitment cue. The Host does not classify
+ordinary wording by keywords. An immediate acknowledgement may
 claim only hearing or evaluation, a proposal or confirmation requires a
 validated plan, starting speech requires committed execution, progress requires
 correlated runtime evidence, and final speech requires reconciled terminal

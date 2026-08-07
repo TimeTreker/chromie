@@ -1144,7 +1144,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("role-play", review_prompt)
         self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
 
-    def test_safe_read_acknowledgement_is_required_at_decoder_boundary(self):
+    def test_pure_safe_read_suppresses_dynamic_speech_at_decoder_boundary(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1156,16 +1156,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             ],
         )
-        ollama = FakeOllama(
-            {
-                "response_plan": {
-                    "immediate": {
-                        "text": "我查一下天气预报。",
-                        "covers_goal_ids": ["goal-weather"],
-                    }
-                }
-            }
-        )
+        ollama = FakeOllama({"response_plan": {}})
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
                 request(
@@ -1184,15 +1175,24 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         schema = ollama.prompts[0][1]["response_format"]
         response_plan_schema = schema["$defs"]["ResponsePlan"]
-        self.assertIn("immediate", response_plan_schema["required"])
+        self.assertNotIn("immediate", response_plan_schema["required"])
+        self.assertEqual(
+            response_plan_schema["properties"]["immediate"],
+            {"type": "null"},
+        )
         self.assertEqual(
             response_plan_schema["properties"]["pre_action"],
             {"type": "null"},
         )
-        self.assertIn("emit exactly one natural everyday immediate acknowledgement", ollama.prompts[0][0])
-        self.assertIn("starts this speech and the lookup in parallel", ollama.prompts[0][0])
+        self.assertIn("emit no response stage before execution", ollama.prompts[0][0])
+        self.assertIsNone(result.composition.response_plan.immediate)
+        self.assertTrue(
+            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
+        )
+        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertEqual(len(ollama.prompts), 1)
 
-    def test_safe_read_acknowledgement_length_remains_model_owned(self):
+    def test_pure_safe_read_dynamic_candidate_fails_soft_without_speech(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1229,13 +1229,18 @@ class ResponseComposerResolverTests(unittest.TestCase):
             )
         )
         self.assertEqual(result.status, "resolved")
-        self.assertEqual(
-            result.composition.response_plan.immediate.text,
-            "我现在就去帮你仔细看看上海今天的天气怎么样。",
+        self.assertIsNone(result.composition.response_plan.immediate)
+        self.assertTrue(result.metadata["fail_soft_primary_activity"])
+        self.assertTrue(
+            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
         )
         self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "pure execute Plan whose pending capabilities are all safe_read",
+            ollama.prompts[1][1]["system"],
+        )
 
-    def test_safe_read_semantic_review_removes_pre_evidence_weather_claims(self):
+    def test_pure_safe_read_skips_pre_evidence_semantic_review(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1247,35 +1252,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             ],
         )
-        unsafe = {
-            "response_plan": {
-                "immediate": {
-                    "text": "内乡今天大概32℃，还有雷雨和冰雹。",
-                    "speech_act": "none",
-                    "commitment_state": "none",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-weather"],
-                }
-            },
-            "social_attention_plan": None,
-            "confidence": 1.0,
-            "rationale": "A result was inferred from prior dialogue.",
-        }
-        reviewed = {
-            "response_plan": {
-                "immediate": {
-                    "text": "对不起，我刚才弄错了地点。我现在查一下内乡。",
-                    "speech_act": "acknowledge",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-weather"],
-                }
-            },
-            "social_attention_plan": None,
-            "confidence": 1.0,
-            "rationale": "Only a pre-evidence acknowledgement is truthful.",
-        }
-        ollama = ScriptedOllama([unsafe, reviewed])
+        ollama = ScriptedOllama([{"response_plan": {}}])
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1294,15 +1271,125 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "resolved")
-        self.assertEqual(
-            result.composition.response_plan.immediate.text,
-            "对不起，我刚才弄错了地点。我现在查一下内乡。",
+        self.assertIsNone(result.composition.response_plan.immediate)
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertFalse(result.metadata["safe_read_semantic_review_succeeded"])
+
+    def test_pure_safe_read_does_not_reuse_scheduled_dynamic_speech(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "Seattle"},
+                }
+            ],
         )
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("independent pre-evidence speech semantic reviewer", ollama.prompts[1][1]["system"])
-        self.assertIn("rather than keyword", ollama.prompts[1][0])
+        ollama = ScriptedOllama([{"response_plan": {}}])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ],
+                        "scheduled_turn_speech": [
+                            {
+                                "status": "scheduled",
+                                "stage": "fast_first",
+                                "route": "tool",
+                                "text": "好呀，我正在查西雅图的天气。",
+                                "speech_event_id": "speech-weather",
+                                "generation": 1,
+                                "orders": [2],
+                            }
+                        ],
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        assert result.composition is not None
+        stage = result.composition.response_plan.immediate
+        self.assertIsNone(stage)
+        self.assertFalse(result.metadata["contract_repair_attempted"])
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_safe_read_unsafe_supplement_fails_soft_to_reviewed_fast_speech(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-weather"],
+            steps=[
+                {
+                    "step_id": "weather",
+                    "skill_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆"},
+                }
+            ],
+        )
+        unsafe = {
+            "response_plan": {
+                "immediate": {
+                    "text": "根据最新天气预报，重庆今天会下雨。",
+                    "speech_act": "statement",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-weather"],
+                }
+            },
+            "social_attention_plan": None,
+            "confidence": 1.0,
+            "rationale": "The model incorrectly inferred a result before execution.",
+        }
+        ollama = ScriptedOllama([unsafe, unsafe])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "chromie.weather.lookup",
+                                "safety_class": "safe_read",
+                            }
+                        ],
+                        "scheduled_turn_speech": [
+                            {
+                                "status": "scheduled",
+                                "stage": "fast_first",
+                                "route": "tool",
+                                "text": "好呀，我正在查重庆今天的天气。",
+                                "speech_event_id": "speech-weather-safe",
+                                "generation": 2,
+                                "orders": [3],
+                            }
+                        ],
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertTrue(result.metadata["fail_soft_primary_activity"])
+        assert result.composition is not None
+        stage = result.composition.response_plan.immediate
+        self.assertIsNone(stage)
         self.assertTrue(
-            result.metadata["safe_read_semantic_review_succeeded"]
+            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
+        )
+        self.assertEqual(
+            [step.skill_id for step in result.composition.canonical_plan.steps],
+            ["chromie.weather.lookup"],
         )
 
     def test_mixed_safe_read_plan_still_receives_pre_evidence_semantic_review(self):

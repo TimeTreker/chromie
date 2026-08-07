@@ -513,7 +513,7 @@ fi
 if (( SKIP_SYNTHETIC == 0 )); then
   SYNTH_ID="comprehensive-synthetic-$RUN_ID"
   SYNTH_ROOT="$E2E_ROOT/voice-synthetic"
-  synth_args=("${PYTHON_CMD[@]}" scripts/voice_acceptance.py
+  synth_args=(env BUILD=0 "${PYTHON_CMD[@]}" scripts/voice_acceptance.py
     --mode synthetic
     --cases speech-only,barge-in,follow-up
     --evidence-root "$SYNTH_ROOT"
@@ -528,7 +528,6 @@ if (( SKIP_SYNTHETIC == 0 )); then
       "$SYNTH_ROOT/$SYNTH_ID"
       --allow-automated
       --write-report "$E2E_ROOT/synthetic-verification.json")
-    (( ALLOW_DIRTY == 1 )) && verify_args+=(--allow-dirty)
     run_capture e2e "verify retained synthetic evidence" 600 "${verify_args[@]}"
   else
     record_skip e2e "verify retained synthetic evidence" "Synthetic evidence directory was not created."

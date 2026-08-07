@@ -130,20 +130,22 @@ ASR -> Cognitive Gateway -> Goal-Driven Cognitive Core /run -> AgentResult
 This path remains for regression coverage and gradual migration. It must not be
 used to turn a failed named-capability request into an unvalidated low-level action.
 
-### Direct conversational fallback
+### Explicitly gated direct-conversation compatibility
 
-When Goal Interpretation is unavailable and the turn is safe for speech-only degradation, the Orchestrator can use a speech-only Ollama streaming path:
+The emergency compatibility gates can authorize a speech-only Ollama streaming
+path for a legacy turn that has not entered a maintained Goal-driven apply lane:
 
 ```text
 ASR -> Ollama -> TTS -> playback
 ```
 
-This fallback produces speech only. It does not gain permission to invoke
-skills or hardware. If Goal Interpretation fails while the utterance or active pending
-task looks embodied, the Orchestrator uses a deterministic safe-fallback speech
-response instead of the generic conversational LLM path. Deterministic local
-silence/unusable-input suppression is applied before Goal Interpretation enablement or
-failure handling, so suppressed input cannot fall through to this LLM path.
+This compatibility path produces speech only. It does not gain permission to
+invoke skills or hardware, and it is not ordinary degradation for maintained
+`apply` lanes. Once Goal-driven authority is selected, Goal Interpretation or
+later failure stays fail-closed and cannot enter this path. A legacy embodied or
+pending-task turn uses deterministic safe-fallback speech instead of generic
+conversation. Deterministic silence/unusable-input suppression runs before any
+compatibility decision, so suppressed input cannot fall through to the LLM.
 
 ## Configuration precedence
 
@@ -224,25 +226,26 @@ This generates runtime configuration, activates the selected Conda environment,
 checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
-The Orchestrator has a true fast-first audio path for slow tool, planning,
-memory, and embodied turns. Once Goal Interpretation confidently selects pending
-work, the Core must author one typed, non-terminal `fast_speech` acknowledgement
-from the current turn and approved mind/style context. The Host validates and
-queues that dynamic sentence before slow Goal Association, planning, and
-execution. One bounded Core repair fills the field when the first output omits
-it; silence is not a valid repaired outcome for pending work.
+The Orchestrator has a fast-first presentation path for slow work. Once Goal
+Interpretation confidently selects eligible planning or embodied pending work,
+the Core must author one typed, non-terminal `fast_speech` acknowledgement from
+the current turn and approved mind/style context. The Host validates and queues
+that reviewed dynamic sentence before slow Goal Association, planning, and
+execution. One bounded Core repair may fill the field when the first output
+omits it. Tool and memory routes deliberately suppress model-authored pre-effect
+speech: their dynamic answer must follow trusted tool evidence or memory commit.
 
 At startup the Orchestrator may also prime a small speaker-specific
 English/Chinese acknowledgement cache through the configured TTS service and
 load the PCM into host memory. Cached cues are generic, low-commitment
 presentation fallbacks such as “One moment” or “我先确认一下”. They are used only
-when dynamic speech is missing, invalid, or cannot be scheduled; after that
-failure an adaptive hedge timer waits `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` (750 ms
-by default) so a final response may still win the race. Cache entries never
-claim a tool result, memory commit, physical execution, or completion.
+when dynamic speech is not admissible, missing, invalid, or cannot be scheduled;
+an adaptive hedge timer then waits `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` (750 ms by
+default) so a final response may still win the race. Cache entries never claim
+a tool result, memory commit, physical execution, or completion.
 
 The Host never authors the semantic sentence. Bare strings and partial
-FastSpeech objects remain parseable but not playable: immediate audio requires
+FastSpeech objects remain parseable but not playable: immediate dynamic audio requires
 an allowed `purpose`, a non-terminal `commitment`,
 `must_not_claim_completion=true`, and text that passes the completion-claim
 guard. Physical work is limited to a safety prelude or confirmation, never an
@@ -256,11 +259,18 @@ serves the required acknowledgement, the Composer copies the exact text with
 playback-start barrier instead of synthesizing or speaking it twice. Final result
 or failure speech remains new, evidence-bounded speech.
 
-The queued grounded-response latency Issue will preserve this single semantic
-authority while allowing independently valid speech stages to be scheduled
-earlier. True incremental PCM playback is separate queued playback-lifecycle
-work; a `tts_stream_start` transport event is not currently audible playback
-evidence.
+Pure safe-read Plans have a stricter boundary: Response Composer emits no
+model-authored pre-evidence stage. The optional generic Host cue owns latency
+presentation and the Tool Result Interpreter owns the single grounded
+post-execution answer. This avoids treating structurally valid fields or a
+same-model review as proof that an ordinary sentence did not already claim the
+result.
+
+Complete non-effectful spoken-response Goals already use the direct Core branch
+after Goal Association, without Fast or Deep Planner. Runtime records that path
+separately from terminal Fast planning and reasoned Deep escalation. True
+incremental PCM playback remains separate playback-lifecycle work; a
+`tts_stream_start` transport event is not currently audible playback evidence.
 
 Manual development start:
 
@@ -305,12 +315,13 @@ targets all eligible ordinary turns. Audible playback remains a shared ordered
 resource, so a barge-in can silence stale audio without erasing the underlying
 work.
 
-Current limitation: final outcome-response staleness still compares the
-originating turn with global playback-generation and session state. Independent
-work and evidence survive, but a newer ordinary turn can suppress that earlier
-Goal's eventual result speech. The queued grounded-response and playback-
-delivery Issues own the required separation between invalidating obsolete audio
-and retaining a future result-delivery obligation.
+Final outcome delivery separates obsolete audio from an independent Goal's
+result obligation. When a newer ordinary turn changes playback generation, a
+completed earlier Goal waits for the foreground session to finish and for an
+idle output window, then delivers its evidence-bound result. Explicit scoped
+cancellation or supersession invalidates the affected Goal; timeout is retained
+as a delivery failure rather than being relabelled as success. Output-only
+barge-in may silence current audio without cancelling the underlying work.
 
 The Interaction Coordinator validates the response and submits speech and capability
 requests to the Trusted Capability Runtime. Scheduling is bounded by

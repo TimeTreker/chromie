@@ -22,11 +22,13 @@ python scripts/general_ability_acceptance.py --mode level-a
 criteria-based removal schedule in the Benchmark migration manifest. Neither it
 nor a Level A pass alone proves natural live robot behavior.
 
-Pending-work regressions should assert the typed `fast_speech` object as well as
-the final route: purpose, non-terminal commitment, and
-`must_not_claim_completion=true`. Live-text cases can set
-`require_fast_speech=true` and `expected_fast_speech_purposes` so the evaluator
-hard-fails a long-silence route even when the eventual final answer is correct.
+Eligible planning/embodied pending-work regressions should assert the typed
+`fast_speech` object as well as the final route: purpose, non-terminal
+commitment, and `must_not_claim_completion=true`. Live-text cases can set
+`require_fast_speech=true` and `expected_fast_speech_purposes`. Tool and memory
+routes instead set `forbid_fast_speech=true`: their model-authored dynamic
+speech must wait for trusted evidence or a committed result, while the Host's
+generic cache remains a separate latency presentation path.
 
 Create and validate scenarios with:
 

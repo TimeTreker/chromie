@@ -24,14 +24,16 @@ User request
   -> model-owned response composition reports the grounded outcome
 ```
 
-Before Goals and Plans exist, pending tool, planning, memory, or embodied work
-requires one natural fast acknowledgement. It must use `claim_state=none` with no
-claimed Goal or Capability IDs. It may acknowledge the process naturally, but it
-must not claim a selected Capability, execution, or result. If the later Response
-Composer judges that acknowledgement sufficient, it references the exact existing
-utterance with `reuse_current_turn_speech=true`; Runtime does not synthesize it a
-second time. The Provider returns structured evidence; Goal reconciliation and
-the model-owned response boundary determine what may be said afterward.
+Before Goals and Plans exist, eligible planning or embodied work may use one
+reviewed natural fast acknowledgement with `claim_state=none` and no claimed
+Goal or Capability IDs. Tool and memory routes suppress model-authored
+pre-effect speech; an optional generic Host cue may cover latency without
+claiming selection, execution, evidence, or a commit. Pure safe-read Response
+Composer Plans also emit no dynamic pre-evidence stage. The Provider returns
+structured evidence; Goal reconciliation and the evidence-bound model response
+determine what may be said afterward. Mixed/effectful Plans may still reference
+an independently valid existing utterance with
+`reuse_current_turn_speech=true`, so Runtime does not synthesize it twice.
 
 An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent

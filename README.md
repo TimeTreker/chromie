@@ -22,16 +22,22 @@ experience artifacts. See
 > base; the maintained Soridormi launcher widens authority to simulator robot
 > actions. Historical voice-pipeline and
 > text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
-> The canonical local gate is reproducible again. Any gate claim must use
+> The canonical local gate is reproducible again. Issues #1, #5, #6, and #7
+> have been merged to `main`; their retained evidence remains bound to the
+> exact recorded revisions and does not automatically become evidence for a
+> later merge commit. Any gate claim must use
 > the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied
 > test count. A strict source-bound verifier for
 > the current-revision microphone-to-audible-response loop is implemented. The
-> current input reaches VAD/ASR but has not produced an intelligible required
-> utterance, so physical target validation remains open without a claim. Default
+> latest automated generated-speech run exercised VAD, ASR, the live
+> Gateway/Core, TTS, playback, and deterministic interruption on an RTX 5090.
+> That run also exposed evidence and semantic-contract defects now tracked in
+> the post-merge audit; it is diagnostic, not release or physical-audio proof.
+> Default
 > audio selections now follow OS device changes during runtime, while explicit
 > selections remain pinned; supervised physical hot-plug evidence is still open.
-> The active Issue is the non-physical default
-> source-bound evidence closure. No release version
+> The active delivery line is clean post-merge source and non-physical
+> target-evidence closure. No release version
 > or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
@@ -108,9 +114,11 @@ These are implementation claims, not current-revision live qualification:
 
 ## Not yet proven on the current revision
 
-- live Gateway/Core text interaction and active cancellation;
-- positive Agent Skill selection with real provider-backed weather execution;
-- paired Chromie/Soridormi MuJoCo execution and safe idle;
+- clean full-matrix generated-speech acceptance after the post-merge fixes;
+- positive Agent Skill selection with trustworthy real provider-backed weather
+  execution and follow-up conversation;
+- paired Chromie/Soridormi MuJoCo execution and safe idle bound to the final
+  post-audit revision;
 - the reviewed Social Attention live baseline;
 - physical microphone and speaker behavior;
 - second-machine LAN exposure validation;
@@ -256,10 +264,10 @@ documented in
   and planning, belongs to LLM reasoning over bounded contracts, not hardcoded
   phrase, regex, or regression-case matches;
 - normal natural-language routing goes through model-authored typed meaning;
-  the queued grounded-response contract will let complete non-effectful
-  conversation avoid a planner used merely to transport speech, keep bounded
-  work on Fast Planner, and use Deep only when wider semantic or safety/resource
-  reasoning is required instead of deterministic guessing;
+  complete non-effectful conversation uses the direct Core response path rather
+  than a planner used merely to transport speech, bounded work stays on Fast
+  Planner, and Deep records the wider semantic or safety/resource reason that
+  required escalation instead of relying on deterministic guessing;
 - simulation exemptions never authorize hardware;
 - physical execution stays default-off and Soridormi-owned;
 - implementation, automated verification, target validation, and release

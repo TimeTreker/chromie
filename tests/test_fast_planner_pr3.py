@@ -2063,6 +2063,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("FINAL AUTHORITATIVE USER TURN owns the current communicative act", prompt)
         self.assertIn("must not replace what the person just meant", prompt)
         self.assertIn("Do not replay the previous task answer", prompt)
+        self.assertIn("first sentence directly state the requested decision", prompt)
+        self.assertIn("never begin by restating prior evidence", prompt)
+        self.assertIn("at most one short supporting clause", prompt)
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
         raw = multi_goal_plan(

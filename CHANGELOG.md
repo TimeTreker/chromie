@@ -5,6 +5,42 @@ remains available in Git history.
 
 ## Unreleased
 
+### Post-merge audit remediation
+
+- Registered every normally scheduled interaction utterance in the same
+  delivered-turn evidence ledger used by fast-first and cached speech, so played
+  final speech can be correlated instead of appearing as an empty delivery.
+- Updated generated-speech acceptance to recognize the current
+  `cognitive_core_done` semantic receipt and deterministic
+  `cognitive_gateway_reflex_applied` interrupt receipt while retaining the old
+  Goal Interpretation event only for compatibility evidence.
+- Made Goal Association resegment mechanical action-collection and location-
+  provenance failures from the authoritative turn rather than anchoring repair
+  on an invalid DTO, and clarified that stable knowledge and ordinary reasoning
+  are spoken responsibilities unless fresh non-vocal evidence is required.
+- Replaced the repeated invalid Goal Interpreter retry with an error-directed
+  typed-contract repair. If the repaired model response still adds durable-only
+  fields to explicit session/ephemeral memory, a logged mechanical recovery may
+  only remove authority; durable, profile, forget, and clear contradictions
+  remain fail-closed.
+- Suppressed model-authored tool and memory speech until trusted evidence or a
+  committed result exists. Pure safe-read Response Composer Plans now emit no
+  dynamic pre-evidence stage; the optional generic Host cue owns latency
+  presentation and the Tool Result Interpreter owns one grounded answer. Mixed
+  Plans retain exact current-turn acknowledgement reuse.
+- Added one bounded evidence-preserving repair when Tool Result Interpreter
+  output is otherwise grounded but violates its response contract, and made
+  decision follow-ups answer the requested decision before the smallest useful
+  supporting evidence.
+- Corrected semantic-authority, compatibility-fallback, current-status,
+  acceptance, configuration, latency, scenario-authoring, and resume-point
+  documentation found stale by the audit. Executable weather scenarios now
+  assert dynamic pre-effect suppression instead of the obsolete acknowledgement
+  requirement.
+- Prevented the comprehensive runner from rebuilding an image underneath its
+  own running containers, made built services recreate against the new image,
+  and removed an unsupported dirty-verifier option.
+
 ### Semantic authority and failure honesty
 
 - Added a typed `CoreInterpretationUnavailable` response. A non-empty turn that

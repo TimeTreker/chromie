@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import unittest
 from unittest import mock
@@ -15,7 +16,11 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     is_allowed_model_ignore,
 )
 from agent.app.cognitive_core.goal_interpreter.fallback import InterpretationUnavailableError
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import (
+    FastSpeech,
+    RouteDecision,
+    RouteRequest,
+)
 
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
@@ -780,6 +785,120 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertEqual(payload["options"]["num_predict"], 512)
         self.assertEqual(payload["options"]["num_ctx"], 4096)
         self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
+
+    def test_contract_repair_payload_includes_exact_error_without_weakening_memory(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        payload = interpreter.build_contract_repair_payload(
+            RouteRequest(text="Remember that my test color is blue."),
+            previous_content=(
+                '{"route":"memory","memory_update":{"scope":"session",'
+                '"retention_days":30}}'
+            ),
+            validation_error=ValueError(
+                "session memory must not carry durable consent fields"
+            ),
+        )
+
+        system = payload["messages"][0]["content"]
+        user = payload["messages"][1]["content"]
+        self.assertIn("Contract Repair", system)
+        self.assertIn("Do not infer durable-memory consent", system)
+        self.assertIn("must omit consent_basis and retention_days", system)
+        self.assertIn("retention_days", user)
+        self.assertIn("session memory must not carry", user)
+        self.assertIsInstance(payload["format"], dict)
+
+    def test_session_memory_contract_repair_can_only_reduce_persistence(self) -> None:
+        class MemoryInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(
+                self,
+                payload: dict,
+                *,
+                stage: str = "unknown",
+            ) -> dict:
+                self.stages.append(stage)
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"memory","intent":"remember_session_fact",'
+                            '"confidence":1.0,"memory_update":{"operation":"remember",'
+                            '"scope":"session","kind":"fact","text":"test color is blue",'
+                            '"persistence_policy":"ephemeral",'
+                            '"retention_days":30}}'
+                        )
+                    }
+                }
+
+        interpreter = MemoryInterpreter()
+        decision = asyncio.run(
+            interpreter.route(
+                RouteRequest(
+                    text="Remember that my test color is blue.",
+                    context={"gateway_admission_complete": True},
+                )
+            )
+        )
+
+        self.assertEqual(decision.route, "memory")
+        self.assertIsNotNone(decision.memory_update)
+        assert decision.memory_update is not None
+        self.assertIsNone(decision.memory_update.retention_days)
+        self.assertEqual(
+            decision.metadata["contract_recovery"],
+            {
+                "strategy": "remove_durable_fields_from_explicit_session_memory",
+                "recovered_paths": ["memory_update.retention_days"],
+            },
+        )
+        self.assertEqual(
+            interpreter.stages,
+            ["quick_intent", "quick_intent_contract_repair"],
+        )
+
+    def test_session_memory_recovery_does_not_weaken_durable_or_forget_contracts(self) -> None:
+        durable = {
+            "memory_update": {
+                "scope": "session",
+                "operation": "remember",
+                "kind": "fact",
+                "text": "blue",
+                "persistence_policy": "durable_with_explicit_consent",
+                "consent_basis": "explicit_current_turn",
+                "retention_days": 30,
+            }
+        }
+        forget = {
+            "memory_update": {
+                "scope": "session",
+                "operation": "forget",
+                "kind": "fact",
+                "text": "blue",
+                "retention_days": 30,
+            }
+        }
+
+        self.assertEqual(
+            OllamaGoalInterpreter._remove_durable_fields_from_session_memory(durable),
+            [],
+        )
+        self.assertEqual(
+            OllamaGoalInterpreter._remove_durable_fields_from_session_memory(forget),
+            [],
+        )
 
     def test_route_only_json_response_gets_default_llm_confidence(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -2255,7 +2374,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(InterpretationUnavailableError, 'placeholder capability intent'):
             await interpreter.route(RouteRequest(text="Hello, how are you."))
 
-    async def test_tool_route_missing_fast_speech_is_repaired_by_interpreter_llm(self) -> None:
+    async def test_tool_route_missing_fast_speech_fails_closed_to_cached_prelude(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2320,17 +2439,19 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "tool")
         self.assertEqual(decision.intent, "weather_query")
-        self.assertIsNotNone(decision.fast_speech)
-        self.assertEqual(decision.fast_speech.text, "好的，我查一下重庆今天的天气。")
-        self.assertEqual(decision.fast_speech.commitment, "checking_only")
-        self.assertIn("fast_speech_repair", decision.metadata)
+        self.assertIsNone(decision.fast_speech)
+        self.assertEqual(
+            decision.metadata["fast_speech_review"],
+            {
+                "stage": "tool_preeffect_suppressed",
+                "model_reviewed": False,
+                "speech_selected": False,
+                "policy": "tool_evidence_required_before_dynamic_speech",
+            },
+        )
         self.assertEqual(
             interpreter.stages,
-            [
-                "primary_interpreter",
-                "fast_speech_repair",
-                "fast_speech_semantic_review",
-            ],
+            ["primary_interpreter"],
         )
 
     async def test_robot_action_fast_speech_repair_stays_generic_before_planning(self) -> None:
@@ -2418,6 +2539,107 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ordinary sentence meaning", review_rendered)
         self.assertIn("rewrite it prospectively", review_rendered)
         self.assertEqual(len(interpreter.payloads), 3)
+
+    async def test_memory_fast_speech_review_keeps_commit_prospective(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        decision = RouteDecision(
+            route="memory",
+            intent="memory_update",
+            confidence=0.95,
+        )
+        candidate = FastSpeech(
+            text="Okay, I remember it now.",
+            purpose="acknowledge",
+            commitment="prelude_only",
+            claim_state="none",
+            claimed_capability_ids=[],
+            claimed_goal_ids=[],
+            must_not_claim_completion=True,
+        )
+
+        payload = interpreter.build_fast_speech_review_payload(
+            RouteRequest(
+                text="Remember that my test color is blue.",
+                language="en-US",
+            ),
+            decision,
+            candidate,
+        )
+        rendered = "\n".join(
+            str(message.get("content") or "") for message in payload["messages"]
+        )
+
+        self.assertIn("memory update has not been committed", rendered)
+        self.assertIn(
+            "explicitly prospective or intentional grammatical construction",
+            rendered,
+        )
+        self.assertIn(
+            "already remembered, noted, recorded, stored, saved, or updated",
+            rendered,
+        )
+        self.assertIn("rewrite them prospectively", rendered)
+        self.assertEqual(payload["model"], "test-model")
+
+    async def test_memory_fast_speech_fails_closed_until_commit(self) -> None:
+        class MemoryInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    pending_work_fast_speech_repair_enabled=True,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(
+                self,
+                payload: dict,
+                *,
+                stage: str = "unknown",
+            ) -> dict:
+                self.stages.append(stage)
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"memory","intent":"memory_update",'
+                            '"confidence":1.0,"memory_update":{"operation":"remember",'
+                            '"scope":"session","kind":"fact","text":"blue",'
+                            '"persistence_policy":"ephemeral"},'
+                            '"fast_speech":{"text":"Okay, I remembered it.",'
+                            '"purpose":"acknowledge","commitment":"prelude_only",'
+                            '"claim_state":"none","claimed_capability_ids":[],'
+                            '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
+                        )
+                    }
+                }
+
+        interpreter = MemoryInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="Remember that my test color is blue.",
+                context={"gateway_admission_complete": True},
+            )
+        )
+
+        self.assertIsNone(decision.fast_speech)
+        self.assertEqual(interpreter.stages, ["quick_intent"])
+        self.assertEqual(
+            decision.metadata["fast_speech_review"],
+            {
+                "stage": "memory_preeffect_suppressed",
+                "model_reviewed": False,
+                "speech_selected": False,
+                "policy": "memory_commit_required_before_speech",
+            },
+        )
+        self.assertIn("authoritative result response required", decision.reason or "")
 
     async def test_fast_speech_review_failure_suppresses_dynamic_candidate(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
@@ -2515,7 +2737,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(decision.fast_speech)
         self.assertEqual(interpreter.calls, 1)
 
-    async def test_tool_route_existing_fast_speech_is_semantically_reviewed(self) -> None:
+    async def test_tool_route_existing_fast_speech_is_suppressed_before_review(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2560,12 +2782,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         decision = await interpreter.route(RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"))
 
         self.assertEqual(decision.route, "tool")
-        self.assertIsNotNone(decision.fast_speech)
-        assert decision.fast_speech is not None
-        self.assertEqual(decision.fast_speech.text, "好呀，我只帮你查重庆今天的天气。")
+        self.assertIsNone(decision.fast_speech)
         self.assertEqual(
             interpreter.stages,
-            ["quick_intent", "fast_speech_semantic_review"],
+            ["quick_intent"],
         )
 
 
@@ -2644,12 +2864,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNotNone(decision.fast_speech)
         self.assertNotIn("intent_review", [stage for stage, _ in interpreter.calls])
-        self.assertTrue(
-            all(
-                model == "quick-model"
-                for stage, model in interpreter.calls
-                if stage in {"fast_speech_repair", "fast_speech_semantic_review"}
-            )
+        stage_models = dict(interpreter.calls)
+        self.assertEqual(stage_models["fast_speech_repair"], "quick-model")
+        self.assertEqual(
+            stage_models["fast_speech_semantic_review"],
+            "quick-model",
         )
 
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:

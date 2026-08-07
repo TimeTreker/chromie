@@ -615,7 +615,12 @@ class FastPlannerResolver:
             "meant. For a reaction, feeling, acknowledgement, evaluation, or practical "
             "decision, answer that latest act directly and naturally. Do not replay the "
             "previous task answer unless the latest turn actually asks for repetition, "
-            "verification, explanation, comparison, or another answer from it. "
+            "verification, explanation, comparison, or another answer from it. For a "
+            "decision-shaped follow-up, make the first sentence directly state the "
+            "requested decision, recommendation, or yes/no answer; never begin by "
+            "restating prior evidence. Include at most one short supporting clause "
+            "after that answer, and omit previously delivered sentences, measurements, "
+            "or conditions that do not change the decision. "
         )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "

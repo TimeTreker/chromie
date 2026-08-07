@@ -271,7 +271,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             text, source = await assistant._generate_runtime_ready_greeting()
         finally:
             if original_timeout is not None:
-                setattr(asyncio, "timeout", original_timeout)
+                asyncio.timeout = original_timeout
 
         self.assertEqual(text, "早上好，我醒啦！")
         self.assertEqual(source, "llm:qwen3:4b")
@@ -1123,7 +1123,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         assistant.fast_first_tool_response_enabled = True
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(
                     route="tool",
@@ -1140,10 +1140,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ),
                 "重庆今天天气怎么样？",
-            ),
-            "好的，我查一下重庆今天的天气。",
+            )
         )
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(
                     route="tool",
@@ -1160,8 +1159,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ),
                 "what's the weather today in chongqing",
-            ),
-            "OK, I’ll check Chongqing’s weather today.",
+            )
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -1247,7 +1245,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    def test_tool_fast_first_response_is_opt_in(self) -> None:
+    def test_tool_fast_first_response_fails_closed_even_when_enabled(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
         assistant.core_generated_fast_speech_enabled = True
@@ -1275,12 +1273,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         assistant.fast_first_tool_response_enabled = True
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 decision,
                 "今天北京天气怎么样？",
-            ),
-            "好的，我查一下北京今天的天气。",
+            )
         )
 
     def test_dynamic_fast_speech_is_default_off_and_requires_full_contract(self) -> None:
@@ -1288,32 +1285,32 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.fast_first_response_enabled = True
         assistant.fast_first_tool_response_enabled = True
         decision = RouteDecision(
-            route="tool",
-            intent="weather_query",
+            route="robot_action",
+            intent="capability:soridormi.walk_forward",
             fast_speech={
-                "text": "Let me check the weather.",
-                "purpose": "acknowledge_and_check",
-                "commitment": "checking_only",
+                "text": "I will get ready.",
+                "purpose": "acknowledge",
+                "commitment": "prelude_only",
             },
         )
 
         self.assertIsNone(
-            assistant._fast_first_response_text(decision, "What is the weather?")
+            assistant._fast_first_response_text(decision, "Move forward.")
         )
 
         assistant.core_generated_fast_speech_enabled = True
         self.assertEqual(
-            assistant._fast_first_response_text(decision, "What is the weather?"),
-            "Let me check the weather.",
+            assistant._fast_first_response_text(decision, "Move forward."),
+            "I will get ready.",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(
-                    route="tool",
-                    intent="weather_query",
-                    fast_speech="Let me check the weather.",
+                    route="robot_action",
+                    intent="capability:soridormi.walk_forward",
+                    fast_speech="I will get ready.",
                 ),
-                "What is the weather?",
+                "Move forward.",
             )
         )
 
@@ -1350,6 +1347,38 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "must_not_claim_completion": True,
                 },
                 route="robot_action",
+            )
+        )
+
+    def test_memory_fast_speech_fails_closed_until_host_commit(self) -> None:
+        self.assertIsNone(
+            VoiceAssistant._validated_fast_speech_payload_text(
+                {
+                    "text": "Okay, I will remember it.",
+                    "purpose": "acknowledge",
+                    "commitment": "prelude_only",
+                    "claim_state": "none",
+                    "claimed_capability_ids": [],
+                    "claimed_goal_ids": [],
+                    "must_not_claim_completion": True,
+                },
+                route="memory",
+            )
+        )
+
+    def test_tool_fast_speech_fails_closed_until_evidence(self) -> None:
+        self.assertIsNone(
+            VoiceAssistant._validated_fast_speech_payload_text(
+                {
+                    "text": "Let me check the weather.",
+                    "purpose": "acknowledge_and_check",
+                    "commitment": "checking_only",
+                    "claim_state": "none",
+                    "claimed_capability_ids": [],
+                    "claimed_goal_ids": [],
+                    "must_not_claim_completion": True,
+                },
+                route="tool",
             )
         )
 
@@ -2369,6 +2398,64 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 (2, "Third chunk."),
             ],
         )
+
+    async def test_interaction_speech_registers_delivered_turn_evidence(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: " ".join(str(text).strip().split()),
+            assistant,
+        )
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+
+        async def schedule(
+            self: VoiceAssistant,
+            text: str,
+            session_id: str | None,
+        ) -> dict[str, Any]:
+            self.playback_start_waiters[
+                self.playback_start_key(4, 9, session_id)
+            ] = asyncio.get_running_loop().create_future()
+            return {
+                "scheduled": True,
+                "generation": 4,
+                "order": 9,
+                "orders": [9],
+                "chunks": 1,
+            }
+
+        assistant.schedule_tts_text = MethodType(schedule, assistant)
+        result = await assistant._schedule_interaction_speech(
+            {
+                "text": "The Moon reflects sunlight.",
+                "metadata": {
+                    "session_id": "sid-final",
+                    "phase": "final",
+                    "delivery_role": "response",
+                    "commitment_state": "completed",
+                },
+            }
+        )
+
+        self.assertIsNotNone(result.get("speech_event_id"))
+        self.assertEqual(assistant._delivered_turn_speech_events("sid-final"), [])
+        assistant.resolve_playback_start_waiter(
+            4,
+            9,
+            "sid-final",
+            started=True,
+            reason="playback_start",
+        )
+        delivered = assistant._delivered_turn_speech_events("sid-final")
+        self.assertEqual(len(delivered), 1)
+        self.assertEqual(delivered[0]["text"], "The Moon reflects sunlight.")
+        self.assertEqual(delivered[0]["stage"], "final")
+        self.assertEqual(delivered[0]["commitment"], "completed")
 
     async def test_single_tts_worker_pipelines_next_chunk_during_playback(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

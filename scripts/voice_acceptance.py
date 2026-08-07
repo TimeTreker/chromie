@@ -1130,6 +1130,17 @@ def friendly_event_line(event: dict[str, Any]) -> str | None:
             f"{prefix} Goal Interpretation: route={message_field(message, 'route') or '?'} "
             f"intent={message_field(message, 'intent') or '?'}"
         )
+    if name == "cognitive_core_done":
+        return (
+            f"{prefix} Cognitive Core: lane={message_field(message, 'lane') or '?'} "
+            f"intent={message_field(message, 'intent') or '?'}"
+        )
+    if name == "cognitive_gateway_reflex_applied":
+        return (
+            f"{prefix} Cognitive Gateway reflex: "
+            f"action={message_field(message, 'action') or '?'} "
+            f"trigger={message_field(message, 'trigger') or '?'}"
+        )
     if name in {"interaction_done", "cognitive_interaction_ready"}:
         return (
             f"{prefix} Goal-driven interaction: speech={message_field(message, 'speech') or '?'} "
@@ -1616,6 +1627,42 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             )
         )
 
+    def semantic_decision_rows() -> list[tuple[int, dict[str, Any], str]]:
+        decision_rows = [
+            *rows("cognitive_core_done"),
+            *rows("goal_interpretation_done"),
+        ]
+        decision_rows.sort(key=lambda value: value[0])
+        return decision_rows
+
+    def interrupt_decision_rows() -> list[tuple[int, dict[str, Any], str]]:
+        decision_rows = [
+            row
+            for row in rows("goal_interpretation_done")
+            if field(row[1], "route") == "interrupt"
+        ]
+        decision_rows.extend(
+            row
+            for row in rows("cognitive_gateway_reflex_applied")
+            if field(row[1], "action") == "interrupt"
+            and str(field(row[1], "goal_interpretation_bypassed") or "").casefold()
+            == "true"
+        )
+        decision_rows.sort(key=lambda value: value[0])
+        return decision_rows
+
+    def require_semantic_decision() -> None:
+        checks.append(
+            CheckResult(
+                name="Cognitive Core semantic decision",
+                passed=bool(semantic_decision_rows()),
+                detail=(
+                    "required event: cognitive_core_done "
+                    "(goal_interpretation_done is accepted only for compatibility evidence)"
+                ),
+            )
+        )
+
     def require_interaction() -> list[tuple[int, dict[str, Any], str]]:
         interaction_rows = [
             *rows("cognitive_interaction_ready"),
@@ -1895,10 +1942,9 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             interrupt_route = next(
                 (
                     index
-                    for index, item, _ in rows("goal_interpretation_done")
+                    for index, item, _ in interrupt_decision_rows()
                     if index > interrupt_asr
                     and str(item.get("sid") or "") == new_sid
-                    and field(item, "route") == "interrupt"
                 ),
                 None,
             )
@@ -2204,7 +2250,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         "follow-up",
     }:
         require("asr_final")
-        require("goal_interpretation_done")
+        require_semantic_decision()
         interaction_messages = require_interaction()
     else:
         interaction_messages = []
@@ -2491,10 +2537,9 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 route_index = next(
                     (
                         index
-                        for index, item, _ in rows("goal_interpretation_done")
+                        for index, item, _ in interrupt_decision_rows()
                         if index > asr_index
                         and str(item.get("sid") or "") == asr_sid
-                        and field(item, "route") == "interrupt"
                     ),
                     None,
                 )
@@ -2538,14 +2583,13 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         stop_sid = str(interruption["new_sid"]) if interruption else ""
         deterministic = any(
             str(item.get("sid") or "") == stop_sid
-            and field(item, "route") == "interrupt"
-            for _index, item, _message in rows("goal_interpretation_done")
+            for _index, item, _message in interrupt_decision_rows()
         )
         checks.append(
             CheckResult(
                 "deterministic stop route",
                 deterministic,
-                "goal_interpretation_done must report route=interrupt",
+                "the Cognitive Gateway must retain its deterministic interrupt receipt",
             )
         )
         checks.append(
@@ -2908,7 +2952,6 @@ def write_override_file(
     runtime_identity_path: Path | None = None,
 ) -> None:
     values = {
-        "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
