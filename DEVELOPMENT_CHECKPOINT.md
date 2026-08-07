@@ -65,44 +65,33 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-The active Issue remains the vocal Goal/Planner semantic repair only. Its source
-mechanism is now implemented on this patch line:
+The vocal Goal/Planner defect has passed the combined canonical and live Level C
+gate. The clean retained bundle at
+`.chromie/acceptance/vocal-issue-1/20260807T032038Z` records Chromie `6809a84`,
+Soridormi `1c15371`, exact typed Goal ownership through body execution, parallel
+walking/blinking completion, truthful singing unavailability with zero steps,
+and safe idle before and after. It does not prove a singing provider, physical
+microphone or speaker behavior, physical robot behavior, or release readiness.
 
-- Goal Association separates completion modality, semantic lane, output mode,
-  and exact-provider need without phrase-specific routing;
-- mode-specific vocal performance remains Speaking and cannot be closed by
-  generic response text or ordinary TTS;
-- existing-audio playback remains Activity;
-- suspicious three-or-more-effect decompositions are freshly resegmented without
-  the previous DTO as semantic authority;
-- normal vocal Goals reject `resource_responsibility`; and
-- one Planner ownership representation remains authoritative for redundant step
-  references.
+The next active semantic Issue is #5, speech-start barge-in with reversible
+playback ducking. Diagnose and fix the earliest acoustic/playback boundary:
 
-Next, close the active defect only through the combined source/live gate from
-clean paired Chromie and Soridormi checkouts with the deployed Agent, TTS, and
-Soridormi simulator services:
+- credible speech start during playback immediately ducks or temporarily pauses
+  audible output without cancelling Cognitive Core work, Goals, body work, or
+  capability execution;
+- a bounded confirmation window uses available echo or AEC evidence;
+- confirmed external speech aborts the current output generation;
+- likely echo or noise restores safely without replay or duplication; and
+- later ASR and Gateway handling retains sole authority for semantic cancellation
+  scope.
 
-```bash
-python scripts/vocal_issue_closure.py \
-  --soridormi-repo ../soridormi \
-  --close-issue
-```
-
-The command must report `closure_eligible=true`. Its default deployment mode
-reuses a ready paired stack or starts the maintained headless stack with current
-images, then captures identity and retains the exact walk/sing/blink trace. A
-failed prerequisite stops the later stages and records its exact error. The live
-result must dispatch and complete the independent walking and blinking members,
-return exact singing unavailability or refusal with no executable singing step,
-match the clean Soridormi endpoint/checkout revision, and return to safe idle.
-A focused unit pass does not prove singing, speaker output, MuJoCo motion, or
-physical robot behavior.
-
-Do not begin TTS/playback migration, neutral capability-ID indirection, or a
-Soridormi execution facade from this Issue. Revisit vocal hosting only through
-the separate evidence triggers in the Roadmap. After the vocal defect closes,
-resume Orchestrator simplification and current-revision target evidence work.
+Retain the originating playback/VAD episode, reproduce the late-silence boundary,
+add focused latency and cancellation-authority assertions, run its general-ability
+class, then run the canonical gates and highest safe automated audio E2E profile.
+Physical microphone and speaker evidence remains supervised and must be reported
+as open when it has not run. Do not move VAD, playback, echo handling, or
+user-level cancellation into Soridormi, and do not begin Issue #6 or #7 before
+Issue #5 meets its acceptance evidence.
 
 ## Canonical owners
 

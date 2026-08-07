@@ -18,20 +18,22 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Repair vocal semantics inside the current architecture: singing, humming,
-   recitation, and authored vocal performance remain Speaking outcomes; playing
-   existing audio remains Activity. Ordinary TTS is not singing evidence.
-3. Preserve exact provider-prefixed capability identity from model proposal
+2. Close speech-start barge-in with reversible playback ducking while keeping
+   acoustic mitigation separate from semantic cancellation authority.
+3. After barge-in evidence closes, qualify an exact vocal-performance provider,
+   then a peer media-playback provider. Singing remains Speaking; existing-audio
+   playback remains Activity; ordinary TTS is neither kind of evidence.
+4. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
    neutral late-binding alias merely to relocate implementation.
-4. Close source-bound and target-bound evidence separately. A passing source
+5. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-5. Reduce compatibility surfaces only after the maintained path has equivalent
+6. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-6. Keep documentation, benchmarks, static analysis, configuration ownership,
+7. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations
@@ -51,6 +53,29 @@ These foundations are maintained only while their automated contracts remain
 passing.
 
 ## Active source work
+
+### Speech-start barge-in and reversible ducking
+
+VAD, playback transport, echo handling, output interruption, and user-level
+cancellation scope remain Host Orchestrator responsibilities. Acoustic handling
+may duck or temporarily pause output on credible speech start, but it cannot
+cancel Cognitive Core work, Goals, body work, or capability execution.
+
+- Bound the speech-start confirmation window and use available echo or AEC
+  evidence.
+- Abort the active output generation after external speech is confirmed.
+- Resume safely after likely echo or noise without replay, duplicated delivery,
+  or late terminal speech.
+- Leave output-only, motion, interaction, Goal, emergency, and ordinary semantic
+  scope to later ASR and Gateway resolution, with distinct cancellation receipts.
+
+Exit criteria:
+
+- retained evidence measures VAD-start-to-duck and confirmed-speech-to-silence;
+- acoustic-stage evidence records `cancel_cognitive_work=false`;
+- echo rejection and safe resume pass focused and automated audio E2E scenarios;
+- no duplicated or late terminal speech survives confirmed interruption; and
+- every semantic cancellation scope remains distinct in evidence.
 
 ### Semantic authority closure
 
@@ -88,10 +113,12 @@ Exit criteria:
 
 ### Vocal semantics and provider qualification
 
-Keep the maintained ownership boundary while closing the retained compound
-walk/sing/blink defect. Speaking, TTS synthesis, playback transport, echo
-handling, audible-delivery ordering, and user-level barge-in remain Chromie-
-owned. Soridormi remains a peer embodied Capability Provider beneath Activity.
+The retained compound walk/sing/blink defect has met its source and Level C
+simulator exit criteria; [Current Status](docs/STATUS.md) owns the evidence.
+Keep the maintained ownership boundary while qualifying future exact providers.
+Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
+ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
+embodied Capability Provider beneath Activity.
 
 - Typed Goal and Planner projections now separate completion modality,
   execution lane, output mode, and exact-provider need; preserve this contract
