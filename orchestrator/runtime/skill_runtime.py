@@ -19,11 +19,16 @@ from shared.chromie_contracts.interaction import (
     CapabilityTraceEvent,
     InteractionResponse,
     InteractionSpeech,
+    MEDIA_CAPABILITY_IDS,
+    MediaPlaybackEvidence,
+    MediaProviderDeclaration,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     VOCAL_MODES,
     VocalPerformanceDelivery,
     VocalProviderDeclaration,
     reject_forbidden_low_level_fields,
+    media_capability_input_schema,
+    media_capability_output_schema,
     vocal_performance_input_schema,
     vocal_performance_output_schema,
 )
@@ -45,7 +50,7 @@ SkillTraceEvent = CapabilityTraceEvent
 
 logger = logging.getLogger(__name__)
 
-CancellationDomain = Literal["output", "embodied_motion"]
+CancellationDomain = Literal["output", "media_output", "embodied_motion"]
 
 _RESULT_AUTHORITY_METADATA_KEYS = (
     "source_goal_ids",
@@ -775,6 +780,7 @@ class SkillRuntime:
 
             domain_scope: dict[CancellationDomain, CancellationScope] = {
                 "output": "output_only",
+                "media_output": "media_output",
                 "embodied_motion": "embodied_motion",
             }
             all_scheduled_items = [
@@ -871,6 +877,7 @@ class SkillRuntime:
                         requested_scope
                         in {
                             "output_only",
+                            "media_output",
                             "embodied_motion",
                             "current_interaction",
                             "global_emergency",
@@ -1113,11 +1120,13 @@ class SkillRuntime:
             (context.interaction_id, request.request_id)
             for _, request, _, context in provider_cancel_items
         }
+
         def binding(key: tuple[str, str]) -> CancellationRequestBinding:
             return CancellationRequestBinding(
                 interaction_id=key[0],
                 request_id=key[1],
             )
+
         return CancellationDispatchReceipt(
             source_turn_id=directive.source_turn_id,
             requested_scope=requested_scope,
@@ -1168,6 +1177,8 @@ class SkillRuntime:
             return True
         if scope == "output_only":
             return "output" in definition.cancellation_domains
+        if scope == "media_output":
+            return "media_output" in definition.cancellation_domains
         if scope == "embodied_motion":
             return "embodied_motion" in definition.cancellation_domains
         return False
@@ -1185,6 +1196,7 @@ class SkillRuntime:
         return {
             "none": 0,
             "output_only": 10,
+            "media_output": 15,
             "specific_goal": 20,
             "embodied_motion": 25,
             "current_interaction": 30,
@@ -2131,6 +2143,15 @@ VocalPerformanceCancelHandler = Callable[
     None | Awaitable[None],
 ]
 
+MediaPlaybackHandler = Callable[
+    [str, dict[str, Any]],
+    MediaPlaybackEvidence | dict[str, Any] | Awaitable[MediaPlaybackEvidence | dict[str, Any]],
+]
+MediaPlaybackCancelHandler = Callable[
+    [SkillRequest, dict[str, Any]],
+    None | Awaitable[None],
+]
+
 
 class VocalPerformanceSkillProvider:
     """Adapt one qualified vocal backend to the exact public Capability.
@@ -2278,6 +2299,185 @@ class VocalPerformanceSkillProvider:
                 completed=True,
                 delivered_mode=delivery.delivered_mode,
                 delivery=delivery,
+            ),
+        )
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        self.cancelled_request_ids.add(request.request_id)
+        if self._cancel_handler is None:
+            return
+        raw = self._cancel_handler(request, dict(context.provider_state))
+        if inspect.isawaitable(raw):
+            await raw
+
+
+class MediaPlaybackSkillProvider:
+    """Adapt one qualified peer media backend to ``chromie.media.*``.
+
+    Media is Activity work even though it shares a physical speaker with
+    Speaking. Every result retains the exact operation, persistent playback
+    identity, bounded progress, and the declared ducking policy.
+    """
+
+    _ALLOWED_STATES = {
+        "play": {"playing", "completed"},
+        "pause": {"paused"},
+        "resume": {"playing", "completed"},
+        "seek": {"playing", "paused", "completed"},
+        "stop": {"stopped", "completed"},
+        "volume": {"playing", "paused", "completed"},
+        "status": {"starting", "playing", "paused", "completed", "stopped", "failed"},
+    }
+
+    def __init__(
+        self,
+        declaration: MediaProviderDeclaration,
+        handler: MediaPlaybackHandler,
+        cancel_handler: MediaPlaybackCancelHandler | None = None,
+    ) -> None:
+        self.declaration = declaration
+        self.provider_id = declaration.provider_id
+        self._handler = handler
+        self._cancel_handler = cancel_handler
+        self.cancelled_request_ids: set[str] = set()
+
+    @staticmethod
+    def _operation_for(capability_id: str) -> str:
+        for operation, exact_id in MEDIA_CAPABILITY_IDS.items():
+            if capability_id == exact_id:
+                return operation
+        return ""
+
+    def _output(
+        self,
+        *,
+        operation: str,
+        capability_id: str,
+        completed: bool,
+        evidence: MediaPlaybackEvidence | None = None,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        qualification = self.declaration.operation_evidence.get(operation)  # type: ignore[arg-type]
+        return {
+            "completed": completed,
+            "operation": operation,
+            "capability_id": capability_id,
+            "provider_id": self.provider_id,
+            "provider_contract_version": self.declaration.contract_version,
+            "evidence_level": qualification.level if qualification is not None else None,
+            "provider_evidence_refs": (
+                list(qualification.artifact_refs) if qualification is not None else []
+            ),
+            "playback_id": evidence.playback_id if evidence is not None else "",
+            "state": evidence.state if evidence is not None else None,
+            "media_kind": evidence.media_kind if evidence is not None else "",
+            "media_ref": evidence.media_ref if evidence is not None else "",
+            "position_ms": evidence.position_ms if evidence is not None else 0,
+            "duration_ms": evidence.duration_ms if evidence is not None else None,
+            "volume": evidence.volume if evidence is not None else 0.0,
+            "delivery_evidence_id": (evidence.delivery_evidence_id if evidence is not None else ""),
+            "mixer_policy": self.declaration.mixer_policy,
+            "ducking_active": bool(evidence is not None and evidence.ducking_active),
+            "reason": reason,
+        }
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        operation = self._operation_for(request.capability_id)
+        if operation not in self.declaration.supported_operations:
+            return SkillResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                skill_version=definition.version,
+                status="refused",
+                provider_id=self.provider_id,
+                output=self._output(
+                    operation=operation,
+                    capability_id=request.capability_id,
+                    completed=False,
+                    reason="requested media operation is not advertised by this provider",
+                ),
+                reason_code="media_operation_unavailable",
+                message=(
+                    f"media operation {operation!r} is unavailable; supported operations "
+                    f"are {self.declaration.supported_operations}"
+                ),
+            )
+
+        try:
+            raw = self._handler(operation, dict(request.args))
+            raw_evidence = await raw if inspect.isawaitable(raw) else raw
+            evidence = (
+                raw_evidence
+                if isinstance(raw_evidence, MediaPlaybackEvidence)
+                else MediaPlaybackEvidence.model_validate(raw_evidence)
+            )
+            invalid_reason = ""
+            if evidence.operation != operation:
+                invalid_reason = "provider returned a different media operation"
+            elif evidence.state not in self._ALLOWED_STATES[operation]:
+                invalid_reason = (
+                    f"provider returned state={evidence.state!r} incompatible with "
+                    f"operation={operation!r}"
+                )
+            elif evidence.media_kind not in self.declaration.supported_media_kinds:
+                invalid_reason = "provider returned an undeclared media kind"
+            if invalid_reason:
+                return SkillResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    skill_version=definition.version,
+                    status="failed",
+                    provider_id=self.provider_id,
+                    output=self._output(
+                        operation=operation,
+                        capability_id=request.capability_id,
+                        completed=False,
+                        evidence=evidence,
+                        reason=invalid_reason,
+                    ),
+                    reason_code="invalid_media_lifecycle_evidence",
+                    message=invalid_reason,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return SkillResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=self._output(
+                    operation=operation,
+                    capability_id=request.capability_id,
+                    completed=False,
+                    reason="provider did not return valid media lifecycle evidence",
+                ),
+                reason_code="invalid_media_lifecycle_evidence",
+                message=str(exc) or type(exc).__name__,
+            )
+
+        return SkillResult(
+            request_id=request.request_id,
+            capability_id=request.capability_id,
+            skill_version=definition.version,
+            status="completed",
+            provider_id=self.provider_id,
+            output=self._output(
+                operation=operation,
+                capability_id=request.capability_id,
+                completed=True,
+                evidence=evidence,
             ),
         )
 
@@ -2505,6 +2705,64 @@ def vocal_performance_definition(
             "provider_declaration": declaration.model_dump(mode="json"),
         },
     )
+
+
+def media_playback_definitions(
+    declaration: MediaProviderDeclaration,
+) -> list[SkillDefinition]:
+    """Return Host-owned definitions for one qualified peer media provider."""
+
+    definitions: list[SkillDefinition] = []
+    for operation in declaration.supported_operations:
+        capability_id = MEDIA_CAPABILITY_IDS[operation]
+        effectful = operation != "status"
+        definitions.append(
+            SkillDefinition(
+                capability_id=capability_id,
+                version="1.0.0",
+                provider_id=declaration.provider_id,
+                description=(
+                    f"Apply exact media lifecycle operation {operation!r} through "
+                    "Chromie's peer media provider."
+                ),
+                input_schema=media_capability_input_schema(
+                    operation,
+                    declaration.supported_media_kinds,
+                ),
+                output_schema=media_capability_output_schema(),
+                available=True,
+                requires_confirmation=False,
+                interruptible=(declaration.request_cancellation and effectful),
+                can_run_parallel=True,
+                exclusive_group=(None if operation == "play" else "chromie.media.control"),
+                timeout_ms=120000 if operation == "play" else 10000,
+                idempotent=operation in {"pause", "resume", "stop", "volume", "status"},
+                cancellation_domains=(("media_output",) if effectful else ()),
+                metadata={
+                    "effects": (
+                        ["read_only", "media_playback", "playback_status"]
+                        if operation == "status"
+                        else ["audio_output", "media_playback", "playback_lifecycle"]
+                    ),
+                    "safety_class": "safe_read" if operation == "status" else "low_risk_action",
+                    "execution_lane": "activity",
+                    "parallel_metadata_declared": True,
+                    "resource_claims": ["audio_output.media"],
+                    "cancellation_granularity": "request",
+                    "media_operation": operation,
+                    "persistent_playback": declaration.persistent_playback,
+                    "progress_reporting": declaration.progress_reporting,
+                    "mixer_policy": declaration.mixer_policy,
+                    "ducking_gain_db": declaration.ducking_gain_db,
+                    "duck_attack_ms": declaration.duck_attack_ms,
+                    "duck_release_ms": declaration.duck_release_ms,
+                    "supported_media_kinds": list(declaration.supported_media_kinds),
+                    "provider_contract_version": declaration.contract_version,
+                    "provider_declaration": declaration.model_dump(mode="json"),
+                },
+            )
+        )
+    return definitions
 
 
 def session_interrupt_definition() -> SkillDefinition:

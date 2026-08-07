@@ -5756,7 +5756,7 @@ class VoiceAssistant:
         """Revoke an approval token synchronously, before interruption awaits."""
 
         dialogue = getattr(self, "confirmation_dialogue", None)
-        if outcome.cancellation_scope == "output_only":
+        if outcome.cancellation_scope in {"output_only", "media_output"}:
             return None
         if outcome.cancellation_scope == "embodied_motion":
             pending = getattr(dialogue, "pending", None)
@@ -8263,6 +8263,10 @@ class VoiceAssistant:
                             "skill_runtime:dispatch_unsupported"
                         )
                 elif scope == "embodied_motion":
+                    dispatch_failures.append(
+                        "skill_runtime:scoped_dispatch_unsupported"
+                    )
+                elif scope == "media_output":
                     dispatch_failures.append(
                         "skill_runtime:scoped_dispatch_unsupported"
                     )

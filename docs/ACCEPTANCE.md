@@ -579,6 +579,44 @@ real mode may be marked target validated only after a clean current-revision run
 retains that provider's immutable declaration, exact-mode completion, audible
 delivery evidence, and the applicable automated or supervised target notes.
 
+### Exact peer-media source qualification
+
+Issue #7 source acceptance uses a qualified stateful fake provider; it does not
+claim that the default deployment can play media or that a physical speaker was
+heard:
+
+```bash
+python -m unittest tests.test_media_provider_contract
+python scripts/scenario_runner.py \
+  --only cognitive_runtime/qualified_media_walk_parallel \
+  --only goal_interpretation/stop_media_output_scope
+python scripts/general_ability_acceptance.py \
+  --mode level-a \
+  --ability-class stable_capability_grounding \
+  --ability-class deterministic_safety_controls
+./scripts/run_tests.sh
+```
+
+The provider suite must cover all seven exact public operations, supported-kind
+rejection before backend invocation, persistent playback identity and bounded
+progress, exact operation/state evidence, qualified catalog exposure without a
+backend-name leak, explicit speech-over-media ducking, and distinct
+stop-talking/media/all receipts. The mixed walk+media scenario must preserve two
+Activity Goals and the exact Soridormi and `chromie.media.play` steps through
+Goal Association, both Planner tiers, Response Composer, and Host
+materialization. The stop-media scenario must take `media_output` with zero
+model calls.
+
+The highest safe live default-provider check is different: because no media
+provider is configured, a current-revision deployed run must retain a typed
+Activity/media Goal and an unavailable media outcome with zero media execution,
+while ordinary TTS, vocal performance, and any independent body work retain
+their own evidence. A real media operation may be marked target validated only
+after its immutable provider declaration and current-revision runtime evidence
+retain the exact operation, playback lifecycle/progress, mixer behavior where
+applicable, cancellation receipt, and target notes. Text, fake-provider, or
+simulator evidence must not be promoted to physical speaker evidence.
+
 Use `--reject-internal-speech` when investigating planner/TTS leakage. For the
 known ASR-style walk typo regression, run:
 

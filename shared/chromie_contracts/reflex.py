@@ -10,6 +10,7 @@ ReflexAction = Literal["continue", "interrupt", "ignore"]
 CancellationScope = Literal[
     "none",
     "output_only",
+    "media_output",
     "embodied_motion",
     "current_interaction",
     "specific_goal",
@@ -271,6 +272,20 @@ _OUTPUT_STOP_PATTERNS = (
         r"别讲话|不要讲话)(?:现在|马上|立即|立刻|一下)*[。！!？?]*$"
     ),
 )
+_MEDIA_STOP_PATTERNS = (
+    re.compile(
+        rf"^{_COMMAND_PREFIX}(?:stop|cancel)\s+"
+        r"(?:the\s+)?(?:music|song|audio|media|playback|recording|stream)"
+        r"(?:\s+(?:now|right\s+now|please|immediately))*[.!?]*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^(?:请|麻烦你)?(?:现在|马上|立即|立刻)?"
+        r"(?:(?:停止|停下|关闭)(?:音乐|歌曲|音频|媒体|播放|录音|直播)|"
+        r"(?:把)?(?:音乐|歌曲|音频|媒体|播放|录音|直播)(?:停止|停下|关掉))"
+        r"(?:现在|马上|立即|立刻|一下)*[。！!？?]*$"
+    ),
+)
 _MOTION_STOP_PATTERNS = (
     re.compile(
         rf"^{_COMMAND_PREFIX}(?:stop|cancel|pause|halt)"
@@ -437,6 +452,19 @@ class ReflexFilter:
                 interrupt_current=True,
                 cancellation_scope="output_only",
                 reason="Matched deterministic speech-output stop rule",
+            )
+        if not is_negated and _matches(normalized, _MEDIA_STOP_PATTERNS):
+            return ReflexOutcome(
+                matched=True,
+                action="interrupt",
+                trigger="stop_command",
+                intent="stop_media_output",
+                confidence=0.99,
+                language=resolved_language,
+                priority="high",
+                interrupt_current=True,
+                cancellation_scope="media_output",
+                reason="Matched deterministic media-output stop rule",
             )
         if not is_negated and _matches(normalized, _MOTION_STOP_PATTERNS):
             return ReflexOutcome(

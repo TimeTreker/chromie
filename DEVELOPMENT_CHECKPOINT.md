@@ -112,24 +112,39 @@ records exact typed Goal ownership, two completed parallel body members, honest
 singing unavailability with zero steps, four played ordinary-TTS chunks with no
 failures, exact runtime/source identity, and safe idle before and after.
 
-The active semantic Issue is now #7, the peer media-playback capability and
-lifecycle:
+Issue #7 now meets its declared source and highest safe default-provider
+evidence scope:
 
-- keep existing music, recordings, streams, and sound effects in Activity;
-- choose exact provider-prefixed public identities once for play, pause, resume,
-  seek, stop, volume, and status, and preserve them from Planner through
-  evidence;
-- retain persistent lifecycle, progress, pause/resume, independent cancellation,
-  and bounded status evidence behind the Trusted Capability Runtime;
-- define explicit mixer/ducking policy for Speaking over media without mutating
-  either Goal; and
-- keep stop-talking, stop-media, and stop-all as distinct deterministic scopes
-  with correlated receipts.
+- exact public `chromie.media.play|pause|resume|seek|stop|volume|status`
+  identities remain Activity operations from Planner through trusted evidence;
+- qualified declarations bind supported media kinds, lifecycle/state/progress,
+  cancellation, mixer policy, immutable provenance, and operation evidence
+  while backend identity remains private;
+- unsupported kinds and exact operation/state mismatches fail before backend
+  invocation, and the default catalog exposes no qualified provider;
+- Singing stays Speaking with `media_operation=none`; media playback stays a
+  separate Activity Goal even when coordinated with Soridormi body work;
+- Speaking overlap carries explicit ducking parameters without mutating either
+  Goal; and
+- stop-talking, stop-media, and stop-all retain distinct deterministic scopes
+  and receipts. The maintained text-to-MuJoCo runner now qualifies primary
+  reflex inputs through the production Gateway path instead of bypassing it.
 
-Do not place backend names in semantic Goals, introduce a neutral media alias,
-move media into Speaking merely because it shares a speaker, or use media
-playback as singing evidence. Real singing remains unvalidated until
-mode-specific target evidence exists.
+The focused provider suite passed 15/15, both exact scenarios passed, the two
+relevant Level A classes passed 14/14, and the canonical gate passed 2,059
+maintained tests, 20 legacy Agent tests, and 102 benchmark tests. Retained live
+evidence under `.chromie/acceptance/media-issue-7/current-revision` distinguishes
+media play from singing, completes the independent five-second walk in
+Soridormi/MuJoCo while media stays unavailable, retains the Chinese
+`media_output` reflex receipt, and returns safe-idle.
+
+The next delivery step is review and merge of the stacked semantic Issue
+branches before starting unrelated architecture or behavior work. Keep backend
+names out of semantic Goals, do not introduce a neutral media alias, and do not
+use source tests, discarded TTS playback, or simulator body evidence as a claim
+for a real media provider, acoustic ducking, a physical speaker, or hardware.
+Real vocal and media modes remain unvalidated until operation-specific target
+evidence exists.
 
 ## Canonical owners
 

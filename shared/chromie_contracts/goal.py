@@ -326,6 +326,7 @@ class GoalAssociationResolution(BaseModel):
                     "execution_lane",
                     "output_mode",
                     "provider_required",
+                    "media_operation",
                 )
                 if key in metadata
             }

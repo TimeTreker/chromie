@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "id": "qualified_media_walk_parallel",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "Walking while playing existing music remains two independently owned Activity Goals; playback never becomes singing or ordinary TTS.",
+  "tags": [
+    "media-provider",
+    "source-contract",
+    "exact-identity",
+    "activity-lane",
+    "parallel"
+  ],
+  "input": {
+    "text": "Walk forward while playing the existing fixture song.",
+    "language": "en-US"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action",
+      "tool"
+    ],
+    "host_replan_budget": 0,
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "parallel_body_and_media_activity",
+      "language": "en-US"
+    },
+    "goal_association": {
+      "turn_id": "turn-qualified-media-walk",
+      "new_goals": [
+        {
+          "goal_id": "goal-walk",
+          "description": "Walk forward for five seconds.",
+          "source_text": "Walk forward while playing the existing fixture song.",
+          "metadata": {
+            "responsibility_kind": "executable_action",
+            "execution_lane": "activity",
+            "output_mode": "body_action",
+            "provider_required": true,
+            "media_operation": "none"
+          }
+        },
+        {
+          "goal_id": "goal-media",
+          "description": "Play the existing fixture song.",
+          "source_text": "Walk forward while playing the existing fixture song.",
+          "metadata": {
+            "responsibility_kind": "executable_action",
+            "execution_lane": "activity",
+            "output_mode": "media_playback",
+            "provider_required": true,
+            "media_operation": "play"
+          }
+        }
+      ],
+      "confidence": 1.0,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-qualified-media-walk",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "uncertain",
+      "confidence": 0.9,
+      "goal_ids": [
+        "goal-walk",
+        "goal-media"
+      ],
+      "escalation_reason": "The peer media provider requires full-catalog planning."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-qualified-media-walk",
+        "planner_tier": "deep",
+        "disposition": "execute",
+        "coverage": "complete",
+        "confidence": 1.0,
+        "goal_ids": [
+          "goal-walk",
+          "goal-media"
+        ],
+        "goal_summary": "Walk while playing the existing fixture song through the peer media provider.",
+        "steps": [
+          {
+            "step_id": "walk-forward",
+            "capability_id": "soridormi.walk_forward",
+            "args": {
+              "duration_s": 5
+            },
+            "timing": "parallel",
+            "source_goal_ids": [
+              "goal-walk"
+            ],
+            "reason_summary": "The body provider owns walking."
+          },
+          {
+            "step_id": "play-media",
+            "capability_id": "chromie.media.play",
+            "args": {
+              "media_ref": "fixture-song",
+              "media_kind": "music"
+            },
+            "timing": "parallel",
+            "source_goal_ids": [
+              "goal-media"
+            ],
+            "reason_summary": "The peer media provider owns existing-audio playback."
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-walk",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "walk-forward"
+            ]
+          },
+          {
+            "goal_id": "goal-media",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "play-media"
+            ]
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 1.0,
+          "status": "exact",
+          "satisfied_goal_ids": [
+            "goal-walk",
+            "goal-media"
+          ],
+          "unmet_goal_ids": [],
+          "unmet_requirements": []
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "capability_id": "soridormi.walk_forward",
+        "provider_id": "soridormi.mcp",
+        "version": "0.1.0",
+        "description": "Walk forward through Soridormi.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.1
+            }
+          },
+          "required": [
+            "duration_s"
+          ],
+          "additionalProperties": false
+        },
+        "interruptible": true,
+        "can_run_parallel": true,
+        "exclusive_group": "soridormi.body.motion",
+        "resource_claims": [
+          "body.primary_motion"
+        ],
+        "metadata": {
+          "effects": [
+            "physical_motion"
+          ],
+          "safety_class": "physical_motion",
+          "execution_lane": "activity",
+          "parallel_metadata_declared": true
+        }
+      },
+      {
+        "capability_id": "chromie.media.play",
+        "provider_id": "scenario.fake_media",
+        "version": "1.0.0",
+        "description": "Source-qualified fake persistent media playback contract.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "media_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "media_kind": {
+              "type": "string",
+              "enum": [
+                "music"
+              ]
+            }
+          },
+          "required": [
+            "media_ref",
+            "media_kind"
+          ],
+          "additionalProperties": false
+        },
+        "interruptible": true,
+        "can_run_parallel": true,
+        "resource_claims": [
+          "audio_output.media"
+        ],
+        "metadata": {
+          "effects": [
+            "audio_output",
+            "media_playback",
+            "playback_lifecycle"
+          ],
+          "safety_class": "low_risk_action",
+          "execution_lane": "activity",
+          "parallel_metadata_declared": true,
+          "media_operation": "play",
+          "persistent_playback": true,
+          "progress_reporting": true,
+          "mixer_policy": "duck_media_during_speaking",
+          "evidence_level": "source_test"
+        }
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "I can walk while the peer media provider starts that existing song.",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-walk",
+            "goal-media"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-walk",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "walk-forward"
+        ]
+      },
+      {
+        "goal_id": "goal-media",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "play-media"
+        ]
+      }
+    ],
+    "capability_ids": [
+      "soridormi.walk_forward",
+      "chromie.media.play"
+    ],
+    "capability_args": [
+      {
+        "duration_s": 5
+      },
+      {
+        "media_ref": "fixture-song",
+        "media_kind": "music"
+      }
+    ],
+    "capability_timings": [
+      "parallel",
+      "parallel"
+    ],
+    "capability_source_goal_ids": [
+      [
+        "goal-walk"
+      ],
+      [
+        "goal-media"
+      ]
+    ],
+    "capability_execution_lanes": [
+      "activity",
+      "activity"
+    ],
+    "speech_covers_goal_ids": [
+      "goal-walk",
+      "goal-media"
+    ],
+    "speech_contains_all": [
+      "existing song"
+    ],
+    "speech_forbids_all": [
+      "sing",
+      "chromie.media.play",
+      "soridormi"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

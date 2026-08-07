@@ -22,6 +22,7 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
+    MEDIA_CAPABILITY_IDS,
     SkillRequest,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     output_schema_sha256,
@@ -504,7 +505,15 @@ class CanonicalPlanRuntimeAdapter:
     def lane_for_plan(plan: CanonicalPlan) -> CognitiveLane:
         if not plan.steps:
             return "chat"
-        if all(step.skill_id.startswith("soridormi.") for step in plan.steps):
+        capability_ids = {step.capability_id for step in plan.steps}
+        soridormi_ids = {
+            capability_id
+            for capability_id in capability_ids
+            if capability_id.startswith("soridormi.")
+        }
+        if soridormi_ids and capability_ids.issubset(
+            soridormi_ids | set(MEDIA_CAPABILITY_IDS.values())
+        ):
             return "robot_action"
         if all(step.skill_id.startswith("chromie.memory.") for step in plan.steps):
             return "memory"
@@ -1021,6 +1030,52 @@ class CanonicalPlanRuntimeAdapter:
             for item in composition.lane_coordination
             for step_id in item.speaking_step_ids
         }
+        plan_steps_by_id = {step.step_id: step for step in plan.steps}
+        media_mixer_by_coordination_id: dict[str, dict[str, Any]] = {}
+        for coordination in composition.lane_coordination:
+            if "speaking" not in coordination.lanes:
+                continue
+            media_step_ids = [
+                step_id
+                for step_id in coordination.activity_step_ids
+                if plan_steps_by_id[step_id].capability_id in MEDIA_CAPABILITY_IDS.values()
+            ]
+            if not media_step_ids:
+                continue
+            mixer_contracts: list[dict[str, Any]] = []
+            for step_id in media_step_ids:
+                definition = self.interaction_runtime.skill_definition(
+                    plan_steps_by_id[step_id].skill_id
+                )
+                if definition.metadata.get("mixer_policy") != ("duck_media_during_speaking"):
+                    raise ValueError(
+                        "speech-over-media coordination requires the declared "
+                        "duck_media_during_speaking mixer policy: " + step_id
+                    )
+                try:
+                    mixer_contracts.append(
+                        {
+                            "media_mixer_policy": "duck_media_during_speaking",
+                            "media_ducking_gain_db": float(definition.metadata["ducking_gain_db"]),
+                            "media_duck_attack_ms": int(definition.metadata["duck_attack_ms"]),
+                            "media_duck_release_ms": int(definition.metadata["duck_release_ms"]),
+                        }
+                    )
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError(
+                        "speech-over-media coordination requires a complete "
+                        "ducking gain and timing contract: " + step_id
+                    ) from exc
+            mixer_contract = mixer_contracts[0]
+            if any(item != mixer_contract for item in mixer_contracts[1:]):
+                raise ValueError(
+                    "speech-over-media coordination requires one unambiguous mixer contract"
+                )
+            media_mixer_by_coordination_id[coordination.coordination_id] = {
+                **mixer_contract,
+                "media_ducking_required": True,
+                "coordinated_media_step_ids": media_step_ids,
+            }
         stage_items = [
             ("immediate", response_plan.immediate),
             ("pre_action", response_plan.pre_action),
@@ -1309,6 +1364,9 @@ class CanonicalPlanRuntimeAdapter:
                         "playback_start_required_for_effects": False,
                     }
                 )
+                mixer_contract = media_mixer_by_coordination_id.get(coordination.coordination_id)
+                if mixer_contract is not None:
+                    speech_metadata.update(mixer_contract)
             elif safe_read_parallel:
                 speech_metadata.update(
                     {
@@ -1356,6 +1414,10 @@ class CanonicalPlanRuntimeAdapter:
                 raise ValueError(
                     "exact vocal performance capability must remain in the speaking lane"
                 )
+            if step.capability_id in MEDIA_CAPABILITY_IDS.values() and execution_lane != "activity":
+                raise ValueError(
+                    "exact media playback capabilities must remain in the activity lane"
+                )
             coordination = (
                 speaking_coordination_by_step_id.get(step.step_id)
                 if execution_lane == "speaking"
@@ -1395,6 +1457,15 @@ class CanonicalPlanRuntimeAdapter:
                 if coordination is not None
                 else {}
             )
+            media_mixer_metadata: dict[str, Any] = {}
+            if (
+                coordination is not None
+                and step.capability_id in MEDIA_CAPABILITY_IDS.values()
+                and "speaking" in coordination.lanes
+            ):
+                media_mixer_metadata = dict(
+                    media_mixer_by_coordination_id[coordination.coordination_id]
+                )
             digest = hashlib.sha256(f"{fingerprint}|{step.step_id}".encode("utf-8")).hexdigest()[
                 :20
             ]
@@ -1431,6 +1502,7 @@ class CanonicalPlanRuntimeAdapter:
                             or bool(coordination_metadata.get("parallel_with_speech"))
                         ),
                         **coordination_metadata,
+                        **media_mixer_metadata,
                         "canonical_timing": step.timing,
                         "effective_timing": ("parallel" if safe_read_parallel else step.timing),
                         "runtime_timing_adjustment": (

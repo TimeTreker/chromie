@@ -38,6 +38,7 @@ from .planner_contract import (
     materialize_goal_outcomes,
     materialize_planner_metadata,
     parallel_plan_contract_errors,
+    planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
     planner_response_goal_ids,
     planner_contract_diagnostics,
@@ -150,6 +151,9 @@ class DeepPlannerResolver:
             response_goal_ids=sorted(planner_response_goal_ids(authoritative_goals)),
             provider_required_vocal_goal_ids=sorted(
                 planner_provider_vocal_goal_ids(authoritative_goals)
+            ),
+            provider_required_media_goal_operations=(
+                planner_provider_media_goal_operations(authoritative_goals)
             ),
         )
         generation_options = {
@@ -522,6 +526,7 @@ class DeepPlannerResolver:
         requires_execution: bool = False,
         response_goal_ids: list[str] | None = None,
         provider_required_vocal_goal_ids: list[str] | None = None,
+        provider_required_media_goal_operations: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
@@ -531,6 +536,7 @@ class DeepPlannerResolver:
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
             provider_required_vocal_goal_ids=(provider_required_vocal_goal_ids),
+            provider_required_media_goal_operations=(provider_required_media_goal_operations),
         )
 
     @staticmethod
@@ -897,7 +903,7 @@ class DeepPlannerResolver:
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "User-facing ordinary speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Execute that Goal only when the supplied maintained planning surface contains exact capability_id chromie.vocal.perform and its input mode enum advertises the authoritative Goal output_mode. Use one owned Speaking-lane step, copy that exact mode and authored content, and keep response_text empty. When the exact capability or requested mode is absent, use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Never silently downgrade one vocal mode to another. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "User-facing ordinary speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Execute that Goal only when the supplied maintained planning surface contains exact capability_id chromie.vocal.perform and its input mode enum advertises the authoritative Goal output_mode. Use one owned Speaking-lane step, copy that exact mode and authored content, and keep response_text empty. When the exact capability or requested mode is absent, use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. A canonical executable_action/activity/media_playback Goal must use exactly one `chromie.media.<media_operation>` capability advertised by the qualified catalog. Existing music, recordings, streams, and sound effects remain Activity work; preserve persistent playback_id and choose play, pause, resume, seek, stop, volume, or status exactly as authored by Goal Association. Media and Speaking may overlap only under the declared duck-media mixer policy; overlap never mutates either Goal or makes playback a vocal result. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Never silently downgrade one vocal mode to another. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "

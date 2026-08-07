@@ -12,11 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 try:
     from chromie_contracts.interaction import (
         CapabilityIdentityModel,
+        MEDIA_CAPABILITY_IDS,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.interaction import (
         CapabilityIdentityModel,
+        MEDIA_CAPABILITY_IDS,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
 
@@ -647,6 +649,33 @@ def planner_provider_vocal_goal_ids(
     return result
 
 
+def planner_provider_media_goal_operations(
+    authoritative_goals: list[dict[str, Any]],
+) -> dict[str, str]:
+    """Return exact media lifecycle operations owned by Activity Goals."""
+
+    result: dict[str, str] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
+        metadata = goal.get("metadata")
+        operation = (
+            str(metadata.get("media_operation") or "").strip() if isinstance(metadata, dict) else ""
+        )
+        if (
+            goal_id
+            and responsibility_kind == "executable_action"
+            and output_mode == "media_playback"
+            and provider_required
+        ):
+            if operation not in MEDIA_CAPABILITY_IDS:
+                raise ValueError(f"media_playback Goal requires exact media_operation: {goal_id}")
+            result[goal_id] = operation
+    return result
+
+
 def validate_goal_responsibility_outcomes(
     output: PlannerModelOutput,
     *,
@@ -657,6 +686,7 @@ def validate_goal_responsibility_outcomes(
 
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
     provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals)
+    provider_media_goal_operations = planner_provider_media_goal_operations(authoritative_goals)
     speaking_goal_ids = response_goal_ids | provider_vocal_goal_ids
     capability_goal_ids: set[str] = set()
     for goal in authoritative_goals:
@@ -676,6 +706,7 @@ def validate_goal_responsibility_outcomes(
         for source_goal_id in item.get("source_goal_ids") or []
     }
     valid_vocal_step_ids: set[str] = set()
+    valid_media_step_ids: set[str] = set()
     for goal_id in sorted(response_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
@@ -743,6 +774,36 @@ def validate_goal_responsibility_outcomes(
             "exact plan with a provider-required vocal goal must leave top-level "
             "response_text empty; Response Composer owns truthful limitation speech"
         )
+    for goal_id, operation in sorted(provider_media_goal_operations.items()):
+        outcome = output.goal_outcomes.get(goal_id)
+        if outcome is None:
+            raise ValueError(
+                f"provider-required media Goal requires an explicit outcome: {goal_id}"
+            )
+        if outcome.disposition == "respond" or outcome.response_text.strip():
+            raise ValueError(
+                "media playback Goal cannot be completed by response text, ordinary "
+                f"TTS, or vocal performance: {goal_id}"
+            )
+        owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
+        if outcome.disposition == "execute":
+            expected_capability = MEDIA_CAPABILITY_IDS[operation]
+            if len(owned_steps) != 1:
+                raise ValueError(
+                    "provider-required media execute outcome requires exactly one "
+                    f"owned {expected_capability} step: {goal_id}"
+                )
+            step = owned_steps[0]
+            if step.capability_id != expected_capability:
+                raise ValueError(
+                    "provider-required media Goal requires exact capability_id "
+                    f"{expected_capability}: {goal_id}"
+                )
+            valid_media_step_ids.add(step.step_id)
+        elif owned_steps:
+            raise ValueError(
+                f"non-executing provider-required media outcome cannot own plan steps: {goal_id}"
+            )
     invalid_steps = [
         step.step_id
         for step in output.steps
@@ -753,6 +814,17 @@ def validate_goal_responsibility_outcomes(
         raise ValueError(
             "Speaking goals can own only an exact qualified vocal Capability step: "
             + ",".join(invalid_steps)
+        )
+    invalid_media_steps = [
+        step.step_id
+        for step in output.steps
+        if set(provider_media_goal_operations).intersection(step.source_goal_ids)
+        and step.step_id not in valid_media_step_ids
+    ]
+    if invalid_media_steps:
+        raise ValueError(
+            "Media playback Goals can own only their exact chromie.media.* "
+            "Capability step: " + ",".join(invalid_media_steps)
         )
     for goal_id in sorted(capability_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
@@ -1523,6 +1595,7 @@ def canonical_plan_response_schema(
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
     provider_required_vocal_goal_ids: list[str] | None = None,
+    provider_required_media_goal_operations: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -1601,6 +1674,11 @@ def canonical_plan_response_schema(
     provider_vocal_goal_set = set(provider_required_vocal_goal_ids or []).intersection(
         allowed_goals
     )
+    provider_media_goal_operations = {
+        goal_id: operation
+        for goal_id, operation in (provider_required_media_goal_operations or {}).items()
+        if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
+    }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_skills
 
     if provider_vocal_goal_set:
@@ -1927,6 +2005,46 @@ def canonical_plan_response_schema(
                             )
                             and (
                                 vocal_capability_available
+                                or (
+                                    branch.get("properties", {}).get("disposition", {}).get("enum")
+                                    != ["execute"]
+                                )
+                            )
+                        ]
+                if goal_id in provider_media_goal_operations:
+                    exact_media_capability = MEDIA_CAPABILITY_IDS[
+                        provider_media_goal_operations[goal_id]
+                    ]
+                    media_capability_available = exact_media_capability in allowed_skills
+                    disposition_field = specialized_properties.get("disposition")
+                    if isinstance(disposition_field, dict):
+                        disposition_field["enum"] = (
+                            ["execute", "clarify", "unavailable", "refused"]
+                            if media_capability_available
+                            else ["clarify", "unavailable", "refused"]
+                        )
+                    response_text_field = specialized_properties.get("response_text")
+                    if isinstance(response_text_field, dict):
+                        response_text_field.pop("minLength", None)
+                        response_text_field["maxLength"] = 0
+                        response_text_field["description"] = (
+                            "Provider-required media outcomes contain no speech. "
+                            "Response Composer owns truthful lifecycle wording."
+                        )
+                    step_ids_field = specialized_properties.get("step_ids")
+                    if isinstance(step_ids_field, dict) and not media_capability_available:
+                        step_ids_field["maxItems"] = 0
+                    branches = specialized.get("oneOf")
+                    if isinstance(branches, list):
+                        specialized["oneOf"] = [
+                            branch
+                            for branch in branches
+                            if (
+                                branch.get("properties", {}).get("disposition", {}).get("enum")
+                                != ["respond"]
+                            )
+                            and (
+                                media_capability_available
                                 or (
                                     branch.get("properties", {}).get("disposition", {}).get("enum")
                                     != ["execute"]

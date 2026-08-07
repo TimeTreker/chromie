@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "stop_media_output_scope",
+  "suite": "goal_interpretation",
+  "level": "module",
+  "description": "Stopping existing-audio playback takes the deterministic media-only cancellation scope without model interpretation.",
+  "tags": [
+    "media-provider",
+    "interrupt",
+    "cancellation-scope",
+    "deterministic"
+  ],
+  "input": {
+    "text": "Stop the music."
+  },
+  "stub": {
+    "interpretation_mode": "hybrid"
+  },
+  "expect": {
+    "route": "interrupt",
+    "intent": "stop_media_output",
+    "source": "rules",
+    "llm_calls": 0,
+    "interrupt_current": true,
+    "should_speak": false,
+    "metadata_json_contains": [
+      "\"cancellation_scope\": \"media_output\""
+    ]
+  }
+}

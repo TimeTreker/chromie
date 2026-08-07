@@ -12,6 +12,7 @@ Chromie Cognitive Core
 └── Activity Execution Lane
       └── Capability Providers
           ├── Soridormi
+          ├── Media Playback
           ├── External Information
           ├── Weather
           ├── Memory
@@ -34,7 +35,7 @@ evidence. Those require a later runtime contract and provider support.
 |---|---|---|
 | Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
 | Social-Attention Proposal Lane | bounded social proposals such as attention, natural blink, gaze, acknowledgement, or restraint | independent speech meaning, Goal creation, motor authorization |
-| Speaking Execution Lane | TTS, playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality or semantic planning |
+| Speaking Execution Lane | authored speech, TTS/vocal playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality, semantic planning, or existing-media lifecycle ownership |
 | Activity Execution Lane | exact provider calls, task execution, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
 | Soridormi | embodied feasibility, body-lane arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
@@ -100,7 +101,8 @@ or unavailable body state. It does not decide whether Chromie should walk,
 blink, look, speak, or sing.
 
 Speech remains a peer Chromie Speaking-lane execution linked through the same
-`coordination_id`. Soridormi never owns speech meaning or playback.
+`coordination_id`. Soridormi never owns speech meaning, TTS playback, or peer
+media execution.
 
 ## Lane-coordination contract
 
@@ -233,7 +235,7 @@ barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
 ## Typed Goal completion contract
 
-Goal Association now projects four separate facts instead of overloading
+Goal Association now projects five separate facts instead of overloading
 `responsibility_kind`:
 
 ```text
@@ -243,9 +245,10 @@ output_mode          speech | expressive_speech | recitation | singing | humming
                      | nonverbal_vocalization | body_action | media_playback
                      | capability_work | other
 provider_required    exact provider evidence required beyond ordinary speech
+media_operation      play | pause | resume | seek | stop | volume | status | none
 ```
 
-The structured model schema requires all four fields. A bounded legacy mapping
+The structured model schema requires all five fields. A bounded legacy mapping
 exists only for retained replay and old test DTOs; it does not select a lane from
 user wording. `output_mode=speech` uses the maintained Chromie response-delivery
 path with `provider_required=false`. Mode-specific vocal outputs use Speaking
@@ -256,6 +259,30 @@ a qualified declaration advertises the authoritative `output_mode`; otherwise
 it must return a per-Goal unavailable, refused, or clarification outcome rather
 than generic `respond`. Activity, body, and media execution remain separate. A
 normal vocal Goal cannot carry `resource_responsibility`.
+
+## Existing media playback
+
+Playing existing music, recordings, streams, or sound effects is Activity work,
+not authored vocal performance. A qualified peer provider exposes only the
+stable `chromie.media.play|pause|resume|seek|stop|volume|status` family. The
+backend name stays behind the Trusted Capability Runtime, while
+`media_operation` binds each media Goal to exactly one public operation from
+Goal Association through planning and evidence. Persistent controls correlate
+through a provider-returned `playback_id`; ordinary TTS delivery and
+`chromie.vocal.perform` cannot satisfy that Goal.
+
+When a response stage intentionally overlaps a media Activity step, both must
+reference one explicit `LaneCoordinationGroup`. The Host requires the qualified
+provider's `duck_media_during_speaking` contract and copies its gain, attack,
+and release values onto the Speaking item and media request. Missing or
+conflicting mixer declarations fail closed before execution. This runtime
+coordination metadata neither merges nor rewrites the Speaking and media Goals.
+
+Media remains independently cancellable. `output_only` selects Speaking output,
+`media_output` selects media work across open runtime interactions, and
+`current_interaction` selects all eligible work in the foreground interaction.
+Each scope returns correlated selected/active/queued/provider-failure evidence;
+none of those receipts by itself proves audible silence or a target safe state.
 
 ## Singing
 
@@ -318,3 +345,11 @@ Acceptance requires:
 This remains partially unavailable until a target-qualified provider advertises
 the requested mode. Source tests prove the exact contract with a fake recitation
 provider only; the planner must not substitute ordinary speech for singing.
+
+### Walk and play existing audio
+
+Acceptance requires two independently owned Activity Goals and exact parallel
+steps: a Soridormi body capability and `chromie.media.play`. The plan remains in
+the robot-action authority envelope because it includes body work, while media
+completion and cancellation remain owned by the peer media provider. The
+response must describe existing-audio playback and must not call it singing.
