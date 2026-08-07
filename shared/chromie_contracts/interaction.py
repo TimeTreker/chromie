@@ -48,6 +48,35 @@ VocalEvidenceLevel = Literal[
     "supervised_target",
 ]
 
+MEDIA_CAPABILITY_IDS = {
+    "play": "chromie.media.play",
+    "pause": "chromie.media.pause",
+    "resume": "chromie.media.resume",
+    "seek": "chromie.media.seek",
+    "stop": "chromie.media.stop",
+    "volume": "chromie.media.volume",
+    "status": "chromie.media.status",
+}
+MEDIA_OPERATIONS = tuple(MEDIA_CAPABILITY_IDS)
+MediaOperation = Literal[
+    "play",
+    "pause",
+    "resume",
+    "seek",
+    "stop",
+    "volume",
+    "status",
+]
+MediaPlaybackState = Literal[
+    "starting",
+    "playing",
+    "paused",
+    "completed",
+    "stopped",
+    "failed",
+]
+MediaMixerPolicy = Literal["duck_media_during_speaking"]
+
 
 def _immutable_provider_revision(value: str) -> bool:
     normalized = value.strip().lower()
@@ -276,6 +305,251 @@ class VocalPerformanceDelivery(BaseModel):
                 if (normalized := " ".join(str(item or "").strip().split()))
             )
         )
+
+
+class MediaOperationEvidence(BaseModel):
+    """Retained source or target evidence for one advertised media operation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: VocalEvidenceLevel
+    artifact_refs: list[str] = Field(min_length=1)
+    claim_summary: str = Field(min_length=1)
+
+    @field_validator("artifact_refs", mode="before")
+    @classmethod
+    def normalize_artifact_refs(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("artifact_refs must be a list")
+        result = list(
+            dict.fromkeys(
+                normalized
+                for item in values
+                if (normalized := " ".join(str(item or "").strip().split()))
+            )
+        )
+        if not result:
+            raise ValueError("artifact_refs must contain retained evidence")
+        return result
+
+    @field_validator("claim_summary")
+    @classmethod
+    def normalize_claim_summary(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("claim_summary must not be empty")
+        return normalized
+
+
+class MediaProviderDeclaration(BaseModel):
+    """Qualified lifecycle and mixer contract for one peer media backend.
+
+    The backend identity remains trusted runtime metadata. Model-facing
+    planning uses only the stable ``chromie.media.*`` capability family.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str = Field(min_length=1)
+    supported_operations: list[MediaOperation] = Field(min_length=1)
+    supported_media_kinds: list[str] = Field(min_length=1)
+    persistent_playback: bool
+    request_cancellation: bool
+    progress_reporting: bool
+    max_concurrency: int = Field(ge=1)
+    mixer_policy: MediaMixerPolicy
+    ducking_gain_db: float = Field(le=0.0)
+    duck_attack_ms: int = Field(ge=0, le=5000)
+    duck_release_ms: int = Field(ge=0, le=10000)
+    provenance: VocalProviderProvenance
+    operation_evidence: dict[MediaOperation, MediaOperationEvidence]
+    contract_version: int = Field(default=1, ge=1)
+
+    @field_validator("provider_id")
+    @classmethod
+    def normalize_provider_id(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("provider_id must not be empty")
+        return normalized
+
+    @field_validator("supported_operations", "supported_media_kinds", mode="before")
+    @classmethod
+    def normalize_list(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("media provider declaration field must be a list")
+        return list(
+            dict.fromkeys(
+                normalized
+                for item in values
+                if (normalized := " ".join(str(item or "").strip().split()))
+            )
+        )
+
+    @model_validator(mode="after")
+    def require_operation_evidence(self) -> "MediaProviderDeclaration":
+        supported = set(self.supported_operations)
+        declared = set(self.operation_evidence)
+        if supported != declared:
+            missing = sorted(supported - declared)
+            extra = sorted(declared - supported)
+            raise ValueError(
+                "operation_evidence must match supported_operations exactly: "
+                f"missing={missing}, extra={extra}"
+            )
+        if not self.persistent_playback:
+            raise ValueError("qualified media providers must retain persistent playback state")
+        if not self.progress_reporting:
+            raise ValueError("qualified media providers must report bounded playback progress")
+        if not self.supported_media_kinds:
+            raise ValueError("supported_media_kinds must not be empty")
+        return self
+
+
+class MediaPlaybackEvidence(BaseModel):
+    """Provider-owned state evidence for one exact media lifecycle operation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: MediaOperation
+    playback_id: str = Field(min_length=1)
+    state: MediaPlaybackState
+    media_kind: str = Field(min_length=1)
+    media_ref: str = Field(min_length=1)
+    position_ms: int = Field(ge=0)
+    duration_ms: int | None = Field(default=None, ge=0)
+    volume: float = Field(ge=0.0, le=1.0)
+    delivery_evidence_id: str = Field(min_length=1)
+    ducking_active: bool = False
+
+    @field_validator(
+        "playback_id",
+        "media_kind",
+        "media_ref",
+        "delivery_evidence_id",
+    )
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("media playback evidence fields must not be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_progress(self) -> "MediaPlaybackEvidence":
+        if self.duration_ms is not None and self.position_ms > self.duration_ms:
+            raise ValueError("media position_ms cannot exceed duration_ms")
+        return self
+
+
+def media_capability_input_schema(
+    operation: str,
+    supported_media_kinds: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Return the closed model-facing input schema for one media operation."""
+
+    if operation not in MEDIA_CAPABILITY_IDS:
+        raise ValueError(f"unknown media operation: {operation!r}")
+    properties: dict[str, Any] = {
+        "playback_id": {"type": "string", "minLength": 1},
+    }
+    required = ["playback_id"]
+    if operation == "play":
+        media_kinds = list(dict.fromkeys(supported_media_kinds or ()))
+        properties = {
+            "media_ref": {"type": "string", "minLength": 1},
+            "media_kind": (
+                {"type": "string", "enum": media_kinds}
+                if media_kinds
+                else {"type": "string", "minLength": 1}
+            ),
+            "start_position_ms": {"type": "integer", "minimum": 0},
+            "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        }
+        required = ["media_ref", "media_kind"]
+    elif operation == "seek":
+        properties["position_ms"] = {"type": "integer", "minimum": 0}
+        required.append("position_ms")
+    elif operation == "volume":
+        properties["volume"] = {"type": "number", "minimum": 0.0, "maximum": 1.0}
+        required.append("volume")
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
+
+
+def media_capability_output_schema() -> dict[str, Any]:
+    """Return the shared closed provider-result schema for media lifecycle work."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "completed": {"type": "boolean"},
+            "operation": {"type": "string", "enum": list(MEDIA_OPERATIONS)},
+            "capability_id": {
+                "type": "string",
+                "enum": list(MEDIA_CAPABILITY_IDS.values()),
+            },
+            "provider_id": {"type": "string"},
+            "provider_contract_version": {"type": "integer", "minimum": 1},
+            "evidence_level": {
+                "type": ["string", "null"],
+                "enum": [None, "source_test", "automated_target", "supervised_target"],
+            },
+            "provider_evidence_refs": {"type": "array", "items": {"type": "string"}},
+            "playback_id": {"type": "string"},
+            "state": {
+                "type": ["string", "null"],
+                "enum": [
+                    None,
+                    "starting",
+                    "playing",
+                    "paused",
+                    "completed",
+                    "stopped",
+                    "failed",
+                ],
+            },
+            "media_kind": {"type": "string"},
+            "media_ref": {"type": "string"},
+            "position_ms": {"type": "integer", "minimum": 0},
+            "duration_ms": {"type": ["integer", "null"], "minimum": 0},
+            "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "delivery_evidence_id": {"type": "string"},
+            "mixer_policy": {
+                "type": "string",
+                "enum": ["duck_media_during_speaking"],
+            },
+            "ducking_active": {"type": "boolean"},
+            "reason": {"type": "string"},
+        },
+        "required": [
+            "completed",
+            "operation",
+            "capability_id",
+            "provider_id",
+            "provider_contract_version",
+            "evidence_level",
+            "provider_evidence_refs",
+            "playback_id",
+            "state",
+            "media_kind",
+            "media_ref",
+            "position_ms",
+            "duration_ms",
+            "volume",
+            "delivery_evidence_id",
+            "mixer_policy",
+            "ducking_active",
+            "reason",
+        ],
+        "additionalProperties": False,
+    }
 
 
 def vocal_performance_input_schema(

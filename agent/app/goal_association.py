@@ -99,6 +99,16 @@ GoalOutputMode = Literal[
     "capability_work",
     "other",
 ]
+GoalMediaOperation = Literal[
+    "none",
+    "play",
+    "pause",
+    "resume",
+    "seek",
+    "stop",
+    "volume",
+    "status",
+]
 _VOCAL_OUTPUT_MODES = frozenset(
     {
         "speech",
@@ -125,7 +135,9 @@ _EXECUTION_CONTRACT_PROMPT = (
     "spoken_response/speaking/<mode-specific-vocal>/true; and "
     "other/none/other/false. Never use capability_dependent merely because an "
     "exact provider is required: provider_required describes evidence need, while "
-    "the human completion mode determines responsibility_kind."
+    "the human completion mode determines responsibility_kind. Every media_playback "
+    "Goal also requires one exact media_operation; every other Goal uses "
+    "media_operation=none."
 )
 
 
@@ -435,6 +447,13 @@ class GoalAssociationModelGoal(BaseModel):
             "Chromie-authored speech delivery, must produce evidence for this Goal."
         ),
     )
+    media_operation: GoalMediaOperation = Field(
+        default="none",
+        description=(
+            "Exact persistent media lifecycle operation for media_playback; "
+            "none for every other output mode."
+        ),
+    )
     bindings: list[GoalAssociationModelBinding] = Field(
         default_factory=list,
         max_length=12,
@@ -481,6 +500,8 @@ class GoalAssociationModelGoal(BaseModel):
                 "executable_action",
                 "capability_dependent",
             }
+        if normalized.get("media_operation") is None:
+            normalized["media_operation"] = "none"
         return normalized
 
     @model_validator(mode="after")
@@ -540,6 +561,14 @@ class GoalAssociationModelGoal(BaseModel):
             raise _execution_contract_error(
                 "ordinary speech uses Chromie's maintained Speaking delivery path and "
                 "must set provider_required=false"
+            )
+        if mode == "media_playback" and self.media_operation == "none":
+            raise _execution_contract_error(
+                "media_playback requires one exact media_operation"
+            )
+        if mode != "media_playback" and self.media_operation != "none":
+            raise _execution_contract_error(
+                "media_operation is valid only for output_mode=media_playback"
             )
         if self.resource_responsibility is not None and lane == "speaking":
             raise _execution_contract_error(
@@ -1350,6 +1379,7 @@ class GoalAssociationResolver:
                             "execution_lane",
                             "output_mode",
                             "provider_required",
+                            "media_operation",
                         ):
                             if field_name not in node_required:
                                 node_required.append(field_name)
@@ -1552,7 +1582,7 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, and provider_required. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. "
+            "Every new Goal must also declare responsibility_kind, execution_lane, output_mode, provider_required, and media_operation. Use executable_action for a user-visible physical or media effect, spoken_response for direct authored speech or vocal performance, capability_dependent when lookup, retrieval, computation, or another non-vocal capability must determine completion, and other only when no maintained lane applies. Singing, humming, recitation, expressive speech, and nonverbal vocalization remain execution_lane=speaking even inside a compound robot command. Body action and media playback use execution_lane=activity. output_mode must be one exact enum value. Media playback also requires one exact media_operation from play, pause, resume, seek, stop, volume, or status; every non-media Goal uses media_operation=none. provider_required means an exact registered Capability Provider beyond ordinary Chromie-authored speech delivery must return completion evidence: it is false for ordinary output_mode=speech, true for every effectful or capability-dependent Goal, and true for mode-specific vocal performance. This field never selects a Provider. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
@@ -1573,7 +1603,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A Speaking/vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, responsibility_kind, execution_lane, output_mode, provider_required, media_operation, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A Speaking/vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -1666,7 +1696,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, media_operation, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. media_playback requires one exact media_operation and every non-media Goal uses media_operation=none. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. "
             + _EXECUTION_CONTRACT_PROMPT
             + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
@@ -1719,13 +1749,15 @@ class GoalAssociationResolver:
             "Use semantic reasoning over the authoritative user turn and bounded "
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
-            "Classify responsibility_kind, execution_lane, output_mode, and "
-            "provider_required by the channel and evidence that complete the human "
+            "Classify responsibility_kind, execution_lane, output_mode, "
+            "provider_required, and media_operation by the channel and evidence "
+            "that complete the human "
             "outcome, not by grammar, verb choice, command framing, or the surrounding "
             "robot-action route. Locomotion, manipulation, posture, gaze, and facial "
             "or body expression are executable_action/activity/body_action because a "
             "body provider must perform them. Playing existing audio is "
-            "executable_action/activity/media_playback. Authored vocal or textual "
+            "executable_action/activity/media_playback with media_operation=play; "
+            "persistent playback controls use their exact operation. Authored vocal or textual "
             "performance is spoken_response/speaking. Singing, humming, recitation, "
             "expressive speech, and nonverbal vocalization are mode-specific outputs "
             "with provider_required=true; an ordinary social reply or joke normally "
@@ -2149,6 +2181,7 @@ class GoalAssociationResolver:
                         "execution_lane": item.execution_lane,
                         "output_mode": item.output_mode,
                         "provider_required": item.provider_required,
+                        "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)
                             for reference in resolved_references

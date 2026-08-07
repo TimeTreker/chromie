@@ -2296,6 +2296,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "MediaPlaybackSkillProvider.execute",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map backend or lifecycle-schema failures into a correlated failed media Capability result without claiming completion or selecting another operation.",
+      "review_status": "reviewed",
+      "body_sha256": "c78deeee73fe46e96f8f3609c3d1432edffce918785f81a491e6679fe5935483",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
       "path": "orchestrator/vad.py",
       "symbol": "<module>",
       "ordinal": 1,

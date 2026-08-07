@@ -182,15 +182,17 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. Every new Goal also declares four typed completion facts.
+are rejected. Every new Goal also declares five typed completion facts.
 `responsibility_kind` is `executable_action`, `spoken_response`,
 `capability_dependent`, or `other`; `execution_lane` is `speaking`, `activity`,
 or `none`; `output_mode` distinguishes ordinary speech, expressive speech,
 recitation, singing, humming, nonverbal vocalization, body action, media
-playback, capability work, or other; and `provider_required` says whether an
+playback, capability work, or other; `provider_required` says whether an
 exact registered Capability Provider beyond ordinary authored speech delivery
-must return completion evidence. The live decoder schema requires all four
-fields, while retained legacy DTOs receive only a bounded compatibility mapping.
+must return completion evidence; and `media_operation` is one exact persistent
+playback operation for `media_playback` or `none` for every other output mode.
+The live decoder schema requires all five fields, while retained legacy DTOs
+receive only a bounded compatibility mapping.
 Mode-specific vocal output remains Speaking but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
 delivery of a capability result remains part of that capability-dependent Goal
@@ -284,6 +286,39 @@ another vocal mode. Cancellation retains the original request identity. These
 results prove only the evidence level and artifacts recorded by the provider
 declaration. Source-test evidence from a fake provider is not singing, speaker,
 or physical-audio target evidence.
+
+### Exact peer-media provider contract
+
+Existing music, recordings, streams, and sound effects use seven stable public
+Activity capabilities: `chromie.media.play`, `chromie.media.pause`,
+`chromie.media.resume`, `chromie.media.seek`, `chromie.media.stop`,
+`chromie.media.volume`, and `chromie.media.status`. Backend identity remains
+trusted runtime metadata and never replaces these IDs in a Goal, Plan, request,
+result, or retained trace. The default catalog keeps every operation visible but
+unavailable until a qualified peer provider declares exact supported operations,
+media kinds, persistent-state and progress support, request cancellation,
+concurrency, mixer parameters, immutable provenance, and retained evidence for
+every advertised operation.
+
+`play` accepts only a provider-declared media kind plus a provider-neutral media
+reference and optional start position or volume. Lifecycle controls require the
+persistent `playback_id`; `seek` and `volume` add their exact value. Completed
+results preserve the requested operation and public capability ID, playback
+identity and state, bounded position/duration/volume, delivery evidence ID,
+evidence level, and declared mixer policy. A different operation, incompatible
+state, undeclared media kind, or malformed progress fails as
+`invalid_media_lifecycle_evidence`; an unsupported input kind is rejected before
+backend invocation.
+
+Speech may overlap media only through an explicit `LaneCoordinationGroup`. The
+Host then materializes the provider declaration's
+`duck_media_during_speaking` gain, attack, and release values onto both the
+Speaking item and media request without changing either Goal. Deterministic
+`output_only`, `media_output`, and `current_interaction` scopes respectively
+mean stop talking, stop media across retained interactions, and stop all work in
+the foreground interaction. Their cancellation receipts retain exact selected
+request identities and provider/dispatch failures; a receipt is not audible
+silence or provider-safe-state proof.
 
 ### TaskGraph validation and execution
 

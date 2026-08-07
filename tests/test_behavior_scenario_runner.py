@@ -29,14 +29,14 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 401)
+        self.assertEqual(len(all_cases), 403)
         self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(goal_interpretation_cases), 26)
+        self.assertEqual(len(goal_interpretation_cases), 27)
         self.assertEqual(len(cognitive_core_dialogue_cases), 3)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 29)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
-        self.assertEqual(len(cognitive_cases), 14)
+        self.assertEqual(len(cognitive_cases), 15)
         self.assertEqual(len(cognitive_turn_loop_cases), 6)
         self.assertIn(
             "cognitive_turn_loop/active_stop_cancel_retains_outcome",
@@ -49,6 +49,14 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn(
             "cognitive_runtime/qualified_vocal_provider_exact_recitation",
             [case.key for case in cognitive_cases],
+        )
+        self.assertIn(
+            "cognitive_runtime/qualified_media_walk_parallel",
+            [case.key for case in cognitive_cases],
+        )
+        self.assertIn(
+            "goal_interpretation/stop_media_output_scope",
+            [case.key for case in goal_interpretation_cases],
         )
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
         self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)

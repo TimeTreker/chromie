@@ -482,6 +482,7 @@ def collect_run_provenance(
     soridormi_repo: Path | None = None,
     endpoint_revision: str | None = None,
     runtime_identity_path: Path | None = None,
+    semantic_runtime_path: str | None = None,
     root: Path = ROOT,
 ) -> dict[str, Any]:
     """Capture the source and semantic-runtime identity for retained evidence."""
@@ -545,12 +546,15 @@ def collect_run_provenance(
         "runtime_identity": runtime_identity_ref,
         "semantic_runtime": {
             "path": (
-                "goal_driven_cognitive_runtime"
-                if selected
-                else (
-                    "agent_interaction_outside_apply_lanes"
-                    if cognitive_runtime
-                    else "legacy_agent_interaction"
+                semantic_runtime_path
+                or (
+                    "goal_driven_cognitive_runtime"
+                    if selected
+                    else (
+                        "agent_interaction_outside_apply_lanes"
+                        if cognitive_runtime
+                        else "legacy_agent_interaction"
+                    )
                 )
             ),
             "configured_cognitive_runtime_mode": (
@@ -720,6 +724,118 @@ def record_execution_bindings(
     )
 
 
+async def dispatch_initial_reflex(
+    *,
+    assistant: Any,
+    text: str,
+    sid: str,
+    turn_capture: Any,
+    route_model: Any,
+    timeout_s: float,
+) -> tuple[Any, Any, dict[str, Any], list[str]]:
+    """Exercise an admitted deterministic control through the production path.
+
+    The text/MuJoCo runner captures the Gateway turn itself so it can retain
+    evidence.  A matched reflex must still be dispatched by
+    ``VoiceAssistant.handle_routed_text``: that is the owner of output
+    invalidation, trusted cancellation, Goal reconciliation, and the guarantee
+    that cognition is bypassed.
+    """
+
+    from shared.chromie_contracts.interaction import (  # noqa: PLC0415
+        InteractionResponse,
+    )
+
+    outcome = turn_capture.reflex_candidate
+    if outcome.action == "continue":
+        raise ValueError("dispatch_initial_reflex requires a matched reflex")
+
+    await assistant.handle_routed_text(text, sid, channel="text")
+    await wait_for_session_done(
+        assistant,
+        sid,
+        timeout_s=timeout_s,
+        allow_interrupted=True,
+    )
+
+    recorded_turn: dict[str, Any] = {}
+    for item in reversed(assistant.conversation_state.get_history()):
+        metadata = item.get("metadata") if isinstance(item, dict) else None
+        if (
+            isinstance(metadata, dict)
+            and metadata.get("source") == "cognitive_gateway_reflex"
+        ):
+            recorded_turn = item
+            break
+
+    recorded_metadata = (
+        recorded_turn.get("metadata")
+        if isinstance(recorded_turn.get("metadata"), dict)
+        else {}
+    )
+    recorded_outcome = (
+        recorded_metadata.get("reflex_outcome")
+        if isinstance(recorded_metadata.get("reflex_outcome"), dict)
+        else {}
+    )
+    errors: list[str] = []
+    if not recorded_turn:
+        errors.append("production reflex dispatch retained no reflex user turn")
+    if recorded_turn.get("route") != outcome.action:
+        errors.append(
+            "production reflex route mismatch: "
+            f"expected {outcome.action!r}, got {recorded_turn.get('route')!r}"
+        )
+    if recorded_turn.get("intent") != outcome.intent:
+        errors.append(
+            "production reflex intent mismatch: "
+            f"expected {outcome.intent!r}, got {recorded_turn.get('intent')!r}"
+        )
+    if recorded_outcome.get("cancellation_scope") != outcome.cancellation_scope:
+        errors.append(
+            "production reflex cancellation scope mismatch: "
+            f"expected {outcome.cancellation_scope!r}, got "
+            f"{recorded_outcome.get('cancellation_scope')!r}"
+        )
+    if outcome.action == "interrupt" and not isinstance(
+        recorded_metadata.get("cancellation_dispatch_receipt"), dict
+    ):
+        errors.append("production interrupt retained no cancellation dispatch receipt")
+
+    reflex_evidence = {
+        "captured_outcome": outcome.model_dump(mode="json"),
+        "recorded_turn": recorded_turn,
+        "goal_interpretation_bypassed": True,
+    }
+    route = route_model.model_validate(
+        {
+            "route": outcome.action,
+            "intent": outcome.intent,
+            "confidence": outcome.confidence,
+            "language": outcome.language,
+            "priority": outcome.priority,
+            "interrupt_current": outcome.interrupt_current,
+            "needs_agent": False,
+            "should_speak": outcome.should_speak,
+            "reason": outcome.reason,
+            "source": "rules",
+            "metadata": {
+                "cancellation_scope": outcome.cancellation_scope,
+                "reflex_outcome": recorded_outcome,
+                "goal_interpretation_bypassed": True,
+            },
+        }
+    )
+    response = InteractionResponse(
+        metadata={
+            "source": "cognitive_gateway_reflex",
+            "reflex_action": outcome.action,
+            "no_interaction_response": True,
+        }
+    )
+    return route, response, reflex_evidence, errors
+
+
 async def run_check(
     args: argparse.Namespace,
     *,
@@ -799,6 +915,137 @@ async def run_check(
             conversation_id=context.get("conversation_id"),
             channel="text",
         )
+        if turn_capture.reflex_candidate.action != "continue":
+            if args.preview_only:
+                raise RuntimeError(
+                    "preview-only cannot dispatch a deterministic reflex; use a "
+                    "non-preview retained run so cancellation evidence is real"
+                )
+            reflex_start = time.perf_counter()
+            route, response, reflex_evidence, reflex_errors = (
+                await dispatch_initial_reflex(
+                    assistant=assistant,
+                    text=args.text,
+                    sid=sid,
+                    turn_capture=turn_capture,
+                    route_model=RouteDecision,
+                    timeout_s=args.timeout_s,
+                )
+            )
+            timings_ms["reflex_ms"] = (
+                time.perf_counter() - reflex_start
+            ) * 1000.0
+            errors.extend(reflex_errors)
+            errors.extend(
+                validate_contract(
+                    route=route,
+                    response=response,
+                    expected_route=args.expect_route,
+                    expected_skills=args.expect_skill,
+                    expect_no_skills=args.expect_no_skills,
+                    expected_args=args.expect_arg,
+                    arg_tolerance=args.arg_tolerance,
+                )
+            )
+            reject_speech_patterns = list(
+                getattr(args, "reject_speech_pattern", []) or []
+            )
+            if bool(getattr(args, "reject_internal_speech", False)):
+                reject_speech_patterns = (
+                    INTERNAL_SPEECH_PATTERNS + reject_speech_patterns
+                )
+            errors.extend(
+                validate_speech_contract(response, reject_speech_patterns)
+            )
+
+            _write_json(evidence_dir / "reflex.json", reflex_evidence)
+            _write_json(evidence_dir / "route.json", route.model_dump(mode="json"))
+            _write_json(
+                evidence_dir / "interaction_response.json",
+                response.model_dump(mode="json"),
+            )
+            try:
+                status_after_start = time.perf_counter()
+                status_after = await _invoke_soridormi_status(invoker)
+            except Exception as exc:
+                errors.append(
+                    "post-reflex Soridormi status probe failed: "
+                    f"{_exception_text(exc)}"
+                )
+                _write_json(
+                    evidence_dir / "status_after_error.json",
+                    {"error": _exception_text(exc)},
+                )
+            else:
+                timings_ms["status_after_ms"] = (
+                    time.perf_counter() - status_after_start
+                ) * 1000.0
+                _write_json(evidence_dir / "status_after.json", status_after)
+                if not args.allow_non_sim and status_after.get("mode") != "sim":
+                    errors.append(
+                        "Post-reflex Soridormi mode is not sim: "
+                        f"{status_after.get('mode')!r}"
+                    )
+                errors.extend(safe_idle_errors(status_after))
+
+            debug_summary = build_debug_summary(
+                route=route,
+                response=response,
+                errors=errors,
+            )
+            summary = {
+                "ok": not errors,
+                "text": args.text,
+                "sid": sid,
+                "speaker": args.speaker,
+                "preview_only": False,
+                "skill_timeout_s": args.skill_timeout_s,
+                "evidence_dir": str(evidence_dir),
+                "timings_ms": {
+                    **{
+                        name: round(value, 1)
+                        for name, value in timings_ms.items()
+                    },
+                    "total_ms": round(
+                        (time.perf_counter() - total_start) * 1000.0,
+                        1,
+                    ),
+                },
+                "debug_summary": debug_summary,
+                "errors": errors,
+                "route": route.model_dump(mode="json"),
+                "interaction_response": response.model_dump(mode="json"),
+                "reflex": reflex_evidence,
+                "cognitive_runtime": None,
+                "execution": None,
+                "interrupt": None,
+                "cognitive_events": str(
+                    evidence_dir / "cognitive_runtime_events.jsonl"
+                ),
+                "status_before": status_before,
+                "status_after": status_after,
+                "session_state": assistant.sessions.state.get(sid),
+                "provenance": collect_run_provenance(
+                    manifest=Path(args.manifest),
+                    cognitive_runtime=bool(args.cognitive_runtime),
+                    cognitive_apply_lanes=str(args.cognitive_apply_lanes),
+                    cognitive_runtime_selected=False,
+                    soridormi_repo=(
+                        Path(raw_soridormi_repo)
+                        if raw_soridormi_repo
+                        else None
+                    ),
+                    endpoint_revision=_endpoint_source_revision(status_before),
+                    runtime_identity_path=(
+                        Path(args.runtime_identity)
+                        if getattr(args, "runtime_identity", None)
+                        else None
+                    ),
+                    semantic_runtime_path="cognitive_gateway_reflex",
+                ),
+            }
+            _write_json(evidence_dir / "summary.json", summary)
+            return summary
         context_snapshot = gateway.assemble_context(turn_capture, context)
         attention_request = gateway.attention_request(
             turn_capture,

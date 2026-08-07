@@ -452,6 +452,27 @@ class ResponseComposerResolverTests(unittest.TestCase):
             stage["properties"]["must_not_claim_completion"]["const"]
         )
 
+    def test_refused_decoder_schema_requires_truthful_limitation_stage(self):
+        canonical = plan(disposition="refused", goals=["goal-media"])
+
+        schema = ResponseComposerResolver._response_schema(canonical)
+        response_plan = schema["$defs"]["ResponsePlan"]
+        stage = schema["$defs"]["ResponseStage"]
+
+        self.assertIn("final", response_plan["required"])
+        self.assertEqual(response_plan["properties"]["immediate"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["pre_action"], {"type": "null"})
+        self.assertEqual(response_plan["properties"]["progress"]["maxItems"], 0)
+        self.assertEqual(
+            response_plan["properties"]["final"],
+            {"$ref": "#/$defs/ResponseStage"},
+        )
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["none", "heard", "evaluating"],
+        )
+        self.assertTrue(stage["properties"]["must_not_claim_completion"]["const"])
+
     def test_execute_decoder_schema_requires_pre_execution_delivery_stage(self):
         canonical = plan(
             disposition="execute",

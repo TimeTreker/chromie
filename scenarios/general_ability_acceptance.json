@@ -118,6 +118,10 @@
         {
           "key": "cognitive_runtime/qualified_vocal_provider_exact_recitation",
           "rationale": "A qualified vocal mode must preserve its exact public capability identity, typed mode, and Speaking-lane authority through planning and Host materialization."
+        },
+        {
+          "key": "cognitive_runtime/qualified_media_walk_parallel",
+          "rationale": "Existing-audio playback remains an exact peer-provider Activity Goal beside body work and never becomes singing or ordinary TTS."
         }
       ],
       "live_text_cases": [
@@ -528,6 +532,10 @@
         {
           "key": "dialogue/polite_interrupt_social",
           "rationale": "Socially phrased interruption should not wait for model permission."
+        },
+        {
+          "key": "goal_interpretation/stop_media_output_scope",
+          "rationale": "Stopping media selects the media-only cancellation scope without stopping speech or all current work."
         }
       ],
       "live_text_cases": []

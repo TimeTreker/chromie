@@ -345,6 +345,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "execution_lane": "speaking",
                 "output_mode": "singing",
                 "provider_required": True,
+                "media_operation": "none",
             },
         )
 
@@ -1423,7 +1424,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, bindings, and optional provider-neutral resource_responsibility only",
+            "Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, media_operation, bindings, and optional provider-neutral resource_responsibility only",
             ollama.prompts[1][0],
         )
 
@@ -2033,7 +2034,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "responsibility_kind", "execution_lane", "output_mode", "provider_required", "bindings", "resource_responsibility"},
+            {"description", "responsibility_kind", "execution_lane", "output_mode", "provider_required", "media_operation", "bindings", "resource_responsibility"},
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(

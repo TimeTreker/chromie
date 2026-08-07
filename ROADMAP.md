@@ -21,9 +21,10 @@ organized by capability, risk, and retained evidence.
 2. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
    default-provider distinction evidence; real modes remain a separate target
    evidence track.
-3. Qualify Issue #7's peer media-playback
-   provider. Singing remains Speaking; existing-audio playback remains Activity;
-   ordinary TTS is neither kind of evidence.
+3. Preserve Issue #7's source-qualified peer media-playback contract and its
+   clean default-provider distinction evidence. Real operations remain a
+   separate target-evidence track; singing remains Speaking, existing-audio
+   playback remains Activity, and ordinary TTS is neither kind of evidence.
 4. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
@@ -106,11 +107,18 @@ walk/sing/blink replay retained at
 singing remained unavailable with zero steps, all ordinary-TTS chunks played,
 and safe idle held before and after. Real vocal modes remain target evidence.
 
-Issue #7 is therefore the active source work. Define exact provider-prefixed
-media play, pause, resume, seek, stop, volume, and status capabilities with a
-bounded persistent lifecycle beneath Activity. Existing audio playback must not
-become authored vocal performance; stop-talking, stop-media, and stop-all must
-retain distinct cancellation scopes and receipts.
+Issue #7 now has the exact provider-prefixed
+`chromie.media.play|pause|resume|seek|stop|volume|status` source contract with a
+bounded persistent lifecycle beneath Activity. Qualified fake-provider tests
+cover supported-kind negotiation, state/progress, exact operation evidence,
+cancellation, mixer policy, and private backend identity. Focused scenarios
+retain a mixed Soridormi walk plus exact media step and deterministic
+`media_output` cancellation. The default-provider live profile keeps playback
+unavailable with no media execution, keeps singing in Speaking, completes an
+independent Soridormi/MuJoCo walk, retains a cognition-bypassing stop-media
+receipt, and returns safe-idle. Existing audio playback therefore does not
+become authored vocal performance; real media and acoustic behavior remain
+target evidence.
 Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
 ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
 embodied Capability Provider beneath Activity.

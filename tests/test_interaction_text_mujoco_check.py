@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision
@@ -16,6 +18,7 @@ from scripts.interaction_text_mujoco_check import (
     build_parser,
     build_debug_summary,
     collect_run_provenance,
+    dispatch_initial_reflex,
     parse_expected_arg,
     record_execution_bindings,
     required_speech_delivery_errors,
@@ -28,9 +31,78 @@ from scripts.interaction_text_mujoco_check import (
     wait_for_session_done,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.reflex import ReflexFilter
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
+
+    def test_initial_reflex_uses_production_dispatch_and_retains_scope(self) -> None:
+        outcome = ReflexFilter().evaluate("停止音乐。")
+
+        class ConversationState:
+            history: list[dict[str, object]] = []
+
+            def get_history(self) -> list[dict[str, object]]:
+                return list(self.history)
+
+        class Assistant:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, str, str]] = []
+                self.sessions = SimpleNamespace(
+                    state={"sid-reflex": {"done_logged": False}}
+                )
+                self.conversation_state = ConversationState()
+
+            async def handle_routed_text(
+                self,
+                text: str,
+                sid: str,
+                *,
+                channel: str,
+            ) -> None:
+                self.calls.append((text, sid, channel))
+                self.conversation_state.history = [
+                    {
+                        "role": "user",
+                        "text": text,
+                        "route": "interrupt",
+                        "intent": "stop_media_output",
+                        "metadata": {
+                            "source": "cognitive_gateway_reflex",
+                            "reflex_outcome": outcome.model_dump(mode="json"),
+                            "cancellation_dispatch_receipt": {
+                                "requested_scope": "media_output",
+                                "selected_request_ids": [],
+                            },
+                        },
+                    }
+                ]
+                self.sessions.state[sid]["done_logged"] = True
+
+        assistant = Assistant()
+        route, response, evidence, errors = asyncio.run(
+            dispatch_initial_reflex(
+                assistant=assistant,
+                text="停止音乐。",
+                sid="sid-reflex",
+                turn_capture=SimpleNamespace(reflex_candidate=outcome),
+                route_model=RouteDecision,
+                timeout_s=1.0,
+            )
+        )
+
+        self.assertEqual(
+            assistant.calls,
+            [("停止音乐。", "sid-reflex", "text")],
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(route.route, "interrupt")
+        self.assertEqual(route.intent, "stop_media_output")
+        self.assertEqual(route.source, "rules")
+        self.assertEqual(route.metadata["cancellation_scope"], "media_output")
+        self.assertFalse(response.speech)
+        self.assertFalse(response.skills)
+        self.assertTrue(evidence["goal_interpretation_bypassed"])
 
     def test_goal_driven_runtime_is_default_with_explicit_legacy_opt_out(self) -> None:
         self.assertTrue(build_parser().parse_args([]).cognitive_runtime)
@@ -115,6 +187,28 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 "cognitive_apply_lanes": ["chat", "robot_action"],
             },
         )
+
+    def test_run_provenance_names_the_reflex_path_without_claiming_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "soridormi.json"
+            manifest.write_text("{}", encoding="utf-8")
+            with patch(
+                "scripts.interaction_text_mujoco_check._git_text",
+                return_value=None,
+            ):
+                provenance = collect_run_provenance(
+                    manifest=manifest,
+                    cognitive_runtime=True,
+                    cognitive_apply_lanes="chat,robot_action",
+                    cognitive_runtime_selected=False,
+                    semantic_runtime_path="cognitive_gateway_reflex",
+                    root=root,
+                )
+
+        semantic = provenance["semantic_runtime"]
+        self.assertEqual(semantic["path"], "cognitive_gateway_reflex")
+        self.assertFalse(semantic["cognitive_runtime_selected_for_route"])
 
     def test_cognitive_runtime_selection_matches_maintained_apply_lanes(self) -> None:
         robot_route = RouteDecision.model_validate(

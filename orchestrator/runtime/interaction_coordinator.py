@@ -25,6 +25,7 @@ from shared.chromie_contracts.reflex import (
 
 from .skill_runtime import (
     LocalSpeechSkillProvider,
+    MediaPlaybackSkillProvider,
     RuntimeAuthorization,
     SessionControlSkillProvider,
     SkillRegistry,
@@ -32,6 +33,7 @@ from .skill_runtime import (
     SkillRuntimeResult,
     VocalPerformanceSkillProvider,
     local_speech_definition,
+    media_playback_definitions,
     session_interrupt_definition,
     vocal_performance_definition,
 )
@@ -103,6 +105,7 @@ class InteractionRuntimeCoordinator:
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
         vocal_provider: VocalPerformanceSkillProvider | None = None,
+        media_provider: MediaPlaybackSkillProvider | None = None,
         capability_manifest_paths: str | None = None,
         max_concurrency: int | None = None,
         catalog_refresh_ttl_s: float | None = None,
@@ -133,6 +136,10 @@ class InteractionRuntimeCoordinator:
         if vocal_provider is not None:
             self.registry.register(vocal_performance_definition(vocal_provider.declaration))
             self.runtime.register_provider(vocal_provider)
+        if media_provider is not None:
+            for definition in media_playback_definitions(media_provider.declaration):
+                self.registry.register(definition)
+            self.runtime.register_provider(media_provider)
         self.runtime.register_provider(SessionControlSkillProvider())
         if agent_tool_handler is not None:
             definitions = local_agent_tool_definitions(capability_manifest_paths)

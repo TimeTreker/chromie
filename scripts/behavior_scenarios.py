@@ -50,8 +50,10 @@ from orchestrator.runtime.skill_runtime import (
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    MEDIA_CAPABILITY_IDS,
     SkillResult,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
+    media_capability_output_schema,
     vocal_performance_output_schema,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -315,6 +317,11 @@ class _CognitiveScenarioRuntime:
                 and skill_id == VOCAL_PERFORMANCE_CAPABILITY_ID
             ):
                 raw_output_schema = vocal_performance_output_schema()
+            elif (
+                raw_output_schema is None
+                and skill_id in MEDIA_CAPABILITY_IDS.values()
+            ):
+                raw_output_schema = media_capability_output_schema()
             definition = SkillDefinition(
                 skill_id=skill_id,
                 version=str(item.get("version") or "0.1.0"),

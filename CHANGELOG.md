@@ -34,6 +34,20 @@ remains available in Git history.
   singing unavailable with no step, played all four ordinary-TTS chunks without
   failure, and returned to safe idle. This closes Issue #6's declared source
   scope without claiming a real singing provider or physical audio.
+- Added the exact peer-media Activity family
+  `chromie.media.play|pause|resume|seek|stop|volume|status`. Qualified providers
+  now declare supported media kinds, persistent lifecycle/progress,
+  cancellation, mixer parameters, immutable provenance, and operation-specific
+  evidence. Exact operation/state mismatches fail closed, speech overlap carries
+  an explicit ducking contract without Goal mutation, and stop-talking,
+  stop-media, and stop-all produce distinct scoped receipts. The default catalog
+  remains unavailable and no physical playback claim is implied.
+- Retained default-provider text-to-MuJoCo evidence that keeps media play as an
+  unavailable Activity, keeps singing as planless Speaking, completes the
+  independent Soridormi walk in a mixed request, and returns safe-idle. The
+  primary-text live runner now dispatches deterministic controls through the
+  production Cognitive Gateway path and retains its cancellation receipt; a
+  Chinese stop-media probe bypasses cognition with exact `media_output` scope.
 
 ### Verification and reproducibility
 

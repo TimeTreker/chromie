@@ -4,15 +4,25 @@ from typing import Any
 
 try:
     from chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        MEDIA_OPERATIONS,
+        MediaProviderDeclaration,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
         VocalProviderDeclaration,
+        media_capability_input_schema,
+        media_capability_output_schema,
         vocal_performance_input_schema,
         vocal_performance_output_schema,
     )
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        MEDIA_OPERATIONS,
+        MediaProviderDeclaration,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
         VocalProviderDeclaration,
+        media_capability_input_schema,
+        media_capability_output_schema,
         vocal_performance_input_schema,
         vocal_performance_output_schema,
     )
@@ -136,9 +146,123 @@ def vocal_performance_tool(
     )
 
 
+def media_playback_tools(
+    declaration: MediaProviderDeclaration | None = None,
+) -> list[ToolCapability]:
+    """Build the stable media lifecycle family from one qualified declaration."""
+
+    supported = set(declaration.supported_operations) if declaration else set()
+    tools: list[ToolCapability] = []
+    for operation in MEDIA_OPERATIONS:
+        available = operation in supported
+        evidence: dict[str, Any] = {}
+        if declaration is not None and available:
+            evidence = declaration.operation_evidence[operation].model_dump(mode="json")
+        tools.append(
+            ToolCapability(
+                name=MEDIA_CAPABILITY_IDS[operation],
+                agent_id="chromie.media",
+                display_name=f"Media {operation}",
+                description=(
+                    f"Apply exact persistent media lifecycle operation {operation!r}; "
+                    "this is Activity work, not authored vocal performance."
+                ),
+                version="1.0.0",
+                input_schema=media_capability_input_schema(
+                    operation,
+                    (
+                        declaration.supported_media_kinds
+                        if declaration is not None and available
+                        else None
+                    ),
+                ),
+                output_schema=media_capability_output_schema(),
+                effects=(
+                    ["read_only", "media_playback", "playback_status"]
+                    if operation == "status"
+                    else ["audio_output", "media_playback", "playback_lifecycle"]
+                ),
+                safety_class="safe_read" if operation == "status" else "low_risk_action",
+                availability=ToolAvailability(
+                    available=available,
+                    modes=[operation] if available else [],
+                    requires=["qualified_media_provider", "audio_output"],
+                    reason=(
+                        None
+                        if available
+                        else (
+                            "no qualified media provider declaration is configured"
+                            if declaration is None
+                            else f"qualified media provider does not advertise {operation}"
+                        )
+                    ),
+                ),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    exclusive_group=(None if operation == "play" else "chromie.media.control"),
+                    timeout_s=120.0 if operation == "play" else 10.0,
+                    idempotent=operation in {"pause", "resume", "stop", "volume", "status"},
+                    side_effect_free=operation == "status",
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "interaction_executable": True,
+                    "prompt_tier": "common"
+                    if operation in {"play", "pause", "resume", "stop"}
+                    else "rare",
+                    "when_to_use": (
+                        f"Use only for exact media operation {operation!r}. Existing "
+                        "audio playback is Activity; never use it as singing, humming, "
+                        "recitation, or ordinary speech evidence."
+                    ),
+                    "execution_lane": "activity",
+                    "media_operation": operation,
+                    "persistent_playback": bool(
+                        declaration is not None and declaration.persistent_playback
+                    ),
+                    "progress_reporting": bool(
+                        declaration is not None and declaration.progress_reporting
+                    ),
+                    "mixer_policy": (declaration.mixer_policy if declaration is not None else None),
+                    "ducking_gain_db": (
+                        declaration.ducking_gain_db if declaration is not None else None
+                    ),
+                    "duck_attack_ms": (
+                        declaration.duck_attack_ms if declaration is not None else None
+                    ),
+                    "duck_release_ms": (
+                        declaration.duck_release_ms if declaration is not None else None
+                    ),
+                    "operation_evidence": evidence,
+                    "can_run_parallel": True,
+                    "exclusive_group": (None if operation == "play" else "chromie.media.control"),
+                    "resource_claims": ["audio_output.media"],
+                    "execution_constraints": {
+                        "exact_operation_required": True,
+                        "persistent_playback_identity_required": True,
+                        "parallel_allowed_with_lanes": [
+                            "speaking",
+                            "activity",
+                            "social_attention",
+                        ],
+                    },
+                    "semantic_scope": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "media_playback",
+                        "media_operation": operation,
+                        "provider_required": True,
+                    },
+                },
+            )
+        )
+    return tools
+
+
 def chromie_manifests(
     *,
     vocal_provider: VocalProviderDeclaration | None = None,
+    media_provider: MediaProviderDeclaration | None = None,
 ) -> list[AgentManifest]:
     speech = AgentManifest(
         agent_id="chromie.speech",
@@ -277,6 +401,22 @@ def chromie_manifests(
                 },
             ),
         ],
+    )
+
+    media = AgentManifest(
+        agent_id="chromie.media",
+        display_name="Chromie Peer Media Provider",
+        description=(
+            "Persistent playback of existing media through exact Activity-lane "
+            "capabilities. It shares the output mixer with Speaking without "
+            "becoming speech or vocal-performance evidence."
+        ),
+        transport=TransportSpec(
+            kind="host_runtime",
+            module="orchestrator.runtime.skill_runtime",
+        ),
+        tags=["chromie", "media", "playback", "activity"],
+        tools=media_playback_tools(media_provider),
     )
 
     task = AgentManifest(
@@ -747,7 +887,7 @@ def chromie_manifests(
         ],
     )
 
-    return [speech, task, memory, weather, external_information]
+    return [speech, media, task, memory, weather, external_information]
 
 
 def chromie_capability_bundle() -> CapabilityBundle:

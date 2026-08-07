@@ -320,8 +320,10 @@ Cancellation:
 
 1. dispatches scoped runtime cancellation and dedicated E-stop work without
    waiting for audible-output device cleanup;
-2. classifies a fixed reflex as output, embodied motion, foreground
-   interaction, or global emergency;
+2. classifies a fixed reflex as speech output, media output, embodied motion,
+   foreground interaction, or global emergency; `output_only`, `media_output`,
+   and `current_interaction` remain distinct stop-talking, stop-media, and
+   stop-all scopes;
 3. selects both active and queued requests and prevents selected queued work
    from starting;
 4. asks only selected interruptible providers to cancel and records failures or
