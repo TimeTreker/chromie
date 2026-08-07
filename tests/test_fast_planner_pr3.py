@@ -208,6 +208,76 @@ def multi_goal_plan(
     }
 
 
+def retained_weather_followup_fixture() -> tuple[dict, AgentRunRequest]:
+    goal_id = "goal-weather"
+    evidence_first = "重庆今天有雷雨和冰雹，而且降雨概率很大。所以需要带伞。"
+    primary = {
+        "disposition": "respond",
+        "coverage": "complete",
+        "confidence": 1.0,
+        "goal_summary": "Decide whether an umbrella is needed.",
+        "response_text": evidence_first,
+        "steps": [],
+        "goal_outcomes": {
+            goal_id: {
+                "disposition": "respond",
+                "coverage": "complete",
+                "response_text": evidence_first,
+                "unresolved": [],
+                "step_ids": [],
+                "satisfaction": exact_satisfaction([goal_id]),
+                "rationale": "The retained weather result supports the decision.",
+            }
+        },
+        "goal_satisfaction": exact_satisfaction([goal_id]),
+    }
+    planner_request = request(
+        "那我出门需要带伞吗？",
+        route="chat",
+        goal_ids=[],
+    )
+    context = dict(planner_request.context)
+    context["goal_association_resolution"] = {
+        "associations": [
+            {
+                "association_id": "association-weather-followup",
+                "relationship": "continue",
+                "target_goal_ids": [goal_id],
+                "confidence": 1.0,
+                "reason_summary": (
+                    "The latest turn asks for a practical decision from the retained result."
+                ),
+                "goal_update": {
+                    "description": "Decide whether the person needs an umbrella."
+                },
+            }
+        ],
+        "new_goals": [],
+    }
+    context["recent_goal_snapshots"] = [
+        {
+            "goal_id": goal_id,
+            "goal": {
+                "description": "Check today's weather in Chongqing.",
+                "source_text": "重庆今天会下雨吗？",
+            },
+        }
+    ]
+    context["history"] = [
+        {
+            "role": "assistant",
+            "text": "重庆今天有雷雨和冰雹，而且降雨概率很大。",
+            "metadata": {
+                "source": "evidence_bound_tool_result_interpretation",
+                "evidence_bound": True,
+                "source_goal_ids": [goal_id],
+                "canonical_plan_id": "plan-weather",
+            },
+        }
+    ]
+    return primary, planner_request.model_copy(update={"context": context})
+
+
 class PlannerVocalResponsibilityTests(unittest.TestCase):
     @staticmethod
     def vocal_goal(*, output_mode: str, provider_required: bool) -> list[dict]:
@@ -664,6 +734,92 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_schema_invalid_capability_args_get_bounded_model_repair(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.94,
+            "goal_ids": ["goal-walk"],
+            "goal_summary": "Walk briefly.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"velocity": 0.1, "duration_s": 1.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        repaired = {
+            **invalid,
+            "steps": [
+                {
+                    **invalid["steps"][0],
+                    "args": {"vx_mps": 0.1, "duration_s": 1.0},
+                }
+            ],
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("Walk briefly.", goal_ids=["goal-walk"])
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].args, {"vx_mps": 0.1, "duration_s": 1.0})
+        self.assertIn("invalid_args", ollama.prompts[1][0])
+        self.assertIn("vx_mps", ollama.prompts[1][0])
+        step_schema = ollama.prompts[0][1]["response_format"]["$defs"][
+            "PlannerModelStep"
+        ]
+        velocity_branch = next(
+            branch
+            for branch in step_schema["oneOf"]
+            if branch["properties"]["capability_id"]["enum"]
+            == ["soridormi.walk_velocity"]
+        )
+        self.assertEqual(
+            velocity_branch["properties"]["args"]["required"],
+            ["vx_mps", "duration_s"],
+        )
+
+    def test_unrepaired_capability_args_are_not_marked_complete(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.94,
+            "goal_ids": ["goal-walk"],
+            "goal_summary": "Walk briefly.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"velocity": 0.1, "duration_s": 1.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+
+        plan = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(invalid),
+                FakeCatalog(),
+                max_contract_repairs=0,
+            ).resolve(request("Walk briefly.", goal_ids=["goal-walk"]))
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.metadata["validation_feedback"][0]["capability_id"],
+            "soridormi.walk_velocity",
+        )
+
     def test_simple_blink_produces_complete_direct_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))
@@ -2063,6 +2219,145 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("FINAL AUTHORITATIVE USER TURN owns the current communicative act", prompt)
         self.assertIn("must not replace what the person just meant", prompt)
         self.assertIn("Do not replay the previous task answer", prompt)
+        self.assertIn("first sentence directly state the requested decision", prompt)
+        self.assertIn("never begin by restating prior evidence", prompt)
+        self.assertIn("at most one short supporting clause", prompt)
+
+    def test_retained_evidence_followup_gets_bounded_decision_first_review(self):
+        goal_id = "goal-weather"
+        evidence_first = "重庆今天有雷雨和冰雹，而且降雨概率很大。所以需要带伞。"
+        decision_first = "需要带伞，因为重庆今天有雷雨和冰雹。"
+        primary = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Decide whether an umbrella is needed.",
+            "response_text": evidence_first,
+            "steps": [],
+            "goal_outcomes": {
+                goal_id: {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": evidence_first,
+                    "unresolved": [],
+                    "step_ids": [],
+                    "satisfaction": exact_satisfaction([goal_id]),
+                    "rationale": "The retained weather result supports the decision.",
+                }
+            },
+            "goal_satisfaction": exact_satisfaction([goal_id]),
+        }
+        review = {
+            "decision": "revise",
+            "confidence": 1.0,
+            "response_text": decision_first,
+            "goal_responses": [
+                {"goal_id": goal_id, "response_text": decision_first}
+            ],
+            "reason": "The original response replayed evidence before answering the decision.",
+        }
+        ollama = ScriptedOllama([primary])
+        reviewer = ScriptedOllama([review])
+        planner_request = request(
+            "那我出门需要带伞吗？",
+            route="chat",
+            goal_ids=[],
+        )
+        context = dict(planner_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [
+                {
+                    "association_id": "association-weather-followup",
+                    "relationship": "continue",
+                    "target_goal_ids": [goal_id],
+                    "confidence": 1.0,
+                    "reason_summary": "The latest turn asks for a practical decision from the retained result.",
+                    "goal_update": {
+                        "description": "Decide whether the person needs an umbrella."
+                    },
+                }
+            ],
+            "new_goals": [],
+        }
+        context["recent_goal_snapshots"] = [
+            {
+                "goal_id": goal_id,
+                "goal": {
+                    "description": "Check today's weather in Chongqing.",
+                    "source_text": "重庆今天会下雨吗？",
+                },
+            }
+        ]
+        context["history"] = [
+            {
+                "role": "assistant",
+                "text": "重庆今天有雷雨和冰雹，而且降雨概率很大。",
+                "metadata": {
+                    "source": "evidence_bound_tool_result_interpretation",
+                    "evidence_bound": True,
+                    "source_goal_ids": [goal_id],
+                    "canonical_plan_id": "plan-weather",
+                },
+            }
+        ]
+
+        plan = asyncio.run(
+            FastPlannerResolver(
+                ollama,
+                FakeCatalog(),
+                communication_reviewer=reviewer,
+            ).resolve(
+                planner_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "respond")
+        self.assertEqual(plan.response_text, decision_first)
+        self.assertEqual(plan.goal_outcomes[0].response_text, decision_first)
+        self.assertEqual(plan.metadata["communication_review"]["status"], "revised")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(len(reviewer.prompts), 1)
+        review_prompt, review_options = reviewer.prompts[0]
+        self.assertIn("communicative act directly", review_prompt)
+        self.assertIn("delivered_evidence_bound_dialogue", review_prompt)
+        self.assertEqual(
+            review_options["prompt_family"],
+            "fast_planner.communication_review",
+        )
+        review_schema = review_options["response_format"]
+        self.assertNotIn(
+            "minLength",
+            review_schema["properties"]["response_text"],
+        )
+        self.assertNotIn(
+            "minLength",
+            review_schema["$defs"]["PlannerCommunicationGoalResponse"][
+                "properties"
+            ]["response_text"],
+        )
+
+    def test_retained_evidence_review_failure_escalates_without_effects(self):
+        primary, planner_request = retained_weather_followup_fixture()
+
+        plan = asyncio.run(
+            FastPlannerResolver(
+                ScriptedOllama([primary]),
+                FakeCatalog(),
+                communication_reviewer=ScriptedOllama(
+                    [RuntimeError("review service unavailable")]
+                ),
+            ).resolve(planner_request)
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(
+            plan.escalation_reason,
+            "followup_communication_review_unavailable",
+        )
+        self.assertEqual(plan.unresolved, ["latest_communicative_act_unreviewed"])
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertEqual(plan.metadata["path_classification"], "coverage_review_failure")
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
         raw = multi_goal_plan(

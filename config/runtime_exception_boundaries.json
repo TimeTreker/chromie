@@ -482,9 +482,9 @@
       "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "If typed contract repair fails, re-raise an LLM budget failure; otherwise log the repair failure and return the empty-input outcome or raise typed interpretation_unavailable without authorizing a semantic lane or effect.",
       "review_status": "reviewed",
-      "body_sha256": "951b2b31c57e372838fca80959952b45d040ada9b10a5b51970cde4eb877e998",
+      "body_sha256": "77f45f0c38cf48857e9a5d24bd5e4d0706a6cf603b3c911eac18e812cc71e69c",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -540,7 +540,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "22a97822061e3985fa009b34d8a67efb8cbdb314627ac66a8877ebe5f1daf5d3",
+      "body_sha256": "2fca3aaa82e696412d7c0134b8298f1f94cbd59875e2c24686e1f7189ae1d9fb",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -583,7 +583,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1bdf79b38e29d25521b433c1b1055baf718ae4587a9da7ac9f6e2bad172dc851",
+      "body_sha256": "f14fbbc21f39d4e715a4714f1c3fa9bcb27ce2495bc31f57ea7327ec5c35b7da",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -595,6 +595,20 @@
       "path": "agent/app/fast_planner.py",
       "symbol": "FastPlannerResolver._resolve",
       "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "review_status": "reviewed",
+      "body_sha256": "a0b8d6d69f45f8cccc4afaa8cb9aff391e29ebd19b5d167c774f8db3d1ec7727",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "agent/app/fast_planner.py",
+      "symbol": "FastPlannerResolver._resolve",
+      "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -891,7 +905,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9b4f6e9fe3b6ab66da5a287bb807d0c0b8f75ff926b85ec74bd01a30df97b24f",
+      "body_sha256": "aa1e8897c80ddb85a7e1d1f89a9607bb1ce50cde56109f877868b635cba4df45",
       "failure_signals": [
         "diagnostic",
         "return",

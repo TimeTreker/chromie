@@ -829,10 +829,175 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 2)
         self.assertIn("A trigger is not proof", ollama.prompts[1][0])
         self.assertIn("Do not use phrase matching", ollama.prompts[1][0])
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
         self.assertEqual(
             result.metadata["semantic_review"]["strategy"],
-            "model_owned_goal_association_review",
+            "model_owned_fresh_goal_resegmentation",
         )
+
+    def test_mixed_stable_knowledge_uses_fresh_model_resegmentation(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Determine why the Moon shines.",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "capability_work",
+                    "provider_required": True,
+                    "media_operation": "none",
+                    "bindings": [],
+                },
+                {
+                    "description": "Remind the user to go to bed early tonight.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Explain that the Moon reflects sunlight.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                },
+                {
+                    "description": "Remind the user to go to bed early tonight.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([initial, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Tell me why the Moon shines, then remind me to go to bed early tonight.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["spoken_response", "spoken_response"],
+        )
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_fresh_goal_resegmentation",
+        )
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
+        self.assertNotIn("Determine why the Moon shines", ollama.prompts[1][0])
+
+    def test_invalid_followup_location_uses_fresh_model_resegmentation(self):
+        initial = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "Look up whether rain in Chongqing requires an umbrella.",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "capability_work",
+                    "provider_required": True,
+                    "media_operation": "none",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "Chongqing",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Answer whether the user needs an umbrella.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "Answer whether the prior rain report means an umbrella is useful.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        ollama = ScriptedOllama([initial, reviewed, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Do I need an umbrella when I go out?",
+                    language="en-US",
+                    active_goals=[
+                        active_goal(
+                            "goal-weather",
+                            "Report today's weather in Chongqing.",
+                            bindings={
+                                "location": {
+                                    "name": "location",
+                                    "entity_type": "location",
+                                    "value": "Chongqing",
+                                    "confidence": 1.0,
+                                }
+                            },
+                            status="done",
+                        )
+                    ],
+                    history=[
+                        {
+                            "role": "assistant",
+                            "content": "There are thunderstorms in Chongqing today.",
+                        }
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "spoken_response",
+        )
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "model_owned_fresh_goal_resegmentation",
+        )
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
+        self.assertNotIn("Look up whether rain", ollama.prompts[1][0])
 
     def test_embodied_request_is_split_and_acknowledgement_is_not_a_goal(self):
         merged = {
@@ -1200,7 +1365,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
         )
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn("physical_action_set", ollama.prompts[1][0])
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "model_owned_fresh_goal_resegmentation",
+        )
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
+        self.assertNotIn("physical_action_set", ollama.prompts[1][0])
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["executable_action", "executable_action", "spoken_response"],

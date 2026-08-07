@@ -429,7 +429,8 @@
           "multi_goal_coverage",
           "factual_correctness",
           "ordering",
-          "naturalness"
+          "naturalness",
+          "groundedness"
         ]
       },
       "review_rubric": {
@@ -437,11 +438,13 @@
           "multi_goal_coverage",
           "factual_correctness",
           "ordering",
-          "naturalness"
+          "naturalness",
+          "groundedness"
         ],
         "guidance": [
           "两个责任都要完成，不能只回应其中一个。",
-          "先解释月亮，再给简短自然的提醒。"
+          "先解释月亮，再给简短自然的提醒。",
+          "不能编造用户个人的日程、计划或处境作为提醒理由。"
         ]
       }
     },
@@ -470,7 +473,8 @@
           "multi_goal_coverage",
           "factual_correctness",
           "ordering",
-          "naturalness"
+          "naturalness",
+          "groundedness"
         ]
       },
       "review_rubric": {
@@ -478,11 +482,13 @@
           "multi_goal_coverage",
           "factual_correctness",
           "ordering",
-          "naturalness"
+          "naturalness",
+          "groundedness"
         ],
         "guidance": [
           "Both independent responsibilities must be completed exactly once.",
-          "Explain first, then give the reminder."
+          "Explain first, then give the reminder.",
+          "Do not invent a user-specific schedule, plan, or circumstance as a reason for the reminder."
         ]
       }
     },

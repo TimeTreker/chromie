@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -454,6 +455,9 @@ class VocalIssueClosureTests(unittest.TestCase):
             fake_launcher.chmod(0o755)
             env = os.environ.copy()
             env["CHROMIE_VOICE_MUJOCO_STATE_DIR"] = str(temp_root / "state")
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+                listener.bind(("127.0.0.1", 0))
+                isolated_mcp_port = listener.getsockname()[1]
 
             completed = subprocess.run(
                 [
@@ -462,6 +466,8 @@ class VocalIssueClosureTests(unittest.TestCase):
                     str(temp_root / "soridormi"),
                     "--no-viewer",
                     "--keep-running",
+                    "--mcp-port",
+                    str(isolated_mcp_port),
                     "--startup-timeout-s",
                     "5",
                 ],

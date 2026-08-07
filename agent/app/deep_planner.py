@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
+    EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     canonical_goal_grounding,
     canonical_plan_response_schema,
     coordinated_action_goal_ids,
@@ -43,6 +44,7 @@ from .planner_contract import (
     planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
+    validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_goal_responsibility_outcomes,
@@ -146,6 +148,9 @@ class DeepPlannerResolver:
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
             allowed_skill_ids=[item["capability_id"] for item in payload],
+            capability_input_schemas={
+                item["capability_id"]: item["input_schema"] for item in payload
+            },
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=sorted(planner_response_goal_ids(authoritative_goals)),
@@ -173,14 +178,15 @@ class DeepPlannerResolver:
         for attempt in range(self.max_replans + 1):
             raw: Any = None
             try:
-                active_response_schema = (
-                    self._safety_revision_response_schema(
-                        response_schema,
+                active_response_schema = self._contract_revision_response_schema(
+                    response_schema,
+                    feedback=feedback,
+                )
+                if self._requires_safety_revision(feedback):
+                    active_response_schema = self._safety_revision_response_schema(
+                        active_response_schema,
                         feedback=feedback,
                     )
-                    if self._requires_safety_revision(feedback)
-                    else response_schema
-                )
                 raw = await self.ollama.generate(
                     self._prompt(
                         request,
@@ -235,11 +241,19 @@ class DeepPlannerResolver:
                     # fragments into rationale strings instead of rebuilding the
                     # missing fields.
                     previous_raw = None
-                    initial_validation_errors = self._validation_error_json(
+                    validation_feedback = self._validation_error_items(
                         exc,
                         raw=raw,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        capability_payload=payload,
                     )
+                    initial_validation_errors = json.dumps(
+                        validation_feedback,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    )[:12000]
                     logger.warning(
                         "deep_planner_contract_repair_start sid=%s attempt=%s "
                         "validation_errors=%s raw_output_ref=%s raw_output=%s",
@@ -251,13 +265,8 @@ class DeepPlannerResolver:
                     )
                     feedback = self._merge_feedback(
                         persistent_safety_feedback,
-                        [
-                            {
-                                "type": "canonical_plan_contract_validation_failure",
-                                "error_type": type(exc).__name__,
-                                "validation_errors": initial_validation_errors,
-                            }
-                        ],
+                        feedback,
+                        validation_feedback,
                     )
                     continue
                 logger.warning(
@@ -453,16 +462,23 @@ class DeepPlannerResolver:
         return isinstance(exc, (json.JSONDecodeError, ValidationError, ValueError))
 
     @staticmethod
-    def _validation_error_json(
+    def _validation_error_items(
         exc: Exception,
         *,
         raw: Any,
         expected_goal_ids_for_turn: list[str],
-    ) -> str:
+        capability_payload: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         if isinstance(exc, ValidationError):
             feedback = list(exc.errors(include_url=False))
         else:
-            feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
+            feedback = [
+                {
+                    "type": "canonical_plan_contract_validation_failure",
+                    "error_type": type(exc).__name__,
+                    "message": str(exc)[:1000],
+                }
+            ]
         feedback.extend(
             planner_contract_diagnostics(
                 raw,
@@ -470,19 +486,121 @@ class DeepPlannerResolver:
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
             )
         )
+        if isinstance(raw, dict):
+            schemas = {
+                str(item.get("capability_id") or ""): item.get("input_schema") or {}
+                for item in list(capability_payload or [])
+            }
+            steps = {
+                str(item.get("step_id") or ""): item
+                for item in raw.get("steps") or []
+                if isinstance(item, dict) and str(item.get("step_id") or "").strip()
+            }
+            for resolution in raw.get("parameter_resolutions") or []:
+                if not isinstance(resolution, dict):
+                    continue
+                step_id = str(resolution.get("step_id") or "").strip()
+                parameter = str(resolution.get("parameter") or "").strip()
+                step = steps.get(step_id)
+                if not parameter or not isinstance(step, dict):
+                    continue
+                args = step.get("args") if isinstance(step.get("args"), dict) else {}
+                if parameter in args:
+                    continue
+                capability_id = str(step.get("capability_id") or "").strip()
+                feedback.append(
+                    {
+                        "type": "parameter_resolution_argument_mismatch",
+                        "step_id": step_id,
+                        "capability_id": capability_id,
+                        "parameter": parameter,
+                        "resolution_value": resolution.get("value"),
+                        "resolution_strategy": resolution.get("strategy"),
+                        "source_goal_ids": list(resolution.get("source_goal_ids") or []),
+                        "actual_arg_keys": sorted(args),
+                        "capability_input_schema": schemas.get(capability_id, {}),
+                        "corrective_contract": (
+                            "A nonblocking parameter_resolution must name an argument "
+                            "present in the referenced step args with the same value. "
+                            "If the value came from an authoritative Goal, use strategy "
+                            "user_supplied. Regenerate a schema-valid consistent step "
+                            "and resolution or return a non-executable clarification; "
+                            "do not describe an absent argument only in prose."
+                        ),
+                    }
+                )
+            if "no matching user_supplied parameter resolution" in str(exc):
+                for resolution in raw.get("parameter_resolutions") or []:
+                    if not isinstance(resolution, dict):
+                        continue
+                    if str(resolution.get("strategy") or "") == "user_supplied":
+                        continue
+                    value = resolution.get("value")
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        continue
+                    step_id = str(resolution.get("step_id") or "").strip()
+                    step = steps.get(step_id)
+                    if not isinstance(step, dict):
+                        continue
+                    feedback.append(
+                        {
+                            "type": "explicit_numeric_resolution_strategy_mismatch",
+                            "step_id": step_id,
+                            "capability_id": str(
+                                step.get("capability_id") or ""
+                            ).strip(),
+                            "parameter": str(
+                                resolution.get("parameter") or ""
+                            ).strip(),
+                            "resolution_value": value,
+                            "actual_strategy": resolution.get("strategy"),
+                            "source_goal_ids": list(
+                                resolution.get("source_goal_ids") or []
+                            ),
+                            "corrective_contract": (
+                                "A numeric value copied from an authoritative Goal "
+                                "must use strategy user_supplied, equal the referenced "
+                                "step argument, and cite that Goal in source_goal_ids."
+                            ),
+                        }
+                    )
         unique: list[dict[str, Any]] = []
         seen: set[tuple[str, tuple[Any, ...]]] = set()
         for item in feedback:
+            message = str(item.get("msg") or item.get("message") or "")
+            location = tuple(item.get("loc") or [])
             key = (
-                str(item.get("msg") or item.get("message") or ""),
-                tuple(item.get("loc") or []),
+                message
+                or json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ),
+                location,
             )
             if key in seen:
                 continue
             seen.add(key)
             unique.append(item)
+        return unique
+
+    @staticmethod
+    def _validation_error_json(
+        exc: Exception,
+        *,
+        raw: Any,
+        expected_goal_ids_for_turn: list[str],
+    ) -> str:
+        """Compatibility helper for focused callers outside the resolve loop."""
+
         return json.dumps(
-            unique,
+            DeepPlannerResolver._validation_error_items(
+                exc,
+                raw=raw,
+                expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+            ),
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -522,6 +640,7 @@ class DeepPlannerResolver:
         expected_goal_ids: list[str],
         *,
         allowed_skill_ids: list[str] | None = None,
+        capability_input_schemas: dict[str, dict[str, Any]] | None = None,
         response_only: bool = False,
         requires_execution: bool = False,
         response_goal_ids: list[str] | None = None,
@@ -532,6 +651,7 @@ class DeepPlannerResolver:
             planner_tier="deep",
             expected_goal_ids=expected_goal_ids,
             allowed_skill_ids=list(allowed_skill_ids or []),
+            capability_input_schemas=capability_input_schemas,
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
@@ -695,6 +815,56 @@ class DeepPlannerResolver:
         )
         return schema
 
+    @staticmethod
+    def _contract_revision_response_schema(
+        base_schema: dict[str, Any],
+        *,
+        feedback: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Tighten only model-authored step/parameter pairs rejected as inconsistent."""
+
+        mismatches = [
+            item
+            for item in list(feedback or [])
+            if isinstance(item, dict)
+            and item.get("type") == "parameter_resolution_argument_mismatch"
+            and str(item.get("capability_id") or "").strip()
+            and str(item.get("parameter") or "").strip()
+        ]
+        if not mismatches:
+            return base_schema
+        schema = copy.deepcopy(base_schema)
+        branches = (
+            schema.get("$defs", {})
+            .get("PlannerModelStep", {})
+            .get("oneOf", [])
+        )
+        if not isinstance(branches, list):
+            return schema
+        for mismatch in mismatches:
+            capability_id = str(mismatch["capability_id"]).strip()
+            parameter = str(mismatch["parameter"]).strip()
+            for branch in branches:
+                if not isinstance(branch, dict):
+                    continue
+                properties = branch.get("properties")
+                if not isinstance(properties, dict):
+                    continue
+                capability_property = properties.get("capability_id")
+                if not isinstance(capability_property, dict) or capability_property.get(
+                    "enum"
+                ) != [capability_id]:
+                    continue
+                args = properties.get("args")
+                if not isinstance(args, dict) or parameter not in (
+                    args.get("properties") or {}
+                ):
+                    continue
+                required = args.setdefault("required", [])
+                if parameter not in required:
+                    required.append(parameter)
+        return schema
+
     @classmethod
     def _safety_revision_contract_errors(
         cls,
@@ -836,6 +1006,14 @@ class DeepPlannerResolver:
         expected_goal_ids: list[str],
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
+        capabilities = self._prioritize_capability_contracts(
+            context,
+            capabilities,
+            feedback=feedback,
+        )
+        prompt_capabilities = [
+            self._prompt_capability_contract(item) for item in capabilities
+        ]
         identity_json = bounded_identity_json(context)
         personality_json = bounded_personality_json(context)
         skill_section = agent_skill_prompt_section(
@@ -882,7 +1060,7 @@ class DeepPlannerResolver:
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"{skill_section}"
-            f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
+            f"Executable capability catalog JSON:\n{self._bounded(prompt_capabilities, 16000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"
             "The active task bindings are historical Host/runtime context. Their "
@@ -898,6 +1076,7 @@ class DeepPlannerResolver:
             f"{route_effect_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
+            f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material step argument, including location, date, target, person, and entity identity, must equal the matching binding; do not replace a binding with a value from older memory or re-resolve the original reference. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
@@ -919,6 +1098,99 @@ class DeepPlannerResolver:
             f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{self._bounded(grounding, 5000)}\n\n"
             f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 4000)}"
         )
+
+    @staticmethod
+    def _prioritize_capability_contracts(
+        context: dict[str, Any],
+        capabilities: list[dict[str, Any]],
+        *,
+        feedback: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        referenced_ids: list[str] = []
+
+        def retain(value: Any) -> None:
+            if isinstance(value, dict):
+                capability_id = str(
+                    value.get("capability_id") or value.get("skill_id") or ""
+                ).strip()
+                if capability_id and capability_id not in referenced_ids:
+                    referenced_ids.append(capability_id)
+                for nested in value.values():
+                    retain(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    retain(nested)
+
+        retain(context.get("runtime_validator_feedback") or [])
+        retain(feedback or [])
+        retain(
+            context.get("fast_plan_resolution")
+            or context.get("fast_planner_resolution")
+            or {}
+        )
+        by_id = {str(item.get("capability_id") or ""): item for item in capabilities}
+        prioritized = [by_id[item] for item in referenced_ids if item in by_id][:12]
+        prioritized_ids = {
+            str(item.get("capability_id") or "") for item in prioritized
+        }
+        return [
+            *prioritized,
+            *[
+                item
+                for item in capabilities
+                if str(item.get("capability_id") or "") not in prioritized_ids
+            ],
+        ]
+
+    @staticmethod
+    def _prompt_capability_contract(
+        capability: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Project the full executable catalog without duplicate provider prose.
+
+        Deep Planner still receives every current capability's exact argument
+        schema and safety/resource contract. Provider hints duplicate most of
+        that data and previously pushed later capabilities beyond the bounded
+        catalog serialization, making the advertised "full catalog" false in
+        deployed prompts.
+        """
+
+        projected = {
+            key: capability.get(key)
+            for key in (
+                "capability_id",
+                "description",
+                "input_schema",
+                "route",
+                "requires_confirmation",
+                "effects",
+                "safety_class",
+                "can_run_parallel",
+                "parallel_metadata_declared",
+                "exclusive_group",
+                "resource_claims",
+            )
+        }
+        hints = capability.get("hints")
+        if isinstance(hints, dict):
+            semantic_scope = hints.get("semantic_scope")
+            if semantic_scope:
+                projected["semantic_scope"] = semantic_scope
+            when_to_use = str(hints.get("when_to_use") or "").strip()
+            if when_to_use and when_to_use != str(
+                capability.get("description") or ""
+            ).strip():
+                projected["when_to_use"] = when_to_use[:600]
+        constraints = capability.get("execution_constraints")
+        if isinstance(constraints, dict):
+            retained_constraints = {
+                key: constraints[key]
+                for key in ("locomotion_envelope", "parallel_allowed_with_lanes")
+                if constraints.get(key)
+            }
+            if retained_constraints:
+                projected["execution_constraints"] = retained_constraints
+        return projected
 
     @staticmethod
     def _system_prompt() -> str:
@@ -987,6 +1259,10 @@ class DeepPlannerResolver:
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
             context=request.context,
+        )
+        validate_explicit_numeric_parameter_grounding(
+            model_output,
+            authoritative_goals=canonical_goal_grounding(request.context),
         )
         validate_goal_binding_argument_grounding(
             model_output,

@@ -15,27 +15,34 @@ organized by capability, risk, and retained evidence.
 
 ## Current priorities
 
-1. Keep every admitted non-operational turn on one Goal-driven semantic path.
+1. Close the 2026-08-07 post-merge audit by merging the source-qualified
+   candidate and retaining clean merged-revision paired MuJoCo proof for exact
+   compound capability arguments plus provider-start cancellation. The
+   dependency-complete source gate and rebuilt clean generated-speech/GPU
+   profile are retained for `90aa72a`; the absent independent semantic reviewer
+   remains an explicit non-release gap. Hard semantic, delivery-evidence,
+   safety, provider, or provenance failures remain non-averageable blockers.
+2. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
+3. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
    default-provider distinction evidence; real modes remain a separate target
    evidence track.
-3. Preserve Issue #7's source-qualified peer media-playback contract and its
+4. Preserve Issue #7's source-qualified peer media-playback contract and its
    clean default-provider distinction evidence. Real operations remain a
    separate target-evidence track; singing remains Speaking, existing-audio
    playback remains Activity, and ordinary TTS is neither kind of evidence.
-4. Preserve exact provider-prefixed capability identity from model proposal
+5. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
    neutral late-binding alias merely to relocate implementation.
-5. Close source-bound and target-bound evidence separately. A passing source
+6. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-6. Reduce compatibility surfaces only after the maintained path has equivalent
+7. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-7. Keep documentation, benchmarks, static analysis, configuration ownership,
+8. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations

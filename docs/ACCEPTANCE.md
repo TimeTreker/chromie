@@ -20,13 +20,13 @@ A higher level does not replace lower-level regression tests.
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Strict profile and 68 focused rejection/regression tests pass | Runner captures running image/model identity and a source-bound speech-only bundle | Not applicable | Open: current physical input reaches VAD/ASR but has not produced an intelligible required utterance; no physical claim |
+| Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Merged `e3d57ff` diagnostic exercised generated speech through VAD, ASR, live Gateway/Core, TTS, and playback; its full matrix failed and is not clean closure evidence | Not applicable | Open: physical attempts remain unintelligible for the required utterance; generated speech is not a physical claim |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
-| Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
+| Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | `e3d57ff` live Gateway/Core/Fast-Planner greeting smoke passed; clean post-audit full-scenario evidence remains open | Source-bound MuJoCo verifier implemented; final-revision paired bundle open | Not claimed |
 | Interaction contracts and Trusted Capability Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider; corrected local Oute `chromie_mixed` passed 10/10 smoke plus two repeated 6/6 full matrices at 8192; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; physical listening and comparative shared-resource target evidence open |
+| ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | The `e3d57ff` diagnostic retained both Ollama models on the RTX 5090, non-empty TTS PCM, and 19/19 GPU-smoke passes; this is generated/service evidence, not physical listening | Not applicable | Historical RTX 5090 Oute evidence remains revision-bound; physical listening and comparative shared-resource target evidence remain open |
 | Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, reversible ducking, order-aware echo matching, and cancellation-authority contracts pass | Clean exact-revision synthetic `issue-5-94718ab-clean` passed echo 6/6 and external barge-in 7/7 with 0.0 ms duck and 8.3 ms confirmed silence | Can pair with sim | PipeWire virtual-mic 7/7 is historical; physical microphone/speaker, acoustic echo-path, audible latency, and live hot-plug review remain open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
@@ -38,6 +38,138 @@ Retained reference-host evidence from June 14 and June 17, 2026:
 | Virtual-microphone voice pipeline `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
 | Synthetic voice pipeline `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, the former Router revision, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
 | Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through the former Router revision and Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
+
+### Post-merge comprehensive diagnostic
+
+On 2026-08-07, clean merged revision `e3d57ff` ran
+`scripts/qualification/run_comprehensive_test.sh --strict-exit --capture auto
+--languages zh,en --stop-services`. The retained bundle under
+`.chromie/comprehensive/20260807T070706Z` reported 40 passes, 8 failures, and one
+skip. Missing pinned host test dependencies explained the source, benchmark,
+and scenario-command failures. The live logs also exposed genuine delivered-
+speech ledger, stale event-contract, Goal-association, memory-repair, and
+safe-read composition defects; those are recorded with their earliest
+responsible boundaries in [Current Status](STATUS.md). The semantic multi-model
+review was skipped because reviewers were not configured. This diagnostic is
+neither a passing full profile nor physical/release evidence.
+
+The first post-audit dirty replay rebuilt the Agent and proved that ordinary
+final speech now reaches the delivered-turn ledger and acoustic capture. It
+also reproduced a session-memory model that repeated invalid durable-only
+fields, a weather segmentation that treated result delivery as a second Goal,
+and nested-runner build/verification defects. These were treated as blockers;
+the dirty replay is diagnostic only and cannot replace the required final clean
+run.
+
+Later focused dirty replays retained the repaired behavior without widening the
+claim. `.chromie/acceptance/post-merge-audit-failclosed-20260807T085330Z`
+delivered one memory response only after commit and one grounded recall.
+`.chromie/acceptance/post-merge-audit-pure-safe-read-20260807T090032Z`
+delivered exactly one `post_execution` weather response per turn, answered the
+umbrella decision first, passed unique-delivery and acoustic checks, and measured
+CER 0.046154. The workflow status remains `review` with
+`semantic_review_pending=true`; manual audit found the retained speech natural
+and evidence-consistent, but that inspection is not relabelled as an automated
+external semantic pass. Both bundles were captured from a dirty source tree and
+are diagnostic evidence only. Final closure still requires a clean committed
+revision and the full comprehensive profile.
+
+The first clean committed replay at `bed08e6`, retained under
+`.chromie/comprehensive/20260807T091712Z`, reported 47 passes, one failure, one
+skip, and no timeouts. All 12 idle and all 12 shared-GPU bilingual workflow
+cases passed their mechanical, audio, completion, unique-delivery, and ordering
+checks; the three retained synthetic voice cases also passed. The sole failure
+was not a Runtime result: the comprehensive shell passed that three-case
+diagnostic bundle to the separately owned full seven-case MuJoCo release
+verifier. That verifier correctly rejected the absent body cases and live
+Soridormi source binding. The collector no longer makes the inapplicable call;
+the repaired committed replay remains required before closure. Semantic review
+also remains pending rather than being inferred from the mechanical result.
+
+The repaired clean committed replay at `d3f7b62`, retained under
+`.chromie/comprehensive/20260807T094903Z`, reported 47 passes, zero failures,
+zero timeouts, and one skipped external semantic review. All deterministic,
+service, GPU, idle/shared-load workflow, and selected synthetic voice checks
+passed mechanically. That result was still not accepted as closure: manual
+inspection of the retained delivered text found one Chinese family-help turn
+that fell back after valid primary speech was coupled to malformed optional
+Social Attention, plus two umbrella follow-ups that still replayed weather
+before the requested decision. These were semantic contract failures even
+though transport and audio assertions passed, so they were not averaged into a
+pass or hidden behind the pending external reviewer.
+
+Dirty focused replay after the general fixes is retained only as diagnostic
+evidence. `.chromie/acceptance/targeted-family-20260807c` delivered one natural
+family-help response with one completed speech event, unique delivery, and CER
+0.0. `.chromie/acceptance/targeted-semantic-20260807b` delivered the umbrella
+decision first, followed by one grounded support clause, with unique delivery
+and CER 0.068966. A forced deployed `/fast-plan` chat probe separately exercised
+the new communication-review branch and revised evidence-first text to “是的，您
+需要带伞。” before the supporting weather clause. An earlier family attempt in
+the same targeted run hit a cold service connection reset and TTS startup
+timeout; the warmed repeat, rather than that failed attempt, is the relevant
+behavior diagnostic. None of these dirty probes replaces final clean,
+revision-bound comprehensive evidence or external semantic adjudication.
+
+Clean commit `258d0ec`, retained under
+`.chromie/comprehensive/20260807T103838Z`, again reported 47 passes, zero
+failures, zero timeouts, and one skipped external semantic review. All 24 idle
+and shared-GPU workflow cases passed mechanical delivery, ordering, capture,
+and transcription checks. Manual review accepted the repaired Chinese
+family-help and umbrella-decision boundaries, but correctly withheld closure:
+the shared-load English multi-part response invented that the user had “a busy
+day tomorrow.” That unsupported personal circumstance is a semantic grounding
+defect even though both requested Goals were completed. The clean bundle is
+therefore retained as diagnostic evidence, not final closure evidence.
+
+Dirty focused grounding replay is retained separately. The first attempt at
+`.chromie/acceptance/targeted-grounding-20260807d` failed before connection
+during cold service startup. The next attempt at
+`.chromie/acceptance/targeted-grounding-20260807e` authored a grounded response
+but the cold TTS worker missed the 20-second playback-start gate, so no speech
+was delivered and the case failed mechanically. After explicit TTS warmup,
+`.chromie/acceptance/targeted-grounding-20260807f` delivered both requested
+Goals once and in order, used only the general benefit of getting enough rest,
+did not invent a personal schedule or circumstance, and measured WER 0.044444.
+This focused dirty evidence does not replace final clean revision binding.
+
+Clean committed revision `90aa72a` ran the corrected comprehensive collector
+under `.chromie/comprehensive/20260807T135248Z`. Its service log records a real
+image build followed by force recreation; nested voice acceptance reused that
+same stack. The run retained 46 passes, zero failures, zero timeouts, and one
+skipped independent semantic-review check. Strict mode therefore returned
+`incomplete`, and `release_qualified=false` remains correct. The archive is
+`/home/chromie/Downloads/chromie-comprehensive-90aa72aa7549-20260807T135248Z.tar.gz`;
+its SHA-256 is
+`c2fafdf827b6bd42e253ce125b2549b97128cf11b48ebe2ac2baecbaea4ea45a`.
+
+The retained current-revision matrix passed 403 deterministic behavior
+scenarios, 19 GPU-smoke checks with zero failures, bilingual acoustic transport,
+all 12 idle and all 12 shared-GPU workflow cases, and all selected synthetic
+speech-only, barge-in, and follow-up cases. The barge-in case measured 0.0 ms
+from VAD start to duck and 4.7 ms from confirmed speech to silence, retained the
+independent output-only Gateway receipt, and proved that stale playback did not
+resume. Warm median TTS first-audio time was 1.107 seconds idle and 1.227 seconds
+under shared GPU load, with no generation-limit hits. The retained cold-start
+distribution includes a roughly 40.2-second first generation and a later
+14.0-second Chinese sample, so no release latency claim is made.
+
+Manual review of all workflow outputs found no recurrence of the audit's hard
+semantic blockers: family answers were direct, stable knowledge was correct,
+session memory recalled blue, the weather correction switched location, the
+umbrella response led with the recommendation, multipart responses stayed
+grounded, and ordered stories were complete and unique. That inspection does
+not substitute for or relabel the skipped external semantic adjudication.
+Generated speech and acoustic loopback do not prove a physical microphone,
+speaker, human pronunciation, or physical robot.
+
+After the executable scenarios were aligned with the evidence-before-claim
+contract, the complete source gate passed: 102 benchmark tests, 2,095 maintained
+tests, 20 legacy Agent tests, and every repository-policy, ownership, Ruff, Mypy,
+configuration, structure, and documentation check. The Level A general-ability
+profile passed 66/66 across all ten ability classes. These results establish
+automatic source behavior only; they do not replace clean revision-bound
+service, audio, simulator, or hardware evidence.
 
 The retained voice-pipeline automated bundles are historical evidence for their recorded
 revisions and legacy semantic path; they are not current goal-driven validation.

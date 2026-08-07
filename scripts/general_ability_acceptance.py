@@ -72,6 +72,7 @@ class TextScenarioCase:
     allow_expressive_cues: bool = True
     require_speech: bool = True
     require_fast_speech: bool = False
+    forbid_fast_speech: bool = False
     expected_fast_speech_purposes: tuple[str, ...] = field(default_factory=tuple)
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
@@ -416,6 +417,10 @@ def validate_live_text_result(
             internal_diagnostics.append(message)
 
     fast_speech = route.get("fast_speech") if isinstance(route, dict) else None
+    if case.forbid_fast_speech and isinstance(fast_speech, dict) and str(
+        fast_speech.get("text") or ""
+    ).strip():
+        errors.append("Core route emitted forbidden pre-effect fast_speech")
     if case.require_fast_speech:
         if not isinstance(fast_speech, dict) or not str(
             fast_speech.get("text") or ""
@@ -657,6 +662,7 @@ def _text_scenario_case(
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
         require_fast_speech=bool(raw.get("require_fast_speech", False)),
+        forbid_fast_speech=bool(raw.get("forbid_fast_speech", False)),
         expected_fast_speech_purposes=_tuple_of_strings(
             raw.get("expected_fast_speech_purposes")
         ),
@@ -828,6 +834,18 @@ def validate_manifest(
             )
         if not ability.level_a_scenarios and not ability.live_text_cases:
             errors.append(f"{ability.ability_id}: no acceptance cases declared")
+        for ref in ability.live_text_cases:
+            for case in (ref.case, *ref.case.turns):
+                if case.require_fast_speech and case.forbid_fast_speech:
+                    errors.append(
+                        f"{ability.ability_id}/{case.case_id}: fast speech "
+                        "cannot be both required and forbidden"
+                    )
+                if case.forbid_fast_speech and case.expected_fast_speech_purposes:
+                    errors.append(
+                        f"{ability.ability_id}/{case.case_id}: forbidden fast "
+                        "speech cannot declare expected purposes"
+                    )
 
     keys = level_a_keys(manifest.ability_classes)
     if keys and validate_level_a_sources:

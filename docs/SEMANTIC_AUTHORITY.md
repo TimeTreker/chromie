@@ -54,17 +54,19 @@ complete.
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
 | Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
-| Orchestrator turn in `apply`; mapped route lane is excluded | Existing routed Agent path | authoritative | The compatibility path selected before Goal-driven ownership; exact Goal Interpretation actions remain adapter-only | Goal-driven Runtime never acquires this turn. |
+| Orchestrator turn in `apply`; mapped route lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; exact Goal Interpretation actions remain unexecuted compatibility input only | Return a typed no-action/error outcome without legacy semantic re-entry. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with exact Goal Interpreter `actions[]` | No new semantic planner; Goal Interpreter-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 | Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
-| Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
+| Post-interrupt correction in `apply`; corrected mapped lane is excluded | Goal-Driven Cognitive Core policy boundary | authoritative fail-closed | No semantic planner is entered; exact actions remain unexecuted compatibility input only and physical resume stays locked | Return a typed no-action/error outcome without legacy semantic re-entry. |
 
-The queued grounded-response latency Issue may add a direct speech-only branch
-after Goal Association. That branch is not implemented by this documentation
-change and does not change the semantic owner shown above: the same Core owns
-Goal meaning, response composition, and all effect boundaries.
+The implemented direct speech-only branch runs after Goal Association for a
+complete non-effectful spoken-response Goal. Response Composer authors the
+answer without invoking Fast or Deep Planner. This changes latency, not
+authority: the same Core owns Goal meaning and response composition, and the
+trusted Host still owns delivery. Capability-dependent safe reads are not this
+branch; their factual speech follows trusted execution evidence.
 
 When Goal Association explicitly binds one Goal with `entity_type=action_list`,
 Fast and Deep Planning require a bounded model-authored semantic completeness

@@ -162,6 +162,11 @@ class ResponseComposerResolver:
             isinstance(target_evidence, dict) and target_evidence.get("available")
         )
         delivered_turn_speech = self._delivered_turn_speech(request.context)
+        pure_safe_read = (
+            plan.disposition == "execute"
+            and self._is_safe_read_plan(plan, request.context)
+            and not self._confirmation_required(plan, request.context)
+        )
         logger.info(
             "response_composer_social_attention_context sid=%s mode=%s "
             "candidates=%s decision_required=%s target_available=%s",
@@ -216,7 +221,7 @@ class ResponseComposerResolver:
                 raw = self._canonicalize_optional_social_attention_payload(raw)
                 raw = self._canonicalize_lane_coordination_payload(raw, plan=plan)
                 model_output = ResponseComposerModelOutput.model_validate(raw)
-                if self._is_safe_read_plan(plan, request.context):
+                if self._is_safe_read_plan(plan, request.context) and not pure_safe_read:
                     safe_read_semantic_review_attempted = True
                     logger.info(
                         "response_composer_safe_read_semantic_review_start sid=%s",
@@ -411,19 +416,25 @@ class ResponseComposerResolver:
                         "contract_schema": "ResponseComposerModelOutput",
                         "safe_read_speech_required": (
                             self._is_safe_read_plan(plan, request.context)
+                            and not pure_safe_read
                             and not delivered_turn_speech
                         ),
                         "safe_read_speech_optional": (
                             self._is_safe_read_plan(plan, request.context)
-                            and bool(delivered_turn_speech)
+                            and (pure_safe_read or bool(delivered_turn_speech))
                         ),
+                        "pure_safe_read_dynamic_speech_suppressed": pure_safe_read,
                         "delivered_turn_speech_count": len(delivered_turn_speech),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
                         "safe_read_semantic_review": {
                             "attempted": safe_read_semantic_review_attempted,
                             "succeeded": safe_read_semantic_review_succeeded,
-                            "strategy": "model_owned_pre_evidence_speech_review",
+                            "strategy": (
+                                "host_cached_prelude_or_post_execution_result"
+                                if pure_safe_read
+                                else "model_owned_pre_evidence_speech_review"
+                            ),
                         },
                         "effectful_semantic_review": {
                             "attempted": effectful_semantic_review_attempted,
@@ -554,8 +565,9 @@ class ResponseComposerResolver:
 
         Response Composer owns wording and optional lane presentation; it does not
         own the already validated Capability Plan.  When a pure, non-confirmation
-        execution Plan has one model-authored current-turn acknowledgement already
-        queued or playback-started, reuse that exact utterance as the existing
+        safe-read execution Plan can proceed without dynamic pre-evidence speech;
+        other execution Plans require one model-authored current-turn acknowledgement
+        already queued or playback-started, which is reused as the existing
         delivery/effect barrier instead of discarding the Activity Plan because an
         optional composition DTO remained malformed.
 
@@ -573,29 +585,35 @@ class ResponseComposerResolver:
             or any(outcome.disposition != "execute" for outcome in plan.goal_outcomes)
         ):
             return None
-        reusable = cls._reusable_turn_speech(request.context)
-        if not reusable:
-            return None
-        candidate = next(
-            (
-                item
-                for item in reversed(reusable)
-                if str(item.get("route") or "").strip() in {"", "robot_action"}
-                and str(item.get("text") or "").strip()
-            ),
-            None,
-        )
-        if candidate is None:
-            return None
-        stage = ResponseStage(
-            text=str(candidate["text"]),
-            speech_act="acknowledge",
-            commitment_state="heard",
-            must_not_claim_completion=True,
-            reuse_current_turn_speech=True,
-            covers_goal_ids=list(plan.goal_ids),
-        )
-        response_plan = ResponsePlan(pre_action=stage)
+        safe_read = cls._is_safe_read_plan(plan, request.context)
+        if safe_read:
+            response_plan = ResponsePlan()
+        else:
+            reusable = cls._reusable_turn_speech(request.context)
+            if not reusable:
+                return None
+            candidate = next(
+                (
+                    item
+                    for item in reversed(reusable)
+                    if str(item.get("route") or "").strip()
+                    in {"", "robot_action"}
+                    and str(item.get("text") or "").strip()
+                ),
+                None,
+            )
+            if candidate is None:
+                return None
+            response_plan = ResponsePlan(
+                pre_action=ResponseStage(
+                    text=str(candidate["text"]),
+                    speech_act="acknowledge",
+                    commitment_state="heard",
+                    must_not_claim_completion=True,
+                    reuse_current_turn_speech=True,
+                    covers_goal_ids=list(plan.goal_ids),
+                )
+            )
         cls._validate_reused_turn_speech(
             response_plan,
             context=request.context,
@@ -628,7 +646,10 @@ class ResponseComposerResolver:
             lane_coordination=[],
             confidence=0.0,
             rationale=(
-                "Reused an existing model-authored acknowledgement so an optional "
+                "Suppressed dynamic pre-evidence speech for a safe read so an optional "
+                "presentation failure could not cancel the validated primary activity."
+                if safe_read
+                else "Reused an existing model-authored acknowledgement so an optional "
                 "presentation failure could not cancel the validated primary activity."
             ),
             metadata={
@@ -636,7 +657,9 @@ class ResponseComposerResolver:
                 "resolver": "response_composer",
                 "task_plan_immutable": True,
                 "fail_soft_primary_activity": True,
-                "reused_current_turn_speech": True,
+                "reused_current_turn_speech": not safe_read,
+                "safe_read_speech_optional": safe_read,
+                "pure_safe_read_dynamic_speech_suppressed": safe_read,
                 "original_failure_type": type(failure).__name__,
                 "original_failure": str(failure)[:300],
                 "contract_repair_attempted": contract_repair_attempted,
@@ -652,13 +675,17 @@ class ResponseComposerResolver:
             status="resolved",
             composition=composition,
             reason_summary=(
-                "Validated primary activity was preserved by reusing existing "
+                "Validated safe-read activity was preserved with dynamic "
+                "pre-evidence speech suppressed."
+                if safe_read
+                else "Validated primary activity was preserved by reusing existing "
                 "current-turn acknowledgement speech."
             ),
             metadata={
                 "authority": "advisory",
                 "resolver": "response_composer",
                 "fail_soft_primary_activity": True,
+                "pure_safe_read_dynamic_speech_suppressed": safe_read,
                 "contract_repair_attempted": contract_repair_attempted,
                 "original_failure_type": type(failure).__name__,
             },
@@ -874,11 +901,18 @@ class ResponseComposerResolver:
             *[("progress", item) for item in response_plan.progress],
             ("final", response_plan.final),
         ):
-            if stage is None or not stage.reuse_current_turn_speech:
+            if stage is None:
+                continue
+            normalized = " ".join(stage.text.strip().split())
+            if not stage.reuse_current_turn_speech:
+                if normalized in reusable_text:
+                    raise ValueError(
+                        "speech that exactly copies scheduled or delivered "
+                        "current-turn speech must set reuse_current_turn_speech=true"
+                    )
                 continue
             if phase not in {"immediate", "pre_action"}:
                 raise ValueError("only immediate or pre_action may reuse current-turn speech")
-            normalized = " ".join(stage.text.strip().split())
             if normalized not in reusable_text:
                 raise ValueError(
                     "reused current-turn speech must copy one exact scheduled or "
@@ -927,7 +961,6 @@ class ResponseComposerResolver:
             if (
                 plan.disposition == "execute"
                 and cls._is_safe_read_plan(plan, context)
-                and cls._delivered_turn_speech(context)
                 and not cls._confirmation_required(plan, context)
             ):
                 return
@@ -983,6 +1016,38 @@ class ResponseComposerResolver:
     ) -> None:
         if not cls._is_safe_read_plan(plan, context):
             return
+        if (
+            plan.disposition == "execute"
+            and not cls._confirmation_required(plan, context)
+        ):
+            if any(
+                stage is not None
+                for stage in (
+                    response_plan.immediate,
+                    response_plan.pre_action,
+                    response_plan.final,
+                )
+            ) or response_plan.progress:
+                raise ValueError(
+                    "pure safe-read execution must not author dynamic "
+                    "pre-evidence speech"
+                )
+            return
+        reusable = cls._reusable_turn_speech(context)
+        if reusable:
+            if response_plan.immediate is None:
+                if cls._delivered_turn_speech(context):
+                    return
+                raise ValueError(
+                    "scheduled safe-read acknowledgement must be represented by "
+                    "an immediate reused-speech stage"
+                )
+            if not response_plan.immediate.reuse_current_turn_speech:
+                raise ValueError(
+                    "safe-read composition must reuse the already scheduled or "
+                    "delivered current-turn acknowledgement instead of authoring "
+                    "another pre-evidence utterance"
+                )
         if response_plan.immediate is None:
             if cls._delivered_turn_speech(context) and not cls._confirmation_required(
                 plan, context
@@ -995,7 +1060,8 @@ class ResponseComposerResolver:
             raise ValueError("safe-read acknowledgement must use immediate, not pre_action")
         # Wording and length are conversational choices owned by the model.
         # The Host validates only the coordination contract: one immediate
-        # pre-result stage, no pre_action/final stage, and no completion claim.
+        # pre-result stage, exact reuse of an existing current-turn utterance when
+        # present, no pre_action/final stage, and no completion claim.
 
     @staticmethod
     def _validate_spoken_language(
@@ -1312,26 +1378,12 @@ class ResponseComposerResolver:
                 if plan.disposition == "execute" and ResponseComposerResolver._is_safe_read_plan(
                     plan, context
                 ):
-                    delivered_turn_speech = ResponseComposerResolver._delivered_turn_speech(context)
-                    # When nothing has been spoken yet, the Composer owns the
-                    # one pre-result acknowledgement. If fast-first speech has
-                    # already begun playback, expose both choices and let the
-                    # model decide whether that speech is sufficient, needs a
-                    # supplement, or requires correction.
-                    response_properties["immediate"] = (
-                        {
-                            "anyOf": [
-                                {"$ref": "#/$defs/ResponseStage"},
-                                {"type": "null"},
-                            ]
-                        }
-                        if delivered_turn_speech
-                        else {"$ref": "#/$defs/ResponseStage"}
-                    )
+                    # A pure safe read has no model-authored pre-evidence
+                    # speech. The Host may use its generic cached latency cue;
+                    # the post-execution interpreter owns the factual answer.
+                    response_properties["immediate"] = {"type": "null"}
                     response_properties["pre_action"] = {"type": "null"}
-                    if not delivered_turn_speech and "immediate" not in response_required:
-                        response_required.append("immediate")
-                    if delivered_turn_speech and "immediate" in response_required:
+                    if "immediate" in response_required:
                         response_required.remove("immediate")
                     response_plan_schema.pop("anyOf", None)
                 else:
@@ -1468,6 +1520,7 @@ class ResponseComposerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
+                raw = self._canonicalize_optional_social_attention_payload(raw)
                 output = ResponseComposerModelOutput.model_validate(raw)
                 self._validate_social_attention_decision(
                     output.social_attention_plan,
@@ -1649,7 +1702,12 @@ class ResponseComposerResolver:
             "model-authored spoken Goals below. No capability planning or effect "
             "execution is required at this boundary. The newest user turn owns "
             "the communicative intent; prior dialogue is context, not a script to "
-            "replay.\n\n"
+            "replay. Ground every user-specific statement in the newest turn, "
+            "validated Goals, or supplied conversation context. Do not invent the "
+            "user's plans, schedule, preferences, relationships, experiences, "
+            "feelings, or circumstances to make a response sound helpful. When a "
+            "friendly supporting reason is useful but no personal fact was supplied, "
+            "phrase it generally.\n\n"
             f"User turn: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n\n"
             "Validated Goal Association JSON:\n"
@@ -2290,6 +2348,7 @@ class ResponseComposerResolver:
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
             "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. decision=express is structurally valid only when it contains at least one supplied body behavior or speech_expression.mode=adapt. A reason alone is not expression. When a requested action already owns a capability, do not duplicate that same capability as auxiliary Social Attention. If a proposed body expression conflicts with primary Activity, choose another eligible untargeted candidate, adapt the response style, or return decision=none with a concrete scene reason. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
+            "Ground every user-specific statement in the newest turn, active Goals, or supplied conversation context. Do not invent the user's plans, schedule, preferences, relationships, experiences, feelings, or circumstances to make a response sound helpful. When a friendly supporting reason is useful but no personal fact was supplied, phrase it generally. "
             "For a retained completed external-result Goal, treat delivered evidence-bound dialogue as the only supplied factual projection. Preserve every measurement and condition from the immutable plan and that dialogue exactly; do not substitute, infer, or embellish external details. The newest user turn remains the conversational target: when it is a reaction, feeling, acknowledgement, evaluation, or practical decision, respond to that act first and use prior facts only as useful support. Never replace the current intent with a replay of the old answer. Omit supporting detail when a direct judgment is sufficient. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -2299,7 +2358,7 @@ class ResponseComposerResolver:
             "For execute plans this is pre-execution composition. Effectful or confirmation-bound work must emit an immediate and/or pre_action stage covering every canonical goal, use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, omit progress and final, and phrase the speech naturally. "
             "When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative without claiming it started, ask the user to approve it, set speech_act=ask_confirmation and commitment_state=waiting_for_user, and do not imply that approval has already been granted. "
             "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. Fast speech marked scheduled is a queued current-turn communicative commitment: do not author another acknowledgement with the same semantic job while it is starting, but never treat scheduled status as proof that the user heard it or as external-fact, execution, or completion evidence. When an existing delivered or scheduled acknowledgement adequately covers pending work, copy its exact text into the appropriate immediate or pre_action stage, set reuse_current_turn_speech=true, and add the current canonical goal IDs. That stage is a reference to existing speech, not a request to speak it again. Use reuse_current_turn_speech=false for any supplement, correction, confirmation question, result, or failure. This is semantic conversational judgment, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
-            "For a pending safe_read or external_read capability, ensure the user receives one adequate natural everyday acknowledgement before the result. When current-turn delivered or scheduled speech already adequately acknowledges that same pending work, reuse it exactly rather than authoring another acknowledgement. When no adequate acknowledgement was delivered or scheduled, or the earlier one needs supplementation or correction, emit exactly one natural everyday immediate acknowledgement. The Host does not impose a character, word, or sentence-count style limit. For a fresh external read, say naturally that Chromie is checking the relevant source. For chromie.memory.retrieve_verified_tool_result, say naturally that Chromie recently checked the exact subject and is retrieving that result, with certainty no stronger than the supplied index metadata. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
+            "For a pure execute plan whose pending capabilities are all safe_read or external_read, emit no response stage before execution: immediate, pre_action, progress, and final must all be absent. The Host may independently play its generic cached latency cue, and the post-execution tool-result interpreter owns the only factual answer. Do not copy, supplement, or reinterpret scheduled or delivered fast speech in this pure safe-read composition. A mixed plan with an independent respond responsibility may still require model-authored speech; that speech must cover only the respond responsibility and must not state any pending measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, speaking delivers model-authored communication and exact provider-qualified vocal performance, and activity executes non-speech provider work. chromie.vocal.perform is a Speaking-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Speaking or vocal-performance evidence. Media may share the physical speaker with Speaking only under its declared duck_media_during_speaking mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy an already-parallel chromie.vocal.perform step into speaking_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the speaking member only when no provider speaking_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
@@ -2445,5 +2504,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, and delivery_role directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. Safe-read work requires one adequate acknowledgement across the whole current turn and no pre_action. If delivered or scheduled current-turn speech already adequately provided the acknowledgement, copy its exact text into the stage, set reuse_current_turn_speech=true, and cover the current Goal IDs; Runtime will reuse that speech instead of speaking it twice. Otherwise author the missing supplement or correction with reuse_current_turn_speech=false. Runtime starts any new acknowledgement in parallel with the lookup, and the Host imposes no fixed wording-length limit. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap across speaking, activity, and optional social_attention lanes, with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages or social behaviors. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. decision=express requires at least one supplied behavior or speech_expression.mode=adapt. Never repeat a primary user-requested capability as auxiliary Social Attention; use another eligible behavior, speech adaptation, or decision=none. Return only the corrected JSON object."
+            "Preserve truthful wording, the explicit Language hint, goal coverage, and valid model-authored conversational style, but correct the JSON structure and coordination invariants. The spoken text must actually use the authoritative language rather than merely describing it. Put speech_act, commitment_state, must_not_claim_completion, covers_goal_ids, coordination_id, and delivery_role directly on each response stage, never in metadata. For terminal respond, use exactly one final stage with commitment_state=completed and must_not_claim_completion=false. Do not shorten or rewrite otherwise valid speech merely to satisfy a Host style preference. For execute and mixed plans with pending effectful steps, use immediate and/or pre_action, omit progress and final, and keep must_not_claim_completion=true. A pure execute Plan whose pending capabilities are all safe_read or external_read must emit no response stage: set immediate, pre_action, and final to null and progress to an empty list. The optional generic Host cache owns latency presentation and the post-execution interpreter owns the grounded result; never copy or supplement scheduled dynamic speech for that pure Plan. For other pending work, if delivered or scheduled current-turn speech already adequately provided the acknowledgement, copy its exact text into the stage, set reuse_current_turn_speech=true, and cover the current Goal IDs; Runtime will reuse that speech instead of speaking it twice. Otherwise author only a required supplement or correction with reuse_current_turn_speech=false. When the CanonicalPlan or supplied execution capability semantics require confirmation, explain any supplied adjustment or alternative, ask for approval with speech_act=ask_confirmation and commitment_state=waiting_for_user, and never claim that the action started. Confirmation or waiting speech must never join a lane_coordination group. Use lane_coordination only for best-effort overlap across speaking, activity, and optional social_attention lanes, with exact parallel CanonicalPlan step IDs and matching coordination_id values on participating speech stages or social behaviors. For clarification, emit exactly one final stage with speech_act=clarify or ask_clarification and commitment_state=waiting_for_user. When Social Attention policy is enabled and reviewed candidates exist, social_attention_plan must be an explicit decision=none or decision=express object and must not be omitted or null; null is reserved for policy off or an empty candidate list. decision=express requires at least one supplied behavior or speech_expression.mode=adapt. Never repeat a primary user-requested capability as auxiliary Social Attention; use another eligible behavior, speech adaptation, or decision=none. Return only the corrected JSON object."
         )

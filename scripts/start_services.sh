@@ -222,7 +222,14 @@ fi
 
 PULL_POLICY="${CHROMIE_PULL_POLICY:-never}"
 echo "[start] Starting containers without building (pull policy: ${PULL_POLICY})..."
-docker compose "${COMPOSE_ARGS[@]}" up -d --no-build --pull "$PULL_POLICY" "${SERVICES[@]}"
+UP_ARGS=(-d --no-build --pull "$PULL_POLICY")
+if [[ "${BUILD:-0}" == "1" ]]; then
+  # A successful image build can replace the image ID beneath an otherwise
+  # unchanged running container. Recreate every owned service before profile
+  # verification so Docker never has to inspect a removed image reference.
+  UP_ARGS+=(--force-recreate)
+fi
+docker compose "${COMPOSE_ARGS[@]}" up "${UP_ARGS[@]}" "${SERVICES[@]}"
 
 echo "[start] Verifying container environment against the auto-detected profile..."
 ./scripts/verify_runtime_profile.sh

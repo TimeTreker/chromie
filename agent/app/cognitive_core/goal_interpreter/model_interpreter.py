@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from .fallback import fallback_decision
+from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
 
 
 def _raise_if_llm_budget_failure(exc: Exception) -> None:
@@ -37,7 +38,6 @@ def _raise_if_llm_budget_failure(exc: Exception) -> None:
         and exc.failure_domain == "llm_budget"
     ):
         raise exc
-from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
 
 
 logger = logging.getLogger("chromie.agent.goal_interpreter.llm")
@@ -1462,6 +1462,7 @@ class OllamaGoalInterpreter:
                         "Authority Boundary:\n"
                         "- This is before authoritative Goals, Plans, authorization, execution, and results.\n"
                         "- The speech may commit to checking, considering, or arranging only the understood pending work, but it must not semantically claim a result, authorized or started motion, memory commit, safe completion, or completed responsibility.\n"
+                        "- For route=memory, use an explicitly prospective or intentional grammatical construction about what Chromie will do next. Do not use completed aspect, a resultative construction, or a present/past state that says or implies the fact is already remembered, noted, recorded, saved, stored, or updated. Do not confirm that the fact is already available in memory.\n"
                         "- Do not add any task, errand, destination, person, object, household activity, or physical action that the user did not request and the interpretation decision did not select.\n"
                         "- Do not predict weather, measurements, conditions, recommendations, conclusions, or other external facts before matching provider evidence exists.\n"
                         "- Identity and personality shape voice only; they never prove ability or create another responsibility.\n- For read-only work, mention only exact model-authored bindings already present in the interpretation decision.\n"
@@ -1533,6 +1534,7 @@ class OllamaGoalInterpreter:
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
                         "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Remove every invented side task, errand, destination, person, object, household activity, or physical action, even when it sounds caring or fits the personality.\n"
                         "- Before provider evidence exists, remove every guessed weather condition, measurement, recommendation, conclusion, or result. Acknowledging that Chromie will check is allowed; guessing what she will find is not.\n"
+                        "- For memory work, the memory update has not been committed at this boundary. Require an explicitly prospective or intentional grammatical construction about what Chromie will do next. The acknowledgement may say that Chromie heard the request and is going to remember or note it, but it must not say or imply that the fact is already remembered, noted, recorded, stored, saved, or updated. Reject completed aspect, resultative constructions, and present or past states that imply completion; rewrite them prospectively.\n"
                         "- For robot_action, the body action definitely has not started at this boundary. Judge the ordinary sentence meaning, not only the typed fields. If the candidate places Chromie already inside an ongoing movement or action, rewrite it prospectively as hearing, preparing, or getting ready to try the understood request.\n"
                         "- Never preserve present-progressive action wording merely because commitment=prelude_only or claim_state=none is structurally valid. The words and the typed contract must agree.\n"
                         "- Do not replace every case with one standard acknowledgement. The pending work still requires one acknowledgement.\n"
@@ -1620,6 +1622,41 @@ class OllamaGoalInterpreter:
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
         payload["format"] = self._route_response_schema()
+        return payload
+
+    def build_contract_repair_payload(
+        self,
+        request: RouteRequest,
+        *,
+        previous_content: str,
+        validation_error: Exception,
+    ) -> dict[str, Any]:
+        payload = self.build_payload(request)
+        payload["messages"] = [
+            {
+                "role": "system",
+                "content": (
+                    self.load_system_prompt()
+                    + "\n\nContract Repair: The previous RouteDecision failed the "
+                    "Host-owned typed contract. Return one corrected complete "
+                    "RouteDecision JSON object. Preserve valid semantic judgments, "
+                    "but revise every field named by the exact validation errors. "
+                    "Do not infer durable-memory consent, a Capability, a route, or "
+                    "an effect from the errors. Session memory is ephemeral and must "
+                    "omit consent_basis and retention_days. Return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    self.build_user_prompt(request)
+                    + "\n\nPrevious model output:\n"
+                    + str(previous_content or "")[:5000]
+                    + "\n\nExact typed validation errors:\n"
+                    + str(validation_error)[:6000]
+                ),
+            },
+        ]
         return payload
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
@@ -2280,10 +2317,29 @@ class OllamaGoalInterpreter:
         data: dict[str, Any],
         *,
         stage: str = "llm",
+        allow_session_memory_contract_recovery: bool = False,
     ) -> RouteDecision:
         content = data.get("message", {}).get("content", "")
         raw_summary = _raw_interpreter_output_summary(str(content or ""))
         parsed = _extract_json_object(content)
+        if allow_session_memory_contract_recovery:
+            recovered_paths = self._remove_durable_fields_from_session_memory(parsed)
+            if recovered_paths:
+                metadata = parsed.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                metadata["contract_recovery"] = {
+                    "strategy": "remove_durable_fields_from_explicit_session_memory",
+                    "recovered_paths": recovered_paths,
+                }
+                parsed["metadata"] = metadata
+                logger.warning(
+                    "goal_interpreter_session_memory_contract_recovered "
+                    "sid=%s stage=%s paths=%s",
+                    request.sid,
+                    stage,
+                    recovered_paths,
+                )
         route_items = _route_items_from_parsed(parsed)
         dominant_route = _dominant_route_from_items(route_items)
         if "route" not in parsed and dominant_route:
@@ -2348,6 +2404,43 @@ class OllamaGoalInterpreter:
         finalized = finalize_decision(decision, request, source="llm")
         self._log_decision_summary(request, finalized, stage=stage, raw_summary=raw_summary)
         return finalized
+
+    @staticmethod
+    def _remove_durable_fields_from_session_memory(
+        parsed: dict[str, Any],
+    ) -> list[str]:
+        """Remove only non-authoritative durable fields from explicit session memory.
+
+        This recovery runs only after one model-owned typed repair attempt. It
+        preserves the model's session/ephemeral/remember semantics and can only
+        reduce persistence authority; contradictory profile, durable, forget, or
+        clear operations continue to fail the typed contract.
+        """
+
+        recovered: list[str] = []
+        containers: list[tuple[str, dict[str, Any]]] = [("memory_update", parsed)]
+        routes = parsed.get("routes")
+        if isinstance(routes, list):
+            containers.extend(
+                (f"routes[{index}].memory_update", item)
+                for index, item in enumerate(routes)
+                if isinstance(item, dict)
+            )
+        for path, container in containers:
+            proposal = container.get("memory_update")
+            if not isinstance(proposal, dict):
+                continue
+            if str(proposal.get("scope") or "session") != "session":
+                continue
+            if str(proposal.get("operation") or "remember") != "remember":
+                continue
+            if str(proposal.get("persistence_policy") or "ephemeral") != "ephemeral":
+                continue
+            for field in ("consent_basis", "retention_days"):
+                if proposal.get(field) is not None:
+                    proposal.pop(field, None)
+                    recovered.append(f"{path}.{field}")
+        return recovered
 
     async def _review_route_only_robot_action(
         self,
@@ -2532,13 +2625,15 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        """Require semantic review for every pending-work acknowledgement.
+        """Require semantic review for admissible pending-work acknowledgements.
 
         Structural FastSpeech fields cannot prove that ordinary wording stayed
-        within the user's request. Tool, memory, and deep-thought acknowledgements
-        can invent unsupported facts or side errands just as embodied speech can
-        invent started motion. When semantic review is disabled or fails, suppress
-        the dynamic utterance so the Host may use its low-commitment cached fallback.
+        within the user's request. Deep-thought acknowledgements can invent
+        unsupported facts or side errands just as embodied speech can invent
+        started motion. Tool and memory speech is suppressed before this boundary
+        because evidence or a committed effect must precede dynamic wording. When
+        semantic review is disabled or fails, suppress the remaining dynamic
+        utterance so the Host may use its low-commitment cached fallback.
         """
 
         target_route = _pending_work_fast_speech_target_route(decision)
@@ -2639,6 +2734,40 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
+        fail_closed_route = _pending_work_fast_speech_target_route(decision)
+        if fail_closed_route in {"memory", "tool"}:
+            policy = (
+                "memory_commit_required_before_speech"
+                if fail_closed_route == "memory"
+                else "tool_evidence_required_before_dynamic_speech"
+            )
+            logger.info(
+                "goal_interpreter_fast_speech_suppressed route=%s intent=%s "
+                "reason=%s sid=%s",
+                decision.route,
+                decision.intent,
+                policy,
+                request.sid,
+            )
+            suppressed = _decision_without_goal_interpretation_fast_speech(
+                decision,
+                reason_suffix=(
+                    f"pre-effect {fail_closed_route} fast speech suppressed; "
+                    "cached prelude or authoritative result response required"
+                ),
+                stage=f"{fail_closed_route}_preeffect_suppressed",
+            )
+            metadata = dict(suppressed.metadata or {})
+            review = dict(metadata.get("fast_speech_review") or {})
+            review.update(
+                {
+                    "model_reviewed": False,
+                    "policy": policy,
+                }
+            )
+            metadata["fast_speech_review"] = review
+            return suppressed.model_copy(update={"metadata": metadata})
+
         prepared = decision
         if _decision_needs_goal_interpretation_fast_speech(decision):
             if not self.pending_work_fast_speech_repair_enabled:
@@ -3308,12 +3437,25 @@ class OllamaGoalInterpreter:
         except (ValueError, ValidationError) as exc:
             logger.warning("Invalid Goal Interpreter model response: %s; content=%r", exc, content[:500])
             try:
-                relaxed = await self._chat_logged(self.build_payload(request, relaxed_json=True), stage="quick_intent_relaxed", request=request)
-                decision = self._decision_from_response(request, relaxed, stage="quick_intent_relaxed")
-                logger.info("Goal Interpreter model recovered with relaxed JSON response")
-            except Exception as relaxed_exc:
-                _raise_if_llm_budget_failure(relaxed_exc)
-                logger.warning("Relaxed Goal Interpreter model retry failed: %s", relaxed_exc)
+                repaired = await self._chat_logged(
+                    self.build_contract_repair_payload(
+                        request,
+                        previous_content=str(content or ""),
+                        validation_error=exc,
+                    ),
+                    stage="quick_intent_contract_repair",
+                    request=request,
+                )
+                decision = self._decision_from_response(
+                    request,
+                    repaired,
+                    stage="quick_intent_contract_repair",
+                    allow_session_memory_contract_recovery=True,
+                )
+                logger.info("Goal Interpreter model recovered with typed contract repair")
+            except Exception as repair_exc:
+                _raise_if_llm_budget_failure(repair_exc)
+                logger.warning("Goal Interpreter typed contract repair failed: %s", repair_exc)
                 return fallback_decision(request, reason=f"invalid_goal_interpreter_response: {exc}")
 
         if (

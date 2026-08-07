@@ -436,6 +436,7 @@ fast_planner_resolver = (
     FastPlannerResolver(
         fast_planner_client,
         capability_catalog,
+        communication_reviewer=ollama_client,
         min_confidence=settings.fast_planner_min_confidence,
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,

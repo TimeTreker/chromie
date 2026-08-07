@@ -82,11 +82,14 @@ streaming remains capability metadata until an incremental token-to-audio input
 transport is implemented and measured end to end.
 
 Raw model tokens, partial JSON, and incomplete response contracts are not valid
-TTS input. Future latency work may submit independently schema-valid
-`fast_speech` or `ResponseStage` text earlier only after Host authorization
+TTS input. The Host may submit an independently schema-valid, semantically
+admissible `fast_speech` or `ResponseStage` earlier only after authorization
 against the applicable correlation, commitment/evidence, claim, and
-cancellation state, and it may play provider PCM chunks incrementally. Those
-are separate semantic and transport changes. Both must preserve ordered
+cancellation state. Tool/memory and pure safe-read dynamic pre-effect speech is
+not admissible; a generic cached cue may be played without claiming a result.
+Provider PCM transport can deliver chunks incrementally, but retained audible-
+latency evidence still requires correlated first-PCM and playback events. Both
+semantic scheduling and transport must preserve ordered
 playback, cancellation generations, stale-output suppression, barge-in, device
 rollover, and delivery evidence.
 

@@ -1319,6 +1319,24 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         )
         self.assertTrue(all(item.passed for item in checks))
 
+    def test_speech_only_accepts_current_cognitive_core_event(self) -> None:
+        checks = analyze_case(
+            "speech-only",
+            [
+                event("asr_final", "asr_final: text='hello'"),
+                event(
+                    "cognitive_core_done",
+                    "cognitive_core_done: lane=chat intent=greeting",
+                ),
+                event(
+                    "cognitive_interaction_ready",
+                    "cognitive_interaction_ready: speech=1 skills=0",
+                ),
+                *tts_completion_events("sid-1", "A short spoken answer."),
+            ],
+        )
+        self.assertTrue(all(item.passed for item in checks))
+
     def test_speech_only_rejects_session_done_without_tts_output(self) -> None:
         checks = analyze_case(
             "speech-only",
@@ -1473,6 +1491,54 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             )
         )
 
+    def test_barge_in_accepts_independent_retry_receipt(self) -> None:
+        records = [
+            event(
+                "playback_start",
+                "playback_start: order=0 source_rate=44100 output_rate=44100 "
+                "audio_ms=30000.0 generation=1",
+                "old",
+            ),
+            event(
+                "playback_duck_started",
+                "playback_duck_started: generation=1 vad_start_to_duck_ms=30.0 "
+                "cancel_cognitive_work=false pause_error=none",
+                "old",
+            ),
+            event(
+                "session_interrupted_by_new_session",
+                "session_interrupted_by_new_session: new_sid=unrecognized",
+                "old",
+            ),
+            event("asr_final", "asr_final: text='unrecognized stop'", "unrecognized"),
+            event(
+                "barge_in_external_speech_confirmed",
+                "barge_in_external_speech_confirmed: scope=output_only "
+                "cancel_cognitive_work=false playback_generation_at_start=1 "
+                "confirmed_speech_to_silence_ms=25.0",
+                "unrecognized",
+            ),
+            event("asr_final", "asr_final: text='stop talking'", "retry"),
+            event(
+                "cognitive_gateway_cancellation_dispatched",
+                "cognitive_gateway_cancellation_dispatched: "
+                "requested_scope=output_only effective_scope=output_only "
+                "interactions=none selected=0 active=0 queued=0 "
+                "non_interruptible=0 provider_failures=0 dispatch_failures=0",
+                "retry",
+            ),
+            event(
+                "cognitive_gateway_reflex_applied",
+                "cognitive_gateway_reflex_applied: action=interrupt "
+                "trigger=stop_output_command goal_interpretation_bypassed=True",
+                "retry",
+            ),
+        ]
+
+        checks = analyze_case("barge-in", records)
+
+        self.assertTrue(all(item.passed for item in checks), checks)
+
     def test_barge_in_missing_interrupt_asr_fails_without_analyzer_error(self) -> None:
         checks = analyze_case(
             "barge-in",
@@ -1593,6 +1659,35 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 if item.name == "no stale output or completed work after stop"
             )
         )
+
+    def test_stop_accepts_current_gateway_reflex_receipt(self) -> None:
+        records = [
+            event(
+                "playback_start",
+                "playback_start: order=0 source_rate=44100 output_rate=44100 "
+                "audio_ms=30000.0 generation=1",
+                "old",
+            ),
+            event(
+                "session_interrupted_by_new_session",
+                "session_interrupted_by_new_session: new_sid=stop",
+                "old",
+            ),
+            event("asr_final", "asr_final: text='stop talking'", "stop"),
+            event(
+                "cognitive_gateway_reflex_applied",
+                "cognitive_gateway_reflex_applied: action=interrupt "
+                "trigger=stop_command goal_interpretation_bypassed=True",
+                "stop",
+            ),
+            event(
+                "interrupt_previous_audio_done",
+                "interrupt_previous_audio_done: playback_generation=2",
+                "stop",
+            ),
+        ]
+        checks = analyze_case("stop", records)
+        self.assertTrue(all(item.passed for item in checks))
 
     def test_speech_skill_requires_bound_spoken_approval(self) -> None:
         checks = analyze_case(

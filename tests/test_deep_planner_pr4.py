@@ -108,6 +108,245 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_prior_validator_capability_contract_precedes_catalog_truncation(self):
+        run_request = request("Walk briefly.")
+        context = dict(run_request.context)
+        context["runtime_validator_feedback"] = [
+            {
+                "type": "invalid_args",
+                "capability_id": "soridormi.walk_forward",
+                "errors": ["args has unknown fields: ['speed']"],
+            }
+        ]
+        capabilities = [
+            {
+                "capability_id": f"rare.capability_{index}",
+                "description": "x" * 500,
+                "input_schema": {"type": "object", "properties": {}},
+            }
+            for index in range(40)
+        ]
+        capabilities.append(
+            {
+                "capability_id": "soridormi.walk_forward",
+                "description": "Walk using the exact provider contract.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"duration_s": {"type": "number"}},
+                    "required": ["duration_s"],
+                    "additionalProperties": False,
+                },
+            }
+        )
+
+        prompt = DeepPlannerResolver(object(), object())._prompt(
+            run_request.model_copy(update={"context": context}),
+            capabilities,
+            feedback=[],
+            response_schema={},
+            expected_goal_ids=["goal-action"],
+        )
+
+        catalog_section = prompt.split(
+            "Executable capability catalog JSON:\n",
+            1,
+        )[1].split("Verified tool-memory index JSON", 1)[0]
+        self.assertIn("soridormi.walk_forward", catalog_section)
+        self.assertIn("duration_s", catalog_section)
+        self.assertIn("additionalProperties", catalog_section)
+        self.assertLess(
+            catalog_section.index("soridormi.walk_forward"),
+            catalog_section.index("rare.capability_0"),
+        )
+
+    def test_compact_catalog_keeps_terminal_numeric_capability_visible(self):
+        capabilities = [
+            {
+                "capability_id": f"soridormi.action_{index:02d}",
+                "description": "Bounded robot action.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {
+                            "type": "number",
+                            "minimum": 0.5,
+                            "maximum": 20.0,
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+                "route": "robot_action",
+                "requires_confirmation": False,
+                "effects": ["physical_motion"],
+                "safety_class": "guarded_motion",
+                "can_run_parallel": False,
+                "parallel_metadata_declared": True,
+                "exclusive_group": "base_motion",
+                "resource_claims": ["base_motion"],
+                "execution_constraints": {
+                    "control_coupling": "primary_body_controller",
+                    "parallel_safe_with": [],
+                    "safety_preemption": "safe_hold",
+                },
+                "hints": {
+                    "when_to_use": "Bounded robot action.",
+                    "examples": "x" * 2000,
+                    "concurrency": {"duplicated": "x" * 2000},
+                },
+            }
+            for index in range(17)
+        ]
+        capabilities.append(
+            {
+                **capabilities[-1],
+                "capability_id": "soridormi.walk_velocity",
+                "description": "Track a bounded body velocity command.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {
+                            "type": "number",
+                            "minimum": -0.03,
+                            "maximum": 0.25,
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+                "hints": {
+                    "when_to_use": "Track a bounded body velocity command.",
+                    "concurrency": {"duplicated": "x" * 5000},
+                },
+            }
+        )
+
+        prompt = DeepPlannerResolver(object(), object())._prompt(
+            request("Walk at an explicit numeric velocity."),
+            capabilities,
+            feedback=[],
+            response_schema={},
+            expected_goal_ids=["goal-action"],
+        )
+        catalog_section = prompt.split(
+            "Executable capability catalog JSON:\n",
+            1,
+        )[1].split("Verified tool-memory index JSON", 1)[0]
+
+        self.assertIn("soridormi.walk_velocity", catalog_section)
+        self.assertIn("vx_mps", catalog_section)
+        self.assertIn('"maximum":0.25', catalog_section)
+        self.assertNotIn("duplicated", catalog_section)
+
+    def test_resolution_mismatch_feedback_carries_selected_capability_schema(self):
+        feedback = DeepPlannerResolver._validation_error_items(
+            ValueError(
+                "parameter resolution references an argument absent from its step"
+            ),
+            raw={
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {"duration_s": 10.0},
+                    }
+                ],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "walk",
+                        "parameter": "vx_mps",
+                        "strategy": "safe_default",
+                        "value": 0.2,
+                        "source_goal_ids": ["goal-action"],
+                    }
+                ],
+            },
+            expected_goal_ids_for_turn=["goal-action"],
+            capability_payload=[
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "vx_mps": {
+                                "type": "number",
+                                "minimum": -0.03,
+                                "maximum": 0.25,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                }
+            ],
+        )
+
+        mismatch = next(
+            item
+            for item in feedback
+            if item["type"] == "parameter_resolution_argument_mismatch"
+        )
+        self.assertEqual(mismatch["capability_id"], "soridormi.walk_velocity")
+        self.assertEqual(mismatch["parameter"], "vx_mps")
+        self.assertEqual(mismatch["resolution_value"], 0.2)
+        self.assertEqual(
+            mismatch["capability_input_schema"]["properties"]["vx_mps"][
+                "maximum"
+            ],
+            0.25,
+        )
+        self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
+
+        schema = DeepPlannerResolver._response_schema(
+            ["goal-action"],
+            allowed_skill_ids=["soridormi.walk_velocity"],
+            capability_input_schemas={
+                "soridormi.walk_velocity": mismatch["capability_input_schema"]
+            },
+        )
+        tightened = DeepPlannerResolver._contract_revision_response_schema(
+            schema,
+            feedback=feedback,
+        )
+        self.assertIn(
+            "vx_mps",
+            tightened["$defs"]["PlannerModelStep"]["oneOf"][0][
+                "properties"
+            ]["args"]["required"],
+        )
+
+    def test_numeric_repair_feedback_rejects_default_strategy_for_goal_value(self):
+        feedback = DeepPlannerResolver._validation_error_items(
+            ValueError(
+                "explicit numeric goal value has no matching user_supplied "
+                "parameter resolution"
+            ),
+            raw={
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {"vx_mps": 0.2},
+                    }
+                ],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "walk",
+                        "parameter": "vx_mps",
+                        "strategy": "safe_default",
+                        "value": 0.2,
+                        "source_goal_ids": ["goal-action"],
+                    }
+                ],
+            },
+            expected_goal_ids_for_turn=["goal-action"],
+        )
+
+        mismatch = next(
+            item
+            for item in feedback
+            if item["type"] == "explicit_numeric_resolution_strategy_mismatch"
+        )
+        self.assertEqual(mismatch["actual_strategy"], "safe_default")
+        self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
+
     def test_deep_decoder_requires_explicit_step_timing(self):
         schema = DeepPlannerResolver._response_schema(
             ["goal-walk", "goal-blink"],
@@ -120,6 +359,45 @@ class DeepPlannerResolverTests(unittest.TestCase):
         required = schema["$defs"]["PlannerModelStep"]["required"]
         self.assertIn("timing", required)
         self.assertIn("reason_summary", required)
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 8)
+        self.assertIn(
+            "never duplicate a step",
+            schema["properties"]["steps"]["description"],
+        )
+
+    def test_deep_decoder_enforces_exact_capability_argument_bounds(self):
+        schema = DeepPlannerResolver._response_schema(
+            ["goal-turn"],
+            allowed_skill_ids=["soridormi.turn_in_place"],
+            capability_input_schemas={
+                "soridormi.turn_in_place": {
+                    "type": "object",
+                    "properties": {
+                        "yaw_radps": {
+                            "type": "number",
+                            "minimum": -0.2,
+                            "maximum": 0.2,
+                        }
+                    },
+                    "additionalProperties": False,
+                }
+            },
+        )
+
+        branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
+        self.assertIn("timing", branch["required"])
+        self.assertIn("source_goal_ids", branch["required"])
+        self.assertEqual(
+            branch["properties"]["capability_id"]["enum"],
+            ["soridormi.turn_in_place"],
+        )
+        self.assertEqual(
+            branch["properties"]["args"]["properties"]["yaw_radps"][
+                "maximum"
+            ],
+            0.2,
+        )
+        self.assertFalse(branch["properties"]["args"]["additionalProperties"])
 
     def test_fast_parallel_safety_feedback_specializes_first_deep_attempt(self):
         adjusted = {
@@ -561,6 +839,59 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
+    def test_explicit_numeric_goal_requires_deep_parameter_provenance(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        repaired = {
+            **invalid,
+            "parameter_resolutions": [
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative Goal.",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+        }
+        run_request = request("Walk for 2 seconds.")
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk for 2 seconds."
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.parameter_resolutions[0].parameter, "duration_s")
+        self.assertIn(
+            "Select a capability whose argument schema can represent the supplied value",
+            ollama.prompts[0][0],
+        )
+        self.assertIn(
+            "include a user_supplied parameter_resolution",
+            ollama.prompts[0][0],
+        )
+        self.assertIn("no matching user_supplied", ollama.prompts[1][0])
+
     def test_parallel_plan_is_revised_when_provider_forbids_overlap(self):
         parallel = {
             "disposition": "execute",
@@ -861,6 +1192,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
         repaired = {
             **invalid,
             "confidence": 1.0,
+            "parameter_resolutions": [
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 15.0,
+                    "confidence": 1.0,
+                    "blocking": False,
+                    "rationale": "Copied from the authoritative walking Goal.",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
             "goal_outcomes": {
                 "goal-walk": {
                     "disposition": "execute",

@@ -352,7 +352,7 @@ authorizes it against the applicable correlation, commitment/evidence state,
 claim guards, and cancellation generation. It need not wait for unrelated later
 response fields.
 
-The queued grounded-response Issue must also distinguish result evidence from
+The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically
 pre-empt current output; an ordinary progress or result stage remains ordered
 until an appropriate speech opening; internal-only evidence updates Goal/task
@@ -609,11 +609,12 @@ The loop records contracts and decisions, not hidden model reasoning:
 - final response claims and delivery result;
 - cancellation and provider postconditions.
 
-The queued grounded-response latency Issue must add direct/Fast/Deep path
-classification and its reason, first-valid-speech-commitment, TTS-request,
-first-PCM, and first-audible-playback timing, plus model queue/evaluation and
-contract-repair count/duration. These are future trace requirements, not claims
-about events emitted by the current runtime.
+The runtime records direct/Fast/Deep path classification and the reason for a
+Deep invocation. Session evidence also records TTS request, first PCM, and
+playback events, but the qualification trace still needs one correlated
+first-valid-speech-commitment boundary plus model queue/evaluation and
+contract-repair count/duration before it can support an end-to-end response-
+latency claim. Do not infer those missing slices from unrelated timestamps.
 
 One trace should answer: what entered, what Chromie understood, what it planned,
 what was authorized, what actually ran, what evidence returned, how each goal
@@ -680,12 +681,12 @@ Required Level A cases include:
 - dedicated E-stop and safe-idle claims require explicit correlated Soridormi
   evidence.
 
-The queued grounded-response latency Issue adds future Level A requirements: a
-grounded greeting or direct speech-only answer invokes neither planner and emits
-one answer; complete bounded capability work terminates at Fast when validation
-accepts it; and work whose semantic complexity or safety/resource reasoning
-requires the wider boundary records a specific Deep reason. These requirements
-do not apply as current gates before that Issue is implemented.
+Current Level A requirements enforce that a grounded greeting or direct speech-
+only answer invokes neither planner and emits one answer; complete bounded
+capability work terminates at Fast when validation accepts it; and work whose
+semantic complexity or safety/resource reasoning requires the wider boundary
+records a specific Deep reason. Runtime latency and physical-audio claims still
+require their separately retained target evidence.
 
 Level A and unit tests prove contract behavior only. Provider-backed live-text,
 simulator, microphone, and physical-robot claims require their corresponding

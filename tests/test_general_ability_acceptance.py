@@ -5,12 +5,14 @@ import json
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from dataclasses import replace
 from io import StringIO
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from scripts.general_ability_acceptance import (
     DEFAULT_MANIFEST,
+    LiveCaseRef,
     TextScenarioCase,
     _run_live_case,
     build_parser,
@@ -51,7 +53,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("wal_forward_typo_walk", live_ids)
         self.assertIn("multi_goal_look_then_blink", live_ids)
         self.assertIn("weather_then_chinese_walk_blink_song", live_ids)
-        self.assertIn("beijing_rain_pending_acknowledgement", live_ids)
+        self.assertIn("beijing_rain_evidence_bound_result", live_ids)
 
     def test_live_validation_requires_structured_pending_work_speech(self) -> None:
         case = TextScenarioCase(
@@ -79,6 +81,59 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "must_not_claim_completion": True,
         }
         self.assertEqual(validate_live_text_result(case, summary), [])
+
+    def test_live_validation_can_forbid_pre_effect_fast_speech(self) -> None:
+        case = TextScenarioCase(
+            case_id="weather",
+            text="今天北京下雨了没有？",
+            expected_routes=("tool",),
+            require_speech=False,
+            forbid_fast_speech=True,
+        )
+        summary = {
+            "route": {
+                "route": "tool",
+                "fast_speech": {
+                    "text": "北京今天已经下雨了。",
+                    "purpose": "acknowledge_and_check",
+                    "commitment": "checking_only",
+                    "must_not_claim_completion": True,
+                },
+            },
+            "interaction_response": {"speech": [], "skills": []},
+            "preview_only": True,
+            "cognitive_runtime": {},
+        }
+
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("forbidden pre-effect" in item for item in errors))
+
+        summary["route"]["fast_speech"] = None
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
+    def test_manifest_rejects_contradictory_fast_speech_policy(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = manifest.ability_classes[0]
+        contradictory = TextScenarioCase(
+            case_id="contradictory",
+            text="Check something.",
+            require_fast_speech=True,
+            forbid_fast_speech=True,
+        )
+        patched_ability = replace(
+            ability,
+            live_text_cases=(
+                *ability.live_text_cases,
+                LiveCaseRef(case=contradictory),
+            ),
+        )
+        patched_manifest = replace(
+            manifest,
+            ability_classes=(patched_ability, *manifest.ability_classes[1:]),
+        )
+
+        errors = validate_manifest(patched_manifest, validate_level_a_sources=False)
+        self.assertTrue(any("both required and forbidden" in item for item in errors))
 
     def test_retained_voice_incident_is_a_two_turn_live_episode(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

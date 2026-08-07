@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from difflib import SequenceMatcher
-import hashlib
 import json
 import logging
 import math
@@ -103,7 +102,7 @@ from shared.chromie_runtime.accelerator_telemetry import (
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
-from orchestrator.schemas.agent import AgentResult, SpeechItem
+from orchestrator.schemas.agent import AgentResult
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.interaction import (
@@ -112,6 +111,7 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
 )
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -122,7 +122,6 @@ from shared.chromie_contracts.tool_result import (
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
-    DEFAULT_REFLEX_FILTER,
     ReflexOutcome,
 )
 from shared.chromie_contracts.user_turn import UserTurnEnvelope
@@ -1855,7 +1854,8 @@ class VoiceAssistant:
         # candidates retain coverage for VAD segments that cross order bounds.
         candidate_keys = list(part_keys)
         candidate_keys.extend(
-            left + right for left, right in zip(part_keys, part_keys[1:])
+            left + right
+            for left, right in zip(part_keys, part_keys[1:], strict=False)
         )
         candidate_keys.append("".join(part_keys))
 
@@ -2129,7 +2129,41 @@ class VoiceAssistant:
                 "status": current_status() or status or "scheduled",
             }
 
-        scheduled = await self.schedule_tts_text(str(args.get("text") or ""), session_id)
+        text = str(args.get("text") or "")
+        scheduled = await self.schedule_tts_text(text, session_id)
+        if scheduled.get("scheduled") is True:
+            raw_orders = scheduled.get("orders")
+            if not isinstance(raw_orders, list):
+                raw_orders = [scheduled.get("order")]
+            orders = [
+                int(item)
+                for item in raw_orders
+                if isinstance(item, int)
+                or (isinstance(item, str) and item.isdigit())
+            ]
+            speech_event = self._register_turn_speech_event(
+                session_id=session_id,
+                generation=int(scheduled.get("generation") or 0),
+                orders=orders,
+                text=text,
+                stage=(
+                    str(metadata.get("phase") or "interaction_speech")
+                    if isinstance(metadata, dict)
+                    else "interaction_speech"
+                ),
+                purpose=(
+                    str(metadata.get("delivery_role") or "response")
+                    if isinstance(metadata, dict)
+                    else "response"
+                ),
+                commitment=(
+                    str(metadata.get("commitment_state") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+            )
+            if speech_event is not None:
+                scheduled["speech_event_id"] = speech_event["event_id"]
         if (
             isinstance(metadata, dict)
             and metadata.get("wait_for_playback_start") is True
@@ -2974,11 +3008,15 @@ class VoiceAssistant:
         claimed_goal_ids = payload.get("claimed_goal_ids")
         if claimed_capability_ids != [] or claimed_goal_ids != []:
             return None
+        # Tool and memory wording becomes authoritative only after matching
+        # evidence or a committed update exists. Pre-effect dynamic speech
+        # therefore fails closed regardless of structurally valid claim fields;
+        # the existing generic cached cue may still cover latency.
+        if str(route or "").strip().casefold() in {"memory", "tool"}:
+            return None
         route_contracts = {
-            "tool": ("acknowledge_and_check", "checking_only"),
             "robot_action": ("acknowledge", "prelude_only"),
             "deep_thought": ("thinking", "prelude_only"),
-            "memory": ("acknowledge", "prelude_only"),
         }
         expected = route_contracts.get(str(route or ""))
         if expected is not None:
@@ -3126,7 +3164,7 @@ class VoiceAssistant:
                 if isinstance(order, int)
             ]
             fast_speech = decision.fast_speech
-            speech_event = self._register_turn_speech_event(
+            self._register_turn_speech_event(
                 session_id=session_id,
                 generation=int(scheduled.get("generation") or 0),
                 orders=orders,
@@ -3313,7 +3351,7 @@ class VoiceAssistant:
         )
         return False
 
-    def _cognitive_gateway_adapter(self) -> GatewayCoreCompatibilityAdapter:
+    def _cognitive_gateway_adapter(self) -> CognitiveGateway:
         adapter = getattr(self, "cognitive_gateway", None)
         if adapter is None:
             adapter = CognitiveGateway()
@@ -4916,7 +4954,7 @@ class VoiceAssistant:
             context_snapshot,
         )
         try:
-            review_attention = getattr(self.agent_client, "review_attention")
+            review_attention = self.agent_client.review_attention
             attention_review = await review_attention(
                 session,
                 request=attention_request,

@@ -218,19 +218,18 @@ independently schema-valid `fast_speech` or `ResponseStage` only after Host
 validation authorizes it against the applicable turn/Goal correlation,
 commitment or evidence state, claim guards, and cancellation generation. It
 need not wait for unrelated later response fields. The stages have distinct
-truth requirements. For pending tool, planning, memory, or embodied work, the
-Core model owns the exact dynamic fast-speech wording under the owner-approved
-mind and style context, but silence is not a valid outcome once that pending
-responsibility is confidently selected. An independent semantic/style review may
-preserve or rewrite a candidate; it may not erase a structurally valid required
-acknowledgement merely by selecting silence. The typed `claim_state`,
-`claimed_capability_ids`, and `claimed_goal_ids` carry claim authority; before
-Goals and Plans exist they must be `none`, empty, and empty. The Host validates
-those typed fields, turn correlation, internal-token safety, and lifecycle state.
-It must not infer conversational meaning from a phrase blacklist or replace
-invalid ordinary speech with a universal canned sentence. A bounded model repair
-is attempted first; the pre-generated cache is only a transport-safe last-resort
-latency fallback when dynamic speech cannot be scheduled.
+truth requirements. For eligible planning or embodied work, the Core model owns
+the exact dynamic fast-speech wording under the owner-approved mind and style
+context, and an independent semantic/style review must preserve or truthfully
+repair it. The typed `claim_state`, `claimed_capability_ids`, and
+`claimed_goal_ids` are necessary claim controls; before Goals and Plans exist
+they must be `none`, empty, and empty. They are not proof that the ordinary
+sentence stayed prospective. Tool and memory routes therefore suppress dynamic
+pre-effect speech until trusted evidence or a committed result exists. The Host
+validates typed fields, turn correlation, internal-token safety, and lifecycle
+state without inferring meaning from a phrase blacklist. The pre-generated
+generic cache is a transport-safe latency presentation path when dynamic speech
+is not admissible or cannot be scheduled; it never claims evidence or an effect.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable
@@ -360,30 +359,27 @@ never a candidate spoken response.
 
 ## Tool behavior
 
-The Cognitive Gateway admits a turn but does not author semantic speech. Once
-Goal Interpretation chooses pending tool, planning, memory, or embodied work,
-the Core should emit one typed, non-terminal `fast_speech` process
-acknowledgement. If the first interpretation omits that field, one bounded Core
-repair may add it without changing the chosen route, bindings, or safety policy.
-The Host validates and schedules that Core-authored speech before the slow
-runtime. A valid cached acknowledgement is used only when dynamic speech is
-missing, invalid, or cannot be scheduled. The Host does not invent or rewrite
-the model-authored sentence.
+The Cognitive Gateway admits a turn but does not author semantic speech. For
+eligible planning or embodied work, Goal Interpretation may emit one typed,
+non-terminal `fast_speech` process acknowledgement; one bounded Core repair may
+add it without changing the chosen route, bindings, or safety policy. Tool and
+memory routes suppress that dynamic field before playback because no pre-effect
+model sentence can claim evidence or a commit yet. The Host may schedule a
+validated generic cached acknowledgement instead, but does not invent or
+rewrite a semantic sentence.
 
 Chromie may say she is checking something only when a real tool call will be made
-with validated arguments. For safe reads, the acknowledgement and the read start
-without serializing the read behind TTS synthesis or playback. A valid cached cue
-remains the lowest-latency presentation path; on a cache miss, the typed Core
-speech prevents a long silent wait for planning, lookup, and final composition.
-Final speech still comes from Response Composer and must not duplicate the
-acknowledgement. When the existing acknowledgement already covers pending work,
-the Composer copies its exact text into a typed stage with
-`reuse_current_turn_speech=true`; Runtime reuses the existing TTS event and
-playback barrier without scheduling duplicate audio. Host code validates
-capability safety, arguments, truth state,
-concurrency, and evidence binding. Physical or externally effectful work uses
-only a safety prelude or confirmation request before execution and keeps its
-confirmation and delivery barriers.
+with validated arguments. For a pure safe read, Response Composer emits no
+dynamic pre-evidence stage and the read does not wait for TTS synthesis or
+playback. A valid generic cached cue remains the optional latency presentation
+path. After execution, Tool Result Interpretation receives only trusted evidence
+and owns the single grounded answer. A mixed Plan may still reuse an exact
+independently valid current-turn utterance with
+`reuse_current_turn_speech=true`; Runtime reuses the existing TTS event without
+scheduling duplicate audio. Host code validates capability safety, arguments,
+truth state, concurrency, and evidence binding. Physical or externally
+effectful work uses only a reviewed safety prelude or confirmation request before
+execution and keeps its confirmation and delivery barriers.
 
 Natural:
 

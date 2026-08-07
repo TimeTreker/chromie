@@ -88,6 +88,8 @@ class ToolResultInterpreter:
     ) -> ToolResultInterpretation:
         evidence_by_id = {item.evidence_id: item for item in request.evidence}
         raw: Any = None
+        contract_repair_attempted = False
+        contract_repair_succeeded = False
         try:
             raw = await self.ollama.generate(
                 self._prompt(request),
@@ -103,12 +105,22 @@ class ToolResultInterpreter:
                 turn_id=request.sid,
                 attempt=1,
             )
-            output = ToolResultModelOutput.model_validate(raw)
             effectful_reviewed = False
-            if self._requires_effectful_review(request):
-                reviewed = await self.ollama.generate(
-                    self._effectful_review_prompt(request, candidate=output),
-                    system=self._effectful_review_system_prompt(),
+            try:
+                output, effectful_reviewed = await self._validated_output(
+                    request,
+                    raw=raw,
+                    evidence_by_id=evidence_by_id,
+                )
+            except (ValidationError, ValueError) as exc:
+                contract_repair_attempted = True
+                raw = await self.ollama.generate(
+                    self._contract_repair_prompt(
+                        request,
+                        previous_output=raw,
+                        validation_error=exc,
+                    ),
+                    system=self._contract_repair_system_prompt(),
                     options={
                         "temperature": 0,
                         "top_p": 0.9,
@@ -116,26 +128,16 @@ class ToolResultInterpreter:
                         "num_predict": self.num_predict,
                     },
                     response_format=self._response_schema(request),
-                    prompt_family="tool_result_interpreter.effectful_review",
+                    prompt_family="tool_result_interpreter.contract_repair",
                     turn_id=request.sid,
-                    attempt=1,
+                    attempt=2,
                 )
-                if not isinstance(reviewed, dict):
-                    raise ValueError(
-                        "effectful tool-result review output is not a JSON object"
-                    )
-                raw = reviewed
-                output = ToolResultModelOutput.model_validate(reviewed)
-                effectful_reviewed = True
-            selected_values = self._validate_fact_references(
-                output.selected_facts,
-                evidence_by_id=evidence_by_id,
-            )
-            self._validate_spoken_response(
-                request,
-                output=output,
-                selected_values=selected_values,
-            )
+                output, effectful_reviewed = await self._validated_output(
+                    request,
+                    raw=raw,
+                    evidence_by_id=evidence_by_id,
+                )
+                contract_repair_succeeded = True
             return ToolResultInterpretation(
                 status="resolved",
                 spoken_response=output.spoken_response,
@@ -149,6 +151,8 @@ class ToolResultInterpreter:
                     "evidence_count": len(request.evidence),
                     "selected_fact_count": len(output.selected_facts),
                     "effectful_semantic_review": effectful_reviewed,
+                    "contract_repair_attempted": contract_repair_attempted,
+                    "contract_repair_succeeded": contract_repair_succeeded,
                     "full_tool_result_retained": True,
                 },
             )
@@ -176,6 +180,8 @@ class ToolResultInterpreter:
                         "error_type": type(exc).__name__,
                         "error": str(exc)[:300],
                         "raw_output": self._bounded(raw, 1200),
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": False,
                         "full_tool_result_retained": True,
                         **failure,
                     },
@@ -187,10 +193,108 @@ class ToolResultInterpreter:
                     "error_type": type(exc).__name__,
                     "error": str(exc)[:300],
                     "raw_output": self._bounded(raw, 1200),
+                    "contract_repair_attempted": contract_repair_attempted,
+                    "contract_repair_succeeded": False,
                     "full_tool_result_retained": True,
                     **failure,
                 },
             )
+
+    async def _validated_output(
+        self,
+        request: ToolResultInterpretationRequest,
+        *,
+        raw: Any,
+        evidence_by_id: dict[str, ToolResultEvidence],
+    ) -> tuple[ToolResultModelOutput, bool]:
+        """Validate one candidate and preserve the independent effectful review."""
+
+        output = ToolResultModelOutput.model_validate(raw)
+        effectful_reviewed = False
+        if self._requires_effectful_review(request):
+            reviewed = await self.ollama.generate(
+                self._effectful_review_prompt(request, candidate=output),
+                system=self._effectful_review_system_prompt(),
+                options={
+                    "temperature": 0,
+                    "top_p": 0.9,
+                    "num_ctx": self.num_ctx,
+                    "num_predict": self.num_predict,
+                },
+                response_format=self._response_schema(request),
+                prompt_family="tool_result_interpreter.effectful_review",
+                turn_id=request.sid,
+                attempt=1,
+            )
+            if not isinstance(reviewed, dict):
+                raise ValueError(
+                    "effectful tool-result review output is not a JSON object"
+                )
+            output = ToolResultModelOutput.model_validate(reviewed)
+            effectful_reviewed = True
+        selected_values = self._validate_fact_references(
+            output.selected_facts,
+            evidence_by_id=evidence_by_id,
+        )
+        self._validate_spoken_response(
+            request,
+            output=output,
+            selected_values=selected_values,
+        )
+        return output, effectful_reviewed
+
+    def _contract_repair_prompt(
+        self,
+        request: ToolResultInterpretationRequest,
+        *,
+        previous_output: Any,
+        validation_error: Exception,
+    ) -> str:
+        """Ask the model to repair presentation only, never trusted evidence."""
+
+        evidence_payload = [
+            {
+                "evidence_id": item.evidence_id,
+                "tool_id": item.tool_id,
+                "status": item.status,
+                "data": item.data,
+                "available_scalar_json_pointers": self._scalar_json_pointers(
+                    item.data
+                ),
+            }
+            for item in request.evidence
+        ]
+        return (
+            "Repair the previous tool-result interpretation so it satisfies the "
+            "exact typed and evidence contract. Return the complete corrected JSON "
+            "object, not a patch. Keep the user's actual question as the target and "
+            "answer it directly. Do not weaken, omit, or work around the reported "
+            "validation failure. Do not change trusted evidence, invent a fact, cite "
+            "an unavailable JSON Pointer, add an unsupported number, expose internal "
+            "identifiers, or claim an unsupported physical outcome. Preserve the "
+            "target language and owner-approved personality. When the response is "
+            "over its selected character or sentence budget, rewrite it naturally "
+            "within that budget while retaining only the most useful supported facts.\n\n"
+            f"User request: {request.user_request}\n"
+            f"Target language: {request.language}\n"
+            f"Normal character budget: {request.max_spoken_chars}\n"
+            f"Normal sentence budget: {request.max_sentences}\n"
+            f"Detailed character budget: {request.detailed_max_spoken_chars}\n"
+            f"Detailed sentence budget: {request.detailed_max_sentences}\n"
+            f"Exact validation failure: {type(validation_error).__name__}: {validation_error}\n"
+            f"Previous output JSON: {self._bounded(previous_output, 5000)}\n"
+            f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
+            "Return JSON only."
+        )
+
+    @staticmethod
+    def _contract_repair_system_prompt() -> str:
+        return (
+            "You are Chromie's tool-result contract repairer. Repair only the "
+            "model-authored selection and spoken presentation. Trusted evidence, "
+            "the user's request, safety limits, and validation budgets are immutable. "
+            "Use semantic reasoning and return JSON only."
+        )
 
     def _prompt(self, request: ToolResultInterpretationRequest) -> str:
         evidence_payload = [

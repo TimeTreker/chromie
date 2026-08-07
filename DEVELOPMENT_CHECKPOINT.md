@@ -12,7 +12,73 @@ Effects remain authorized only by trusted Host and provider boundaries.
 
 ## Current checkpoint
 
-The latest source cleanup establishes:
+The semantic Issue stack was merged to `main` on 2026-08-07 as PRs #8 through
+#11. The merge commits are `2bb7a14`, `832afa1`, `0514f3c`, and `e3d57ff`.
+Issues #1, #5, #6, and #7 are closed. Retained evidence from their feature
+revisions remains revision-bound rather than being relabelled as merge-revision
+evidence.
+
+The post-merge audit of `e3d57ff` established:
+
+- the GPU, containers, Gateway/Core/Fast-Planner greeting round trip, TTS PCM,
+  deterministic transport, and generated-speech barge-in path were live;
+- the first strict comprehensive run retained 40 passing and 8 failing checks;
+  missing host test dependencies caused the source/scenario portion of those
+  failures, while log inspection and retained scenario replay exposed the
+  implementation/orchestration defects and stale acceptance-event contract
+  recorded in `docs/STATUS.md`;
+- ordinary/final speech was played without entering the delivered-turn ledger;
+  safe-read composition could duplicate or overclaim pre-evidence speech;
+  Goal Association could anchor mechanical location defects and misclassify
+  mixed stable-knowledge/reminder turns; session-memory contract retry repeated
+  invalid output; typed pre-effect speech still made false tool/memory claims;
+  valid tool results could fail only for sentence length; weather follow-ups
+  replayed old evidence; service rebuilds could retain deleted image IDs; and
+  the voice harness required retired events; the first mechanically clean
+  comprehensive replay then exposed valid direct speech discarded by malformed
+  optional Social Attention and a prompt-only decision-first contract that the
+  deployed Fast Planner could ignore; the next mechanically clean replay then
+  exposed an otherwise complete multi-Goal response inventing an unsupported
+  user schedule as friendly reminder rationale;
+- focused regressions now cover the repaired evidence ledger, current Core and
+  Gateway event contracts, fresh model-owned Goal resegmentation, useful typed
+  contract repair with authority-reducing session recovery, tool/memory
+  pre-effect speech suppression, pure safe-read single ownership, and bounded
+  evidence-preserving result repair, authority-reducing direct auxiliary
+  validation, bounded model-owned retained-evidence communication review, and
+  Response Composer grounding against invented user circumstances;
+- the dependency-complete canonical gate passes 2,095 maintained tests, 20
+  legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
+  all ten general-ability classes;
+- the comprehensive runner now builds once before nested voice acceptance;
+  the first clean committed replay then exposed and removed an inapplicable
+  full seven-case MuJoCo verifier call on its three-case diagnostic bundle; its
+  next clean replay passed every mechanical check but remained blocked after
+  manual delivered-text inspection found the two semantic defects above; and
+- semantic documentation mismatches were corrected in the existing authority
+  documents instead of creating another audit owner.
+
+The final paired replay exposed three planner contract defects rather than a
+Soridormi motion defect:
+
+- Fast and Deep decoder schemas did not bind an exact capability to its provider
+  argument schema, and only Fast described explicit numeric Goal provenance;
+- Deep's unprojected catalog exceeded its prompt bound, so later capabilities
+  such as exact velocity walking were absent from the deployed "full catalog";
+- Deep's step and prose collections were not decoder-bounded, allowing one walk
+  step to repeat until the model output limit before cancellation could reach a
+  provider.
+
+Exact capability schemas, shared numeric provenance validation, structured
+bounded repair, a compact complete catalog, and bounded Deep collections close
+those boundaries. Clean commit `90aa72a` passed the canonical source gate and a
+rebuilt comprehensive profile with 46 passes, zero failures/timeouts, and one
+explicit external-semantic-review skip. Manual inspection found no recurrence
+of the audit's semantic blockers; strict status remains `incomplete`, not
+release-qualified. `docs/STATUS.md` owns paths, limits, latency outliers, and the
+paired audit. Clean merged-revision MuJoCo binding remains required.
+
+The underlying maintained source still establishes:
 
 - typed `interpretation_unavailable` instead of invented semantic fallback;
 - strict catalog-backed action proposals in semantic repair;
@@ -65,86 +131,22 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-The vocal Goal/Planner defect has passed the combined canonical and live Level C
-gate. The clean retained bundle at
-`.chromie/acceptance/vocal-issue-1/20260807T032038Z` records Chromie `6809a84`,
-Soridormi `1c15371`, exact typed Goal ownership through body execution, parallel
-walking/blinking completion, truthful singing unavailability with zero steps,
-and safe idle before and after. It does not prove a singing provider, physical
-microphone or speaker behavior, physical robot behavior, or release readiness.
+The merged Issues retain clean, revision-bound source and highest-safe automated
+evidence for the walk/sing/blink defect, reversible barge-in, the exact
+`chromie.vocal.perform` contract, and peer media Activity. The evidence paths,
+counts, limits, and remaining physical/provider gaps are owned by
+[Current Status](docs/STATUS.md) and [Acceptance](docs/ACCEPTANCE.md). In
+particular, generated speech and MuJoCo body results do not prove a physical
+microphone, speaker, robot, real vocal provider, or real media provider.
 
-Issue #5 has met its source and highest safe automated audio criteria. Clean
-Chromie `94718ab` passed `barge-in-echo` 6/6 and `barge-in` 7/7 in
-`.chromie/acceptance/voice/issue-5-94718ab-clean`. The retained output replay
-ducked in 0.0 ms, survived ASR distortion through order-aware echo matching,
-resumed the same generation, and completed 11/11 scheduled chunks before the
-next case. Confirmed external speech ducked in 0.0 ms, reached output silence in
-8.3 ms, retained `cancel_cognitive_work=false`, and produced a later distinct
-Gateway output-only receipt with zero provider or dispatch failures. Physical
-microphone/speaker, arbitrary human pronunciation, audible device latency, and
-the real acoustic echo path remain supervised target evidence rather than source
-closure claims.
-
-Issue #6 is complete for its declared source and default-provider evidence
-scope. Its exact `chromie.vocal.perform` source contract preserves the Speaking
-lane and the current Chromie playback boundary:
-
-- one provider-prefixed capability identity survives proposal, validation,
-  authorization, execution, cancellation, and evidence in source tests;
-- requests use typed vocal modes and declarations bind supported modes to
-  streaming, timing, sample format, concurrency, cancellation, provenance, and
-  retained mode-specific evidence;
-- ordinary TTS regressions remain passing and distinct from recitation, humming,
-  and singing evidence;
-- unsupported modes return exact unavailable outcomes and silent downgrades
-  fail; and
-- the focused cognitive-runtime scenario passes through Goal Association, Fast
-  Planner, Deep Planner, Response Composer, and Host materialization with
-  `execution_lane=speaking`.
-
-The source evidence passed the focused provider/TTS suite, the exact
-recitation scenario, the `stable_capability_grounding` class 8/8, and the full
-canonical gate with 2,041 maintained tests, 20 legacy Agent tests, and 102
-benchmark tests. Clean Chromie `e558ff4` and Soridormi `1c15371` then passed
-`scripts/vocal_issue_closure.py` in
-`.chromie/acceptance/vocal-issue-6/issue-6-e558ff4-clean`. The retained output
-records exact typed Goal ownership, two completed parallel body members, honest
-singing unavailability with zero steps, four played ordinary-TTS chunks with no
-failures, exact runtime/source identity, and safe idle before and after.
-
-Issue #7 now meets its declared source and highest safe default-provider
-evidence scope:
-
-- exact public `chromie.media.play|pause|resume|seek|stop|volume|status`
-  identities remain Activity operations from Planner through trusted evidence;
-- qualified declarations bind supported media kinds, lifecycle/state/progress,
-  cancellation, mixer policy, immutable provenance, and operation evidence
-  while backend identity remains private;
-- unsupported kinds and exact operation/state mismatches fail before backend
-  invocation, and the default catalog exposes no qualified provider;
-- Singing stays Speaking with `media_operation=none`; media playback stays a
-  separate Activity Goal even when coordinated with Soridormi body work;
-- Speaking overlap carries explicit ducking parameters without mutating either
-  Goal; and
-- stop-talking, stop-media, and stop-all retain distinct deterministic scopes
-  and receipts. The maintained text-to-MuJoCo runner now qualifies primary
-  reflex inputs through the production Gateway path instead of bypassing it.
-
-The focused provider suite passed 15/15, both exact scenarios passed, the two
-relevant Level A classes passed 14/14, and the canonical gate passed 2,059
-maintained tests, 20 legacy Agent tests, and 102 benchmark tests. Retained live
-evidence under `.chromie/acceptance/media-issue-7/current-revision` distinguishes
-media play from singing, completes the independent five-second walk in
-Soridormi/MuJoCo while media stays unavailable, retains the Chinese
-`media_output` reflex receipt, and returns safe-idle.
-
-The next delivery step is review and merge of the stacked semantic Issue
-branches before starting unrelated architecture or behavior work. Keep backend
-names out of semantic Goals, do not introduce a neutral media alias, and do not
-use source tests, discarded TTS playback, or simulator body evidence as a claim
-for a real media provider, acoustic ducking, a physical speaker, or hardware.
-Real vocal and media modes remain unvalidated until operation-specific target
-evidence exists.
+The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
+capability manifest and compatibility authority are bound to that revision.
+Merge the source-qualified Chromie candidate only after CI is green, then repeat
+the exact compound execution and provider-start cancellation with clean merged
+runtime identity. Keep backend names out of semantic Goals, do not introduce a
+neutral media alias, and do not use source tests, generated/discarded TTS, or
+simulator evidence as a claim for a real provider, physical audio, or hardware.
+Real vocal and media modes remain unvalidated pending operation-specific proof.
 
 ## Canonical owners
 

@@ -208,6 +208,58 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "fallback")
         self.assertEqual(result.spoken_response, "重庆很热，现在37℃，体感42℃。")
 
+    async def test_repairs_over_budget_grounded_answer_without_losing_evidence(self) -> None:
+        ollama = _ScriptedOllama(
+            [
+                {
+                    "spoken_response": "要带哦！重庆今天有雷雨。降雨概率很大。",
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {
+                            "evidence_id": "weather-result",
+                            "json_pointer": "/condition",
+                        },
+                        {
+                            "evidence_id": "weather-result",
+                            "json_pointer": "/precipitation_probability",
+                        },
+                    ],
+                    "confidence": 0.96,
+                    "rationale": "Grounded but one sentence over budget.",
+                },
+                {
+                    "spoken_response": "要带哦，重庆今天有雷雨，降雨概率不低。",
+                    "answer_mode": "direct",
+                    "selected_facts": [
+                        {
+                            "evidence_id": "weather-result",
+                            "json_pointer": "/condition",
+                        },
+                        {
+                            "evidence_id": "weather-result",
+                            "json_pointer": "/precipitation_probability",
+                        },
+                    ],
+                    "confidence": 0.96,
+                    "rationale": "Rewritten within the exact budget.",
+                },
+            ]
+        )
+
+        result = await ToolResultInterpreter(ollama).interpret(self._request())
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.spoken_response, "要带哦，重庆今天有雷雨，降雨概率不低。")
+        self.assertTrue(result.metadata["contract_repair_attempted"])
+        self.assertTrue(result.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertEqual(
+            ollama.calls[1]["prompt_family"],
+            "tool_result_interpreter.contract_repair",
+        )
+        self.assertIn("sentence budget", ollama.prompts[1])
+        self.assertIn("Trusted evidence JSON", ollama.prompts[1])
+
     async def test_rejects_internal_workflow_narration(self) -> None:
         ollama = _ScriptedOllama(
             {

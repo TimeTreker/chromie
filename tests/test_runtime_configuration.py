@@ -353,6 +353,17 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("./scripts/compose.sh logs -f chromie-llm", source)
         self.assertNotIn("docker compose --env-file .env.runtime logs -f chromie-llm", source)
 
+    def test_start_services_recreates_owned_containers_after_build(self) -> None:
+        source = (ROOT / "scripts" / "start_services.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('if [[ "${BUILD:-0}" == "1" ]]', source)
+        self.assertIn("UP_ARGS+=(--force-recreate)", source)
+        self.assertIn(
+            'docker compose "${COMPOSE_ARGS[@]}" up "${UP_ARGS[@]}" "${SERVICES[@]}"',
+            source,
+        )
+
     def test_start_chromie_supports_service_only_attachment(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"
