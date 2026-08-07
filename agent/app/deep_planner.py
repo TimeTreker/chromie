@@ -38,6 +38,7 @@ from .planner_contract import (
     materialize_goal_outcomes,
     materialize_planner_metadata,
     parallel_plan_contract_errors,
+    planner_provider_vocal_goal_ids,
     planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
@@ -140,6 +141,9 @@ class DeepPlannerResolver:
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=sorted(planner_response_goal_ids(authoritative_goals)),
+            provider_required_vocal_goal_ids=sorted(
+                planner_provider_vocal_goal_ids(authoritative_goals)
+            ),
         )
         generation_options = {
             "temperature": 0,
@@ -515,6 +519,7 @@ class DeepPlannerResolver:
         response_only: bool = False,
         requires_execution: bool = False,
         response_goal_ids: list[str] | None = None,
+        provider_required_vocal_goal_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
@@ -523,6 +528,9 @@ class DeepPlannerResolver:
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
+            provider_required_vocal_goal_ids=(
+                provider_required_vocal_goal_ids
+            ),
         )
 
     @staticmethod
@@ -531,7 +539,6 @@ class DeepPlannerResolver:
             "parallel_capability_not_declared_safe",
             "parallel_exclusive_group_conflict",
             "parallel_resource_claim_conflict",
-            "coordinated_action_coverage_incomplete",
             "safety_revision_contract_not_satisfied",
         }
         return any(
@@ -623,6 +630,9 @@ class DeepPlannerResolver:
         """Forbid exact execution after deterministic concurrency rejection."""
 
         schema = copy.deepcopy(base_schema)
+        response_text = schema.get("properties", {}).get("response_text")
+        if isinstance(response_text, dict):
+            response_text.pop("maxLength", None)
         if cls._requires_sequential_safety_revision(list(feedback or [])):
             # The deployed structured decoder does not reliably enforce a
             # nested step constraint added only through a top-level allOf.
@@ -754,15 +764,34 @@ class DeepPlannerResolver:
         *,
         context: dict[str, Any] | None,
     ) -> None:
-        """Reject a silent loss of Fast Planner concurrency.
+        """Reject an omitted Deep Planner ordering/concurrency decision.
 
-        The Host does not infer concurrency from user phrases. It only preserves
-        the preceding model-authored Fast plan as semantic evidence. Deep Planner
-        may keep parallel timing or explicitly revise it using validator feedback,
-        but omitting timing must never fall through to the DTO's sequential
-        compatibility default.
+        Every Deep step must author its timing explicitly.  The Host must not
+        turn an omitted semantic decision into sequential execution through the
+        DTO's compatibility default, including when Fast Planner failed before
+        producing a usable advisory plan.  When Fast did retain a parallel plan,
+        the later checks also ensure that Deep does not omit timing only for the
+        corresponding replacement steps.
         """
 
+        raw_steps = raw.get("steps")
+        if not isinstance(raw_steps, list):
+            return
+        missing = [
+            index
+            for index, item in enumerate(raw_steps)
+            if isinstance(item, dict) and "timing" not in item
+        ]
+        # A single executable step has no inter-step overlap relation, so its
+        # compatibility default cannot silently serialize another action.  The
+        # decoder still requires an explicit value for all new model output;
+        # retain bounded acceptance here only for older/test providers that
+        # return one otherwise valid singleton step.
+        if missing and len(raw_steps) > 1:
+            raise ValueError(
+                "deep planner omitted timing for executable step(s) "
+                f"{missing}; explicitly author sequential or parallel timing"
+            )
         if not isinstance(context, dict):
             return
         advisory = context.get("fast_plan_resolution") or context.get(
@@ -771,7 +800,6 @@ class DeepPlannerResolver:
         if not isinstance(advisory, dict):
             return
         fast_steps = advisory.get("steps")
-        raw_steps = raw.get("steps")
         if not isinstance(fast_steps, list) or not isinstance(raw_steps, list):
             return
         parallel_fast = [
@@ -795,16 +823,8 @@ class DeepPlannerResolver:
         )
         if expected_skills != actual_skills:
             return
-        missing = [
-            index
-            for index, item in enumerate(raw_steps)
-            if isinstance(item, dict) and "timing" not in item
-        ]
-        if missing:
-            raise ValueError(
-                "deep planner omitted timing while revising a parallel Fast plan; "
-                "explicitly preserve parallel timing or author an explicit reviewed alternative"
-            )
+        # Missing timing was rejected above.  Keep the Fast-plan comparison so
+        # this boundary remains the owner for future exact replacement checks.
 
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
@@ -884,12 +904,14 @@ class DeepPlannerResolver:
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "User-facing speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Until an exact provider-prefixed vocal Capability contract is present in the maintained planning surface, that Goal must use unavailable, refused, or a specific clarification outcome with zero step_ids; response_text, a song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "User-facing speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Until an exact provider-prefixed vocal Capability contract is present in the maintained planning surface, that Goal must use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
             "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
             "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
+            "Complete plan coverage means every Goal has an explicit outcome; it does not mean every Goal can be satisfied. An unavailable, refused, or unresolved Goal must remain in unmet_goal_ids with a non-exact satisfaction status and score. The top-level satisfaction must preserve those same unmet Goals and requirements even when independent execute Goals can proceed in a coverage=complete mixed plan. "
+            "An unavailable or refused outcome explicitly represents its Goal but does not satisfy it, and it is not by itself a safe adjustment or alternative. Do not promise, acknowledge as forthcoming, or otherwise claim that unavailable or refused work will occur in top-level or per-goal response_text. State the limitation truthfully while preserving exact independent executable work. "
             "Top-level disposition is the aggregate of per-goal dispositions: use mixed only when at least two different per-goal disposition values are present. Multiple goals that are all execute use top-level execute; multiple goals that are all respond use top-level respond. "
             "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
             "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
@@ -997,7 +1019,6 @@ class DeepPlannerResolver:
             step = dict(item)
             if not step.get("step_id"):
                 step["step_id"] = f"{plan_id}:step:{index}"
-            step.setdefault("timing", "sequential")
             normalized.append(step)
         out["steps"] = normalized
         out.setdefault("coverage", "uncertain")

@@ -1712,6 +1712,14 @@ class SkillRuntime:
             traces.append(trace)
             contexts.append(context)
 
+        # Pydantic copies mutable inputs while validating each context.  Rebind
+        # every group member to one actual provider-state object so the provider
+        # activity identity written during compilation is visible to sibling
+        # cancellation paths and the terminal correlated traces.
+        shared_state = contexts[0].provider_state
+        for context in contexts[1:]:
+            context.provider_state = shared_state
+
         async with self._active_lock:
             cancellation_rules = [
                 rule
@@ -1912,7 +1920,7 @@ class SkillRuntime:
                     data={
                         "reason_code": result.reason_code,
                         "provider_local_group": True,
-                        "provider_activity_id": shared_state.get(
+                        "provider_activity_id": contexts[0].provider_state.get(
                             "provider_activity_id"
                         ),
                     },

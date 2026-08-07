@@ -64,6 +64,12 @@
                   "null"
                 ]
               },
+              "active_lanes": {
+                "type": "object"
+              },
+              "activity_idle": {
+                "type": "boolean"
+              },
               "safe_idle": {
                 "type": "boolean"
               },
@@ -702,52 +708,7 @@
               "skills": {
                 "type": "array",
                 "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "skill_id": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "body_lane": {
-                      "type": "string",
-                      "enum": [
-                        "subtle_expression",
-                        "locomotion",
-                        "whole_body",
-                        "safety"
-                      ]
-                    },
-                    "can_run_parallel": {
-                      "type": "boolean"
-                    },
-                    "exclusive_group": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "resource_claims": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "parameters_schema": {
-                      "type": "object"
-                    },
-                    "execution_constraints": {
-                      "type": "object"
-                    }
-                  },
-                  "additionalProperties": true
+                  "type": "object"
                 }
               }
             },
@@ -1044,6 +1005,1431 @@
           "failure_modes": [],
           "default_failure_policy": {
             "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        }
+      ]
+    },
+    {
+      "agent_id": "soridormi.activity",
+      "display_name": "Soridormi Concurrent Body Activity Agent",
+      "description": "Validate and execute exact coordinated body activities containing one primary locomotion member plus compatible subtle-expression members. Speech remains a peer Chromie execution lane.",
+      "version": "0.1.0",
+      "llm_visible": true,
+      "transport": {
+        "kind": "mcp_streamable_http",
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim"
+        }
+      },
+      "tags": [
+        "soridormi",
+        "body-activity",
+        "concurrency",
+        "safety"
+      ],
+      "tools": [
+        {
+          "name": "soridormi.activity.get_capabilities",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Read Soridormi's body ability classes, resource model, concurrency rules, and Chromie speech ownership boundary.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              },
+              "canonical_tools": {
+                "type": "object"
+              },
+              "compatibility_aliases": {
+                "type": "object"
+              },
+              "ability_classes": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "control_couplings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "concurrency_rules": {
+                "type": "object"
+              },
+              "coordination": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "schema_version",
+              "speech_owner",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required",
+              "ability_classes",
+              "control_couplings",
+              "concurrency_rules"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.activity.compile",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Validate exact body members, resource compatibility, bounded head-overlay envelopes, and compile an opaque executable body activity. This is deterministic embodied compilation, not cognitive planning.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "coordination_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "members": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "member_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "skill_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "skill_id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "profile": {
+                "type": "string"
+              },
+              "chromie_intent": {
+                "type": "object",
+                "description": "Chromie-side proposal metadata. Soridormi treats it as advisory intent, never as a hardware command.",
+                "properties": {
+                  "execution_mode": {
+                    "type": "string",
+                    "const": "proposed"
+                  },
+                  "execution_semantics": {
+                    "type": "string",
+                    "const": "proposal_from_chromie"
+                  },
+                  "requires_runtime_validation": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "interaction_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "skill_id": {
+                    "type": "string"
+                  },
+                  "upstream_skill_id": {
+                    "type": "string"
+                  },
+                  "source_component": {
+                    "type": "string"
+                  },
+                  "requires_live_perception": {
+                    "type": "boolean"
+                  },
+                  "perception_dependency": {
+                    "type": "string"
+                  },
+                  "physical_state_source": {
+                    "type": "string",
+                    "const": "soridormi_runtime"
+                  },
+                  "chromie_must_not_provide_physical_coordinates": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "soridormi_owns_pose_estimation": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "execution_mode",
+                  "execution_semantics",
+                  "requires_runtime_validation"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "members"
+            ],
+            "additionalProperties": false
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "planning_only",
+            "compiles_body_activity",
+            "resource_validation"
+          ],
+          "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 3.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use after the authoritative planner has selected exact body skills that must run concurrently. Do not include speech here.",
+            "speech_boundary": "Chromie's Speaking Execution Lane owns speech and singing; link peer execution with coordination_id only."
+          }
+        },
+        {
+          "name": "soridormi.activity.execute",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Execute a validated concurrent body-activity plan. Soridormi composes one final motor command and may reject, constrain, stop, or recover independently for physical safety.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "compiled_activity_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "compiled_activity_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "physical_motion",
+            "visual_expression",
+            "body_activity_execution"
+          ],
+          "safety_class": "physical_motion",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.body_activity_scheduler",
+            "timeout_s": 60.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": true,
+            "reason": "A coordinated body activity may move the robot.",
+            "required_in_modes": [
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "skippable_in_modes": [
+              "sim"
+            ]
+          },
+          "monitoring": {
+            "requires_safety_monitor": true,
+            "recommended_monitor_tools": [
+              "soridormi.safety.monitor_motion"
+            ],
+            "hard_interrupt_events": [
+              "emergency_stop"
+            ]
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.activity.create_plan",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Compatibility alias for soridormi.activity.compile. It deterministically compiles exact body members and does not perform cognitive planning.",
+          "version": "0.1.0",
+          "llm_visible": false,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "coordination_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "members": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "member_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "skill_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "skill_id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "profile": {
+                "type": "string"
+              },
+              "chromie_intent": {
+                "type": "object",
+                "description": "Chromie-side proposal metadata. Soridormi treats it as advisory intent, never as a hardware command.",
+                "properties": {
+                  "execution_mode": {
+                    "type": "string",
+                    "const": "proposed"
+                  },
+                  "execution_semantics": {
+                    "type": "string",
+                    "const": "proposal_from_chromie"
+                  },
+                  "requires_runtime_validation": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "interaction_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "skill_id": {
+                    "type": "string"
+                  },
+                  "upstream_skill_id": {
+                    "type": "string"
+                  },
+                  "source_component": {
+                    "type": "string"
+                  },
+                  "requires_live_perception": {
+                    "type": "boolean"
+                  },
+                  "perception_dependency": {
+                    "type": "string"
+                  },
+                  "physical_state_source": {
+                    "type": "string",
+                    "const": "soridormi_runtime"
+                  },
+                  "chromie_must_not_provide_physical_coordinates": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "soridormi_owns_pose_estimation": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "execution_mode",
+                  "execution_semantics",
+                  "requires_runtime_validation"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "members"
+            ],
+            "additionalProperties": false
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "planning_only",
+            "compiles_body_activity",
+            "resource_validation"
+          ],
+          "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 3.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.activity.execute_plan",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Compatibility alias for soridormi.activity.execute.",
+          "version": "0.1.0",
+          "llm_visible": false,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "plan_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "physical_motion",
+            "visual_expression",
+            "body_activity_execution"
+          ],
+          "safety_class": "physical_motion",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.body_activity_scheduler",
+            "timeout_s": 60.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": true,
+            "reason": "A coordinated body activity may move the robot.",
+            "required_in_modes": [
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "skippable_in_modes": [
+              "sim"
+            ]
+          },
+          "monitoring": {
+            "requires_safety_monitor": true,
+            "recommended_monitor_tools": [
+              "soridormi.safety.monitor_motion"
+            ],
+            "hard_interrupt_events": [
+              "emergency_stop"
+            ]
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.activity.status",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Read per-member and aggregate body-activity status.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "compiled_activity_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "compiled_activity_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.activity.cancel",
+          "agent_id": "soridormi.activity",
+          "display_name": null,
+          "description": "Cancel one coordinated body activity. Physical safety may still escalate independently to emergency stop or recovery.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "compiled_activity_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "compiled_activity_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "compiled_activity_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "coordination_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "running",
+                  "completed",
+                  "completed_with_degradation",
+                  "cancelled",
+                  "failed"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "cancel_requested": {
+                "type": "boolean"
+              },
+              "cancel_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "failure_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "dry_run_only": {
+                "type": "boolean"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "member_results": {
+                "type": "object"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "safety_authority": {
+                "type": "string",
+                "const": "soridormi"
+              },
+              "speech_owner": {
+                "type": "string",
+                "const": "chromie"
+              },
+              "one_final_motor_command_authority": {
+                "type": "boolean",
+                "const": true
+              },
+              "semantic_role": {
+                "type": "string",
+                "const": "deterministic_embodied_compiler"
+              },
+              "cognitive_planning": {
+                "type": "boolean",
+                "const": false
+              },
+              "llm_required": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "schema_version",
+              "compiled_activity_id",
+              "plan_id",
+              "status",
+              "terminal",
+              "members",
+              "resource_claims",
+              "safety_authority",
+              "speech_owner",
+              "one_final_motor_command_authority",
+              "semantic_role",
+              "cognitive_planning",
+              "llm_required"
+            ]
+          },
+          "effects": [
+            "physical_motion",
+            "safety_control",
+            "activity_lifecycle"
+          ],
+          "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": true,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "emergency_stop",
             "target": null,
             "message": null,
             "default_output": null,
@@ -2772,14 +4158,24 @@
     ],
     "physical_motion_tools": [
       "soridormi.motion.execute_plan",
-      "soridormi.skill.execute_plan"
+      "soridormi.skill.execute_plan",
+      "soridormi.activity.execute"
     ],
     "planning_tools": [
       "soridormi.motion.create_plan",
       "soridormi.skill.create_plan",
+      "soridormi.activity.get_capabilities",
+      "soridormi.activity.compile",
       "soridormi.task.get_capabilities",
       "soridormi.task.preview",
       "soridormi.task.submit"
+    ],
+    "body_activity_tools": [
+      "soridormi.activity.get_capabilities",
+      "soridormi.activity.compile",
+      "soridormi.activity.execute",
+      "soridormi.activity.status",
+      "soridormi.activity.cancel"
     ],
     "embodied_task_tools": [
       "soridormi.task.get_capabilities",
@@ -2792,6 +4188,7 @@
     "safety_tools": [
       "soridormi.safety.monitor_motion",
       "soridormi.motion.stop",
+      "soridormi.activity.cancel",
       "soridormi.task.cancel",
       "soridormi.safety.emergency_stop"
     ],
@@ -2803,13 +4200,38 @@
       "soridormi.motion.execute_plan",
       "chromie.report"
     ],
+    "chromie_concurrency_model": {
+      "cognitive_core": "single_authoritative_mind",
+      "lanes": [
+        "social_attention_proposal",
+        "speaking_execution",
+        "activity_execution"
+      ],
+      "runtime_coordinator": "chromie",
+      "speech_owner": "chromie",
+      "body_provider": "soridormi"
+    },
+    "soridormi_concurrency_model": {
+      "primary_locomotion_members": "zero_or_one",
+      "subtle_expression_members": "zero_or_more_when_resources_do_not_conflict",
+      "one_final_motor_command_authority": true,
+      "safety_authority": "soridormi"
+    },
     "rules": [
       "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
+      "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
+      "The Speaking Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
+      "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
+      "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
       "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
       "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
+      "Chromie must use soridormi.activity.compile before soridormi.activity.execute.",
+      "Chromie must cover soridormi.activity.execute with soridormi.safety.monitor_motion.",
+      "Soridormi accepts at most one primary locomotion member and composes compatible head overlays into one final motor command.",
+      "Soridormi may reject, constrain, cancel, or recover body activity without waiting for Chromie when physical safety requires it.",
       "Chromie may use soridormi.task.get_capabilities to inspect Soridormi-owned embodied readiness before preview or submission.",
       "Chromie may use soridormi.task.preview before user confirmation or task submission to inspect Soridormi's no-motion embodied interpretation.",
       "Chromie may submit structured embodied goals through soridormi.task.submit, but task submission is contract-only and no-motion until Soridormi adds task execution.",
@@ -2826,6 +4248,11 @@
       "soridormi.skill.execute_plan": {
         "on_failure": "soridormi.motion.stop then chromie.report",
         "on_timeout": "soridormi.motion.stop then chromie.report",
+        "on_safety_event": "soridormi.safety.emergency_stop then chromie.report"
+      },
+      "soridormi.activity.execute": {
+        "on_failure": "soridormi.activity.cancel then chromie.report",
+        "on_timeout": "soridormi.activity.cancel then soridormi.motion.stop then chromie.report",
         "on_safety_event": "soridormi.safety.emergency_stop then chromie.report"
       }
     }
@@ -2862,6 +4289,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "c5a3debf4819fa3cc6b631f3b0a25570ce5f5c17"
+    "upstream_commit": "1c15371f8875aba289711047164f8b41ef6c5fc9"
   }
 }
