@@ -16,6 +16,7 @@ from typing import Any
 import numpy as np
 
 from orchestrator.audio_injection import read_audio_packet
+from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.session import now_ms
 from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
@@ -46,6 +47,62 @@ class InputSessionRuntime:
     def __init__(self, host: Any) -> None:
         self.host = host
 
+    async def _begin_playback_duck(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+    ) -> None:
+        host = self.host
+        state = host._playback_state()
+        started_ms = now_ms()
+        if not state.begin_output_duck(
+            generation=generation,
+            session_id=session_id,
+            started_ms=started_ms,
+        ):
+            return
+
+        confirmation_timeout_s = max(
+            0.001,
+            (float(host.max_vad_utterance_ms) / 1000.0)
+            + float(host.asr_timeout_s),
+        )
+
+        async def release_after_timeout() -> None:
+            await asyncio.sleep(confirmation_timeout_s)
+            await self._release_playback_duck(
+                generation=generation,
+                session_id=session_id,
+                reason="confirmation_timeout",
+            )
+
+        state.output_duck_timeout_task = asyncio.create_task(
+            release_after_timeout()
+        )
+        await playback_transport_for(host).pause_output_for_duck(
+            generation=generation,
+            session_id=session_id,
+        )
+
+    async def _release_playback_duck(
+        self,
+        *,
+        generation: int | None,
+        session_id: str | None,
+        reason: str,
+    ) -> None:
+        if generation is None:
+            return
+        playback_state = getattr(self.host, "_playback_state", None)
+        if not callable(playback_state):
+            return
+        await playback_transport_for(self.host).resume_output_after_duck(
+            generation=generation,
+            session_id=session_id,
+            reason=reason,
+        )
+
     def mic_callback(self, indata, frames, time_info, status):
         host = self.host
         if status:
@@ -75,6 +132,15 @@ class InputSessionRuntime:
         playback_generation_at_start: int | None = None,
     ):
         host = self.host
+        playback_state = host._playback_state()
+        current_session_id = getattr(host, "session_id", None)
+        duck_session_id = (
+            playback_state.output_duck_session_id
+            if playback_generation_at_start is not None
+            and playback_state.output_duck_generation
+            == playback_generation_at_start
+            else current_session_id
+        )
         duration_ms = (len(audio) / (host.target_asr_rate * 2)) * 1000.0
         duration = duration_ms / 1000.0
         rms = float(np.sqrt(np.mean(np.square(np.frombuffer(audio, dtype=np.int16).astype(np.float32))))) if audio else 0.0
@@ -84,9 +150,19 @@ class InputSessionRuntime:
                 duration,
                 host.max_vad_utterance_ms,
             )
+            await self._release_playback_duck(
+                generation=playback_generation_at_start,
+                session_id=duck_session_id,
+                reason="hard_maximum",
+            )
             return
         if duration_ms < host.min_audio_ms:
             logger.warning("VAD speech ended but skipped: duration=%.2fs min_audio_ms=%s", duration, host.min_audio_ms)
+            await self._release_playback_duck(
+                generation=playback_generation_at_start,
+                session_id=duck_session_id,
+                reason="short_audio",
+            )
             return
         playback_contaminated = bool(
             started_during_playback or host.is_playing_audio
@@ -107,9 +183,30 @@ class InputSessionRuntime:
                 playback_generation_at_start,
                 host.playback_generation,
             )
+            await self._release_playback_duck(
+                generation=playback_generation_at_start,
+                session_id=duck_session_id,
+                reason="low_rms",
+            )
             return
 
-        session_id = host.create_session()
+        playback_candidate = bool(
+            started_during_playback
+            and playback_generation_at_start is not None
+            and playback_state.output_duck_matches(
+                playback_generation_at_start,
+                duck_session_id,
+            )
+        )
+        session_id = duck_session_id if playback_candidate else host.create_session()
+        if not session_id:
+            await self._release_playback_duck(
+                generation=playback_generation_at_start,
+                session_id=None,
+                reason="missing_playback_session",
+            )
+            playback_candidate = False
+            session_id = host.create_session()
         with host.sessions.trace_context(session_id):
             runtime_tracer.mark(
                 module=VAD_TRACE_MODULE,
@@ -124,20 +221,28 @@ class InputSessionRuntime:
                     "playback_generation_at_start": playback_generation_at_start,
                 },
             )
-            host.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
-            host.save_audio(audio, "input", session_id=session_id)
-            # Barge-in must silence audio immediately, before ASR is available,
-            # but it cannot yet know whether the utterance means stop talking,
-            # stop moving, cancel the foreground turn, or something ordinary.
-            # Scope-dependent cognitive/runtime cancellation happens only after
-            # the transcript reaches the Cognitive Gateway.
-            host._invalidate_output_state(
-                cancel_cognitive_work=False,
-            )
-            host._schedule_output_abort(
-                new_session_id=session_id,
-                log_event=True,
-            )
+            if playback_candidate:
+                host.session_log(
+                    session_id,
+                    "vad_playback_candidate_validated: audio=%.2fs rms=%.1f "
+                    "bytes=%s playback_generation_at_start=%s",
+                    duration,
+                    rms,
+                    len(audio),
+                    playback_generation_at_start,
+                )
+            else:
+                host.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
+                host.save_audio(audio, "input", session_id=session_id)
+                # A validated new input turn invalidates old speech output, but
+                # it cannot yet decide Goal, body, or global cancellation scope.
+                host._invalidate_output_state(
+                    cancel_cognitive_work=False,
+                )
+                host._schedule_output_abort(
+                    new_session_id=session_id,
+                    log_event=True,
+                )
 
             try:
                 async with runtime_tracer.span(
@@ -170,6 +275,12 @@ class InputSessionRuntime:
                     if result.get("type") == "error":
                         asr_span.set_status("error")
                         host.session_log(session_id, "asr_error: asr_ms=%.1f error=%s", asr_done_ms - asr_start_ms, result)
+                        if playback_candidate:
+                            await self._release_playback_duck(
+                                generation=playback_generation_at_start,
+                                session_id=session_id,
+                                reason="asr_error",
+                            )
                         return
                     if result.get("type") == "final":
                         user_text = result.get("text", "").strip()
@@ -180,7 +291,8 @@ class InputSessionRuntime:
                             kind="milestone",
                             attributes={"text_chars": len(user_text)},
                         )
-                        host.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
+                        if not playback_candidate:
+                            host.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
                         likely_echo, echo_ratio, echo_coverage = host._likely_tts_echo(
                             user_text,
                             playback_generation_at_start=(
@@ -199,16 +311,82 @@ class InputSessionRuntime:
                                 echo_coverage,
                                 user_text,
                             )
-                            state = host.sessions.state.get(session_id)
-                            if state is not None:
-                                state["llm_done"] = True
-                            host.maybe_session_done(session_id)
+                            if playback_candidate:
+                                await self._release_playback_duck(
+                                    generation=playback_generation_at_start,
+                                    session_id=session_id,
+                                    reason="likely_tts_echo",
+                                )
+                            else:
+                                state = host.sessions.state.get(session_id)
+                                if state is not None:
+                                    state["llm_done"] = True
+                                host.maybe_session_done(session_id)
                             return
                         if user_text:
+                            if playback_candidate:
+                                confirmation_started_ms = now_ms()
+                                await host.abort_output_stream()
+                                host._invalidate_output_state(
+                                    cancel_cognitive_work=False,
+                                )
+                                confirmed_speech_to_silence_ms = (
+                                    now_ms() - confirmation_started_ms
+                                )
+                                new_session_id = host.create_session()
+                                with host.sessions.trace_context(new_session_id):
+                                    host.session_log(
+                                        new_session_id,
+                                        "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s "
+                                        "started_during_playback=true",
+                                        duration,
+                                        rms,
+                                        len(audio),
+                                    )
+                                    host.save_audio(
+                                        audio,
+                                        "input",
+                                        session_id=new_session_id,
+                                    )
+                                    host.session_log(
+                                        new_session_id,
+                                        "asr_final: asr_ms=%.1f text_chars=%s text=%r",
+                                        asr_done_ms - asr_start_ms,
+                                        len(user_text),
+                                        user_text,
+                                    )
+                                    host.session_log(
+                                        new_session_id,
+                                        "barge_in_external_speech_confirmed: "
+                                        "scope=output_only cancel_cognitive_work=false "
+                                        "playback_generation_at_start=%s "
+                                        "confirmed_speech_to_silence_ms=%.1f",
+                                        playback_generation_at_start,
+                                        confirmed_speech_to_silence_ms,
+                                    )
+                                session_id = new_session_id
                             host._launch_routed_turn(user_text, session_id)
                         else:
                             host.session_log(session_id, "asr_empty_text")
+                            if playback_candidate:
+                                await self._release_playback_duck(
+                                    generation=playback_generation_at_start,
+                                    session_id=session_id,
+                                    reason="asr_empty",
+                                )
+                    elif playback_candidate:
+                        await self._release_playback_duck(
+                            generation=playback_generation_at_start,
+                            session_id=session_id,
+                            reason="unsupported_asr_result",
+                        )
             except Exception as exc:
+                if playback_candidate:
+                    await self._release_playback_duck(
+                        generation=playback_generation_at_start,
+                        session_id=session_id,
+                        reason="asr_exception",
+                    )
                 host.session_log(session_id, "asr_exception: error=%s", exc)
                 logger.error("%s ASR error: %s", session_id, exc, exc_info=True)
                 try:
@@ -481,6 +659,11 @@ class InputSessionRuntime:
                     host._vad_segment_started_during_playback,
                     host._vad_segment_playback_generation,
                 )
+                if host._vad_segment_started_during_playback:
+                    await self._begin_playback_duck(
+                        generation=host._vad_segment_playback_generation,
+                        session_id=getattr(host, "session_id", None),
+                    )
             if ended and vad_audio:
                 started_during_playback = bool(
                     host._vad_segment_started_during_playback
@@ -496,6 +679,13 @@ class InputSessionRuntime:
                         host.max_vad_utterance_ms,
                         len(vad_audio),
                     )
+                    await self._release_playback_duck(
+                        generation=playback_generation_at_start,
+                        session_id=(
+                            host._playback_state().output_duck_session_id
+                        ),
+                        reason="hard_maximum",
+                    )
                 else:
                     host._queue_vad_utterance(
                         vad_audio,
@@ -504,6 +694,14 @@ class InputSessionRuntime:
                             playback_generation_at_start
                         ),
                     )
+            elif ended:
+                await self._release_playback_duck(
+                    generation=host._vad_segment_playback_generation,
+                    session_id=host._playback_state().output_duck_session_id,
+                    reason="empty_vad_end",
+                )
+                host._vad_segment_started_during_playback = False
+                host._vad_segment_playback_generation = None
         host._vad_leftover = buffered[offset:]
         await asyncio.sleep(0)
 

@@ -18,11 +18,11 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Close speech-start barge-in with reversible playback ducking while keeping
-   acoustic mitigation separate from semantic cancellation authority.
-3. After barge-in evidence closes, qualify an exact vocal-performance provider,
-   then a peer media-playback provider. Singing remains Speaking; existing-audio
-   playback remains Activity; ordinary TTS is neither kind of evidence.
+2. Qualify the exact `chromie.vocal.perform` provider contract while preserving
+   Speaking-lane semantics and the Chromie-owned playback boundary.
+3. After vocal-provider source evidence closes, qualify a peer media-playback
+   provider. Singing remains Speaking; existing-audio playback remains Activity;
+   ordinary TTS is neither kind of evidence.
 4. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
@@ -42,8 +42,11 @@ Completed foundations are represented by capabilities and evidence, not by
 sequential milestone numbers. Earlier incremental work is represented by two completed foundation groups:
 
 - **Local interaction foundation:** Compose-based services, ASR/TTS contracts,
-  bounded session state, playback ordering, barge-in, deterministic stop and
-  cancellation, and simulator integration.
+  bounded session state, playback ordering, reversible speech-start barge-in,
+  order-aware echo resume, deterministic stop and cancellation, and simulator
+  integration. Clean generated-speech evidence for `94718ab` retains acoustic
+  and later semantic cancellation as distinct receipts; physical audio remains
+  an open evidence track.
 - **Goal-driven control-plane foundation:** Cognitive Gateway admission,
   immutable turn envelopes, Core-owned Goal Interpretation, Goal Association,
   Fast and Deep Planner contracts, Response Composer, Trusted Capability
@@ -53,29 +56,6 @@ These foundations are maintained only while their automated contracts remain
 passing.
 
 ## Active source work
-
-### Speech-start barge-in and reversible ducking
-
-VAD, playback transport, echo handling, output interruption, and user-level
-cancellation scope remain Host Orchestrator responsibilities. Acoustic handling
-may duck or temporarily pause output on credible speech start, but it cannot
-cancel Cognitive Core work, Goals, body work, or capability execution.
-
-- Bound the speech-start confirmation window and use available echo or AEC
-  evidence.
-- Abort the active output generation after external speech is confirmed.
-- Resume safely after likely echo or noise without replay, duplicated delivery,
-  or late terminal speech.
-- Leave output-only, motion, interaction, Goal, emergency, and ordinary semantic
-  scope to later ASR and Gateway resolution, with distinct cancellation receipts.
-
-Exit criteria:
-
-- retained evidence measures VAD-start-to-duck and confirmed-speech-to-silence;
-- acoustic-stage evidence records `cancel_cognitive_work=false`;
-- echo rejection and safe resume pass focused and automated audio E2E scenarios;
-- no duplicated or late terminal speech survives confirmed interruption; and
-- every semantic cancellation scope remains distinct in evidence.
 
 ### Semantic authority closure
 
@@ -115,7 +95,9 @@ Exit criteria:
 
 The retained compound walk/sing/blink defect has met its source and Level C
 simulator exit criteria; [Current Status](docs/STATUS.md) owns the evidence.
-Keep the maintained ownership boundary while qualifying future exact providers.
+Issue #6 now owns the next source change: define the exact
+`chromie.vocal.perform` provider contract while keeping the maintained ownership
+boundary.
 Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
 ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
 embodied Capability Provider beneath Activity.
@@ -130,23 +112,29 @@ embodied Capability Provider beneath Activity.
 - Use an exact provider-prefixed vocal capability such as
   `chromie.vocal.perform`; provider implementation may change behind the stable
   identity, but the Planner-to-evidence identity must not.
+- Carry a typed mode for speech, expressive speech, recitation, singing,
+  humming, or nonverbal vocalization. Provider declarations own supported modes,
+  streaming, timing marks, sample formats, concurrency, cancellation, and model
+  provenance.
 - Do not let ordinary expressive TTS advertise or close a singing outcome.
+- Return exact unavailable outcomes for unsupported modes; never silently
+  downgrade one vocal mode to another.
 - Do not attach resource-acquisition responsibility to ordinary vocal output.
 - Keep one authoritative Planner step-ownership representation and derive or
   strictly validate redundant references.
 
 Exit criteria:
 
-- the retained Chinese walk/sing/blink episode and generalized vocal/media
-  variants pass focused and general-ability source tests;
-- Planner output contains no unknown step reference and no body/media
-  substitution for singing;
-- `scripts/vocal_issue_closure.py` reports `closure_eligible=true` from one clean
-  revision after the canonical source gate, exact typed Goal/Plan validation,
-  real Soridormi/MuJoCo walking and blinking completion, exact singing
-  unavailability or refusal, matching source identity, and safe-idle recovery;
-  and
-- target audio or robot behavior is claimed only from retained target evidence.
+- exact capability identity survives proposal, validation, authorization,
+  execution, cancellation, and evidence;
+- a fake provider proves supported-mode negotiation, exact unsupported outcomes,
+  cancellation, and provenance in source tests;
+- ordinary TTS remains equivalent for ordering, interruption, echo handling,
+  and audible-delivery evidence without becoming singing evidence;
+- the retained Chinese walk/sing/blink and generalized vocal/media distinctions
+  remain passing; and
+- real singing and physical audio are claimed only from retained mode-specific
+  target evidence.
 
 ### Conditional vocal-hosting review
 

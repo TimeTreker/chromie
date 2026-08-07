@@ -904,6 +904,24 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(ratio, 0.78)
         self.assertGreaterEqual(coverage, 0.88)
 
+    def test_tts_echo_match_uses_best_chunk_for_asr_distortion(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant._tts_text_by_generation = {
+            4: [
+                "Once upon a time, a long,",
+                "long time ago, the Moon was very lonely in the big, dark sky.",
+                "It did not have any friends to play with.",
+            ]
+        }
+
+        likely, ratio, _ = assistant._likely_tts_echo(
+            "Once upon a time along says why.",
+            playback_generation_at_start=4,
+        )
+
+        self.assertTrue(likely)
+        self.assertGreaterEqual(ratio, 0.78)
+
     def test_tts_echo_match_keeps_real_barge_in(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant._tts_text_by_generation = {

@@ -1897,9 +1897,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator.input_session_runtime",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Fail closed on ASR transport or result-processing failure, release any reversible acoustic duck without inventing a user turn, retain diagnostics, and discard the failed WebSocket before later reuse.",
       "review_status": "reviewed",
-      "body_sha256": "5cd1af7a0cb62872b97b1d528caa6ac0fee2220c406dcf268b5207040a1aa5cd",
+      "body_sha256": "9f6aeaa909ee4aff89badca2dda4d3835d95bb531669f4615adb06f65c1c7d19",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -2067,6 +2067,20 @@
     },
     {
       "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.pause_output_for_duck",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator.playback_transport",
+      "contract": "Map a device-stream abort failure into the acoustic duck receipt while keeping future playback chunks blocked; retain the diagnostic and never claim that audible output paused successfully.",
+      "review_status": "reviewed",
+      "body_sha256": "0937fcefc21180fd1f2ac8aa0e4209c54c0b65cdc3bd1ad46f0fbcd9cd21be23",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
       "symbol": "PlaybackTransport.play_one_order",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -2077,6 +2091,20 @@
       "failure_signals": [
         "diagnostic",
         "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.resume_output_after_duck",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator.playback_transport",
+      "contract": "Map a device-stream restart failure into the resume receipt, release bounded duck waiters to avoid deadlock, and let ordered playback record the resulting transport failure without replaying audio.",
+      "review_status": "reviewed",
+      "body_sha256": "1148c467aea3e211b478969cbcca448d61bb943f8c1f5d856e84435eca467bdd",
+      "failure_signals": [
+        "diagnostic",
         "state_update"
       ]
     },

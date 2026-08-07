@@ -27,7 +27,7 @@ A higher level does not replace lower-level regression tests.
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider; corrected local Oute `chromie_mixed` passed 10/10 smoke plus two repeated 6/6 full matrices at 8192; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; physical listening and comparative shared-resource target evidence open |
-| Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, and barge-in contracts pass | Manual host default resolution; live default-change observation open | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker and live hot-plug review open |
+| Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, reversible ducking, order-aware echo matching, and cancellation-authority contracts pass | Clean exact-revision synthetic `issue-5-94718ab-clean` passed echo 6/6 and external barge-in 7/7 with 0.0 ms duck and 8.3 ms confirmed silence | Can pair with sim | PipeWire virtual-mic 7/7 is historical; physical microphone/speaker, acoustic echo-path, audible latency, and live hot-plug review remain open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
 
@@ -878,6 +878,28 @@ mode uses host playback and configured input-device capture, so it is useful
 for low-cost microphone/speaker regression when bound to real devices, but it
 proves generated speech rather than arbitrary human pronunciation.
 
+The focused reversible-barge-in profile is:
+
+```bash
+python scripts/voice_acceptance.py \
+  --mode synthetic \
+  --cases barge-in-echo,barge-in \
+  --start-services
+```
+
+`barge-in-echo` waits for one completed output chunk, replays that exact retained
+PCM through the selected automated input path, and requires generation-bound
+echo suppression, release of the same playback session, unique playback starts,
+and a clean terminal `session_done` before another case begins. `barge-in`
+injects confirmed external speech during active playback and requires distinct
+acoustic and Gateway receipts. Both acoustic receipts must retain
+`cancel_cognitive_work=false`; VAD-start-to-duck and
+confirmed-speech-to-silence must each be at most 250 ms. A pause/restart error,
+late old-session TTS or playback, dispatch failure, duplicate start, missing
+terminal completion, or cross-case overlap is a hard failure. Captured-output
+replay is automated-only; physical microphone and speaker behavior still
+requires supervised evidence.
+
 The current development compatibility policy lists `synthetic`,
 `virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy
 does not turn them into human voice-device evidence. Before a bundle can enter
@@ -925,6 +947,11 @@ WebSocket service and stores it under:
 ```text
 .chromie/acceptance/voice/<id>/generated-input/
 ```
+
+Before generating fixtures, the runner waits for application-level TTS health
+to report both a ready provider and a live worker. Attempts are retained in
+`tts-readiness.log`; a listening TCP port or a container in `starting` state is
+not treated as fixture-generation readiness.
 
 It then injects a private framed PCM16 stream through the Orchestrator process's
 stdin. No network injection endpoint is opened. The Orchestrator resamples the

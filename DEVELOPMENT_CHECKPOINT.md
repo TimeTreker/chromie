@@ -73,25 +73,36 @@ walking/blinking completion, truthful singing unavailability with zero steps,
 and safe idle before and after. It does not prove a singing provider, physical
 microphone or speaker behavior, physical robot behavior, or release readiness.
 
-The next active semantic Issue is #5, speech-start barge-in with reversible
-playback ducking. Diagnose and fix the earliest acoustic/playback boundary:
+Issue #5 has met its source and highest safe automated audio criteria. Clean
+Chromie `94718ab` passed `barge-in-echo` 6/6 and `barge-in` 7/7 in
+`.chromie/acceptance/voice/issue-5-94718ab-clean`. The retained output replay
+ducked in 0.0 ms, survived ASR distortion through order-aware echo matching,
+resumed the same generation, and completed 11/11 scheduled chunks before the
+next case. Confirmed external speech ducked in 0.0 ms, reached output silence in
+8.3 ms, retained `cancel_cognitive_work=false`, and produced a later distinct
+Gateway output-only receipt with zero provider or dispatch failures. Physical
+microphone/speaker, arbitrary human pronunciation, audible device latency, and
+the real acoustic echo path remain supervised target evidence rather than source
+closure claims.
 
-- credible speech start during playback immediately ducks or temporarily pauses
-  audible output without cancelling Cognitive Core work, Goals, body work, or
-  capability execution;
-- a bounded confirmation window uses available echo or AEC evidence;
-- confirmed external speech aborts the current output generation;
-- likely echo or noise restores safely without replay or duplication; and
-- later ASR and Gateway handling retains sole authority for semantic cancellation
-  scope.
+The next active semantic Issue is #6, the exact `chromie.vocal.perform` provider
+contract. Preserve the Speaking lane and the current Chromie playback boundary:
 
-Retain the originating playback/VAD episode, reproduce the late-silence boundary,
-add focused latency and cancellation-authority assertions, run its general-ability
-class, then run the canonical gates and highest safe automated audio E2E profile.
-Physical microphone and speaker evidence remains supervised and must be reported
-as open when it has not run. Do not move VAD, playback, echo handling, or
-user-level cancellation into Soridormi, and do not begin Issue #6 or #7 before
-Issue #5 meets its acceptance evidence.
+- one provider-prefixed capability identity survives proposal, validation,
+  authorization, execution, cancellation, and evidence;
+- requests use typed vocal modes and providers declare supported modes,
+  streaming, timing, sample format, concurrency, cancellation, and provenance;
+- ordinary TTS retains its current ordering, interruption, echo, and delivery
+  behavior while remaining distinct from recitation, humming, and singing;
+- unsupported modes return exact unavailable outcomes without silent downgrade;
+  and
+- fake-provider tests prove mode negotiation and failure behavior before any
+  real singing claim.
+
+Do not place backend names in semantic Goals, add a neutral late-binding alias,
+move playback ownership into Soridormi, or begin Issue #7 before Issue #6 meets
+its source acceptance. Real singing remains unvalidated until mode-specific
+target evidence exists.
 
 ## Canonical owners
 
