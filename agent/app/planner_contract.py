@@ -10,9 +10,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 try:
-    from chromie_contracts.interaction import CapabilityIdentityModel
+    from chromie_contracts.interaction import (
+        CapabilityIdentityModel,
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+    )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.interaction import CapabilityIdentityModel
+    from shared.chromie_contracts.interaction import (
+        CapabilityIdentityModel,
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+    )
 
 try:
     from chromie_contracts.goal import GoalAssociationResolution
@@ -45,9 +51,7 @@ except ImportError:  # pragma: no cover
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
-_NUMERIC_LITERAL_RE = re.compile(
-    r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)"
-)
+_NUMERIC_LITERAL_RE = re.compile(r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)")
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
 _LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
@@ -71,11 +75,7 @@ class PlannerCoverageReview(BaseModel):
             value = [value]
         if not isinstance(value, list):
             raise ValueError("uncovered_requirements must be an array")
-        return [
-            text
-            for item in value
-            if (text := " ".join(str(item or "").strip().split()))
-        ]
+        return [text for item in value if (text := " ".join(str(item or "").strip().split()))]
 
     @model_validator(mode="after")
     def validate_decision(self) -> "PlannerCoverageReview":
@@ -84,6 +84,7 @@ class PlannerCoverageReview(BaseModel):
         if self.decision == "reject" and not self.uncovered_requirements:
             raise ValueError("rejected coverage requires uncovered requirements")
         return self
+
 
 # Response Composer owns user-facing speech in the goal-driven pipeline.  These
 # runtime transport skills are valid in legacy/native InteractionResponse task
@@ -94,10 +95,7 @@ RESPONSE_COMPOSER_OWNED_SKILL_IDS = RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
 
 
 def is_planner_step_capability(capability_id: str) -> bool:
-    return (
-        str(capability_id or "").strip()
-        not in RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
-    )
+    return str(capability_id or "").strip() not in RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
 
 
 def is_planner_step_skill(skill_id: str) -> bool:
@@ -202,9 +200,7 @@ class PlannerModelGoalOutcome(BaseModel):
     def validate_outcome_shape(self) -> "PlannerModelGoalOutcome":
         if self.disposition == "execute":
             if self.coverage != "complete" or not self.step_ids:
-                raise ValueError(
-                    "execute goal outcome requires complete coverage and step_ids"
-                )
+                raise ValueError("execute goal outcome requires complete coverage and step_ids")
             if self.response_text.strip():
                 raise ValueError(
                     "execute goal outcome must not carry response_text; "
@@ -219,24 +215,16 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError("respond goal outcome must not reference steps")
         elif self.disposition == "escalate":
             if self.coverage not in {"partial", "uncertain"}:
-                raise ValueError(
-                    "escalate goal outcome requires partial or uncertain coverage"
-                )
+                raise ValueError("escalate goal outcome requires partial or uncertain coverage")
             if self.step_ids:
                 raise ValueError("escalate goal outcome must not reference steps")
             if self.response_text.strip():
-                raise ValueError(
-                    "escalate goal outcome must not claim a conversational answer"
-                )
+                raise ValueError("escalate goal outcome must not claim a conversational answer")
             if not self.unresolved and not self.rationale.strip():
-                raise ValueError(
-                    "escalate goal outcome requires an unresolved need or rationale"
-                )
+                raise ValueError("escalate goal outcome requires an unresolved need or rationale")
         elif self.disposition == "clarify":
             if self.coverage not in {"partial", "uncertain"}:
-                raise ValueError(
-                    "clarify goal outcome requires partial or uncertain coverage"
-                )
+                raise ValueError("clarify goal outcome requires partial or uncertain coverage")
             if self.step_ids:
                 raise ValueError("clarify goal outcome must not reference steps")
             if not self.unresolved and not self.response_text.strip():
@@ -244,9 +232,7 @@ class PlannerModelGoalOutcome(BaseModel):
                     "clarify goal outcome requires an unresolved need or response_text"
                 )
         elif self.step_ids:
-            raise ValueError(
-                "unavailable and refused goal outcomes must not reference steps"
-            )
+            raise ValueError("unavailable and refused goal outcomes must not reference steps")
         return self
 
 
@@ -283,9 +269,10 @@ class PlannerModelOutput(BaseModel):
             return value
         normalized = copy.deepcopy(value)
         outcomes = normalized.get("goal_outcomes")
-        if normalized.get("disposition") in {"execute", "mixed"} and normalized.get(
-            "response_text"
-        ) is None:
+        if (
+            normalized.get("disposition") in {"execute", "mixed"}
+            and normalized.get("response_text") is None
+        ):
             normalized["response_text"] = ""
         if isinstance(outcomes, dict):
             for outcome_value in outcomes.values():
@@ -304,10 +291,7 @@ class PlannerModelOutput(BaseModel):
         outcome = next(iter(outcomes.values()))
         if not isinstance(outcome, dict):
             return normalized
-        if (
-            normalized.get("disposition") == "clarify"
-            and outcome.get("disposition") == "clarify"
-        ):
+        if normalized.get("disposition") == "clarify" and outcome.get("disposition") == "clarify":
             if not str(outcome.get("response_text") or "").strip():
                 response_text = str(normalized.get("response_text") or "").strip()
                 if response_text:
@@ -340,9 +324,7 @@ class PlannerModelOutput(BaseModel):
         if self.disposition == "respond" and not self.response_text.strip():
             raise ValueError("respond planner output requires response_text")
         if self.disposition not in {"execute", "mixed"} and self.steps:
-            raise ValueError(
-                f"{self.disposition} planner output must not carry executable steps"
-            )
+            raise ValueError(f"{self.disposition} planner output must not carry executable steps")
         if self.disposition == "escalate" and not self.escalation_reason.strip():
             raise ValueError("escalate planner output requires escalation_reason")
         if self.disposition in {"execute", "respond", "mixed"}:
@@ -356,13 +338,9 @@ class PlannerModelOutput(BaseModel):
                 )
         if self.plan_relation in {"safe_adjustment", "alternative"}:
             if self.disposition not in {"execute", "mixed"}:
-                raise ValueError(
-                    "safe-adjusted and alternative plans must be executable"
-                )
+                raise ValueError("safe-adjusted and alternative plans must be executable")
             if not self.user_confirmation_required:
-                raise ValueError(
-                    "safe-adjusted and alternative plans require user confirmation"
-                )
+                raise ValueError("safe-adjusted and alternative plans require user confirmation")
             if not self.response_text.strip():
                 raise ValueError(
                     "safe-adjusted and alternative plans require response_text "
@@ -372,22 +350,14 @@ class PlannerModelOutput(BaseModel):
             "execute",
             "mixed",
         }:
-            raise ValueError(
-                "planner-requested confirmation is valid only for executable plans"
-            )
+            raise ValueError("planner-requested confirmation is valid only for executable plans")
         if self.goal_outcomes:
-            outcome_dispositions = {
-                item.disposition for item in self.goal_outcomes.values()
-            }
+            outcome_dispositions = {item.disposition for item in self.goal_outcomes.values()}
             expected_disposition = (
-                "mixed"
-                if len(outcome_dispositions) > 1
-                else next(iter(outcome_dispositions))
+                "mixed" if len(outcome_dispositions) > 1 else next(iter(outcome_dispositions))
             )
             if self.disposition != expected_disposition:
-                raise ValueError(
-                    "top-level disposition must match per-goal outcome dispositions"
-                )
+                raise ValueError("top-level disposition must match per-goal outcome dispositions")
         return self
 
 
@@ -500,9 +470,7 @@ def goal_association_prompt_projection(
         referent = item.get("referent")
         if isinstance(referent, dict):
             update["referent"] = {
-                key: copy.deepcopy(referent[key])
-                for key in referent_keys
-                if key in referent
+                key: copy.deepcopy(referent[key]) for key in referent_keys if key in referent
             }
         referent_updates.append(update)
     projection["referent_updates"] = referent_updates
@@ -516,11 +484,7 @@ def goal_association_prompt_projection(
         "reason_summary",
     )
     projection["resolved_references"] = [
-        {
-            key: copy.deepcopy(item[key])
-            for key in resolved_reference_keys
-            if key in item
-        }
+        {key: copy.deepcopy(item[key]) for key in resolved_reference_keys if key in item}
         for item in raw.get("resolved_references") or []
         if isinstance(item, dict)
     ]
@@ -532,9 +496,7 @@ def goal_association_prompt_projection(
         allow_nan=False,
     ).encode("utf-8")
     if len(serialized) > 65_536:
-        raise ValueError(
-            "Goal Association prompt projection exceeds 65536 UTF-8 bytes"
-        )
+        raise ValueError("Goal Association prompt projection exceeds 65536 UTF-8 bytes")
     return projection
 
 
@@ -653,9 +615,7 @@ def planner_response_goal_ids(
         if not isinstance(goal, dict):
             continue
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        responsibility_kind, output_mode, provider_required = (
-            _goal_execution_metadata(goal)
-        )
+        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
         if (
             goal_id
             and responsibility_kind == "spoken_response"
@@ -676,9 +636,7 @@ def planner_provider_vocal_goal_ids(
         if not isinstance(goal, dict):
             continue
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        responsibility_kind, output_mode, provider_required = (
-            _goal_execution_metadata(goal)
-        )
+        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
         if (
             goal_id
             and responsibility_kind == "spoken_response"
@@ -717,12 +675,11 @@ def validate_goal_responsibility_outcomes(
         for item in evidence_bound_dialogue(context)
         for source_goal_id in item.get("source_goal_ids") or []
     }
+    valid_vocal_step_ids: set[str] = set()
     for goal_id in sorted(response_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
-            raise ValueError(
-                f"spoken_response goal requires an explicit outcome: {goal_id}"
-            )
+            raise ValueError(f"spoken_response goal requires an explicit outcome: {goal_id}")
         if outcome.disposition != "respond":
             raise ValueError(
                 "spoken_response goal must use disposition=respond and no "
@@ -734,11 +691,11 @@ def validate_goal_responsibility_outcomes(
             raise ValueError(
                 f"provider-required vocal goal requires an explicit outcome: {goal_id}"
             )
-        if outcome.disposition in {"respond", "execute"}:
+        if outcome.disposition == "respond":
             raise ValueError(
                 "provider-required vocal goal cannot be completed by response_text, "
-                "ordinary TTS, or an Activity step before an exact vocal Capability "
-                f"contract exists: {goal_id}"
+                "ordinary TTS, media playback, or a body step: "
+                f"{goal_id}"
             )
         if outcome.response_text.strip():
             raise ValueError(
@@ -746,11 +703,42 @@ def validate_goal_responsibility_outcomes(
                 "empty; Response Composer owns truthful limitation speech: "
                 f"{goal_id}"
             )
-    if (
-        provider_vocal_goal_ids
-        and output.plan_relation == "exact"
-        and output.response_text.strip()
-    ):
+        owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
+        if outcome.disposition == "execute":
+            expected_mode = next(
+                (
+                    _goal_execution_metadata(goal)[1]
+                    for goal in authoritative_goals
+                    if str(goal.get("goal_id") or "").strip() == goal_id
+                ),
+                "",
+            )
+            if len(owned_steps) != 1:
+                raise ValueError(
+                    "provider-required vocal execute outcome requires exactly one "
+                    f"owned {VOCAL_PERFORMANCE_CAPABILITY_ID} step: {goal_id}"
+                )
+            step = owned_steps[0]
+            if step.capability_id != VOCAL_PERFORMANCE_CAPABILITY_ID:
+                raise ValueError(
+                    "provider-required vocal goal requires exact capability_id "
+                    f"{VOCAL_PERFORMANCE_CAPABILITY_ID}: {goal_id}"
+                )
+            if str(step.args.get("mode") or "").strip() != expected_mode:
+                raise ValueError(
+                    "vocal capability mode must exactly match authoritative Goal "
+                    f"output_mode={expected_mode!r}: {goal_id}"
+                )
+            if not str(step.args.get("text") or "").strip():
+                raise ValueError(
+                    f"vocal capability request requires authored text/content: {goal_id}"
+                )
+            valid_vocal_step_ids.add(step.step_id)
+        elif owned_steps:
+            raise ValueError(
+                f"non-executing provider-required vocal outcome cannot own plan steps: {goal_id}"
+            )
+    if provider_vocal_goal_ids and output.plan_relation == "exact" and output.response_text.strip():
         raise ValueError(
             "exact plan with a provider-required vocal goal must leave top-level "
             "response_text empty; Response Composer owns truthful limitation speech"
@@ -759,10 +747,11 @@ def validate_goal_responsibility_outcomes(
         step.step_id
         for step in output.steps
         if speaking_goal_ids.intersection(step.source_goal_ids)
+        and step.step_id not in valid_vocal_step_ids
     ]
     if invalid_steps:
         raise ValueError(
-            "Speaking goals cannot own Activity planner steps: "
+            "Speaking goals can own only an exact qualified vocal Capability step: "
             + ",".join(invalid_steps)
         )
     for goal_id in sorted(capability_goal_ids):
@@ -777,8 +766,7 @@ def validate_goal_responsibility_outcomes(
         if responds_without_capability and goal_id not in evidence_goal_ids:
             raise ValueError(
                 "capability_dependent goal cannot use disposition=respond "
-                "without capability or delivered evidence-bound dialogue: "
-                + goal_id
+                "without capability or delivered evidence-bound dialogue: " + goal_id
             )
 
 
@@ -809,8 +797,7 @@ def coordinated_action_goal_ids(
         metadata = goal.get("metadata")
         if (
             isinstance(metadata, dict)
-            and str(metadata.get("responsibility_kind") or "").strip()
-            == "executable_action"
+            and str(metadata.get("responsibility_kind") or "").strip() == "executable_action"
         ):
             goal_ids.add(goal_id)
         resource_responsibility = goal.get("resource_responsibility")
@@ -825,11 +812,7 @@ def coordinated_action_goal_ids(
         if any(
             isinstance(binding, dict)
             and "_".join(
-                str(binding.get("entity_type") or "")
-                .strip()
-                .casefold()
-                .replace("-", "_")
-                .split()
+                str(binding.get("entity_type") or "").strip().casefold().replace("-", "_").split()
             )
             == "action_list"
             for binding in bindings.values()
@@ -885,9 +868,7 @@ def parallel_plan_contract_errors(
                     "type": "parallel_capability_not_declared_safe",
                     "step_id": step.step_id,
                     "capability_id": step.capability_id,
-                    "parallel_metadata_declared": capability.get(
-                        "parallel_metadata_declared"
-                    ),
+                    "parallel_metadata_declared": capability.get("parallel_metadata_declared"),
                     "can_run_parallel": capability.get("can_run_parallel"),
                 }
             )
@@ -897,9 +878,7 @@ def parallel_plan_contract_errors(
     for index, (left_step, left) in enumerate(usable):
         left_group = str(left.get("exclusive_group") or "").strip()
         left_resources = {
-            str(item).strip()
-            for item in left.get("resource_claims") or []
-            if str(item).strip()
+            str(item).strip() for item in left.get("resource_claims") or [] if str(item).strip()
         }
         for right_step, right in usable[index + 1 :]:
             right_group = str(right.get("exclusive_group") or "").strip()
@@ -998,8 +977,7 @@ async def review_coordinated_action_plan_coverage(
                     "uncovered_requirements must be empty."
                 ),
                 "reject": (
-                    "List each omitted or contradicted responsibility in "
-                    "uncovered_requirements."
+                    "List each omitted or contradicted responsibility in uncovered_requirements."
                 ),
                 "execution_authority": "none",
             },
@@ -1096,13 +1074,7 @@ def _normalized_material_value(value: Any) -> Any:
 def _normalized_entity_type(value: Any) -> str:
     """Normalize a model-authored binding type without inferring semantics."""
 
-    return "_".join(
-        str(value or "")
-        .strip()
-        .casefold()
-        .replace("-", "_")
-        .split()
-    )
+    return "_".join(str(value or "").strip().casefold().replace("-", "_").split())
 
 
 def _list_literal_items(value: str) -> list[str]:
@@ -1144,8 +1116,7 @@ def _material_values_equal(
                 left_by_key[key],
                 right_by_key[key],
                 list_compatible=(
-                    isinstance(left_by_key[key], list)
-                    or isinstance(right_by_key[key], list)
+                    isinstance(left_by_key[key], list) or isinstance(right_by_key[key], list)
                 ),
             )
             for key in left_by_key
@@ -1172,9 +1143,7 @@ def _goal_binding_map(goal: dict[str, Any]) -> dict[str, dict[str, Any]]:
         if not name or not isinstance(raw_binding, dict) or "value" not in raw_binding:
             continue
         bindings[name] = {
-            "entity_type": _normalized_entity_type(
-                raw_binding.get("entity_type")
-            ),
+            "entity_type": _normalized_entity_type(raw_binding.get("entity_type")),
             "value": raw_binding.get("value"),
         }
     return bindings
@@ -1211,9 +1180,7 @@ def validate_goal_binding_argument_grounding(
 
     for step in output.steps:
         claimed_goal_ids = [
-            goal_id
-            for goal_id in step.source_goal_ids
-            if goal_id in bindings_by_goal
+            goal_id for goal_id in step.source_goal_ids if goal_id in bindings_by_goal
         ]
         if not claimed_goal_ids:
             continue
@@ -1221,16 +1188,13 @@ def validate_goal_binding_argument_grounding(
         required: dict[str, dict[str, Any]] = {}
         for goal_id in claimed_goal_ids:
             for name, binding in bindings_by_goal[goal_id].items():
-                if (
-                    name in required
-                    and not _material_values_equal(
-                        required[name]["value"],
-                        binding["value"],
-                        list_compatible=(
-                            required[name]["entity_type"] in _LIST_ENTITY_TYPES
-                            or binding["entity_type"] in _LIST_ENTITY_TYPES
-                        ),
-                    )
+                if name in required and not _material_values_equal(
+                    required[name]["value"],
+                    binding["value"],
+                    list_compatible=(
+                        required[name]["entity_type"] in _LIST_ENTITY_TYPES
+                        or binding["entity_type"] in _LIST_ENTITY_TYPES
+                    ),
                 ):
                     raise ValueError(
                         "one executable step cannot satisfy conflicting authoritative "
@@ -1246,9 +1210,7 @@ def validate_goal_binding_argument_grounding(
             if not _material_values_equal(
                 actual,
                 expected,
-                list_compatible=(
-                    binding["entity_type"] in _LIST_ENTITY_TYPES
-                ),
+                list_compatible=(binding["entity_type"] in _LIST_ENTITY_TYPES),
             ):
                 raise ValueError(
                     "planner step argument contradicts authoritative Goal binding: "
@@ -1265,17 +1227,14 @@ def validate_goal_binding_argument_grounding(
             for name, binding in required.items():
                 if name not in material_args:
                     raise ValueError(
-                        "verified-memory retrieval omitted authoritative Goal binding: "
-                        f"{name!r}"
+                        f"verified-memory retrieval omitted authoritative Goal binding: {name!r}"
                     )
                 actual = material_args[name]
                 expected = binding["value"]
                 if not _material_values_equal(
                     actual,
                     expected,
-                    list_compatible=(
-                        binding["entity_type"] in _LIST_ENTITY_TYPES
-                    ),
+                    list_compatible=(binding["entity_type"] in _LIST_ENTITY_TYPES),
                 ):
                     raise ValueError(
                         "verified-memory retrieval contradicts authoritative Goal "
@@ -1331,12 +1290,8 @@ def validate_external_response_evidence_boundary(
         for item in planned:
             if not isinstance(item, dict):
                 continue
-            safety_class = " ".join(
-                str(item.get("safety_class") or "").strip().split()
-            ).casefold()
-            if safety_class in external_safety_classes or item.get(
-                "retryable_safe_read"
-            ) is True:
+            safety_class = " ".join(str(item.get("safety_class") or "").strip().split()).casefold()
+            if safety_class in external_safety_classes or item.get("retryable_safe_read") is True:
                 has_external_read = True
                 break
         if has_external_read:
@@ -1419,9 +1374,7 @@ def evidence_bound_dialogue(
                     for value in metadata.get("source_goal_ids") or []
                     if (normalized := " ".join(str(value or "").strip().split()))
                 ][:8],
-                "canonical_plan_id": str(
-                    metadata.get("canonical_plan_id") or ""
-                )[:200],
+                "canonical_plan_id": str(metadata.get("canonical_plan_id") or "")[:200],
                 "source": "evidence_bound_tool_result_interpretation",
             }
         )
@@ -1473,10 +1426,7 @@ def validate_explicit_numeric_parameter_grounding(
     def resolution_location(resolution: PlanParameterResolution) -> str:
         """Render an unambiguous typed location for model repair feedback."""
 
-        return (
-            f"step_id={resolution.step_id!r}, "
-            f"parameter={resolution.parameter!r}"
-        )
+        return f"step_id={resolution.step_id!r}, parameter={resolution.parameter!r}"
 
     goal_text: dict[str, str] = {}
     for goal in authoritative_goals:
@@ -1551,11 +1501,7 @@ def validate_explicit_numeric_parameter_grounding(
         if outcome.disposition == "execute"
     }
     if not executable_goal_ids:
-        executable_goal_ids = {
-            goal_id
-            for step in output.steps
-            for goal_id in step.source_goal_ids
-        }
+        executable_goal_ids = {goal_id for step in output.steps for goal_id in step.source_goal_ids}
     for goal_id in executable_goal_ids:
         for literal in literals(goal_text.get(goal_id, "")):
             if not any(
@@ -1602,9 +1548,7 @@ def canonical_plan_response_schema(
 
     schema = copy.deepcopy(PlannerModelOutput.model_json_schema())
     schema["title"] = (
-        "FastPlannerModelOutput"
-        if planner_tier == "fast"
-        else "DeepPlannerModelOutput"
+        "FastPlannerModelOutput" if planner_tier == "fast" else "DeepPlannerModelOutput"
     )
     properties = schema.setdefault("properties", {})
     required = schema.setdefault("required", [])
@@ -1654,9 +1598,10 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
-    provider_vocal_goal_set = set(
-        provider_required_vocal_goal_ids or []
-    ).intersection(allowed_goals)
+    provider_vocal_goal_set = set(provider_required_vocal_goal_ids or []).intersection(
+        allowed_goals
+    )
+    vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_skills
 
     if provider_vocal_goal_set:
         planner_response_text = properties.get("response_text")
@@ -1680,10 +1625,7 @@ def canonical_plan_response_schema(
     # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
     # emits a complete map.  Fast Planner uses one flat decoder-compatible shape:
     # either an empty map for semantic escalation or a complete terminal map.
-    if (
-        len(allowed_goals) > 1
-        and "goal_outcomes" not in required
-    ):
+    if len(allowed_goals) > 1 and "goal_outcomes" not in required:
         required.append("goal_outcomes")
 
     goal_outcomes = properties.get("goal_outcomes")
@@ -1751,9 +1693,7 @@ def canonical_plan_response_schema(
         ):
             if field_name not in outcome_required:
                 outcome_required.append(field_name)
-        outcome_disposition = (
-            outcome_schema.get("properties", {}).get("disposition")
-        )
+        outcome_disposition = outcome_schema.get("properties", {}).get("disposition")
         if isinstance(outcome_disposition, dict):
             if response_only:
                 outcome_disposition["enum"] = (
@@ -1775,7 +1715,11 @@ def canonical_plan_response_schema(
         outcome_properties = outcome_schema.get("properties", {})
         base_branches: list[dict[str, Any]] = []
         allowed_outcomes = (
-            (["respond"] if planner_tier == "fast" else ["respond", "clarify", "unavailable", "refused"])
+            (
+                ["respond"]
+                if planner_tier == "fast"
+                else ["respond", "clarify", "unavailable", "refused"]
+            )
             if response_only
             else (
                 ["respond", "execute"]
@@ -1790,9 +1734,7 @@ def canonical_plan_response_schema(
             )
         )
         for outcome_name in allowed_outcomes:
-            branch: dict[str, Any] = {
-                "properties": {"disposition": {"enum": [outcome_name]}}
-            }
+            branch: dict[str, Any] = {"properties": {"disposition": {"enum": [outcome_name]}}}
             branch_props = branch["properties"]
             if outcome_name == "execute":
                 branch_props["coverage"] = {"enum": ["complete"]}
@@ -1849,13 +1791,9 @@ def canonical_plan_response_schema(
     # Inline each Deep Planner goal outcome and its satisfaction object so the
     # decoder sees every required semantic field at the exact goal key.
     if planner_tier == "deep":
-        satisfaction_schema = schema.get("$defs", {}).get(
-            "PlannerGoalSatisfaction"
-        )
+        satisfaction_schema = schema.get("$defs", {}).get("PlannerGoalSatisfaction")
         if isinstance(satisfaction_schema, dict):
-            satisfaction_required = satisfaction_schema.setdefault(
-                "required", []
-            )
+            satisfaction_required = satisfaction_schema.setdefault("required", [])
             for field_name in (
                 "score",
                 "status",
@@ -1875,10 +1813,7 @@ def canonical_plan_response_schema(
                     "Deep Planner result, including clarify/unavailable/refused."
                 )
 
-        if (
-            isinstance(goal_outcomes, dict)
-            and isinstance(outcome_schema, dict)
-        ):
+        if isinstance(goal_outcomes, dict) and isinstance(outcome_schema, dict):
             outcome_properties = goal_outcomes.get("properties", {})
             for goal_id in allowed_goals:
                 goal_property = outcome_properties.get(goal_id)
@@ -1887,12 +1822,8 @@ def canonical_plan_response_schema(
                 specialized = copy.deepcopy(outcome_schema)
                 specialized_properties = specialized.get("properties", {})
                 if isinstance(satisfaction_schema, dict):
-                    specialized_satisfaction = copy.deepcopy(
-                        satisfaction_schema
-                    )
-                    satisfaction_properties = specialized_satisfaction.get(
-                        "properties", {}
-                    )
+                    specialized_satisfaction = copy.deepcopy(satisfaction_schema)
+                    satisfaction_properties = specialized_satisfaction.get("properties", {})
                     for field_name in (
                         "satisfied_goal_ids",
                         "unmet_goal_ids",
@@ -1905,13 +1836,9 @@ def canonical_plan_response_schema(
                             }
                             field["uniqueItems"] = True
                             field["maxItems"] = 1
-                    specialized_properties["satisfaction"] = (
-                        specialized_satisfaction
-                    )
+                    specialized_properties["satisfaction"] = specialized_satisfaction
                 if requires_execution and goal_id not in response_goal_set:
-                    disposition_field = specialized_properties.get(
-                        "disposition"
-                    )
+                    disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
                         disposition_field["enum"] = [
                             "execute",
@@ -1919,9 +1846,7 @@ def canonical_plan_response_schema(
                             "unavailable",
                             "refused",
                         ]
-                    response_text_field = specialized_properties.get(
-                        "response_text"
-                    )
+                    response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
                         response_text_field["maxLength"] = 0
                         response_text_field["description"] = (
@@ -1934,9 +1859,7 @@ def canonical_plan_response_schema(
                             branch
                             for branch in branches
                             if (
-                                branch.get("properties", {})
-                                .get("disposition", {})
-                                .get("enum")
+                                branch.get("properties", {}).get("disposition", {}).get("enum")
                                 != ["respond"]
                             )
                         ]
@@ -1961,23 +1884,28 @@ def canonical_plan_response_schema(
                             branch
                             for branch in branches
                             if (
-                                branch.get("properties", {})
-                                .get("disposition", {})
-                                .get("enum")
+                                branch.get("properties", {}).get("disposition", {}).get("enum")
                                 == ["respond"]
                             )
                         ]
                 if goal_id in provider_vocal_goal_set:
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
-                        disposition_field["enum"] = [
-                            "clarify",
-                            "unavailable",
-                            "refused",
-                        ]
-                    response_text_field = specialized_properties.get(
-                        "response_text"
-                    )
+                        disposition_field["enum"] = (
+                            [
+                                "execute",
+                                "clarify",
+                                "unavailable",
+                                "refused",
+                            ]
+                            if vocal_capability_available
+                            else [
+                                "clarify",
+                                "unavailable",
+                                "refused",
+                            ]
+                        )
+                    response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
                         response_text_field.pop("minLength", None)
                         response_text_field["maxLength"] = 0
@@ -1986,8 +1914,25 @@ def canonical_plan_response_schema(
                             "Response Composer owns truthful limitation wording."
                         )
                     step_ids_field = specialized_properties.get("step_ids")
-                    if isinstance(step_ids_field, dict):
+                    if isinstance(step_ids_field, dict) and not vocal_capability_available:
                         step_ids_field["maxItems"] = 0
+                    branches = specialized.get("oneOf")
+                    if isinstance(branches, list):
+                        specialized["oneOf"] = [
+                            branch
+                            for branch in branches
+                            if (
+                                branch.get("properties", {}).get("disposition", {}).get("enum")
+                                != ["respond"]
+                            )
+                            and (
+                                vocal_capability_available
+                                or (
+                                    branch.get("properties", {}).get("disposition", {}).get("enum")
+                                    != ["execute"]
+                                )
+                            )
+                        ]
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -2375,18 +2320,14 @@ def fast_multi_goal_response_schema(
                 continue
             specialized_outcome = copy.deepcopy(outcome_schema)
             specialized_satisfaction = copy.deepcopy(satisfaction_schema)
-            specialized_satisfaction_properties = specialized_satisfaction.get(
-                "properties", {}
-            )
+            specialized_satisfaction_properties = specialized_satisfaction.get("properties", {})
             for field_name in ("satisfied_goal_ids", "unmet_goal_ids"):
                 field_schema = specialized_satisfaction_properties.get(field_name)
                 if isinstance(field_schema, dict):
                     field_schema["items"] = {"type": "string", "enum": [goal_id]}
                     field_schema["uniqueItems"] = True
                     field_schema["maxItems"] = 1
-            satisfied = specialized_satisfaction_properties.get(
-                "satisfied_goal_ids"
-            )
+            satisfied = specialized_satisfaction_properties.get("satisfied_goal_ids")
             if isinstance(satisfied, dict):
                 satisfied["description"] = (
                     f"Only {goal_id!r} may appear here. Include it when this "
@@ -2399,18 +2340,12 @@ def fast_multi_goal_response_schema(
                     "planning gap. Pending execution and sibling goals do not "
                     "belong here; exact satisfaction requires an empty list."
                 )
-            specialized_outcome_properties = specialized_outcome.get(
-                "properties", {}
-            )
+            specialized_outcome_properties = specialized_outcome.get("properties", {})
             if requires_execution and goal_id not in response_goal_set:
-                disposition_field = specialized_outcome_properties.get(
-                    "disposition"
-                )
+                disposition_field = specialized_outcome_properties.get("disposition")
                 if isinstance(disposition_field, dict):
                     disposition_field["enum"] = ["execute", "clarify", "escalate"]
-                response_text_field = specialized_outcome_properties.get(
-                    "response_text"
-                )
+                response_text_field = specialized_outcome_properties.get("response_text")
                 if isinstance(response_text_field, dict):
                     response_text_field["maxLength"] = 0
                     response_text_field["description"] = (
@@ -2423,21 +2358,15 @@ def fast_multi_goal_response_schema(
                         branch
                         for branch in branches
                         if (
-                            branch.get("properties", {})
-                            .get("disposition", {})
-                            .get("enum")
+                            branch.get("properties", {}).get("disposition", {}).get("enum")
                             != ["respond"]
                         )
                     ]
             if goal_id in response_goal_set:
-                disposition_field = specialized_outcome_properties.get(
-                    "disposition"
-                )
+                disposition_field = specialized_outcome_properties.get("disposition")
                 if isinstance(disposition_field, dict):
                     disposition_field["enum"] = ["respond"]
-                response_text_field = specialized_outcome_properties.get(
-                    "response_text"
-                )
+                response_text_field = specialized_outcome_properties.get("response_text")
                 if isinstance(response_text_field, dict):
                     response_text_field.pop("maxLength", None)
                     response_text_field["minLength"] = 1
@@ -2451,9 +2380,7 @@ def fast_multi_goal_response_schema(
                         branch
                         for branch in branches
                         if (
-                            branch.get("properties", {})
-                            .get("disposition", {})
-                            .get("enum")
+                            branch.get("properties", {}).get("disposition", {}).get("enum")
                             == ["respond"]
                         )
                     ]
@@ -2463,9 +2390,7 @@ def fast_multi_goal_response_schema(
             )
             step_ids = specialized_outcome_properties.get("step_ids")
             if isinstance(step_ids, dict):
-                step_ids["maxItems"] = (
-                    0 if goal_id in response_goal_set else 1
-                )
+                step_ids["maxItems"] = 0 if goal_id in response_goal_set else 1
                 step_ids["uniqueItems"] = True
                 step_ids["description"] = (
                     "No executable step may be owned by this direct-response Goal."
@@ -2573,9 +2498,7 @@ def fast_multi_goal_response_schema(
         "user_confirmation_required",
     )
     schema["properties"] = {
-        key: properties[key]
-        for key in preferred_property_order
-        if key in properties
+        key: properties[key] for key in preferred_property_order if key in properties
     }
     return schema
 
@@ -2820,10 +2743,7 @@ def planner_contract_diagnostics(
         if require_complete_outcome_map and outcome_goal_set != expected_goal_set:
             add(
                 ["goal_outcomes"],
-                (
-                    "goal_outcomes keys must cover exactly the authoritative Goal "
-                    "Association IDs"
-                ),
+                ("goal_outcomes keys must cover exactly the authoritative Goal Association IDs"),
                 value={
                     "expected": expected_goal_ids,
                     "actual": list(outcomes),
@@ -2914,9 +2834,10 @@ def planner_contract_diagnostics(
                         "escalate goal outcome must not claim a conversational answer",
                         value=outcome_response,
                     )
-                if not outcome.get("unresolved") and not str(
-                    outcome.get("rationale") or ""
-                ).strip():
+                if (
+                    not outcome.get("unresolved")
+                    and not str(outcome.get("rationale") or "").strip()
+                ):
                     add(
                         ["goal_outcomes", goal_id],
                         "escalate goal outcome requires an unresolved need or rationale",
@@ -2942,10 +2863,7 @@ def planner_contract_diagnostics(
                         "clarify goal outcome requires an unresolved need or response_text",
                         value=outcome,
                     )
-            elif (
-                outcome_disposition in {"unavailable", "refused"}
-                and normalized_outcome_step_ids
-            ):
+            elif outcome_disposition in {"unavailable", "refused"} and normalized_outcome_step_ids:
                 add(
                     ["goal_outcomes", goal_id, "step_ids"],
                     "unavailable and refused goal outcomes must not reference steps",
@@ -2956,17 +2874,14 @@ def planner_contract_diagnostics(
             if unknown_steps:
                 add(
                     ["goal_outcomes", goal_id, "step_ids"],
-                    "goal outcome references unknown step IDs: "
-                    + ",".join(sorted(unknown_steps)),
+                    "goal outcome references unknown step IDs: " + ",".join(sorted(unknown_steps)),
                     value=normalized_outcome_step_ids,
                 )
 
         normalized_dispositions = {item for item in outcome_dispositions if item}
         if normalized_dispositions:
             expected_disposition = (
-                "mixed"
-                if len(normalized_dispositions) > 1
-                else next(iter(normalized_dispositions))
+                "mixed" if len(normalized_dispositions) > 1 else next(iter(normalized_dispositions))
             )
             if disposition != expected_disposition:
                 add(
@@ -3000,10 +2915,7 @@ def planner_contract_diagnostics(
                         "expected": sorted(expected_sources),
                     },
                 )
-    elif (
-        len(expected_goal_set) > 1
-        and disposition in {"execute", "respond", "mixed"}
-    ):
+    elif len(expected_goal_set) > 1 and disposition in {"execute", "respond", "mixed"}:
         add(
             ["goal_outcomes"],
             (
@@ -3066,11 +2978,7 @@ def _normalize_redundant_planner_response_fields(
                 break
             step_id = " ".join(str(item.get("step_id") or "").strip().split())
             source_goal_ids = item.get("source_goal_ids")
-            if (
-                not step_id
-                or step_id in seen_step_ids
-                or not isinstance(source_goal_ids, list)
-            ):
+            if not step_id or step_id in seen_step_ids or not isinstance(source_goal_ids, list):
                 ownership_is_usable = False
                 break
             seen_step_ids.add(step_id)
@@ -3164,9 +3072,7 @@ def validate_planner_model_output(
                 if " ".join(str(item or "").strip().split())
             )
         )
-        if expected_goal_ids_for_turn and set(normalized_echo) != set(
-            expected_goal_ids_for_turn
-        ):
+        if expected_goal_ids_for_turn and set(normalized_echo) != set(expected_goal_ids_for_turn):
             raise ValueError(
                 "goal_ids_do_not_match_goal_association: planner echo conflicts "
                 "with authoritative Goal Association IDs"
@@ -3212,24 +3118,14 @@ def validate_planner_model_output(
                 "multi-goal fast planner output requires explicit fields: "
                 + ",".join(missing_envelope_fields)
             )
-    if (
-        planner_tier == "fast"
-        and len(expected_goal_id_set) > 1
-        and not goal_outcomes_were_supplied
-    ):
-        raise ValueError(
-            "multi-goal fast planner output requires an explicit goal_outcomes object"
-        )
+    if planner_tier == "fast" and len(expected_goal_id_set) > 1 and not goal_outcomes_were_supplied:
+        raise ValueError("multi-goal fast planner output requires an explicit goal_outcomes object")
     if planner_tier == "fast" and output.disposition == "escalate":
         if output.coverage not in {"partial", "uncertain"}:
-            raise ValueError(
-                "fast semantic escalation requires partial or uncertain coverage"
-            )
+            raise ValueError("fast semantic escalation requires partial or uncertain coverage")
         if len(expected_goal_id_set) <= 1:
             if output.goal_outcomes:
-                raise ValueError(
-                    "single-goal fast semantic escalation requires goal_outcomes={}"
-                )
+                raise ValueError("single-goal fast semantic escalation requires goal_outcomes={}")
             if output.goal_satisfaction is not None:
                 raise ValueError(
                     "single-goal fast semantic escalation requires goal_satisfaction=null"
@@ -3249,13 +3145,10 @@ def validate_planner_model_output(
         and outcome_goal_ids != expected_goal_id_set
     ):
         raise ValueError(
-            "goal_outcomes keys must cover exactly the authoritative Goal "
-            "Association IDs"
+            "goal_outcomes keys must cover exactly the authoritative Goal Association IDs"
         )
     if planner_tier == "fast" and output.goal_outcomes:
-        outcome_dispositions = {
-            outcome.disposition for outcome in output.goal_outcomes.values()
-        }
+        outcome_dispositions = {outcome.disposition for outcome in output.goal_outcomes.values()}
         unsupported = outcome_dispositions - {"execute", "respond", "clarify", "escalate"}
         if unsupported:
             raise ValueError(
@@ -3269,9 +3162,7 @@ def validate_planner_model_output(
                     "execute or respond outcomes"
                 )
             if output.disposition != "clarify":
-                raise ValueError(
-                    "all-clarify goal outcomes require top-level disposition=clarify"
-                )
+                raise ValueError("all-clarify goal outcomes require top-level disposition=clarify")
             if output.steps:
                 raise ValueError("fast clarification must not carry steps")
         elif "escalate" in outcome_dispositions:
@@ -3288,30 +3179,21 @@ def validate_planner_model_output(
                 raise ValueError("fast semantic escalation must not carry steps")
             if output.goal_satisfaction is None:
                 raise ValueError(
-                    "multi-goal fast semantic escalation requires model-authored "
-                    "goal_satisfaction"
+                    "multi-goal fast semantic escalation requires model-authored goal_satisfaction"
                 )
             if output.goal_satisfaction.status == "exact":
-                raise ValueError(
-                    "fast semantic escalation cannot claim exact goal satisfaction"
-                )
+                raise ValueError("fast semantic escalation cannot claim exact goal satisfaction")
         elif output.disposition == "escalate":
-            raise ValueError(
-                "multi-goal fast escalation requires one escalate outcome per goal"
-            )
+            raise ValueError("multi-goal fast escalation requires one escalate outcome per goal")
         if output.disposition == "mixed" and outcome_dispositions != {
             "execute",
             "respond",
         }:
-            raise ValueError(
-                "fast mixed output requires at least one execute and one respond goal"
-            )
+            raise ValueError("fast mixed output requires at least one execute and one respond goal")
     for goal_id, outcome in output.goal_outcomes.items():
         if planner_tier == "fast" and len(expected_goal_id_set) > 1:
             if outcome.satisfaction is None:
-                raise ValueError(
-                    "multi-goal fast outcomes require model-authored satisfaction"
-                )
+                raise ValueError("multi-goal fast outcomes require model-authored satisfaction")
         referenced_goal_ids = {
             *(outcome.satisfaction.satisfied_goal_ids if outcome.satisfaction else []),
             *(outcome.satisfaction.unmet_goal_ids if outcome.satisfaction else []),
@@ -3320,14 +3202,11 @@ def validate_planner_model_output(
         if foreign_goal_ids:
             raise ValueError(
                 "per-goal outcome satisfaction may reference only its enclosing "
-                f"authoritative goal ID {goal_id!r}; found "
-                + ",".join(sorted(foreign_goal_ids))
+                f"authoritative goal ID {goal_id!r}; found " + ",".join(sorted(foreign_goal_ids))
             )
     if planner_tier == "fast" and len(expected_goal_id_set) > 1:
         if output.goal_satisfaction is None:
-            raise ValueError(
-                "multi-goal fast output requires model-authored goal_satisfaction"
-            )
+            raise ValueError("multi-goal fast output requires model-authored goal_satisfaction")
     if output.goal_satisfaction is not None:
         referenced_goal_ids = {
             *output.goal_satisfaction.satisfied_goal_ids,

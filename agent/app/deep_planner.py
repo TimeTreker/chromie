@@ -66,9 +66,18 @@ class DeepPlannerResolver:
         schema_version=1,
     )
 
-    def __init__(self, ollama: OllamaClient, catalog: CapabilityCatalog, *, min_confidence: float = 0.65,
-                 num_ctx: int = 8192, num_predict: int = 1024, max_capabilities: int = 96,
-                 max_replans: int = 2, min_goal_satisfaction: float = 0.75) -> None:
+    def __init__(
+        self,
+        ollama: OllamaClient,
+        catalog: CapabilityCatalog,
+        *,
+        min_confidence: float = 0.65,
+        num_ctx: int = 8192,
+        num_predict: int = 1024,
+        max_capabilities: int = 96,
+        max_replans: int = 2,
+        min_goal_satisfaction: float = 0.75,
+    ) -> None:
         self.ollama = ollama
         self.catalog = catalog
         self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
@@ -127,9 +136,7 @@ class DeepPlannerResolver:
             # Cognitive Core already established the effect envelope. A tool
             # lane may choose among tool capabilities, but it must never drift
             # into a body gesture merely because that capability is common.
-            executable = [
-                item for item in executable if str(item.route) == "tool"
-            ]
+            executable = [item for item in executable if str(item.route) == "tool"]
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
         expected_goal_ids_for_turn = expected_goal_ids(
             request.context if isinstance(request.context, dict) else {}
@@ -179,18 +186,10 @@ class DeepPlannerResolver:
                         previous_raw=previous_raw,
                         expected_goal_ids=expected_goal_ids_for_turn,
                     ),
-                    system=(
-                        self._revision_system_prompt()
-                        if feedback
-                        else self._system_prompt()
-                    ),
+                    system=(self._revision_system_prompt() if feedback else self._system_prompt()),
                     options=generation_options,
                     response_format=active_response_schema,
-                    prompt_family=(
-                        "deep_planner.revision"
-                        if feedback
-                        else "deep_planner.primary"
-                    ),
+                    prompt_family=("deep_planner.revision" if feedback else "deep_planner.primary"),
                     turn_id=request.sid,
                     attempt=attempt + 1,
                 )
@@ -248,11 +247,13 @@ class DeepPlannerResolver:
                     )
                     feedback = self._merge_feedback(
                         persistent_safety_feedback,
-                        [{
-                            "type": "canonical_plan_contract_validation_failure",
-                            "error_type": type(exc).__name__,
-                            "validation_errors": initial_validation_errors,
-                        }],
+                        [
+                            {
+                                "type": "canonical_plan_contract_validation_failure",
+                                "error_type": type(exc).__name__,
+                                "validation_errors": initial_validation_errors,
+                            }
+                        ],
                     )
                     continue
                 logger.warning(
@@ -261,9 +262,7 @@ class DeepPlannerResolver:
                     "initial_raw_output=%s repair_raw_output=%s",
                     request.sid,
                     cognition_text_reference(initial_raw_output),
-                    cognition_text_reference(
-                        raw if contract_repair_attempted else None
-                    ),
+                    cognition_text_reference(raw if contract_repair_attempted else None),
                     self._bounded(initial_raw_output, 5000)
                     if initial_raw_output is not None
                     else "",
@@ -271,7 +270,9 @@ class DeepPlannerResolver:
                     if contract_repair_attempted and raw is not None
                     else "",
                 )
-                integrity_metadata = cognitive_integrity_metadata(stage="deep_planner", exc=exc, request=request)
+                integrity_metadata = cognitive_integrity_metadata(
+                    stage="deep_planner", exc=exc, request=request
+                )
                 return self._clarify(
                     plan_id,
                     request,
@@ -286,9 +287,7 @@ class DeepPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output_ref": cognition_text_reference(
-                            initial_raw_output
-                        ),
+                        "initial_raw_output_ref": cognition_text_reference(initial_raw_output),
                         "repair_raw_output_ref": cognition_text_reference(
                             raw if contract_repair_attempted else None
                         ),
@@ -316,18 +315,14 @@ class DeepPlannerResolver:
                     and plan.steps
                 ):
                     try:
-                        coverage_review = (
-                            await review_coordinated_action_plan_coverage(
-                                self.ollama,
-                                request_text=request.text,
-                                language=str(request.language or "und"),
-                                authoritative_goals=canonical_goal_grounding(
-                                    request.context
-                                ),
-                                plan=plan,
-                                capabilities=payload,
-                                num_ctx=self.num_ctx,
-                            )
+                        coverage_review = await review_coordinated_action_plan_coverage(
+                            self.ollama,
+                            request_text=request.text,
+                            language=str(request.language or "und"),
+                            authoritative_goals=canonical_goal_grounding(request.context),
+                            plan=plan,
+                            capabilities=payload,
+                            num_ctx=self.num_ctx,
                         )
                     except Exception as exc:
                         logger.warning(
@@ -345,18 +340,14 @@ class DeepPlannerResolver:
                             error=exc,
                             attempts=attempt + 1,
                             metadata={
-                                "coordinated_goal_ids": sorted(
-                                    coordinated_goal_ids
-                                ),
+                                "coordinated_goal_ids": sorted(coordinated_goal_ids),
                                 "execution_allowed": False,
                             },
                         )
                     if coverage_review.decision != "accept":
                         review_error = {
                             "type": "coordinated_action_coverage_incomplete",
-                            "uncovered_requirements": list(
-                                coverage_review.uncovered_requirements
-                            ),
+                            "uncovered_requirements": list(coverage_review.uncovered_requirements),
                             "reason": coverage_review.reason,
                             "confidence": coverage_review.confidence,
                         }
@@ -382,9 +373,7 @@ class DeepPlannerResolver:
                             unresolved=coverage_review.uncovered_requirements,
                             metadata={
                                 "validation_feedback": [review_error],
-                                "coordinated_goal_ids": sorted(
-                                    coordinated_goal_ids
-                                ),
+                                "coordinated_goal_ids": sorted(coordinated_goal_ids),
                                 "execution_allowed": False,
                             },
                             attempts=attempt + 1,
@@ -396,13 +385,21 @@ class DeepPlannerResolver:
                         "execution_authority": "none",
                     }
                 metadata = dict(plan.metadata)
-                metadata.update({"resolver": "deep_planner", "status": "complete" if plan.coverage == "complete" else plan.disposition,
-                                 "authority": "advisory", "attempt_count": attempt + 1,
-                                 "full_capability_count": len(payload), "max_replans": self.max_replans, "min_goal_satisfaction": self.min_goal_satisfaction,
-                                 "contract_schema": "DeepPlannerModelOutput",
-                                 "canonical_contract": "CanonicalPlan",
-                                 "contract_repair_attempted": contract_repair_attempted,
-                                 "contract_repair_succeeded": contract_repair_attempted})
+                metadata.update(
+                    {
+                        "resolver": "deep_planner",
+                        "status": "complete" if plan.coverage == "complete" else plan.disposition,
+                        "authority": "advisory",
+                        "attempt_count": attempt + 1,
+                        "full_capability_count": len(payload),
+                        "max_replans": self.max_replans,
+                        "min_goal_satisfaction": self.min_goal_satisfaction,
+                        "contract_schema": "DeepPlannerModelOutput",
+                        "canonical_contract": "CanonicalPlan",
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": contract_repair_attempted,
+                    }
+                )
                 metadata.update(coverage_review_metadata)
                 if contract_repair_attempted:
                     metadata["contract_repair"] = {
@@ -428,8 +425,7 @@ class DeepPlannerResolver:
                 request,
                 "validation_rejected_after_replan",
                 unresolved=[
-                    item.get("step_id") or item.get("skill_id") or item["type"]
-                    for item in errors
+                    item.get("step_id") or item.get("skill_id") or item["type"] for item in errors
                 ],
                 metadata={
                     "validation_feedback": errors,
@@ -462,9 +458,7 @@ class DeepPlannerResolver:
         if isinstance(exc, ValidationError):
             feedback = list(exc.errors(include_url=False))
         else:
-            feedback = [
-                {"type": type(exc).__name__, "message": str(exc)[:1000]}
-            ]
+            feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
         feedback.extend(
             planner_contract_diagnostics(
                 raw,
@@ -494,20 +488,28 @@ class DeepPlannerResolver:
     @staticmethod
     def _capability_payload(item: Any) -> dict[str, Any]:
         return {
-            "capability_id": item.capability_id, "description": item.description,
-            "input_schema": item.input_schema, "route": item.route, "available": item.available,
+            "capability_id": item.capability_id,
+            "description": item.description,
+            "input_schema": item.input_schema,
+            "route": item.route,
+            "available": item.available,
             "interaction_executable": item.interaction_executable,
-            "requires_confirmation": item.requires_confirmation, "effects": item.effects,
-            "safety_class": item.safety_class, "can_run_parallel": item.can_run_parallel,
+            "requires_confirmation": item.requires_confirmation,
+            "effects": item.effects,
+            "safety_class": item.safety_class,
+            "can_run_parallel": item.can_run_parallel,
             "parallel_metadata_declared": item.parallel_metadata_declared,
-            "exclusive_group": item.exclusive_group, "resource_claims": item.resource_claims,
+            "exclusive_group": item.exclusive_group,
+            "resource_claims": item.resource_claims,
             "execution_constraints": item.execution_constraints,
             "hints": dict(item.hints),
         }
 
     @staticmethod
     def _plan_id(request: AgentRunRequest) -> str:
-        digest = hashlib.sha256(f"{request.sid or 'turn'}|deep|{request.text}".encode()).hexdigest()[:20]
+        digest = hashlib.sha256(
+            f"{request.sid or 'turn'}|deep|{request.text}".encode()
+        ).hexdigest()[:20]
         return f"plan_{digest}"
 
     @classmethod
@@ -528,9 +530,7 @@ class DeepPlannerResolver:
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
-            provider_required_vocal_goal_ids=(
-                provider_required_vocal_goal_ids
-            ),
+            provider_required_vocal_goal_ids=(provider_required_vocal_goal_ids),
         )
 
     @staticmethod
@@ -541,10 +541,7 @@ class DeepPlannerResolver:
             "parallel_resource_claim_conflict",
             "safety_revision_contract_not_satisfied",
         }
-        return any(
-            isinstance(item, dict) and item.get("type") in safety_types
-            for item in feedback
-        )
+        return any(isinstance(item, dict) and item.get("type") in safety_types for item in feedback)
 
     @staticmethod
     def _requires_sequential_safety_revision(
@@ -556,8 +553,7 @@ class DeepPlannerResolver:
             "parallel_resource_claim_conflict",
         }
         return any(
-            isinstance(item, dict) and item.get("type") in concurrency_types
-            for item in feedback
+            isinstance(item, dict) and item.get("type") in concurrency_types for item in feedback
         )
 
     @classmethod
@@ -568,9 +564,7 @@ class DeepPlannerResolver:
         """Carry upstream deterministic safety findings into Deep attempt one."""
 
         candidates: list[dict[str, Any]] = []
-        fast_plan = context.get("fast_plan_resolution") or context.get(
-            "fast_planner_resolution"
-        )
+        fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution")
         if isinstance(fast_plan, dict):
             metadata = fast_plan.get("metadata")
             if isinstance(metadata, dict):
@@ -583,14 +577,10 @@ class DeepPlannerResolver:
                     isinstance(parallel_errors, list)
                     and int(metadata.get("executable_step_count") or 0) > 1
                 ):
-                    candidates.extend(
-                        item for item in parallel_errors if isinstance(item, dict)
-                    )
+                    candidates.extend(item for item in parallel_errors if isinstance(item, dict))
         runtime_feedback = context.get("runtime_validator_feedback")
         if isinstance(runtime_feedback, list):
-            candidates.extend(
-                item for item in runtime_feedback if isinstance(item, dict)
-            )
+            candidates.extend(item for item in runtime_feedback if isinstance(item, dict))
         return [
             dict(item)
             for item in cls._merge_feedback(candidates)
@@ -710,21 +700,20 @@ class DeepPlannerResolver:
         if not cls._requires_safety_revision(feedback):
             return []
         if plan.disposition in {"clarify", "unavailable", "refused"}:
-            return [] if not plan.steps else [
-                {
-                    "type": "safety_revision_contract_not_satisfied",
-                    "reason": "non-executable safety revision retained plan steps",
-                }
-            ]
+            return (
+                []
+                if not plan.steps
+                else [
+                    {
+                        "type": "safety_revision_contract_not_satisfied",
+                        "reason": "non-executable safety revision retained plan steps",
+                    }
+                ]
+            )
         relation = str(plan.metadata.get("plan_relation") or "exact")
         confirmation = plan.metadata.get("user_confirmation_required") is True
-        retained_parallel_steps = [
-            step.step_id for step in plan.steps if step.timing == "parallel"
-        ]
-        if (
-            cls._requires_sequential_safety_revision(feedback)
-            and retained_parallel_steps
-        ):
+        retained_parallel_steps = [step.step_id for step in plan.steps if step.timing == "parallel"]
+        if cls._requires_sequential_safety_revision(feedback) and retained_parallel_steps:
             return [
                 {
                     "type": "safety_revision_contract_not_satisfied",
@@ -794,9 +783,7 @@ class DeepPlannerResolver:
             )
         if not isinstance(context, dict):
             return
-        advisory = context.get("fast_plan_resolution") or context.get(
-            "fast_planner_resolution"
-        )
+        advisory = context.get("fast_plan_resolution") or context.get("fast_planner_resolution")
         if not isinstance(advisory, dict):
             return
         fast_steps = advisory.get("steps")
@@ -805,8 +792,7 @@ class DeepPlannerResolver:
         parallel_fast = [
             item
             for item in fast_steps
-            if isinstance(item, dict)
-            and str(item.get("timing") or "").strip() == "parallel"
+            if isinstance(item, dict) and str(item.get("timing") or "").strip() == "parallel"
         ]
         if len(parallel_fast) < 2:
             return
@@ -828,7 +814,9 @@ class DeepPlannerResolver:
 
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
-        text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        text = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+        )
         return text if len(text) <= limit else text[:limit].rstrip() + "..."
 
     def _prompt(
@@ -848,12 +836,17 @@ class DeepPlannerResolver:
             context,
             agent_role="deep_planner",
         )
-        fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
+        fast_plan = (
+            context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
+        )
         goals = context.get("active_goal_snapshots") or []
         association = goal_association_prompt_projection(context)
         grounding = canonical_goal_grounding(context)
         runtime_feedback = context.get("runtime_validator_feedback") or []
-        combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]
+        combined_feedback = [
+            *feedback,
+            *(runtime_feedback if isinstance(runtime_feedback, list) else []),
+        ]
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
         source_route = str(request.route_decision.route or "").strip()
@@ -904,7 +897,7 @@ class DeepPlannerResolver:
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "User-facing speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Until an exact provider-prefixed vocal Capability contract is present in the maintained planning surface, that Goal must use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "User-facing ordinary speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Execute that Goal only when the supplied maintained planning surface contains exact capability_id chromie.vocal.perform and its input mode enum advertises the authoritative Goal output_mode. Use one owned Speaking-lane step, copy that exact mode and authored content, and keep response_text empty. When the exact capability or requested mode is absent, use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Never silently downgrade one vocal mode to another. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
@@ -1064,8 +1057,13 @@ class DeepPlannerResolver:
                 }
             )
         if plan.coverage == "complete" and plan.confidence < self.min_confidence:
-            errors.append({"type": "confidence_below_threshold", "confidence": plan.confidence,
-                           "required": self.min_confidence})
+            errors.append(
+                {
+                    "type": "confidence_below_threshold",
+                    "confidence": plan.confidence,
+                    "required": self.min_confidence,
+                }
+            )
         if plan.coverage == "complete":
             if plan.goal_satisfaction is None:
                 errors.append({"type": "missing_goal_satisfaction"})
@@ -1073,7 +1071,13 @@ class DeepPlannerResolver:
                 plan.disposition != "mixed"
                 and plan.goal_satisfaction.score < self.min_goal_satisfaction
             ):
-                errors.append({"type": "goal_satisfaction_below_threshold", "score": plan.goal_satisfaction.score, "required": self.min_goal_satisfaction})
+                errors.append(
+                    {
+                        "type": "goal_satisfaction_below_threshold",
+                        "score": plan.goal_satisfaction.score,
+                        "required": self.min_goal_satisfaction,
+                    }
+                )
         if plan.disposition == "mixed":
             for outcome in plan.goal_outcomes:
                 if outcome.disposition not in {"execute", "respond"}:
@@ -1098,31 +1102,78 @@ class DeepPlannerResolver:
         step_ids = {step.step_id for step in plan.steps}
         for resolution in plan.parameter_resolutions:
             if resolution.step_id not in step_ids and not resolution.blocking:
-                errors.append({"type": "parameter_resolution_unknown_step", "step_id": resolution.step_id, "parameter": resolution.parameter})
+                errors.append(
+                    {
+                        "type": "parameter_resolution_unknown_step",
+                        "step_id": resolution.step_id,
+                        "parameter": resolution.parameter,
+                    }
+                )
             if resolution.blocking and plan.disposition == "execute":
-                errors.append({"type": "blocking_parameter_resolution", "step_id": resolution.step_id, "parameter": resolution.parameter})
+                errors.append(
+                    {
+                        "type": "blocking_parameter_resolution",
+                        "step_id": resolution.step_id,
+                        "parameter": resolution.parameter,
+                    }
+                )
         for step in plan.steps:
             capability = allowed.get(step.capability_id)
             if capability is None:
-                errors.append({"type": "unknown_capability", "step_id": step.step_id, "capability_id": step.capability_id})
+                errors.append(
+                    {
+                        "type": "unknown_capability",
+                        "step_id": step.step_id,
+                        "capability_id": step.capability_id,
+                    }
+                )
                 continue
             if not capability.get("available") or not capability.get("interaction_executable"):
-                errors.append({"type": "capability_not_executable", "step_id": step.step_id,
-                               "capability_id": step.capability_id})
+                errors.append(
+                    {
+                        "type": "capability_not_executable",
+                        "step_id": step.step_id,
+                        "capability_id": step.capability_id,
+                    }
+                )
                 continue
-            schema_errors = validate_args_for_schema(step.args, capability.get("input_schema") or {})
+            schema_errors = validate_args_for_schema(
+                step.args, capability.get("input_schema") or {}
+            )
             if schema_errors:
-                errors.append({"type": "invalid_args", "step_id": step.step_id, "capability_id": step.capability_id,
-                               "errors": schema_errors[:8]})
+                errors.append(
+                    {
+                        "type": "invalid_args",
+                        "step_id": step.step_id,
+                        "capability_id": step.capability_id,
+                        "errors": schema_errors[:8],
+                    }
+                )
         errors.extend(parallel_plan_contract_errors(plan, capabilities))
         return errors
 
-    def _clarify(self, plan_id: str, request: AgentRunRequest, reason: str, *, unresolved: list[str] | None = None,
-                 metadata: dict[str, Any] | None = None, error: Exception | None = None,
-                 attempts: int = 1) -> CanonicalPlan:
+    def _clarify(
+        self,
+        plan_id: str,
+        request: AgentRunRequest,
+        reason: str,
+        *,
+        unresolved: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        error: Exception | None = None,
+        attempts: int = 1,
+    ) -> CanonicalPlan:
         detail = dict(metadata or {})
-        detail.update({"resolver": "deep_planner", "status": "clarify", "authority": "advisory",
-                       "attempt_count": attempts, "max_replans": self.max_replans, "reason": reason})
+        detail.update(
+            {
+                "resolver": "deep_planner",
+                "status": "clarify",
+                "authority": "advisory",
+                "attempt_count": attempts,
+                "max_replans": self.max_replans,
+                "reason": reason,
+            }
+        )
         if error is not None:
             detail.update(
                 {
@@ -1132,7 +1183,16 @@ class DeepPlannerResolver:
                 }
             )
         context = request.context if isinstance(request.context, dict) else {}
-        return CanonicalPlan(plan_id=plan_id, planner_tier="deep", disposition="clarify",
-                             coverage="uncertain", confidence=0.0, goal_summary=request.text,
-                             goal_ids=expected_goal_ids(context),
-                             response_text="", steps=[], unresolved=list(unresolved or []), metadata=detail)
+        return CanonicalPlan(
+            plan_id=plan_id,
+            planner_tier="deep",
+            disposition="clarify",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_summary=request.text,
+            goal_ids=expected_goal_ids(context),
+            response_text="",
+            steps=[],
+            unresolved=list(unresolved or []),
+            metadata=detail,
+        )

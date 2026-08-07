@@ -249,10 +249,13 @@ The structured model schema requires all four fields. A bounded legacy mapping
 exists only for retained replay and old test DTOs; it does not select a lane from
 user wording. `output_mode=speech` uses the maintained Chromie response-delivery
 path with `provider_required=false`. Mode-specific vocal outputs use Speaking
-with `provider_required=true`; until an exact provider-prefixed vocal Capability
-exists, Planner must return a per-Goal unavailable, refused, or clarification
-outcome rather than generic `respond`. Activity, body, and media execution remain
-separate. A normal vocal Goal cannot carry `resource_responsibility`.
+with `provider_required=true`. `chromie.vocal.perform` is the exact source
+contract for qualified provider execution, but the default catalog remains
+unavailable and advertises no modes. Planner may execute one such Goal only when
+a qualified declaration advertises the authoritative `output_mode`; otherwise
+it must return a per-Goal unavailable, refused, or clarification outcome rather
+than generic `respond`. Activity, body, and media execution remain separate. A
+normal vocal Goal cannot carry `resource_responsibility`.
 
 ## Singing
 
@@ -264,11 +267,19 @@ be reclassified as `express_attention` or another body action merely because it
 is coordinated with motion.
 
 Ordinary TTS is not proof of a singing capability. Chromie may claim singing
-only when an exact vocal Capability Provider advertises and completes a suitable
-contract, for example `chromie.vocal.perform`. Until then, Chromie may speak or
-recite text but must not claim melodic performance; it should report the missing
-vocal capability or offer a clearly labeled alternative while leaving requested
-body actions independently planable.
+only when a qualified provider advertises `singing` on
+`chromie.vocal.perform` and returns exact completed mode and audible-delivery
+evidence. The maintained default has no qualified mode, so Chromie may speak
+text but must not claim melodic performance; it should report the missing vocal
+capability or offer a clearly labeled alternative while leaving requested body
+actions independently planable.
+
+An executable vocal-performance step remains a Speaking member during
+cross-lane coordination. `LaneCoordinationGroup.speaking_step_ids` binds those
+provider steps, while `activity_step_ids` binds Activity work. Response Composer
+may coordinate both in one parallel group, but it cannot relabel the vocal step
+as Activity or treat an acknowledgement through `chromie.speak` as performance
+evidence.
 
 ## Self-concept boundary
 
@@ -304,5 +315,6 @@ Acceptance requires:
 
 ### Walk, blink, and sing
 
-This remains partially unavailable until a genuine vocal-performance
-capability exists. The planner must not substitute ordinary speech for singing.
+This remains partially unavailable until a target-qualified provider advertises
+the requested mode. Source tests prove the exact contract with a fake recitation
+provider only; the planner must not substitute ordinary speech for singing.

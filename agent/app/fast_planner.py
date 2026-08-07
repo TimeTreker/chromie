@@ -137,9 +137,7 @@ class FastPlannerResolver:
             # Cognitive Core already established the effect envelope. A tool
             # lane may choose among tool capabilities, but it must never drift
             # into a body gesture merely because that capability is common.
-            executable = [
-                item for item in executable if str(item.route) == "tool"
-            ]
+            executable = [item for item in executable if str(item.route) == "tool"]
         capability_payload = [
             {
                 "capability_id": item.capability_id,
@@ -162,16 +160,12 @@ class FastPlannerResolver:
         response_goal_ids = sorted(planner_response_goal_ids(authoritative_goals))
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (
-            "FastPlannerMultiGoalPlanOutput"
-            if multi_goal_contract
-            else "FastPlannerModelOutput"
+            "FastPlannerMultiGoalPlanOutput" if multi_goal_contract else "FastPlannerModelOutput"
         )
         response_schema = (
             fast_multi_goal_response_schema(
                 expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_skill_ids=[
-                    item["capability_id"] for item in capability_payload
-                ],
+                allowed_skill_ids=[item["capability_id"] for item in capability_payload],
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
@@ -180,9 +174,7 @@ class FastPlannerResolver:
             else canonical_plan_response_schema(
                 planner_tier="fast",
                 expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_skill_ids=[
-                    item["capability_id"] for item in capability_payload
-                ],
+                allowed_skill_ids=[item["capability_id"] for item in capability_payload],
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
@@ -284,9 +276,8 @@ class FastPlannerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
-                if (
-                    attempt < self.max_contract_repairs
-                    and isinstance(exc, (ValidationError, json.JSONDecodeError, ValueError))
+                if attempt < self.max_contract_repairs and isinstance(
+                    exc, (ValidationError, json.JSONDecodeError, ValueError)
                 ):
                     contract_repair_attempted = True
                     initial_raw_output = raw
@@ -315,9 +306,7 @@ class FastPlannerResolver:
                     "initial_raw_output=%s repair_raw_output=%s",
                     request.sid,
                     cognition_text_reference(initial_raw_output),
-                    cognition_text_reference(
-                        raw if contract_repair_attempted else None
-                    ),
+                    cognition_text_reference(raw if contract_repair_attempted else None),
                     self._bounded(initial_raw_output, 4000)
                     if initial_raw_output is not None
                     else "",
@@ -325,7 +314,9 @@ class FastPlannerResolver:
                     if contract_repair_attempted and raw is not None
                     else "",
                 )
-                integrity_metadata = cognitive_integrity_metadata(stage="fast_planner", exc=exc, request=request)
+                integrity_metadata = cognitive_integrity_metadata(
+                    stage="fast_planner", exc=exc, request=request
+                )
                 return self._escalation(
                     plan_id,
                     request,
@@ -340,9 +331,7 @@ class FastPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output_ref": cognition_text_reference(
-                            initial_raw_output
-                        ),
+                        "initial_raw_output_ref": cognition_text_reference(initial_raw_output),
                         "repair_raw_output_ref": cognition_text_reference(
                             raw if contract_repair_attempted else None
                         ),
@@ -376,8 +365,7 @@ class FastPlannerResolver:
                     )
                 except Exception as exc:
                     logger.warning(
-                        "fast_planner_coverage_review_unavailable sid=%s "
-                        "error_type=%s error=%s",
+                        "fast_planner_coverage_review_unavailable sid=%s error_type=%s error=%s",
                         request.sid,
                         type(exc).__name__,
                         exc,
@@ -395,8 +383,7 @@ class FastPlannerResolver:
                     )
                 if coverage_review.decision != "accept":
                     logger.warning(
-                        "fast_planner_coverage_review_rejected sid=%s "
-                        "uncovered=%s reason=%s",
+                        "fast_planner_coverage_review_rejected sid=%s uncovered=%s reason=%s",
                         request.sid,
                         coverage_review.uncovered_requirements,
                         coverage_review.reason,
@@ -507,9 +494,7 @@ class FastPlannerResolver:
         if isinstance(exc, ValidationError):
             feedback = list(exc.errors(include_url=False))
         else:
-            feedback = [
-                {"type": type(exc).__name__, "message": str(exc)[:1000]}
-            ]
+            feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
         feedback.extend(
             planner_contract_diagnostics(
                 raw,
@@ -622,9 +607,7 @@ class FastPlannerResolver:
                 else ""
             )
         )
-        semantic_scope_contract = (
-            "For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane speaking/activity coordination to Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
-        )
+        semantic_scope_contract = "For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane speaking/activity coordination to Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         current_turn_communication_contract = (
             "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
             "Retained Goals, delivered evidence-bound dialogue, and verified memory "
@@ -701,7 +684,7 @@ class FastPlannerResolver:
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{route_effect_contract}"
             f"{concise_output_contract}"
-            "User-facing speech is owned by Response Composer, not a plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. A spoken_response Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Fast Planner must escalate that Goal unless an exact maintained contract already authorizes a terminal unavailable, refused, or clarification outcome; never invent a vocal capability ID. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "User-facing ordinary speech is owned by Response Composer, not a plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false is a direct conversational responsibility: use disposition=respond with the actual response_text now. A spoken_response Goal with provider_required=true is a mode-specific vocal performance and cannot be completed by response_text, chromie.speak, ordinary TTS, media playback, or a body gesture. Execute that Goal only when the supplied catalog contains exact capability_id chromie.vocal.perform and its mode enum contains the authoritative Goal output_mode; copy that exact mode and authored content into one owned step. Otherwise escalate for an exact unavailable, refused, or clarification outcome; never invent a vocal capability ID or silently choose another mode. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
             "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
             "For every terminal or escalation result, goal_outcomes must be keyed exactly once by every supplied canonical Goal ID. Each execute outcome needs its real step_ids; each respond outcome needs non-empty response_text and step_ids=[]; each escalation outcome needs its unresolved reason and non-exact satisfaction. "

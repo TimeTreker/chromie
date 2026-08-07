@@ -18,9 +18,10 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Qualify the exact `chromie.vocal.perform` provider contract while preserving
+2. Retain the clean current-revision default-provider walk/sing/blink replay for
+   the source-qualified `chromie.vocal.perform` contract while preserving
    Speaking-lane semantics and the Chromie-owned playback boundary.
-3. After vocal-provider source evidence closes, qualify a peer media-playback
+3. After that Issue #6 delivery evidence closes, qualify a peer media-playback
    provider. Singing remains Speaking; existing-audio playback remains Activity;
    ordinary TTS is neither kind of evidence.
 4. Preserve exact provider-prefixed capability identity from model proposal
@@ -95,9 +96,12 @@ Exit criteria:
 
 The retained compound walk/sing/blink defect has met its source and Level C
 simulator exit criteria; [Current Status](docs/STATUS.md) owns the evidence.
-Issue #6 now owns the next source change: define the exact
-`chromie.vocal.perform` provider contract while keeping the maintained ownership
-boundary.
+Issue #6 now has an exact source-qualified `chromie.vocal.perform` provider
+contract while keeping the maintained ownership boundary. Fake-provider tests,
+an exact recitation scenario, the relevant general-ability class, ordinary TTS
+regressions, and the canonical gate meet the source criteria. The remaining
+delivery step is the clean current-revision default-provider walk/sing/blink
+replay; Issue #7 must not begin before that retained evidence passes.
 Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
 ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
 embodied Capability Provider beneath Activity.

@@ -25,6 +25,337 @@ CapabilityResultStatus = Literal[
 ]
 SkillResultStatus = CapabilityResultStatus
 
+VOCAL_PERFORMANCE_CAPABILITY_ID = "chromie.vocal.perform"
+VOCAL_MODES = (
+    "speech",
+    "expressive_speech",
+    "recitation",
+    "singing",
+    "humming",
+    "nonverbal_vocalization",
+)
+VocalMode = Literal[
+    "speech",
+    "expressive_speech",
+    "recitation",
+    "singing",
+    "humming",
+    "nonverbal_vocalization",
+]
+VocalEvidenceLevel = Literal[
+    "source_test",
+    "automated_target",
+    "supervised_target",
+]
+
+
+def _immutable_provider_revision(value: str) -> bool:
+    normalized = value.strip().lower()
+    return bool(
+        re.fullmatch(r"[0-9a-f]{7,64}", normalized)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", normalized)
+        or re.fullmatch(
+            r"v?\d+\.\d+\.\d+(?:[-+][a-z0-9.-]+)?",
+            normalized,
+        )
+    )
+
+
+class VocalProviderArtifact(BaseModel):
+    """One immutable model or runtime artifact used by a vocal provider."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1)
+    artifact_id: str = Field(min_length=1)
+    revision: str = Field(min_length=1)
+    license_id: str = Field(min_length=1)
+
+    @field_validator("kind", "artifact_id", "revision", "license_id")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("vocal provider artifact fields must not be empty")
+        return normalized
+
+    @field_validator("revision")
+    @classmethod
+    def require_immutable_revision(cls, value: str) -> str:
+        if not _immutable_provider_revision(value):
+            raise ValueError(
+                "vocal provider artifact revision must be an immutable commit, "
+                "sha256 digest, or semantic version"
+            )
+        return value
+
+
+class VocalProviderProvenance(BaseModel):
+    """Auditable implementation and model identity behind one provider."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    implementation: str = Field(min_length=1)
+    software_source: str = Field(min_length=1)
+    software_revision: str = Field(min_length=1)
+    software_license_id: str = Field(min_length=1)
+    license_review_status: str = Field(min_length=1)
+    model_artifacts: list[VocalProviderArtifact] = Field(min_length=1)
+
+    @field_validator(
+        "implementation",
+        "software_source",
+        "software_revision",
+        "software_license_id",
+        "license_review_status",
+    )
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("vocal provider provenance fields must not be empty")
+        return normalized
+
+    @field_validator("software_revision")
+    @classmethod
+    def require_immutable_revision(cls, value: str) -> str:
+        if not _immutable_provider_revision(value):
+            raise ValueError(
+                "vocal provider software_revision must be an immutable commit, "
+                "sha256 digest, or semantic version"
+            )
+        return value
+
+
+class VocalModeEvidence(BaseModel):
+    """Retained qualification evidence for one advertised vocal mode."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: VocalEvidenceLevel
+    artifact_refs: list[str] = Field(min_length=1)
+    claim_summary: str = Field(min_length=1)
+
+    @field_validator("artifact_refs", mode="before")
+    @classmethod
+    def normalize_artifact_refs(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("artifact_refs must be a list")
+        result: list[str] = []
+        for item in values:
+            normalized = " ".join(str(item or "").strip().split())
+            if normalized and normalized not in result:
+                result.append(normalized)
+        if not result:
+            raise ValueError("artifact_refs must contain retained evidence")
+        return result
+
+    @field_validator("claim_summary")
+    @classmethod
+    def normalize_claim_summary(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("claim_summary must not be empty")
+        return normalized
+
+
+class VocalProviderDeclaration(BaseModel):
+    """Qualified behavior, resource, and evidence declaration for one backend.
+
+    The backend identity is trusted runtime metadata. Planner-to-execution
+    identity remains :data:`VOCAL_PERFORMANCE_CAPABILITY_ID`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str = Field(min_length=1)
+    supported_modes: list[VocalMode] = Field(min_length=1)
+    native_text_streaming: bool
+    native_audio_streaming: bool
+    request_cancellation: bool
+    timing_mark_types: list[str] = Field(default_factory=list)
+    sample_formats: list[str] = Field(min_length=1)
+    sample_rates: list[int] = Field(min_length=1)
+    max_concurrency: int = Field(ge=1)
+    provenance: VocalProviderProvenance
+    mode_evidence: dict[VocalMode, VocalModeEvidence]
+    contract_version: int = Field(default=1, ge=1)
+
+    @field_validator("provider_id")
+    @classmethod
+    def normalize_provider_id(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("provider_id must not be empty")
+        return normalized
+
+    @field_validator("supported_modes", mode="before")
+    @classmethod
+    def normalize_supported_modes(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("supported_modes must be a list")
+        result: list[str] = []
+        for item in values:
+            normalized = str(item or "").strip()
+            if normalized and normalized not in result:
+                result.append(normalized)
+        return result
+
+    @field_validator("timing_mark_types", "sample_formats", mode="before")
+    @classmethod
+    def normalize_string_list(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("provider declaration field must be a list")
+        result: list[str] = []
+        for item in values:
+            normalized = " ".join(str(item or "").strip().split())
+            if normalized and normalized not in result:
+                result.append(normalized)
+        return result
+
+    @field_validator("sample_rates")
+    @classmethod
+    def validate_sample_rates(cls, value: list[int]) -> list[int]:
+        if any(rate < 8000 for rate in value):
+            raise ValueError("sample_rates must contain valid PCM rates")
+        return list(dict.fromkeys(value))
+
+    @model_validator(mode="after")
+    def require_mode_evidence(self) -> "VocalProviderDeclaration":
+        supported = set(self.supported_modes)
+        declared = set(self.mode_evidence)
+        if supported != declared:
+            missing = sorted(supported - declared)
+            extra = sorted(declared - supported)
+            raise ValueError(
+                "mode_evidence must match supported_modes exactly: "
+                f"missing={missing}, extra={extra}"
+            )
+        if not self.sample_formats:
+            raise ValueError("sample_formats must not be empty")
+        if not self.sample_rates:
+            raise ValueError("sample_rates must not be empty")
+        return self
+
+
+class VocalPerformanceDelivery(BaseModel):
+    """Host-retained audible-delivery evidence returned by a vocal backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    delivered_mode: VocalMode
+    delivery_evidence_id: str = Field(min_length=1)
+    playback_started: bool
+    playback_completed: bool
+    audio_duration_ms: float = Field(gt=0)
+    sample_format: str = Field(min_length=1)
+    sample_rate: int = Field(ge=8000)
+    timing_marks_emitted: list[str] = Field(default_factory=list)
+
+    @field_validator("delivery_evidence_id", "sample_format")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("vocal delivery evidence fields must not be empty")
+        return normalized
+
+    @field_validator("timing_marks_emitted", mode="before")
+    @classmethod
+    def normalize_timing_marks(cls, value: Any) -> list[str]:
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("timing_marks_emitted must be a list")
+        return list(
+            dict.fromkeys(
+                normalized
+                for item in values
+                if (normalized := " ".join(str(item or "").strip().split()))
+            )
+        )
+
+
+def vocal_performance_input_schema(
+    supported_modes: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Return the model-safe request schema for the exact public Capability."""
+
+    modes = list(dict.fromkeys(supported_modes or VOCAL_MODES))
+    invalid = sorted(set(modes) - set(VOCAL_MODES))
+    if invalid or not modes:
+        raise ValueError(f"invalid supported vocal modes: {invalid or modes}")
+    return {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "minLength": 1},
+            "mode": {"type": "string", "enum": modes},
+            "language_hint": {"type": "string", "minLength": 1},
+            "voice_profile": {"type": "string", "minLength": 1},
+            "metadata": {"type": "object"},
+        },
+        "required": ["text", "mode"],
+        "additionalProperties": False,
+    }
+
+
+def vocal_performance_output_schema() -> dict[str, Any]:
+    """Return the closed provider-result schema committed by the Host."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "completed": {"type": "boolean"},
+            "requested_mode": {"type": "string", "enum": list(VOCAL_MODES)},
+            "delivered_mode": {
+                "type": ["string", "null"],
+                "enum": [None, *VOCAL_MODES],
+            },
+            "provider_id": {"type": "string"},
+            "provider_contract_version": {"type": "integer", "minimum": 1},
+            "evidence_level": {
+                "type": ["string", "null"],
+                "enum": [None, "source_test", "automated_target", "supervised_target"],
+            },
+            "provider_evidence_refs": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "delivery_evidence_id": {"type": "string"},
+            "playback_started": {"type": "boolean"},
+            "playback_completed": {"type": "boolean"},
+            "audio_duration_ms": {"type": "number", "minimum": 0},
+            "sample_format": {"type": "string"},
+            "sample_rate": {"type": "integer", "minimum": 0},
+            "timing_marks_emitted": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "reason": {"type": "string"},
+        },
+        "required": [
+            "completed",
+            "requested_mode",
+            "delivered_mode",
+            "provider_id",
+            "provider_contract_version",
+            "evidence_level",
+            "provider_evidence_refs",
+            "delivery_evidence_id",
+            "playback_started",
+            "playback_completed",
+            "audio_duration_ms",
+            "sample_format",
+            "sample_rate",
+            "timing_marks_emitted",
+            "reason",
+        ],
+        "additionalProperties": False,
+    }
+
+
 FORBIDDEN_LOW_LEVEL_FIELDS = frozenset(
     {
         "action_14d",
@@ -45,9 +376,7 @@ FORBIDDEN_LOW_LEVEL_FIELDS = frozenset(
 _FORBIDDEN_LOW_LEVEL_FIELD_COMPACTS = frozenset(
     field.replace("_", "") for field in FORBIDDEN_LOW_LEVEL_FIELDS
 )
-_FIELD_CAMEL_BOUNDARY = re.compile(
-    r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])"
-)
+_FIELD_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 _FIELD_SEPARATOR = re.compile(r"[^a-z0-9]+")
 
 RAW_PLANAR_CONTROLLER_FIELDS = frozenset({"vx", "vy", "yaw"})
@@ -76,9 +405,7 @@ def output_schema_sha256(output_schema: dict[str, Any]) -> str:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise ValueError("output_schema is not canonical JSON") from exc
-    return hashlib.sha256(
-        _OUTPUT_SCHEMA_DIGEST_DOMAIN + canonical
-    ).hexdigest()
+    return hashlib.sha256(_OUTPUT_SCHEMA_DIGEST_DOMAIN + canonical).hexdigest()
 
 
 def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | None:
@@ -121,14 +448,11 @@ def reject_forbidden_low_level_fields(
         for key, item in value.items():
             expanded = _FIELD_CAMEL_BOUNDARY.sub(" ", str(key).strip())
             normalized = "_".join(
-                part
-                for part in _FIELD_SEPARATOR.split(expanded.casefold())
-                if part
+                part for part in _FIELD_SEPARATOR.split(expanded.casefold()) if part
             )
             if (
                 normalized in FORBIDDEN_LOW_LEVEL_FIELDS
-                or normalized.replace("_", "")
-                in _FORBIDDEN_LOW_LEVEL_FIELD_COMPACTS
+                or normalized.replace("_", "") in _FORBIDDEN_LOW_LEVEL_FIELD_COMPACTS
             ):
                 raise ValueError(f"forbidden low-level field at {path}.{key}")
             reject_forbidden_low_level_fields(item, path=f"{path}.{key}")
@@ -136,6 +460,7 @@ def reject_forbidden_low_level_fields(
         for index, item in enumerate(value):
             reject_forbidden_low_level_fields(item, path=f"{path}[{index}]")
     return value
+
 
 SUPPORTED_OUTPUT_SCHEMA_TYPES = frozenset(
     {
@@ -164,15 +489,15 @@ def output_schema_declaration_error(
 
     if not isinstance(schema, dict):
         return f"{path} is not an object schema"
-    if "$ref" in schema or any(
-        key in schema for key in ("allOf", "anyOf", "oneOf")
-    ):
+    if "$ref" in schema or any(key in schema for key in ("allOf", "anyOf", "oneOf")):
         return f"{path} uses unsupported schema indirection or composition"
     schema_type = schema.get("type")
     if isinstance(schema_type, str):
         schema_types = {schema_type}
-    elif isinstance(schema_type, list) and schema_type and all(
-        isinstance(item, str) for item in schema_type
+    elif (
+        isinstance(schema_type, list)
+        and schema_type
+        and all(isinstance(item, str) for item in schema_type)
     ):
         schema_types = set(schema_type)
     elif schema_type is None:
@@ -199,8 +524,7 @@ def output_schema_declaration_error(
             return f"{path} must set additionalProperties=false"
         required = schema.get("required", [])
         if not isinstance(required, list) or any(
-            not isinstance(item, str) or item not in properties
-            for item in required
+            not isinstance(item, str) or item not in properties for item in required
         ):
             return f"{path} has invalid required properties"
         for key, child in properties.items():
@@ -227,15 +551,12 @@ def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
     if error is not None:
         raise ValueError(error)
     if not isinstance(schema, dict):
-        raise ValueError(
-            "output schema validation completed without an object declaration"
-        )
+        raise ValueError("output schema validation completed without an object declaration")
     reject_forbidden_low_level_fields(schema)
     raw_controller_path = find_raw_controller_array_schema(schema)
     if raw_controller_path is not None:
         raise ValueError(
-            "output schema exposes a raw planar controller command array at "
-            f"{raw_controller_path}"
+            f"output schema exposes a raw planar controller command array at {raw_controller_path}"
         )
     return schema
 
@@ -252,9 +573,7 @@ def _normalize_capability_identity_mapping(
     capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
     legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
     if has_capability and has_legacy and capability_id != legacy_skill_id:
-        raise ValueError(
-            "conflicting capability_id and legacy skill_id executable identities"
-        )
+        raise ValueError("conflicting capability_id and legacy skill_id executable identities")
     normalized = capability_id or legacy_skill_id
     if not normalized:
         raise ValueError("capability_id must not be empty")
@@ -286,9 +605,7 @@ def _normalize_optional_capability_identity_mapping(
     capability_id = " ".join(str(payload.get("capability_id") or "").strip().split())
     legacy_skill_id = " ".join(str(payload.get("skill_id") or "").strip().split())
     if capability_id and legacy_skill_id and capability_id != legacy_skill_id:
-        raise ValueError(
-            "conflicting capability_id and legacy skill_id executable identities"
-        )
+        raise ValueError("conflicting capability_id and legacy skill_id executable identities")
     payload["capability_id"] = capability_id or legacy_skill_id or None
     payload.pop("skill_id", None)
     return payload
@@ -327,9 +644,7 @@ class OptionalCapabilityIdentityModel(BaseModel):
         deep: bool = False,
     ) -> Self:
         normalized = (
-            _normalize_optional_capability_identity_mapping(update)
-            if update is not None
-            else None
+            _normalize_optional_capability_identity_mapping(update) if update is not None else None
         )
         return super().model_copy(update=normalized, deep=deep)
 
@@ -363,11 +678,7 @@ class CapabilityIdentityModel(BaseModel):
         update: Mapping[str, Any] | None = None,
         deep: bool = False,
     ) -> Self:
-        normalized = (
-            _normalize_capability_identity_mapping(update)
-            if update is not None
-            else None
-        )
+        normalized = _normalize_capability_identity_mapping(update) if update is not None else None
         return super().model_copy(update=normalized, deep=deep)
 
 
@@ -527,7 +838,6 @@ class InteractionResponse(BaseModel):
         ]
         if len(execution_ids) != len(set(execution_ids)):
             raise ValueError(
-                "speech ids and skill request_ids must be unique within "
-                "one interaction"
+                "speech ids and skill request_ids must be unique within one interaction"
             )
         return self

@@ -29,6 +29,7 @@ try:
     from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from chromie_contracts.execution_lanes import LaneCoordinationGroup
     from chromie_contracts.goal import GoalAssociationResolution
+    from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -52,6 +53,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
     from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -104,7 +106,9 @@ class ResponseComposerResolver:
         schema_version=1,
     )
 
-    def __init__(self, ollama: OllamaClient, *, num_ctx: int = 8192, num_predict: int = 1024) -> None:
+    def __init__(
+        self, ollama: OllamaClient, *, num_ctx: int = 8192, num_predict: int = 1024
+    ) -> None:
         self.ollama = ollama
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
@@ -125,9 +129,7 @@ class ResponseComposerResolver:
                 ) as span:
                     result = await self._resolve(request)
                     span.set_attribute("result_status", result.status)
-                    span.set_attribute(
-                        "composition_available", result.composition is not None
-                    )
+                    span.set_attribute("composition_available", result.composition is not None)
                     if result.status != "resolved":
                         span.set_status("error")
         except BaseException:
@@ -151,11 +153,9 @@ class ResponseComposerResolver:
             )
         composition_id = self._composition_id(request, plan)
         social_attention_mode = self._social_attention_mode(request.context)
-        social_attention_candidate_count = self._social_attention_candidate_count(
+        social_attention_candidate_count = self._social_attention_candidate_count(request.context)
+        social_attention_decision_required = self._social_attention_decision_required(
             request.context
-        )
-        social_attention_decision_required = (
-            self._social_attention_decision_required(request.context)
         )
         target_evidence = request.context.get("social_attention_target_evidence")
         target_available = bool(
@@ -241,21 +241,14 @@ class ResponseComposerResolver:
                         attempt=1,
                     )
                     if not isinstance(reviewed, dict):
-                        raise ValueError(
-                            "safe-read semantic review output is not a JSON object"
-                        )
+                        raise ValueError("safe-read semantic review output is not a JSON object")
                     raw = reviewed
-                    reviewed = self._canonicalize_optional_social_attention_payload(
-                        reviewed
-                    )
-                    reviewed = self._canonicalize_lane_coordination_payload(
-                        reviewed, plan=plan
-                    )
+                    reviewed = self._canonicalize_optional_social_attention_payload(reviewed)
+                    reviewed = self._canonicalize_lane_coordination_payload(reviewed, plan=plan)
                     model_output = ResponseComposerModelOutput.model_validate(reviewed)
                     safe_read_semantic_review_succeeded = True
                     logger.info(
-                        "response_composer_safe_read_semantic_review_done sid=%s "
-                        "status=success",
+                        "response_composer_safe_read_semantic_review_done sid=%s status=success",
                         request.sid,
                     )
                 elif self._requires_effectful_semantic_review(plan, request.context):
@@ -283,21 +276,14 @@ class ResponseComposerResolver:
                         attempt=1,
                     )
                     if not isinstance(reviewed, dict):
-                        raise ValueError(
-                            "effectful semantic review output is not a JSON object"
-                        )
+                        raise ValueError("effectful semantic review output is not a JSON object")
                     raw = reviewed
-                    reviewed = self._canonicalize_optional_social_attention_payload(
-                        reviewed
-                    )
-                    reviewed = self._canonicalize_lane_coordination_payload(
-                        reviewed, plan=plan
-                    )
+                    reviewed = self._canonicalize_optional_social_attention_payload(reviewed)
+                    reviewed = self._canonicalize_lane_coordination_payload(reviewed, plan=plan)
                     model_output = ResponseComposerModelOutput.model_validate(reviewed)
                     effectful_semantic_review_succeeded = True
                     logger.info(
-                        "response_composer_effectful_semantic_review_done sid=%s "
-                        "status=success",
+                        "response_composer_effectful_semantic_review_done sid=%s status=success",
                         request.sid,
                     )
                 repaired_response_plan, mixed_coverage_reasons = (
@@ -371,13 +357,11 @@ class ResponseComposerResolver:
                         "speech_expression.mode=adapt, or an explicit "
                         "decision=none with a concrete scene reason."
                     )
-                response_plan, lane_coordination, lane_reasons = (
-                    self._reconcile_lane_coordination(
-                        response_plan=model_output.response_plan,
-                        lane_coordination=model_output.lane_coordination,
-                        social_attention_plan=social_plan,
-                        plan=plan,
-                    )
+                response_plan, lane_coordination, lane_reasons = self._reconcile_lane_coordination(
+                    response_plan=model_output.response_plan,
+                    lane_coordination=model_output.lane_coordination,
+                    social_attention_plan=social_plan,
+                    plan=plan,
                 )
                 logger.info(
                     "response_composer_social_attention_decision sid=%s mode=%s "
@@ -416,19 +400,11 @@ class ResponseComposerResolver:
                             "execution_enabled": social_attention_mode == "on",
                             "embodiment_independent": True,
                         },
-                        "social_attention_decision_required": (
-                            social_attention_decision_required
-                        ),
-                        "social_attention_candidate_count": (
-                            social_attention_candidate_count
-                        ),
+                        "social_attention_decision_required": (social_attention_decision_required),
+                        "social_attention_candidate_count": (social_attention_candidate_count),
                         "social_attention_model_decision": model_social_decision,
-                        "social_attention_model_behavior_count": (
-                            model_social_behavior_count
-                        ),
-                        "social_attention_validated_decision": (
-                            validated_social_decision
-                        ),
+                        "social_attention_model_behavior_count": (model_social_behavior_count),
+                        "social_attention_validated_decision": (validated_social_decision),
                         "social_attention_validated_behavior_count": (
                             validated_social_behavior_count
                         ),
@@ -464,16 +440,10 @@ class ResponseComposerResolver:
                         "authority": "advisory",
                         "resolver": "response_composer",
                         "contract_schema": "ResponseComposerModelOutput",
-                        "social_attention_decision_required": (
-                            social_attention_decision_required
-                        ),
-                        "social_attention_candidate_count": (
-                            social_attention_candidate_count
-                        ),
+                        "social_attention_decision_required": (social_attention_decision_required),
+                        "social_attention_candidate_count": (social_attention_candidate_count),
                         "social_attention_model_decision": model_social_decision,
-                        "social_attention_validated_decision": (
-                            validated_social_decision
-                        ),
+                        "social_attention_validated_decision": (validated_social_decision),
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
                         "safe_read_semantic_review_attempted": (
@@ -505,7 +475,9 @@ class ResponseComposerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
-                integrity_metadata = cognitive_integrity_metadata(stage="response_composer", exc=exc, request=request)
+                integrity_metadata = cognitive_integrity_metadata(
+                    stage="response_composer", exc=exc, request=request
+                )
                 if attempt == 0 and isinstance(
                     exc, (ValidationError, json.JSONDecodeError, ValueError)
                 ):
@@ -527,12 +499,8 @@ class ResponseComposerResolver:
                     "initial_raw_output_ref=%s repair_raw_output_ref=%s "
                     "initial_raw_output=%s repair_raw_output=%s",
                     request.sid,
-                    cognition_text_reference(
-                        previous_raw if contract_repair_attempted else None
-                    ),
-                    cognition_text_reference(
-                        raw if contract_repair_attempted else None
-                    ),
+                    cognition_text_reference(previous_raw if contract_repair_attempted else None),
+                    cognition_text_reference(raw if contract_repair_attempted else None),
                     self._bounded(previous_raw, 5000)
                     if contract_repair_attempted and previous_raw is not None
                     else "",
@@ -602,10 +570,7 @@ class ResponseComposerResolver:
             or not plan.steps
             or cls._confirmation_required(plan, request.context)
             or plan.waiting_goal_ids()
-            or any(
-                outcome.disposition != "execute"
-                for outcome in plan.goal_outcomes
-            )
+            or any(outcome.disposition != "execute" for outcome in plan.goal_outcomes)
         ):
             return None
         reusable = cls._reusable_turn_speech(request.context)
@@ -678,8 +643,7 @@ class ResponseComposerResolver:
             },
         )
         logger.warning(
-            "response_composer_primary_activity_fail_soft sid=%s plan_id=%s "
-            "failure_type=%s",
+            "response_composer_primary_activity_fail_soft sid=%s plan_id=%s failure_type=%s",
             request.sid,
             plan.plan_id,
             type(failure).__name__,
@@ -739,8 +703,7 @@ class ResponseComposerResolver:
             if isinstance(item, dict)
         }
         return all(
-            safety_by_capability.get(step.capability_id) == "safe_read"
-            for step in plan.steps
+            safety_by_capability.get(step.capability_id) == "safe_read" for step in plan.steps
         )
 
     @staticmethod
@@ -841,11 +804,7 @@ class ResponseComposerResolver:
             )
             if stage is not None
         ]
-        covered = {
-            goal_id
-            for stage in stages
-            for goal_id in stage.covers_goal_ids
-        }
+        covered = {goal_id for stage in stages for goal_id in stage.covers_goal_ids}
         missing = set(plan.goal_ids) - covered
         if not missing:
             return response_plan, []
@@ -877,19 +836,11 @@ class ResponseComposerResolver:
                 and stage.reuse_current_turn_speech
                 and " ".join(stage.text.strip().split()) == candidate_text
             ):
-                updated_ids = list(
-                    dict.fromkeys([*stage.covers_goal_ids, *ordered_missing])
-                )
+                updated_ids = list(dict.fromkeys([*stage.covers_goal_ids, *ordered_missing]))
                 repaired = response_plan.model_copy(
-                    update={
-                        field_name: stage.model_copy(
-                            update={"covers_goal_ids": updated_ids}
-                        )
-                    }
+                    update={field_name: stage.model_copy(update={"covers_goal_ids": updated_ids})}
                 )
-                return repaired, [
-                    "mixed_execute_goal_coverage_extended_from_reused_turn_speech"
-                ]
+                return repaired, ["mixed_execute_goal_coverage_extended_from_reused_turn_speech"]
 
         if response_plan.pre_action is not None:
             return response_plan, []
@@ -903,9 +854,7 @@ class ResponseComposerResolver:
         )
         repaired = response_plan.model_copy(update={"pre_action": stage})
         cls._validate_reused_turn_speech(repaired, context=context)
-        return repaired, [
-            "mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"
-        ]
+        return repaired, ["mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"]
 
     @classmethod
     def _validate_reused_turn_speech(
@@ -928,9 +877,7 @@ class ResponseComposerResolver:
             if stage is None or not stage.reuse_current_turn_speech:
                 continue
             if phase not in {"immediate", "pre_action"}:
-                raise ValueError(
-                    "only immediate or pre_action may reuse current-turn speech"
-                )
+                raise ValueError("only immediate or pre_action may reuse current-turn speech")
             normalized = " ".join(stage.text.strip().split())
             if normalized not in reusable_text:
                 raise ValueError(
@@ -1022,8 +969,7 @@ class ResponseComposerResolver:
             )
         ):
             raise ValueError(
-                "execute response requests confirmation without a supplied "
-                "confirmation requirement"
+                "execute response requests confirmation without a supplied confirmation requirement"
             )
 
     @classmethod
@@ -1038,18 +984,15 @@ class ResponseComposerResolver:
         if not cls._is_safe_read_plan(plan, context):
             return
         if response_plan.immediate is None:
-            if (
-                cls._delivered_turn_speech(context)
-                and not cls._confirmation_required(plan, context)
+            if cls._delivered_turn_speech(context) and not cls._confirmation_required(
+                plan, context
             ):
                 return
             raise ValueError(
                 "safe-read execution requires one model-authored immediate acknowledgement"
             )
         if response_plan.pre_action is not None:
-            raise ValueError(
-                "safe-read acknowledgement must use immediate, not pre_action"
-            )
+            raise ValueError("safe-read acknowledgement must use immediate, not pre_action")
         # Wording and length are conversational choices owned by the model.
         # The Host validates only the coordination contract: one immediate
         # pre-result stage, no pre_action/final stage, and no completion claim.
@@ -1085,26 +1028,16 @@ class ResponseComposerResolver:
                 or "\uf900" <= char <= "\ufaff"
             )
         )
-        latin_count = sum(
-            1
-            for char in spoken
-            if ("A" <= char <= "Z") or ("a" <= char <= "z")
-        )
+        latin_count = sum(1 for char in spoken if ("A" <= char <= "Z") or ("a" <= char <= "z"))
         if language.startswith("zh"):
             # Permit names and compact technical units inside Chinese, but
             # reject an English answer merely wrapped in Chinese context.
             if cjk_count == 0 and latin_count:
-                raise ValueError(
-                    "spoken response must use the authoritative Chinese language"
-                )
+                raise ValueError("spoken response must use the authoritative Chinese language")
             if latin_count > max(12, cjk_count * 2):
-                raise ValueError(
-                    "spoken response contains too much English for zh-CN"
-                )
+                raise ValueError("spoken response contains too much English for zh-CN")
         elif language.startswith("en") and cjk_count > max(2, latin_count // 4):
-            raise ValueError(
-                "spoken response must use the authoritative English language"
-            )
+            raise ValueError("spoken response must use the authoritative English language")
 
     @staticmethod
     def _has_effectful_goal_context(
@@ -1132,8 +1065,7 @@ class ResponseComposerResolver:
             return True
         association = goal_association_prompt_projection(context)
         return bool(
-            isinstance(association, dict)
-            and contains_effectful_goal(association.get("new_goals"))
+            isinstance(association, dict) and contains_effectful_goal(association.get("new_goals"))
         )
 
     @classmethod
@@ -1143,9 +1075,7 @@ class ResponseComposerResolver:
         context: dict[str, Any] | None,
     ) -> bool:
         execution_capabilities = (
-            context.get("execution_capabilities")
-            if isinstance(context, dict)
-            else None
+            context.get("execution_capabilities") if isinstance(context, dict) else None
         )
         has_non_read_execution = bool(
             isinstance(execution_capabilities, list)
@@ -1154,12 +1084,8 @@ class ResponseComposerResolver:
         )
         return bool(
             plan.goal_ids
-            and plan.disposition
-            in {"execute", "mixed", "clarify", "unavailable", "refused"}
-            and (
-                cls._has_effectful_goal_context(context)
-                or has_non_read_execution
-            )
+            and plan.disposition in {"execute", "mixed", "clarify", "unavailable", "refused"}
+            and (cls._has_effectful_goal_context(context) or has_non_read_execution)
         )
 
     @staticmethod
@@ -1241,9 +1167,7 @@ class ResponseComposerResolver:
                 non_null = [
                     item
                     for item in alternatives
-                    if not (
-                        isinstance(item, dict) and item.get("type") == "null"
-                    )
+                    if not (isinstance(item, dict) and item.get("type") == "null")
                 ]
                 if len(non_null) == 1:
                     schema["properties"]["social_attention_plan"] = non_null[0]
@@ -1261,9 +1185,7 @@ class ResponseComposerResolver:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "ResponseComposerModelOutput"
         if ResponseComposerResolver._social_attention_decision_required(context):
-            ResponseComposerResolver._require_social_attention_decision_in_schema(
-                schema
-            )
+            ResponseComposerResolver._require_social_attention_decision_in_schema(schema)
         goal_ids = list(dict.fromkeys(plan.goal_ids))
 
         def constrain(node: Any) -> None:
@@ -1273,9 +1195,7 @@ class ResponseComposerResolver:
                     covers_goal_ids = properties.get("covers_goal_ids")
                     if isinstance(covers_goal_ids, dict):
                         covers_goal_ids["items"] = (
-                            {"type": "string", "enum": goal_ids}
-                            if goal_ids
-                            else {"type": "string"}
+                            {"type": "string", "enum": goal_ids} if goal_ids else {"type": "string"}
                         )
                         if goal_ids:
                             covers_goal_ids["minItems"] = 1
@@ -1319,8 +1239,8 @@ class ResponseComposerResolver:
                 if isinstance(must_not_claim, dict):
                     must_not_claim["const"] = True
             elif plan.disposition in {"execute", "mixed"}:
-                confirmation_required = (
-                    ResponseComposerResolver._confirmation_required(plan, context)
+                confirmation_required = ResponseComposerResolver._confirmation_required(
+                    plan, context
                 )
                 if isinstance(commitment, dict):
                     if confirmation_required:
@@ -1375,13 +1295,10 @@ class ResponseComposerResolver:
                 progress = response_properties.get("progress")
                 if isinstance(progress, dict):
                     progress["maxItems"] = 0
-                if (
-                    plan.disposition == "execute"
-                    and ResponseComposerResolver._is_safe_read_plan(plan, context)
+                if plan.disposition == "execute" and ResponseComposerResolver._is_safe_read_plan(
+                    plan, context
                 ):
-                    delivered_turn_speech = (
-                        ResponseComposerResolver._delivered_turn_speech(context)
-                    )
+                    delivered_turn_speech = ResponseComposerResolver._delivered_turn_speech(context)
                     # When nothing has been spoken yet, the Composer owns the
                     # one pre-result acknowledgement. If fast-first speech has
                     # already begun playback, expose both choices and let the
@@ -1410,15 +1327,11 @@ class ResponseComposerResolver:
                     response_plan_schema["anyOf"] = [
                         {
                             "required": ["immediate"],
-                            "properties": {
-                                "immediate": {"$ref": "#/$defs/ResponseStage"}
-                            },
+                            "properties": {"immediate": {"$ref": "#/$defs/ResponseStage"}},
                         },
                         {
                             "required": ["pre_action"],
-                            "properties": {
-                                "pre_action": {"$ref": "#/$defs/ResponseStage"}
-                            },
+                            "properties": {"pre_action": {"$ref": "#/$defs/ResponseStage"}},
                         },
                     ]
         return schema
@@ -1470,8 +1383,7 @@ class ResponseComposerResolver:
         if association.clarification or association.associations or not association.new_goals:
             return None
         if any(
-            str((goal.metadata or {}).get("responsibility_kind") or "")
-            != "spoken_response"
+            str((goal.metadata or {}).get("responsibility_kind") or "") != "spoken_response"
             for goal in association.new_goals
         ):
             return None
@@ -1523,9 +1435,7 @@ class ResponseComposerResolver:
                         validation_errors=validation_errors,
                     ),
                     system=(
-                        self._repair_system_prompt()
-                        if repair_attempted
-                        else self._system_prompt()
+                        self._repair_system_prompt() if repair_attempted else self._system_prompt()
                     ),
                     options={
                         "temperature": 0.2,
@@ -1564,12 +1474,8 @@ class ResponseComposerResolver:
                         "planless direct responses cannot declare cross-lane coordination"
                     )
                 composition = DirectResponseComposition(
-                    composition_id=self._direct_composition_id(
-                        request, association
-                    ),
-                    goal_association_fingerprint=(
-                        goal_association_fingerprint(association)
-                    ),
+                    composition_id=self._direct_composition_id(request, association),
+                    goal_association_fingerprint=(goal_association_fingerprint(association)),
                     goal_association=association,
                     response_plan=output.response_plan,
                     social_attention_plan=social_plan,
@@ -1626,9 +1532,7 @@ class ResponseComposerResolver:
                         if failure["failure_domain"] == "model_contract"
                         else "model_unavailable"
                     ),
-                    reason_summary=(
-                        "Direct response composition did not complete successfully."
-                    ),
+                    reason_summary=("Direct response composition did not complete successfully."),
                     metadata={
                         "authority": "advisory",
                         "resolver": "response_composer",
@@ -1651,18 +1555,14 @@ class ResponseComposerResolver:
             or response_plan.progress
             or response_plan.final is None
         ):
-            raise ValueError(
-                "direct spoken Goals require exactly one final response stage"
-            )
+            raise ValueError("direct spoken Goals require exactly one final response stage")
         final = response_plan.final
         if set(final.covers_goal_ids) != set(goal_ids):
             raise ValueError("direct response must cover every spoken Goal")
         if final.commitment_state != "completed":
             raise ValueError("direct response must complete the spoken Goals")
         if final.must_not_claim_completion:
-            raise ValueError(
-                "direct response must permit completion of the authored speech"
-            )
+            raise ValueError("direct response must permit completion of the authored speech")
 
     @staticmethod
     def _direct_response_schema(
@@ -1672,9 +1572,7 @@ class ResponseComposerResolver:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "DirectResponseComposerModelOutput"
         if ResponseComposerResolver._social_attention_decision_required(context):
-            ResponseComposerResolver._require_social_attention_decision_in_schema(
-                schema
-            )
+            ResponseComposerResolver._require_social_attention_decision_in_schema(schema)
         stage_schema = schema.get("$defs", {}).get("ResponseStage")
         if isinstance(stage_schema, dict):
             required = stage_schema.setdefault("required", [])
@@ -1794,7 +1692,9 @@ class ResponseComposerResolver:
 
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
-        text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        text = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+        )
         return text if len(text) <= limit else text[:limit].rstrip() + "..."
 
     @staticmethod
@@ -1872,7 +1772,10 @@ class ResponseComposerResolver:
             if behavior.skill_id in primary_ids or behavior.skill_id in seen:
                 reasons.append(f"duplicate_or_primary_skill:{behavior.skill_id}")
                 continue
-            if candidate.get("available") is False or candidate.get("interaction_executable") is not True:
+            if (
+                candidate.get("available") is False
+                or candidate.get("interaction_executable") is not True
+            ):
                 reasons.append(f"unavailable_social_skill:{behavior.skill_id}")
                 continue
             if bool(candidate.get("requires_confirmation")):
@@ -1881,9 +1784,7 @@ class ResponseComposerResolver:
             schema = candidate.get("input_schema")
             if not isinstance(schema, dict):
                 schema = {}
-            target_args_reason = self._validate_target_args(
-                behavior.args, schema, context
-            )
+            target_args_reason = self._validate_target_args(behavior.args, schema, context)
             if target_args_reason:
                 reasons.append(f"target_error:{behavior.skill_id}:{target_args_reason}")
                 continue
@@ -1916,7 +1817,6 @@ class ResponseComposerResolver:
                 "metadata": {**metadata, "validation_reasons": reasons},
             }
         ), reasons
-
 
     @staticmethod
     def _canonicalize_optional_social_attention_payload(
@@ -2018,8 +1918,15 @@ class ResponseComposerResolver:
         if not isinstance(groups, list) or not groups:
             return normalized
         allowed_lanes = {"speaking", "activity", "social_attention"}
-        parallel_step_ids = {
-            step.step_id for step in plan.steps if step.timing == "parallel"
+        parallel_speaking_step_ids = {
+            step.step_id
+            for step in plan.steps
+            if step.timing == "parallel" and step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+        }
+        parallel_activity_step_ids = {
+            step.step_id
+            for step in plan.steps
+            if step.timing == "parallel" and step.capability_id != VOCAL_PERFORMANCE_CAPABILITY_ID
         }
 
         def values_list(value: Any) -> list[Any]:
@@ -2033,19 +1940,13 @@ class ResponseComposerResolver:
             1
             for item in groups
             if isinstance(item, dict)
-            and "activity"
-            in {
-                str(value).strip()
-                for value in values_list(item.get("lanes"))
-            }
+            and "activity" in {str(value).strip() for value in values_list(item.get("lanes"))}
         )
         valid_groups: list[dict[str, Any]] = []
         for item in groups:
             if not isinstance(item, dict):
                 continue
-            coordination_id = " ".join(
-                str(item.get("coordination_id") or "").strip().split()
-            )
+            coordination_id = " ".join(str(item.get("coordination_id") or "").strip().split())
             if not coordination_id:
                 continue
             lanes: list[str] = []
@@ -2054,25 +1955,48 @@ class ResponseComposerResolver:
                 if lane in allowed_lanes and lane not in lanes:
                     lanes.append(lane)
             activity_ids: list[str] = []
+            speaking_ids: list[str] = []
+            if "speaking" in lanes:
+                for value in values_list(item.get("speaking_step_ids")):
+                    step_id = str(value).strip()
+                    if (
+                        step_id
+                        and step_id in parallel_speaking_step_ids
+                        and step_id not in speaking_ids
+                    ):
+                        speaking_ids.append(step_id)
+                if (
+                    not speaking_ids
+                    and len(parallel_speaking_step_ids) == 1
+                    and len(
+                        [
+                            group
+                            for group in groups
+                            if isinstance(group, dict)
+                            and "speaking" in values_list(group.get("lanes"))
+                        ]
+                    )
+                    == 1
+                ):
+                    speaking_ids = sorted(parallel_speaking_step_ids)
             if "activity" in lanes:
                 for value in values_list(item.get("activity_step_ids")):
                     step_id = str(value).strip()
                     if (
                         step_id
-                        and step_id in parallel_step_ids
+                        and step_id in parallel_activity_step_ids
                         and step_id not in activity_ids
                     ):
                         activity_ids.append(step_id)
                 if (
                     not activity_ids
                     and raw_activity_group_count == 1
-                    and parallel_step_ids
-                    and len(parallel_step_ids) == len(plan.steps)
+                    and parallel_activity_step_ids
                 ):
                     activity_ids = [
                         step.step_id
                         for step in plan.steps
-                        if step.step_id in parallel_step_ids
+                        if step.step_id in parallel_activity_step_ids
                     ]
                 if not activity_ids:
                     lanes = [lane for lane in lanes if lane != "activity"]
@@ -2084,45 +2008,37 @@ class ResponseComposerResolver:
                 "lanes": lanes,
                 "start_policy": "best_effort_parallel",
                 "failure_policy": "independent",
-                "reason_summary": " ".join(
-                    str(item.get("reason_summary") or "").strip().split()
-                ),
+                "reason_summary": " ".join(str(item.get("reason_summary") or "").strip().split()),
             }
             if "activity" in lanes:
                 cleaned["activity_step_ids"] = activity_ids
+            if "speaking" in lanes and speaking_ids:
+                cleaned["speaking_step_ids"] = speaking_ids
             valid_groups.append(cleaned)
         activity_groups = [
             item
             for item in valid_groups
-            if "activity" in {
-                str(value).strip() for value in item.get("lanes") or []
-            }
+            if "activity" in {str(value).strip() for value in item.get("lanes") or []}
         ]
-        if (
-            len(activity_groups) == 1
-            and parallel_step_ids
-            and len(parallel_step_ids) == len(plan.steps)
-        ):
+        if len(activity_groups) == 1 and parallel_activity_step_ids:
             group = activity_groups[0]
             if not group.get("activity_step_ids"):
                 group["activity_step_ids"] = [
                     step.step_id
                     for step in plan.steps
-                    if step.step_id in parallel_step_ids
+                    if step.step_id in parallel_activity_step_ids
                 ]
 
         respond_goal_ids = {
-            outcome.goal_id
-            for outcome in plan.goal_outcomes
-            if outcome.disposition == "respond"
+            outcome.goal_id for outcome in plan.goal_outcomes if outcome.disposition == "respond"
         }
         stages = cls._raw_response_stages(normalized.get("response_plan"))
         for group in valid_groups:
             lanes = {str(value).strip() for value in group.get("lanes") or []}
-            coordination_id = " ".join(
-                str(group.get("coordination_id") or "").strip().split()
-            )
+            coordination_id = " ".join(str(group.get("coordination_id") or "").strip().split())
             if "speaking" not in lanes or not coordination_id:
+                continue
+            if group.get("speaking_step_ids"):
                 continue
             if any(
                 str(stage.get("coordination_id") or "").strip() == coordination_id
@@ -2139,10 +2055,8 @@ class ResponseComposerResolver:
                 if not covered.intersection(respond_goal_ids):
                     continue
                 if (
-                    str(stage.get("speech_act") or "").strip().casefold()
-                    == "ask_confirmation"
-                    or str(stage.get("commitment_state") or "").strip()
-                    == "waiting_for_user"
+                    str(stage.get("speech_act") or "").strip().casefold() == "ask_confirmation"
+                    or str(stage.get("commitment_state") or "").strip() == "waiting_for_user"
                 ):
                     continue
                 candidates.append(stage)
@@ -2177,41 +2091,48 @@ class ResponseComposerResolver:
                 for item in social_attention_plan.behaviors
                 if str(item.coordination_id or "").strip()
             }
-        parallel_steps = {
-            step.step_id for step in plan.steps if step.timing == "parallel"
+        parallel_speaking_steps = {
+            step.step_id
+            for step in plan.steps
+            if step.timing == "parallel" and step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+        }
+        parallel_activity_steps = {
+            step.step_id
+            for step in plan.steps
+            if step.timing == "parallel" and step.capability_id != VOCAL_PERFORMANCE_CAPABILITY_ID
         }
         kept: list[LaneCoordinationGroup] = []
         reasons: list[str] = []
         dropped_ids: set[str] = set()
         for group in lane_coordination:
             lanes: list[str] = []
-            if "speaking" in group.lanes and group.coordination_id in speech_ids:
+            speaking_step_ids = [
+                step_id for step_id in group.speaking_step_ids if step_id in parallel_speaking_steps
+            ]
+            if "speaking" in group.lanes and (
+                group.coordination_id in speech_ids or speaking_step_ids
+            ):
                 lanes.append("speaking")
             if (
                 "activity" in group.lanes
                 and group.activity_step_ids
-                and set(group.activity_step_ids).issubset(parallel_steps)
+                and set(group.activity_step_ids).issubset(parallel_activity_steps)
             ):
                 lanes.append("activity")
-            if (
-                "social_attention" in group.lanes
-                and group.coordination_id in social_ids
-            ):
+            if "social_attention" in group.lanes and group.coordination_id in social_ids:
                 lanes.append("social_attention")
             if len(lanes) < 2:
                 dropped_ids.add(group.coordination_id)
                 reasons.append(
-                    "lane_coordination_pruned_after_member_validation:"
-                    + group.coordination_id
+                    "lane_coordination_pruned_after_member_validation:" + group.coordination_id
                 )
                 continue
-            activity_step_ids = (
-                list(group.activity_step_ids) if "activity" in lanes else []
-            )
+            activity_step_ids = list(group.activity_step_ids) if "activity" in lanes else []
             kept.append(
                 group.model_copy(
                     update={
                         "lanes": lanes,
+                        "speaking_step_ids": (speaking_step_ids if "speaking" in lanes else []),
                         "activity_step_ids": activity_step_ids,
                     }
                 )
@@ -2366,7 +2287,7 @@ class ResponseComposerResolver:
             "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. Fast speech marked scheduled is a queued current-turn communicative commitment: do not author another acknowledgement with the same semantic job while it is starting, but never treat scheduled status as proof that the user heard it or as external-fact, execution, or completion evidence. When an existing delivered or scheduled acknowledgement adequately covers pending work, copy its exact text into the appropriate immediate or pre_action stage, set reuse_current_turn_speech=true, and add the current canonical goal IDs. That stage is a reference to existing speech, not a request to speak it again. Use reuse_current_turn_speech=false for any supplement, correction, confirmation question, result, or failure. This is semantic conversational judgment, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
             "For a pending safe_read or external_read capability, ensure the user receives one adequate natural everyday acknowledgement before the result. When current-turn delivered or scheduled speech already adequately acknowledges that same pending work, reuse it exactly rather than authoring another acknowledgement. When no adequate acknowledgement was delivered or scheduled, or the earlier one needs supplementation or correction, emit exactly one natural everyday immediate acknowledgement. The Host does not impose a character, word, or sentence-count style limit. For a fresh external read, say naturally that Chromie is checking the relevant source. For chromie.memory.retrieve_verified_tool_result, say naturally that Chromie recently checked the exact subject and is retrieving that result, with certainty no stronger than the supplied index metadata. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. Do not restate the full request, promise a result, or state any measurement, condition, recommendation, or conclusion before matching trusted evidence exists. Runtime starts this speech and the lookup in parallel, so never imply that the lookup waits for playback to finish. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
-            "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, speaking delivers model-authored communication, and activity executes non-speech provider work. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy exact CanonicalPlan step IDs into activity_step_ids, and only when those steps already use timing=parallel under compatible provider metadata. A coordinated response stage must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
+            "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, speaking delivers model-authored communication and exact provider-qualified vocal performance, and activity executes non-speech provider work. chromie.vocal.perform is a Speaking-lane provider step, never response transport and never an Activity step. An optional acknowledgement about pending vocal work remains ordinary chromie.speak delivery and is not performance evidence. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy an already-parallel chromie.vocal.perform step into speaking_step_ids; copy only already-parallel non-speech provider steps into activity_step_ids. A coordinated response stage may supply the speaking member only when no provider speaking_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "

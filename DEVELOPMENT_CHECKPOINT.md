@@ -85,24 +85,34 @@ microphone/speaker, arbitrary human pronunciation, audible device latency, and
 the real acoustic echo path remain supervised target evidence rather than source
 closure claims.
 
-The next active semantic Issue is #6, the exact `chromie.vocal.perform` provider
-contract. Preserve the Speaking lane and the current Chromie playback boundary:
+The active semantic Issue remains #6 through its final clean current-revision
+default-provider replay. Its exact `chromie.vocal.perform` source contract now
+preserves the Speaking lane and the current Chromie playback boundary:
 
 - one provider-prefixed capability identity survives proposal, validation,
-  authorization, execution, cancellation, and evidence;
-- requests use typed vocal modes and providers declare supported modes,
-  streaming, timing, sample format, concurrency, cancellation, and provenance;
-- ordinary TTS retains its current ordering, interruption, echo, and delivery
-  behavior while remaining distinct from recitation, humming, and singing;
-- unsupported modes return exact unavailable outcomes without silent downgrade;
-  and
-- fake-provider tests prove mode negotiation and failure behavior before any
-  real singing claim.
+  authorization, execution, cancellation, and evidence in source tests;
+- requests use typed vocal modes and declarations bind supported modes to
+  streaming, timing, sample format, concurrency, cancellation, provenance, and
+  retained mode-specific evidence;
+- ordinary TTS regressions remain passing and distinct from recitation, humming,
+  and singing evidence;
+- unsupported modes return exact unavailable outcomes and silent downgrades
+  fail; and
+- the focused cognitive-runtime scenario passes through Goal Association, Fast
+  Planner, Deep Planner, Response Composer, and Host materialization with
+  `execution_lane=speaking`.
+
+The pre-commit source evidence passed the focused provider/TTS suite, the exact
+recitation scenario, the `stable_capability_grounding` class 8/8, and the full
+canonical gate with 2,041 maintained tests, 20 legacy Agent tests, and 102
+benchmark tests. Commit this reviewed source, run
+`scripts/vocal_issue_closure.py` from that clean revision, inspect the complete
+retained live output, and only then advance to Issue #7.
 
 Do not place backend names in semantic Goals, add a neutral late-binding alias,
 move playback ownership into Soridormi, or begin Issue #7 before Issue #6 meets
-its source acceptance. Real singing remains unvalidated until mode-specific
-target evidence exists.
+its clean current-revision delivery evidence. Real singing remains unvalidated
+until mode-specific target evidence exists.
 
 ## Canonical owners
 

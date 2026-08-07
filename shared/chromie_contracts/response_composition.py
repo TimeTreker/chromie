@@ -17,8 +17,6 @@ ResponseCompositionStatus = Literal["resolved", "model_unavailable", "invalid_in
 ResponseCompositionPhase = Literal["pre_execution"]
 
 
-
-
 def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
     payload = json.dumps(
         resolution.prompt_projection(),
@@ -100,8 +98,7 @@ class CoordinatedResponsePlan(BaseModel):
         phased_stages = self._stages(self.response_plan)
         stages = [stage for _, stage in phased_stages]
         safe_read_speech_optional = (
-            plan.disposition == "execute"
-            and self.metadata.get("safe_read_speech_optional") is True
+            plan.disposition == "execute" and self.metadata.get("safe_read_speech_optional") is True
         )
         if not stages and not safe_read_speech_optional:
             raise ValueError("terminal canonical plans require at least one spoken response stage")
@@ -116,37 +113,52 @@ class CoordinatedResponsePlan(BaseModel):
                 )
             covered_goals.update(stage.covers_goal_ids)
 
-        if known_goals and covered_goals != known_goals and not (
-            safe_read_speech_optional and not stages
+        if (
+            known_goals
+            and covered_goals != known_goals
+            and not (safe_read_speech_optional and not stages)
         ):
             missing = sorted(known_goals - covered_goals)
-            raise ValueError("response composition does not cover all plan goals: " + ",".join(missing))
+            raise ValueError(
+                "response composition does not cover all plan goals: " + ",".join(missing)
+            )
 
-        coordination_by_id = {
-            item.coordination_id: item for item in self.lane_coordination
-        }
+        coordination_by_id = {item.coordination_id: item for item in self.lane_coordination}
         if len(coordination_by_id) != len(self.lane_coordination):
             raise ValueError("lane coordination IDs must be unique")
         plan_steps = {step.step_id: step for step in plan.steps}
+        coordinated_speaking_steps: set[str] = set()
         coordinated_activity_steps: set[str] = set()
         for group in self.lane_coordination:
+            for step_id in group.speaking_step_ids:
+                step = plan_steps.get(step_id)
+                if step is None:
+                    raise ValueError(
+                        "lane coordination references unknown speaking step: " + step_id
+                    )
+                if step_id in coordinated_speaking_steps:
+                    raise ValueError(
+                        "speaking step belongs to more than one lane coordination group: " + step_id
+                    )
+                coordinated_speaking_steps.add(step_id)
+                if step.timing != "parallel":
+                    raise ValueError(
+                        "cross-lane speaking steps must use timing=parallel: " + step_id
+                    )
             for step_id in group.activity_step_ids:
                 step = plan_steps.get(step_id)
                 if step is None:
                     raise ValueError(
-                        "lane coordination references unknown activity step: "
-                        + step_id
+                        "lane coordination references unknown activity step: " + step_id
                     )
                 if step_id in coordinated_activity_steps:
                     raise ValueError(
-                        "activity step belongs to more than one lane coordination group: "
-                        + step_id
+                        "activity step belongs to more than one lane coordination group: " + step_id
                     )
                 coordinated_activity_steps.add(step_id)
                 if step.timing != "parallel":
                     raise ValueError(
-                        "cross-lane activity steps must use timing=parallel: "
-                        + step_id
+                        "cross-lane activity steps must use timing=parallel: " + step_id
                     )
 
         coordinated_speech_ids: set[str] = set()
@@ -157,21 +169,17 @@ class CoordinatedResponsePlan(BaseModel):
             coordination_group = coordination_by_id.get(coordination_id)
             if coordination_group is None:
                 raise ValueError(
-                    "response stage references unknown lane coordination: "
-                    + coordination_id
+                    "response stage references unknown lane coordination: " + coordination_id
                 )
             if "speaking" not in coordination_group.lanes:
                 raise ValueError(
-                    "response stage coordination requires the speaking lane: "
-                    + coordination_id
+                    "response stage coordination requires the speaking lane: " + coordination_id
                 )
             if (
                 stage.speech_act.casefold() == "ask_confirmation"
                 or stage.commitment_state == "waiting_for_user"
             ):
-                raise ValueError(
-                    "confirmation and waiting speech cannot overlap effect execution"
-                )
+                raise ValueError("confirmation and waiting speech cannot overlap effect execution")
             coordinated_speech_ids.add(coordination_id)
 
         coordinated_social_ids: set[str] = set()
@@ -183,8 +191,7 @@ class CoordinatedResponsePlan(BaseModel):
                 coordination_group = coordination_by_id.get(coordination_id)
                 if coordination_group is None:
                     raise ValueError(
-                        "social behavior references unknown lane coordination: "
-                        + coordination_id
+                        "social behavior references unknown lane coordination: " + coordination_id
                     )
                 if "social_attention" not in coordination_group.lanes:
                     raise ValueError(
@@ -195,10 +202,14 @@ class CoordinatedResponsePlan(BaseModel):
 
         for group in self.lane_coordination:
             lane_set = set(group.lanes)
-            if "speaking" in lane_set and group.coordination_id not in coordinated_speech_ids:
+            if (
+                "speaking" in lane_set
+                and not group.speaking_step_ids
+                and group.coordination_id not in coordinated_speech_ids
+            ):
                 raise ValueError(
-                    "speaking lane coordination requires one coordinated response stage: "
-                    + group.coordination_id
+                    "speaking lane coordination requires a provider step or one "
+                    "coordinated response stage: " + group.coordination_id
                 )
             if (
                 "social_attention" in lane_set
@@ -211,7 +222,9 @@ class CoordinatedResponsePlan(BaseModel):
 
         if plan.disposition == "execute":
             if self.response_plan.final is not None:
-                raise ValueError("pre-execution response composition must not include a final stage")
+                raise ValueError(
+                    "pre-execution response composition must not include a final stage"
+                )
             allowed = {"none", "heard", "evaluating", "waiting_for_user"}
             for stage in stages:
                 if stage.commitment_state not in allowed:
@@ -235,9 +248,7 @@ class CoordinatedResponsePlan(BaseModel):
                             + stage.commitment_state
                         )
                     if not stage.must_not_claim_completion:
-                        raise ValueError(
-                            "mixed pre-execution stages must forbid completion claims"
-                        )
+                        raise ValueError("mixed pre-execution stages must forbid completion claims")
             covered_clarifications: set[str] = set()
             for _, stage in phased_stages:
                 if (
@@ -266,7 +277,9 @@ class CoordinatedResponsePlan(BaseModel):
                 )
         elif plan.disposition in {"unavailable", "refused"}:
             if any(stage.commitment_state in {"completed", "executing"} for stage in stages):
-                raise ValueError("unavailable or refused plans cannot claim execution or completion")
+                raise ValueError(
+                    "unavailable or refused plans cannot claim execution or completion"
+                )
 
         if self.social_attention_plan is not None:
             social = self.social_attention_plan
@@ -320,9 +333,7 @@ class DirectResponseComposition(BaseModel):
         if self.goal_association_fingerprint != goal_association_fingerprint(association):
             raise ValueError("goal association fingerprint mismatch")
         if association.associations:
-            raise ValueError(
-                "planless direct composition accepts only newly authored speech Goals"
-            )
+            raise ValueError("planless direct composition accepts only newly authored speech Goals")
         goal_ids = [
             str(goal.goal_id or "").strip()
             for goal in association.new_goals
@@ -331,13 +342,10 @@ class DirectResponseComposition(BaseModel):
         if not goal_ids:
             raise ValueError("direct response composition requires canonical Goal IDs")
         if any(
-            str((goal.metadata or {}).get("responsibility_kind") or "")
-            != "spoken_response"
+            str((goal.metadata or {}).get("responsibility_kind") or "") != "spoken_response"
             for goal in association.new_goals
         ):
-            raise ValueError(
-                "planless direct composition is limited to spoken_response Goals"
-            )
+            raise ValueError("planless direct composition is limited to spoken_response Goals")
         response = self.response_plan
         if (
             response.immediate is not None
@@ -345,9 +353,7 @@ class DirectResponseComposition(BaseModel):
             or response.progress
             or response.final is None
         ):
-            raise ValueError(
-                "direct response composition requires exactly one final speech stage"
-            )
+            raise ValueError("direct response composition requires exactly one final speech stage")
         final = response.final
         if set(final.covers_goal_ids) != set(goal_ids):
             raise ValueError("direct response must cover every spoken Goal exactly")

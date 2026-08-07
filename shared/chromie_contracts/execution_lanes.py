@@ -52,6 +52,7 @@ class LaneCoordinationGroup(BaseModel):
     coordination_id: str = Field(min_length=1)
     relation: LaneCoordinationRelation = "parallel"
     lanes: list[ChromieExecutionLane] = Field(min_length=2, max_length=3)
+    speaking_step_ids: list[str] = Field(default_factory=list)
     activity_step_ids: list[str] = Field(default_factory=list)
     start_policy: LaneCoordinationStartPolicy = "best_effort_parallel"
     failure_policy: LaneCoordinationFailurePolicy = "independent"
@@ -62,9 +63,9 @@ class LaneCoordinationGroup(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         return _normalize_text(value)
 
-    @field_validator("activity_step_ids", mode="before")
+    @field_validator("speaking_step_ids", "activity_step_ids", mode="before")
     @classmethod
-    def normalize_activity_step_ids(cls, value: Any) -> list[str]:
+    def normalize_step_ids(cls, value: Any) -> list[str]:
         return _normalize_unique_text_list(value)
 
     @field_validator("lanes", mode="before")
@@ -79,11 +80,9 @@ class LaneCoordinationGroup(BaseModel):
     def validate_lane_membership(self) -> "LaneCoordinationGroup":
         lane_set = set(self.lanes)
         if "activity" in lane_set and not self.activity_step_ids:
-            raise ValueError(
-                "activity lane coordination requires activity_step_ids"
-            )
+            raise ValueError("activity lane coordination requires activity_step_ids")
         if "activity" not in lane_set and self.activity_step_ids:
-            raise ValueError(
-                "activity_step_ids require the activity lane"
-            )
+            raise ValueError("activity_step_ids require the activity lane")
+        if "speaking" not in lane_set and self.speaking_step_ids:
+            raise ValueError("speaking_step_ids require the speaking lane")
         return self

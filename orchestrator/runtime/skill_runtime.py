@@ -19,7 +19,20 @@ from shared.chromie_contracts.interaction import (
     CapabilityTraceEvent,
     InteractionResponse,
     InteractionSpeech,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+    VOCAL_MODES,
+    VocalPerformanceDelivery,
+    VocalProviderDeclaration,
     reject_forbidden_low_level_fields,
+    vocal_performance_input_schema,
+    vocal_performance_output_schema,
+)
+from shared.chromie_contracts.reflex import (
+    CancellationDirective,
+    CancellationDispatchReceipt,
+    CancellationProviderFailure,
+    CancellationRequestBinding,
+    CancellationScope,
 )
 from shared.chromie_contracts.soridormi_body_contract import (
     normalize_soridormi_body_contract,
@@ -29,13 +42,6 @@ SkillRequest = CapabilityRequest
 SkillResult = CapabilityResult
 SkillTrace = CapabilityTrace
 SkillTraceEvent = CapabilityTraceEvent
-from shared.chromie_contracts.reflex import (
-    CancellationDirective,
-    CancellationDispatchReceipt,
-    CancellationProviderFailure,
-    CancellationRequestBinding,
-    CancellationScope,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +112,6 @@ SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
 
 
 class SkillDefinition(CapabilityIdentityModel):
-
     version: str = Field(default="0.1.0", min_length=1)
     provider_id: str = Field(min_length=1)
     description: str = ""
@@ -179,33 +184,21 @@ class SkillRegistry:
                 raise ValueError("Soridormi skill catalog entry has no skill_id")
             skill_id = f"soridormi.{upstream_id}"
             if skill_id in imported:
-                raise ValueError(
-                    f"duplicate Soridormi skill_id in one catalog: {upstream_id}"
-                )
+                raise ValueError(f"duplicate Soridormi skill_id in one catalog: {upstream_id}")
 
             execution = item.get("execution")
             execution_contract = execution if isinstance(execution, dict) else {}
             availability = item.get("availability")
-            availability_contract = (
-                availability if isinstance(availability, dict) else {}
-            )
+            availability_contract = availability if isinstance(availability, dict) else {}
             confirmation = item.get("confirmation")
-            confirmation_contract = (
-                confirmation if isinstance(confirmation, dict) else {}
-            )
+            confirmation_contract = confirmation if isinstance(confirmation, dict) else {}
             effects_raw = item.get("effects")
             if effects_raw is None:
                 effects = ["physical_motion"]
             elif isinstance(effects_raw, list):
-                effects = [
-                    str(value)
-                    for value in effects_raw
-                    if str(value).strip()
-                ]
+                effects = [str(value) for value in effects_raw if str(value).strip()]
             else:
-                raise ValueError(
-                    f"Soridormi skill {upstream_id!r} effects must be a list"
-                )
+                raise ValueError(f"Soridormi skill {upstream_id!r} effects must be a list")
             safety_class = str(item.get("safety_class") or "physical_motion")
             provider_requires_confirmation = bool(
                 item.get(
@@ -228,15 +221,9 @@ class SkillRegistry:
             upstream_metadata = item.get("metadata")
             if not isinstance(upstream_metadata, dict):
                 upstream_metadata = {}
-            input_schema = (
-                item.get("parameters_schema")
-                or item.get("input_schema")
-                or {}
-            )
+            input_schema = item.get("parameters_schema") or item.get("input_schema") or {}
             if not isinstance(input_schema, dict):
-                raise ValueError(
-                    f"Soridormi skill {upstream_id!r} input schema must be an object"
-                )
+                raise ValueError(f"Soridormi skill {upstream_id!r} input schema must be an object")
             imported[skill_id] = SkillDefinition(
                 skill_id=skill_id,
                 version=str(item.get("version") or version),
@@ -251,8 +238,7 @@ class SkillRegistry:
                     )
                 ),
                 unavailable_reason=(
-                    item.get("unavailable_reason")
-                    or availability_contract.get("reason")
+                    item.get("unavailable_reason") or availability_contract.get("reason")
                 ),
                 requires_confirmation=effective_requires_confirmation,
                 interruptible=bool(item.get("interruptible", False)),
@@ -288,9 +274,7 @@ class SkillRegistry:
                     "ability_class": body_contract["ability_class"],
                     "control_coupling": body_contract["control_coupling"],
                     "concurrency": dict(canonical_concurrency),
-                    "parallel_metadata_declared": body_contract[
-                        "parallel_metadata_declared"
-                    ],
+                    "parallel_metadata_declared": body_contract["parallel_metadata_declared"],
                     "provider_local_activity_compilation": body_contract[
                         "provider_local_activity_compilation"
                     ],
@@ -326,9 +310,7 @@ class SkillRegistry:
                     updated[skill_id] = definition.model_copy(
                         update={
                             "available": False,
-                            "unavailable_reason": (
-                                "not present in latest Soridormi catalog"
-                            ),
+                            "unavailable_reason": ("not present in latest Soridormi catalog"),
                             "metadata": {
                                 **definition.metadata,
                                 "catalog_absent": True,
@@ -336,7 +318,6 @@ class SkillRegistry:
                         }
                     )
         self._skills = updated
-
 
 
 class SkillExecutionContext(BaseModel):
@@ -364,16 +345,14 @@ class SkillProvider(Protocol):
         request: SkillRequest,
         definition: SkillDefinition,
         context: SkillExecutionContext,
-    ) -> SkillResult:
-        ...
+    ) -> SkillResult: ...
 
     async def cancel(
         self,
         request: SkillRequest,
         definition: SkillDefinition,
         context: SkillExecutionContext,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 class RuntimeAuthorization(BaseModel):
@@ -485,12 +464,8 @@ class SkillRuntime:
                             source_goal_ids=[
                                 str(value) for value in source_goal_ids if str(value).strip()
                             ],
-                            provider_started=bool(
-                                context is not None and context.provider_started
-                            ),
-                            task_done=bool(
-                                active is not None and active[0].done()
-                            ),
+                            provider_started=bool(context is not None and context.provider_started),
+                            task_done=bool(active is not None and active[0].done()),
                         )
                     )
             return SkillRuntimeExecutionObservation(
@@ -524,10 +499,7 @@ class SkillRuntime:
         try:
             authorization = authorization or RuntimeAuthorization()
             scheduled = self._scheduled_requests(response)
-            validated = [
-                self._validate_request(request, authorization)
-                for request in scheduled
-            ]
+            validated = [self._validate_request(request, authorization) for request in scheduled]
         except BaseException:
             if auto_managed:
                 self.end_interaction(response.interaction_id)
@@ -550,10 +522,7 @@ class SkillRuntime:
                     {},
                 )
                 interaction_scheduled.update(
-                    {
-                        request.request_id: (request, definition)
-                        for request, definition in validated
-                    }
+                    {request.request_id: (request, definition) for request, definition in validated}
                 )
             try:
                 pending_parallel: list[tuple[SkillRequest, SkillDefinition]] = []
@@ -571,10 +540,7 @@ class SkillRuntime:
                         results.extend(batch_results)
                         traces.extend(batch_traces)
                         pending_parallel = []
-                        if any(
-                            self._is_runtime_cancellation(result)
-                            for result in batch_results
-                        ):
+                        if any(self._is_runtime_cancellation(result) for result in batch_results):
                             return SkillRuntimeResult(
                                 interaction_id=response.interaction_id,
                                 status="cancelled",
@@ -623,10 +589,7 @@ class SkillRuntime:
                     )
                     results.extend(batch_results)
                     traces.extend(batch_traces)
-                    if any(
-                        self._is_runtime_cancellation(result)
-                        for result in batch_results
-                    ):
+                    if any(self._is_runtime_cancellation(result) for result in batch_results):
                         return SkillRuntimeResult(
                             interaction_id=response.interaction_id,
                             status="cancelled",
@@ -634,9 +597,7 @@ class SkillRuntime:
                             traces=traces,
                         )
             except asyncio.CancelledError:
-                await asyncio.shield(
-                    self.cancel_interaction(response.interaction_id)
-                )
+                await asyncio.shield(self.cancel_interaction(response.interaction_id))
                 return SkillRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="cancelled",
@@ -644,18 +605,13 @@ class SkillRuntime:
                     traces=traces,
                 )
 
-            cancelled_results = [
-                result for result in results if result.status == "cancelled"
-            ]
+            cancelled_results = [result for result in results if result.status == "cancelled"]
             status = (
                 "completed"
                 if all(result.status == "completed" for result in results)
                 else "cancelled"
                 if cancelled_results
-                and all(
-                    result.status in {"completed", "cancelled"}
-                    for result in results
-                )
+                and all(result.status in {"completed", "cancelled"} for result in results)
                 and all(
                     str(result.reason_code or "").startswith("cancelled")
                     for result in cancelled_results
@@ -672,9 +628,7 @@ class SkillRuntime:
             if execution_registered:
                 async with self._active_lock:
                     self._scheduled.pop(response.interaction_id, None)
-                    self._executing_interactions.discard(
-                        response.interaction_id
-                    )
+                    self._executing_interactions.discard(response.interaction_id)
             if auto_managed:
                 self.end_interaction(response.interaction_id)
 
@@ -707,9 +661,7 @@ class SkillRuntime:
         elif reason_code.startswith("cancelled_"):
             cancellation_scope = reason_code.removeprefix("cancelled_")
         elif reason_code.startswith("cancellation_failed_"):
-            cancellation_scope = reason_code.removeprefix(
-                "cancellation_failed_"
-            )
+            cancellation_scope = reason_code.removeprefix("cancellation_failed_")
         cancellation_closes_interaction = cancellation_scope in {
             "current_interaction",
             "global_emergency",
@@ -723,10 +675,7 @@ class SkillRuntime:
 
     @staticmethod
     def _is_runtime_cancellation(result: SkillResult) -> bool:
-        return (
-            result.status == "cancelled"
-            and result.reason_code == "cancelled"
-        )
+        return result.status == "cancelled" and result.reason_code == "cancelled"
 
     async def cancel_all(self) -> None:
         await self.cancel_scope(
@@ -771,26 +720,20 @@ class SkillRuntime:
             else:
                 base_interaction_ids = sorted(known_interactions)
 
-            base_scheduled_items: list[
-                tuple[str, SkillRequest, SkillDefinition]
-            ] = []
+            base_scheduled_items: list[tuple[str, SkillRequest, SkillDefinition]] = []
             for interaction_id in base_interaction_ids:
                 for request, definition in self._scheduled.get(
                     interaction_id,
                     {},
                 ).values():
-                    base_scheduled_items.append(
-                        (interaction_id, request, definition)
-                    )
+                    base_scheduled_items.append((interaction_id, request, definition))
 
             effective_scope = requested_scope
             widened = False
             widening_reason = ""
             stale_binding_request_ids: set[str] = set()
             shared_owner_conflict_request_ids: set[str] = set()
-            base_selected: list[
-                tuple[str, SkillRequest, SkillDefinition]
-            ] = []
+            base_selected: list[tuple[str, SkillRequest, SkillDefinition]] = []
             for interaction_id, request, definition in base_scheduled_items:
                 if requested_scope == "specific_goal":
                     binding = self._specific_goal_binding(
@@ -801,22 +744,16 @@ class SkillRuntime:
                         stale_binding_request_ids.add(request.request_id)
                         continue
                     if binding == "shared_owner_conflict":
-                        shared_owner_conflict_request_ids.add(
-                            request.request_id
-                        )
+                        shared_owner_conflict_request_ids.add(request.request_id)
                         continue
                     if binding == "match":
-                        base_selected.append(
-                            (interaction_id, request, definition)
-                        )
+                        base_selected.append((interaction_id, request, definition))
                     continue
                 if self._scope_matches_definition(
                     requested_scope,
                     definition,
                 ):
-                    base_selected.append(
-                        (interaction_id, request, definition)
-                    )
+                    base_selected.append((interaction_id, request, definition))
 
             # Provider-global cancellation has collateral effect only when an
             # eligible provider request has actually started. Arbiter waiters
@@ -824,24 +761,17 @@ class SkillRuntime:
             # trigger a provider call or scope widening.
             global_domains_required: set[CancellationDomain] = set()
             for interaction_id, request, definition in base_selected:
-                active_item = self._active.get(
-                    (interaction_id, request.request_id)
-                )
+                active_item = self._active.get((interaction_id, request.request_id))
                 if (
                     active_item is None
-                    or (
-                        active_item[0].done()
-                        and active_item[3].provider_cancel_future is None
-                    )
+                    or (active_item[0].done() and active_item[3].provider_cancel_future is None)
                     or not active_item[3].provider_started
                     or not request.cancellable
                     or not definition.interruptible
                     or not self._provider_cancellation_is_global(definition)
                 ):
                     continue
-                global_domains_required.update(
-                    definition.cancellation_domains
-                )
+                global_domains_required.update(definition.cancellation_domains)
 
             domain_scope: dict[CancellationDomain, CancellationScope] = {
                 "output": "output_only",
@@ -866,9 +796,7 @@ class SkillRuntime:
             selection_scope_by_key: dict[
                 tuple[str, str],
                 CancellationScope,
-            ] = {
-                key: requested_scope for key in selected_by_key
-            }
+            ] = {key: requested_scope for key in selected_by_key}
             rules_to_install: dict[
                 str,
                 list[_CancellationRule],
@@ -883,14 +811,10 @@ class SkillRuntime:
                     else "provider_supports_only_global_output_cancel"
                     if ordered_domains == ["output"]
                     else (
-                        "provider_supports_only_global_domain_cancel:"
-                        + ",".join(ordered_domains)
+                        "provider_supports_only_global_domain_cancel:" + ",".join(ordered_domains)
                     )
                 )
-                global_scopes = {
-                    domain_scope[item]
-                    for item in global_domains_required
-                }
+                global_scopes = {domain_scope[item] for item in global_domains_required}
                 if requested_scope == "specific_goal" and len(global_scopes) == 1:
                     effective_scope = next(iter(global_scopes))
                 for interaction_id, request, definition in all_scheduled_items:
@@ -939,18 +863,21 @@ class SkillRuntime:
                     )
             else:
                 specific_goal_bound_to_open_interaction = (
-                    requested_scope == "specific_goal"
-                    and bool(base_interaction_ids)
+                    requested_scope == "specific_goal" and bool(base_interaction_ids)
                 )
-                should_install = bool(base_selected) or (
-                    requested_scope
-                    in {
-                        "output_only",
-                        "embodied_motion",
-                        "current_interaction",
-                        "global_emergency",
-                    }
-                ) or specific_goal_bound_to_open_interaction
+                should_install = (
+                    bool(base_selected)
+                    or (
+                        requested_scope
+                        in {
+                            "output_only",
+                            "embodied_motion",
+                            "current_interaction",
+                            "global_emergency",
+                        }
+                    )
+                    or specific_goal_bound_to_open_interaction
+                )
                 if should_install:
                     for interaction_id in base_interaction_ids:
                         rules_to_install.setdefault(
@@ -975,10 +902,7 @@ class SkillRuntime:
             completed_active_keys = {
                 key
                 for key, item in self._active.items()
-                if (
-                    item[0].done()
-                    and item[3].provider_cancel_future is None
-                )
+                if (item[0].done() and item[3].provider_cancel_future is None)
             }
             for key in completed_active_keys:
                 selected_by_key.pop(key, None)
@@ -995,10 +919,7 @@ class SkillRuntime:
                 for key, item in self._active.items()
                 if (
                     key in selected_keys
-                    and (
-                        not item[0].done()
-                        or item[3].provider_cancel_future is not None
-                    )
+                    and (not item[0].done() or item[3].provider_cancel_future is not None)
                 )
             ]
 
@@ -1032,9 +953,7 @@ class SkillRuntime:
                         context.cancellation_scope,
                         item_scope,
                     )
-                    context.cancellation_reason_code = (
-                        f"cancelled_{context.cancellation_scope}"
-                    )
+                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
                     provider_cancel_items.append(item)
                     continue
                 if context.provider_started:
@@ -1044,9 +963,7 @@ class SkillRuntime:
                         context.cancellation_scope,
                         item_scope,
                     )
-                    context.cancellation_reason_code = (
-                        f"cancelled_{context.cancellation_scope}"
-                    )
+                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
                     task.cancel()
                     locally_cancelled_items.append(item)
                 elif request.cancellable and definition.interruptible:
@@ -1054,9 +971,7 @@ class SkillRuntime:
                         context.cancellation_scope,
                         item_scope,
                     )
-                    context.cancellation_reason_code = (
-                        f"cancelled_{context.cancellation_scope}"
-                    )
+                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
                     task.cancel()
                     locally_cancelled_items.append(item)
                     provider_cancel_items.append(item)
@@ -1113,36 +1028,21 @@ class SkillRuntime:
                 ]
             ] = []
             for group_items in provider_groups.values():
-                first_future = group_items[0][
-                    3
-                ].provider_cancel_future
-                same_future_for_all = (
-                    first_future is not None
-                    and all(
-                        item[3].provider_cancel_future is first_future
-                        for item in group_items
-                    )
+                first_future = group_items[0][3].provider_cancel_future
+                same_future_for_all = first_future is not None and all(
+                    item[3].provider_cancel_future is first_future for item in group_items
                 )
                 same_source_for_all = all(
-                    item[3].provider_cancel_source_turn_id
-                    == directive.source_turn_id
+                    item[3].provider_cancel_source_turn_id == directive.source_turn_id
                     for item in group_items
                 )
                 prior_dispatch_succeeded = all(
-                    item[3].provider_cancel_error is None
-                    for item in group_items
+                    item[3].provider_cancel_error is None for item in group_items
                 )
-                same_dispatch = (
-                    same_future_for_all
-                    and (
-                        not first_future.done()
-                        or same_source_for_all
-                        or prior_dispatch_succeeded
-                    )
+                same_dispatch = same_future_for_all and (
+                    not first_future.done() or same_source_for_all or prior_dispatch_succeeded
                 )
-                existing_future = (
-                    first_future if same_dispatch else None
-                )
+                existing_future = first_future if same_dispatch else None
                 if existing_future is None:
                     representative = group_items[0]
                     _, request, definition, context = representative
@@ -1157,12 +1057,8 @@ class SkillRuntime:
                 for item in group_items:
                     item[3].provider_cancel_requested = True
                     item[3].provider_cancel_future = existing_future
-                    item[3].provider_cancel_source_turn_id = (
-                        directive.source_turn_id
-                    )
-                provider_group_futures.append(
-                    (group_items, existing_future)
-                )
+                    item[3].provider_cancel_source_turn_id = directive.source_turn_id
+                provider_group_futures.append((group_items, existing_future))
 
             interaction_ids = sorted(
                 {
@@ -1175,20 +1071,15 @@ class SkillRuntime:
             # semantic ordering key; changing a DTO field name may change those
             # digests without changing the Plan.
             selected_binding_order = tuple(selected_by_key)
-            selected_binding_keys = set(selected_binding_order)
             active_binding_order = tuple(
                 key for key in selected_binding_order if key in active_keys
             )
             queued_binding_order = tuple(
                 key for key in selected_binding_order if key not in active_keys
             )
-            queued_keys = set(queued_binding_order)
 
         provider_results = await asyncio.gather(
-            *(
-                asyncio.shield(future)
-                for _, future in provider_group_futures
-            ),
+            *(asyncio.shield(future) for _, future in provider_group_futures),
             return_exceptions=True,
         )
         provider_failures: dict[tuple[str, str], str] = {}
@@ -1204,32 +1095,29 @@ class SkillRuntime:
             if not error:
                 continue
             for _, request, _, context in group_items:
-                provider_failures[
-                    (context.interaction_id, request.request_id)
-                ] = error
+                provider_failures[(context.interaction_id, request.request_id)] = error
         await asyncio.gather(
             *(item[0] for item in locally_cancelled_items),
             return_exceptions=True,
         )
         for _, request, _, context in provider_cancel_items:
             if context.provider_cancel_error:
-                provider_failures[
-                    (context.interaction_id, request.request_id)
-                ] = context.provider_cancel_error
+                provider_failures[(context.interaction_id, request.request_id)] = (
+                    context.provider_cancel_error
+                )
 
         affected_goal_ids = {
-            goal_id
-            for _, request, _ in selected
-            for goal_id in self._request_goal_ids(request)
+            goal_id for _, request, _ in selected for goal_id in self._request_goal_ids(request)
         }
         cancel_requested_keys = {
             (context.interaction_id, request.request_id)
             for _, request, _, context in provider_cancel_items
         }
-        binding = lambda key: CancellationRequestBinding(
-            interaction_id=key[0],
-            request_id=key[1],
-        )
+        def binding(key: tuple[str, str]) -> CancellationRequestBinding:
+            return CancellationRequestBinding(
+                interaction_id=key[0],
+                request_id=key[1],
+            )
         return CancellationDispatchReceipt(
             source_turn_id=directive.source_turn_id,
             requested_scope=requested_scope,
@@ -1237,60 +1125,33 @@ class SkillRuntime:
             interaction_ids=tuple(sorted(interaction_ids)),
             target_goal_ids=directive.target_goal_ids,
             expected_plan_id=directive.expected_plan_id,
-            expected_plan_fingerprint=(
-                directive.expected_plan_fingerprint
-            ),
+            expected_plan_fingerprint=(directive.expected_plan_fingerprint),
             affected_goal_ids=tuple(sorted(affected_goal_ids)),
-            selected_request_ids=tuple(
-                key[1] for key in selected_binding_order
-            ),
-            selected_request_bindings=tuple(
-                binding(key) for key in selected_binding_order
-            ),
-            active_request_ids=tuple(
-                key[1] for key in active_binding_order
-            ),
-            active_request_bindings=tuple(
-                binding(key) for key in active_binding_order
-            ),
-            queued_request_ids=tuple(
-                key[1] for key in queued_binding_order
-            ),
-            queued_request_bindings=tuple(
-                binding(key) for key in queued_binding_order
-            ),
-            cancel_requested_request_ids=tuple(
-                sorted({key[1] for key in cancel_requested_keys})
-            ),
+            selected_request_ids=tuple(key[1] for key in selected_binding_order),
+            selected_request_bindings=tuple(binding(key) for key in selected_binding_order),
+            active_request_ids=tuple(key[1] for key in active_binding_order),
+            active_request_bindings=tuple(binding(key) for key in active_binding_order),
+            queued_request_ids=tuple(key[1] for key in queued_binding_order),
+            queued_request_bindings=tuple(binding(key) for key in queued_binding_order),
+            cancel_requested_request_ids=tuple(sorted({key[1] for key in cancel_requested_keys})),
             cancel_requested_request_bindings=tuple(
                 binding(key) for key in sorted(cancel_requested_keys)
             ),
-            non_interruptible_request_ids=tuple(
-                sorted({key[1] for key in non_interruptible_keys})
-            ),
+            non_interruptible_request_ids=tuple(sorted({key[1] for key in non_interruptible_keys})),
             non_interruptible_request_bindings=tuple(
                 binding(key) for key in sorted(non_interruptible_keys)
             ),
-            shared_owner_conflict_request_ids=tuple(
-                sorted(shared_owner_conflict_request_ids)
-            ),
-            stale_binding_request_ids=tuple(
-                sorted(stale_binding_request_ids)
-            ),
+            shared_owner_conflict_request_ids=tuple(sorted(shared_owner_conflict_request_ids)),
+            stale_binding_request_ids=tuple(sorted(stale_binding_request_ids)),
             provider_cancel_failures=tuple(
-                (
-                    f"{request_id}:"
-                    f"{provider_failures[(interaction_id, request_id)]}"
-                )
+                (f"{request_id}:{provider_failures[(interaction_id, request_id)]}")
                 for interaction_id, request_id in sorted(provider_failures)
             ),
             provider_cancel_failure_evidence=tuple(
                 CancellationProviderFailure(
                     interaction_id=interaction_id,
                     request_id=request_id,
-                    error=provider_failures[
-                        (interaction_id, request_id)
-                    ],
+                    error=provider_failures[(interaction_id, request_id)],
                 )
                 for interaction_id, request_id in sorted(provider_failures)
             ),
@@ -1316,11 +1177,7 @@ class SkillRuntime:
         definition: SkillDefinition,
     ) -> bool:
         return (
-            str(
-                definition.metadata.get("cancellation_granularity")
-                or "request"
-            )
-            == "global_domain"
+            str(definition.metadata.get("cancellation_granularity") or "request") == "global_domain"
         )
 
     @staticmethod
@@ -1340,11 +1197,7 @@ class SkillRuntime:
         first: CancellationScope,
         second: CancellationScope,
     ) -> CancellationScope:
-        return (
-            second
-            if cls._scope_priority(second) >= cls._scope_priority(first)
-            else first
-        )
+        return second if cls._scope_priority(second) >= cls._scope_priority(first) else first
 
     @staticmethod
     def _request_goal_ids(request: SkillRequest) -> set[str]:
@@ -1361,11 +1214,7 @@ class SkillRuntime:
                     raw = [raw]
                 if not isinstance(raw, (list, tuple)):
                     continue
-                values.update(
-                    str(item).strip()
-                    for item in raw
-                    if str(item).strip()
-                )
+                values.update(str(item).strip() for item in raw if str(item).strip())
         return values
 
     @classmethod
@@ -1384,13 +1233,10 @@ class SkillRuntime:
         if not goal_ids.intersection(targets):
             return "no_match"
         metadata = request.metadata
-        if (
-            str(metadata.get("canonical_plan_id") or "")
-            != str(directive.expected_plan_id or "")
-            or str(
-                metadata.get("canonical_plan_fingerprint") or ""
-            )
-            != str(directive.expected_plan_fingerprint or "")
+        if str(metadata.get("canonical_plan_id") or "") != str(
+            directive.expected_plan_id or ""
+        ) or str(metadata.get("canonical_plan_fingerprint") or "") != str(
+            directive.expected_plan_fingerprint or ""
         ):
             return "stale"
         if not goal_ids.issubset(targets):
@@ -1404,9 +1250,7 @@ class SkillRuntime:
         definition: SkillDefinition,
     ) -> _CancellationRule | None:
         matching: list[tuple[int, _CancellationRule]] = []
-        for index, rule in enumerate(
-            self._cancellation_rules.get(interaction_id, ())
-        ):
+        for index, rule in enumerate(self._cancellation_rules.get(interaction_id, ())):
             if rule.effective_scope == "specific_goal":
                 if (
                     self._specific_goal_binding(
@@ -1439,9 +1283,7 @@ class SkillRuntime:
             waiting_count=snapshot.waiting_count,
             serial_active=snapshot.serial_active,
             serial_waiters=snapshot.serial_waiters,
-            active_interaction_ids=sorted(
-                {interaction_id for interaction_id, _ in self._active}
-            ),
+            active_interaction_ids=sorted({interaction_id for interaction_id, _ in self._active}),
         )
 
     def _scheduled_requests(self, response: InteractionResponse) -> list[SkillRequest]:
@@ -1453,9 +1295,7 @@ class SkillRuntime:
         scheduled = [*before, *response.skills, *after]
         request_ids = [request.request_id for request in scheduled]
         if len(request_ids) != len(set(request_ids)):
-            raise ValueError(
-                "scheduled request IDs must be unique within one interaction"
-            )
+            raise ValueError("scheduled request IDs must be unique within one interaction")
         return scheduled
 
     def _speech_request(self, speech: InteractionSpeech) -> SkillRequest:
@@ -1493,8 +1333,7 @@ class SkillRuntime:
             },
             timing=(
                 "sequential"
-                if playback_barrier
-                or speech.timing in {"sequential", "after_skills"}
+                if playback_barrier or speech.timing in {"sequential", "after_skills"}
                 else "parallel"
             ),
             timeout_ms=speech.timeout_ms,
@@ -1535,14 +1374,10 @@ class SkillRuntime:
     ) -> tuple[str, str] | None:
         if definition.metadata.get("provider_local_activity_compilation") is not True:
             return None
-        coordination_id = str(
-            request.metadata.get("coordination_id") or ""
-        ).strip()
+        coordination_id = str(request.metadata.get("coordination_id") or "").strip()
         args_metadata = request.args.get("metadata")
         if not coordination_id and isinstance(args_metadata, dict):
-            coordination_id = str(
-                args_metadata.get("coordination_id") or ""
-            ).strip()
+            coordination_id = str(args_metadata.get("coordination_id") or "").strip()
         return (
             definition.provider_id,
             coordination_id or "__parallel_body_batch__",
@@ -1558,9 +1393,7 @@ class SkillRuntime:
         for index, (request, definition) in enumerate(items):
             provider = self._providers[definition.provider_id]
             group_key = self._provider_group_key(request, definition)
-            if group_key is None or not callable(
-                getattr(provider, "execute_group", None)
-            ):
+            if group_key is None or not callable(getattr(provider, "execute_group", None)):
                 continue
             grouped_indices.setdefault(group_key, []).append(index)
 
@@ -1701,16 +1534,14 @@ class SkillRuntime:
         provider = self._providers[provider_id]
         execute_group = getattr(provider, "execute_group", None)
         if not callable(execute_group):
-            raise ValueError(
-                f"provider {provider_id!r} does not implement execute_group"
-            )
+            raise ValueError(f"provider {provider_id!r} does not implement execute_group")
 
         shared_state: dict[str, Any] = {
             "provider_group_request_ids": [request.request_id for request, _ in items]
         }
         traces: list[SkillTrace] = []
         contexts: list[SkillExecutionContext] = []
-        for request, definition in items:
+        for request, _definition in items:
             trace = SkillTrace(
                 interaction_id=interaction_id,
                 request_id=request.request_id,
@@ -1794,9 +1625,7 @@ class SkillRuntime:
                 )
 
         task = asyncio.create_task(invoke())
-        active_keys = [
-            (interaction_id, request.request_id) for request, _ in items
-        ]
+        active_keys = [(interaction_id, request.request_id) for request, _ in items]
         async with self._active_lock:
             for active_key, (request, definition), context in zip(
                 active_keys,
@@ -1812,8 +1641,7 @@ class SkillRuntime:
                 )
 
         timeout_s = max(
-            (request.timeout_ms or definition.timeout_ms) / 1000.0
-            for request, definition in items
+            (request.timeout_ms or definition.timeout_ms) / 1000.0 for request, definition in items
         )
         results: list[SkillResult]
         try:
@@ -1835,9 +1663,7 @@ class SkillRuntime:
                     items,
                     status="failed" if cancel_error else "cancelled",
                     reason_code=(
-                        f"cancellation_failed_{scope}"
-                        if cancel_error
-                        else f"cancelled_{scope}"
+                        f"cancellation_failed_{scope}" if cancel_error else f"cancelled_{scope}"
                     ),
                     message=(
                         "provider-local body activity returned after cancellation"
@@ -1861,11 +1687,7 @@ class SkillRuntime:
                 reason_code="timeout",
                 message=(
                     f"provider-local body activity exceeded {timeout_s:.3f}s timeout"
-                    + (
-                        f"; provider cancellation failed: {cancel_error}"
-                        if cancel_error
-                        else ""
-                    )
+                    + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
         except asyncio.CancelledError:
@@ -1881,17 +1703,11 @@ class SkillRuntime:
                 items,
                 status="failed" if cancel_error else "cancelled",
                 reason_code=(
-                    "cancellation_failed_current_interaction"
-                    if cancel_error
-                    else "cancelled"
+                    "cancellation_failed_current_interaction" if cancel_error else "cancelled"
                 ),
                 message=(
                     "provider-local body activity was cancelled"
-                    + (
-                        f"; provider cancellation failed: {cancel_error}"
-                        if cancel_error
-                        else ""
-                    )
+                    + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
         except Exception as exc:
@@ -1916,7 +1732,7 @@ class SkillRuntime:
         results = self._normalize_group_results(items, results)
         finished_at = datetime.now(timezone.utc)
         pairs: list[tuple[SkillResult, SkillTrace]] = []
-        for result, trace, (request, definition) in zip(
+        for result, trace, (request, _definition) in zip(
             results,
             traces,
             items,
@@ -2003,9 +1819,7 @@ class SkillRuntime:
                     status="failed",
                     provider_id=definition.provider_id,
                     reason_code="member_result_missing",
-                    message=(
-                        "provider-local body activity omitted evidence for this member"
-                    ),
+                    message=("provider-local body activity omitted evidence for this member"),
                 )
             normalized.append(result)
         return normalized
@@ -2063,9 +1877,7 @@ class SkillRuntime:
             ):
                 async with self._active_lock:
                     context.provider_started = True
-                    trace.events.append(
-                        SkillTraceEvent(type="started")
-                    )
+                    trace.events.append(SkillTraceEvent(type="started"))
                 return await provider.execute(request, definition, context)
 
         active_key = (interaction_id, request.request_id)
@@ -2103,9 +1915,7 @@ class SkillRuntime:
                         message=result.message,
                         data={
                             "reason_code": "cancelled_before_start",
-                            "cancellation_scope": (
-                                cancellation_rule.effective_scope
-                            ),
+                            "cancellation_scope": (cancellation_rule.effective_scope),
                         },
                     )
                 )
@@ -2134,9 +1944,7 @@ class SkillRuntime:
                     request_id=request.request_id,
                     skill_id=request.skill_id,
                     skill_version=definition.version,
-                    status=(
-                        "failed" if scoped_cancel_failed else "cancelled"
-                    ),
+                    status=("failed" if scoped_cancel_failed else "cancelled"),
                     provider_id=definition.provider_id,
                     reason_code=(
                         f"cancellation_failed_{context.cancellation_scope}"
@@ -2147,8 +1955,7 @@ class SkillRuntime:
                         "provider execution returned after cancellation "
                         "was selected"
                         + (
-                            "; provider cancellation was not confirmed: "
-                            f"{cancel_error}"
+                            f"; provider cancellation was not confirmed: {cancel_error}"
                             if cancel_error
                             else ""
                         )
@@ -2174,21 +1981,13 @@ class SkillRuntime:
                 reason_code="timeout",
                 message=(
                     f"skill exceeded {timeout_s:.3f}s timeout"
-                    + (
-                        f"; provider cancellation failed: {cancel_error}"
-                        if cancel_error
-                        else ""
-                    )
+                    + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
         except asyncio.CancelledError:
             cancel_error: str | None = None
             cancelled_before_provider = not context.provider_started
-            if (
-                context.provider_started
-                and request.cancellable
-                and definition.interruptible
-            ):
+            if context.provider_started and request.cancellable and definition.interruptible:
                 cancel_error = await asyncio.shield(
                     self._cancel_provider(
                         provider,
@@ -2198,8 +1997,7 @@ class SkillRuntime:
                     )
                 )
             scoped_cancel_failed = bool(
-                cancel_error
-                and context.cancellation_reason_code != "cancelled"
+                cancel_error and context.cancellation_reason_code != "cancelled"
             )
             result = SkillResult(
                 request_id=request.request_id,
@@ -2228,11 +2026,7 @@ class SkillRuntime:
                         if context.cancellation_scope != "none"
                         else ""
                     )
-                    + (
-                        f"; provider cancellation failed: {cancel_error}"
-                        if cancel_error
-                        else ""
-                    )
+                    + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
         except Exception as exc:
@@ -2302,9 +2096,7 @@ class SkillRuntime:
         try:
             await provider.cancel(request, definition, contexts[0])
         except asyncio.CancelledError:
-            error = (
-                "provider cancellation coroutine was cancelled"
-            )
+            error = "provider cancellation coroutine was cancelled"
         except Exception as exc:
             error = str(exc) or exc.__class__.__name__
             logger.warning(
@@ -2327,6 +2119,180 @@ SpeechCancelHandler = Callable[
     [SkillRequest, dict[str, Any]],
     None | Awaitable[None],
 ]
+
+VocalPerformanceHandler = Callable[
+    [dict[str, Any]],
+    VocalPerformanceDelivery
+    | dict[str, Any]
+    | Awaitable[VocalPerformanceDelivery | dict[str, Any]],
+]
+VocalPerformanceCancelHandler = Callable[
+    [SkillRequest, dict[str, Any]],
+    None | Awaitable[None],
+]
+
+
+class VocalPerformanceSkillProvider:
+    """Adapt one qualified vocal backend to the exact public Capability.
+
+    The backend may change, but its declaration and execution evidence are
+    checked here before a completed result can cross the Trusted Capability
+    Runtime boundary. Unsupported modes return a typed refusal rather than
+    reaching the backend or being downgraded to ordinary speech.
+    """
+
+    def __init__(
+        self,
+        declaration: VocalProviderDeclaration,
+        handler: VocalPerformanceHandler,
+        cancel_handler: VocalPerformanceCancelHandler | None = None,
+    ) -> None:
+        self.declaration = declaration
+        self.provider_id = declaration.provider_id
+        self._handler = handler
+        self._cancel_handler = cancel_handler
+        self.cancelled_request_ids: set[str] = set()
+
+    def _output(
+        self,
+        *,
+        requested_mode: str,
+        completed: bool,
+        delivered_mode: str | None = None,
+        delivery: VocalPerformanceDelivery | None = None,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        evidence = self.declaration.mode_evidence.get(requested_mode)  # type: ignore[arg-type]
+        return {
+            "completed": completed,
+            "requested_mode": requested_mode,
+            "delivered_mode": delivered_mode,
+            "provider_id": self.provider_id,
+            "provider_contract_version": self.declaration.contract_version,
+            "evidence_level": evidence.level if evidence is not None else None,
+            "provider_evidence_refs": (
+                list(evidence.artifact_refs) if evidence is not None else []
+            ),
+            "delivery_evidence_id": (delivery.delivery_evidence_id if delivery is not None else ""),
+            "playback_started": bool(delivery is not None and delivery.playback_started),
+            "playback_completed": bool(delivery is not None and delivery.playback_completed),
+            "audio_duration_ms": (delivery.audio_duration_ms if delivery is not None else 0.0),
+            "sample_format": (delivery.sample_format if delivery is not None else ""),
+            "sample_rate": delivery.sample_rate if delivery is not None else 0,
+            "timing_marks_emitted": (
+                list(delivery.timing_marks_emitted) if delivery is not None else []
+            ),
+            "reason": reason,
+        }
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        requested_mode = str(request.args.get("mode") or "").strip()
+        if requested_mode not in self.declaration.supported_modes:
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="refused",
+                provider_id=self.provider_id,
+                output=self._output(
+                    requested_mode=requested_mode,
+                    completed=False,
+                    reason=("requested vocal mode is not advertised by this qualified provider"),
+                ),
+                reason_code="vocal_mode_unavailable",
+                message=(
+                    f"vocal mode {requested_mode!r} is unavailable; supported "
+                    f"modes are {self.declaration.supported_modes}"
+                ),
+            )
+
+        try:
+            raw = self._handler(dict(request.args))
+            raw_delivery = await raw if inspect.isawaitable(raw) else raw
+            delivery = (
+                raw_delivery
+                if isinstance(raw_delivery, VocalPerformanceDelivery)
+                else VocalPerformanceDelivery.model_validate(raw_delivery)
+            )
+            invalid_reason = ""
+            if delivery.delivered_mode != requested_mode:
+                invalid_reason = "provider returned a different vocal mode"
+            elif not delivery.playback_started or not delivery.playback_completed:
+                invalid_reason = "audible playback did not complete"
+            elif delivery.sample_format not in self.declaration.sample_formats:
+                invalid_reason = "provider returned an undeclared sample format"
+            elif delivery.sample_rate not in self.declaration.sample_rates:
+                invalid_reason = "provider returned an undeclared sample rate"
+            elif not set(delivery.timing_marks_emitted).issubset(
+                self.declaration.timing_mark_types
+            ):
+                invalid_reason = "provider returned undeclared timing marks"
+            if invalid_reason:
+                return SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=definition.version,
+                    status="failed",
+                    provider_id=self.provider_id,
+                    output=self._output(
+                        requested_mode=requested_mode,
+                        completed=False,
+                        delivered_mode=delivery.delivered_mode,
+                        delivery=delivery,
+                        reason=invalid_reason,
+                    ),
+                    reason_code="invalid_vocal_delivery_evidence",
+                    message=invalid_reason,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=self._output(
+                    requested_mode=requested_mode,
+                    completed=False,
+                    reason="provider did not return valid vocal delivery evidence",
+                ),
+                reason_code="invalid_vocal_delivery_evidence",
+                message=str(exc) or type(exc).__name__,
+            )
+
+        return SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            skill_version=definition.version,
+            status="completed",
+            provider_id=self.provider_id,
+            output=self._output(
+                requested_mode=requested_mode,
+                completed=True,
+                delivered_mode=delivery.delivered_mode,
+                delivery=delivery,
+            ),
+        )
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        self.cancelled_request_ids.add(request.request_id)
+        if self._cancel_handler is None:
+            return
+        raw = self._cancel_handler(request, dict(context.provider_state))
+        if inspect.isawaitable(raw):
+            await raw
 
 
 class LocalSpeechSkillProvider:
@@ -2351,12 +2317,9 @@ class LocalSpeechSkillProvider:
         output = await raw if inspect.isawaitable(raw) else raw
         metadata = request.args.get("metadata")
         playback_barrier = bool(
-            isinstance(metadata, dict)
-            and metadata.get("wait_for_playback_start") is True
+            isinstance(metadata, dict) and metadata.get("wait_for_playback_start") is True
         )
-        playback_started = bool(
-            isinstance(output, dict) and output.get("playback_started") is True
-        )
+        playback_started = bool(isinstance(output, dict) and output.get("playback_started") is True)
         if playback_barrier and not playback_started:
             return SkillResult(
                 request_id=request.request_id,
@@ -2498,6 +2461,52 @@ def local_speech_definition() -> SkillDefinition:
     )
 
 
+def vocal_performance_definition(
+    declaration: VocalProviderDeclaration,
+) -> SkillDefinition:
+    """Return the Host-owned definition for one qualified vocal provider."""
+
+    return SkillDefinition(
+        skill_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
+        version="1.0.0",
+        provider_id=declaration.provider_id,
+        description=(
+            "Perform one exact provider-qualified vocal mode through Chromie's playback boundary."
+        ),
+        # The runtime accepts every typed public mode so a stale or malicious
+        # request receives a correlated unavailable result from the provider
+        # negotiation boundary instead of an uncaught schema exception.
+        input_schema=vocal_performance_input_schema(list(VOCAL_MODES)),
+        output_schema=vocal_performance_output_schema(),
+        available=True,
+        requires_confirmation=False,
+        interruptible=declaration.request_cancellation,
+        can_run_parallel=True,
+        exclusive_group="chromie.audio",
+        timeout_ms=120000,
+        idempotent=False,
+        cancellation_domains=("output",),
+        metadata={
+            "effects": ["user_interaction", "audio_output", "vocal_performance"],
+            "safety_class": "low_risk_action",
+            "execution_lane": "speaking",
+            "parallel_metadata_declared": True,
+            "resource_claims": ["audio_output"],
+            "cancellation_granularity": "request",
+            "supported_vocal_modes": list(declaration.supported_modes),
+            "native_text_streaming": declaration.native_text_streaming,
+            "native_audio_streaming": declaration.native_audio_streaming,
+            "request_cancellation": declaration.request_cancellation,
+            "timing_mark_types": list(declaration.timing_mark_types),
+            "sample_formats": list(declaration.sample_formats),
+            "sample_rates": list(declaration.sample_rates),
+            "max_concurrency": declaration.max_concurrency,
+            "provider_contract_version": declaration.contract_version,
+            "provider_declaration": declaration.model_dump(mode="json"),
+        },
+    )
+
+
 def session_interrupt_definition() -> SkillDefinition:
     return SkillDefinition(
         skill_id="session.interrupt",
@@ -2535,7 +2544,9 @@ def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> N
     if not schema:
         return
     schema_type = schema.get("type")
-    allowed_types = schema_type if isinstance(schema_type, list) else [schema_type] if schema_type else []
+    allowed_types = (
+        schema_type if isinstance(schema_type, list) else [schema_type] if schema_type else []
+    )
     if allowed_types and not any(_matches_type(value, item) for item in allowed_types):
         raise ValueError(f"{path} expected {allowed_types}, got {type(value).__name__}")
     if "enum" in schema and value not in schema["enum"]:

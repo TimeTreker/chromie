@@ -13,6 +13,14 @@ from orchestrator.runtime.skill_runtime import (
     SkillResult,
     SkillRuntime,
     local_speech_definition,
+    vocal_performance_definition,
+)
+from shared.chromie_contracts.interaction import (
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+    VocalModeEvidence,
+    VocalProviderArtifact,
+    VocalProviderDeclaration,
+    VocalProviderProvenance,
 )
 from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -60,9 +68,7 @@ def _definition(
         exclusive_group=group,
         metadata={
             "effects": [
-                "social_expression"
-                if safety_class == "low_risk_action"
-                else "physical_motion"
+                "social_expression" if safety_class == "low_risk_action" else "physical_motion"
             ],
             "safety_class": safety_class,
             "parallel_metadata_declared": True,
@@ -238,13 +244,17 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         contract = ExecutionLaneContractTests()
         plan = contract._plan()
         composition = contract._composition(plan)
-        return await adapter.build_response(
-            plan=plan,
-            composition=composition,
-            session_id="lane-session",
-            language="zh-CN",
-            context={},
-        ), walk, blink
+        return (
+            await adapter.build_response(
+                plan=plan,
+                composition=composition,
+                session_id="lane-session",
+                language="zh-CN",
+                context={},
+            ),
+            walk,
+            blink,
+        )
 
     async def test_adapter_materializes_three_distinct_lane_members(self) -> None:
         response, _, _ = await self._response()
@@ -302,6 +312,133 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 context={},
             )
 
+    async def test_vocal_provider_step_remains_speaking_when_parallel_with_activity(self) -> None:
+        vocal = vocal_performance_definition(
+            VocalProviderDeclaration(
+                provider_id="fake.vocal.lane-test",
+                supported_modes=["singing"],
+                native_text_streaming=True,
+                native_audio_streaming=True,
+                request_cancellation=True,
+                timing_mark_types=[],
+                sample_formats=["pcm_s16le"],
+                sample_rates=[24000],
+                max_concurrency=1,
+                provenance=VocalProviderProvenance(
+                    implementation="Fake lane-test provider",
+                    software_source="https://example.invalid/vocal-lane",
+                    software_revision="0123456789abcdef",
+                    software_license_id="Apache-2.0",
+                    license_review_status="source_test_only",
+                    model_artifacts=[
+                        VocalProviderArtifact(
+                            kind="fixture",
+                            artifact_id="fake/vocal-lane",
+                            revision="sha256:" + "2" * 64,
+                            license_id="Apache-2.0",
+                        )
+                    ],
+                ),
+                mode_evidence={
+                    "singing": VocalModeEvidence(
+                        level="source_test",
+                        artifact_refs=["tests/test_execution_lanes.py#vocal-provider-step"],
+                        claim_summary="Fake source test only.",
+                    )
+                },
+            )
+        )
+        walk = _definition(
+            "soridormi.walk_forward",
+            group="soridormi.base_motion",
+            resources=["base_motion", "balance_control"],
+        )
+        plan = CanonicalPlan(
+            plan_id="vocal-activity-lane-plan",
+            planner_tier="deep",
+            disposition="execute",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-sing", "goal-walk"],
+            goal_summary="Sing while walking.",
+            steps=[
+                {
+                    "step_id": "sing",
+                    "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
+                    "args": {"text": "Hello.", "mode": "singing"},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-sing"],
+                },
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-walk"],
+                },
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-sing",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["sing"],
+                },
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                },
+            ],
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id="vocal-activity-lane-composition",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                immediate=ResponseStage(
+                    text="I can do those together.",
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            lane_coordination=[
+                LaneCoordinationGroup(
+                    coordination_id="vocal-with-walk",
+                    lanes=["speaking", "activity"],
+                    speaking_step_ids=["sing"],
+                    activity_step_ids=["walk"],
+                )
+            ],
+            confidence=1.0,
+        )
+
+        response = await CanonicalPlanRuntimeAdapter(
+            _InteractionRuntimeView([vocal, walk])
+        ).build_response(
+            plan=plan,
+            composition=composition,
+            session_id="vocal-activity-lane-session",
+            language="en-US",
+            context={},
+        )
+
+        by_id = {item.capability_id: item for item in response.skills}
+        self.assertEqual(
+            by_id[VOCAL_PERFORMANCE_CAPABILITY_ID].metadata["execution_lane"],
+            "speaking",
+        )
+        self.assertTrue(by_id[VOCAL_PERFORMANCE_CAPABILITY_ID].metadata["parallel_with_activity"])
+        self.assertEqual(
+            by_id["soridormi.walk_forward"].metadata["execution_lane"],
+            "activity",
+        )
+        self.assertTrue(by_id["soridormi.walk_forward"].metadata["parallel_with_speech"])
+
     async def test_skill_runtime_overlaps_speech_walk_and_blink(self) -> None:
         response, walk, blink = await self._response()
         registry = SkillRegistry()
@@ -328,10 +465,15 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(elapsed, 0.20)
         self.assertEqual(len(speech_provider.calls), 1)
         self.assertEqual(body_provider.calls, [])
-        self.assertEqual(body_provider.group_calls, [[
-            response.skills[0].request_id,
-            response.skills[1].request_id,
-        ]])
+        self.assertEqual(
+            body_provider.group_calls,
+            [
+                [
+                    response.skills[0].request_id,
+                    response.skills[1].request_id,
+                ]
+            ],
+        )
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
             "speaking",

@@ -51,6 +51,8 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     SkillResult,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+    vocal_performance_output_schema,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.reflex import CancellationDirective
@@ -308,6 +310,11 @@ class _CognitiveScenarioRuntime:
                 # envelope, so reproduce that materialization here instead of
                 # requiring every scenario to duplicate an adapter-owned schema.
                 raw_output_schema = SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA
+            elif (
+                raw_output_schema is None
+                and skill_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+            ):
+                raw_output_schema = vocal_performance_output_schema()
             definition = SkillDefinition(
                 skill_id=skill_id,
                 version=str(item.get("version") or "0.1.0"),
@@ -1943,6 +1950,10 @@ async def evaluate_cognitive_runtime_scenario(
             list(item.metadata.get("source_goal_ids") or [])
             for item in interaction.skills
         ] if interaction else [],
+        "capability_execution_lanes": [
+            str(item.metadata.get("execution_lane") or "")
+            for item in interaction.skills
+        ] if interaction else [],
         "interaction_status": interaction.status if interaction else None,
         "speech_texts": [item.text for item in speech_items],
         "confirmation_prompt": (
@@ -1983,6 +1994,7 @@ async def evaluate_cognitive_runtime_scenario(
         "capability_args": "skill_args",
         "capability_timings": "skill_timings",
         "capability_source_goal_ids": "skill_source_goal_ids",
+        "capability_execution_lanes": "skill_execution_lanes",
         "speech_covers_goal_ids": "speech_covers_goal_ids",
     }
     for key, legacy_key in compatibility_keys.items():

@@ -540,7 +540,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "7037fa85d22dd3fc1d51bae4eeb24f69a56785ddecbee820604de45dda2a083e",
+      "body_sha256": "22a97822061e3985fa009b34d8a67efb8cbdb314627ac66a8877ebe5f1daf5d3",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -556,7 +556,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "89dcf14bc9678ad6bcfe3e71e4478ee5db6abf024fb0e16630d12bcea404d26a",
+      "body_sha256": "750001d182b642e799dd9797f00cb62f2e2d25669556a7ed84e177ab2dd69b71",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -583,7 +583,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "13544a520c3d9c3d469e725346c0f328f4dc4187a13ecb4b6669402022e66ff3",
+      "body_sha256": "1bdf79b38e29d25521b433c1b1055baf718ae4587a9da7ac9f6e2bad172dc851",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -599,7 +599,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "89b78e5324ae7812336703fa0517db76bcf9573ddd300545cfb74b0d07d25c32",
+      "body_sha256": "527edf05070aa63ad983fcbe760d93779ce64e464abf0734473c1a3c1b6f1641",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -695,7 +695,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "9115f40769c8f4032f1c7245b5a7b1f34d846f1f62bfb170455574d71f4eaf81",
+      "body_sha256": "f7536a8768eabe3a88805da9e9d986ce96b04a211ac00e9be4ee652156991766",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -711,7 +711,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1b13dfef37887f83dd96aca6f0fe4ea6592806cb242427fe99a537a3cf2c40b9",
+      "body_sha256": "fecc22cb8aaa17ecd6ccbae05e9dc4aad1b1fd88727f0c4b861a5b19a5cb960a",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -1713,7 +1713,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "aaaf98d1d331802c0cf11f58f0bb72cabc05a5739a4b278cfff7c39b440f6aea",
+      "body_sha256": "20c868d0a10fafd0b76c8b7fb37919e0c44deca3daf1120a742c13fad069dd8f",
       "failure_signals": []
     },
     {
@@ -2280,6 +2280,19 @@
       "body_sha256": "9dfd73f419e08e94596198f4154747eb2d91872f9aea5ea920686eab870d60c3",
       "failure_signals": [
         "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "VocalPerformanceSkillProvider.execute",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map backend or delivery-schema failures into a correlated failed vocal Capability result without claiming completion or selecting another mode.",
+      "review_status": "reviewed",
+      "body_sha256": "fa785da94b08f604d54977232e82f62769a1385d78f24be789a3c97b960c6c9e",
+      "failure_signals": [
+        "return"
       ]
     },
     {

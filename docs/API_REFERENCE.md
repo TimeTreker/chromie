@@ -257,6 +257,34 @@ provider completes that speech request only after playback has started or the
 configured wait times out; this lets the following sequential body skill begin
 with audible speech instead of merely queued TTS.
 
+### Exact vocal-performance provider contract
+
+`chromie.vocal.perform` is the single public Capability identity for qualified
+provider-backed vocal performance. Backend identity is trusted runtime
+metadata; it is not copied into semantic Goals and does not replace the public
+Capability ID during proposal, validation, authorization, execution,
+cancellation, or evidence collection.
+
+The request schema requires authored `text` and one exact `mode` from
+`speech`, `expressive_speech`, `recitation`, `singing`, `humming`, or
+`nonverbal_vocalization`. A qualified provider declaration names its supported
+modes, text/audio streaming support, request-cancellation support, timing-mark
+types, sample formats and rates, concurrency limit, immutable software/model
+provenance, and retained evidence for every advertised mode. The default Agent
+catalog retains this contract as unavailable and advertises no supported modes;
+only a declaration with mode-specific evidence makes it planner-visible.
+
+The Trusted Capability Runtime rejects an unsupported requested mode with the
+correlated `vocal_mode_unavailable` outcome before invoking the backend. A
+completed result requires the delivered mode to equal the requested mode,
+completed playback evidence, a declared sample format and rate, and no
+undeclared timing marks. A mode mismatch or malformed delivery evidence fails
+as `invalid_vocal_delivery_evidence`; it is never repaired into ordinary TTS or
+another vocal mode. Cancellation retains the original request identity. These
+results prove only the evidence level and artifacts recorded by the provider
+declaration. Source-test evidence from a fake provider is not singing, speaker,
+or physical-audio target evidence.
+
 ### TaskGraph validation and execution
 
 | Method | Path | Gate or authorization | Purpose |
