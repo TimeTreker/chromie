@@ -878,6 +878,28 @@ mode uses host playback and configured input-device capture, so it is useful
 for low-cost microphone/speaker regression when bound to real devices, but it
 proves generated speech rather than arbitrary human pronunciation.
 
+The focused reversible-barge-in profile is:
+
+```bash
+python scripts/voice_acceptance.py \
+  --mode synthetic \
+  --cases barge-in-echo,barge-in \
+  --start-services
+```
+
+`barge-in-echo` waits for one completed output chunk, replays that exact retained
+PCM through the selected automated input path, and requires generation-bound
+echo suppression, release of the same playback session, unique playback starts,
+and a clean terminal `session_done` before another case begins. `barge-in`
+injects confirmed external speech during active playback and requires distinct
+acoustic and Gateway receipts. Both acoustic receipts must retain
+`cancel_cognitive_work=false`; VAD-start-to-duck and
+confirmed-speech-to-silence must each be at most 250 ms. A pause/restart error,
+late old-session TTS or playback, dispatch failure, duplicate start, missing
+terminal completion, or cross-case overlap is a hard failure. Captured-output
+replay is automated-only; physical microphone and speaker behavior still
+requires supervised evidence.
+
 The current development compatibility policy lists `synthetic`,
 `virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy
 does not turn them into human voice-device evidence. Before a bundle can enter
@@ -925,6 +947,11 @@ WebSocket service and stores it under:
 ```text
 .chromie/acceptance/voice/<id>/generated-input/
 ```
+
+Before generating fixtures, the runner waits for application-level TTS health
+to report both a ready provider and a live worker. Attempts are retained in
+`tts-readiness.log`; a listening TCP port or a container in `starting` state is
+not treated as fixture-generation readiness.
 
 It then injects a private framed PCM16 stream through the Orchestrator process's
 stdin. No network injection endpoint is opened. The Orchestrator resamples the

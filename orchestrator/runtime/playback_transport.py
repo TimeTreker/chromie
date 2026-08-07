@@ -99,6 +99,109 @@ class PlaybackTransport:
                 host.output_latency,
             )
 
+    async def pause_output_for_duck(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+    ) -> float | None:
+        host = self.host
+        state = host._playback_state()
+        if not state.output_duck_matches(generation, session_id):
+            return None
+        pause_error = ""
+        if host.audio_output_mode == "device":
+            async with host.output_write_lock:
+                async with host.output_stream_lock:
+                    stream = host.output_stream
+                    if (
+                        stream is not None
+                        and state.output_duck_matches(generation, session_id)
+                    ):
+                        try:
+                            await asyncio.to_thread(stream.abort)
+                        except Exception as exc:
+                            pause_error = type(exc).__name__
+                            logger.warning(
+                                "Failed to pause output stream for VAD duck: %s",
+                                exc,
+                            )
+        duck_started_ms = state.output_duck_started_ms
+        latency_ms = (
+            max(0.0, now_ms() - duck_started_ms)
+            if duck_started_ms is not None
+            else 0.0
+        )
+        if state.output_duck_matches(generation, session_id):
+            host.session_log(
+                session_id,
+                "playback_duck_started: generation=%s "
+                "vad_start_to_duck_ms=%.1f cancel_cognitive_work=false "
+                "pause_error=%s",
+                generation,
+                latency_ms,
+                pause_error or "none",
+            )
+        return latency_ms
+
+    async def resume_output_after_duck(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+        reason: str,
+    ) -> bool:
+        host = self.host
+        state = host._playback_state()
+        if not state.output_duck_matches(generation, session_id):
+            return False
+        resume_error = ""
+        if host.audio_output_mode == "device":
+            async with host.output_write_lock:
+                async with host.output_stream_lock:
+                    stream = host.output_stream
+                    if (
+                        stream is not None
+                        and state.output_duck_matches(generation, session_id)
+                    ):
+                        try:
+                            await asyncio.to_thread(stream.start)
+                        except Exception as exc:
+                            resume_error = type(exc).__name__
+                            logger.warning(
+                                "Failed to resume output stream after VAD duck: %s",
+                                exc,
+                            )
+        started_ms = state.release_output_duck(
+            generation=generation,
+            session_id=session_id,
+        )
+        if started_ms is None:
+            return False
+        host.session_log(
+            session_id,
+            "playback_duck_released: generation=%s reason=%s "
+            "duck_duration_ms=%.1f resume_error=%s",
+            generation,
+            reason,
+            max(0.0, now_ms() - started_ms),
+            resume_error or "none",
+        )
+        return not resume_error
+
+    async def wait_for_output_duck_release(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+    ) -> None:
+        host = self.host
+        state = host._playback_state()
+        while state.output_duck_matches(generation, session_id):
+            await state.output_duck_released.wait()
+        if host.is_stale_playback(generation, session_id):
+            raise asyncio.CancelledError("Playback invalidated while output was ducked")
+
     async def abort_output_stream(self):
         host = self.host
         async with host.output_write_lock:
@@ -165,6 +268,10 @@ class PlaybackTransport:
                 int(host.output_rate * host.playback_chunk_ms / 1000),
             )
             for offset in range(0, samples.size, frames_per_chunk):
+                await self.wait_for_output_duck_release(
+                    generation=generation,
+                    session_id=session_id,
+                )
                 if host.is_stale_playback(generation, session_id):
                     raise asyncio.CancelledError(
                         "Discarded playback interrupted by newer session"
@@ -176,12 +283,20 @@ class PlaybackTransport:
                     await asyncio.sleep(0)
             return
         output = host.mono_to_output_channels(samples)
+        await self.wait_for_output_duck_release(
+            generation=generation,
+            session_id=session_id,
+        )
         await host.ensure_output_stream()
         stream = host.output_stream
         if stream is None:
             raise RuntimeError("Output stream is not available")
         frames_per_chunk = max(1, int(host.output_rate * host.playback_chunk_ms / 1000))
         for offset in range(0, len(output), frames_per_chunk):
+            await self.wait_for_output_duck_release(
+                generation=generation,
+                session_id=session_id,
+            )
             if host.is_stale_playback(generation, session_id):
                 await host.abort_output_stream()
                 raise asyncio.CancelledError("Playback interrupted by newer session")

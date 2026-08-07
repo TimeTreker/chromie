@@ -85,3 +85,18 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lifecycle.synthesis_order, 0)
         self.assertEqual(lifecycle.pending_audio, {})
         self.assertEqual(lifecycle.cancelled_playback_orders, set())
+
+    async def test_generation_invalidation_releases_a_pending_output_duck(self) -> None:
+        lifecycle = PlaybackDeliveryLifecycle(playback_generation=7)
+        lifecycle.begin_output_duck(
+            generation=7,
+            session_id="sid",
+            started_ms=1.0,
+        )
+        waiter = asyncio.create_task(lifecycle.output_duck_released.wait())
+
+        self.assertEqual(lifecycle.begin_new_generation(), 8)
+        await asyncio.wait_for(waiter, timeout=0.1)
+
+        self.assertIsNone(lifecycle.output_duck_generation)
+        self.assertTrue(lifecycle.output_duck_released.is_set())

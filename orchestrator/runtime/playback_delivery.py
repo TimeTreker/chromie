@@ -45,7 +45,15 @@ class PlaybackDeliveryLifecycle:
     output_stream: Any | None = None
     output_stream_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     output_write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    output_duck_generation: int | None = None
+    output_duck_session_id: str | None = None
+    output_duck_started_ms: float | None = None
+    output_duck_released: asyncio.Event = field(default_factory=asyncio.Event)
+    output_duck_timeout_task: asyncio.Task[Any] | None = None
     transport: Any | None = None
+
+    def __post_init__(self) -> None:
+        self.output_duck_released.set()
 
     @staticmethod
     def key(
@@ -247,7 +255,71 @@ class PlaybackDeliveryLifecycle:
         self.pending_audio.clear()
         self.cancelled_playback_orders.clear()
 
+    def begin_output_duck(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+        started_ms: float,
+    ) -> bool:
+        if self.output_duck_matches(generation, session_id):
+            return False
+        self.cancel_output_duck()
+        self.output_duck_generation = int(generation)
+        self.output_duck_session_id = session_id
+        self.output_duck_started_ms = float(started_ms)
+        self.output_duck_released.clear()
+        return True
+
+    def output_duck_matches(
+        self,
+        generation: int,
+        session_id: str | None,
+    ) -> bool:
+        return (
+            self.output_duck_generation == int(generation)
+            and self.output_duck_session_id == session_id
+        )
+
+    def release_output_duck(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+    ) -> float | None:
+        if not self.output_duck_matches(generation, session_id):
+            return None
+        started_ms = self.output_duck_started_ms
+        self.output_duck_generation = None
+        self.output_duck_session_id = None
+        self.output_duck_started_ms = None
+        timeout_task = self.output_duck_timeout_task
+        self.output_duck_timeout_task = None
+        if (
+            timeout_task is not None
+            and timeout_task is not asyncio.current_task()
+            and not timeout_task.done()
+        ):
+            timeout_task.cancel()
+        self.output_duck_released.set()
+        return started_ms
+
+    def cancel_output_duck(self) -> None:
+        self.output_duck_generation = None
+        self.output_duck_session_id = None
+        self.output_duck_started_ms = None
+        timeout_task = self.output_duck_timeout_task
+        self.output_duck_timeout_task = None
+        if (
+            timeout_task is not None
+            and timeout_task is not asyncio.current_task()
+            and not timeout_task.done()
+        ):
+            timeout_task.cancel()
+        self.output_duck_released.set()
+
     def begin_new_generation(self) -> int:
+        self.cancel_output_duck()
         self.playback_generation += 1
         self.reset_order_state()
         return self.playback_generation

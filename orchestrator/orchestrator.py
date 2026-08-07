@@ -1703,6 +1703,13 @@ class VoiceAssistant:
                 break
         self.vad.reset()
         self._vad_leftover = b""
+        duck_state = self._playback_state()
+        if duck_state.output_duck_generation is not None:
+            await playback_transport_for(self).resume_output_after_duck(
+                generation=duck_state.output_duck_generation,
+                session_id=duck_state.output_duck_session_id,
+                reason="input_device_change",
+            )
         self._vad_segment_started_during_playback = False
         self._vad_segment_playback_generation = None
         self._set_input_device_params(params)
@@ -1835,21 +1842,53 @@ class VoiceAssistant:
             [],
         )
         transcript_key = self._normalize_echo_text(transcript)
-        spoken_key = self._normalize_echo_text(" ".join(spoken_parts))
-        if len(transcript_key) < 2 or not spoken_key:
+        part_keys = [
+            key
+            for part in spoken_parts
+            if (key := self._normalize_echo_text(part))
+        ]
+        if len(transcript_key) < 2 or not part_keys:
             return False, 0.0, 0.0
-        if transcript_key in spoken_key:
-            return True, 1.0, 1.0
-
-        matcher = SequenceMatcher(None, transcript_key, spoken_key, autojunk=False)
-        ratio = float(matcher.ratio())
-        longest = max((block.size for block in matcher.get_matching_blocks()), default=0)
-        transcript_coverage = float(longest / max(1, len(transcript_key)))
-        likely = bool(
-            ratio >= 0.78
-            or (transcript_coverage >= 0.88 and len(transcript_key) >= 6)
+        # One retained output recording corresponds to one scheduled TTS order.
+        # Compare ASR against each order first so a short replay is not diluted
+        # by an entire multi-sentence generation.  Adjacent and whole-generation
+        # candidates retain coverage for VAD segments that cross order bounds.
+        candidate_keys = list(part_keys)
+        candidate_keys.extend(
+            left + right for left, right in zip(part_keys, part_keys[1:])
         )
-        return likely, ratio, transcript_coverage
+        candidate_keys.append("".join(part_keys))
+
+        best_ratio = 0.0
+        best_coverage = 0.0
+        best_strength = -1.0
+        for spoken_key in dict.fromkeys(candidate_keys):
+            if transcript_key in spoken_key:
+                return True, 1.0, 1.0
+            matcher = SequenceMatcher(
+                None,
+                transcript_key,
+                spoken_key,
+                autojunk=False,
+            )
+            ratio = float(matcher.ratio())
+            longest = max(
+                (block.size for block in matcher.get_matching_blocks()),
+                default=0,
+            )
+            transcript_coverage = float(
+                longest / max(1, len(transcript_key))
+            )
+            strength = max(ratio / 0.78, transcript_coverage / 0.88)
+            if strength > best_strength:
+                best_ratio = ratio
+                best_coverage = transcript_coverage
+                best_strength = strength
+        likely = bool(
+            best_ratio >= 0.78
+            or (best_coverage >= 0.88 and len(transcript_key) >= 6)
+        )
+        return likely, best_ratio, best_coverage
 
     async def schedule_tts_sentence(
         self,
@@ -7975,6 +8014,7 @@ class VoiceAssistant:
         cancel_cognitive_work: bool = True,
     ) -> None:
         self.playback_generation += 1
+        self._playback_state().cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",

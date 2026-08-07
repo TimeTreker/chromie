@@ -18,6 +18,7 @@ Four modes are available:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import ast
 import getpass
 import hashlib
@@ -49,7 +50,9 @@ from scripts.acceptance_audio import (
     HostSpeakerPlayer,
     PulseVirtualMicrophone,
     generate_tts_fixtures,
+    write_pcm16_wav,
 )
+from scripts.benchmark_tts import request_health as request_tts_health
 
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "voice"
 AUTOMATIC_MODES = {"synthetic", "virtual-mic", "acoustic"}
@@ -68,6 +71,8 @@ AGENT_COMPOSE_SERVICE = "chromie-agent"
 HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 RUNTIME_REEXEC_ENV = "CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"
 LIVE_VOICE_PROFILE = "current-revision-live-voice"
+MAX_VAD_START_TO_DUCK_MS = 250.0
+MAX_CONFIRMED_SPEECH_TO_SILENCE_MS = 250.0
 
 
 def _missing_automatic_runtime_packages(mode: str) -> list[str]:
@@ -213,6 +218,7 @@ class SpokenStep:
     wait_for_confirmation_prompt_completion: bool = False
     wait_before_label: str | None = None
     countdown_s: int | None = None
+    replay_previous_output: bool = False
 
 
 @dataclass(frozen=True)
@@ -302,8 +308,10 @@ CASES: dict[str, AcceptanceCase] = {
             "While Chromie is speaking, say: Stop talking.",
         ),
         (
-            "The previous session is marked interrupted.",
-            "Playback generation is cancelled and stale speech does not resume.",
+            "VAD start ducks output within the acceptance budget without cancelling cognitive work.",
+            "Confirmed external speech silences and invalidates the previous output generation.",
+            "The later Gateway cancellation receipt keeps semantic scope distinct.",
+            "Stale speech does not resume.",
         ),
         (
             SpokenStep(
@@ -315,6 +323,32 @@ CASES: dict[str, AcceptanceCase] = {
                 wait_before_events=("playback_start",),
                 wait_before_label="audible playback to begin",
                 countdown_s=0,
+            ),
+        ),
+    ),
+    "barge-in-echo": AcceptanceCase(
+        "barge-in-echo",
+        "Echo rejection and reversible playback resume",
+        (
+            "Ask for a response long enough to produce more than one playback chunk.",
+            "After one output chunk completes, replay that exact captured PCM into the input path.",
+            "Inspect the retained duck, echo-suppression, resume, and playback-order evidence.",
+        ),
+        (
+            "VAD start ducks output without cancelling cognitive work.",
+            "ASR classifies the captured robot speech as likely echo.",
+            "The same playback generation resumes without a new user session.",
+            "Each output order starts at most once and later output completes.",
+        ),
+        (
+            SpokenStep(
+                "Tell me a detailed story about the Moon that takes at least thirty seconds."
+            ),
+            SpokenStep(
+                "Replay the just-completed Chromie output chunk.",
+                wait_before_events=("playback_end",),
+                wait_before_label="one captured Chromie output chunk to finish",
+                replay_previous_output=True,
             ),
         ),
     ),
@@ -441,6 +475,53 @@ def tcp_endpoint_check(name: str, endpoint: str) -> CheckResult:
     except OSError as exc:
         return CheckResult(name, False, f"{host}:{port} is unreachable: {exc}")
     return CheckResult(name, True, f"{host}:{port} is reachable")
+
+
+def tts_health_ready(payload: dict[str, Any]) -> tuple[bool, str]:
+    provider_health = payload.get("provider_health")
+    if not isinstance(provider_health, dict):
+        return False, "provider_health is missing"
+    if provider_health.get("ready") is not True:
+        return False, "provider is not ready"
+    if provider_health.get("worker_process_alive") is not True:
+        return False, "provider worker is not alive"
+    return True, "provider and worker are ready"
+
+
+def wait_for_tts_readiness(
+    endpoint: str,
+    *,
+    timeout_s: float,
+    log_path: Path,
+) -> None:
+    deadline = time.monotonic() + timeout_s
+    attempts = 0
+    last_detail = "health was not attempted"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as handle:
+        while time.monotonic() < deadline:
+            attempts += 1
+            try:
+                payload = asyncio.run(request_tts_health(endpoint))
+                ready, detail = tts_health_ready(payload)
+                last_detail = detail
+                handle.write(
+                    f"attempt={attempts} ready={str(ready).lower()} detail={detail}\n"
+                )
+                handle.flush()
+                if ready:
+                    return
+            except Exception as exc:
+                last_detail = f"{type(exc).__name__}: {exc}"
+                handle.write(
+                    f"attempt={attempts} ready=false detail={last_detail}\n"
+                )
+                handle.flush()
+            time.sleep(1.0)
+    raise TimeoutError(
+        f"TTS did not become application-ready within {timeout_s:.0f}s after "
+        f"{attempts} attempts: {last_detail}; see {log_path}"
+    )
 
 
 def acceptance_readiness(
@@ -676,12 +757,12 @@ class SpokenCapture:
 class AcceptanceAudioDriver:
     mode: str
     fixtures: dict[str, AudioFixture]
+    recordings_dir: Path
     orchestrator_process: subprocess.Popen[Any] | None = None
     virtual_microphone: PulseVirtualMicrophone | None = None
     speaker_player: HostSpeakerPlayer | None = None
 
-    def deliver(self, prompt: str) -> AudioFixture:
-        fixture = self.fixtures[prompt]
+    def _deliver_fixture(self, fixture: AudioFixture) -> None:
         if self.mode == "synthetic":
             process = self.orchestrator_process
             if process is None or process.stdin is None:
@@ -704,6 +785,60 @@ class AcceptanceAudioDriver:
             self.speaker_player.play(fixture)
         else:
             raise RuntimeError(f"Audio delivery is not used in mode {self.mode!r}")
+
+    def deliver(self, prompt: str) -> AudioFixture:
+        fixture = self.fixtures[prompt]
+        self._deliver_fixture(fixture)
+        return fixture
+
+    def replay_output(
+        self,
+        *,
+        session_id: str,
+        source_rate: int,
+        timeout_s: float = 5.0,
+    ) -> AudioFixture:
+        deadline = time.monotonic() + timeout_s
+        candidates: list[Path] = []
+        prefix = f"output_{session_id}_"
+        while time.monotonic() < deadline:
+            candidates = sorted(
+                (
+                    path
+                    for path in self.recordings_dir.glob("output_*.raw")
+                    if path.name.startswith(prefix) and path.stat().st_size > 0
+                ),
+                key=lambda path: path.stat().st_mtime_ns,
+            )
+            if candidates:
+                break
+            time.sleep(0.05)
+        if not candidates:
+            raise RuntimeError(
+                "No completed output PCM capture was retained for "
+                f"session {session_id!r} within {timeout_s:.1f}s"
+            )
+        raw_path = candidates[-1]
+        pcm16 = raw_path.read_bytes()
+        wav_path = (
+            self.recordings_dir.parent
+            / "generated-input"
+            / f"replayed-{raw_path.stem}.wav"
+        )
+        write_pcm16_wav(
+            wav_path,
+            pcm16=pcm16,
+            sample_rate=source_rate,
+            channels=1,
+        )
+        fixture = AudioFixture(
+            text="captured Chromie output replay",
+            pcm16=pcm16,
+            sample_rate=source_rate,
+            channels=1,
+            path=wav_path,
+        )
+        self._deliver_fixture(fixture)
         return fixture
 
 
@@ -1155,6 +1290,7 @@ def guide_spoken_step(
 ) -> SpokenCapture:
     """Guide one spoken utterance and confirm that ASR captured it."""
 
+    trigger: dict[str, Any] | None = None
     if step.wait_for_confirmation_prompt_completion or step.wait_before_events:
         label = step.wait_before_label or "/".join(step.wait_before_events)
         print(f"\nWaiting for {label} before the next utterance...")
@@ -1188,6 +1324,125 @@ def guide_spoken_step(
                 attempts=0,
             )
         print(f"Ready condition detected: {trigger.get('event')}")
+
+    if step.replay_previous_output:
+        if mode == "supervised" or audio_driver is None:
+            return SpokenCapture(
+                check=CheckResult(
+                    name=f"guided utterance {step_index}",
+                    passed=False,
+                    detail=(
+                        "captured-output replay is an automated audio probe; "
+                        "select synthetic, virtual-mic, or acoustic mode"
+                    ),
+                ),
+                sid=None,
+                transcript="",
+                attempts=0,
+            )
+        trigger_sid = str((trigger or {}).get("sid") or "")
+        trigger_order = message_field(
+            str((trigger or {}).get("message") or ""),
+            "order",
+        )
+        source_rate: int | None = None
+        for item in reversed(read_events(events_path)):
+            if item.get("event") != "playback_start":
+                continue
+            if str(item.get("sid") or "") != trigger_sid:
+                continue
+            if message_field(str(item.get("message") or ""), "order") != trigger_order:
+                continue
+            raw_rate = message_field(str(item.get("message") or ""), "source_rate")
+            try:
+                source_rate = int(raw_rate) if raw_rate is not None else None
+            except ValueError:
+                source_rate = None
+            break
+        if not trigger_sid or source_rate is None or source_rate <= 0:
+            return SpokenCapture(
+                check=CheckResult(
+                    name=f"guided utterance {step_index}",
+                    passed=False,
+                    detail="completed playback was missing its session or source-rate provenance",
+                ),
+                sid=trigger_sid or None,
+                transcript="",
+                attempts=0,
+            )
+        marker = len(read_events(events_path))
+        fixture = audio_driver.replay_output(
+            session_id=trigger_sid,
+            source_rate=source_rate,
+        )
+        print("\n" + "!" * 72)
+        print(
+            f">>> CAPTURED OUTPUT REPLAYED ({case.case_id}, "
+            f"step {step_index}/{len(case.spoken_steps)})"
+        )
+        print(f">>> Session: {trigger_sid}")
+        print(f">>> WAV    : {fixture.path}")
+        print(
+            f">>> Audio  : {fixture.sample_rate} Hz, {fixture.channels} channel(s), "
+            f"{len(fixture.pcm16)} PCM bytes"
+        )
+        print("!" * 72)
+        classification_event = wait_for_any_event(
+            events_path,
+            marker=marker,
+            event_names=(
+                "asr_tts_echo_suppressed",
+                "barge_in_external_speech_confirmed",
+                "asr_error",
+            ),
+            timeout_s=asr_timeout_s,
+        )
+        echo_event = (
+            classification_event
+            if classification_event is not None
+            and classification_event.get("event")
+            == "asr_tts_echo_suppressed"
+            and str(classification_event.get("sid") or "") == trigger_sid
+            else None
+        )
+        release_event = None
+        if echo_event is not None:
+            release_event = wait_for_any_event(
+                events_path,
+                marker=marker,
+                event_names=("playback_duck_released",),
+                timeout_s=asr_timeout_s,
+                session_ids=(trigger_sid,),
+            )
+        passed = bool(
+            echo_event
+            and release_event
+            and message_field(
+                str(release_event.get("message") or ""),
+                "reason",
+            )
+            == "likely_tts_echo"
+        )
+        if passed:
+            case_session_ids.add(trigger_sid)
+        return SpokenCapture(
+            check=CheckResult(
+                name=f"guided utterance {step_index}",
+                passed=passed,
+                detail=(
+                    "captured output was classified as likely TTS echo and the "
+                    "same playback session was released"
+                    if passed
+                    else "captured output did not produce correlated echo suppression and resume"
+                ),
+            ),
+            sid=trigger_sid,
+            transcript=(
+                message_field(str((echo_event or {}).get("message") or ""), "text")
+                or ""
+            ),
+            attempts=1,
+        )
 
     attempts = max(1, asr_retries + 1)
     latest_transcript = ""
@@ -1337,6 +1592,15 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             return None
         try:
             return int(raw)
+        except ValueError:
+            return None
+
+    def float_field(message: str, name: str) -> float | None:
+        raw = message_field(message, name)
+        if raw is None:
+            return None
+        try:
+            return float(raw)
         except ValueError:
             return None
 
@@ -1707,6 +1971,231 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             }
         return None
 
+    def external_barge_in_chain() -> dict[str, Any] | None:
+        for duck_index, duck, duck_message in rows("playback_duck_started"):
+            old_sid = str(duck.get("sid") or "")
+            generation = field(duck, "generation")
+            duck_latency_ms = float_field(
+                duck_message,
+                "vad_start_to_duck_ms",
+            )
+            if not old_sid or generation is None:
+                continue
+            active_playback = any(
+                start_index < duck_index
+                and str(start.get("sid") or "") == old_sid
+                and field(start, "generation") == generation
+                and not any(
+                    start_index < end_index < duck_index
+                    and str(end.get("sid") or "") == old_sid
+                    and field(end, "order") == field(start, "order")
+                    for end_index, end, _ in rows("playback_end")
+                )
+                for start_index, start, _ in rows("playback_start")
+            )
+            if not active_playback:
+                continue
+            interrupted = next(
+                (
+                    (index, field(item, "new_sid"))
+                    for index, item, _ in rows(
+                        "session_interrupted_by_new_session"
+                    )
+                    if index > duck_index
+                    and str(item.get("sid") or "") == old_sid
+                    and field(item, "new_sid")
+                ),
+                None,
+            )
+            if interrupted is None:
+                continue
+            interrupted_index, new_sid = interrupted
+            confirmed = next(
+                (
+                    (index, item, message)
+                    for index, item, message in rows(
+                        "barge_in_external_speech_confirmed"
+                    )
+                    if index > interrupted_index
+                    and str(item.get("sid") or "") == new_sid
+                    and field(item, "playback_generation_at_start")
+                    == generation
+                ),
+                None,
+            )
+            if confirmed is None:
+                continue
+            confirmed_index, confirmed_event, confirmed_message = confirmed
+            confirmed_latency_ms = float_field(
+                confirmed_message,
+                "confirmed_speech_to_silence_ms",
+            )
+            asr_captured = any(
+                interrupted_index < index < confirmed_index
+                and str(item.get("sid") or "") == new_sid
+                and bool(extract_asr_text(item))
+                for index, item, _ in rows("asr_final")
+            )
+            if not asr_captured:
+                continue
+            semantic_receipt = next(
+                (
+                    (index, item)
+                    for index, item, _ in rows(
+                        "cognitive_gateway_cancellation_dispatched"
+                    )
+                    if index > confirmed_index
+                    and str(item.get("sid") or "") == new_sid
+                    and field(item, "requested_scope") == "output_only"
+                    and field(item, "effective_scope") == "output_only"
+                    and field(item, "dispatch_failures") == "0"
+                    and field(item, "provider_failures") == "0"
+                ),
+                None,
+            )
+            reflex_applied = any(
+                index > (semantic_receipt[0] if semantic_receipt else confirmed_index)
+                and str(item.get("sid") or "") == new_sid
+                and field(item, "action") == "interrupt"
+                for index, item, _ in rows("cognitive_gateway_reflex_applied")
+            )
+            stale_output = any(
+                index > confirmed_index
+                and str(item.get("sid") or "") == old_sid
+                and item.get("event")
+                in {"tts_schedule", "playback_start", "playback_end"}
+                for index, item in enumerate(events)
+            )
+            return {
+                "old_sid": old_sid,
+                "new_sid": new_sid,
+                "generation": generation,
+                "duck_latency_ms": duck_latency_ms,
+                "duck_within_budget": bool(
+                    duck_latency_ms is not None
+                    and 0.0 <= duck_latency_ms <= MAX_VAD_START_TO_DUCK_MS
+                    and field(duck, "cancel_cognitive_work") == "false"
+                    and field(duck, "pause_error") == "none"
+                ),
+                "confirmed_latency_ms": confirmed_latency_ms,
+                "confirmed_within_budget": bool(
+                    confirmed_latency_ms is not None
+                    and 0.0
+                    <= confirmed_latency_ms
+                    <= MAX_CONFIRMED_SPEECH_TO_SILENCE_MS
+                    and field(confirmed_event, "scope") == "output_only"
+                    and field(confirmed_event, "cancel_cognitive_work")
+                    == "false"
+                    and asr_captured
+                ),
+                "semantic_receipt": semantic_receipt is not None
+                and reflex_applied,
+                "no_stale_output": not stale_output,
+            }
+
+    def echo_resume_chain() -> dict[str, Any] | None:
+        for duck_index, duck, duck_message in rows("playback_duck_started"):
+            sid = str(duck.get("sid") or "")
+            generation = field(duck, "generation")
+            duck_latency_ms = float_field(
+                duck_message,
+                "vad_start_to_duck_ms",
+            )
+            if not sid or generation is None:
+                continue
+            active_playback = any(
+                start_index < duck_index
+                and str(start.get("sid") or "") == sid
+                and field(start, "generation") == generation
+                and not any(
+                    start_index < end_index < duck_index
+                    and str(end.get("sid") or "") == sid
+                    and field(end, "order") == field(start, "order")
+                    for end_index, end, _ in rows("playback_end")
+                )
+                for start_index, start, _ in rows("playback_start")
+            )
+            if not active_playback:
+                continue
+            echo = next(
+                (
+                    (index, item)
+                    for index, item, _ in rows("asr_tts_echo_suppressed")
+                    if index > duck_index
+                    and str(item.get("sid") or "") == sid
+                    and field(item, "generation") == generation
+                ),
+                None,
+            )
+            if echo is None:
+                continue
+            release = next(
+                (
+                    (index, item)
+                    for index, item, _ in rows("playback_duck_released")
+                    if index > echo[0]
+                    and str(item.get("sid") or "") == sid
+                    and field(item, "generation") == generation
+                    and field(item, "reason") == "likely_tts_echo"
+                ),
+                None,
+            )
+            if release is None:
+                continue
+            release_index, release_event = release
+            later_playback_completed = any(
+                index > release_index
+                and str(item.get("sid") or "") == sid
+                for index, item, _ in rows("playback_end")
+            )
+            clean_session_completed = any(
+                index > release_index
+                and str(item.get("sid") or "") == sid
+                and (scheduled := integer_field(message, "scheduled_tts"))
+                is not None
+                and (played := integer_field(message, "played_tts")) is not None
+                and scheduled >= 1
+                and played == scheduled
+                and integer_field(message, "failed_tts") == 0
+                and integer_field(message, "skipped_tts") == 0
+                for index, item, message in rows("session_done")
+            )
+            playback_keys = [
+                (field(item, "generation"), field(item, "order"))
+                for _index, item, _ in rows("playback_start")
+                if str(item.get("sid") or "") == sid
+            ]
+            invalidated = any(
+                index > duck_index
+                and str(item.get("sid") or "") == sid
+                and item.get("event")
+                in {
+                    "barge_in_external_speech_confirmed",
+                    "playback_aborted_by_interrupt",
+                    "session_interrupted_by_new_session",
+                }
+                for index, item in enumerate(events)
+            )
+            return {
+                "sid": sid,
+                "generation": generation,
+                "duck_within_budget": bool(
+                    duck_latency_ms is not None
+                    and 0.0 <= duck_latency_ms <= MAX_VAD_START_TO_DUCK_MS
+                    and field(duck, "cancel_cognitive_work") == "false"
+                    and field(duck, "pause_error") == "none"
+                ),
+                "echo_suppressed": True,
+                "same_generation_released": (
+                    field(release_event, "resume_error") == "none"
+                    and not invalidated
+                ),
+                "later_playback_completed": later_playback_completed,
+                "clean_session_completed": clean_session_completed,
+                "no_duplicate_starts": len(playback_keys)
+                == len(set(playback_keys)),
+            }
+
     if case_id in {
         "speech-only",
         "speech-skill",
@@ -1871,22 +2360,83 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             )
         )
     elif case_id == "barge-in":
-        interruption = interrupt_chain(forbid_later_work=False)
+        interruption = external_barge_in_chain()
         checks.append(
             CheckResult(
                 "active playback session interrupted",
                 interruption is not None,
-                "an active old-session playback must link to the new interrupt session",
+                "an active old-session playback must link its duck and confirmed external speech to the new session",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "VAD-start duck met the output-only latency budget",
+                bool(interruption and interruption["duck_within_budget"]),
+                (
+                    "playback_duck_started must report cancel_cognitive_work=false, "
+                    f"pause_error=none, and <= {MAX_VAD_START_TO_DUCK_MS:.0f} ms; "
+                    f"observed={interruption.get('duck_latency_ms') if interruption else None}"
+                ),
+            )
+        )
+        checks.append(
+            CheckResult(
+                "confirmed speech met the silence budget",
+                bool(interruption and interruption["confirmed_within_budget"]),
+                (
+                    "barge_in_external_speech_confirmed must retain scope=output_only, "
+                    f"cancel_cognitive_work=false, and <= {MAX_CONFIRMED_SPEECH_TO_SILENCE_MS:.0f} ms; "
+                    f"observed={interruption.get('confirmed_latency_ms') if interruption else None}"
+                ),
+            )
+        )
+        checks.append(
+            CheckResult(
+                "semantic cancellation receipt remained distinct",
+                bool(interruption and interruption["semantic_receipt"]),
+                "the later Gateway receipt must independently report requested/effective output_only with no dispatch failures",
             )
         )
         checks.append(
             CheckResult(
                 "stale playback did not resume",
+                bool(interruption and interruption["no_stale_output"]),
+                "no old-session TTS schedule or playback start/end may follow confirmed silence",
+            )
+        )
+    elif case_id == "barge-in-echo":
+        echo = echo_resume_chain()
+        checks.append(
+            CheckResult(
+                "captured output classified as likely echo",
+                bool(echo and echo["echo_suppressed"]),
+                "the replayed output PCM must produce a generation-bound asr_tts_echo_suppressed event",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "echo probe duck met the latency budget",
+                bool(echo and echo["duck_within_budget"]),
+                f"the echo probe must duck output-only within {MAX_VAD_START_TO_DUCK_MS:.0f} ms",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "same playback generation resumed",
+                bool(echo and echo["same_generation_released"]),
+                "likely echo must release the same session/generation without interruption or a resume error",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "resumed playback completed without duplicate start",
                 bool(
-                    interruption
-                    and interruption["no_later_output_or_work"]
+                    echo
+                    and echo["later_playback_completed"]
+                    and echo["clean_session_completed"]
+                    and echo["no_duplicate_starts"]
                 ),
-                "no old-session playback_start/playback_end may follow interrupt completion",
+                "a clean correlated session_done is required after resumed playback and each session/generation/order may start only once",
             )
         )
     elif case_id == "body-cancel":
@@ -2220,6 +2770,7 @@ def render_summary(
             "- `metadata.json` — revisions, host and run configuration",
             "- `runtime.env.redacted` — generated runtime configuration with secret-like values redacted",
             "- `audio-devices.log` — host audio-device discovery",
+            "- `tts-readiness.log` — application-level provider/worker readiness attempts",
             "- `events.jsonl` — correlated Orchestrator session events",
             "- `cognitive-runtime.jsonl` — applied goal-driven runtime evidence",
             "- `orchestrator.log` — complete host Orchestrator output",
@@ -2710,10 +3261,16 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 timeout=60,
             )
         if args.mode in AUTOMATIC_MODES:
+            wait_for_tts_readiness(
+                args.tts_url,
+                timeout_s=args.service_timeout_s,
+                log_path=evidence_dir / "tts-readiness.log",
+            )
             prompts = [
                 step.prompt
                 for case_id in selected
                 for step in CASES[case_id].spoken_steps
+                if not step.replay_previous_output
             ]
             print(
                 f"Generating {len(dict.fromkeys(prompts))} reusable test utterance(s) "
@@ -2743,6 +3300,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
             audio_driver = AcceptanceAudioDriver(
                 mode=args.mode,
                 fixtures=fixtures,
+                recordings_dir=recordings_dir,
                 virtual_microphone=virtual_microphone,
                 speaker_player=(
                     HostSpeakerPlayer(

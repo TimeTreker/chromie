@@ -725,10 +725,18 @@ are still being generated.
 Playback remains serialized by order. The TTS service owns independent model
 workers when `TTS_WORKER_COUNT>1`; otherwise chunking is pipelined
 generation/playback over the single worker.
-When VAD accepts new user audio, the host interrupts old speech output before
-ASR so the user can barge in. It does not cancel active body skills at that
-point; body cancellation is reserved for a routed `interrupt` decision after ASR
-and Goal Interpretation validation.
+When VAD reports credible speech start during playback, the Host immediately
+ducks the matching output session and generation before the utterance closes.
+This acoustic action records `cancel_cognitive_work=false`: it does not cancel
+Cognitive Core work, Goals, body work, or capability execution. The confirmation
+window is bounded by the existing maximum VAD utterance and ASR timeouts rather
+than another runtime switch. Short, quiet, empty, failed-ASR, or likely TTS-echo
+input releases the same generation at the next unplayed chunk, so completed
+audio is neither replayed nor duplicated. Confirmed external speech first closes
+the still-ducked output stream, then invalidates that output generation and
+creates the routed user session. ASR and the Cognitive Gateway remain the only
+owners of later output-only, motion, interaction, Goal, or emergency semantic
+cancellation scope.
 
 ## Conversation state
 

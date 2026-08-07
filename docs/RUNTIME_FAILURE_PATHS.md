@@ -29,6 +29,12 @@ failure. Output-stream stop/close and ASR WebSocket close therefore retain
 cleanup containment, but now emit debug diagnostics rather than silently using
 `pass`.
 
+Reversible playback ducking maps device abort and restart failures into explicit
+`pause_error` and `resume_error` receipt fields. A pause failure keeps future
+chunks blocked; a resume failure releases bounded waiters to avoid deadlock and
+lets ordered playback retain the resulting transport failure. Neither path may
+claim successful silence or resumed delivery.
+
 ### defined degradation
 
 Malformed optional or historical context may be omitted only when the caller

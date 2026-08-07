@@ -34,6 +34,7 @@ from scripts.voice_acceptance import (
     redact_env_file,
     run_acceptance,
     service_runtime_overrides,
+    tts_health_ready,
     wait_for_any_event,
     wait_for_case_checks,
     wait_for_confirmation_prompt_completion,
@@ -260,10 +261,13 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False", "sid-3"),
         event("tts_schedule", "tts_schedule: order=0 chars=20 scheduled_tts=1 generation=1 text='A long Moon story begins.'", "sid-3"),
         event("playback_start", "playback_start: order=0 source_rate=44100 output_rate=44100 audio_ms=30000.0 generation=1", "sid-3"),
+        event("playback_duck_started", "playback_duck_started: generation=1 vad_start_to_duck_ms=40.0 cancel_cognitive_work=false pause_error=none", "sid-3"),
         event("session_interrupted_by_new_session", "session_interrupted_by_new_session: new_sid=sid-3-follow", "sid-3"),
         event("asr_final", "asr_final: text='stop talking'", "sid-3-follow"),
-        event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "sid-3-follow"),
-        event("interrupt_previous_audio_done", "interrupt_previous_audio_done: playback_generation=2", "sid-3-follow"),
+        event("barge_in_external_speech_confirmed", "barge_in_external_speech_confirmed: scope=output_only cancel_cognitive_work=false playback_generation_at_start=1 confirmed_speech_to_silence_ms=20.0", "sid-3-follow"),
+        event("cognitive_gateway_cancellation_dispatched", "cognitive_gateway_cancellation_dispatched: requested_scope=output_only effective_scope=output_only interactions=none selected=0 active=0 queued=0 non_interruptible=0 provider_failures=0 dispatch_failures=0", "sid-3-follow"),
+        event("cognitive_gateway_reflex_applied", "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_output_command goal_interpretation_bypassed=True", "sid-3-follow"),
+        event("playback_aborted_by_interrupt", "playback_aborted_by_interrupt: order=0 playback_ms=100.0 generation=1", "sid-3"),
         event("asr_final", "asr_final: text='nod eight times'", "sid-4"),
         event("goal_interpretation_done", "goal_interpretation_done: route=robot_action", "sid-4"),
         event("cognitive_interaction_ready", "cognitive_interaction_ready: speech=1 skills=1 requires_confirmation=True", "sid-4"),
@@ -942,12 +946,62 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             driver = AcceptanceAudioDriver(
                 mode="synthetic",
                 fixtures={fixture.text: fixture},
+                recordings_dir=Path(temp_dir),
                 orchestrator_process=process,
             )
             driver.deliver(fixture.text)
             stdin.seek(0)
             decoded = read_audio_packet(stdin)
             self.assertEqual(decoded.pcm16, fixture.pcm16)
+
+    def test_tts_readiness_requires_ready_live_worker(self) -> None:
+        self.assertEqual(
+            tts_health_ready(
+                {
+                    "provider_health": {
+                        "ready": True,
+                        "worker_process_alive": True,
+                    }
+                }
+            ),
+            (True, "provider and worker are ready"),
+        )
+        ready, detail = tts_health_ready(
+            {
+                "provider_health": {
+                    "ready": True,
+                    "worker_process_alive": False,
+                }
+            }
+        )
+        self.assertFalse(ready)
+        self.assertIn("not alive", detail)
+
+    def test_synthetic_audio_driver_replays_retained_output_pcm(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            recordings = root / "recordings"
+            recordings.mkdir()
+            payload = b"\x03\x00" * 160
+            (recordings / "output_sid-echo_1.raw").write_bytes(payload)
+            stdin = io.BytesIO()
+            driver = AcceptanceAudioDriver(
+                mode="synthetic",
+                fixtures={},
+                recordings_dir=recordings,
+                orchestrator_process=SimpleNamespace(stdin=stdin),
+            )
+
+            fixture = driver.replay_output(
+                session_id="sid-echo",
+                source_rate=24000,
+            )
+
+            stdin.seek(0)
+            decoded = read_audio_packet(stdin)
+            self.assertEqual(decoded.pcm16, payload)
+            self.assertEqual(decoded.sample_rate, 24000)
+            self.assertTrue(fixture.path.is_file())
 
     def test_acceptance_overrides_select_headless_synthetic_audio(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1371,15 +1425,36 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "old",
             ),
             event(
+                "playback_duck_started",
+                "playback_duck_started: generation=1 vad_start_to_duck_ms=30.0 "
+                "cancel_cognitive_work=false pause_error=none",
+                "old",
+            ),
+            event(
                 "session_interrupted_by_new_session",
                 "session_interrupted_by_new_session: new_sid=stop",
                 "old",
             ),
             event("asr_final", "asr_final: text='stop talking'", "stop"),
-            event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "stop"),
             event(
-                "interrupt_previous_audio_done",
-                "interrupt_previous_audio_done: playback_generation=2",
+                "barge_in_external_speech_confirmed",
+                "barge_in_external_speech_confirmed: scope=output_only "
+                "cancel_cognitive_work=false playback_generation_at_start=1 "
+                "confirmed_speech_to_silence_ms=25.0",
+                "stop",
+            ),
+            event(
+                "cognitive_gateway_cancellation_dispatched",
+                "cognitive_gateway_cancellation_dispatched: "
+                "requested_scope=output_only effective_scope=output_only "
+                "interactions=none selected=0 active=0 queued=0 "
+                "non_interruptible=0 provider_failures=0 dispatch_failures=0",
+                "stop",
+            ),
+            event(
+                "cognitive_gateway_reflex_applied",
+                "cognitive_gateway_reflex_applied: action=interrupt "
+                "trigger=stop_output_command goal_interpretation_bypassed=True",
                 "stop",
             ),
             event(
@@ -1409,14 +1484,22 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                     "old",
                 ),
                 event(
+                    "playback_duck_started",
+                    "playback_duck_started: generation=1 "
+                    "vad_start_to_duck_ms=30.0 cancel_cognitive_work=false "
+                    "pause_error=none",
+                    "old",
+                ),
+                event(
                     "session_interrupted_by_new_session",
                     "session_interrupted_by_new_session: new_sid=stop",
                     "old",
                 ),
-                event("goal_interpretation_done", "goal_interpretation_done: route=interrupt", "stop"),
                 event(
-                    "interrupt_previous_audio_done",
-                    "interrupt_previous_audio_done: playback_generation=2",
+                    "barge_in_external_speech_confirmed",
+                    "barge_in_external_speech_confirmed: scope=output_only "
+                    "cancel_cognitive_work=false playback_generation_at_start=1 "
+                    "confirmed_speech_to_silence_ms=25.0",
                     "stop",
                 ),
             ],
@@ -1428,6 +1511,52 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 if item.name == "active playback session interrupted"
             )
         )
+
+    def test_barge_in_echo_requires_same_generation_resume_and_no_duplicates(self) -> None:
+        checks = analyze_case(
+            "barge-in-echo",
+            [
+                event(
+                    "playback_start",
+                    "playback_start: order=1 source_rate=44100 output_rate=44100 "
+                    "audio_ms=30000.0 generation=4",
+                    "old",
+                ),
+                event(
+                    "playback_duck_started",
+                    "playback_duck_started: generation=4 "
+                    "vad_start_to_duck_ms=35.0 cancel_cognitive_work=false "
+                    "pause_error=none",
+                    "old",
+                ),
+                event(
+                    "asr_tts_echo_suppressed",
+                    "asr_tts_echo_suppressed: generation=4 ratio=1.000 "
+                    "coverage=1.000 text='the robot response'",
+                    "old",
+                ),
+                event(
+                    "playback_duck_released",
+                    "playback_duck_released: generation=4 "
+                    "reason=likely_tts_echo duck_duration_ms=400.0 "
+                    "resume_error=none",
+                    "old",
+                ),
+                event(
+                    "playback_end",
+                    "playback_end: order=1 playback_ms=1000.0 played_tts=2",
+                    "old",
+                ),
+                event(
+                    "session_done",
+                    "session_done: scheduled_tts=2 queued_tts=2 played_tts=2 "
+                    "failed_tts=0 skipped_tts=0 response_chars=80 total_ms=2000.0",
+                    "old",
+                ),
+            ],
+        )
+
+        self.assertTrue(all(item.passed for item in checks))
 
     def test_stop_rejects_late_old_session_work(self) -> None:
         records = [
