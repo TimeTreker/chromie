@@ -29,6 +29,11 @@ remains available in Git history.
   planning instead of the ordinary direct-speech shortcut, remain Speaking
   during cross-lane coordination, and retain one identity through cancellation
   and outcome evidence. The default catalog still advertises no qualified mode.
+- Retained clean default-provider Level C evidence for `e558ff4`: the original
+  walk/sing/blink turn completed both body members in Soridormi/MuJoCo, kept
+  singing unavailable with no step, played all four ordinary-TTS chunks without
+  failure, and returned to safe idle. This closes Issue #6's declared source
+  scope without claiming a real singing provider or physical audio.
 
 ### Verification and reproducibility
 

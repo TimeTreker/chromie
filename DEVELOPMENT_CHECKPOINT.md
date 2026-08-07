@@ -85,9 +85,9 @@ microphone/speaker, arbitrary human pronunciation, audible device latency, and
 the real acoustic echo path remain supervised target evidence rather than source
 closure claims.
 
-The active semantic Issue remains #6 through its final clean current-revision
-default-provider replay. Its exact `chromie.vocal.perform` source contract now
-preserves the Speaking lane and the current Chromie playback boundary:
+Issue #6 is complete for its declared source and default-provider evidence
+scope. Its exact `chromie.vocal.perform` source contract preserves the Speaking
+lane and the current Chromie playback boundary:
 
 - one provider-prefixed capability identity survives proposal, validation,
   authorization, execution, cancellation, and evidence in source tests;
@@ -102,17 +102,34 @@ preserves the Speaking lane and the current Chromie playback boundary:
   Planner, Deep Planner, Response Composer, and Host materialization with
   `execution_lane=speaking`.
 
-The pre-commit source evidence passed the focused provider/TTS suite, the exact
+The source evidence passed the focused provider/TTS suite, the exact
 recitation scenario, the `stable_capability_grounding` class 8/8, and the full
 canonical gate with 2,041 maintained tests, 20 legacy Agent tests, and 102
-benchmark tests. Commit this reviewed source, run
-`scripts/vocal_issue_closure.py` from that clean revision, inspect the complete
-retained live output, and only then advance to Issue #7.
+benchmark tests. Clean Chromie `e558ff4` and Soridormi `1c15371` then passed
+`scripts/vocal_issue_closure.py` in
+`.chromie/acceptance/vocal-issue-6/issue-6-e558ff4-clean`. The retained output
+records exact typed Goal ownership, two completed parallel body members, honest
+singing unavailability with zero steps, four played ordinary-TTS chunks with no
+failures, exact runtime/source identity, and safe idle before and after.
 
-Do not place backend names in semantic Goals, add a neutral late-binding alias,
-move playback ownership into Soridormi, or begin Issue #7 before Issue #6 meets
-its clean current-revision delivery evidence. Real singing remains unvalidated
-until mode-specific target evidence exists.
+The active semantic Issue is now #7, the peer media-playback capability and
+lifecycle:
+
+- keep existing music, recordings, streams, and sound effects in Activity;
+- choose exact provider-prefixed public identities once for play, pause, resume,
+  seek, stop, volume, and status, and preserve them from Planner through
+  evidence;
+- retain persistent lifecycle, progress, pause/resume, independent cancellation,
+  and bounded status evidence behind the Trusted Capability Runtime;
+- define explicit mixer/ducking policy for Speaking over media without mutating
+  either Goal; and
+- keep stop-talking, stop-media, and stop-all as distinct deterministic scopes
+  with correlated receipts.
+
+Do not place backend names in semantic Goals, introduce a neutral media alias,
+move media into Speaking merely because it shares a speaker, or use media
+playback as singing evidence. Real singing remains unvalidated until
+mode-specific target evidence exists.
 
 ## Canonical owners
 
