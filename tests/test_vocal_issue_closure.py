@@ -213,6 +213,47 @@ class VocalIssueClosureTests(unittest.TestCase):
             errors,
         )
 
+    def test_truthful_response_delivery_is_not_singing_performance_evidence(self) -> None:
+        summary = passing_summary()
+        summary["execution"]["results"].append(
+            {
+                "capability_id": "chromie.speak",
+                "status": "completed",
+                "metadata": {
+                    "source_goal_ids": ["goal-sing"],
+                    "covers_goal_ids": ["goal-sing"],
+                    "execution_lane": "speaking",
+                    "delivery_role": "response",
+                },
+            }
+        )
+
+        errors = self.validate(summary)
+
+        self.assertEqual(errors, [])
+
+    def test_speech_performance_role_cannot_close_unavailable_singing(self) -> None:
+        summary = passing_summary()
+        summary["execution"]["results"].append(
+            {
+                "capability_id": "chromie.speak",
+                "status": "completed",
+                "metadata": {
+                    "source_goal_ids": ["goal-sing"],
+                    "covers_goal_ids": ["goal-sing"],
+                    "execution_lane": "speaking",
+                    "delivery_role": "performance",
+                },
+            }
+        )
+
+        errors = self.validate(summary)
+
+        self.assertTrue(
+            any("ordinary capability execution" in item for item in errors),
+            errors,
+        )
+
     def test_body_execution_and_safe_idle_are_required(self) -> None:
         summary = passing_summary()
         summary["execution"]["results"] = []
