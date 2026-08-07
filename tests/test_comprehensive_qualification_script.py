@@ -125,6 +125,11 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn('"review_infrastructure_failed": review_infrastructure_failed', source)
         self.assertIn('[[ "$OVERALL_STATUS" != "passed" ]]', source)
 
+    def test_diagnostic_voice_subset_does_not_call_full_release_verifier(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("--cases speech-only,barge-in,follow-up", source)
+        self.assertNotIn("scripts/verify_voice_evidence.py", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.5.0"
+SCRIPT_VERSION="1.5.1"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -162,7 +162,6 @@ required_files=(
   scripts/benchmark_tts.py
   scripts/closed_loop_e2e.py
   scripts/voice_acceptance.py
-  scripts/verify_voice_evidence.py
   benchmarks/manifests/closed_loop_e2e_v1.json
   benchmarks/manifests/fault_injection_v1.json
 )
@@ -523,15 +522,6 @@ if (( SKIP_SYNTHETIC == 0 )); then
     --continue-after-failure)
   (( ALLOW_DIRTY == 1 )) && synth_args+=(--allow-dirty)
   run_capture e2e "retained synthetic voice acceptance" "$E2E_TIMEOUT_S" "${synth_args[@]}"
-  if [[ -d "$SYNTH_ROOT/$SYNTH_ID" ]]; then
-    verify_args=("${PYTHON_CMD[@]}" scripts/verify_voice_evidence.py
-      "$SYNTH_ROOT/$SYNTH_ID"
-      --allow-automated
-      --write-report "$E2E_ROOT/synthetic-verification.json")
-    run_capture e2e "verify retained synthetic evidence" 600 "${verify_args[@]}"
-  else
-    record_skip e2e "verify retained synthetic evidence" "Synthetic evidence directory was not created."
-  fi
 else
   record_skip e2e "retained synthetic voice acceptance" "Skipped by option or service phase."
 fi

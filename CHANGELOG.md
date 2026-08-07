@@ -39,7 +39,8 @@ remains available in Git history.
   requirement.
 - Prevented the comprehensive runner from rebuilding an image underneath its
   own running containers, made built services recreate against the new image,
-  and removed an unsupported dirty-verifier option.
+  removed an unsupported dirty-verifier option, and stopped applying the full
+  seven-case MuJoCo release verifier to a three-case diagnostic voice bundle.
 
 ### Semantic authority and failure honesty
 

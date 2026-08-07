@@ -74,8 +74,20 @@ external semantic pass. Both bundles were captured from a dirty source tree and
 are diagnostic evidence only. Final closure still requires a clean committed
 revision and the full comprehensive profile.
 
+The first clean committed replay at `bed08e6`, retained under
+`.chromie/comprehensive/20260807T091712Z`, reported 47 passes, one failure, one
+skip, and no timeouts. All 12 idle and all 12 shared-GPU bilingual workflow
+cases passed their mechanical, audio, completion, unique-delivery, and ordering
+checks; the three retained synthetic voice cases also passed. The sole failure
+was not a Runtime result: the comprehensive shell passed that three-case
+diagnostic bundle to the separately owned full seven-case MuJoCo release
+verifier. That verifier correctly rejected the absent body cases and live
+Soridormi source binding. The collector no longer makes the inapplicable call;
+the repaired committed replay remains required before closure. Semantic review
+also remains pending rather than being inferred from the mechanical result.
+
 After the executable scenarios were aligned with the evidence-before-claim
-contract, the complete source gate passed: 102 benchmark tests, 2,077 maintained
+contract, the complete source gate passed: 102 benchmark tests, 2,078 maintained
 tests, 20 legacy Agent tests, and every repository-policy, ownership, Ruff, Mypy,
 configuration, structure, and documentation check. The Level A general-ability
 profile passed 66/66 across all ten ability classes. These results establish

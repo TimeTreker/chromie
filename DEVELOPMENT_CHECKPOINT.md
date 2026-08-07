@@ -39,11 +39,12 @@ The post-merge audit of `e3d57ff` established:
   contract repair with authority-reducing session recovery, tool/memory
   pre-effect speech suppression, pure safe-read single ownership, and bounded
   evidence-preserving result repair;
-- the dependency-complete canonical gate passes 2,077 maintained tests, 20
+- the dependency-complete canonical gate passes 2,078 maintained tests, 20
   legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
   all ten general-ability classes;
-- the comprehensive runner now builds once before nested voice acceptance and
-  no longer passes a nonexistent dirty-mode option to the verifier; and
+- the comprehensive runner now builds once before nested voice acceptance;
+  the first clean committed replay then exposed and removed an inapplicable
+  full seven-case MuJoCo verifier call on its three-case diagnostic bundle; and
 - semantic documentation mismatches were corrected in the existing authority
   documents instead of creating another audit owner.
 
