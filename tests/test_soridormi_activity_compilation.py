@@ -271,6 +271,10 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
             "activity-1",
         )
         self.assertEqual(
+            result.results[0].metadata["source_goal_ids"],
+            ["goal-walk"],
+        )
+        self.assertEqual(
             result.traces[0].events[-1].data["provider_activity_id"],
             "activity-1",
         )

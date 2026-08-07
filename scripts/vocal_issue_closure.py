@@ -797,7 +797,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Leave a stack started by this command running after evidence collection.",
     )
-    parser.add_argument("--walk-capability", default="soridormi.walk_velocity")
+    parser.add_argument("--walk-capability", default="soridormi.walk_forward")
     parser.add_argument("--blink-capability", default="soridormi.blink_eyes")
     parser.add_argument("--timeout-s", type=float, default=1200.0)
     parser.add_argument("--skill-timeout-s", type=float, default=180.0)

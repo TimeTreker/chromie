@@ -41,6 +41,22 @@ logger = logging.getLogger(__name__)
 
 CancellationDomain = Literal["output", "embodied_motion"]
 
+_RESULT_AUTHORITY_METADATA_KEYS = (
+    "source_goal_ids",
+    "covers_goal_ids",
+    "canonical_plan_id",
+    "canonical_plan_fingerprint",
+    "step_id",
+    "execution_lane",
+    "coordination_id",
+    "delivery_role",
+    "lane_coordination_relation",
+    "lane_start_policy",
+    "lane_failure_policy",
+    "parallel_with_activity",
+    "parallel_with_social_attention",
+)
+
 
 SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -1900,12 +1916,13 @@ class SkillRuntime:
         results = self._normalize_group_results(items, results)
         finished_at = datetime.now(timezone.utc)
         pairs: list[tuple[SkillResult, SkillTrace]] = []
-        for result, trace, (_, definition) in zip(
+        for result, trace, (request, definition) in zip(
             results,
             traces,
             items,
             strict=True,
         ):
+            self._bind_result_authority(request, result)
             result.trace_id = trace.trace_id
             if result.started_at is None:
                 result.started_at = trace.started_at
@@ -1992,6 +2009,29 @@ class SkillRuntime:
                 )
             normalized.append(result)
         return normalized
+
+    @staticmethod
+    def _bind_result_authority(
+        request: SkillRequest,
+        result: SkillResult,
+    ) -> SkillResult:
+        """Retain Host-owned request provenance on terminal evidence.
+
+        Providers own execution output and provider-local metadata, but they do
+        not own canonical Goal or Plan identity. Copy the committed request's
+        bounded authority fields onto the result after provider execution so a
+        provider cannot omit or replace the ownership required for outcome
+        reconciliation and retained evidence.
+        """
+
+        authority = {
+            key: request.metadata[key]
+            for key in _RESULT_AUTHORITY_METADATA_KEYS
+            if key in request.metadata
+        }
+        if authority:
+            result.metadata = {**result.metadata, **authority}
+        return result
 
     async def _run_one(
         self,
@@ -2212,6 +2252,7 @@ class SkillRuntime:
                 if interaction_scheduled is not None:
                     interaction_scheduled.pop(request.request_id, None)
 
+        self._bind_result_authority(request, result)
         result.trace_id = trace.trace_id
         trace.status = result.status
         trace.finished_at = datetime.now(timezone.utc)

@@ -22,7 +22,7 @@ from scripts.vocal_issue_closure import (
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = "a" * 40
 SORIDORMI_REVISION = "b" * 40
-WALK = "soridormi.walk_velocity"
+WALK = "soridormi.walk_forward"
 BLINK = "soridormi.blink_eyes"
 
 
@@ -97,7 +97,7 @@ def passing_summary() -> dict:
                     {
                         "step_id": "step-walk",
                         "capability_id": WALK,
-                        "args": {"duration_s": 15.0, "vx_mps": 0.1},
+                        "args": {"duration_s": 15.0},
                         "timing": "parallel",
                         "source_goal_ids": ["goal-walk"],
                     },
@@ -360,6 +360,7 @@ class VocalIssueClosureTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["--soridormi-repo", "../soridormi"])
         self.assertEqual(args.deployment_mode, "auto")
+        self.assertEqual(args.walk_capability, WALK)
         command = _deployment_start_command(
             soridormi_repo=Path("../soridormi"),
             rebuild_no_cache=False,

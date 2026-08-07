@@ -307,12 +307,30 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         execution = await runtime.execute(
-            InteractionResponse(speech=[{"text": "Hello."}])
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "Hello.",
+                        "metadata": {
+                            "source_goal_ids": ["goal-greeting"],
+                            "canonical_plan_id": "plan-greeting",
+                        },
+                    }
+                ]
+            )
         )
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(spoken, ["Hello."])
         self.assertEqual(execution.results[0].skill_id, "chromie.speak")
+        self.assertEqual(
+            execution.results[0].metadata["source_goal_ids"],
+            ["goal-greeting"],
+        )
+        self.assertEqual(
+            execution.results[0].metadata["canonical_plan_id"],
+            "plan-greeting",
+        )
 
     async def test_failed_playback_start_barrier_prevents_following_body_effect(self) -> None:
         registry = SkillRegistry()
