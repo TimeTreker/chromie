@@ -2507,6 +2507,15 @@ class GoalDrivenRuntimeCoordinator:
                         fast_plan,
                         path_classification=fast_planner_path,
                     )
+                    fast_validation_feedback = fast_plan.metadata.get(
+                        "validation_feedback"
+                    )
+                    if isinstance(fast_validation_feedback, list):
+                        deep_context["runtime_validator_feedback"] = [
+                            dict(item)
+                            for item in fast_validation_feedback
+                            if isinstance(item, dict)
+                        ]
                     deep_context["deep_planner_invocation_reason"] = deep_reason
                     stage = time.perf_counter()
                     terminal_plan = await self.agent_client.resolve_deep_plan(

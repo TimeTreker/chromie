@@ -58,6 +58,24 @@ The post-merge audit of `e3d57ff` established:
 - semantic documentation mismatches were corrected in the existing authority
   documents instead of creating another audit owner.
 
+The final paired replay exposed three planner contract defects rather than a
+Soridormi motion defect:
+
+- Fast and Deep decoder schemas did not bind an exact capability to its provider
+  argument schema, and only Fast described explicit numeric Goal provenance;
+- Deep's unprojected catalog exceeded its prompt bound, so later capabilities
+  such as exact velocity walking were absent from the deployed "full catalog";
+- Deep's step and prose collections were not decoder-bounded, allowing one walk
+  step to repeat until the model output limit before cancellation could reach a
+  provider.
+
+Exact capability schemas, shared numeric provenance validation, structured
+bounded repair, a compact complete catalog, and bounded Deep collections close
+those boundaries. Dirty-tree MuJoCo diagnostics retained exact ordered
+walk/nod/turn execution and provider-start cancellation ending safe-idle.
+`docs/STATUS.md` owns paths, limits, and the paired repository audit; clean
+merged-revision binding remains required.
+
 The underlying maintained source still establishes:
 
 - typed `interpretation_unavailable` instead of invented semantic fallback;
@@ -119,14 +137,17 @@ counts, limits, and remaining physical/provider gaps are owned by
 particular, generated speech and MuJoCo body results do not prove a physical
 microphone, speaker, robot, real vocal provider, or real media provider.
 
-The next delivery step is to close the post-merge audit branch with the
-dependency-complete canonical gate and the rebuilt comprehensive generated-
-speech/GPU scenario profile, inspect retained output and logs, and merge only
-if the final source tree is clean. Keep backend names out of semantic Goals, do
-not introduce a neutral media alias, and do not use source tests, generated or
-discarded TTS playback, or simulator body evidence as a claim for a real media
-provider, acoustic ducking, a physical speaker, or hardware. Real vocal and
-media modes remain unvalidated until operation-specific target evidence exists.
+The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
+capability manifest and compatibility authority are bound to that revision. The
+next delivery step is to run the dependency-complete canonical gate and
+rebuilt comprehensive generated-speech/GPU scenario profile, inspect retained
+output and logs, and merge only if the final source tree is clean. Then repeat
+the exact compound execution and provider-start cancellation with clean merged
+runtime identity. Keep backend names out of semantic Goals, do not introduce a
+neutral media alias, and do not use source tests, generated or discarded TTS
+playback, or simulator body evidence as a claim for a real media provider, acoustic ducking, a physical
+speaker, or hardware. Real vocal and media modes remain unvalidated until
+operation-specific target evidence exists.
 
 ## Canonical owners
 

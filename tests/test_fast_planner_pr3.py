@@ -734,6 +734,92 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_schema_invalid_capability_args_get_bounded_model_repair(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.94,
+            "goal_ids": ["goal-walk"],
+            "goal_summary": "Walk briefly.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"velocity": 0.1, "duration_s": 1.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        repaired = {
+            **invalid,
+            "steps": [
+                {
+                    **invalid["steps"][0],
+                    "args": {"vx_mps": 0.1, "duration_s": 1.0},
+                }
+            ],
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("Walk briefly.", goal_ids=["goal-walk"])
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].args, {"vx_mps": 0.1, "duration_s": 1.0})
+        self.assertIn("invalid_args", ollama.prompts[1][0])
+        self.assertIn("vx_mps", ollama.prompts[1][0])
+        step_schema = ollama.prompts[0][1]["response_format"]["$defs"][
+            "PlannerModelStep"
+        ]
+        velocity_branch = next(
+            branch
+            for branch in step_schema["oneOf"]
+            if branch["properties"]["capability_id"]["enum"]
+            == ["soridormi.walk_velocity"]
+        )
+        self.assertEqual(
+            velocity_branch["properties"]["args"]["required"],
+            ["vx_mps", "duration_s"],
+        )
+
+    def test_unrepaired_capability_args_are_not_marked_complete(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.94,
+            "goal_ids": ["goal-walk"],
+            "goal_summary": "Walk briefly.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"velocity": 0.1, "duration_s": 1.0},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+
+        plan = asyncio.run(
+            FastPlannerResolver(
+                FakeOllama(invalid),
+                FakeCatalog(),
+                max_contract_repairs=0,
+            ).resolve(request("Walk briefly.", goal_ids=["goal-walk"]))
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.metadata["validation_feedback"][0]["capability_id"],
+            "soridormi.walk_velocity",
+        )
+
     def test_simple_blink_produces_complete_direct_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))

@@ -95,6 +95,150 @@ def _weather_goal() -> dict:
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
+    def test_numeric_grounding_reports_all_missing_goal_values_together(self):
+        goal_id = "goal-walk"
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Walk at 0.2 for 10 seconds.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {"vx_mps": 0.2, "duration_s": 10.0},
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Execute the requested bounded walk.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["walk"],
+                        "satisfaction": _satisfaction(goal_id),
+                        "rationale": "The walk capability covers the request.",
+                    }
+                },
+                "goal_satisfaction": _satisfaction(goal_id),
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+
+        with self.assertRaises(ValueError) as raised:
+            validate_explicit_numeric_parameter_grounding(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": goal_id,
+                        "description": "Walk at 0.2 speed for 10 seconds.",
+                        "success_criteria": [],
+                    }
+                ],
+            )
+
+        message = str(raised.exception)
+        self.assertIn("value=0.2", message)
+        self.assertIn("value=10", message)
+
+    def test_numeric_user_supplied_resolution_rejects_false_goal_provenance(self):
+        goal_id = "goal-walk"
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Walk at 0.2 for 10 seconds.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {
+                            "vx_mps": 0.2,
+                            "duration_s": 10.0,
+                            "yaw_radps": 0.15,
+                        },
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Execute the requested bounded walk.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "walk",
+                        "parameter": "vx_mps",
+                        "strategy": "user_supplied",
+                        "value": 0.2,
+                        "confidence": 1.0,
+                        "blocking": False,
+                        "rationale": "Copied from the Goal.",
+                        "source_goal_ids": [goal_id],
+                    },
+                    {
+                        "step_id": "walk",
+                        "parameter": "duration_s",
+                        "strategy": "user_supplied",
+                        "value": 10.0,
+                        "confidence": 1.0,
+                        "blocking": False,
+                        "rationale": "Copied from the Goal.",
+                        "source_goal_ids": [goal_id],
+                    },
+                    {
+                        "step_id": "walk",
+                        "parameter": "yaw_radps",
+                        "strategy": "user_supplied",
+                        "value": 0.15,
+                        "confidence": 1.0,
+                        "blocking": False,
+                        "rationale": "Incorrectly attributed to the Goal.",
+                        "source_goal_ids": [goal_id],
+                    },
+                ],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["walk"],
+                        "satisfaction": _satisfaction(goal_id),
+                        "rationale": "The walk capability covers the request.",
+                    }
+                },
+                "goal_satisfaction": _satisfaction(goal_id),
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "not present in its authoritative source Goal",
+        ):
+            validate_explicit_numeric_parameter_grounding(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": goal_id,
+                        "description": "Walk at 0.2 speed for 10 seconds.",
+                        "success_criteria": [],
+                    }
+                ],
+            )
+
     def test_typed_list_binding_accepts_equivalent_json_array_argument(self):
         validate_goal_binding_argument_grounding(
             _weather_output(),

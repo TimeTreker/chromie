@@ -14,7 +14,7 @@
   "soridormi": {
     "repository": "https://github.com/TimeTreker/soridormi.git",
     "capability_schema_version": "0.1",
-    "upstream_commit": "1c15371f8875aba289711047164f8b41ef6c5fc9",
+    "upstream_commit": "fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83",
     "supported_mode": "sim"
   },
   "unsupported_claims": [

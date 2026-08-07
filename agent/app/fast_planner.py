@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
+from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
@@ -18,6 +19,7 @@ from .cognitive_identity import (
     bounded_personality_json,
 )
 from .planner_contract import (
+    EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     canonical_goal_grounding,
     canonical_plan_response_schema,
     goal_association_prompt_projection,
@@ -57,6 +59,19 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan
 
 logger = logging.getLogger("chromie.agent.fast_planner")
+
+
+class _CapabilityArgumentValidationError(ValueError):
+    def __init__(self, feedback: list[dict[str, Any]]) -> None:
+        self.feedback = [dict(item) for item in feedback]
+        super().__init__(
+            json.dumps(
+                self.feedback,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
 
 
 class FastPlannerResolver:
@@ -170,6 +185,10 @@ class FastPlannerResolver:
             fast_multi_goal_response_schema(
                 expected_goal_ids=expected_goal_ids_for_turn,
                 allowed_skill_ids=[item["capability_id"] for item in capability_payload],
+                capability_input_schemas={
+                    item["capability_id"]: item["input_schema"]
+                    for item in capability_payload
+                },
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
@@ -179,6 +198,10 @@ class FastPlannerResolver:
                 planner_tier="fast",
                 expected_goal_ids=expected_goal_ids_for_turn,
                 allowed_skill_ids=[item["capability_id"] for item in capability_payload],
+                capability_input_schemas={
+                    item["capability_id"]: item["input_schema"]
+                    for item in capability_payload
+                },
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
@@ -266,6 +289,12 @@ class FastPlannerResolver:
                     validated_model_output,
                     context=request.context,
                 )
+                capability_errors = self._capability_argument_errors(
+                    plan,
+                    capability_payload,
+                )
+                if capability_errors:
+                    raise _CapabilityArgumentValidationError(capability_errors)
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
                 logger.warning(
@@ -338,6 +367,11 @@ class FastPlannerResolver:
                         "initial_raw_output_ref": cognition_text_reference(initial_raw_output),
                         "repair_raw_output_ref": cognition_text_reference(
                             raw if contract_repair_attempted else None
+                        ),
+                        "validation_feedback": (
+                            exc.feedback
+                            if isinstance(exc, _CapabilityArgumentValidationError)
+                            else []
                         ),
                         **integrity_metadata,
                     },
@@ -564,7 +598,9 @@ class FastPlannerResolver:
         raw: Any,
         expected_goal_ids_for_turn: list[str],
     ) -> str:
-        if isinstance(exc, ValidationError):
+        if isinstance(exc, _CapabilityArgumentValidationError):
+            feedback = [dict(item) for item in exc.feedback]
+        elif isinstance(exc, ValidationError):
             feedback = list(exc.errors(include_url=False))
         else:
             feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
@@ -593,6 +629,32 @@ class FastPlannerResolver:
             separators=(",", ":"),
             default=str,
         )[:10000]
+
+    @staticmethod
+    def _capability_argument_errors(
+        plan: CanonicalPlan,
+        capability_payload: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        allowed = {item["capability_id"]: item for item in capability_payload}
+        errors: list[dict[str, Any]] = []
+        for step in plan.steps:
+            capability = allowed.get(step.capability_id)
+            if capability is None:
+                continue
+            schema_errors = validate_args_for_schema(
+                step.args,
+                capability.get("input_schema") or {},
+            )
+            if schema_errors:
+                errors.append(
+                    {
+                        "type": "invalid_args",
+                        "step_id": step.step_id,
+                        "capability_id": step.capability_id,
+                        "errors": schema_errors[:8],
+                    }
+                )
+        return errors
 
     @staticmethod
     def _plan_id(request: AgentRunRequest) -> str:
@@ -637,24 +699,8 @@ class FastPlannerResolver:
         }
         grounding = canonical_goal_grounding(context)
         argument_grounding_contract = (
-            "Treat an explicit numeric value in an authoritative goal as a "
-            "user-supplied candidate for the matching catalog argument. When "
-            "the value and units are unambiguous and the value is within the "
-            "catalog schema, copy it exactly; never silently replace it with "
-            "a schema default. Catalog defaults are only for parameters the "
-            "user did not supply. If the units, argument mapping, or validity "
-            "are uncertain, escalate instead of claiming exact coverage. A "
-            "material adjustment must use a non-exact plan_relation, require "
-            "confirmation, and explain the change. "
-            "For each numeric literal in an executable authoritative goal, "
-            "include a user_supplied parameter_resolution tied to the owned "
-            "step and goal. The parameter field must be the exact bare key in "
-            "that step's args object, never a step- or capability-qualified "
-            "name. Its value must equal the step argument and its "
-            "source_goal_ids must identify the authoritative Goal containing "
-            "that same number. Use those stable Goal IDs as provenance; do not "
-            "copy, paraphrase, or annotate Goal text into another field. "
-            "For chromie.memory.retrieve_verified_tool_result, resolved Goal "
+            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
+            + "For chromie.memory.retrieve_verified_tool_result, resolved Goal "
             "bindings such as location and date belong inside the single "
             "material_args object. They are not missing direct step arguments, "
             "so do not emit separate location or date parameter_resolutions. "

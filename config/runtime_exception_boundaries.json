@@ -540,7 +540,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "22a97822061e3985fa009b34d8a67efb8cbdb314627ac66a8877ebe5f1daf5d3",
+      "body_sha256": "2fca3aaa82e696412d7c0134b8298f1f94cbd59875e2c24686e1f7189ae1d9fb",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -583,7 +583,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1bdf79b38e29d25521b433c1b1055baf718ae4587a9da7ac9f6e2bad172dc851",
+      "body_sha256": "f14fbbc21f39d4e715a4714f1c3fa9bcb27ce2495bc31f57ea7327ec5c35b7da",
       "failure_signals": [
         "continue",
         "diagnostic",

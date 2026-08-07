@@ -1577,6 +1577,50 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "semantic_escalation",
         )
 
+    def test_fast_argument_validation_feedback_reaches_deep_planner(self):
+        validation_feedback = [
+            {
+                "type": "invalid_args",
+                "capability_id": "soridormi.blink_eyes",
+                "errors": ["args has unknown fields: ['times']"],
+            }
+        ]
+        fast = CanonicalPlan(
+            plan_id="fast-invalid-args",
+            planner_tier="fast",
+            disposition="escalate",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_ids=["goal-1"],
+            escalation_reason="fast_planner_model_contract_failed",
+            metadata={
+                "path_classification": "contract_failure",
+                "validation_feedback": validation_feedback,
+            },
+        )
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[fast],
+            deep_plans=[execute_plan()],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
+            policy=CognitiveRuntimePolicy(
+                mode="apply", apply_lanes=frozenset({"robot_action"})
+            ),
+        )
+
+        result = self.run_resolution(
+            coordinator, client, text="眨眼。", route="robot_action"
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            client.deep_contexts[0]["runtime_validator_feedback"],
+            validation_feedback,
+        )
+
     def test_fast_contract_failure_stays_visible_and_is_sanitized_for_deep(self):
         fast = CanonicalPlan(
             plan_id="fast-contract-failure",

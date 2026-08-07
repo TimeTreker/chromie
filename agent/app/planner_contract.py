@@ -53,7 +53,30 @@ except ImportError:  # pragma: no cover
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
-_NUMERIC_LITERAL_RE = re.compile(r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)")
+EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
+    "Treat an explicit numeric value in an authoritative goal as a "
+    "user-supplied candidate for the matching catalog argument. When "
+    "the value and units are unambiguous and the value is within the "
+    "catalog schema, copy it exactly; never silently replace it with "
+    "a schema default or describe it only in prose. Select a capability "
+    "whose argument schema can represent the supplied value. Catalog "
+    "defaults are only for parameters the user did not supply. If the "
+    "units, argument mapping, or validity are uncertain, clarify or "
+    "escalate according to the planner tier instead of claiming exact "
+    "coverage. A material adjustment must use a non-exact plan_relation, "
+    "require confirmation, and explain the change. For each numeric "
+    "literal in an executable authoritative goal, include a user_supplied "
+    "parameter_resolution tied to the owned step and goal. The parameter "
+    "field must be the exact bare key in that step's args object, never a "
+    "step- or capability-qualified name. Its value must equal the step "
+    "argument and its source_goal_ids must identify the authoritative Goal "
+    "containing that same number. Use those stable Goal IDs as provenance; "
+    "do not copy, paraphrase, or annotate Goal text into another field. "
+)
+
+_NUMERIC_LITERAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
+)
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
 _LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
@@ -1747,6 +1770,9 @@ def validate_explicit_numeric_parameter_grounding(
 
     steps = {step.step_id: step for step in output.steps}
     user_numeric_resolutions: list[tuple[PlanParameterResolution, Decimal]] = []
+    unsupported_user_numeric_resolutions: list[
+        tuple[PlanParameterResolution, Decimal, list[str]]
+    ] = []
     for resolution in output.parameter_resolutions:
         if resolution.blocking:
             continue
@@ -1791,6 +1817,15 @@ def validate_explicit_numeric_parameter_grounding(
                 "numeric user_supplied parameter resolution requires source_goal_ids: "
                 f"{resolution_location(resolution)}"
             )
+        unsupported_goal_ids = [
+            goal_id
+            for goal_id in source_goal_ids
+            if resolved_number not in literals(goal_text.get(goal_id, ""))
+        ]
+        if unsupported_goal_ids:
+            unsupported_user_numeric_resolutions.append(
+                (resolution, resolved_number, unsupported_goal_ids)
+            )
         user_numeric_resolutions.append((resolution, resolved_number))
 
     executable_goal_ids = {
@@ -1800,16 +1835,33 @@ def validate_explicit_numeric_parameter_grounding(
     }
     if not executable_goal_ids:
         executable_goal_ids = {goal_id for step in output.steps for goal_id in step.source_goal_ids}
-    for goal_id in executable_goal_ids:
+    missing_numeric_grounding: list[tuple[str, Decimal]] = []
+    for goal_id in sorted(executable_goal_ids):
         for literal in literals(goal_text.get(goal_id, "")):
             if not any(
                 literal == value and goal_id in resolution.source_goal_ids
                 for resolution, value in user_numeric_resolutions
             ):
-                raise ValueError(
-                    "explicit numeric goal value has no matching user_supplied "
-                    f"parameter resolution: goal_id={goal_id!r}, value={literal}"
-                )
+                missing_numeric_grounding.append((goal_id, literal))
+    if missing_numeric_grounding:
+        missing = "; ".join(
+            f"goal_id={goal_id!r}, value={literal}"
+            for goal_id, literal in missing_numeric_grounding
+        )
+        raise ValueError(
+            "explicit numeric goal value has no matching user_supplied "
+            f"parameter resolution: {missing}"
+        )
+    if unsupported_user_numeric_resolutions:
+        unsupported = "; ".join(
+            f"{resolution_location(resolution)}, value={value}, "
+            f"source_goal_ids={goal_ids!r}"
+            for resolution, value, goal_ids in unsupported_user_numeric_resolutions
+        )
+        raise ValueError(
+            "numeric user_supplied parameter resolution is not present in "
+            f"its authoritative source Goal: {unsupported}"
+        )
 
 
 def canonical_plan_response_schema(
@@ -1817,6 +1869,7 @@ def canonical_plan_response_schema(
     planner_tier: PlannerTier,
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
+    capability_input_schemas: dict[str, dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
@@ -1838,6 +1891,7 @@ def canonical_plan_response_schema(
         schema = fast_multi_goal_response_schema(
             expected_goal_ids=expected_goal_ids,
             allowed_skill_ids=allowed_skill_ids,
+            capability_input_schemas=capability_input_schemas,
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
@@ -2284,6 +2338,65 @@ def canonical_plan_response_schema(
                     f"authoritative goal {goal_id!r}."
                 )
 
+    if planner_tier == "deep":
+        max_deep_steps = max(4, len(allowed_goals) * 4)
+        steps_schema = properties.get("steps")
+        if isinstance(steps_schema, dict):
+            steps_schema["maxItems"] = max_deep_steps
+            steps_schema["description"] = (
+                "A bounded compositional plan with at most four executable "
+                "steps per authoritative Goal. Repeated motions belong in a "
+                "capability count argument; never duplicate a step."
+            )
+        parameter_resolution_schema = properties.get("parameter_resolutions")
+        if isinstance(parameter_resolution_schema, dict):
+            parameter_resolution_schema["maxItems"] = max_deep_steps * 2
+        unresolved_schema = properties.get("unresolved")
+        if isinstance(unresolved_schema, dict):
+            unresolved_schema["maxItems"] = max(4, len(allowed_goals) * 2)
+
+        def bound_deep_text(
+            owner: dict[str, Any], field_name: str, maximum: int
+        ) -> None:
+            field = owner.get(field_name)
+            if isinstance(field, dict):
+                current = field.get("maxLength")
+                field["maxLength"] = (
+                    min(int(current), maximum)
+                    if isinstance(current, int)
+                    else maximum
+                )
+
+        bound_deep_text(properties, "goal_summary", 240)
+        bound_deep_text(properties, "response_text", 800)
+        bound_deep_text(properties, "escalation_reason", 240)
+        step_model = schema.get("$defs", {}).get("PlannerModelStep")
+        if isinstance(step_model, dict):
+            bound_deep_text(step_model.get("properties", {}), "reason_summary", 240)
+        resolution_model = schema.get("$defs", {}).get("PlanParameterResolution")
+        if isinstance(resolution_model, dict):
+            bound_deep_text(resolution_model.get("properties", {}), "rationale", 240)
+        satisfaction_model = schema.get("$defs", {}).get("PlannerGoalSatisfaction")
+        if isinstance(satisfaction_model, dict):
+            bound_deep_text(satisfaction_model.get("properties", {}), "rationale", 320)
+        outcome_model = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
+        if isinstance(outcome_model, dict):
+            bound_deep_text(outcome_model.get("properties", {}), "rationale", 320)
+
+        def bound_deep_prose(node: Any) -> None:
+            if isinstance(node, dict):
+                node_properties = node.get("properties")
+                if isinstance(node_properties, dict):
+                    bound_deep_text(node_properties, "reason_summary", 240)
+                    bound_deep_text(node_properties, "rationale", 320)
+                for nested in node.values():
+                    bound_deep_prose(nested)
+            elif isinstance(node, list):
+                for nested in node:
+                    bound_deep_prose(nested)
+
+        bound_deep_prose(schema)
+
     if response_only:
         steps_schema = properties.get("steps")
         if isinstance(steps_schema, dict):
@@ -2306,6 +2419,11 @@ def canonical_plan_response_schema(
         ):
             if field_name not in step_required:
                 step_required.append(field_name)
+        _constrain_planner_step_args(
+            step_schema,
+            allowed_skills=allowed_skills,
+            capability_input_schemas=capability_input_schemas,
+        )
     return schema
 
 
@@ -2313,6 +2431,7 @@ def fast_multi_goal_response_schema(
     *,
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
+    capability_input_schemas: dict[str, dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
@@ -2537,7 +2656,6 @@ def fast_multi_goal_response_schema(
         if isinstance(step_id, dict):
             step_id["minLength"] = 1
         bound_text(step_schema.get("properties", {}), "reason_summary", 160)
-
     resolution_schema = schema.get("$defs", {}).get("PlanParameterResolution")
     if isinstance(resolution_schema, dict):
         resolution_required = resolution_schema.setdefault("required", [])
@@ -2593,6 +2711,12 @@ def fast_multi_goal_response_schema(
                 constrain(value)
 
     constrain(schema)
+    if isinstance(step_schema, dict):
+        _constrain_planner_step_args(
+            step_schema,
+            allowed_skills=allowed_skills,
+            capability_input_schemas=capability_input_schemas,
+        )
 
     def strict_satisfaction_schema(
         base: dict[str, Any],
@@ -2845,6 +2969,45 @@ def fast_multi_goal_response_schema(
         key: properties[key] for key in preferred_property_order if key in properties
     }
     return schema
+
+
+def _constrain_planner_step_args(
+    step_schema: dict[str, Any],
+    *,
+    allowed_skills: list[str],
+    capability_input_schemas: dict[str, dict[str, Any]] | None,
+) -> None:
+    """Bind each model-selected capability to its exact provider arg schema."""
+
+    if not capability_input_schemas:
+        return
+    base_properties = step_schema.get("properties")
+    if not isinstance(base_properties, dict):
+        return
+    required = [
+        str(item) for item in step_schema.get("required", []) if str(item).strip()
+    ]
+    branches: list[dict[str, Any]] = []
+    for capability_id in allowed_skills:
+        input_schema = capability_input_schemas.get(capability_id)
+        if not isinstance(input_schema, dict):
+            continue
+        properties = copy.deepcopy(base_properties)
+        properties["capability_id"] = {
+            "type": "string",
+            "enum": [capability_id],
+        }
+        properties["args"] = copy.deepcopy(input_schema)
+        branches.append(
+            {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": False,
+            }
+        )
+    if branches:
+        step_schema["oneOf"] = branches
 
 
 def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
