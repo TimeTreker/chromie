@@ -134,6 +134,51 @@ wait_for_tcp() {
   echo "[voice-mujoco] $label is ready."
 }
 
+wait_for_ws() {
+  local host="$1" port="$2" timeout_s="$3" label="$4" expected_service="$5"
+  local launcher_pid="${6:-}" launcher_log="${7:-}"
+  local deadline=$((SECONDS + timeout_s))
+  echo "[voice-mujoco] Waiting for $label at ws://$host:$port..."
+  until python3 - "$host" "$port" "$expected_service" <<'PY' >/dev/null 2>&1
+import asyncio
+import json
+import sys
+
+import websockets
+
+
+async def main() -> None:
+    host, raw_port, expected_service = sys.argv[1:]
+    async with websockets.connect(
+        f"ws://{host}:{int(raw_port)}", open_timeout=3
+    ) as websocket:
+        await websocket.send(json.dumps({"type": "health"}))
+        raw = await asyncio.wait_for(websocket.recv(), timeout=3)
+        if not isinstance(raw, str):
+            raise RuntimeError("health response was not JSON text")
+        payload = json.loads(raw)
+        if payload.get("type") != "pong" or payload.get("service") != expected_service:
+            raise RuntimeError(f"invalid {expected_service} health response")
+
+
+asyncio.run(main())
+PY
+  do
+    if [ -n "$launcher_pid" ] && ! kill -0 "$launcher_pid" 2>/dev/null; then
+      echo "[voice-mujoco][error] $label launcher exited before becoming ready." >&2
+      if [ -n "$launcher_log" ]; then tail -n 180 "$launcher_log" >&2 || true; fi
+      return 1
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "[voice-mujoco][error] Timed out waiting for $label." >&2
+      if [ -n "$launcher_log" ]; then tail -n 180 "$launcher_log" >&2 || true; fi
+      return 1
+    fi
+    sleep 2
+  done
+  echo "[voice-mujoco] $label is ready."
+}
+
 cleanup() {
   local rc=$?
   if [ "$KEEP_RUNNING" = "1" ]; then
@@ -188,8 +233,8 @@ CHROMIE_PID=$!
 echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 
 wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent" "$CHROMIE_PID" "$CHROMIE_LOG"
-wait_for_tcp 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR" "$CHROMIE_PID" "$CHROMIE_LOG"
-wait_for_tcp 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS" "$CHROMIE_PID" "$CHROMIE_LOG"
+wait_for_ws 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR" asr "$CHROMIE_PID" "$CHROMIE_LOG"
+wait_for_ws 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS" tts "$CHROMIE_PID" "$CHROMIE_LOG"
 wait_for_tcp 127.0.0.1 11434 "$STARTUP_TIMEOUT_S" "Chromie Ollama" "$CHROMIE_PID" "$CHROMIE_LOG"
 
 echo "[voice-mujoco] Waiting for Chromie Orchestrator..."

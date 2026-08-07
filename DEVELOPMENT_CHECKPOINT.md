@@ -73,10 +73,11 @@ Exact capability schemas, shared numeric provenance validation, structured
 bounded repair, a compact complete catalog, and bounded Deep collections close
 those boundaries. Clean commit `90aa72a` passed the canonical source gate and a
 rebuilt comprehensive profile with 46 passes, zero failures/timeouts, and one
-explicit external-semantic-review skip. Manual inspection found no recurrence
-of the audit's semantic blockers; strict status remains `incomplete`, not
-release-qualified. `docs/STATUS.md` owns paths, limits, latency outliers, and the
-paired audit. Clean merged-revision MuJoCo binding remains required.
+external-semantic-review skip. Manual inspection found no semantic blocker;
+strict status remains `incomplete`, not release-qualified. `docs/STATUS.md` owns
+paths, limits, and latency outliers. Clean-main startup exposed bare-TCP ASR/TTS
+probes creating WebSocket tracebacks called fatal by the log checker; JSON health
+probes replace them. Clean merged-revision MuJoCo binding remains required.
 
 The underlying maintained source still establishes:
 

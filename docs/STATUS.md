@@ -115,6 +115,17 @@ repairs remained visible. One ModelScope missing-token message occurred while
 the retained local TTS assets loaded successfully and does not support an
 external-download claim.
 
+The first clean-main paired startup exposed one additional audit defect in the
+evidence harness rather than the runtime: `start_voice_mujoco.sh` and
+`status_voice_mujoco.sh` tested ASR/TTS WebSocket ports with bare TCP connects.
+The WebSocket servers correctly rejected those incomplete handshakes and logged
+tracebacks; `check_voice_mujoco_logs.sh` then classified the probe-generated
+tracebacks as fatal. Both callers now perform the maintained JSON health
+exchange and validate the expected `pong` service identity. A live focused
+rerun reported every paired endpoint ready and every 30-second startup-log
+slice free of fatal patterns. The earlier tracebacks remain retained as the
+originating diagnostic rather than being hidden or reclassified.
+
 The paired Soridormi repository-gate audit is merged on its `main` revision
 `fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83`. Chromie's generated capability
 snapshot and compatibility authority bind that exact revision; regeneration
