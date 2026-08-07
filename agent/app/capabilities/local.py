@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+from typing import Any
+
+try:
+    from chromie_contracts.interaction import (
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+        VocalProviderDeclaration,
+        vocal_performance_input_schema,
+        vocal_performance_output_schema,
+    )
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import (
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+        VocalProviderDeclaration,
+        vocal_performance_input_schema,
+        vocal_performance_output_schema,
+    )
 
 from ..settings import agent_service_settings
 
@@ -25,9 +41,8 @@ def _weather_tool_availability() -> ToolAvailability:
 
 
 def _external_information_availability() -> ToolAvailability:
-    enabled = (
-        agent_service_settings.external_information_enabled
-        and bool(agent_service_settings.external_information_url)
+    enabled = agent_service_settings.external_information_enabled and bool(
+        agent_service_settings.external_information_url
     )
     reason = None
     if not agent_service_settings.external_information_enabled:
@@ -41,7 +56,90 @@ def _external_information_availability() -> ToolAvailability:
         reason=reason,
     )
 
-def chromie_manifests() -> list[AgentManifest]:
+
+def vocal_performance_tool(
+    declaration: VocalProviderDeclaration | None = None,
+) -> ToolCapability:
+    """Build the exact public vocal Capability from a qualified declaration.
+
+    The default static registry retains the public contract as unavailable. A
+    deployment may expose it to planning only by supplying a declaration whose
+    every advertised mode has retained evidence. Backend identity remains out
+    of the model-facing semantic schema and hints.
+    """
+
+    supported_modes = list(declaration.supported_modes) if declaration else []
+    evidence: dict[str, Any] = {}
+    if declaration is not None:
+        evidence = {
+            mode: item.model_dump(mode="json") for mode, item in declaration.mode_evidence.items()
+        }
+    return ToolCapability(
+        name=VOCAL_PERFORMANCE_CAPABILITY_ID,
+        agent_id="chromie.speech",
+        display_name="Perform qualified vocal output",
+        description=(
+            "Perform one provider-qualified vocal mode through Chromie's "
+            "ordered playback and interruption boundary."
+        ),
+        version="1.0.0",
+        input_schema=vocal_performance_input_schema(supported_modes or None),
+        output_schema=vocal_performance_output_schema(),
+        effects=["user_interaction", "audio_output", "vocal_performance"],
+        safety_class="low_risk_action",
+        availability=ToolAvailability(
+            available=declaration is not None,
+            modes=supported_modes,
+            requires=["qualified_vocal_provider", "audio_output"],
+            reason=(
+                None
+                if declaration is not None
+                else "no qualified vocal provider declaration is configured"
+            ),
+        ),
+        execution=ExecutionPolicy(
+            can_run_parallel=True,
+            exclusive_group="chromie.audio",
+            timeout_s=120.0,
+            idempotent=False,
+            side_effect_free=False,
+        ),
+        default_failure_policy=FailurePolicy(strategy="skip"),
+        llm_hints={
+            "when_to_use": (
+                "Use only when the requested typed vocal mode appears in "
+                "supported_vocal_modes; never substitute ordinary speech, "
+                "media playback, or a body gesture."
+            ),
+            "interaction_executable": True,
+            "execution_lane": "speaking",
+            "supported_vocal_modes": supported_modes,
+            "mode_evidence": evidence,
+            "can_run_parallel": True,
+            "exclusive_group": "chromie.audio",
+            "resource_claims": ["audio_output"],
+            "execution_constraints": {
+                "exact_mode_required": True,
+                "silent_mode_downgrade_forbidden": True,
+                "parallel_allowed_with_lanes": [
+                    "activity",
+                    "social_attention",
+                ],
+            },
+            "semantic_scope": {
+                "responsibility_kind": "spoken_response",
+                "execution_lane": "speaking",
+                "output_modes": supported_modes,
+                "provider_required": True,
+            },
+        },
+    )
+
+
+def chromie_manifests(
+    *,
+    vocal_provider: VocalProviderDeclaration | None = None,
+) -> list[AgentManifest]:
     speech = AgentManifest(
         agent_id="chromie.speech",
         display_name="Chromie Speech Agent",
@@ -49,6 +147,7 @@ def chromie_manifests() -> list[AgentManifest]:
         transport=TransportSpec(kind="local_python", module="app.agents.speaker"),
         tags=["chromie", "speech", "user_interaction"],
         tools=[
+            vocal_performance_tool(vocal_provider),
             ToolCapability(
                 name="chromie.speak",
                 agent_id="chromie.speech",
@@ -58,14 +157,23 @@ def chromie_manifests() -> list[AgentManifest]:
                     "type": "object",
                     "properties": {
                         "text": {"type": "string", "minLength": 1},
-                        "style": {"type": "string", "enum": ["brief", "normal", "confirm", "warning"]},
+                        "style": {
+                            "type": "string",
+                            "enum": ["brief", "normal", "confirm", "warning"],
+                        },
                     },
                     "required": ["text"],
                 },
                 output_schema={"type": "object", "properties": {"spoken": {"type": "boolean"}}},
                 effects=["user_interaction", "audio_output"],
                 safety_class="low_risk_action",
-                execution=ExecutionPolicy(can_run_parallel=True, exclusive_group="chromie.audio", timeout_s=10.0, idempotent=False, side_effect_free=False),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    exclusive_group="chromie.audio",
+                    timeout_s=10.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
                 default_failure_policy=FailurePolicy(strategy="skip"),
                 llm_hints={
                     "when_to_use": "Use to explain plans, progress, or results to the user.",
@@ -88,45 +196,85 @@ def chromie_manifests() -> list[AgentManifest]:
                 description="Ask the user to confirm a risky or physical action before it executes.",
                 input_schema={
                     "type": "object",
-                    "properties": {"question": {"type": "string", "minLength": 1}, "plan_summary": {"type": "string"}},
+                    "properties": {
+                        "question": {"type": "string", "minLength": 1},
+                        "plan_summary": {"type": "string"},
+                    },
                     "required": ["question"],
                 },
                 output_schema={
                     "type": "object",
-                    "properties": {"confirmed": {"type": "boolean"}, "user_text": {"type": "string"}},
+                    "properties": {
+                        "confirmed": {"type": "boolean"},
+                        "user_text": {"type": "string"},
+                    },
                     "required": ["confirmed"],
                 },
                 effects=["user_interaction"],
                 safety_class="low_risk_action",
-                execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="user_dialog", timeout_s=60.0, idempotent=False, side_effect_free=False),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="user_dialog",
+                    timeout_s=60.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
                 default_failure_policy=FailurePolicy(strategy="abort_task"),
-                llm_hints={"when_to_use": "Use before physical motion or memory writes that require explicit user approval."},
+                llm_hints={
+                    "when_to_use": "Use before physical motion or memory writes that require explicit user approval."
+                },
             ),
             ToolCapability(
                 name="chromie.listen",
                 agent_id="chromie.speech",
                 display_name="Listen for user response",
                 description="Listen for a short user response through Chromie's ASR/input layer.",
-                input_schema={"type": "object", "properties": {"timeout_s": {"type": "number", "minimum": 0.1}}},
-                output_schema={"type": "object", "properties": {"text": {"type": "string"}, "language": {"type": "string"}}},
+                input_schema={
+                    "type": "object",
+                    "properties": {"timeout_s": {"type": "number", "minimum": 0.1}},
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}, "language": {"type": "string"}},
+                },
                 effects=["read_only", "audio_input", "user_interaction"],
                 safety_class="safe_read",
-                execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="chromie_audio", timeout_s=60.0, idempotent=False, side_effect_free=False),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="chromie_audio",
+                    timeout_s=60.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
                 default_failure_policy=FailurePolicy(strategy="ask_user"),
-                llm_hints={"when_to_use": "Use when a task requires a spoken clarification or confirmation."},
+                llm_hints={
+                    "when_to_use": "Use when a task requires a spoken clarification or confirmation."
+                },
             ),
             ToolCapability(
                 name="chromie.report",
                 agent_id="chromie.speech",
                 display_name="Report result",
                 description="Report task progress, failure, or completion to the user.",
-                input_schema={"type": "object", "properties": {"message": {"type": "string", "minLength": 1}}, "required": ["message"]},
+                input_schema={
+                    "type": "object",
+                    "properties": {"message": {"type": "string", "minLength": 1}},
+                    "required": ["message"],
+                },
                 output_schema={"type": "object", "properties": {"reported": {"type": "boolean"}}},
                 effects=["user_interaction", "audio_output"],
                 safety_class="low_risk_action",
-                execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="chromie_audio", timeout_s=10.0, idempotent=False, side_effect_free=False),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="chromie_audio",
+                    timeout_s=10.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
                 default_failure_policy=FailurePolicy(strategy="skip"),
-                llm_hints={"when_to_use": "Use at the end of a DAG or after fallback to explain the outcome."},
+                llm_hints={
+                    "when_to_use": "Use at the end of a DAG or after fallback to explain the outcome."
+                },
             ),
         ],
     )
@@ -147,7 +295,9 @@ def chromie_manifests() -> list[AgentManifest]:
                 output_schema={"type": "object", "properties": {"events": {"type": "array"}}},
                 effects=["read_only"],
                 safety_class="safe_read",
-                execution=ExecutionPolicy(can_run_parallel=True, timeout_s=2.0, idempotent=True, side_effect_free=True),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True, timeout_s=2.0, idempotent=True, side_effect_free=True
+                ),
                 default_failure_policy=FailurePolicy(strategy="skip"),
             )
         ],
@@ -360,11 +510,21 @@ def chromie_manifests() -> list[AgentManifest]:
                         "source": {"type": "string", "minLength": 1},
                     },
                     "required": [
-                        "location", "country", "timezone", "date", "condition",
-                        "weather_code", "current_temperature_c",
-                        "apparent_temperature_c", "high_c", "low_c",
-                        "precipitation_probability_max", "precipitation_sum_mm",
-                        "wind_speed_kmh", "summary", "source"
+                        "location",
+                        "country",
+                        "timezone",
+                        "date",
+                        "condition",
+                        "weather_code",
+                        "current_temperature_c",
+                        "apparent_temperature_c",
+                        "high_c",
+                        "low_c",
+                        "precipitation_probability_max",
+                        "precipitation_sum_mm",
+                        "wind_speed_kmh",
+                        "summary",
+                        "source",
                     ],
                     "additionalProperties": False,
                 },
@@ -400,10 +560,16 @@ def chromie_manifests() -> list[AgentManifest]:
                     "semantic_scope": {
                         "domain": "weather_forecast",
                         "supported_temporal_scopes": [
-                            "current", "today", "tomorrow", "near_term_forecast"
+                            "current",
+                            "today",
+                            "tomorrow",
+                            "near_term_forecast",
                         ],
                         "unsupported_temporal_scopes": [
-                            "annual", "seasonal", "historical", "climate_normals"
+                            "annual",
+                            "seasonal",
+                            "historical",
+                            "climate_normals",
                         ],
                         "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
                     },

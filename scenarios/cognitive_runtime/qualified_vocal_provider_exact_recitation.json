@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "id": "qualified_vocal_provider_exact_recitation",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A source-qualified fake recitation provider keeps one exact capability identity and the Speaking lane without becoming ordinary response TTS.",
+  "tags": [
+    "vocal-provider",
+    "source-contract",
+    "exact-identity",
+    "speaking-lane"
+  ],
+  "input": {
+    "text": "Recite this greeting with the qualified recitation voice: Hello from Chromie.",
+    "language": "en-US"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action",
+      "tool"
+    ],
+    "route_decision": {
+      "route": "tool",
+      "intent": "qualified_vocal_performance",
+      "language": "en-US"
+    },
+    "goal_association": {
+      "turn_id": "turn-qualified-recitation",
+      "new_goals": [
+        {
+          "goal_id": "goal-recitation",
+          "description": "Recite the authored greeting using a qualified recitation provider.",
+          "source_text": "Recite this greeting with the qualified recitation voice: Hello from Chromie.",
+          "metadata": {
+            "responsibility_kind": "spoken_response",
+            "execution_lane": "speaking",
+            "output_mode": "recitation",
+            "provider_required": true
+          }
+        }
+      ],
+      "confidence": 1.0,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-qualified-recitation",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "uncertain",
+      "confidence": 0.9,
+      "goal_ids": [
+        "goal-recitation"
+      ],
+      "escalation_reason": "The rare qualified vocal capability requires full-catalog planning."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-qualified-recitation",
+        "planner_tier": "deep",
+        "disposition": "execute",
+        "coverage": "complete",
+        "confidence": 1.0,
+        "goal_ids": [
+          "goal-recitation"
+        ],
+        "goal_summary": "Recite the authored greeting with the exact qualified provider capability.",
+        "steps": [
+          {
+            "step_id": "perform-recitation",
+            "capability_id": "chromie.vocal.perform",
+            "args": {
+              "text": "Hello from Chromie.",
+              "mode": "recitation"
+            },
+            "timing": "sequential",
+            "source_goal_ids": [
+              "goal-recitation"
+            ],
+            "reason_summary": "The declared provider supports exact recitation."
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-recitation",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "perform-recitation"
+            ]
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 1.0,
+          "status": "exact",
+          "satisfied_goal_ids": [
+            "goal-recitation"
+          ],
+          "unmet_goal_ids": [],
+          "unmet_requirements": []
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "capability_id": "chromie.vocal.perform",
+        "provider_id": "scenario.fake_vocal",
+        "version": "1.0.0",
+        "description": "Source-qualified fake recitation provider contract.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "recitation"
+              ]
+            }
+          },
+          "required": [
+            "text",
+            "mode"
+          ],
+          "additionalProperties": false
+        },
+        "interruptible": true,
+        "can_run_parallel": true,
+        "exclusive_group": "chromie.audio",
+        "resource_claims": [
+          "audio_output"
+        ],
+        "metadata": {
+          "effects": [
+            "user_interaction",
+            "audio_output",
+            "vocal_performance"
+          ],
+          "safety_class": "low_risk_action",
+          "execution_lane": "speaking",
+          "parallel_metadata_declared": true,
+          "supported_vocal_modes": [
+            "recitation"
+          ],
+          "evidence_level": "source_test"
+        }
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "I can use the qualified recitation mode for that greeting.",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-recitation"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "tool",
+    "planner_tier": "deep",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-recitation",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "perform-recitation"
+        ]
+      }
+    ],
+    "capability_ids": [
+      "chromie.vocal.perform"
+    ],
+    "capability_args": [
+      {
+        "text": "Hello from Chromie.",
+        "mode": "recitation"
+      }
+    ],
+    "capability_source_goal_ids": [
+      [
+        "goal-recitation"
+      ]
+    ],
+    "capability_execution_lanes": [
+      "speaking"
+    ],
+    "speech_covers_goal_ids": [
+      "goal-recitation"
+    ],
+    "speech_contains_all": [
+      "qualified recitation mode"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

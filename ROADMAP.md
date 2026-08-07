@@ -18,9 +18,10 @@ organized by capability, risk, and retained evidence.
 1. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-2. Qualify the exact `chromie.vocal.perform` provider contract while preserving
-   Speaking-lane semantics and the Chromie-owned playback boundary.
-3. After vocal-provider source evidence closes, qualify a peer media-playback
+2. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
+   default-provider distinction evidence; real modes remain a separate target
+   evidence track.
+3. Qualify Issue #7's peer media-playback
    provider. Singing remains Speaking; existing-audio playback remains Activity;
    ordinary TTS is neither kind of evidence.
 4. Preserve exact provider-prefixed capability identity from model proposal
@@ -95,9 +96,21 @@ Exit criteria:
 
 The retained compound walk/sing/blink defect has met its source and Level C
 simulator exit criteria; [Current Status](docs/STATUS.md) owns the evidence.
-Issue #6 now owns the next source change: define the exact
-`chromie.vocal.perform` provider contract while keeping the maintained ownership
-boundary.
+Issue #6 has an exact source-qualified `chromie.vocal.perform` provider contract
+while keeping the maintained ownership boundary. Fake-provider tests, an exact
+recitation scenario, the relevant general-ability class, ordinary TTS
+regressions, and the canonical gate meet the source criteria. Clean Chromie
+`e558ff4` and Soridormi `1c15371` then passed the default-provider
+walk/sing/blink replay retained at
+`.chromie/acceptance/vocal-issue-6/issue-6-e558ff4-clean`: body work completed,
+singing remained unavailable with zero steps, all ordinary-TTS chunks played,
+and safe idle held before and after. Real vocal modes remain target evidence.
+
+Issue #7 is therefore the active source work. Define exact provider-prefixed
+media play, pause, resume, seek, stop, volume, and status capabilities with a
+bounded persistent lifecycle beneath Activity. Existing audio playback must not
+become authored vocal performance; stop-talking, stop-media, and stop-all must
+retain distinct cancellation scopes and receipts.
 Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
 ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
 embodied Capability Provider beneath Activity.

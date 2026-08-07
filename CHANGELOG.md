@@ -22,6 +22,18 @@ remains available in Git history.
   body behavior. Mutually inconsistent typed Goal tuples now trigger a fresh
   model-owned resegmentation from the authoritative turn without supplying the
   invalid DTO as semantic evidence.
+- Added the exact `chromie.vocal.perform` contract. Qualified providers declare
+  mode-specific retained evidence, streaming, timing, sample, concurrency,
+  cancellation, and immutable provenance properties; unsupported modes and
+  silent downgrades fail closed. Provider vocal Goals now pass through canonical
+  planning instead of the ordinary direct-speech shortcut, remain Speaking
+  during cross-lane coordination, and retain one identity through cancellation
+  and outcome evidence. The default catalog still advertises no qualified mode.
+- Retained clean default-provider Level C evidence for `e558ff4`: the original
+  walk/sing/blink turn completed both body members in Soridormi/MuJoCo, kept
+  singing unavailable with no step, played all four ordinary-TTS chunks without
+  failure, and returned to safe idle. This closes Issue #6's declared source
+  scope without claiming a real singing provider or physical audio.
 
 ### Verification and reproducibility
 

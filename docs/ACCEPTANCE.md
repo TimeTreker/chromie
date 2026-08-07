@@ -545,6 +545,40 @@ validate a singing provider, physical microphone/speaker quality, physical
 robot behavior, or release readiness. `--skip-canonical-gate` is diagnostic-only
 and can never produce closure-eligible evidence.
 
+### Exact vocal-provider source qualification
+
+Issue #6 source acceptance uses a fake provider so exact identity, mode
+negotiation, cancellation, and evidence failure semantics can be tested without
+making a singing or physical-audio claim:
+
+```bash
+python -m unittest \
+  tests.test_vocal_provider_contract \
+  tests.test_execution_lanes \
+  tests.test_tts_provider_contract
+python scripts/scenario_runner.py \
+  --only cognitive_runtime/qualified_vocal_provider_exact_recitation
+python scripts/general_ability_acceptance.py \
+  --mode level-a \
+  --ability-class stable_capability_grounding
+./scripts/run_tests.sh
+```
+
+The focused scenario must preserve `chromie.vocal.perform`, the exact requested
+mode, source Goal ownership, and `execution_lane=speaking` through Goal
+Association, both Planner tiers, Response Composer, and Host materialization.
+Provider tests must cover declaration evidence, unsupported-mode refusal before
+backend invocation, silent-downgrade rejection, exact request cancellation, and
+the final Trusted Capability Runtime/turn-closure evidence identity. Ordinary
+TTS regression tests must remain passing.
+
+This is Level A source evidence only. The existing clean walk/sing/blink Level C
+profile remains the live default-provider proof: singing is unavailable with no
+executable step while independent body work completes and safe idle holds. A
+real mode may be marked target validated only after a clean current-revision run
+retains that provider's immutable declaration, exact-mode completion, audible
+delivery evidence, and the applicable automated or supervised target notes.
+
 Use `--reject-internal-speech` when investigating planner/TTS leakage. For the
 known ASR-style walk typo regression, run:
 

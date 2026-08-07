@@ -23,6 +23,7 @@ from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
     SkillRequest,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
     output_schema_sha256,
     validate_output_schema_declaration,
 )
@@ -108,13 +109,17 @@ class CognitiveRuntimePolicy:
 
 
 class CognitiveAgentClient(Protocol):
-    async def resolve_goal_association(self, session: Any, **kwargs: Any) -> GoalAssociationResolution: ...
+    async def resolve_goal_association(
+        self, session: Any, **kwargs: Any
+    ) -> GoalAssociationResolution: ...
 
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
-    async def compose_response_plan(self, session: Any, **kwargs: Any) -> ResponseCompositionResolution: ...
+    async def compose_response_plan(
+        self, session: Any, **kwargs: Any
+    ) -> ResponseCompositionResolution: ...
 
 
 class CognitiveEvidenceRecorder:
@@ -177,9 +182,7 @@ class CognitiveEvidenceRecorder:
             "context_snapshot_digest": (
                 context_snapshot.digest if context_snapshot is not None else None
             ),
-            "context_reference_types": [
-                item.context_type for item in envelope.context_refs
-            ],
+            "context_reference_types": [item.context_type for item in envelope.context_refs],
             "text_chars": len(text or ""),
             "text_sha256_16": self._text_digest(text),
             "run_identity": self._identity_reference(),
@@ -197,9 +200,7 @@ class CognitiveEvidenceRecorder:
         self.counters[f"lane:{resolution.lane}"] += 1
         self.counters[f"mode:{resolution.mode}"] += 1
         failure_class = str(resolution.metadata.get("failure_class") or "").strip()
-        attribution = str(
-            resolution.metadata.get("architecture_attribution") or ""
-        ).strip()
+        attribution = str(resolution.metadata.get("architecture_attribution") or "").strip()
         if failure_class:
             self.counters[f"failure_class:{failure_class}"] += 1
         if attribution:
@@ -222,9 +223,7 @@ class CognitiveEvidenceRecorder:
         ):
             self.counters["fast_contract_repair"] += 1
         if bool(resolution.metadata.get("deep_planner_invoked")):
-            reason = str(
-                resolution.metadata.get("deep_planner_invocation_reason") or "unknown"
-            )
+            reason = str(resolution.metadata.get("deep_planner_invocation_reason") or "unknown")
             self.counters[f"deep_planner_invoked:{reason}"] += 1
         elif fast_path == "terminal":
             self.counters["deep_planner_avoided"] += 1
@@ -239,9 +238,7 @@ class CognitiveEvidenceRecorder:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "sid": sid,
             "turn_id": (
-                resolution.turn_envelope.turn_id
-                if resolution.turn_envelope is not None
-                else sid
+                resolution.turn_envelope.turn_id if resolution.turn_envelope is not None else sid
             ),
             "conversation_id": (
                 resolution.turn_envelope.conversation_id
@@ -323,9 +320,7 @@ class CognitiveEvidenceRecorder:
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n"
-            )
+            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
     @staticmethod
     def _plan_summary(plan: CanonicalPlan | None) -> dict[str, Any] | None:
@@ -341,8 +336,7 @@ class CognitiveEvidenceRecorder:
             "step_ids": [item.step_id for item in plan.steps],
             "capability_ids": [item.capability_id for item in plan.steps],
             "selected_agent_skills": [
-                item.model_dump(mode="json")
-                for item in plan.selected_agent_skills
+                item.model_dump(mode="json") for item in plan.selected_agent_skills
             ],
             "goal_satisfaction": (
                 plan.goal_satisfaction.model_dump(mode="json")
@@ -358,12 +352,8 @@ class CognitiveEvidenceRecorder:
         if resolution is None:
             return None
         composition = resolution.composition
-        coordinated = (
-            composition if isinstance(composition, CoordinatedResponsePlan) else None
-        )
-        direct = (
-            composition if isinstance(composition, DirectResponseComposition) else None
-        )
+        coordinated = composition if isinstance(composition, CoordinatedResponsePlan) else None
+        direct = composition if isinstance(composition, DirectResponseComposition) else None
         return {
             "status": resolution.status,
             "composition_id": composition.composition_id if composition else None,
@@ -398,9 +388,7 @@ class CognitiveEvidenceRecorder:
                 dict(composition.metadata.get("safe_read_semantic_review") or {})
                 if composition
                 and isinstance(composition.metadata, dict)
-                and isinstance(
-                    composition.metadata.get("safe_read_semantic_review"), dict
-                )
+                and isinstance(composition.metadata.get("safe_read_semantic_review"), dict)
                 else None
             ),
         }
@@ -421,9 +409,7 @@ class CognitiveEvidenceRecorder:
         turns = int(self.counters.get("turns", 0))
         return {
             "turns": turns,
-            "mean_total_latency_ms": (
-                round(self.total_latency_ms / turns, 1) if turns else 0.0
-            ),
+            "mean_total_latency_ms": (round(self.total_latency_ms / turns, 1) if turns else 0.0),
             "counters": dict(sorted(self.counters.items())),
             "path": str(self.path),
             "enabled": self.enabled,
@@ -663,9 +649,7 @@ class CanonicalPlanRuntimeAdapter:
                 )
             left_group = str(definition.exclusive_group or "")
             left_resources = {
-                str(item)
-                for item in definition.metadata.get("resource_claims", [])
-                if str(item)
+                str(item) for item in definition.metadata.get("resource_claims", []) if str(item)
             }
             for other in steps[index + 1 :]:
                 other_definition = definitions.get(other.step_id)
@@ -696,7 +680,6 @@ class CanonicalPlanRuntimeAdapter:
                     )
         return errors
 
-
     @staticmethod
     def _attention_target_error(attention: Any, context: dict[str, Any]) -> str | None:
         target = attention.target
@@ -713,9 +696,7 @@ class CanonicalPlanRuntimeAdapter:
         expected_ref = str(evidence_target.get("target_ref") or "").strip()
         if expected_ref and expected_ref != target.target_ref:
             return "attention_target_ref_mismatch"
-        expected_direction = str(
-            evidence_target.get("relative_direction") or ""
-        ).strip()
+        expected_direction = str(evidence_target.get("relative_direction") or "").strip()
         claimed_direction = str(target.relative_direction or "").strip()
         if expected_direction and claimed_direction and expected_direction != claimed_direction:
             return "attention_target_direction_mismatch"
@@ -762,9 +743,7 @@ class CanonicalPlanRuntimeAdapter:
             return True
         social_group = str(social_definition.exclusive_group or "")
         social_resources = {
-            str(item)
-            for item in social_definition.metadata.get("resource_claims", [])
-            if str(item)
+            str(item) for item in social_definition.metadata.get("resource_claims", []) if str(item)
         }
         for definition in primary_definitions.values():
             if not definition.can_run_parallel:
@@ -775,9 +754,7 @@ class CanonicalPlanRuntimeAdapter:
             if social_group and primary_group and social_group == primary_group:
                 return True
             primary_resources = {
-                str(item)
-                for item in definition.metadata.get("resource_claims", [])
-                if str(item)
+                str(item) for item in definition.metadata.get("resource_claims", []) if str(item)
             }
             if social_resources.intersection(primary_resources):
                 return True
@@ -813,9 +790,7 @@ class CanonicalPlanRuntimeAdapter:
                     "phase": "final",
                     "speech_act": final.speech_act,
                     "commitment_state": final.commitment_state,
-                    "must_not_claim_completion": (
-                        final.must_not_claim_completion
-                    ),
+                    "must_not_claim_completion": (final.must_not_claim_completion),
                     "covers_goal_ids": list(final.covers_goal_ids),
                     "source_goal_ids": list(final.covers_goal_ids),
                     "goal_association_fingerprint": fingerprint,
@@ -840,9 +815,7 @@ class CanonicalPlanRuntimeAdapter:
             elif policy_mode == "report_only":
                 omitted_attention.append("policy_report_only")
             else:
-                target_error = self._attention_target_error(
-                    attention, runtime_context
-                )
+                target_error = self._attention_target_error(attention, runtime_context)
                 if target_error:
                     omitted_attention.append(target_error)
                 else:
@@ -861,9 +834,7 @@ class CanonicalPlanRuntimeAdapter:
                                 )
                                 continue
                             if not definition.available:
-                                omitted_attention.append(
-                                    f"unavailable:{behavior.skill_id}"
-                                )
+                                omitted_attention.append(f"unavailable:{behavior.skill_id}")
                                 continue
                             if definition.requires_confirmation:
                                 omitted_attention.append(
@@ -879,9 +850,7 @@ class CanonicalPlanRuntimeAdapter:
                                 behavior.args, definition.input_schema
                             )
                             if schema_errors:
-                                omitted_attention.append(
-                                    f"invalid_args:{behavior.skill_id}"
-                                )
+                                omitted_attention.append(f"invalid_args:{behavior.skill_id}")
                                 continue
                             target_args_error = self._attention_target_args_error(
                                 behavior.args,
@@ -890,15 +859,13 @@ class CanonicalPlanRuntimeAdapter:
                             )
                             if target_args_error:
                                 omitted_attention.append(
-                                    f"target_error:{behavior.skill_id}:"
-                                    f"{target_args_error}"
+                                    f"target_error:{behavior.skill_id}:{target_args_error}"
                                 )
                                 continue
                             digest = hashlib.sha256(
-                                (
-                                    f"{fingerprint}|direct-social|{index}|"
-                                    f"{behavior.skill_id}"
-                                ).encode("utf-8")
+                                (f"{fingerprint}|direct-social|{index}|{behavior.skill_id}").encode(
+                                    "utf-8"
+                                )
                             ).hexdigest()[:20]
                             request = SkillRequest(
                                 request_id=f"social_{digest}",
@@ -909,9 +876,7 @@ class CanonicalPlanRuntimeAdapter:
                                 timeout_ms=definition.timeout_ms,
                                 cancellable=definition.interruptible,
                                 requires_confirmation=False,
-                                idempotency_key=(
-                                    f"direct:{fingerprint[:16]}:social:{index}"
-                                ),
+                                idempotency_key=(f"direct:{fingerprint[:16]}:social:{index}"),
                                 metadata={
                                     "source": "social_attention_plan",
                                     "auxiliary_social_attention": True,
@@ -929,14 +894,11 @@ class CanonicalPlanRuntimeAdapter:
                                 },
                             )
                             skills.append(request)
-                            self._record_auxiliary_behavior_request(
-                                request, session_id=session_id
-                            )
+                            self._record_auxiliary_behavior_request(request, session_id=session_id)
                             seen.add(behavior.skill_id)
                         except Exception as exc:
                             omitted_attention.append(
-                                f"invalid:{behavior.skill_id}:"
-                                f"{type(exc).__name__}"
+                                f"invalid:{behavior.skill_id}:{type(exc).__name__}"
                             )
 
         metadata = {
@@ -944,13 +906,9 @@ class CanonicalPlanRuntimeAdapter:
             "cognitive_runtime_apply": True,
             "language": language,
             "planless_direct_response": True,
-            "goal_association": association.model_dump(
-                mode="json", exclude_none=True
-            ),
+            "goal_association": association.model_dump(mode="json", exclude_none=True),
             "goal_association_fingerprint": fingerprint,
-            "response_composition": composition.model_dump(
-                mode="json", exclude_none=True
-            ),
+            "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "social_attention": "proposal_and_auxiliary_execution",
                 "speaking": "response_delivery",
@@ -966,9 +924,7 @@ class CanonicalPlanRuntimeAdapter:
             "operational_speech_authority": "llm_direct_response",
         }
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
-            metadata["user_turn_envelope"] = runtime_context[
-                "user_turn_envelope"
-            ]
+            metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
         return InteractionResponse(
             interaction_id=f"cognitive_{session_id}",
             status="ok",
@@ -1033,7 +989,10 @@ class CanonicalPlanRuntimeAdapter:
             raise ValueError("response composition canonical-plan fingerprint mismatch")
         errors = await self.validation_errors(plan)
         if errors:
-            raise ValueError("runtime canonical-plan validation failed: " + json.dumps(errors, ensure_ascii=False))
+            raise ValueError(
+                "runtime canonical-plan validation failed: "
+                + json.dumps(errors, ensure_ascii=False)
+            )
 
         fingerprint = canonical_plan_fingerprint(plan)
         alternative = str(plan.metadata.get("plan_relation") or "") in {
@@ -1050,13 +1009,17 @@ class CanonicalPlanRuntimeAdapter:
 
         response_plan = composition.response_plan
         lane_coordination_by_id = {
-            item.coordination_id: item
-            for item in composition.lane_coordination
+            item.coordination_id: item for item in composition.lane_coordination
         }
         activity_coordination_by_step_id = {
             step_id: item
             for item in composition.lane_coordination
             for step_id in item.activity_step_ids
+        }
+        speaking_coordination_by_step_id = {
+            step_id: item
+            for item in composition.lane_coordination
+            for step_id in item.speaking_step_ids
         }
         stage_items = [
             ("immediate", response_plan.immediate),
@@ -1064,26 +1027,18 @@ class CanonicalPlanRuntimeAdapter:
             *[("progress", item) for item in response_plan.progress],
             ("final", response_plan.final),
         ]
-        effectful_pre_execution = (
-            plan.disposition in {"execute", "mixed"} and bool(plan.steps)
-        )
+        effectful_pre_execution = plan.disposition in {"execute", "mixed"} and bool(plan.steps)
         executable_definitions = (
-            [
-                self.interaction_runtime.skill_definition(step.skill_id)
-                for step in plan.steps
-            ]
+            [self.interaction_runtime.skill_definition(step.skill_id) for step in plan.steps]
             if effectful_pre_execution
             else []
         )
         read_only_plan = bool(executable_definitions) and all(
-            str((definition.metadata or {}).get("safety_class") or "")
-            == "safe_read"
+            str((definition.metadata or {}).get("safety_class") or "") == "safe_read"
             for definition in executable_definitions
         )
         safe_read_parallel = (
-            effectful_pre_execution
-            and read_only_plan
-            and not confirmation_goal_ids
+            effectful_pre_execution and read_only_plan and not confirmation_goal_ids
         )
         safe_read_speech_optional = (
             safe_read_parallel
@@ -1122,14 +1077,10 @@ class CanonicalPlanRuntimeAdapter:
                 else None
             )
             available_pre_execution = [
-                item
-                for item in (immediate_item, pre_action_item)
-                if item is not None
+                item for item in (immediate_item, pre_action_item) if item is not None
             ]
             covered_pre_execution = {
-                goal_id
-                for _, stage in available_pre_execution
-                for goal_id in stage.covers_goal_ids
+                goal_id for _, stage in available_pre_execution for goal_id in stage.covers_goal_ids
             }
 
             # A safe, read-only lookup may start immediately without any spoken
@@ -1137,10 +1088,7 @@ class CanonicalPlanRuntimeAdapter:
             # acknowledgement, it is optional and runs in parallel with the lookup.
             # Effectful or confirmation-gated work retains the delivery barrier.
             if safe_read_parallel:
-                if (
-                    not safe_read_speech_optional
-                    and not available_pre_execution
-                ):
+                if not safe_read_speech_optional and not available_pre_execution:
                     raise ValueError(
                         "mixed safe-read execution requires response speech for "
                         "its non-executing goals"
@@ -1152,18 +1100,12 @@ class CanonicalPlanRuntimeAdapter:
                         "safe-read pre-execution speech, when present, must cover "
                         "all canonical goals"
                     )
-                if (
-                    pre_action_item is not None
-                    and required_goal_ids.issubset(
-                        set(pre_action_item[1].covers_goal_ids)
-                    )
+                if pre_action_item is not None and required_goal_ids.issubset(
+                    set(pre_action_item[1].covers_goal_ids)
                 ):
                     stage_items = [pre_action_item]
-                elif (
-                    immediate_item is not None
-                    and required_goal_ids.issubset(
-                        set(immediate_item[1].covers_goal_ids)
-                    )
+                elif immediate_item is not None and required_goal_ids.issubset(
+                    set(immediate_item[1].covers_goal_ids)
                 ):
                     stage_items = [immediate_item]
                 else:
@@ -1177,18 +1119,12 @@ class CanonicalPlanRuntimeAdapter:
                         "pre_action stages covering all canonical goals"
                     )
 
-                if (
-                    pre_action_item is not None
-                    and required_goal_ids.issubset(
-                        set(pre_action_item[1].covers_goal_ids)
-                    )
+                if pre_action_item is not None and required_goal_ids.issubset(
+                    set(pre_action_item[1].covers_goal_ids)
                 ):
                     stage_items = [pre_action_item]
-                elif (
-                    immediate_item is not None
-                    and required_goal_ids.issubset(
-                        set(immediate_item[1].covers_goal_ids)
-                    )
+                elif immediate_item is not None and required_goal_ids.issubset(
+                    set(immediate_item[1].covers_goal_ids)
                 ):
                     stage_items = [immediate_item]
                 else:
@@ -1210,8 +1146,7 @@ class CanonicalPlanRuntimeAdapter:
                 (
                     (phase, stage)
                     for phase, stage in stage_items
-                    if stage is not None
-                    and required_goal_ids.issubset(set(stage.covers_goal_ids))
+                    if stage is not None and required_goal_ids.issubset(set(stage.covers_goal_ids))
                 ),
                 None,
             )
@@ -1224,9 +1159,7 @@ class CanonicalPlanRuntimeAdapter:
                 and stage.commitment_state == "waiting_for_user"
             ]
             confirmation_stage_goal_ids = {
-                goal_id
-                for stage in confirmation_stages
-                for goal_id in stage.covers_goal_ids
+                goal_id for stage in confirmation_stages for goal_id in stage.covers_goal_ids
             }
             if confirmation_goal_ids and not confirmation_goal_ids.issubset(
                 confirmation_stage_goal_ids
@@ -1270,9 +1203,7 @@ class CanonicalPlanRuntimeAdapter:
                             "safe_read_micro_ack": safe_read_speech_optional,
                             "coordination_id": stage.coordination_id,
                             "delivery_role": stage.delivery_role,
-                            "reuse_current_turn_speech": (
-                                stage.reuse_current_turn_speech
-                            ),
+                            "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                         }
                     ]
                 else:
@@ -1284,24 +1215,17 @@ class CanonicalPlanRuntimeAdapter:
                         "text": stage.text,
                         "speech_act": stage.speech_act,
                         "commitment_state": stage.commitment_state,
-                        "must_not_claim_completion": (
-                            stage.must_not_claim_completion
-                        ),
+                        "must_not_claim_completion": (stage.must_not_claim_completion),
                         "covers_goal_ids": list(stage.covers_goal_ids),
                         "claims": list(stage.claims),
                         "source": "goal_driven_response_composer",
-                        "operational_text_source": (
-                            "llm_wording_runtime_validated"
-                        ),
+                        "operational_text_source": ("llm_wording_runtime_validated"),
                         "runtime_confirmation_required": (
-                            bool(confirmation_goal_ids)
-                            and stage in confirmation_stages
+                            bool(confirmation_goal_ids) and stage in confirmation_stages
                         ),
                         "coordination_id": stage.coordination_id,
                         "delivery_role": stage.delivery_role,
-                        "reuse_current_turn_speech": (
-                            stage.reuse_current_turn_speech
-                        ),
+                        "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                     }
                     for phase, stage in stage_items
                     if stage is not None
@@ -1319,9 +1243,7 @@ class CanonicalPlanRuntimeAdapter:
                     "source": "goal_driven_response_composer",
                     "coordination_id": stage.coordination_id,
                     "delivery_role": stage.delivery_role,
-                    "reuse_current_turn_speech": (
-                        stage.reuse_current_turn_speech
-                    ),
+                    "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1332,18 +1254,14 @@ class CanonicalPlanRuntimeAdapter:
             phase = str(projected["phase"])
             coordination_id = str(projected.get("coordination_id") or "").strip()
             coordination = lane_coordination_by_id.get(coordination_id)
-            coordinated_speech = bool(
-                coordination is not None and "speaking" in coordination.lanes
-            )
+            coordinated_speech = bool(coordination is not None and "speaking" in coordination.lanes)
             playback_barrier = not safe_read_parallel and not coordinated_speech
             speech_metadata = {
                 "source": projected["source"],
                 "phase": phase,
                 "speech_act": projected["speech_act"],
                 "commitment_state": projected["commitment_state"],
-                "must_not_claim_completion": projected[
-                    "must_not_claim_completion"
-                ],
+                "must_not_claim_completion": projected["must_not_claim_completion"],
                 "covers_goal_ids": projected["covers_goal_ids"],
                 "source_goal_ids": projected["covers_goal_ids"],
                 "canonical_plan_id": plan.plan_id,
@@ -1355,9 +1273,7 @@ class CanonicalPlanRuntimeAdapter:
                 "playback_start_required_for_delivery": playback_barrier,
             }
             if projected.get("reuse_current_turn_speech") is True:
-                normalized_text = " ".join(
-                    str(projected.get("text") or "").strip().split()
-                )
+                normalized_text = " ".join(str(projected.get("text") or "").strip().split())
                 reused = reusable_turn_speech.get(normalized_text)
                 if reused is None:
                     raise ValueError(
@@ -1375,9 +1291,7 @@ class CanonicalPlanRuntimeAdapter:
                         "reused_speech_status": reused.get("status"),
                         "reused_speech_generation": reused.get("generation"),
                         "reused_speech_orders": [
-                            int(item)
-                            for item in raw_orders
-                            if isinstance(item, int)
+                            int(item) for item in raw_orders if isinstance(item, int)
                         ],
                     }
                 )
@@ -1429,17 +1343,40 @@ class CanonicalPlanRuntimeAdapter:
         skills: list[SkillRequest] = []
         for step in plan.steps:
             definition = self.interaction_runtime.skill_definition(step.skill_id)
-            coordination = activity_coordination_by_step_id.get(step.step_id)
+            execution_lane = str(definition.metadata.get("execution_lane") or "activity").strip()
+            if execution_lane not in {"speaking", "activity"}:
+                raise ValueError(
+                    "canonical plan capability has unsupported execution lane: "
+                    f"{step.skill_id}={execution_lane!r}"
+                )
+            if (
+                step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+                and execution_lane != "speaking"
+            ):
+                raise ValueError(
+                    "exact vocal performance capability must remain in the speaking lane"
+                )
+            coordination = (
+                speaking_coordination_by_step_id.get(step.step_id)
+                if execution_lane == "speaking"
+                else activity_coordination_by_step_id.get(step.step_id)
+            )
+            wrong_lane_coordination = (
+                activity_coordination_by_step_id.get(step.step_id)
+                if execution_lane == "speaking"
+                else speaking_coordination_by_step_id.get(step.step_id)
+            )
+            if wrong_lane_coordination is not None:
+                raise ValueError(
+                    "lane coordination step membership contradicts trusted "
+                    f"capability execution_lane={execution_lane}: {step.step_id}"
+                )
             if coordination is not None:
                 if not definition.can_run_parallel:
-                    raise ValueError(
-                        "cross-lane activity capability is not parallel-safe: "
-                        + step.skill_id
-                    )
+                    raise ValueError("cross-lane capability is not parallel-safe: " + step.skill_id)
                 if definition.metadata.get("parallel_metadata_declared") is not True:
                     raise ValueError(
-                        "cross-lane activity capability lacks explicit parallel metadata: "
-                        + step.skill_id
+                        "cross-lane capability lacks explicit parallel metadata: " + step.skill_id
                     )
             coordination_metadata = (
                 {
@@ -1447,17 +1384,20 @@ class CanonicalPlanRuntimeAdapter:
                     "lane_coordination_relation": coordination.relation,
                     "lane_start_policy": coordination.start_policy,
                     "lane_failure_policy": coordination.failure_policy,
-                    "parallel_with_speech": "speaking" in coordination.lanes,
-                    "parallel_with_social_attention": (
-                        "social_attention" in coordination.lanes
+                    "parallel_with_speech": (
+                        execution_lane != "speaking" and "speaking" in coordination.lanes
                     ),
+                    "parallel_with_activity": (
+                        execution_lane != "activity" and "activity" in coordination.lanes
+                    ),
+                    "parallel_with_social_attention": ("social_attention" in coordination.lanes),
                 }
                 if coordination is not None
                 else {}
             )
-            digest = hashlib.sha256(
-                f"{fingerprint}|{step.step_id}".encode("utf-8")
-            ).hexdigest()[:20]
+            digest = hashlib.sha256(f"{fingerprint}|{step.step_id}".encode("utf-8")).hexdigest()[
+                :20
+            ]
             skills.append(
                 SkillRequest(
                     request_id=f"cogreq_{digest}",
@@ -1467,13 +1407,9 @@ class CanonicalPlanRuntimeAdapter:
                     timing="parallel" if safe_read_parallel else step.timing,
                     timeout_ms=definition.timeout_ms,
                     cancellable=definition.interruptible,
-                    requires_confirmation=(
-                        bool(definition.requires_confirmation) or alternative
-                    ),
+                    requires_confirmation=(bool(definition.requires_confirmation) or alternative),
                     idempotency_key=f"{plan.plan_id}:{step.step_id}:{fingerprint[:16]}",
-                    committed_output_schema_sha256=output_schema_sha256(
-                        definition.output_schema
-                    ),
+                    committed_output_schema_sha256=output_schema_sha256(definition.output_schema),
                     metadata={
                         **step.metadata,
                         "source": "goal_driven_canonical_plan",
@@ -1485,23 +1421,18 @@ class CanonicalPlanRuntimeAdapter:
                         "reason_summary": step.reason_summary,
                         "language": language,
                         "effects": list(definition.metadata.get("effects") or []),
-                        "safety_class": str(
-                            definition.metadata.get("safety_class") or ""
-                        ),
-                        "effectful": str(
-                            definition.metadata.get("safety_class") or ""
-                        ) not in {"safe_read", "planning_only"},
+                        "safety_class": str(definition.metadata.get("safety_class") or ""),
+                        "effectful": str(definition.metadata.get("safety_class") or "")
+                        not in {"safe_read", "planning_only"},
                         "retryable_safe_read": safe_read_parallel,
-                        "execution_lane": "activity",
+                        "execution_lane": execution_lane,
                         "parallel_with_speech": (
                             safe_read_parallel
                             or bool(coordination_metadata.get("parallel_with_speech"))
                         ),
                         **coordination_metadata,
                         "canonical_timing": step.timing,
-                        "effective_timing": (
-                            "parallel" if safe_read_parallel else step.timing
-                        ),
+                        "effective_timing": ("parallel" if safe_read_parallel else step.timing),
                         "runtime_timing_adjustment": (
                             "safe_read_parallel"
                             if safe_read_parallel and step.timing != "parallel"
@@ -1517,7 +1448,11 @@ class CanonicalPlanRuntimeAdapter:
         policy_mode = self._effective_social_attention_mode(composition)
         if attention is not None and attention.decision == "express" and policy_mode == "off":
             omitted_attention.append("policy_off")
-        elif attention is not None and attention.decision == "express" and policy_mode == "report_only":
+        elif (
+            attention is not None
+            and attention.decision == "express"
+            and policy_mode == "report_only"
+        ):
             omitted_attention.append("policy_report_only")
         elif attention is not None and attention.decision == "express":
             target_error = self._attention_target_error(attention, runtime_context)
@@ -1531,26 +1466,21 @@ class CanonicalPlanRuntimeAdapter:
                 seen_social: set[str] = set()
                 for index, behavior in enumerate(attention.behaviors):
                     try:
-                        await self.interaction_runtime.ensure_skill_definitions(
-                            [behavior.skill_id]
-                        )
-                        definition = self.interaction_runtime.skill_definition(
-                            behavior.skill_id
-                        )
-                        if behavior.skill_id in primary_definitions or behavior.skill_id in seen_social:
+                        await self.interaction_runtime.ensure_skill_definitions([behavior.skill_id])
+                        definition = self.interaction_runtime.skill_definition(behavior.skill_id)
+                        if (
+                            behavior.skill_id in primary_definitions
+                            or behavior.skill_id in seen_social
+                        ):
                             omitted_attention.append(
                                 f"duplicate_or_primary_skill:{behavior.skill_id}"
                             )
                             continue
                         if not definition.available:
-                            omitted_attention.append(
-                                f"unavailable:{behavior.skill_id}"
-                            )
+                            omitted_attention.append(f"unavailable:{behavior.skill_id}")
                             continue
                         if definition.requires_confirmation:
-                            omitted_attention.append(
-                                f"confirmation_required:{behavior.skill_id}"
-                            )
+                            omitted_attention.append(f"confirmation_required:{behavior.skill_id}")
                             continue
                         if behavior.timing != "parallel":
                             omitted_attention.append(
@@ -1561,9 +1491,7 @@ class CanonicalPlanRuntimeAdapter:
                             behavior.args, definition.input_schema
                         )
                         if schema_errors:
-                            omitted_attention.append(
-                                f"invalid_args:{behavior.skill_id}"
-                            )
+                            omitted_attention.append(f"invalid_args:{behavior.skill_id}")
                             continue
                         target_args_error = self._attention_target_args_error(
                             behavior.args,
@@ -1580,36 +1508,24 @@ class CanonicalPlanRuntimeAdapter:
                             behavior.timing,
                             primary_definitions,
                         ):
-                            omitted_attention.append(
-                                f"resource_conflict:{behavior.skill_id}"
-                            )
+                            omitted_attention.append(f"resource_conflict:{behavior.skill_id}")
                             continue
-                        coordination_id = str(
-                            behavior.coordination_id or ""
-                        ).strip()
-                        coordination = lane_coordination_by_id.get(
-                            coordination_id
-                        )
+                        coordination_id = str(behavior.coordination_id or "").strip()
+                        coordination = lane_coordination_by_id.get(coordination_id)
                         coordination_metadata = (
                             {
                                 "coordination_id": coordination.coordination_id,
                                 "lane_coordination_relation": coordination.relation,
                                 "lane_start_policy": coordination.start_policy,
                                 "lane_failure_policy": coordination.failure_policy,
-                                "parallel_with_speech": (
-                                    "speaking" in coordination.lanes
-                                ),
-                                "parallel_with_activity": (
-                                    "activity" in coordination.lanes
-                                ),
+                                "parallel_with_speech": ("speaking" in coordination.lanes),
+                                "parallel_with_activity": ("activity" in coordination.lanes),
                             }
                             if coordination is not None
                             else {}
                         )
                         digest = hashlib.sha256(
-                            f"{fingerprint}|social|{index}|{behavior.skill_id}".encode(
-                                "utf-8"
-                            )
+                            f"{fingerprint}|social|{index}|{behavior.skill_id}".encode("utf-8")
                         ).hexdigest()[:20]
                         skills.append(
                             SkillRequest(
@@ -1688,22 +1604,32 @@ class CanonicalPlanRuntimeAdapter:
             "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
-            "response_composition": composition.model_dump(
-                mode="json", exclude_none=True
-            ),
+            "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "social_attention": "proposal_and_auxiliary_execution",
-                "speaking": "response_delivery",
-                "activity": "provider_work",
+                "speaking": (
+                    "response_delivery_and_provider_work"
+                    if any(
+                        request.metadata.get("execution_lane") == "speaking" for request in skills
+                    )
+                    else "response_delivery"
+                ),
+                "activity": (
+                    "provider_work"
+                    if any(
+                        request.metadata.get("execution_lane") == "activity"
+                        and request.metadata.get("auxiliary_social_attention") is not True
+                        for request in skills
+                    )
+                    else "idle"
+                ),
             },
             "lane_coordination_groups": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in composition.lane_coordination
             ],
             "planning_result": (
-                "composed_plan"
-                if plan.disposition in {"execute", "mixed"}
-                else plan.disposition
+                "composed_plan" if plan.disposition in {"execute", "mixed"} else plan.disposition
             ),
             "capability_decision": plan.disposition,
             "goal_ids": plan.goal_ids,
@@ -1719,18 +1645,12 @@ class CanonicalPlanRuntimeAdapter:
                 attention.decision if attention is not None else "missing"
             ),
             "social_attention_proposed_capability_ids": proposed_social_capability_ids,
-            "social_attention_materialized_capability_ids": (
-                materialized_social_capability_ids
-            ),
-            "social_attention_materialized_count": len(
-                materialized_social_capability_ids
-            ),
+            "social_attention_materialized_capability_ids": (materialized_social_capability_ids),
+            "social_attention_materialized_count": len(materialized_social_capability_ids),
             "recent_auxiliary_behavior_evidence": (
                 self.recent_auxiliary_behavior_evidence(session_id)
             ),
-            "omitted_pre_execution_speech_phases": (
-                omitted_pre_execution_speech_phases
-            ),
+            "omitted_pre_execution_speech_phases": (omitted_pre_execution_speech_phases),
             "operational_speech_authority": (
                 "llm_optional_micro_ack"
                 if safe_read_speech_optional
@@ -1751,13 +1671,10 @@ class CanonicalPlanRuntimeAdapter:
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
             metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
         mind_context = runtime_context.get("mind")
-        if (
-            isinstance(mind_context, dict)
-            and isinstance(mind_context.get("personality_expression"), dict)
+        if isinstance(mind_context, dict) and isinstance(
+            mind_context.get("personality_expression"), dict
         ):
-            metadata["personality_expression"] = mind_context[
-                "personality_expression"
-            ]
+            metadata["personality_expression"] = mind_context["personality_expression"]
         if alternative:
             metadata["material_plan_change_requires_confirmation"] = True
         confirmation_prompt = next(
@@ -1770,18 +1687,14 @@ class CanonicalPlanRuntimeAdapter:
         )
         if confirmation_prompt:
             metadata["confirmation_prompt"] = confirmation_prompt
-            metadata["confirmation_prompt_source"] = (
-                "llm_wording_runtime_validated"
-            )
+            metadata["confirmation_prompt_source"] = "llm_wording_runtime_validated"
         return InteractionResponse(
             status=status_map.get(plan.disposition, "error"),
             speech=speech,
             skills=skills,
             requires_confirmation=any(item.requires_confirmation for item in skills),
             reason=(
-                plan.escalation_reason
-                if plan.disposition in {"unavailable", "refused"}
-                else None
+                plan.escalation_reason if plan.disposition in {"unavailable", "refused"} else None
             ),
             metadata=metadata,
         )
@@ -1805,9 +1718,7 @@ class GoalDrivenRuntimeCoordinator:
         policy: CognitiveRuntimePolicy,
         goal_state_apply: Callable[..., list[dict[str, Any]]] | None = None,
         context_refresh: Callable[[], dict[str, Any]] | None = None,
-        delivered_turn_speech_provider: (
-            Callable[[str], list[dict[str, Any]]] | None
-        ) = None,
+        delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
@@ -1843,8 +1754,8 @@ class GoalDrivenRuntimeCoordinator:
             and not association.associations
             and bool(association.new_goals)
             and all(
-                str((goal.metadata or {}).get("responsibility_kind") or "")
-                == "spoken_response"
+                str((goal.metadata or {}).get("responsibility_kind") or "") == "spoken_response"
+                and not bool((goal.metadata or {}).get("provider_required"))
                 and bool(str(goal.goal_id or "").strip())
                 for goal in association.new_goals
             )
@@ -1866,9 +1777,7 @@ class GoalDrivenRuntimeCoordinator:
         language: str,
         context: dict[str, Any],
     ) -> InteractionResponse:
-        text = " ".join(
-            str(getattr(route_decision, "speak_first", "") or "").strip().split()
-        )
+        text = " ".join(str(getattr(route_decision, "speak_first", "") or "").strip().split())
         if not text:
             raise ValueError(
                 "terminal missing-ability decision requires model-authored speak_first"
@@ -1887,13 +1796,9 @@ class GoalDrivenRuntimeCoordinator:
             "operational_speech_authority": "goal_interpreter_model",
             "missing_ability_terminal": True,
             "desired_abilities": (
-                list(desired_abilities)
-                if isinstance(desired_abilities, list)
-                else []
+                list(desired_abilities) if isinstance(desired_abilities, list) else []
             ),
-            "task_proposals": (
-                list(task_proposals) if isinstance(task_proposals, list) else []
-            ),
+            "task_proposals": (list(task_proposals) if isinstance(task_proposals, list) else []),
         }
         if isinstance(context.get("user_turn_envelope"), dict):
             metadata["user_turn_envelope"] = context["user_turn_envelope"]
@@ -1977,21 +1882,13 @@ class GoalDrivenRuntimeCoordinator:
     ) -> CognitiveRuntimeResolution:
         if core_interpretation is not None:
             if turn_envelope is None:
-                raise ValueError(
-                    "Core interpretation requires its admitted UserTurnEnvelope"
-                )
+                raise ValueError("Core interpretation requires its admitted UserTurnEnvelope")
             if core_interpretation.turn_id != turn_envelope.turn_id:
-                raise ValueError(
-                    "Core interpretation turn does not match UserTurnEnvelope"
-                )
+                raise ValueError("Core interpretation turn does not match UserTurnEnvelope")
             if core_interpretation.session_id != turn_envelope.session_id:
-                raise ValueError(
-                    "Core interpretation session does not match UserTurnEnvelope"
-                )
+                raise ValueError("Core interpretation session does not match UserTurnEnvelope")
             route_decision = CompatibilityRouteDecision.model_validate(
-                core_interpretation.route_decision_projection().model_dump(
-                    mode="json"
-                )
+                core_interpretation.route_decision_projection().model_dump(mode="json")
             )
             context = {
                 **context,
@@ -1999,9 +1896,7 @@ class GoalDrivenRuntimeCoordinator:
                     mode="json",
                     exclude={"compatibility_projection"},
                 ),
-                "core_interpretation_projection_digest": (
-                    core_interpretation.projection_digest
-                ),
+                "core_interpretation_projection_digest": (core_interpretation.projection_digest),
             }
         if route_decision is None:
             raise ValueError(
@@ -2016,15 +1911,9 @@ class GoalDrivenRuntimeCoordinator:
                     f"records, got {turn_envelope.admission}"
                 )
             if str(sid or "").strip() != turn_envelope.session_id:
-                raise ValueError(
-                    "Goal-driven Runtime session does not match UserTurnEnvelope"
-                )
-            if " ".join((text or "").strip().split()) != (
-                turn_envelope.normalized_input.text
-            ):
-                raise ValueError(
-                    "Goal-driven Runtime text does not match UserTurnEnvelope"
-                )
+                raise ValueError("Goal-driven Runtime session does not match UserTurnEnvelope")
+            if " ".join((text or "").strip().split()) != (turn_envelope.normalized_input.text):
+                raise ValueError("Goal-driven Runtime text does not match UserTurnEnvelope")
             text = turn_envelope.normalized_input.text
             sid = turn_envelope.session_id
             language = turn_envelope.normalized_input.language
@@ -2042,14 +1931,10 @@ class GoalDrivenRuntimeCoordinator:
         if not isinstance(experience, dict):
             experience = {}
         conversation_id = str(
-            context.get("conversation_id")
-            or experience.get("conversation_id")
-            or ""
+            context.get("conversation_id") or experience.get("conversation_id") or ""
         )
         interaction_id = str(
-            context.get("interaction_id")
-            or experience.get("interaction_id")
-            or sid
+            context.get("interaction_id") or experience.get("interaction_id") or sid
         )
         turn_index = context.get("turn_index") or experience.get("turn_index")
         route = str(getattr(route_decision, "route", "") or "")
@@ -2097,9 +1982,7 @@ class GoalDrivenRuntimeCoordinator:
                 language=language,
             )
             if turn_envelope is not None:
-                resolution = resolution.model_copy(
-                    update={"turn_envelope": turn_envelope}
-                )
+                resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
             return attach_core_identity(resolution)
         try:
             async with trace_scope:
@@ -2119,9 +2002,7 @@ class GoalDrivenRuntimeCoordinator:
                         language=language,
                     )
                     if turn_envelope is not None:
-                        resolution = resolution.model_copy(
-                            update={"turn_envelope": turn_envelope}
-                        )
+                        resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
                     resolution = attach_core_identity(resolution)
                     span.set_attribute("result_status", resolution.status)
                     span.set_attribute("lane", resolution.lane)
@@ -2148,11 +2029,7 @@ class GoalDrivenRuntimeCoordinator:
                 snapshot,
                 event_subtype="goal_driven_interaction",
                 producer="chromie.orchestrator.cognitive_runtime",
-                severity=(
-                    "warning"
-                    if resolution.status == "error"
-                    else retention.severity
-                ),
+                severity=("warning" if resolution.status == "error" else retention.severity),
                 retention_reason=retention.reason,
             )
         return resolution.model_copy(update={"metadata": metadata})
@@ -2184,19 +2061,16 @@ class GoalDrivenRuntimeCoordinator:
 
         def path_metadata() -> dict[str, Any]:
             first_deep_reason = (
-                deep_planner_invocation_reasons[0]
-                if deep_planner_invocation_reasons
-                else ""
+                deep_planner_invocation_reasons[0] if deep_planner_invocation_reasons else ""
             )
             return {
                 "fast_planner_path": fast_planner_path,
                 "deep_planner_invoked": bool(deep_planner_invocation_reasons),
                 "deep_planner_invocation_reason": first_deep_reason,
-                "deep_planner_invocation_reasons": list(
-                    deep_planner_invocation_reasons
-                ),
+                "deep_planner_invocation_reasons": list(deep_planner_invocation_reasons),
                 "deep_planner_avoided": bool(
-                    fast_planner_path in {
+                    fast_planner_path
+                    in {
                         "terminal",
                         "direct_spoken_response",
                         "terminal_missing_ability",
@@ -2207,9 +2081,7 @@ class GoalDrivenRuntimeCoordinator:
                     terminal_plan.planner_tier if terminal_plan is not None else ""
                 ),
                 "authoritative_goal_count": (
-                    len(self._association_goal_ids(association))
-                    if association is not None
-                    else 0
+                    len(self._association_goal_ids(association)) if association is not None else 0
                 ),
                 "fast_goal_outcome_count": (
                     len(fast_plan.goal_outcomes) if fast_plan is not None else 0
@@ -2294,13 +2166,9 @@ class GoalDrivenRuntimeCoordinator:
                 timeout_ms=self.policy.goal_association_timeout_ms,
             )
             timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
-            association_status = str(
-                (association.metadata or {}).get("status") or "resolved"
-            )
+            association_status = str((association.metadata or {}).get("status") or "resolved")
             planning_context = dict(context)
-            planning_context["goal_association_resolution"] = (
-                association.prompt_projection()
-            )
+            planning_context["goal_association_resolution"] = association.prompt_projection()
 
             if association_status not in {"resolved", "needs_clarification"}:
                 raise CognitiveStageFailure(
@@ -2322,8 +2190,7 @@ class GoalDrivenRuntimeCoordinator:
             # Named cancellation remains deferred to the trusted runtime closure
             # because execution-bound cancellation requires provider receipts.
             has_named_goal_cancellation = any(
-                item.relationship == "cancel"
-                for item in association.associations
+                item.relationship == "cancel" for item in association.associations
             )
             if (
                 self.policy.mode == "apply"
@@ -2341,9 +2208,7 @@ class GoalDrivenRuntimeCoordinator:
                             user_text=text,
                             route=route_decision.route,
                             intent=route_decision.intent,
-                            source=(
-                                "goal_driven_cognitive_runtime_goal_association"
-                            ),
+                            source=("goal_driven_cognitive_runtime_goal_association"),
                         )
                     except Exception as exc:
                         raise CognitiveStageFailure(
@@ -2361,7 +2226,8 @@ class GoalDrivenRuntimeCoordinator:
                         item
                         for item in goal_state_results
                         if item.get("applied") is False
-                        and item.get("reason") not in {
+                        and item.get("reason")
+                        not in {
                             "operation_already_applied",
                         }
                     ]
@@ -2426,18 +2292,16 @@ class GoalDrivenRuntimeCoordinator:
                     fast_planner_path = "direct_spoken_response"
                     lane = "chat"
                     composition_context = dict(planning_context)
-                    composition_context[
-                        "direct_goal_association_resolution"
-                    ] = association.prompt_projection()
+                    composition_context["direct_goal_association_resolution"] = (
+                        association.prompt_projection()
+                    )
                     composition_context["execution_capabilities"] = []
                     recent_auxiliary_evidence = getattr(
                         self.adapter,
                         "recent_auxiliary_behavior_evidence",
                         None,
                     )
-                    composition_context[
-                        "recent_auxiliary_behavior_evidence"
-                    ] = (
+                    composition_context["recent_auxiliary_behavior_evidence"] = (
                         recent_auxiliary_evidence(sid)
                         if callable(recent_auxiliary_evidence)
                         else []
@@ -2448,42 +2312,29 @@ class GoalDrivenRuntimeCoordinator:
                         else []
                     )
                     composition_context["delivered_turn_speech"] = [
-                        dict(item)
-                        for item in delivered_turn_speech
-                        if isinstance(item, dict)
+                        dict(item) for item in delivered_turn_speech if isinstance(item, dict)
                     ]
                     stage = time.perf_counter()
-                    composition_resolution = (
-                        await self.agent_client.compose_response_plan(
-                            session,
-                            text=text,
-                            route_decision=route_decision,
-                            sid=sid,
-                            context=composition_context,
-                            history=history,
-                            timeout_ms=(
-                                self.policy.response_composer_timeout_ms
-                            ),
-                        )
+                    composition_resolution = await self.agent_client.compose_response_plan(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=composition_context,
+                        history=history,
+                        timeout_ms=(self.policy.response_composer_timeout_ms),
                     )
-                    timings["response_composer"] = (
-                        time.perf_counter() - stage
-                    ) * 1000.0
-                    if (
-                        composition_resolution.status != "resolved"
-                        or not isinstance(
-                            composition_resolution.composition,
-                            DirectResponseComposition,
-                        )
+                    timings["response_composer"] = (time.perf_counter() - stage) * 1000.0
+                    if composition_resolution.status != "resolved" or not isinstance(
+                        composition_resolution.composition,
+                        DirectResponseComposition,
                     ):
                         raise CognitiveStageFailure(
                             "response_composer",
                             self._stage_failure_metadata(
                                 "response_composer",
                                 composition_resolution.metadata,
-                                default_failure_class=(
-                                    composition_resolution.status
-                                ),
+                                default_failure_class=(composition_resolution.status),
                             ),
                         )
                     if self.policy.mode == "apply":
@@ -2498,14 +2349,10 @@ class GoalDrivenRuntimeCoordinator:
                                 composition=composition_resolution,
                                 timings=timings,
                                 started=started,
-                                fallback_reason=(
-                                    "direct_response_lane_not_enabled_for_apply"
-                                ),
+                                fallback_reason=("direct_response_lane_not_enabled_for_apply"),
                                 metadata={
                                     "failure_stage": "authority_boundary",
-                                    "failure_class": (
-                                        "direct_response_lane_mismatch"
-                                    ),
+                                    "failure_class": ("direct_response_lane_mismatch"),
                                     "failure_domain": "cognitive_runtime",
                                     "retryable": False,
                                     **path_metadata(),
@@ -2513,20 +2360,14 @@ class GoalDrivenRuntimeCoordinator:
                             )
                         stage = time.perf_counter()
                         interaction = await self.adapter.build_direct_response(
-                            composition=(
-                                composition_resolution.composition
-                            ),
+                            composition=(composition_resolution.composition),
                             session_id=sid,
                             language=language,
                             context=composition_context,
                         )
-                        timings["runtime_adapter"] = (
-                            time.perf_counter() - stage
-                        ) * 1000.0
+                        timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
                         if goal_state_commit_stage == "goal_association":
-                            interaction.metadata["goal_state_results"] = (
-                                goal_state_results
-                            )
+                            interaction.metadata["goal_state_results"] = goal_state_results
                         return self._finish(
                             mode="apply",
                             status="applied",
@@ -2590,11 +2431,9 @@ class GoalDrivenRuntimeCoordinator:
                     )
                     deep_planner_invocation_reasons.append(deep_reason)
                     deep_context = dict(planning_context)
-                    deep_context["fast_plan_resolution"] = (
-                        self._fast_plan_context_for_deep(
-                            fast_plan,
-                            path_classification=fast_planner_path,
-                        )
+                    deep_context["fast_plan_resolution"] = self._fast_plan_context_for_deep(
+                        fast_plan,
+                        path_classification=fast_planner_path,
                     )
                     deep_context["deep_planner_invocation_reason"] = deep_reason
                     stage = time.perf_counter()
@@ -2627,9 +2466,7 @@ class GoalDrivenRuntimeCoordinator:
                     composition=None,
                     timings=timings,
                     started=started,
-                    fallback_reason=(
-                        "terminal_plan_exceeds_source_route_effect_envelope"
-                    ),
+                    fallback_reason=("terminal_plan_exceeds_source_route_effect_envelope"),
                     metadata={
                         "failure_stage": "authority_boundary",
                         "failure_class": "route_effect_escalation",
@@ -2666,9 +2503,7 @@ class GoalDrivenRuntimeCoordinator:
                     history=history,
                     timeout_ms=self.policy.deep_planner_timeout_ms,
                 )
-                timings[f"runtime_replan_{replan_count}"] = (
-                    time.perf_counter() - stage
-                ) * 1000.0
+                timings[f"runtime_replan_{replan_count}"] = (time.perf_counter() - stage) * 1000.0
                 deep_failure = self._optional_stage_failure_metadata(
                     "deep_planner", terminal_plan.metadata
                 )
@@ -2686,9 +2521,7 @@ class GoalDrivenRuntimeCoordinator:
                         composition=None,
                         timings=timings,
                         started=started,
-                        fallback_reason=(
-                            "terminal_plan_exceeds_source_route_effect_envelope"
-                        ),
+                        fallback_reason=("terminal_plan_exceeds_source_route_effect_envelope"),
                         metadata={
                             "failure_stage": "authority_boundary",
                             "failure_class": "route_effect_escalation",
@@ -2709,12 +2542,17 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             composition_context = dict(planning_context)
-            composition_context["canonical_plan_resolution"] = (
-                terminal_plan.prompt_projection()
-            )
+            composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
             composition_context["execution_capabilities"] = [
                 {
                     "capability_id": step.capability_id,
+                    "step_id": step.step_id,
+                    "execution_lane": str(
+                        self.adapter.interaction_runtime.skill_definition(
+                            step.skill_id
+                        ).metadata.get("execution_lane")
+                        or "activity"
+                    ),
                     "effects": list(
                         self.adapter.interaction_runtime.skill_definition(
                             step.skill_id
@@ -2741,9 +2579,7 @@ class GoalDrivenRuntimeCoordinator:
                 None,
             )
             composition_context["recent_auxiliary_behavior_evidence"] = (
-                recent_auxiliary_evidence(sid)
-                if callable(recent_auxiliary_evidence)
-                else []
+                recent_auxiliary_evidence(sid) if callable(recent_auxiliary_evidence) else []
             )
             delivered_turn_speech = (
                 self.delivered_turn_speech_provider(sid)
@@ -2751,9 +2587,7 @@ class GoalDrivenRuntimeCoordinator:
                 else []
             )
             composition_context["delivered_turn_speech"] = [
-                dict(item)
-                for item in delivered_turn_speech
-                if isinstance(item, dict)
+                dict(item) for item in delivered_turn_speech if isinstance(item, dict)
             ]
             stage = time.perf_counter()
             composition_resolution = await self.agent_client.compose_response_plan(
@@ -2832,9 +2666,7 @@ class GoalDrivenRuntimeCoordinator:
                         "runtime_replan_count": replan_count,
                         "stage_diagnostics": stage_diagnostics,
                         "architecture_attribution": (
-                            "not_evaluated"
-                            if stage_diagnostics
-                            else "not_evaluated"
+                            "not_evaluated" if stage_diagnostics else "not_evaluated"
                         ),
                         **path_metadata(),
                     },
@@ -2854,9 +2686,7 @@ class GoalDrivenRuntimeCoordinator:
                     "runtime_replan_count": replan_count,
                     "stage_diagnostics": stage_diagnostics,
                     "architecture_attribution": (
-                        "not_evaluated"
-                        if stage_diagnostics
-                        else "not_evaluated"
+                        "not_evaluated" if stage_diagnostics else "not_evaluated"
                     ),
                     **path_metadata(),
                 },
@@ -2935,9 +2765,7 @@ class GoalDrivenRuntimeCoordinator:
             "failure_class": str(
                 values.get("failure_class") or default_failure_class or "stage_failure"
             ),
-            "failure_domain": str(
-                values.get("failure_domain") or "model_or_runtime"
-            ),
+            "failure_domain": str(values.get("failure_domain") or "model_or_runtime"),
             "architecture_attribution": str(
                 values.get("architecture_attribution") or "not_evaluated"
             ),

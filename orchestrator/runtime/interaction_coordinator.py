@@ -15,7 +15,6 @@ from agent.app.tool_invocation import (
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    InteractionSpeech,
     SkillRequest,
     SkillResult,
 )
@@ -31,8 +30,10 @@ from .skill_runtime import (
     SkillRegistry,
     SkillRuntime,
     SkillRuntimeResult,
+    VocalPerformanceSkillProvider,
     local_speech_definition,
     session_interrupt_definition,
+    vocal_performance_definition,
 )
 from .skill_adapters import (
     TaskGraphCancelHandler,
@@ -101,6 +102,7 @@ class InteractionRuntimeCoordinator:
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
+        vocal_provider: VocalPerformanceSkillProvider | None = None,
         capability_manifest_paths: str | None = None,
         max_concurrency: int | None = None,
         catalog_refresh_ttl_s: float | None = None,
@@ -128,6 +130,9 @@ class InteractionRuntimeCoordinator:
                 speech_cancel_scheduler,
             )
         )
+        if vocal_provider is not None:
+            self.registry.register(vocal_performance_definition(vocal_provider.declaration))
+            self.runtime.register_provider(vocal_provider)
         self.runtime.register_provider(SessionControlSkillProvider())
         if agent_tool_handler is not None:
             definitions = local_agent_tool_definitions(capability_manifest_paths)
@@ -136,9 +141,7 @@ class InteractionRuntimeCoordinator:
             if definitions:
                 self.runtime.register_provider(AgentToolSkillProvider(agent_tool_handler))
         if conversation_memory_handler is not None:
-            memory_definitions = host_runtime_memory_definitions(
-                capability_manifest_paths
-            )
+            memory_definitions = host_runtime_memory_definitions(capability_manifest_paths)
             for definition in memory_definitions:
                 self.registry.register(definition)
             if memory_definitions:
@@ -219,10 +222,7 @@ class InteractionRuntimeCoordinator:
         """Synchronously expose a launch before any awaitable preflight."""
 
         if not self.runtime.begin_interaction(interaction_id):
-            raise ValueError(
-                "cannot reserve an already-open interaction_id="
-                f"{interaction_id!r}"
-            )
+            raise ValueError(f"cannot reserve an already-open interaction_id={interaction_id!r}")
 
     def release_interaction(self, interaction_id: str) -> None:
         self.runtime.end_interaction(interaction_id)
@@ -235,18 +235,14 @@ class InteractionRuntimeCoordinator:
         confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
         raw_body_requests = [
-            request
-            for request in response.skills
-            if request.skill_id.startswith("soridormi.")
+            request for request in response.skills if request.skill_id.startswith("soridormi.")
         ]
         suppress_body_failure_speech = self._suppress_body_failure_speech(response)
         if raw_body_requests:
             if self.soridormi_invoker is None:
                 try:
                     await self._ensure_soridormi_catalog(
-                        required_skill_ids=(
-                            request.skill_id for request in raw_body_requests
-                        ),
+                        required_skill_ids=(request.skill_id for request in raw_body_requests),
                     )
                 except RuntimeError as exc:
                     if suppress_body_failure_speech:
@@ -261,9 +257,7 @@ class InteractionRuntimeCoordinator:
                     raise
             try:
                 await self._ensure_soridormi_catalog(
-                    required_skill_ids=(
-                        request.skill_id for request in raw_body_requests
-                    ),
+                    required_skill_ids=(request.skill_id for request in raw_body_requests),
                 )
             except RuntimeError as exc:
                 return await self._body_setup_failure(
@@ -287,14 +281,10 @@ class InteractionRuntimeCoordinator:
             )
         suppress_body_failure_speech = self._suppress_body_failure_speech(prepared)
         body_requests = [
-            request
-            for request in prepared.skills
-            if request.skill_id.startswith("soridormi.")
+            request for request in prepared.skills if request.skill_id.startswith("soridormi.")
         ]
         task_graph_requests = [
-            request
-            for request in prepared.skills
-            if request.skill_id == _TASK_GRAPH_SKILL_ID
+            request for request in prepared.skills if request.skill_id == _TASK_GRAPH_SKILL_ID
         ]
         gated_requests = [*body_requests, *task_graph_requests]
         if task_graph_requests and not self._task_graph_enabled:
@@ -335,9 +325,7 @@ class InteractionRuntimeCoordinator:
                 deep=True,
                 update={
                     "speech": [
-                        speech
-                        for speech in prepared.speech
-                        if speech.timing != "after_skills"
+                        speech for speech in prepared.speech if speech.timing != "after_skills"
                     ]
                 },
             )
@@ -355,9 +343,7 @@ class InteractionRuntimeCoordinator:
 
         gated_request_ids = {request.request_id for request in gated_requests}
         body_results = [
-            result
-            for result in execution.results
-            if result.request_id in gated_request_ids
+            result for result in execution.results if result.request_id in gated_request_ids
         ]
         failed_body_results = [
             result
@@ -418,11 +404,7 @@ class InteractionRuntimeCoordinator:
             return self._merge_executions(
                 execution,
                 followup_execution,
-                status=(
-                    "completed"
-                    if followup_execution.status == "completed"
-                    else "failed"
-                ),
+                status=("completed" if followup_execution.status == "completed" else "failed"),
             )
         return execution
 
@@ -467,7 +449,6 @@ class InteractionRuntimeCoordinator:
             )
         )
 
-
     def _enforce_structured_planning_state(
         self,
         response: InteractionResponse,
@@ -489,28 +470,20 @@ class InteractionRuntimeCoordinator:
         } or capability_decision in {"clarify", "unsupported", "blocked"}
         if not blocked:
             return response
-        effectful = [
-            request
-            for request in response.skills
-            if request.skill_id != "chromie.speak"
-        ]
+        effectful = [request for request in response.skills if request.skill_id != "chromie.speak"]
         if not effectful:
             return response
         return response.model_copy(
             deep=True,
             update={
                 "skills": [
-                    request
-                    for request in response.skills
-                    if request.skill_id == "chromie.speak"
+                    request for request in response.skills if request.skill_id == "chromie.speak"
                 ],
                 "requires_confirmation": False,
                 "metadata": {
                     **metadata,
                     "structured_planning_execution_suppressed": True,
-                    "suppressed_capability_ids": [
-                        request.skill_id for request in effectful
-                    ],
+                    "suppressed_capability_ids": [request.skill_id for request in effectful],
                 },
             },
         )
@@ -558,9 +531,7 @@ class InteractionRuntimeCoordinator:
                     "interruptible": True,
                     "metadata": {
                         "source": "host_body_setup_failure_fallback",
-                        "failed_request_ids": [
-                            result.request_id for result in body_results
-                        ],
+                        "failed_request_ids": [result.request_id for result in body_results],
                         "session_id": session_id,
                     },
                 }
@@ -594,11 +565,7 @@ class InteractionRuntimeCoordinator:
                     if zh
                     else "The task timed out, and I could not confirm it completed safely."
                 )
-            return (
-                "我无法安全完成这个任务。"
-                if zh
-                else "I could not complete that task safely."
-            )
+            return "我无法安全完成这个任务。" if zh else "I could not complete that task safely."
         if any(result.status == "refused" for result in results):
             return (
                 "安全检查未通过，我没有执行这个动作。"
@@ -614,11 +581,7 @@ class InteractionRuntimeCoordinator:
         conservative = conservative_body_failure_message(results, language=language)
         if conservative:
             return conservative
-        return (
-            "我无法安全完成这个动作。"
-            if zh
-            else "I could not complete that movement safely."
-        )
+        return "我无法安全完成这个动作。" if zh else "I could not complete that movement safely."
 
     def _merge_executions(
         self,
@@ -639,9 +602,7 @@ class InteractionRuntimeCoordinator:
         response: InteractionResponse,
     ) -> set[str]:
         body_requests = [
-            request
-            for request in response.skills
-            if request.skill_id.startswith("soridormi.")
+            request for request in response.skills if request.skill_id.startswith("soridormi.")
         ]
         if body_requests:
             await self._ensure_soridormi_catalog(
@@ -690,9 +651,8 @@ class InteractionRuntimeCoordinator:
             }
         output = dict(outcome.output or {})
         required_postconditions = ("stopped", "emergency", "safe_idle")
-        postcondition_confirmed = (
-            outcome.status == "success"
-            and all(output.get(key) is True for key in required_postconditions)
+        postcondition_confirmed = outcome.status == "success" and all(
+            output.get(key) is True for key in required_postconditions
         )
         if outcome.status == "success" and not postcondition_confirmed:
             return {
@@ -743,19 +703,13 @@ class InteractionRuntimeCoordinator:
                 {},
             )
             if outcome.status != "success":
-                raise RuntimeError(
-                    outcome.error or "Soridormi named-skill catalog lookup failed"
-                )
+                raise RuntimeError(outcome.error or "Soridormi named-skill catalog lookup failed")
             skills = outcome.output.get("skills")
             if not isinstance(skills, list):
-                raise RuntimeError(
-                    "Soridormi named-skill catalog response has no skills list"
-                )
+                raise RuntimeError("Soridormi named-skill catalog response has no skills list")
             self.registry.import_soridormi_catalog(skills)
             if "soridormi.mcp" not in self.runtime.provider_ids():
-                self.runtime.register_provider(
-                    SoridormiNamedSkillAdapter(self.soridormi_invoker)
-                )
+                self.runtime.register_provider(SoridormiNamedSkillAdapter(self.soridormi_invoker))
             self._catalog_loaded = True
             self._catalog_last_loaded_at = time.monotonic()
 
@@ -780,9 +734,7 @@ class InteractionRuntimeCoordinator:
             return True
         if self._catalog_last_loaded_at is None:
             return True
-        return (
-            time.monotonic() - self._catalog_last_loaded_at
-        ) >= self._catalog_refresh_ttl_s
+        return (time.monotonic() - self._catalog_last_loaded_at) >= self._catalog_refresh_ttl_s
 
     def _required_soridormi_skills_need_refresh(
         self,
@@ -861,9 +813,7 @@ class InteractionRuntimeCoordinator:
             "truth_reconciliation_reason": reason,
         }
         if self._has_typed_supersession_evidence(response):
-            metadata["truth_reconciliation_speech_source"] = (
-                "typed_superseded_proposal"
-            )
+            metadata["truth_reconciliation_speech_source"] = "typed_superseded_proposal"
             return response.model_copy(deep=True, update={"metadata": metadata})
 
         metadata.update(
@@ -890,15 +840,12 @@ class InteractionRuntimeCoordinator:
     ) -> bool:
         if not response.speech:
             return False
-        reason = str(
-            response.metadata.get("truth_reconciliation_reason") or ""
-        ).strip()
+        reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
         superseded = response.metadata.get("superseded_task_proposals")
         if not reason or not isinstance(superseded, list) or not superseded:
             return False
         return all(
-            isinstance(item, dict)
-            and bool(str(item.get("superseded_by") or "").strip())
+            isinstance(item, dict) and bool(str(item.get("superseded_by") or "").strip())
             for item in superseded
         )
 
@@ -944,9 +891,7 @@ class InteractionRuntimeCoordinator:
                 "guarded_operation",
             }:
                 return True
-            if effects.intersection(
-                {"physical_motion", "safety_control", "emergency_stop"}
-            ):
+            if effects.intersection({"physical_motion", "safety_control", "emergency_stop"}):
                 return True
             # Historical compatibility may lack capability metadata. Keep the
             # old body/task safety surface, but never classify arbitrary

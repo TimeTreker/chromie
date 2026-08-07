@@ -114,6 +114,10 @@
         {
           "key": "goal_interpretation/chinese_walk_after_weather_intent_repaired",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
+        },
+        {
+          "key": "cognitive_runtime/qualified_vocal_provider_exact_recitation",
+          "rationale": "A qualified vocal mode must preserve its exact public capability identity, typed mode, and Speaking-lane authority through planning and Host materialization."
         }
       ],
       "live_text_cases": [
