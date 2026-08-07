@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -385,7 +387,8 @@ class VocalIssueClosureTests(unittest.TestCase):
 
         self.assertIn("--startup-timeout-s)", source)
         self.assertIn(
-            'wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent"',
+            'wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" '
+            '"Chromie Agent" "$CHROMIE_PID" "$CHROMIE_LOG"',
             source,
         )
         self.assertIn(
@@ -393,6 +396,48 @@ class VocalIssueClosureTests(unittest.TestCase):
             source,
         )
         self.assertNotIn('127.0.0.1 8092 420 "Chromie Agent"', source)
+
+    def test_paired_launcher_reports_soridormi_child_exit_without_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            soridormi_scripts = temp_root / "soridormi" / "scripts"
+            soridormi_scripts.mkdir(parents=True)
+            fake_launcher = soridormi_scripts / "start_soridormi_mujoco.sh"
+            fake_launcher.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo '[soridormi][error] simulated launcher failure' >&2\n"
+                "exit 23\n",
+                encoding="utf-8",
+            )
+            fake_launcher.chmod(0o755)
+            env = os.environ.copy()
+            env["CHROMIE_VOICE_MUJOCO_STATE_DIR"] = str(temp_root / "state")
+
+            completed = subprocess.run(
+                [
+                    str(ROOT / "scripts" / "start_voice_mujoco.sh"),
+                    "--soridormi-repo",
+                    str(temp_root / "soridormi"),
+                    "--no-viewer",
+                    "--keep-running",
+                    "--startup-timeout-s",
+                    "5",
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+
+        rendered = completed.stdout + completed.stderr
+        self.assertEqual(completed.returncode, 1, rendered)
+        self.assertIn(
+            "Soridormi MCP launcher exited before becoming ready.",
+            rendered,
+        )
+        self.assertIn("simulated launcher failure", rendered)
 
     def test_legacy_list_outcomes_remain_readable_during_evidence_migration(self) -> None:
         summary = passing_summary()
