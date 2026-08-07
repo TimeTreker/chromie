@@ -24,8 +24,9 @@ The post-merge audit of `e3d57ff` established:
   deterministic transport, and generated-speech barge-in path were live;
 - the first strict comprehensive run retained 40 passing and 8 failing checks;
   missing host test dependencies caused the source/scenario portion of those
-  failures, while log inspection and retained scenario replay exposed nine
-  implementation/orchestration defects and one stale acceptance-event contract;
+  failures, while log inspection and retained scenario replay exposed the
+  implementation/orchestration defects and stale acceptance-event contract
+  recorded in `docs/STATUS.md`;
 - ordinary/final speech was played without entering the delivered-turn ledger;
   safe-read composition could duplicate or overclaim pre-evidence speech;
   Goal Association could anchor mechanical location defects and misclassify
@@ -33,18 +34,24 @@ The post-merge audit of `e3d57ff` established:
   invalid output; typed pre-effect speech still made false tool/memory claims;
   valid tool results could fail only for sentence length; weather follow-ups
   replayed old evidence; service rebuilds could retain deleted image IDs; and
-  the voice harness required retired events;
+  the voice harness required retired events; the first mechanically clean
+  comprehensive replay then exposed valid direct speech discarded by malformed
+  optional Social Attention and a prompt-only decision-first contract that the
+  deployed Fast Planner could ignore;
 - focused regressions now cover the repaired evidence ledger, current Core and
   Gateway event contracts, fresh model-owned Goal resegmentation, useful typed
   contract repair with authority-reducing session recovery, tool/memory
   pre-effect speech suppression, pure safe-read single ownership, and bounded
-  evidence-preserving result repair;
-- the dependency-complete canonical gate passes 2,078 maintained tests, 20
+  evidence-preserving result repair, authority-reducing direct auxiliary
+  validation, and bounded model-owned retained-evidence communication review;
+- the dependency-complete canonical gate passes 2,081 maintained tests, 20
   legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
   all ten general-ability classes;
 - the comprehensive runner now builds once before nested voice acceptance;
   the first clean committed replay then exposed and removed an inapplicable
-  full seven-case MuJoCo verifier call on its three-case diagnostic bundle; and
+  full seven-case MuJoCo verifier call on its three-case diagnostic bundle; its
+  next clean replay passed every mechanical check but remained blocked after
+  manual delivered-text inspection found the two semantic defects above; and
 - semantic documentation mismatches were corrected in the existing authority
   documents instead of creating another audit owner.
 

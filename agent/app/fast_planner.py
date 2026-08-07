@@ -31,7 +31,9 @@ from .planner_contract import (
     parallel_plan_contract_errors,
     planner_response_goal_ids,
     planner_contract_diagnostics,
+    retained_evidence_response_review_required,
     review_coordinated_action_plan_coverage,
+    review_retained_evidence_response,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -72,6 +74,7 @@ class FastPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
+        communication_reviewer: OllamaClient | None = None,
         min_confidence: float = 0.8,
         num_ctx: int = 8192,
         num_predict: int = 2048,
@@ -79,6 +82,7 @@ class FastPlannerResolver:
         max_contract_repairs: int = 1,
     ) -> None:
         self.ollama = ollama
+        self.communication_reviewer = communication_reviewer or ollama
         self.catalog = catalog
         self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
         self.num_ctx = max(2048, int(num_ctx))
@@ -345,6 +349,75 @@ class FastPlannerResolver:
                 request=request,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
             )
+            if retained_evidence_response_review_required(request.context, validated):
+                try:
+                    communication_review = await review_retained_evidence_response(
+                        self.communication_reviewer,
+                        request_text=request.text,
+                        language=str(request.language or "und"),
+                        association=goal_association_prompt_projection(request.context),
+                        authoritative_goals=canonical_goal_grounding(request.context),
+                        delivered_evidence=evidence_bound_dialogue(
+                            request.context,
+                            fallback_history=request.history,
+                        ),
+                        plan=validated,
+                        num_ctx=self.num_ctx,
+                        turn_id=str(request.sid or ""),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "fast_planner_communication_review_unavailable "
+                        "sid=%s error_type=%s error=%s",
+                        request.sid,
+                        type(exc).__name__,
+                        exc,
+                    )
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "followup_communication_review_unavailable",
+                        unresolved=["latest_communicative_act_unreviewed"],
+                        error=exc,
+                        path_classification="coverage_review_failure",
+                        metadata={"execution_allowed": False},
+                    )
+                reviewed_by_goal = {
+                    item.goal_id: item.response_text
+                    for item in communication_review.goal_responses
+                }
+                reviewed_outcomes = [
+                    item.model_copy(
+                        update={"response_text": reviewed_by_goal[item.goal_id]}
+                    )
+                    if item.disposition == "respond"
+                    else item
+                    for item in validated.goal_outcomes
+                ]
+                metadata = dict(validated.metadata)
+                metadata["communication_review"] = {
+                    "status": (
+                        "revised"
+                        if communication_review.decision == "revise"
+                        else "accepted"
+                    ),
+                    "confidence": communication_review.confidence,
+                    "reason": communication_review.reason,
+                    "semantic_authority": "planner_model",
+                    "execution_authority": "none",
+                }
+                validated = validated.model_copy(
+                    update={
+                        "response_text": communication_review.response_text,
+                        "goal_outcomes": reviewed_outcomes,
+                        "metadata": metadata,
+                    }
+                )
+                logger.info(
+                    "fast_planner_communication_review_done sid=%s decision=%s",
+                    request.sid,
+                    communication_review.decision,
+                )
             coordinated_goal_ids = coordinated_action_goal_ids(
                 canonical_goal_grounding(request.context)
             )

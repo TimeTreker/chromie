@@ -1520,6 +1520,7 @@ class ResponseComposerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
+                raw = self._canonicalize_optional_social_attention_payload(raw)
                 output = ResponseComposerModelOutput.model_validate(raw)
                 self._validate_social_attention_decision(
                     output.social_attention_plan,

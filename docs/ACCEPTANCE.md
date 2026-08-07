@@ -86,8 +86,33 @@ Soridormi source binding. The collector no longer makes the inapplicable call;
 the repaired committed replay remains required before closure. Semantic review
 also remains pending rather than being inferred from the mechanical result.
 
+The repaired clean committed replay at `d3f7b62`, retained under
+`.chromie/comprehensive/20260807T094903Z`, reported 47 passes, zero failures,
+zero timeouts, and one skipped external semantic review. All deterministic,
+service, GPU, idle/shared-load workflow, and selected synthetic voice checks
+passed mechanically. That result was still not accepted as closure: manual
+inspection of the retained delivered text found one Chinese family-help turn
+that fell back after valid primary speech was coupled to malformed optional
+Social Attention, plus two umbrella follow-ups that still replayed weather
+before the requested decision. These were semantic contract failures even
+though transport and audio assertions passed, so they were not averaged into a
+pass or hidden behind the pending external reviewer.
+
+Dirty focused replay after the general fixes is retained only as diagnostic
+evidence. `.chromie/acceptance/targeted-family-20260807c` delivered one natural
+family-help response with one completed speech event, unique delivery, and CER
+0.0. `.chromie/acceptance/targeted-semantic-20260807b` delivered the umbrella
+decision first, followed by one grounded support clause, with unique delivery
+and CER 0.068966. A forced deployed `/fast-plan` chat probe separately exercised
+the new communication-review branch and revised evidence-first text to “是的，您
+需要带伞。” before the supporting weather clause. An earlier family attempt in
+the same targeted run hit a cold service connection reset and TTS startup
+timeout; the warmed repeat, rather than that failed attempt, is the relevant
+behavior diagnostic. None of these dirty probes replaces final clean,
+revision-bound comprehensive evidence or external semantic adjudication.
+
 After the executable scenarios were aligned with the evidence-before-claim
-contract, the complete source gate passed: 102 benchmark tests, 2,078 maintained
+contract, the complete source gate passed: 102 benchmark tests, 2,081 maintained
 tests, 20 legacy Agent tests, and every repository-policy, ownership, Ruff, Mypy,
 configuration, structure, and documentation check. The Level A general-ability
 profile passed 66/66 across all ten ability classes. These results establish

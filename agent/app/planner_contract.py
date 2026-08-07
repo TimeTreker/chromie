@@ -88,6 +88,47 @@ class PlannerCoverageReview(BaseModel):
         return self
 
 
+class PlannerCommunicationGoalResponse(BaseModel):
+    """One model-reviewed conversational response for an authoritative Goal."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_id: str = Field(min_length=1)
+    response_text: str = Field(min_length=1, max_length=2400)
+
+    @field_validator("goal_id", "response_text", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+
+class PlannerCommunicationReview(BaseModel):
+    """Bounded model review of a retained-evidence conversational follow-up."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accept", "revise"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    response_text: str = Field(min_length=1, max_length=2400)
+    goal_responses: list[PlannerCommunicationGoalResponse] = Field(
+        min_length=1,
+        max_length=16,
+    )
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("response_text", "reason", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        return " ".join(value.strip().split()) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_goal_responses(self) -> "PlannerCommunicationReview":
+        goal_ids = [item.goal_id for item in self.goal_responses]
+        if len(goal_ids) != len(set(goal_ids)):
+            raise ValueError("communication review goal responses must be unique")
+        return self
+
+
 # Response Composer owns user-facing speech in the goal-driven pipeline.  These
 # runtime transport skills are valid in legacy/native InteractionResponse task
 # lists, but they are not task-plan leaves: conversational goals use a
@@ -977,6 +1018,191 @@ def parallel_plan_contract_errors(
                     }
                 )
     return errors
+
+
+def retained_evidence_response_review_required(
+    context: dict[str, Any] | None,
+    plan: CanonicalPlan,
+) -> bool:
+    """Identify typed retained-Goal responses that need semantic turn review.
+
+    Goal Association, not Host wording rules, decides whether the latest turn
+    continues or otherwise refers to an existing Goal. The review is required
+    only when trusted delivered evidence is also available and the terminal
+    Plan proposes a conversational response with no executable effects.
+    """
+
+    if plan.disposition != "respond" or plan.steps:
+        return False
+    responding_goal_ids = {
+        item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"
+    } or set(plan.goal_ids)
+    if not responding_goal_ids or not evidence_bound_dialogue(context):
+        return False
+    association = goal_association_prompt_projection(context)
+    return any(
+        isinstance(item, dict)
+        and str(item.get("relationship") or "").strip() != "new"
+        and responding_goal_ids.intersection(
+            str(goal_id).strip()
+            for goal_id in item.get("target_goal_ids") or []
+            if str(goal_id).strip()
+        )
+        for item in association.get("associations") or []
+    )
+
+
+async def review_retained_evidence_response(
+    client: Any,
+    *,
+    request_text: str,
+    language: str,
+    association: dict[str, Any],
+    authoritative_goals: list[dict[str, Any]],
+    delivered_evidence: list[dict[str, Any]],
+    plan: CanonicalPlan,
+    num_ctx: int,
+    turn_id: str,
+) -> PlannerCommunicationReview:
+    """Ask the planner model to accept or revise follow-up communication.
+
+    This review can change only model-authored response text. It cannot create
+    Goals, choose Capabilities, add steps, authorize execution, or reinterpret
+    provider evidence. An accepted response must be returned byte-for-byte so
+    the Host cannot silently treat an unrequested rewrite as acceptance.
+    """
+
+    response_goal_ids = [
+        item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"
+    ] or list(plan.goal_ids)
+    proposed_goal_responses = {
+        item.goal_id: item.response_text
+        for item in plan.goal_outcomes
+        if item.disposition == "respond"
+    }
+    if not proposed_goal_responses and len(response_goal_ids) == 1:
+        proposed_goal_responses[response_goal_ids[0]] = plan.response_text
+    prompt = json.dumps(
+        {
+            "responsibility": (
+                "Review whether the proposed response answers the latest user turn's "
+                "communicative act directly while using retained delivered evidence only "
+                "as support. Judge meaning across languages rather than matching phrases. "
+                "First determine whether the latest turn is a reaction, feeling, "
+                "acknowledgement, evaluation, practical decision, recommendation request, "
+                "or yes/no question about the retained result. A practical decision, "
+                "recommendation, or yes/no follow-up must state that answer in its first "
+                "sentence and may then include at most one short supporting clause. It "
+                "must not begin by replaying prior evidence, and must omit previously "
+                "delivered measurements or conditions that do not change the decision. "
+                "Other follow-ups must likewise answer the latest act instead of replacing "
+                "it with the old task answer. Preserve the requested language and every "
+                "retained fact that is actually used; never invent, infer, strengthen, or "
+                "contradict an external fact. Choose accept only when the proposed text "
+                "already satisfies this contract. Otherwise choose revise and author the "
+                "smallest natural correction."
+            ),
+            "latest_user_turn": request_text,
+            "language": language,
+            "goal_association": association,
+            "authoritative_goals": authoritative_goals,
+            "delivered_evidence_bound_dialogue": delivered_evidence,
+            "proposed_response_text": plan.response_text,
+            "proposed_goal_responses": proposed_goal_responses,
+            "output_contract": {
+                "decision": "accept or revise",
+                "accept": (
+                    "Return proposed_response_text and every proposed_goal_response "
+                    "exactly unchanged."
+                ),
+                "revise": (
+                    "Return one corrected aggregate response_text and exactly one "
+                    "corrected response for every supplied response Goal ID."
+                ),
+                "response_goal_ids": response_goal_ids,
+                "execution_authority": "none",
+            },
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    raw = await client.generate(
+        prompt,
+        system=(
+            "You are the current Planner's bounded conversational-contract reviewer. "
+            "Review the latest communicative act against the model-authored Goal "
+            "Association and trusted delivered evidence. Do not use phrase rules, add "
+            "facts, create actions, or authorize execution. Return only the required "
+            "JSON object."
+        ),
+        options={
+            "temperature": 0,
+            "top_p": 0.8,
+            "num_ctx": max(4096, int(num_ctx)),
+            "num_predict": 512,
+        },
+        response_format=planner_communication_review_response_schema(response_goal_ids),
+        prompt_family="fast_planner.communication_review",
+        turn_id=turn_id,
+        attempt=1,
+    )
+    if not isinstance(raw, dict):
+        raise ValueError("planner communication review response is not a JSON object")
+    review = PlannerCommunicationReview.model_validate(raw)
+    reviewed_by_goal = {item.goal_id: item.response_text for item in review.goal_responses}
+    if set(reviewed_by_goal) != set(response_goal_ids):
+        raise ValueError(
+            "communication review responses must cover exactly the response Goal IDs"
+        )
+    if review.decision == "accept" and (
+        review.response_text != plan.response_text
+        or reviewed_by_goal != proposed_goal_responses
+    ):
+        raise ValueError("accepted communication review must preserve proposed text exactly")
+    return review
+
+
+def planner_communication_review_response_schema(
+    response_goal_ids: list[str],
+) -> dict[str, Any]:
+    """Return a decoder-tight schema for bounded response communication review."""
+
+    schema = copy.deepcopy(PlannerCommunicationReview.model_json_schema())
+    schema["required"] = [
+        "decision",
+        "confidence",
+        "response_text",
+        "goal_responses",
+        "reason",
+    ]
+    goal_responses = schema.get("properties", {}).get("goal_responses")
+    if isinstance(goal_responses, dict):
+        goal_responses["minItems"] = len(response_goal_ids)
+        goal_responses["maxItems"] = len(response_goal_ids)
+    goal_response = schema.get("$defs", {}).get("PlannerCommunicationGoalResponse")
+    if isinstance(goal_response, dict):
+        goal_response["required"] = ["goal_id", "response_text"]
+        goal_response_properties = goal_response.get("properties", {})
+        goal_id = goal_response_properties.get("goal_id")
+        if isinstance(goal_id, dict):
+            # llama.cpp's deployed JSON-grammar parser rejects the combination
+            # of nested string-length constraints used by this DTO. Pydantic
+            # still enforces every length immediately after decoding.
+            goal_id.pop("minLength", None)
+            goal_id.pop("maxLength", None)
+            goal_id["enum"] = list(response_goal_ids)
+        goal_response_text = goal_response_properties.get("response_text")
+        if isinstance(goal_response_text, dict):
+            goal_response_text.pop("minLength", None)
+            goal_response_text.pop("maxLength", None)
+    for field_name in ("response_text", "reason"):
+        field = schema.get("properties", {}).get(field_name)
+        if isinstance(field, dict):
+            field.pop("minLength", None)
+            field.pop("maxLength", None)
+    return schema
 
 
 async def review_coordinated_action_plan_coverage(

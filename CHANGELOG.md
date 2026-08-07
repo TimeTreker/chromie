@@ -31,7 +31,12 @@ remains available in Git history.
 - Added one bounded evidence-preserving repair when Tool Result Interpreter
   output is otherwise grounded but violates its response contract, and made
   decision follow-ups answer the requested decision before the smallest useful
-  supporting evidence.
+  supporting evidence. Retained-Goal responses now receive an executable
+  model-owned communication review from the existing stronger Agent model;
+  review may revise response text only and fails closed without effects.
+- Preserved valid planless direct speech when optional Social Attention is
+  malformed or empty by reducing the auxiliary proposal to explicit stillness
+  before nested validation, without selecting behavior or rewriting speech.
 - Corrected semantic-authority, compatibility-fallback, current-status,
   acceptance, configuration, latency, scenario-authoring, and resume-point
   documentation found stale by the audit. Executable weather scenarios now
