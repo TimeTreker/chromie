@@ -408,12 +408,14 @@ before playback.
 
 ## Soridormi contract snapshot
 
-`capabilities/soridormi.json` contains 20 tools grouped under six external
+`capabilities/soridormi.json` contains 27 tools grouped under seven external
 agents:
 
 - robot status, mode, and battery reads;
 - motion plan creation, execution, stop, and cancellation;
 - named-skill catalog, plan creation, and execution;
+- resource-aware body-activity capability discovery, compilation, execution,
+  compatibility aliases, status, and cancellation;
 - read-only Soridormi task capability readiness;
 - no-motion embodied task preview with non-persistent `preview_id`;
 - no-motion embodied task submit, status, events, cancellation, lifecycle phase

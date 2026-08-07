@@ -308,6 +308,38 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             ),
         )
 
+    def test_singing_unavailability_leaves_speech_to_response_composer(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "unavailable",
+                "coverage": "uncertain",
+                "confidence": 1.0,
+                "response_text": "I am singing now.",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-vocal": {
+                        "disposition": "unavailable",
+                        "coverage": "uncertain",
+                        "response_text": "I am singing now.",
+                        "unresolved": ["No singing provider is registered."],
+                        "step_ids": [],
+                    }
+                },
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "must leave response_text empty",
+        ):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=self.vocal_goal(
+                    output_mode="singing",
+                    provider_required=True,
+                ),
+            )
+
     def test_ordinary_speech_still_uses_respond_outcome(self):
         output = PlannerModelOutput.model_validate(
             {

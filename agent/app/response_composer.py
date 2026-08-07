@@ -1218,6 +1218,42 @@ class ResponseComposerResolver:
         return 0
 
     @staticmethod
+    def _require_social_attention_decision_in_schema(
+        schema: dict[str, Any],
+    ) -> None:
+        """Require the model's auxiliary-expression choice at decode time.
+
+        ``SocialAttentionPlan`` keeps defaults for compatibility and policy-off
+        callers. When reviewed candidates make the responsibility mandatory,
+        the decoder must also require the nested semantic decision. Otherwise
+        a body proposal with an omitted decision reaches Pydantic as the
+        default ``none`` and fails only after decoding, leaving repair without
+        an explicit model-authored choice.
+        """
+
+        required = schema.setdefault("required", [])
+        if "social_attention_plan" not in required:
+            required.append("social_attention_plan")
+        social_schema = schema.get("properties", {}).get("social_attention_plan")
+        if isinstance(social_schema, dict):
+            alternatives = social_schema.get("anyOf")
+            if isinstance(alternatives, list):
+                non_null = [
+                    item
+                    for item in alternatives
+                    if not (
+                        isinstance(item, dict) and item.get("type") == "null"
+                    )
+                ]
+                if len(non_null) == 1:
+                    schema["properties"]["social_attention_plan"] = non_null[0]
+        social_plan_schema = schema.get("$defs", {}).get("SocialAttentionPlan")
+        if isinstance(social_plan_schema, dict):
+            social_required = social_plan_schema.setdefault("required", [])
+            if "decision" not in social_required:
+                social_required.append("decision")
+
+    @staticmethod
     def _response_schema(
         plan: CanonicalPlan,
         context: dict[str, Any] | None = None,
@@ -1225,25 +1261,9 @@ class ResponseComposerResolver:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "ResponseComposerModelOutput"
         if ResponseComposerResolver._social_attention_decision_required(context):
-            required = schema.setdefault("required", [])
-            if "social_attention_plan" not in required:
-                required.append("social_attention_plan")
-            social_schema = schema.get("properties", {}).get(
-                "social_attention_plan"
+            ResponseComposerResolver._require_social_attention_decision_in_schema(
+                schema
             )
-            if isinstance(social_schema, dict):
-                alternatives = social_schema.get("anyOf")
-                if isinstance(alternatives, list):
-                    non_null = [
-                        item
-                        for item in alternatives
-                        if not (
-                            isinstance(item, dict)
-                            and item.get("type") == "null"
-                        )
-                    ]
-                    if len(non_null) == 1:
-                        schema["properties"]["social_attention_plan"] = non_null[0]
         goal_ids = list(dict.fromkeys(plan.goal_ids))
 
         def constrain(node: Any) -> None:
@@ -1652,25 +1672,9 @@ class ResponseComposerResolver:
         schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
         schema["title"] = "DirectResponseComposerModelOutput"
         if ResponseComposerResolver._social_attention_decision_required(context):
-            required = schema.setdefault("required", [])
-            if "social_attention_plan" not in required:
-                required.append("social_attention_plan")
-            social_schema = schema.get("properties", {}).get(
-                "social_attention_plan"
+            ResponseComposerResolver._require_social_attention_decision_in_schema(
+                schema
             )
-            if isinstance(social_schema, dict):
-                alternatives = social_schema.get("anyOf")
-                if isinstance(alternatives, list):
-                    non_null = [
-                        item
-                        for item in alternatives
-                        if not (
-                            isinstance(item, dict)
-                            and item.get("type") == "null"
-                        )
-                    ]
-                    if len(non_null) == 1:
-                        schema["properties"]["social_attention_plan"] = non_null[0]
         stage_schema = schema.get("$defs", {}).get("ResponseStage")
         if isinstance(stage_schema, dict):
             required = stage_schema.setdefault("required", [])
@@ -1918,21 +1922,22 @@ class ResponseComposerResolver:
     def _canonicalize_optional_social_attention_payload(
         raw: dict[str, Any],
     ) -> dict[str, Any]:
-        """Fail soft when an optional express decision contains no expression.
+        """Fail soft on contradictory empty or none auxiliary expression.
 
         Social Attention is auxiliary presentation, never execution authority. A
         model output that chooses ``express`` but supplies neither a body behavior
         nor ``speech_expression.mode=adapt`` has no executable semantic member.
-        Normalize only that empty shape to an explicit ``none`` decision before
-        nested Pydantic validation, preserving the immutable primary Plan.
+        Conversely, an explicit ``none`` decision cannot authorize optional body
+        behavior or adapted speech. Normalize either contradiction to stillness
+        before nested Pydantic validation, preserving the immutable primary Plan
+        without selecting an auxiliary behavior on the model's behalf.
         """
 
         normalized = copy.deepcopy(raw)
         value = normalized.get("social_attention_plan")
         if not isinstance(value, dict):
             return normalized
-        if str(value.get("decision") or "").strip() != "express":
-            return normalized
+        decision = str(value.get("decision") or "").strip()
         behaviors = value.get("behaviors")
         has_behavior = isinstance(behaviors, list) and any(
             isinstance(item, dict) for item in behaviors
@@ -1943,6 +1948,19 @@ class ResponseComposerResolver:
             if isinstance(speech_expression, dict)
             else ""
         )
+        if decision == "none" and (has_behavior or speech_mode == "adapt"):
+            metadata = value.get("metadata")
+            value["behaviors"] = []
+            value["speech_expression"] = {"mode": "none"}
+            value["metadata"] = {
+                **(metadata if isinstance(metadata, dict) else {}),
+                "canonicalized_conflicting_none_expression": True,
+                "authority": "advisory",
+                "auxiliary_social_attention": True,
+            }
+            return normalized
+        if decision != "express":
+            return normalized
         if has_behavior or speech_mode == "adapt":
             return normalized
         confidence = value.get("confidence")

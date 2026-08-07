@@ -104,6 +104,54 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(goal_ids, {"goal-fetch-water"})
 
+    def test_semantic_coverage_rejection_does_not_trigger_safety_revision(self) -> None:
+        feedback = [
+            {
+                "type": "coordinated_action_coverage_incomplete",
+                "uncovered_requirements": ["truthfully disclose unavailable singing"],
+                "reason": "The Plan promises a performance marked unavailable.",
+            }
+        ]
+
+        self.assertFalse(DeepPlannerResolver._requires_safety_revision(feedback))
+        self.assertEqual(
+            DeepPlannerResolver._safety_revision_contract_errors(
+                CanonicalPlan(
+                    plan_id="semantic-repair",
+                    planner_tier="deep",
+                    disposition="mixed",
+                    coverage="complete",
+                    confidence=1.0,
+                    goal_ids=["goal-walk", "goal-sing"],
+                    response_text="I cannot sing, but I can still walk.",
+                    steps=[
+                        {
+                            "step_id": "walk",
+                            "capability_id": "soridormi.walk_forward",
+                            "args": {"duration_s": 15},
+                            "source_goal_ids": ["goal-walk"],
+                        }
+                    ],
+                    goal_outcomes=[
+                        {
+                            "goal_id": "goal-walk",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["walk"],
+                        },
+                        {
+                            "goal_id": "goal-sing",
+                            "disposition": "unavailable",
+                            "coverage": "partial",
+                            "unresolved": ["singing provider unavailable"],
+                        },
+                    ],
+                ),
+                feedback,
+            ),
+            [],
+        )
+
     def test_planner_schema_requires_confirmation_for_material_adjustment(self) -> None:
         schema = canonical_plan_response_schema(
             planner_tier="deep",
@@ -358,7 +406,19 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             joke_outcome["properties"]["disposition"]["enum"], ["respond"]
         )
-        self.assertTrue(joke_outcome["oneOf"])
+        self.assertNotIn("oneOf", joke_outcome)
+        self.assertEqual(
+            set(joke_outcome["required"]),
+            {
+                "disposition",
+                "coverage",
+                "response_text",
+                "unresolved",
+                "step_ids",
+                "satisfaction",
+                "rationale",
+            },
+        )
 
     async def test_preassociation_clarify_is_advisory_to_goal_association(self) -> None:
         ollama = _SequenceOllama(
@@ -664,6 +724,35 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             raw,
             context=context,
         )
+
+    def test_deep_planner_requires_timing_when_fast_has_no_usable_plan(self) -> None:
+        from agent.app.deep_planner import DeepPlannerResolver
+
+        raw = {
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15},
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                },
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "omitted timing"):
+            DeepPlannerResolver._validate_parallel_timing_preservation(
+                raw,
+                context={
+                    "fast_plan_resolution": {
+                        "disposition": "escalate",
+                        "steps": [],
+                    }
+                },
+            )
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(

@@ -122,6 +122,10 @@ class ResponseComposerSocialAttentionContractTests(
         self.assertFalse(
             _allows_null(schema["properties"]["social_attention_plan"])
         )
+        self.assertIn(
+            "decision",
+            schema["$defs"]["SocialAttentionPlan"]["required"],
+        )
 
     def test_schema_keeps_explicit_null_for_policy_off(self) -> None:
         schema = ResponseComposerResolver._response_schema(
@@ -138,6 +142,10 @@ class ResponseComposerSocialAttentionContractTests(
         )
         self.assertTrue(
             _allows_null(schema["properties"]["social_attention_plan"])
+        )
+        self.assertNotIn(
+            "decision",
+            schema["$defs"]["SocialAttentionPlan"].get("required", []),
         )
 
     async def test_missing_decision_repairs_to_explicit_none(self) -> None:
@@ -176,6 +184,66 @@ class ResponseComposerSocialAttentionContractTests(
         self.assertTrue(
             resolution.metadata["contract_repair_attempted"]
         )
+
+    async def test_none_decision_discards_contradictory_optional_expression(self) -> None:
+        output = _response_output(include_social=True)
+        output["social_attention_plan"].update(  # type: ignore[index,union-attr]
+            {
+                "behaviors": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "coordination_id": "attention-blink",
+                        "reason": "Optional acknowledgement.",
+                    }
+                ],
+                "speech_expression": {"mode": "adapt", "style": "warm"},
+            }
+        )
+        ollama = _SequenceOllama([output])
+
+        resolution = await ResponseComposerResolver(  # type: ignore[arg-type]
+            ollama
+        ).resolve(_request())
+
+        self.assertEqual(resolution.status, "resolved")
+        assert resolution.composition is not None
+        attention = resolution.composition.social_attention_plan
+        assert attention is not None
+        self.assertEqual(attention.decision, "none")
+        self.assertEqual(attention.behaviors, [])
+        self.assertEqual(attention.speech_expression.mode, "none")
+        self.assertTrue(
+            attention.metadata["canonicalized_conflicting_none_expression"]
+        )
+        self.assertFalse(resolution.metadata["contract_repair_attempted"])
+
+    async def test_omitted_decision_with_behavior_requires_model_repair(self) -> None:
+        incomplete = _response_output(include_social=True)
+        social = incomplete["social_attention_plan"]
+        assert isinstance(social, dict)
+        social.pop("decision")
+        social["behaviors"] = [
+            {
+                "capability_id": "soridormi.blink_eyes",
+                "coordination_id": "attention-blink",
+                "reason": "Optional acknowledgement.",
+            }
+        ]
+        ollama = _SequenceOllama(
+            [incomplete, _response_output(include_social=True)]
+        )
+
+        resolution = await ResponseComposerResolver(  # type: ignore[arg-type]
+            ollama
+        ).resolve(_request())
+
+        self.assertEqual(resolution.status, "resolved")
+        assert resolution.composition is not None
+        attention = resolution.composition.social_attention_plan
+        assert attention is not None
+        self.assertEqual(attention.decision, "none")
+        self.assertEqual(len(ollama.schemas), 2)
+        self.assertTrue(resolution.metadata["contract_repair_attempted"])
 
 
 if __name__ == "__main__":

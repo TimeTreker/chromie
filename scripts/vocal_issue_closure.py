@@ -335,6 +335,18 @@ def _source_goal_ids(item: dict[str, Any]) -> set[str]:
     return {str(value).strip() for value in direct if str(value).strip()}
 
 
+def _is_truthful_response_delivery(item: dict[str, Any]) -> bool:
+    """Distinguish response transport from vocal-performance evidence."""
+
+    metadata = item.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    return (
+        _capability_id(item) == "chromie.speak"
+        and metadata.get("execution_lane") == "speaking"
+        and metadata.get("delivery_role") == "response"
+    )
+
+
 def _safe_idle_errors(status: Any, *, label: str) -> list[str]:
     if not isinstance(status, dict):
         return [f"{label} Soridormi status is missing"]
@@ -611,7 +623,11 @@ def validate_closure_summary(
                 f"{capability_id} result ownership is not limited to typed body Goals"
             )
     for result in result_items:
-        if singing_goal_id and singing_goal_id in _source_goal_ids(result):
+        if (
+            singing_goal_id
+            and singing_goal_id in _source_goal_ids(result)
+            and not _is_truthful_response_delivery(result)
+        ):
             errors.append("ordinary capability execution was recorded as singing evidence")
 
     report = {
@@ -797,7 +813,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Leave a stack started by this command running after evidence collection.",
     )
-    parser.add_argument("--walk-capability", default="soridormi.walk_velocity")
+    parser.add_argument("--walk-capability", default="soridormi.walk_forward")
     parser.add_argument("--blink-capability", default="soridormi.blink_eyes")
     parser.add_argument("--timeout-s", type=float, default=1200.0)
     parser.add_argument("--skill-timeout-s", type=float, default=180.0)

@@ -111,11 +111,22 @@ PY
 
 wait_for_tcp() {
   local host="$1" port="$2" timeout_s="$3" label="$4"
+  local launcher_pid="${5:-}" launcher_log="${6:-}"
   local deadline=$((SECONDS + timeout_s))
   echo "[voice-mujoco] Waiting for $label at $host:$port..."
   until python_tcp_check "$host" "$port"; do
+    if [ -n "$launcher_pid" ] && ! kill -0 "$launcher_pid" 2>/dev/null; then
+      echo "[voice-mujoco][error] $label launcher exited before becoming ready." >&2
+      if [ -n "$launcher_log" ]; then
+        tail -n 180 "$launcher_log" >&2 || true
+      fi
+      return 1
+    fi
     if (( SECONDS >= deadline )); then
       echo "[voice-mujoco][error] Timed out waiting for $label." >&2
+      if [ -n "$launcher_log" ]; then
+        tail -n 180 "$launcher_log" >&2 || true
+      fi
       return 1
     fi
     sleep 2
@@ -160,8 +171,7 @@ fi
 SORIDORMI_PID=$!
 echo "$SORIDORMI_PID" > "$SORIDORMI_PID_FILE"
 
-if ! wait_for_tcp 127.0.0.1 "$MCP_PORT" "$STARTUP_TIMEOUT_S" "Soridormi MCP"; then
-  tail -n 180 "$SORIDORMI_LOG" >&2 || true
+if ! wait_for_tcp 127.0.0.1 "$MCP_PORT" "$STARTUP_TIMEOUT_S" "Soridormi MCP" "$SORIDORMI_PID" "$SORIDORMI_LOG"; then
   exit 1
 fi
 
@@ -177,10 +187,10 @@ ORCH_EVENT_LOG_PATH="$EVENT_LOG" \
 CHROMIE_PID=$!
 echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 
-wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent"
-wait_for_tcp 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR"
-wait_for_tcp 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS"
-wait_for_tcp 127.0.0.1 11434 "$STARTUP_TIMEOUT_S" "Chromie Ollama"
+wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent" "$CHROMIE_PID" "$CHROMIE_LOG"
+wait_for_tcp 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR" "$CHROMIE_PID" "$CHROMIE_LOG"
+wait_for_tcp 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS" "$CHROMIE_PID" "$CHROMIE_LOG"
+wait_for_tcp 127.0.0.1 11434 "$STARTUP_TIMEOUT_S" "Chromie Ollama" "$CHROMIE_PID" "$CHROMIE_LOG"
 
 echo "[voice-mujoco] Waiting for Chromie Orchestrator..."
 ORCHESTRATOR_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_S))

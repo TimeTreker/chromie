@@ -740,6 +740,21 @@ def validate_goal_responsibility_outcomes(
                 "ordinary TTS, or an Activity step before an exact vocal Capability "
                 f"contract exists: {goal_id}"
             )
+        if outcome.response_text.strip():
+            raise ValueError(
+                "provider-required vocal goal outcome must leave response_text "
+                "empty; Response Composer owns truthful limitation speech: "
+                f"{goal_id}"
+            )
+    if (
+        provider_vocal_goal_ids
+        and output.plan_relation == "exact"
+        and output.response_text.strip()
+    ):
+        raise ValueError(
+            "exact plan with a provider-required vocal goal must leave top-level "
+            "response_text empty; Response Composer owns truthful limitation speech"
+        )
     invalid_steps = [
         step.step_id
         for step in output.steps
@@ -956,7 +971,7 @@ async def review_coordinated_action_plan_coverage(
                 "outcome response_text and requires no executable speech-transport "
                 "step. Still reject a promise, acknowledgement, title, or stage "
                 "direction that does not contain the requested authored response or "
-                "performance itself. Treat movement mode, expression, spoken performance, "
+                "performance itself. An unavailable or refused outcome explicitly represents the Goal but leaves it unmet; it requires no executable step and is not by itself an adjustment or alternative. Accept that terminal representation when satisfaction also keeps the Goal unmet and no response_text falsely promises or claims the unavailable work. Treat movement mode, expression, spoken performance, "
                 "and simultaneity as material when the user requested them; walking is not "
                 "running unless the supplied Capability semantics explicitly say so. Do not "
                 "propose or authorize replacement steps."
@@ -1561,6 +1576,7 @@ def canonical_plan_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
+    provider_required_vocal_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -1638,6 +1654,18 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
+    provider_vocal_goal_set = set(
+        provider_required_vocal_goal_ids or []
+    ).intersection(allowed_goals)
+
+    if provider_vocal_goal_set:
+        planner_response_text = properties.get("response_text")
+        if isinstance(planner_response_text, dict):
+            planner_response_text["maxLength"] = 0
+            planner_response_text["description"] = (
+                "An exact plan containing a provider-required vocal Goal leaves "
+                "user-facing limitation speech to Response Composer."
+            )
 
     if requires_execution:
         planner_response_text = properties.get("response_text")
@@ -1735,6 +1763,14 @@ def canonical_plan_response_schema(
                 )
             elif planner_tier == "fast":
                 outcome_disposition["enum"] = ["respond", "execute"]
+            else:
+                outcome_disposition["enum"] = [
+                    "respond",
+                    "execute",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                ]
 
         outcome_properties = outcome_schema.get("properties", {})
         base_branches: list[dict[str, Any]] = []
@@ -1772,7 +1808,7 @@ def canonical_plan_response_schema(
             else:
                 branch_props["step_ids"] = {"maxItems": 0}
             base_branches.append(branch)
-        if base_branches:
+        if base_branches and planner_tier == "fast":
             outcome_schema["oneOf"] = base_branches
 
     goal_list_fields = {
@@ -1931,6 +1967,27 @@ def canonical_plan_response_schema(
                                 == ["respond"]
                             )
                         ]
+                if goal_id in provider_vocal_goal_set:
+                    disposition_field = specialized_properties.get("disposition")
+                    if isinstance(disposition_field, dict):
+                        disposition_field["enum"] = [
+                            "clarify",
+                            "unavailable",
+                            "refused",
+                        ]
+                    response_text_field = specialized_properties.get(
+                        "response_text"
+                    )
+                    if isinstance(response_text_field, dict):
+                        response_text_field.pop("minLength", None)
+                        response_text_field["maxLength"] = 0
+                        response_text_field["description"] = (
+                            "Provider-required vocal outcomes contain no speech. "
+                            "Response Composer owns truthful limitation wording."
+                        )
+                    step_ids_field = specialized_properties.get("step_ids")
+                    if isinstance(step_ids_field, dict):
+                        step_ids_field["maxItems"] = 0
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -1950,7 +2007,14 @@ def canonical_plan_response_schema(
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
     if isinstance(step_schema, dict):
         step_required = step_schema.setdefault("required", [])
-        for field_name in ("step_id", "capability_id", "args", "source_goal_ids"):
+        for field_name in (
+            "step_id",
+            "capability_id",
+            "args",
+            "timing",
+            "source_goal_ids",
+            "reason_summary",
+        ):
             if field_name not in step_required:
                 step_required.append(field_name)
     return schema
@@ -2786,15 +2850,21 @@ def planner_contract_diagnostics(
                 if " ".join(str(item or "").strip().split())
             ]
             outcome_dispositions.add(str(outcome_disposition or ""))
-            if planner_tier == "fast" and outcome_disposition not in {
-                "execute",
-                "respond",
-                "clarify",
-                "escalate",
-            }:
+            allowed_outcome_dispositions = (
+                {"execute", "respond", "clarify", "escalate"}
+                if planner_tier == "fast"
+                else {
+                    "execute",
+                    "respond",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                }
+            )
+            if outcome_disposition not in allowed_outcome_dispositions:
                 add(
                     ["goal_outcomes", goal_id, "disposition"],
-                    "fast goal outcomes may only execute, respond, clarify, or escalate",
+                    f"{planner_tier} goal outcome requires one legal explicit disposition",
                     value=outcome_disposition,
                 )
             inspect_satisfaction(
@@ -2872,7 +2942,10 @@ def planner_contract_diagnostics(
                         "clarify goal outcome requires an unresolved need or response_text",
                         value=outcome,
                     )
-            elif normalized_outcome_step_ids:
+            elif (
+                outcome_disposition in {"unavailable", "refused"}
+                and normalized_outcome_step_ids
+            ):
                 add(
                     ["goal_outcomes", goal_id, "step_ids"],
                     "unavailable and refused goal outcomes must not reference steps",

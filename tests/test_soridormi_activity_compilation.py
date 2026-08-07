@@ -270,6 +270,18 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
             result.results[0].metadata["provider_activity_id"],
             "activity-1",
         )
+        self.assertEqual(
+            result.results[0].metadata["source_goal_ids"],
+            ["goal-walk"],
+        )
+        self.assertEqual(
+            result.traces[0].events[-1].data["provider_activity_id"],
+            "activity-1",
+        )
+        self.assertEqual(
+            result.traces[1].events[-1].data["provider_activity_id"],
+            "activity-1",
+        )
 
     async def test_activity_cancel_uses_compiled_activity_identity(self) -> None:
         invoker = _ActivityInvoker()

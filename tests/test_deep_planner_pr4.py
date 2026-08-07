@@ -108,6 +108,19 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_deep_decoder_requires_explicit_step_timing(self):
+        schema = DeepPlannerResolver._response_schema(
+            ["goal-walk", "goal-blink"],
+            allowed_skill_ids=[
+                "soridormi.walk_forward",
+                "soridormi.blink_eyes",
+            ],
+        )
+
+        required = schema["$defs"]["PlannerModelStep"]["required"]
+        self.assertIn("timing", required)
+        self.assertIn("reason_summary", required)
+
     def test_fast_parallel_safety_feedback_specializes_first_deep_attempt(self):
         adjusted = {
             "disposition": "execute",
@@ -311,11 +324,151 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn('"user_confirmation_required":true', prompt)
         self.assertIn("requires no executable speech-transport step", prompt)
         self.assertIn("do not reject solely", prompt)
+        self.assertIn(
+            "unavailable or refused outcome explicitly represents the Goal",
+            prompt,
+        )
+
+    def test_semantic_coverage_rejection_replans_without_safety_adjustment(self):
+        goal_ids = ["goal-walk", "goal-sing"]
+        run_request = request(
+            "Walk while singing.",
+            goal_ids=goal_ids,
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-walk",
+                    "description": "Walk forward.",
+                    "source_text": "Walk while singing.",
+                    "metadata": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "body_action",
+                        "provider_required": True,
+                    },
+                },
+                {
+                    "goal_id": "goal-sing",
+                    "description": "Sing while walking.",
+                    "source_text": "Walk while singing.",
+                    "metadata": {
+                        "responsibility_kind": "spoken_response",
+                        "execution_lane": "speaking",
+                        "output_mode": "singing",
+                        "provider_required": True,
+                    },
+                },
+            ],
+        }
+        run_request = run_request.model_copy(update={"context": context})
+
+        def mixed_plan():
+            return {
+                "disposition": "mixed",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Walk while singing.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15.0},
+                        "timing": "sequential",
+                        "source_goal_ids": ["goal-walk"],
+                        "reason_summary": "Walk for the requested duration.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": ["singing provider unavailable"],
+                "parameter_resolutions": [],
+                "goal_outcomes": {
+                    "goal-walk": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["walk"],
+                        "satisfaction": {
+                            "score": 1.0,
+                            "status": "exact",
+                            "satisfied_goal_ids": ["goal-walk"],
+                            "unmet_goal_ids": [],
+                            "unmet_requirements": [],
+                            "rationale": "The walking step covers this goal.",
+                        },
+                        "rationale": "The walking step owns this goal.",
+                    },
+                    "goal-sing": {
+                        "disposition": "unavailable",
+                        "coverage": "partial",
+                        "response_text": "",
+                        "unresolved": ["singing provider unavailable"],
+                        "step_ids": [],
+                        "satisfaction": {
+                            "score": 0.0,
+                            "status": "unsatisfied",
+                            "satisfied_goal_ids": [],
+                            "unmet_goal_ids": ["goal-sing"],
+                            "unmet_requirements": ["singing provider unavailable"],
+                            "rationale": "No exact singing provider is registered.",
+                        },
+                        "rationale": "No exact singing provider is registered.",
+                    },
+                },
+                "goal_satisfaction": {
+                    "score": 0.5,
+                    "status": "partial",
+                    "satisfied_goal_ids": ["goal-walk"],
+                    "unmet_goal_ids": ["goal-sing"],
+                    "unmet_requirements": ["singing provider unavailable"],
+                    "rationale": "Walking is covered but singing is unavailable.",
+                },
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+
+        ollama = SequencedOllama(
+            [
+                mixed_plan(),
+                {
+                    "decision": "reject",
+                    "confidence": 1.0,
+                    "uncovered_requirements": [
+                        "The selected movement does not fully implement the body mode."
+                    ],
+                    "reason": "The body action needs semantic regeneration.",
+                },
+                mixed_plan(),
+                {
+                    "decision": "accept",
+                    "confidence": 1.0,
+                    "uncovered_requirements": [],
+                    "reason": "The unavailable Goal is explicit and remains unmet.",
+                },
+            ]
+        )
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                run_request
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.response_text, "")
+        self.assertEqual(plan.metadata["plan_relation"], "exact")
+        self.assertFalse(plan.metadata["user_confirmation_required"])
+        self.assertEqual(plan.metadata["coverage_review"]["status"], "accepted")
+        self.assertNotIn("safety revision", ollama.prompts[2][0].casefold())
 
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
-            {"step_id":"walk","capability_id":"soridormi.walk_forward","args":{"duration_s":15},"source_goal_ids":["goal-action"]},
-            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
+            {"step_id":"walk","capability_id":"soridormi.walk_forward","args":{"duration_s":15},"timing":"sequential","source_goal_ids":["goal-action"]},
+            {"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         catalog = FullCatalog()
         plan = asyncio.run(DeepPlannerResolver(SequencedOllama([raw]), catalog).resolve(request()))
@@ -466,12 +619,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 },
             ],
@@ -586,6 +741,230 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("respond goal outcome requires complete coverage and response_text", repair_prompt)
         self.assertIn("execute goal outcome requires complete coverage and step_ids", repair_prompt)
         self.assertIn("actual answer text now", repair_prompt)
+
+    def test_vocal_compound_repair_preserves_body_execution_and_unavailability(self):
+        goal_ids = ["goal-walk", "goal-sing", "goal-blink"]
+        run_request = request(
+            "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
+            goal_ids=goal_ids,
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-walk",
+                    "description": "Walk forward for 15 seconds.",
+                    "metadata": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "body_action",
+                        "provider_required": True,
+                    },
+                },
+                {
+                    "goal_id": "goal-sing",
+                    "description": "Sing while walking.",
+                    "metadata": {
+                        "responsibility_kind": "spoken_response",
+                        "execution_lane": "speaking",
+                        "output_mode": "singing",
+                        "provider_required": True,
+                    },
+                },
+                {
+                    "goal_id": "goal-blink",
+                    "description": "Blink while walking.",
+                    "metadata": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "body_action",
+                        "provider_required": True,
+                    },
+                },
+            ],
+        }
+        run_request = run_request.model_copy(update={"context": context})
+        steps = [
+            {
+                "step_id": "walk",
+                "capability_id": "soridormi.walk_forward",
+                "args": {"duration_s": 15.0},
+                "timing": "parallel",
+                "source_goal_ids": ["goal-walk"],
+                "reason_summary": "Walk for the requested duration.",
+            },
+            {
+                "step_id": "blink",
+                "capability_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "timing": "parallel",
+                "source_goal_ids": ["goal-blink"],
+                "reason_summary": "Blink during the walk.",
+            },
+        ]
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "goal_summary": "Walk, sing, and blink together.",
+            "response_text": "",
+            "steps": steps,
+            "escalation_reason": "",
+            "unresolved": ["singing provider unavailable"],
+            "parameter_resolutions": [],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["walk"],
+                    "satisfaction": None,
+                    "rationale": "The walking step owns this goal.",
+                },
+                "goal-sing": {
+                    "coverage": "partial",
+                    "response_text": "",
+                    "unresolved": ["singing provider unavailable"],
+                    "step_ids": [],
+                    "satisfaction": None,
+                    "rationale": "No exact singing provider is registered.",
+                },
+                "goal-blink": {
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["blink"],
+                    "satisfaction": None,
+                    "rationale": "The blinking step owns this goal.",
+                },
+            },
+            "goal_satisfaction": {
+                "score": 0.95,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
+                "unmet_goal_ids": ["goal-sing"],
+                "unmet_requirements": ["singing provider unavailable"],
+                "rationale": "Body work is covered but singing is unavailable.",
+            },
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        exact = lambda goal_id: {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+            "unmet_goal_ids": [],
+            "unmet_requirements": [],
+            "rationale": "The owned step prospectively satisfies this goal.",
+        }
+        repaired = {
+            **invalid,
+            "confidence": 1.0,
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["walk"],
+                    "satisfaction": exact("goal-walk"),
+                    "rationale": "The walking step owns this goal.",
+                },
+                "goal-sing": {
+                    "disposition": "unavailable",
+                    "coverage": "partial",
+                    "response_text": "",
+                    "unresolved": ["singing provider unavailable"],
+                    "step_ids": [],
+                    "satisfaction": {
+                        "score": 0.0,
+                        "status": "unsatisfied",
+                        "satisfied_goal_ids": [],
+                        "unmet_goal_ids": ["goal-sing"],
+                        "unmet_requirements": ["singing provider unavailable"],
+                        "rationale": "No exact singing provider is registered.",
+                    },
+                    "rationale": "No exact singing provider is registered.",
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["blink"],
+                    "satisfaction": exact("goal-blink"),
+                    "rationale": "The blinking step owns this goal.",
+                },
+            },
+            "goal_satisfaction": {
+                "score": 0.67,
+                "status": "partial",
+                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
+                "unmet_goal_ids": ["goal-sing"],
+                "unmet_requirements": ["singing provider unavailable"],
+                "rationale": "Body work is covered but singing is unavailable.",
+            },
+        }
+        coverage_review = {
+            "decision": "accept",
+            "confidence": 1.0,
+            "uncovered_requirements": [],
+            "reason": "Walking and blinking each have an exact owned step.",
+        }
+        catalog = FullCatalog()
+        catalog.items[0] = catalog.items[0].model_copy(
+            update={"can_run_parallel": True}
+        )
+        ollama = SequencedOllama([invalid, repaired, coverage_review])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, catalog, max_replans=1).resolve(
+                run_request
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(
+            [outcome.disposition for outcome in plan.goal_outcomes],
+            ["execute", "unavailable", "execute"],
+        )
+        self.assertEqual(
+            [step.capability_id for step in plan.steps],
+            ["soridormi.walk_forward", "soridormi.blink_eyes"],
+        )
+        self.assertEqual(plan.goal_satisfaction.status, "partial")
+        self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-sing"])
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertIn(
+            "Complete plan coverage means every Goal has an explicit outcome",
+            ollama.prompts[1][0],
+        )
+        self.assertIn(
+            "deep goal outcome requires one legal explicit disposition",
+            ollama.prompts[1][0],
+        )
+        self.assertNotIn(
+            "unavailable and refused goal outcomes must not reference steps",
+            ollama.prompts[1][0],
+        )
+        schema = ollama.prompts[0][1]["response_format"]
+        vocal_outcome = schema["properties"]["goal_outcomes"]["properties"][
+            "goal-sing"
+        ]
+        self.assertEqual(
+            vocal_outcome["properties"]["disposition"]["enum"],
+            ["clarify", "unavailable", "refused"],
+        )
+        self.assertEqual(
+            vocal_outcome["properties"]["response_text"]["maxLength"],
+            0,
+        )
+        self.assertEqual(
+            vocal_outcome["properties"]["step_ids"]["maxItems"],
+            0,
+        )
+        self.assertEqual(schema["properties"]["response_text"]["maxLength"], 0)
 
 
     def test_missing_goal_outcomes_mixed_plan_repairs_under_required_schema(self):
@@ -804,6 +1183,31 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "rationale",
             },
         )
+        for goal_id in ("goal-look", "goal-blink"):
+            outcome = outcomes["properties"][goal_id]
+            self.assertNotIn("oneOf", outcome)
+            self.assertEqual(
+                outcome["properties"]["disposition"]["enum"],
+                [
+                    "respond",
+                    "execute",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                ],
+            )
+            self.assertEqual(
+                set(outcome["required"]),
+                {
+                    "disposition",
+                    "coverage",
+                    "response_text",
+                    "unresolved",
+                    "step_ids",
+                    "satisfaction",
+                    "rationale",
+                },
+            )
         self.assertIn("plan_relation", schema["properties"])
         self.assertIn("user_confirmation_required", schema["properties"])
 
@@ -814,6 +1218,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "step_id": "step_look_at_user",
                 "capability_id": "soridormi.look_at_person",
                 "args": {"duration_s": 2.0, "target_ref": "person"},
+                "timing": "sequential",
                 "source_goal_ids": [goal_ids[0]],
                 "reason_summary": "Look at the user for two seconds.",
             },
@@ -821,6 +1226,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "step_id": "step_blink_twice",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": [goal_ids[1]],
                 "reason_summary": "Blink twice.",
             },
@@ -935,6 +1341,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "step_blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 },
                 {
@@ -1029,12 +1436,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "step_blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 },
                 {
                     "step_id": "step_neutral",
                     "capability_id": "soridormi.look_at_person",
                     "args": {"duration_s": 2.0, "target_ref": "person"},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-blink"],
                 },
             ],
@@ -1215,12 +1624,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "step_id": "look",
                 "capability_id": "soridormi.look_at_person",
                 "args": {"duration_s": 2.0, "target_ref": "person"},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-look"],
             },
             {
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
+                "timing": "sequential",
                 "source_goal_ids": ["goal-blink"],
             },
         ]
@@ -1425,12 +1836,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "step_id": "look",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-look"],
                 },
                 {
                     "step_id": "status",
                     "capability_id": "rare.observe_doorway",
                     "args": {},
+                    "timing": "sequential",
                     "source_goal_ids": ["goal-check-status"],
                 },
             ],

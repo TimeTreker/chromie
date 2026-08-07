@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,7 +22,7 @@ from scripts.vocal_issue_closure import (
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = "a" * 40
 SORIDORMI_REVISION = "b" * 40
-WALK = "soridormi.walk_velocity"
+WALK = "soridormi.walk_forward"
 BLINK = "soridormi.blink_eyes"
 
 
@@ -95,7 +97,7 @@ def passing_summary() -> dict:
                     {
                         "step_id": "step-walk",
                         "capability_id": WALK,
-                        "args": {"duration_s": 15.0, "vx_mps": 0.1},
+                        "args": {"duration_s": 15.0},
                         "timing": "parallel",
                         "source_goal_ids": ["goal-walk"],
                     },
@@ -206,6 +208,47 @@ class VocalIssueClosureTests(unittest.TestCase):
         errors = self.validate(summary)
 
         self.assertTrue(any("incorrectly reached" in item for item in errors), errors)
+        self.assertTrue(
+            any("ordinary capability execution" in item for item in errors),
+            errors,
+        )
+
+    def test_truthful_response_delivery_is_not_singing_performance_evidence(self) -> None:
+        summary = passing_summary()
+        summary["execution"]["results"].append(
+            {
+                "capability_id": "chromie.speak",
+                "status": "completed",
+                "metadata": {
+                    "source_goal_ids": ["goal-sing"],
+                    "covers_goal_ids": ["goal-sing"],
+                    "execution_lane": "speaking",
+                    "delivery_role": "response",
+                },
+            }
+        )
+
+        errors = self.validate(summary)
+
+        self.assertEqual(errors, [])
+
+    def test_speech_performance_role_cannot_close_unavailable_singing(self) -> None:
+        summary = passing_summary()
+        summary["execution"]["results"].append(
+            {
+                "capability_id": "chromie.speak",
+                "status": "completed",
+                "metadata": {
+                    "source_goal_ids": ["goal-sing"],
+                    "covers_goal_ids": ["goal-sing"],
+                    "execution_lane": "speaking",
+                    "delivery_role": "performance",
+                },
+            }
+        )
+
+        errors = self.validate(summary)
+
         self.assertTrue(
             any("ordinary capability execution" in item for item in errors),
             errors,
@@ -358,6 +401,7 @@ class VocalIssueClosureTests(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["--soridormi-repo", "../soridormi"])
         self.assertEqual(args.deployment_mode, "auto")
+        self.assertEqual(args.walk_capability, WALK)
         command = _deployment_start_command(
             soridormi_repo=Path("../soridormi"),
             rebuild_no_cache=False,
@@ -385,7 +429,8 @@ class VocalIssueClosureTests(unittest.TestCase):
 
         self.assertIn("--startup-timeout-s)", source)
         self.assertIn(
-            'wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent"',
+            'wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" '
+            '"Chromie Agent" "$CHROMIE_PID" "$CHROMIE_LOG"',
             source,
         )
         self.assertIn(
@@ -393,6 +438,48 @@ class VocalIssueClosureTests(unittest.TestCase):
             source,
         )
         self.assertNotIn('127.0.0.1 8092 420 "Chromie Agent"', source)
+
+    def test_paired_launcher_reports_soridormi_child_exit_without_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            soridormi_scripts = temp_root / "soridormi" / "scripts"
+            soridormi_scripts.mkdir(parents=True)
+            fake_launcher = soridormi_scripts / "start_soridormi_mujoco.sh"
+            fake_launcher.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo '[soridormi][error] simulated launcher failure' >&2\n"
+                "exit 23\n",
+                encoding="utf-8",
+            )
+            fake_launcher.chmod(0o755)
+            env = os.environ.copy()
+            env["CHROMIE_VOICE_MUJOCO_STATE_DIR"] = str(temp_root / "state")
+
+            completed = subprocess.run(
+                [
+                    str(ROOT / "scripts" / "start_voice_mujoco.sh"),
+                    "--soridormi-repo",
+                    str(temp_root / "soridormi"),
+                    "--no-viewer",
+                    "--keep-running",
+                    "--startup-timeout-s",
+                    "5",
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+
+        rendered = completed.stdout + completed.stderr
+        self.assertEqual(completed.returncode, 1, rendered)
+        self.assertIn(
+            "Soridormi MCP launcher exited before becoming ready.",
+            rendered,
+        )
+        self.assertIn("simulated launcher failure", rendered)
 
     def test_legacy_list_outcomes_remain_readable_during_evidence_migration(self) -> None:
         summary = passing_summary()
