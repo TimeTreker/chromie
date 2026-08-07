@@ -130,6 +130,11 @@ class ComprehensiveQualificationScriptTests(unittest.TestCase):
         self.assertIn("--cases speech-only,barge-in,follow-up", source)
         self.assertNotIn("scripts/verify_voice_evidence.py", source)
 
+    def test_live_profile_builds_once_then_reuses_images(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("env BUILD=1 ./scripts/start_services.sh", source)
+        self.assertIn('synth_args=(env BUILD=0 "${PYTHON_CMD[@]}"', source)
+
 
 if __name__ == "__main__":
     unittest.main()

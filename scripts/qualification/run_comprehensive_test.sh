@@ -13,7 +13,7 @@
 # Every phase is fail-soft so a failed check still leaves an uploadable archive.
 set -uo pipefail
 
-SCRIPT_VERSION="1.5.1"
+SCRIPT_VERSION="1.5.2"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 DEFAULT_REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 REPO_DIR="$DEFAULT_REPO_DIR"
@@ -466,7 +466,8 @@ fi
 # ---------------------------------------------------------------------------
 if (( SKIP_SERVICES == 0 )); then
   run_capture services "build runtime environment" "$SERVICE_TIMEOUT_S" ./scripts/build_runtime_env.sh
-  run_capture services "start services" "$SERVICE_TIMEOUT_S" ./scripts/start_services.sh
+  run_capture services "build and start services" "$SERVICE_TIMEOUT_S" \
+    env BUILD=1 ./scripts/start_services.sh
   SERVICES_STARTED=1
 
   if [[ -f .env.runtime ]]; then

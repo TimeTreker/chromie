@@ -2091,7 +2091,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                         "cognitive_gateway_cancellation_dispatched"
                     )
                     if index > confirmed_index
-                    and str(item.get("sid") or "") == new_sid
+                    and bool(str(item.get("sid") or ""))
                     and field(item, "requested_scope") == "output_only"
                     and field(item, "effective_scope") == "output_only"
                     and field(item, "dispatch_failures") == "0"
@@ -2099,9 +2099,14 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 ),
                 None,
             )
+            semantic_sid = (
+                str(semantic_receipt[1].get("sid") or "")
+                if semantic_receipt
+                else ""
+            )
             reflex_applied = any(
                 index > (semantic_receipt[0] if semantic_receipt else confirmed_index)
-                and str(item.get("sid") or "") == new_sid
+                and str(item.get("sid") or "") == semantic_sid
                 and field(item, "action") == "interrupt"
                 for index, item, _ in rows("cognitive_gateway_reflex_applied")
             )
