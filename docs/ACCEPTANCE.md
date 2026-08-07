@@ -111,8 +111,30 @@ timeout; the warmed repeat, rather than that failed attempt, is the relevant
 behavior diagnostic. None of these dirty probes replaces final clean,
 revision-bound comprehensive evidence or external semantic adjudication.
 
+Clean commit `258d0ec`, retained under
+`.chromie/comprehensive/20260807T103838Z`, again reported 47 passes, zero
+failures, zero timeouts, and one skipped external semantic review. All 24 idle
+and shared-GPU workflow cases passed mechanical delivery, ordering, capture,
+and transcription checks. Manual review accepted the repaired Chinese
+family-help and umbrella-decision boundaries, but correctly withheld closure:
+the shared-load English multi-part response invented that the user had “a busy
+day tomorrow.” That unsupported personal circumstance is a semantic grounding
+defect even though both requested Goals were completed. The clean bundle is
+therefore retained as diagnostic evidence, not final closure evidence.
+
+Dirty focused grounding replay is retained separately. The first attempt at
+`.chromie/acceptance/targeted-grounding-20260807d` failed before connection
+during cold service startup. The next attempt at
+`.chromie/acceptance/targeted-grounding-20260807e` authored a grounded response
+but the cold TTS worker missed the 20-second playback-start gate, so no speech
+was delivered and the case failed mechanically. After explicit TTS warmup,
+`.chromie/acceptance/targeted-grounding-20260807f` delivered both requested
+Goals once and in order, used only the general benefit of getting enough rest,
+did not invent a personal schedule or circumstance, and measured WER 0.044444.
+This focused dirty evidence does not replace final clean revision binding.
+
 After the executable scenarios were aligned with the evidence-before-claim
-contract, the complete source gate passed: 102 benchmark tests, 2,081 maintained
+contract, the complete source gate passed: 102 benchmark tests, 2,082 maintained
 tests, 20 legacy Agent tests, and every repository-policy, ownership, Ruff, Mypy,
 configuration, structure, and documentation check. The Level A general-ability
 profile passed 66/66 across all ten ability classes. These results establish

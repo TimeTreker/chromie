@@ -37,6 +37,9 @@ remains available in Git history.
 - Preserved valid planless direct speech when optional Social Attention is
   malformed or empty by reducing the auxiliary proposal to explicit stillness
   before nested validation, without selecting behavior or rewriting speech.
+- Required direct and planned response composition to ground user-specific
+  circumstances in the current turn, Goals, or supplied conversation instead
+  of inventing a helpful-sounding personal schedule or situation.
 - Corrected semantic-authority, compatibility-fallback, current-status,
   acceptance, configuration, latency, scenario-authoring, and resume-point
   documentation found stale by the audit. Executable weather scenarios now

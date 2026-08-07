@@ -177,6 +177,7 @@ class DirectResponseComposerTests(unittest.TestCase):
         self.assertEqual(result.composition.response_plan.final.text, "你好呀！")
         self.assertIn("without a planning transport stage", result.reason_summary)
         self.assertIn("six-year-old", ollama.prompts[0])
+        self.assertIn("Do not invent the user's plans, schedule", ollama.prompts[0])
 
     def test_invalid_optional_social_expression_preserves_valid_direct_speech(self) -> None:
         association = direct_association()

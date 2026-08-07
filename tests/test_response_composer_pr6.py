@@ -200,6 +200,16 @@ class ResponseCompositionContractTests(unittest.TestCase):
 
 
 class ResponseComposerResolverTests(unittest.TestCase):
+    def test_planned_prompt_forbids_invented_user_circumstances(self):
+        canonical = plan(goals=["goal-explain", "goal-remind"])
+
+        prompt = ResponseComposerResolver(FakeOllama({}))._prompt(
+            request(canonical),
+            canonical,
+        )
+
+        self.assertIn("Do not invent the user's plans, schedule", prompt)
+
     def test_empty_express_social_attention_downgrades_without_canceling_plan(self):
         canonical = plan(goals=["goal-chat"] )
         output = {

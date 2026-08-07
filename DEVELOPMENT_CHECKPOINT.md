@@ -37,14 +37,17 @@ The post-merge audit of `e3d57ff` established:
   the voice harness required retired events; the first mechanically clean
   comprehensive replay then exposed valid direct speech discarded by malformed
   optional Social Attention and a prompt-only decision-first contract that the
-  deployed Fast Planner could ignore;
+  deployed Fast Planner could ignore; the next mechanically clean replay then
+  exposed an otherwise complete multi-Goal response inventing an unsupported
+  user schedule as friendly reminder rationale;
 - focused regressions now cover the repaired evidence ledger, current Core and
   Gateway event contracts, fresh model-owned Goal resegmentation, useful typed
   contract repair with authority-reducing session recovery, tool/memory
   pre-effect speech suppression, pure safe-read single ownership, and bounded
   evidence-preserving result repair, authority-reducing direct auxiliary
-  validation, and bounded model-owned retained-evidence communication review;
-- the dependency-complete canonical gate passes 2,081 maintained tests, 20
+  validation, bounded model-owned retained-evidence communication review, and
+  Response Composer grounding against invented user circumstances;
+- the dependency-complete canonical gate passes 2,082 maintained tests, 20
   legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
   all ten general-ability classes;
 - the comprehensive runner now builds once before nested voice acceptance;
