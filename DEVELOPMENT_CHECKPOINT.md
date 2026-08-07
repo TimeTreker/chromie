@@ -77,22 +77,20 @@ external-semantic-review skip. Manual inspection found no semantic blocker;
 strict status remains `incomplete`, not release-qualified. `docs/STATUS.md` owns
 paths, limits, and latency outliers. Clean-main startup exposed bare-TCP ASR/TTS
 probes creating WebSocket tracebacks called fatal by the log checker; JSON health
-probes replace them. Clean merged-revision MuJoCo binding remains required.
+probes replace them.
 
-The underlying maintained source still establishes:
+That binding is now retained from clean merged Chromie `a36444b` and Soridormi
+`fa8080d2` under `.chromie/acceptance/post-merge-audit-final/a36444b`. Identity
+SHA-256 `4d1ba0381e8ea10a6e581f572b6c960d097e001f2aa4ff442fa55a9c00902ec9`
+binds both clean checkouts and services. Exact walk/nod/turn completed and the
+separate active walk cancelled through the Gateway stop reflex in 31.1 ms;
+Goals reconciled, safe idle held, and post-run logs were clean. This closes the
+highest-safe automated audit milestone, not independent review, physical-device,
+physical-robot, provider, or release tracks.
 
-- typed `interpretation_unavailable` instead of invented semantic fallback;
-- strict catalog-backed action proposals in semantic repair;
-- memory in maintained Goal-driven apply profiles;
-- fail-closed excluded lanes without legacy semantic re-entry;
-- a current Gateway-to-Core-to-Fast-Planner smoke contract;
-- archive-portable deterministic source identity;
-- benchmark validation in the canonical source gate;
-- removal of duplicate audits, handoffs, implementation plans, and obsolete
-  Route2/Route3 or named-skill planning documents.
-
-`/interaction` and `/run` remain compatibility surfaces. Their semantic planner
-is emergency-only and must not be used as ordinary fallback.
+The maintained source contracts and compatibility state are owned by
+`docs/STATUS.md`; `/interaction` and `/run` remain emergency-only compatibility
+surfaces and must not become ordinary semantic fallback.
 
 ## Resume commands
 
@@ -142,12 +140,11 @@ microphone, speaker, robot, real vocal provider, or real media provider.
 
 The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
 capability manifest and compatibility authority are bound to that revision.
-Merge the source-qualified Chromie candidate only after CI is green, then repeat
-the exact compound execution and provider-start cancellation with clean merged
-runtime identity. Keep backend names out of semantic Goals, do not introduce a
-neutral media alias, and do not use source tests, generated/discarded TTS, or
-simulator evidence as a claim for a real provider, physical audio, or hardware.
-Real vocal and media modes remain unvalidated pending operation-specific proof.
+Chromie PRs #12 and #13 are merged with green Python 3.11/3.12 checks; exact
+compound and cancellation replay is retained against clean merged `a36444b`.
+Preserve it while advancing explicit target tracks. Keep backend names out of
+Goals, add no neutral media alias, and never relabel source, generated TTS, or
+simulator evidence as real-provider, physical-audio, or hardware proof.
 
 ## Canonical owners
 
