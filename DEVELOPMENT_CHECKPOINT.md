@@ -47,7 +47,7 @@ The post-merge audit of `e3d57ff` established:
   evidence-preserving result repair, authority-reducing direct auxiliary
   validation, bounded model-owned retained-evidence communication review, and
   Response Composer grounding against invented user circumstances;
-- the dependency-complete canonical gate passes 2,082 maintained tests, 20
+- the dependency-complete canonical gate passes 2,095 maintained tests, 20
   legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
   all ten general-ability classes;
 - the comprehensive runner now builds once before nested voice acceptance;
@@ -71,10 +71,12 @@ Soridormi motion defect:
 
 Exact capability schemas, shared numeric provenance validation, structured
 bounded repair, a compact complete catalog, and bounded Deep collections close
-those boundaries. Dirty-tree MuJoCo diagnostics retained exact ordered
-walk/nod/turn execution and provider-start cancellation ending safe-idle.
-`docs/STATUS.md` owns paths, limits, and the paired repository audit; clean
-merged-revision binding remains required.
+those boundaries. Clean commit `90aa72a` passed the canonical source gate and a
+rebuilt comprehensive profile with 46 passes, zero failures/timeouts, and one
+explicit external-semantic-review skip. Manual inspection found no recurrence
+of the audit's semantic blockers; strict status remains `incomplete`, not
+release-qualified. `docs/STATUS.md` owns paths, limits, latency outliers, and the
+paired audit. Clean merged-revision MuJoCo binding remains required.
 
 The underlying maintained source still establishes:
 
@@ -138,16 +140,13 @@ particular, generated speech and MuJoCo body results do not prove a physical
 microphone, speaker, robot, real vocal provider, or real media provider.
 
 The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
-capability manifest and compatibility authority are bound to that revision. The
-next delivery step is to run the dependency-complete canonical gate and
-rebuilt comprehensive generated-speech/GPU scenario profile, inspect retained
-output and logs, and merge only if the final source tree is clean. Then repeat
+capability manifest and compatibility authority are bound to that revision.
+Merge the source-qualified Chromie candidate only after CI is green, then repeat
 the exact compound execution and provider-start cancellation with clean merged
 runtime identity. Keep backend names out of semantic Goals, do not introduce a
-neutral media alias, and do not use source tests, generated or discarded TTS
-playback, or simulator body evidence as a claim for a real media provider, acoustic ducking, a physical
-speaker, or hardware. Real vocal and media modes remain unvalidated until
-operation-specific target evidence exists.
+neutral media alias, and do not use source tests, generated/discarded TTS, or
+simulator evidence as a claim for a real provider, physical audio, or hardware.
+Real vocal and media modes remain unvalidated pending operation-specific proof.
 
 ## Canonical owners
 

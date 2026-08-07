@@ -133,8 +133,38 @@ Goals once and in order, used only the general benefit of getting enough rest,
 did not invent a personal schedule or circumstance, and measured WER 0.044444.
 This focused dirty evidence does not replace final clean revision binding.
 
+Clean committed revision `90aa72a` ran the corrected comprehensive collector
+under `.chromie/comprehensive/20260807T135248Z`. Its service log records a real
+image build followed by force recreation; nested voice acceptance reused that
+same stack. The run retained 46 passes, zero failures, zero timeouts, and one
+skipped independent semantic-review check. Strict mode therefore returned
+`incomplete`, and `release_qualified=false` remains correct. The archive is
+`/home/chromie/Downloads/chromie-comprehensive-90aa72aa7549-20260807T135248Z.tar.gz`;
+its SHA-256 is
+`c2fafdf827b6bd42e253ce125b2549b97128cf11b48ebe2ac2baecbaea4ea45a`.
+
+The retained current-revision matrix passed 403 deterministic behavior
+scenarios, 19 GPU-smoke checks with zero failures, bilingual acoustic transport,
+all 12 idle and all 12 shared-GPU workflow cases, and all selected synthetic
+speech-only, barge-in, and follow-up cases. The barge-in case measured 0.0 ms
+from VAD start to duck and 4.7 ms from confirmed speech to silence, retained the
+independent output-only Gateway receipt, and proved that stale playback did not
+resume. Warm median TTS first-audio time was 1.107 seconds idle and 1.227 seconds
+under shared GPU load, with no generation-limit hits. The retained cold-start
+distribution includes a roughly 40.2-second first generation and a later
+14.0-second Chinese sample, so no release latency claim is made.
+
+Manual review of all workflow outputs found no recurrence of the audit's hard
+semantic blockers: family answers were direct, stable knowledge was correct,
+session memory recalled blue, the weather correction switched location, the
+umbrella response led with the recommendation, multipart responses stayed
+grounded, and ordered stories were complete and unique. That inspection does
+not substitute for or relabel the skipped external semantic adjudication.
+Generated speech and acoustic loopback do not prove a physical microphone,
+speaker, human pronunciation, or physical robot.
+
 After the executable scenarios were aligned with the evidence-before-claim
-contract, the complete source gate passed: 102 benchmark tests, 2,082 maintained
+contract, the complete source gate passed: 102 benchmark tests, 2,095 maintained
 tests, 20 legacy Agent tests, and every repository-policy, ownership, Ruff, Mypy,
 configuration, structure, and documentation check. The Level A general-ability
 profile passed 66/66 across all ten ability classes. These results establish

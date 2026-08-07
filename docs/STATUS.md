@@ -12,9 +12,9 @@ reconciliation. Trusted Host and provider boundaries authorize effects.
 
 | Area | Implementation | Automatic verification | Target validation | Release readiness |
 |---|---|---|---|---|
-| Core interpretation | Non-empty turns that cannot be interpreted now return a typed `interpretation_unavailable` outcome. They are not reassigned to chat or deep thought. | Contract, endpoint, fallback, behavior-scenario, and capability-routing tests cover unavailable and empty-input paths. | The merged `e3d57ff` diagnostic proved a live RTX 5090 Gateway/Core/Fast-Planner greeting round trip. Broader clean scenario evidence for the post-audit tree remains open. | Development only. |
-| Capability repair | Semantic repair can return strict ordered action proposals only for `robot_action`; every capability and argument remains subject to catalog and policy validation. Fast and Deep Planner decoder schemas bind each exact capability ID to its provider argument schema. Explicit numeric Goal values require matching step arguments plus Goal-bound `user_supplied` provenance, and bounded same-tier repair receives structured cross-field defects. | Schema, prompt, provider-argument, numeric-provenance, bounded-repair, compound-plan, and end-to-end routing tests cover exact velocity, duration, ordering, and rejection outside the action lane. | Dirty current-tree headless MuJoCo diagnostics completed exact ordered compound execution and provider-start cancellation; clean merged revision binding and physical execution remain open. | Development only. |
-| Semantic authority | Maintained profiles include memory in Goal-driven apply lanes. A disabled or unsupported mapped lane is a Core-owned authoritative fail-closed boundary and cannot enter either ordinary or legacy planning. | Semantic-authority audit, profile configuration, Orchestrator, and behavior tests cover allowlisted and excluded lanes. | Retained live service and simulator evidence must be refreshed for the patched source. | Development only. |
+| Core interpretation | Non-empty turns that cannot be interpreted now return a typed `interpretation_unavailable` outcome. They are not reassigned to chat or deep thought. | Contract, endpoint, fallback, behavior-scenario, and capability-routing tests cover unavailable and empty-input paths. | Clean `90aa72a` rebuilt-service evidence exercised the live RTX 5090 Gateway/Core/Planner path, all maintained deterministic scenarios, bilingual acoustic workflows, and selected synthetic voice cases. | Development only. |
+| Capability repair | Semantic repair can return strict ordered action proposals only for `robot_action`; every capability and argument remains subject to catalog and policy validation. Fast and Deep Planner decoder schemas bind each exact capability ID to its provider argument schema. Explicit numeric Goal values require matching step arguments plus Goal-bound `user_supplied` provenance, and bounded same-tier repair receives structured cross-field defects. | Schema, prompt, provider-argument, numeric-provenance, bounded-repair, compound-plan, and end-to-end routing tests cover exact velocity, duration, ordering, and rejection outside the action lane. | Candidate-tree headless MuJoCo diagnostics completed exact ordered compound execution and provider-start cancellation; clean merged-revision binding and physical execution remain open. | Development only. |
+| Semantic authority | Maintained profiles include memory in Goal-driven apply lanes. A disabled or unsupported mapped lane is a Core-owned authoritative fail-closed boundary and cannot enter either ordinary or legacy planning. | Semantic-authority audit, profile configuration, Orchestrator, and behavior tests cover allowlisted and excluded lanes. | Clean `90aa72a` bilingual workflows retained correct session-memory recall, stable knowledge, tool follow-up, location correction, multipart grounding, and ordered playback under idle and shared GPU load. | Development only. |
 | Control-plane smoke | The smoke test builds an immutable Gateway/Core request and validates the current Core and Fast Planner contracts. It no longer uses the retired flat interpretation payload or ordinary `/run` planning. | Builder tests and shell syntax checks are source-verifiable. | Requires a running Agent service and configured model. | Development only. |
 | Source identity | Evidence metadata uses the Git commit in a checkout or a deterministic SHA-256 source-tree identity in an archive. | Archive and checkout forms are covered by unit tests. | Runtime provenance still requires resolved image and model digests. | Development only. |
 | Canonical verification | Repository, ownership, static-analysis, configuration, structure, documentation, benchmark, unit, and retained legacy checks are wired through `scripts/run_tests.sh`. GitHub Actions are pinned by immutable SHA. | The local audit environment verifies all dependency-available gates; unavailable pinned analyzers must remain reported as unavailable rather than passed. | CI and target profiles must be rerun from the final source revision. | Development only. |
@@ -39,7 +39,7 @@ multi-model reviewer was not configured.
 The audit findings are kept here because this file owns current implementation
 and evidence; the stable Project Charter is not an incident log.
 
-| Finding and earliest responsible boundary | Implemented remediation | Automatic verification | Target validation | Release readiness |
+| Finding and earliest responsible boundary | Implemented remediation | Automatic verification | Evidence before final replay | State before final replay |
 |---|---|---|---|---|
 | Ordinary and final TTS played but the Host scheduling boundary did not register it in the delivered-turn ledger, leaving `delivered_text` empty. This violated evidence-before-claim discipline. | Normal interaction speech now registers its generation, orders, text, phase, role, and commitment in the same turn ledger as other speech paths. | Focused Orchestrator regression covers scheduling and ledger correlation. | Rebuilt generated-speech matrix pending. | Open. |
 | Voice acceptance required the retired `goal_interpretation_done` event although maintained ordinary decisions now emit `cognitive_core_done` and deterministic stops emit a Gateway reflex receipt. | The analyzer consumes current Core and Gateway events; the retired event is compatibility-only. | Focused ordinary-speech and stop regressions pass. | Rebuilt generated-speech matrix pending. | Open. |
@@ -61,6 +61,14 @@ and evidence; the stable Project Charter is not an incident log.
 | The paired-launcher child-exit regression used fixed MCP port 8000. Running the canonical source gate beside the retained live stack let that unrelated endpoint satisfy readiness, so a deliberately failed child was masked until the test's outer timeout. | The test now reserves an isolated loopback port and passes it through the public launcher option. It still exercises the real launcher process and child-exit message without depending on global service state. | The focused regression reports the simulated Soridormi child failure in 0.05 seconds while the live port-8000 stack remains running. | Not applicable; this is test isolation, not simulator or hardware evidence. | Closed as an automatic-evidence defect. |
 | README, checkpoint, acceptance, semantic-authority, configuration, and Orchestrator compatibility prose lagged merged behavior. Mechanical link/terminology checks did not detect the semantic mismatch. | Existing authoritative owners were corrected; no standalone audit document, environment switch, or architectural term was added. | Documentation, semantic-authority, and repository-policy gates remain required. | Not applicable. | Documentation is current only while the final gates pass. |
 
+The `90aa72a` comprehensive replay closes every row above whose remaining item
+was the final clean rebuilt scenario matrix or manual delivered-text inspection.
+The exact compound and provider-start-cancellation rows still require a repeat
+after the candidate is merged, because their retained simulator bundles were
+captured from the pre-commit candidate tree. Independent semantic adjudication,
+physical audio/robot proof, provider commissioning, publishable provenance, and
+release readiness remain open and must not be inferred from this closure.
+
 The audit added no current document, public environment key, compatibility path,
 or architectural term. Documentation count remains 102 and the runtime
 configuration inventory remains 458 keys, four modes, one public boolean, and
@@ -72,8 +80,40 @@ The post-audit source tree passed the dependency-complete canonical gate: 13
 repository-policy families, test ownership, Ruff, Mypy, configuration ownership,
 runtime-structure ratchets, documentation checks, 102 benchmark tests, 2,095
 maintained tests, and 20 legacy Agent tests. The full Level A general-ability run
-passed 66/66 across all ten classes. These are automatic source claims; the
-required clean committed comprehensive runtime profile remains a separate gate.
+passed 66/66 across all ten classes.
+
+Clean committed revision `90aa72a` then ran the corrected strict comprehensive
+profile under `.chromie/comprehensive/20260807T135248Z`. The outer runner built
+and force-recreated the services once; nested acceptance reused those images.
+It retained 46 passes, zero failures, zero timeouts, and one skipped independent
+semantic-review check. The skip makes the strict result `incomplete` and not
+release-qualified; it is not a hidden runtime pass or failure. The archive is
+`/home/chromie/Downloads/chromie-comprehensive-90aa72aa7549-20260807T135248Z.tar.gz`
+with SHA-256
+`c2fafdf827b6bd42e253ce125b2549b97128cf11b48ebe2ac2baecbaea4ea45a`.
+
+The retained mechanical profile passed 403 maintained deterministic behavior
+scenarios, 19 GPU-smoke checks with no failures, real non-empty TTS PCM, both
+Ollama models at 100% GPU placement, bilingual acoustic transport, 12 idle and
+12 shared-load workflow cases, and synthetic speech-only, barge-in, and
+follow-up cases. Barge-in retained 0.0 ms duck and 4.7 ms confirmed-silence
+latency, an independent output-only Gateway receipt, and no stale playback.
+Warm TTS median first audio was 1.107 seconds idle and 1.227 seconds under shared
+GPU load with no generation-limit hits. A post-rebuild cold generation took
+about 40.2 seconds to first audio and one later Chinese sample took 14.0 seconds;
+no release latency budget is claimed.
+
+Manual inspection of every retained `delivered_text` accepted the audit probes:
+family help stayed direct, Moon facts were correct, session recall returned
+blue, the weather correction changed Seattle to Portland, the umbrella
+follow-up led with the recommendation, multipart replies added no invented user
+circumstance, and both stories were complete and nonduplicated. This inspection
+is evidence that no known semantic blocker from the audit recurred; it is not
+relabeled as the skipped external semantic adjudication. Compose-log inspection
+found no traceback, crash, OOM, or fatal service failure. Logged model-contract
+repairs remained visible. One ModelScope missing-token message occurred while
+the retained local TTS assets loaded successfully and does not support an
+external-download claim.
 
 The paired Soridormi repository-gate audit is merged on its `main` revision
 `fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83`. Chromie's generated capability
@@ -94,8 +134,6 @@ and operator rollback evidence shows that no maintained profile depends on it.
 
 ## Open source issues
 
-- Close the post-merge remediation with a clean dependency-complete canonical
-  gate and rebuilt generated-speech/GPU comprehensive profile.
 - Keep the vocal-hosting decision deferred until a measured synchronization,
   cancellation-latency, platform-adaptation, or resource-contention blocker is
   retained.
@@ -111,8 +149,6 @@ and operator rollback evidence shows that no maintained profile depends on it.
 
 ## Open target evidence
 
-- a clean full generated-speech scenario matrix for the final post-audit
-  revision (the `e3d57ff` Gateway/Core/Fast-Planner smoke is diagnostic);
 - clean merged-revision binding for the exact compound body execution and
   provider-start voice-to-MuJoCo cancellation diagnostics retained on the dirty
   candidate tree;

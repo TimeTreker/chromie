@@ -15,12 +15,13 @@ organized by capability, risk, and retained evidence.
 
 ## Current priorities
 
-1. Close the 2026-08-07 post-merge audit with one dependency-complete canonical
-   source gate, one rebuilt retained clean generated-speech/GPU scenario
-   profile, and clean source-bound paired MuJoCo proof for exact compound
-   capability arguments plus provider-start cancellation. Hard semantic,
-   delivery-evidence, safety, provider, or provenance failures remain blockers
-   rather than averageable scores.
+1. Close the 2026-08-07 post-merge audit by merging the source-qualified
+   candidate and retaining clean merged-revision paired MuJoCo proof for exact
+   compound capability arguments plus provider-start cancellation. The
+   dependency-complete source gate and rebuilt clean generated-speech/GPU
+   profile are retained for `90aa72a`; the absent independent semantic reviewer
+   remains an explicit non-release gap. Hard semantic, delivery-evidence,
+   safety, provider, or provenance failures remain non-averageable blockers.
 2. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
