@@ -27,8 +27,9 @@ remains available in Git history.
 
 - Made speech-start barge-in reversible: the Host now ducks only the active
   playback generation while ASR distinguishes external speech from likely TTS
-  echo, then either resumes the next unplayed chunk or closes and invalidates
-  output before the Cognitive Gateway owns semantic cancellation. Focused voice
+  echo, compares distorted ASR against the relevant scheduled output chunks,
+  then either resumes the next unplayed chunk or closes and invalidates output
+  before the Cognitive Gateway owns semantic cancellation. Focused voice
   acceptance now replays retained output PCM, enforces 250 ms acoustic budgets,
   waits for clean case completion, and retains application-level TTS readiness.
 - Replaced the obsolete GPU control-plane smoke flow with immutable Gateway/Core
