@@ -1509,6 +1509,12 @@ class OllamaGoalInterpreter:
             target_route
         ]
         mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
+        abilities_json = _bounded_json(
+            _compact_candidate_capabilities(
+                _review_capabilities_from_request(request), limit=12
+            ),
+            max_chars=1800,
+        )
         return {
             "model": self.model,
             "stream": False,
@@ -1533,6 +1539,7 @@ class OllamaGoalInterpreter:
                         "- Preserve the valid acknowledgement or naturally rewrite it in Chromie's supplied style; do not remove it or return null.\n"
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
                         "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Remove every invented side task, errand, destination, person, object, household activity, or physical action, even when it sounds caring or fits the personality.\n"
+                        "- Any exact capability in the interpretation decision is an advisory pre-association hypothesis. Compare the requested human outcome with the supplied ability descriptions. If the selected ability semantics do not cover the outcome, do not promise that outcome or a method; use a low-commitment acknowledgement that Chromie understood and will work out what is actually possible.\n"
                         "- Before provider evidence exists, remove every guessed weather condition, measurement, recommendation, conclusion, or result. Acknowledging that Chromie will check is allowed; guessing what she will find is not.\n"
                         "- For memory work, the memory update has not been committed at this boundary. Require an explicitly prospective or intentional grammatical construction about what Chromie will do next. The acknowledgement may say that Chromie heard the request and is going to remember or note it, but it must not say or imply that the fact is already remembered, noted, recorded, stored, saved, or updated. Reject completed aspect, resultative constructions, and present or past states that imply completion; rewrite them prospectively.\n"
                         "- For robot_action, the body action definitely has not started at this boundary. Judge the ordinary sentence meaning, not only the typed fields. If the candidate places Chromie already inside an ongoing movement or action, rewrite it prospectively as hearing, preparing, or getting ready to try the understood request.\n"
@@ -1551,7 +1558,8 @@ class OllamaGoalInterpreter:
                         "Candidate fast_speech JSON: "
                         f"{_bounded_json(candidate.model_dump(mode='json'), max_chars=1800)}\n"
                         "Interpretation decision JSON: "
-                        f"{_bounded_json(decision.model_dump(mode='json', exclude_none=True), max_chars=2600)}"
+                        f"{_bounded_json(decision.model_dump(mode='json', exclude_none=True), max_chars=2600)}\n"
+                        f"Common ability catalog JSON: {abilities_json}"
                     ),
                 },
             ],

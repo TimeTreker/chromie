@@ -104,6 +104,19 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(goal_ids, {"goal-fetch-water"})
 
+    def test_capability_dependent_goal_requires_scope_coverage_audit(self) -> None:
+        goal_ids = coordinated_action_goal_ids(
+            [
+                {
+                    "goal_id": "goal-current-place",
+                    "description": "Find a currently open restaurant.",
+                    "metadata": {"responsibility_kind": "capability_dependent"},
+                }
+            ]
+        )
+
+        self.assertEqual(goal_ids, {"goal-current-place"})
+
     def test_semantic_coverage_rejection_does_not_trigger_safety_revision(self) -> None:
         feedback = [
             {

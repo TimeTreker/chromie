@@ -54,7 +54,8 @@ PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
-    "Treat an explicit numeric value in an authoritative goal as a "
+    "Treat an explicit numeric value in authoritative Goal text or a typed "
+    "Goal binding as a "
     "user-supplied candidate for the matching catalog argument. When "
     "the value and units are unambiguous and the value is within the "
     "catalog schema, copy it exactly; never silently replace it with "
@@ -65,12 +66,20 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "escalate according to the planner tier instead of claiming exact "
     "coverage. A material adjustment must use a non-exact plan_relation, "
     "require confirmation, and explain the change. For each numeric "
-    "literal in an executable authoritative goal, include a user_supplied "
+    "literal in an executable authoritative Goal's text or typed bindings, "
+    "include a user_supplied "
     "parameter_resolution tied to the owned step and goal. The parameter "
     "field must be the exact bare key in that step's args object, never a "
     "step- or capability-qualified name. Its value must equal the step "
     "argument and its source_goal_ids must identify the authoritative Goal "
-    "containing that same number. Use those stable Goal IDs as provenance; "
+    "containing that same number. A typed binding is the model-owned canonical "
+    "provenance for a quantity stated in words by the user. Use those stable "
+    "Goal IDs as provenance. Never borrow a numeric literal or typed binding from "
+    "a sibling Goal to fill another step. When an optional catalog argument was not "
+    "supplied by the owning Goal, omit that argument and its resolution so the "
+    "provider applies its declared default, or copy the exact catalog default with "
+    "strategy=schema_default and no source_goal_ids. Never label a catalog default "
+    "as user_supplied. "
     "do not copy, paraphrase, or annotate Goal text into another field. "
 )
 
@@ -620,6 +629,16 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                 "constraints": goal.get("constraints") or {},
                 "success_criteria": goal.get("success_criteria") or [],
                 "object": goal.get("object") or {},
+                **(
+                    {
+                        "resource_responsibility": goal[
+                            "resource_responsibility"
+                        ]
+                    }
+                    if isinstance(goal.get("resource_responsibility"), dict)
+                    and goal["resource_responsibility"]
+                    else {}
+                ),
                 "metadata": goal.get("metadata") or {},
             }
 
@@ -649,6 +668,16 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                     "constraints": item.get("constraints") or {},
                     "success_criteria": item.get("success_criteria") or [],
                     "object": item.get("object") or {},
+                    **(
+                        {
+                            "resource_responsibility": item[
+                                "resource_responsibility"
+                            ]
+                        }
+                        if isinstance(item.get("resource_responsibility"), dict)
+                        and item["resource_responsibility"]
+                        else {}
+                    ),
                     "metadata": item.get("metadata") or {},
                 }
             )
@@ -906,17 +935,161 @@ def validate_goal_responsibility_outcomes(
             )
 
 
+class ResourceResponsibilityCapabilityGroundingError(ValueError):
+    """A selected Capability does not satisfy a typed resource contract."""
+
+
+class ResourceResponsibilityCapabilityUnavailableError(
+    ResourceResponsibilityCapabilityGroundingError
+):
+    """No supplied Capability declares the typed resource contract."""
+
+
+def validate_resource_responsibility_capability_grounding(
+    output: PlannerModelOutput,
+    *,
+    authoritative_goals: list[dict[str, Any]],
+    capabilities: list[dict[str, Any]],
+) -> None:
+    """Require provider-declared semantics for executable resource Goals.
+
+    Goal Association owns the typed resource responsibility and the planner
+    owns Capability selection. This validator makes neither semantic choice: it
+    only rejects an executable selection when the selected provider contract
+    does not exactly declare the already-selected responsibility type,
+    resource kind, delivery mode, and result-evidence contract. Generic motion
+    can therefore never be promoted into acquisition or delivery by a model
+    rationale alone. Non-executing terminal outcomes remain valid fail-closed
+    representations and require no Capability.
+    """
+
+    capability_by_id = {
+        " ".join(str(item.get("capability_id") or "").strip().split()): item
+        for item in capabilities
+        if isinstance(item, dict)
+        and " ".join(str(item.get("capability_id") or "").strip().split())
+    }
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility = goal.get("resource_responsibility")
+        if not goal_id or not isinstance(responsibility, dict) or not responsibility:
+            continue
+
+        owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
+        if not owned_steps:
+            continue
+        if len(owned_steps) != 1:
+            raise ValueError(
+                "resource responsibility execute outcome requires exactly one "
+                f"provider-owned Capability step: {goal_id}"
+            )
+
+        step = owned_steps[0]
+        capability = capability_by_id.get(step.capability_id)
+        if capability is None:
+            raise ValueError(
+                "resource responsibility step uses a Capability absent from the "
+                f"authoritative catalog: goal_id={goal_id}, "
+                f"capability_id={step.capability_id}"
+            )
+        resource = responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        expected_type = " ".join(
+            str(responsibility.get("responsibility_type") or "").strip().split()
+        )
+        expected_kind = " ".join(str(resource.get("kind") or "").strip().split())
+        expected_delivery = " ".join(
+            str(responsibility.get("delivery_mode") or "").strip().split()
+        )
+
+        def contract_errors(candidate: dict[str, Any]) -> list[str]:
+            candidate_hints = candidate.get("hints")
+            candidate_metadata = candidate.get("metadata")
+            candidate_hints = (
+                candidate_hints if isinstance(candidate_hints, dict) else {}
+            )
+            candidate_metadata = (
+                candidate_metadata if isinstance(candidate_metadata, dict) else {}
+            )
+            candidate_scope = candidate_hints.get("semantic_scope")
+            if not isinstance(candidate_scope, dict) or not candidate_scope:
+                candidate_scope = candidate_metadata.get("semantic_scope")
+            candidate_contract = candidate_hints.get("resource_contract")
+            if not isinstance(candidate_contract, dict) or not candidate_contract:
+                candidate_contract = candidate_metadata.get("resource_contract")
+            candidate_scope = (
+                candidate_scope if isinstance(candidate_scope, dict) else {}
+            )
+            candidate_contract = (
+                candidate_contract if isinstance(candidate_contract, dict) else {}
+            )
+            candidate_raw_kinds = candidate_scope.get("resource_kinds")
+            candidate_kinds = {
+                " ".join(str(value or "").strip().split())
+                for value in (
+                    candidate_raw_kinds
+                    if isinstance(candidate_raw_kinds, list)
+                    else []
+                )
+                if " ".join(str(value or "").strip().split())
+            }
+            candidate_errors: list[str] = []
+            if not candidate_contract:
+                candidate_errors.append("missing resource_contract")
+            if candidate_scope.get("responsibility_type") != expected_type:
+                candidate_errors.append(
+                    "semantic_scope.responsibility_type does not match "
+                    f"{expected_type!r}"
+                )
+            if expected_kind not in candidate_kinds:
+                candidate_errors.append(
+                    "semantic_scope.resource_kinds does not include "
+                    f"{expected_kind!r}"
+                )
+            if candidate_scope.get("delivery") != expected_delivery:
+                candidate_errors.append(
+                    "semantic_scope.delivery does not match "
+                    f"{expected_delivery!r}"
+                )
+            return candidate_errors
+
+        errors = contract_errors(capability)
+        if errors:
+            matching_capability_ids = sorted(
+                capability_id
+                for capability_id, candidate in capability_by_id.items()
+                if not contract_errors(candidate)
+            )
+            message = (
+                "resource responsibility Capability contract mismatch: "
+                f"goal_id={goal_id}, capability_id={step.capability_id}: "
+                + "; ".join(errors)
+            )
+            if not matching_capability_ids:
+                raise ResourceResponsibilityCapabilityUnavailableError(
+                    message + "; no supplied Capability declares the required contract"
+                )
+            raise ResourceResponsibilityCapabilityGroundingError(
+                message
+                + "; matching_capability_ids="
+                + ",".join(matching_capability_ids)
+            )
+
+
 def coordinated_action_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return model-authored effectful Goals requiring semantic coverage audit.
+    """Return model-authored provider Goals requiring semantic coverage audit.
 
     Goal Association, rather than the Host, declares ``responsibility_kind`` and
     authors any ``action_list`` binding or sibling Goal split. The Host uses only
     those typed facts to require an independent model completeness audit; it does
     not infer actions, parse user wording, or select Capabilities. Auditing every
-    executable-action Goal prevents a generic movement step from being accepted as
-    exact completion of a richer physical responsibility such as object handling.
+    executable-action and capability-dependent Goal prevents a generic movement
+    step from being accepted as object handling and prevents a domain-specific
+    read Capability from being broadened into unrelated external retrieval.
     """
 
     goal_ids: set[str] = set()
@@ -931,10 +1104,9 @@ def coordinated_action_goal_ids(
         if source_text:
             source_groups.setdefault(source_text, set()).add(goal_id)
         metadata = goal.get("metadata")
-        if (
-            isinstance(metadata, dict)
-            and str(metadata.get("responsibility_kind") or "").strip() == "executable_action"
-        ):
+        if isinstance(metadata, dict) and str(
+            metadata.get("responsibility_kind") or ""
+        ).strip() in {"executable_action", "capability_dependent"}:
             goal_ids.add(goal_id)
         resource_responsibility = goal.get("resource_responsibility")
         if isinstance(resource_responsibility, dict) and resource_responsibility:
@@ -976,13 +1148,6 @@ def parallel_plan_contract_errors(
     author an explicit safe adjustment, alternative, or clarification.
     """
 
-    # One step has no peer with which to overlap. Treating its redundant
-    # ``parallel`` label as a concurrency request contradicts the runtime
-    # contract, which already admits a single-step batch without provider
-    # parallel metadata. This is arity validation, not a Host timing choice.
-    if len(plan.steps) < 2:
-        return []
-
     by_id = {
         str(item.get("capability_id") or ""): item
         for item in capabilities
@@ -1004,6 +1169,7 @@ def parallel_plan_contract_errors(
                     "type": "parallel_capability_not_declared_safe",
                     "step_id": step.step_id,
                     "capability_id": step.capability_id,
+                    "parallel_step_count": len(parallel_steps),
                     "parallel_metadata_declared": capability.get("parallel_metadata_declared"),
                     "can_run_parallel": capability.get("can_run_parallel"),
                 }
@@ -1256,14 +1422,27 @@ async def review_coordinated_action_plan_coverage(
                 "that claims complete or exact coverage while omitting any such "
                 "responsibility. Reject a step assigned to a Goal when the supplied "
                 "Capability semantics do not actually implement that Goal; a step "
-                "reason cannot invent an unstated feature. Reject requested "
+                "reason cannot invent an unstated feature. Treat each supplied "
+                "Capability's semantic_type, semantic_scope.domain, supported request "
+                "kinds, when_to_use, and when_not_to_use as a closed applicability "
+                "contract rather than illustrative wording. Reject a domain-specific "
+                "read Capability when the Goal asks for another domain; shared "
+                "arguments such as location, date, or current status do not broaden "
+                "its domain. Reject requested "
                 "concurrency unless the Plan either uses capabilities with explicit "
                 "compatible parallel declarations or records an explicit safe "
                 "adjustment/alternative for user confirmation. When that adjustment "
                 "contract is explicit, confirmation-bound, and explained, do not "
                 "reject solely because its retained steps are sequential; the changed "
-                "timing is represented for the user to approve. A person's age, family role, personality, or self-concept is never evidence that a physical Capability exists. Only the supplied executable Capability semantics can establish ability. An exact distance, object acquisition, carrying, return trip, or safety result must be implemented by the supplied Capability semantics and represented by owned steps; duration or a generic movement step cannot be treated as proof of an unsupported distance or another physical responsibility. A Goal whose "
-                "typed resource_responsibility must be covered by an exact Capability "
+                "timing is represented for the user to approve. A person's age, family role, personality, or self-concept is never evidence that a physical Capability exists. Only the supplied executable Capability semantics can establish ability. An exact distance, object acquisition, carrying, return trip, or safety result must be implemented by the supplied Capability semantics and represented by owned steps; duration or a generic movement step cannot be treated as proof of an unsupported distance or another physical responsibility. "
+                "An explicit ordered relation in the authoritative turn or Goals must "
+                "remain sequential. Capability parallel-safety is permission to honor "
+                "requested concurrency, never evidence that concurrency was requested; "
+                "reject an exact Plan that labels ordered actions parallel. Every explicit "
+                "typed Goal binding is authoritative. Reject exact satisfaction when a "
+                "step argument replaces that binding with a catalog minimum, maximum, or "
+                "default, even if the replacement is executable. A Goal whose typed "
+                "resource_responsibility must be covered by an exact Capability "
                 "whose supplied semantic_scope supports that resource kind, acquisition, "
                 "and delivery. A locomotion step cannot acquire or deliver information, "
                 "and a response promise cannot replace requested authored content. A Goal whose "
@@ -1448,6 +1627,21 @@ def _material_values_equal(
             left = _list_literal_items(left)
         if isinstance(right, str):
             right = _list_literal_items(right)
+    elif (
+        isinstance(left, (int, float, Decimal))
+        and not isinstance(left, bool)
+        and isinstance(right, str)
+        and _NUMERIC_LITERAL_RE.fullmatch(right.strip()) is not None
+    ) or (
+        isinstance(right, (int, float, Decimal))
+        and not isinstance(right, bool)
+        and isinstance(left, str)
+        and _NUMERIC_LITERAL_RE.fullmatch(left.strip()) is not None
+    ):
+        try:
+            return Decimal(str(left).strip()) == Decimal(str(right).strip())
+        except InvalidOperation:
+            return False
     return _normalized_material_value(left) == _normalized_material_value(right)
 
 
@@ -1766,6 +1960,16 @@ def validate_explicit_numeric_parameter_grounding(
         source_text = str(goal.get("source_text") or "").strip()
         if not parts and source_text:
             parts.append(source_text)
+        goal_object = goal.get("object")
+        bindings = goal_object.get("bindings") if isinstance(goal_object, dict) else None
+        if isinstance(bindings, dict):
+            parts.extend(
+                str(binding.get("value")).strip()
+                for binding in bindings.values()
+                if isinstance(binding, dict)
+                and binding.get("value") is not None
+                and str(binding.get("value")).strip()
+            )
         goal_text[goal_id] = " ".join(dict.fromkeys(parts))
 
     steps = {step.step_id: step for step in output.steps}
@@ -1862,6 +2066,135 @@ def validate_explicit_numeric_parameter_grounding(
             "numeric user_supplied parameter resolution is not present in "
             f"its authoritative source Goal: {unsupported}"
         )
+
+
+def normalize_schema_default_parameter_provenance(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+    capability_payload: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Correct a mechanically provable schema-default provenance label.
+
+    The planner still owns capability, argument, and Goal/step selection. This
+    adapter changes only ``user_supplied`` provenance when the numeric value is
+    absent from every cited Goal and exactly equals the selected capability's
+    declared default for the same argument. It never changes an argument value
+    or repairs values without authoritative catalog-default evidence.
+    """
+
+    def numeric(value: Any) -> Decimal | None:
+        if isinstance(value, bool) or not isinstance(
+            value,
+            (int, float, Decimal, str),
+        ):
+            return None
+        if (
+            isinstance(value, str)
+            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None
+        ):
+            return None
+        try:
+            return Decimal(str(value).strip())
+        except InvalidOperation:
+            return None
+
+    goal_numbers: dict[str, set[Decimal]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        if not goal_id:
+            continue
+        values: set[Decimal] = set()
+        for text in [
+            goal.get("description"),
+            *(goal.get("success_criteria") or []),
+        ]:
+            for match in _NUMERIC_LITERAL_RE.finditer(str(text or "")):
+                parsed = numeric(match.group(0))
+                if parsed is not None:
+                    values.add(parsed)
+        goal_object = goal.get("object")
+        bindings = (
+            goal_object.get("bindings") if isinstance(goal_object, dict) else None
+        )
+        if isinstance(bindings, dict):
+            for binding in bindings.values():
+                if not isinstance(binding, dict):
+                    continue
+                parsed = numeric(binding.get("value"))
+                if parsed is not None:
+                    values.add(parsed)
+        goal_numbers[goal_id] = values
+
+    schemas = {
+        str(item.get("capability_id") or "").strip(): item.get("input_schema") or {}
+        for item in capability_payload
+        if isinstance(item, dict)
+    }
+    normalized = copy.deepcopy(raw)
+    steps = {
+        str(item.get("step_id") or "").strip(): item
+        for item in normalized.get("steps") or []
+        if isinstance(item, dict) and str(item.get("step_id") or "").strip()
+    }
+    repairs: list[dict[str, Any]] = []
+    for resolution in normalized.get("parameter_resolutions") or []:
+        if not isinstance(resolution, dict):
+            continue
+        if str(resolution.get("strategy") or "") != "user_supplied":
+            continue
+        resolved_number = numeric(resolution.get("value"))
+        if resolved_number is None:
+            continue
+        source_goal_ids = [
+            " ".join(str(value or "").strip().split())
+            for value in resolution.get("source_goal_ids") or []
+        ]
+        if any(
+            resolved_number in goal_numbers.get(goal_id, set())
+            for goal_id in source_goal_ids
+        ):
+            continue
+        step_id = str(resolution.get("step_id") or "").strip()
+        parameter = str(resolution.get("parameter") or "").strip()
+        step = steps.get(step_id)
+        if not isinstance(step, dict):
+            continue
+        args = step.get("args") if isinstance(step.get("args"), dict) else {}
+        argument_number = numeric(args.get(parameter))
+        capability_id = str(step.get("capability_id") or "").strip()
+        parameter_schema = (
+            schemas.get(capability_id, {}).get("properties", {}).get(parameter, {})
+        )
+        schema_default = (
+            parameter_schema.get("default")
+            if isinstance(parameter_schema, dict)
+            else None
+        )
+        default_number = numeric(schema_default)
+        if (
+            argument_number is None
+            or default_number is None
+            or resolved_number != argument_number
+            or resolved_number != default_number
+        ):
+            continue
+        resolution["strategy"] = "schema_default"
+        resolution["source_goal_ids"] = []
+        repairs.append(
+            {
+                "step_id": step_id,
+                "capability_id": capability_id,
+                "parameter": parameter,
+                "value": resolution.get("value"),
+                "from_strategy": "user_supplied",
+                "to_strategy": "schema_default",
+                "reason": "exact_declared_catalog_default_absent_from_cited_goals",
+            }
+        )
+    return normalized, repairs
 
 
 def canonical_plan_response_schema(

@@ -20,6 +20,7 @@ from .cognitive_identity import (
 )
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+    ResourceResponsibilityCapabilityUnavailableError,
     canonical_goal_grounding,
     canonical_plan_response_schema,
     goal_association_prompt_projection,
@@ -30,6 +31,7 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
     planner_response_goal_ids,
     planner_contract_diagnostics,
@@ -39,6 +41,7 @@ from .planner_contract import (
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
+    validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
@@ -255,6 +258,22 @@ class FastPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
+                raw, provenance_repairs = (
+                    normalize_schema_default_parameter_provenance(
+                        raw,
+                        authoritative_goals=canonical_goal_grounding(
+                            request.context
+                        ),
+                        capability_payload=capability_payload,
+                    )
+                )
+                if provenance_repairs:
+                    logger.info(
+                        "fast_planner_schema_default_provenance_normalized "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(provenance_repairs, 2000),
+                    )
                 normalized = (
                     self._normalize_multi_goal(
                         raw,
@@ -285,6 +304,11 @@ class FastPlannerResolver:
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
                 )
+                validate_resource_responsibility_capability_grounding(
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
+                    capabilities=capability_payload,
+                )
                 validate_external_response_evidence_boundary(
                     validated_model_output,
                     context=request.context,
@@ -309,6 +333,20 @@ class FastPlannerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
+                if isinstance(
+                    exc, ResourceResponsibilityCapabilityUnavailableError
+                ):
+                    return self._escalation(
+                        plan_id,
+                        request,
+                        "resource_responsibility_capability_unavailable",
+                        unresolved=[str(exc)],
+                        path_classification="semantic_escalation",
+                        metadata={
+                            "execution_allowed": False,
+                            "resource_contract_unavailable": True,
+                        },
+                    )
                 if attempt < self.max_contract_repairs and isinstance(
                     exc, (ValidationError, json.JSONDecodeError, ValueError)
                 ):
@@ -726,7 +764,7 @@ class FastPlannerResolver:
                 else ""
             )
         )
-        semantic_scope_contract = "For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane speaking/activity coordination to Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+        semantic_scope_contract = "For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material tool argument, especially location, date, target, and entity identity, must equal the corresponding binding; never reinterpret an original pronoun or replace a binding with an older memory entry. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane speaking/activity coordination to Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
         current_turn_communication_contract = (
             "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
             "Retained Goals, delivered evidence-bound dialogue, and verified memory "

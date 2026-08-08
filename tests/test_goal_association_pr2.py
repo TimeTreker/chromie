@@ -155,6 +155,22 @@ class ScriptedOllama:
         return payload
 
 
+def binding_audit(*bindings_by_goal):
+    return {
+        "goal_bindings": [
+            {
+                "candidate_goal_index": index,
+                "bindings": bindings,
+                "reason_summary": (
+                    "Explicit material bindings audited for this Goal."
+                ),
+            }
+            for index, bindings in enumerate(bindings_by_goal)
+        ],
+        "reason_summary": "All candidate Goal bindings were audited.",
+    }
+
+
 def request(
     text: str,
     *,
@@ -241,6 +257,366 @@ class GoalAssociationModelOutputTests(unittest.TestCase):
 
 
 class GoalAssociationResolverTests(unittest.TestCase):
+    def test_resource_source_resegmentation_preserves_one_delivery_goal(self):
+        invalid = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Pick up the red mug and hand it to me.",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [
+                        {
+                            "name": "object_color",
+                            "entity_type": "color",
+                            "value": "red",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "object_type",
+                            "entity_type": "physical_object",
+                            "value": "mug",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "red mug",
+                        "source_status": "known",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "confidence": 1.0,
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": (
+                        "Acquire and hand me the red mug, then report completion."
+                    ),
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "bindings": [
+                        {
+                            "name": "object_color",
+                            "entity_type": "color",
+                            "value": "red",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "object_type",
+                            "entity_type": "physical_object",
+                            "value": "mug",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "red mug",
+                        "source_status": "unknown",
+                        "delivery_mode": "physical_handover",
+                    },
+                },
+                {
+                    "description": "Tell me when the handoff is finished.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": corrected["new_goals"][0][
+                        "description"
+                    ],
+                    "reason_summary": "The resource handoff is the positive effect.",
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "capability_result_delivery_only",
+                    "audible_content_summary": "",
+                    "final_goal_description": "",
+                    "reason_summary": (
+                        "The completion report depends on the handoff result."
+                    ),
+                },
+            ],
+            "reason_summary": (
+                "The physical Goal owns its contingent completion delivery."
+            ),
+        }
+        ollama = ScriptedOllama([invalid, corrected, corrected, adjudication])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Pick up the red mug and hand it to me, then tell me when "
+                    "you have finished.",
+                    language="en-US",
+                    route="robot_action",
+                    intent="semantic_capability_planning",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.source.status, "unknown")
+        self.assertEqual(responsibility.delivery_mode, "physical_handover")
+        self.assertIn("report completion", result.new_goals[0].description)
+        review_prompt = ollama.prompts[2][0]
+        self.assertIn("provider-owned stages", review_prompt)
+        self.assertIn("Do not split pickup and handoff", review_prompt)
+        self.assertIn("not an independently satisfiable spoken_response", review_prompt)
+        self.assertIn("DTO to review JSON", review_prompt)
+        self.assertNotIn("No previous Goal DTO is supplied", review_prompt)
+        self.assertEqual(
+            ollama.prompts[3][1]["prompt_family"],
+            "goal_association.independence_adjudication",
+        )
+
+    def test_invalid_known_resource_source_uses_exact_contract_revision(self):
+        invalid = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Put the item over there.",
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "body_action",
+                    "provider_required": True,
+                    "media_operation": "none",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "the item",
+                        "source_status": "known",
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.9,
+            "reason_summary": "The item is the resource.",
+        }
+        clarified = {
+            "decision": "clarify",
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "Which item do you mean, and where should I put it?",
+            "confidence": 0.7,
+            "reason_summary": "The resource and its source are unresolved.",
+        }
+        ollama = ScriptedOllama([invalid, clarified])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Could you put that over there?",
+                    language="en-US",
+                    route="robot_action",
+                    intent="capability:soridormi.look_at_person",
+                )
+            )
+        )
+
+        self.assertEqual(result.clarification, clarified["clarification"])
+        self.assertEqual(len(ollama.prompts), 2)
+        prompt, kwargs = ollama.prompts[1]
+        self.assertEqual(
+            kwargs["prompt_family"],
+            "goal_association.repair",
+        )
+        self.assertIn("known resource source requires", prompt)
+        self.assertIn("Previous model output JSON", prompt)
+        self.assertIn('"source_status":"known"', prompt)
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "schema_constrained_model_revision",
+        )
+
+    def test_tool_route_spoken_only_output_gets_fresh_responsibility_review(self):
+        spoken_only = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Recommend a noodle restaurant open now.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.9,
+            "reason_summary": "Answer conversationally.",
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Find a noodle restaurant that is open now.",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "capability_work",
+                    "provider_required": True,
+                    "media_operation": "none",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "a current open noodle restaurant",
+                        "source_status": "provider_resolved",
+                        "source_description": "current external place information",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "Current opening status requires fresh evidence.",
+        }
+        ollama = ScriptedOllama([spoken_only, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Find me a noodle restaurant that's open right now.",
+                    language="en-US",
+                    route="tool",
+                    intent="capability:chromie.weather.lookup",
+                )
+            )
+        )
+
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "capability_dependent",
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        prompt, kwargs = ollama.prompts[1]
+        self.assertEqual(kwargs["prompt_family"], "goal_association.semantic_resegmentation")
+        self.assertIn("tool_route_spoken_responsibility_review", prompt)
+        self.assertIn("No previous Goal DTO is supplied", prompt)
+
+    def test_recommendation_route_spoken_only_output_gets_fresh_evidence_review(self):
+        spoken_only = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Recommend a noodle restaurant open now.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.9,
+            "reason_summary": "Answer conversationally.",
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Find a noodle restaurant that is open now.",
+                    "responsibility_kind": "capability_dependent",
+                    "execution_lane": "activity",
+                    "output_mode": "capability_work",
+                    "provider_required": True,
+                    "media_operation": "none",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "a current open noodle restaurant",
+                        "source_status": "provider_resolved",
+                        "source_description": "current external place information",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "Current opening status requires fresh evidence.",
+        }
+        ollama = ScriptedOllama([spoken_only, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Recommend a noodle restaurant that is open right now.",
+                    language="en-US",
+                    route="chat",
+                    intent="recommendation",
+                )
+            )
+        )
+
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "capability_dependent",
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        prompt, kwargs = ollama.prompts[1]
+        self.assertEqual(kwargs["prompt_family"], "goal_association.semantic_resegmentation")
+        self.assertIn("recommendation_route_spoken_responsibility_review", prompt)
+        self.assertIn("No previous Goal DTO is supplied", prompt)
+
+    def test_prompt_distinguishes_resource_identity_from_source_and_binds_counts(self):
+        ollama = FakeOllama(
+            {
+                "decision": "clarify",
+                "new_goals": [],
+                "referent_updates": [],
+                "resolved_references": [],
+                "clarification": "Which object do you mean?",
+                "confidence": 0.7,
+                "reason_summary": "The object is unresolved.",
+            }
+        )
+
+        asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Put that over there, then blink twice.", language="en-US")
+            )
+        )
+        prompt = ollama.prompts[0][0]
+        self.assertIn("Resource identity is not source evidence", prompt)
+        self.assertIn("source_description or source_binding_names is mandatory", prompt)
+        self.assertIn("normalize its binding value to the equivalent numeric string", prompt)
+        self.assertIn("Description text alone is not parameter provenance", prompt)
+
 
     def test_compound_walk_sing_blink_is_freshly_resegmented_with_typed_modes(self):
         initial = {
@@ -303,7 +679,19 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
-        ollama = ScriptedOllama([initial, reviewed])
+        audited_bindings = binding_audit(
+            [
+                {
+                    "name": "duration_s",
+                    "entity_type": "duration_seconds",
+                    "value": "15",
+                    "confidence": 1.0,
+                }
+            ],
+            [],
+            [],
+        )
+        ollama = ScriptedOllama([initial, reviewed, audited_bindings])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -314,7 +702,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             result.metadata["semantic_review"]["strategy"],
             "model_owned_fresh_goal_resegmentation",
@@ -337,6 +725,14 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
         )
         self.assertIsNone(result.new_goals[1].resource_responsibility)
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["duration_s"]["value"],
+            "15",
+        )
+        self.assertEqual(
+            result.metadata["binding_audit"]["strategy"],
+            "model_owned_material_parameter_audit",
+        )
         projection = result.prompt_projection()
         self.assertEqual(
             projection["new_goals"][1]["metadata"],
@@ -424,7 +820,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
-        ollama = ScriptedOllama([invalid, resegmented])
+        ollama = ScriptedOllama(
+            [invalid, resegmented, binding_audit([], [], [])]
+        )
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -437,7 +835,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         repair_prompt, repair_kwargs = ollama.prompts[1]
         self.assertEqual(
             repair_kwargs["prompt_family"],
@@ -999,7 +1397,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
         self.assertNotIn("Look up whether rain", ollama.prompts[1][0])
 
-    def test_embodied_request_is_split_and_acknowledgement_is_not_a_goal(self):
+    def test_embodied_request_separates_movement_but_keeps_resource_delivery(self):
         merged = {
             "decision": "create_goals",
             "new_goals": [
@@ -1032,14 +1430,23 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     ],
                 },
                 {
-                    "description": "拿一杯水。",
+                    "description": "拿一杯水并带回给用户。",
                     "responsibility_kind": "executable_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "返回用户身边。",
-                    "responsibility_kind": "executable_action",
-                    "bindings": [],
+                    "bindings": [
+                        {
+                            "name": "resource",
+                            "entity_type": "physical_object",
+                            "value": "一杯水",
+                            "confidence": 1.0,
+                        }
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "physical_object",
+                        "resource_description": "一杯水",
+                        "source_status": "unknown",
+                        "recipient_description": "用户",
+                        "delivery_mode": "physical_handover",
+                    },
                 },
             ],
             "confidence": 1.0,
@@ -1055,11 +1462,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 2)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
-            ["往前移动50米。", "拿一杯水。", "返回用户身边。"],
+            ["往前移动50米。", "拿一杯水并带回给用户。"],
         )
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "executable_action", "executable_action"],
+            ["executable_action", "executable_action"],
         )
         self.assertEqual(
             result.metadata["semantic_review"]["triggers"],
@@ -1067,8 +1474,200 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         review_prompt = ollama.prompts[1][0]
         self.assertIn("acknowledgement, confirmation", review_prompt)
-        self.assertIn("acquiring or manipulating an object", review_prompt)
+        self.assertIn("provider-owned stages", review_prompt)
+        self.assertIn("Do not split pickup and handoff", review_prompt)
         self.assertIn("Identity shapes expression only", review_prompt)
+
+    def test_negative_speech_constraint_stays_with_embodied_goal(self):
+        initial = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Nod twice.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "count",
+                            "entity_type": "number",
+                            "value": "2",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Acknowledge that no more weather details will be given.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Nod twice without giving more weather details.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "count",
+                            "entity_type": "number",
+                            "value": "2",
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ],
+            "confidence": 1.0,
+        }
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": (
+                        "Nod twice without giving more weather details."
+                    ),
+                    "reason_summary": "The requested nod is a positive body effect.",
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "silence_or_omission_only",
+                    "audible_content_summary": "",
+                    "final_goal_description": "Do not give more weather details.",
+                    "reason_summary": (
+                        "Compliance consists only of omitting more weather details."
+                    ),
+                },
+            ],
+            "reason_summary": (
+                "The nod is independently requested; the prohibition is a delivery "
+                "constraint rather than spoken content."
+            ),
+        }
+        ollama = ScriptedOllama([initial, initial, adjudication])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Now nod twice, and do not give me more weather details.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].description,
+            "Nod twice without giving more weather details.",
+        )
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "executable_action",
+        )
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_goal_independence_adjudication",
+        )
+        self.assertEqual(result.metadata["semantic_review"]["attempt_count"], 2)
+        review_prompt = ollama.prompts[1][0]
+        self.assertIn("No previous Goal DTO is supplied", review_prompt)
+        self.assertNotIn("Acknowledge that no more weather", review_prompt)
+        self.assertIn("not a request for a verbal acknowledgement", review_prompt)
+        self.assertIn("do not create a sibling", review_prompt)
+        self.assertIn("omitting its typed binding is invalid", review_prompt)
+        self.assertIn("description text alone is never enough", review_prompt)
+        adjudication_prompt = ollama.prompts[2][0]
+        self.assertIn("if the body action occurred", adjudication_prompt)
+        self.assertIn("sets a boundary on delivery", adjudication_prompt)
+        self.assertIn("every zero-based candidate Goal", adjudication_prompt)
+        self.assertIn("positive words, information", adjudication_prompt)
+        self.assertIn("silence_or_omission_only", adjudication_prompt)
+        self.assertIn(
+            "goal_association.independence_adjudication",
+            ollama.prompts[2][1]["prompt_family"],
+        )
+        adjudication_schema = ollama.prompts[2][1]["response_format"]
+        self.assertEqual(
+            adjudication_schema["$defs"][
+                "GoalIndependenceCandidateDecision"
+            ]["properties"]["candidate_goal_index"]["enum"],
+            [0, 1],
+        )
+        self.assertEqual(
+            adjudication_schema["$defs"][
+                "GoalIndependenceCandidateDecision"
+            ]["required"],
+            [
+                "candidate_goal_index",
+                "completion_mode",
+                "audible_content_summary",
+                "final_goal_description",
+                "reason_summary",
+            ],
+        )
+
+    def test_independence_adjudication_preserves_requested_authored_content(self):
+        mixed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Blink twice.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [
+                        {
+                            "name": "count",
+                            "entity_type": "number",
+                            "value": "2",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Tell a short joke.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": "Blink twice.",
+                    "reason_summary": "The requested blink is a positive body effect.",
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "independently_requested_authored_content",
+                    "audible_content_summary": "A short joke.",
+                    "final_goal_description": "Tell a short joke.",
+                    "reason_summary": "The user positively requested a joke to hear.",
+                },
+            ],
+            "reason_summary": "Both outcomes are independently requested.",
+        }
+        ollama = ScriptedOllama([mixed, mixed, adjudication])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Blink twice and tell me a short joke.", language="en-US")
+            )
+        )
+
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Blink twice.", "Tell a short joke."],
+        )
+        self.assertEqual(
+            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
+            ["executable_action", "spoken_response"],
+        )
 
     def test_independent_spoken_performance_survives_model_semantic_review(self):
         mixed = {
@@ -1094,7 +1693,26 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
-        ollama = ScriptedOllama([mixed, mixed])
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": mixed["new_goals"][0]["description"],
+                    "reason_summary": "Weather lookup is the capability outcome.",
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "independently_requested_authored_content",
+                    "audible_content_summary": "A short song.",
+                    "final_goal_description": mixed["new_goals"][1]["description"],
+                    "reason_summary": "The song is independently requested content.",
+                },
+            ],
+            "reason_summary": "Both independently requested outcomes are preserved.",
+        }
+        ollama = ScriptedOllama([mixed, mixed, adjudication])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -1105,12 +1723,198 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["capability_dependent", "spoken_response"],
         )
         self.assertIn("such as a song, joke", ollama.prompts[1][0])
+        self.assertEqual(
+            ollama.prompts[2][1]["prompt_family"],
+            "goal_association.independence_adjudication",
+        )
+
+    def test_capability_result_recommendation_is_owned_by_capability_goal(self):
+        mixed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Check tomorrow's weather in Shanghai.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "Shanghai",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "date",
+                            "entity_type": "date",
+                            "value": "tomorrow",
+                            "confidence": 1.0,
+                        },
+                    ],
+                },
+                {
+                    "description": "Recommend whether to take an umbrella.",
+                    "responsibility_kind": "spoken_response",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": mixed["new_goals"][0]["description"],
+                    "reason_summary": "Fresh weather evidence is required.",
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "capability_result_delivery_only",
+                    "audible_content_summary": "",
+                    "final_goal_description": "",
+                    "reason_summary": (
+                        "The umbrella recommendation depends on the weather result."
+                    ),
+                },
+            ],
+            "reason_summary": (
+                "The capability Goal owns both evidence acquisition and delivery."
+            ),
+        }
+        ollama = ScriptedOllama([mixed, mixed, adjudication])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Check tomorrow's weather in Shanghai and tell me whether I "
+                    "should take an umbrella.",
+                    language="en-US",
+                    route="tool",
+                    intent="capability:chromie.weather.lookup",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "capability_dependent",
+        )
+        self.assertEqual(
+            result.metadata["semantic_review"]["strategy"],
+            "model_owned_goal_independence_adjudication",
+        )
+        self.assertIn(
+            "capability_result_delivery_only",
+            ollama.prompts[2][0],
+        )
+        self.assertIn(
+            "contingent completion report",
+            ollama.prompts[2][0],
+        )
+        self.assertIn(
+            "pending work has finished depends on execution evidence",
+            ollama.prompts[2][1]["system"],
+        )
+
+    def test_compound_mixed_goal_triggers_binding_audit_without_host_word_rules(self):
+        self.assertTrue(
+            GoalAssociationResolver._binding_audit_required(
+                {
+                    "new_goals": [
+                        {
+                            "description": "Blink twice.",
+                            "responsibility_kind": "executable_action",
+                            "bindings": [],
+                        },
+                        {
+                            "description": "Explain why leaves change color.",
+                            "responsibility_kind": "spoken_response",
+                            "bindings": [],
+                        },
+                    ]
+                }
+            )
+        )
+        self.assertFalse(
+            GoalAssociationResolver._binding_audit_required(
+                {
+                    "new_goals": [
+                        {
+                            "description": "Blink.",
+                            "responsibility_kind": "executable_action",
+                            "bindings": [],
+                        }
+                    ]
+                }
+            )
+        )
+
+    def test_compound_numeric_binding_audit_recovers_duration(self):
+        segmented = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Turn in place.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+                {
+                    "description": "Look at the user for 2 seconds.",
+                    "responsibility_kind": "executable_action",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        audited_bindings = binding_audit(
+            [],
+            [
+                {
+                    "name": "duration_s",
+                    "entity_type": "duration_seconds",
+                    "value": "2",
+                    "confidence": 1.0,
+                }
+            ],
+        )
+        ollama = ScriptedOllama([segmented, audited_bindings])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Turn in place, then look at me for two seconds.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "goal_association.binding_audit",
+        )
+        self.assertEqual(
+            result.new_goals[1].object["bindings"]["duration_s"]["value"],
+            "2",
+        )
+        self.assertEqual(
+            result.metadata["binding_audit"]["strategy"],
+            "model_owned_material_parameter_audit",
+        )
+        audit_schema = ollama.prompts[1][1]["response_format"]
+        self.assertEqual(
+            audit_schema["$defs"]["GoalBindingAuditItem"]["properties"]
+            ["candidate_goal_index"]["enum"],
+            [0, 1],
+        )
 
     def test_failed_model_semantic_review_fails_closed(self):
         mixed = {
@@ -1343,6 +2147,18 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     ],
                     "confidence": 1.0,
                 },
+                binding_audit(
+                    [
+                        {
+                            "name": "duration_s",
+                            "entity_type": "duration_seconds",
+                            "value": "15",
+                            "confidence": 1.0,
+                        }
+                    ],
+                    [],
+                    [],
+                ),
             ]
         )
 
@@ -1355,7 +2171,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
             [
@@ -1374,6 +2190,10 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["executable_action", "executable_action", "spoken_response"],
+        )
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["duration_s"]["value"],
+            "15",
         )
         goal_schema = ollama.prompts[0][1]["response_format"]["$defs"][
             "GoalAssociationModelGoal"
@@ -1457,7 +2277,9 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             "confidence": 1.0,
         }
-        ollama = ScriptedOllama([initial, reviewed])
+        ollama = ScriptedOllama(
+            [initial, reviewed, binding_audit([], [], [])]
+        )
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -1465,7 +2287,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             result.metadata["semantic_review"]["triggers"],
             ["multi_embodied_responsibility_review"],

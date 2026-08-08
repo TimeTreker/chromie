@@ -554,6 +554,109 @@ class AgentSkillProgressiveDisclosureTests(unittest.TestCase):
             )["projections"][0]["content"],
         )
 
+    def test_duplicate_fast_and_deep_provenance_loads_one_downstream_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            registry = load_agent_skill_registry([root]).registry
+            summary = registry.list_summaries()[0]
+            coordinator = AgentSkillProgressiveDisclosureCoordinator(
+                AgentSkillSelectionService(ScriptedModel([]), registry),
+                AgentSkillDisclosureService(registry),
+            )
+            provenance_common = {
+                "agent_skill_id": summary.agent_skill_id,
+                "version": summary.version,
+                "content_digest": summary.content_digest,
+            }
+            canonical = CanonicalPlan.model_validate(
+                {
+                    "plan_id": "plan-fast-deep-reuse",
+                    "planner_tier": "deep",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "confidence": 1.0,
+                    "goal_ids": ["goal-weather", "goal-advice"],
+                    "response_text": "Grounded response.",
+                    "goal_outcomes": [
+                        {
+                            "goal_id": "goal-weather",
+                            "disposition": "respond",
+                            "coverage": "complete",
+                            "response_text": "Grounded response.",
+                        },
+                        {
+                            "goal_id": "goal-advice",
+                            "disposition": "respond",
+                            "coverage": "complete",
+                            "response_text": "Grounded response.",
+                        },
+                    ],
+                    "selected_agent_skills": [
+                        {
+                            **provenance_common,
+                            "selection_id": "selection-fast",
+                            "disclosure_id": "disclosure-fast",
+                            "disclosure_digest": "sha256:" + "a" * 64,
+                            "selected_by_agent_role": "fast_planner",
+                            "projection": "fast_planner",
+                            "projection_digest": "sha256:" + "b" * 64,
+                            "relevant_goal_ids": ["goal-weather"],
+                            "selection_rationale": "Fast method selection.",
+                            "selection_confidence": 0.8,
+                        },
+                        {
+                            **provenance_common,
+                            "selection_id": "selection-deep",
+                            "disclosure_id": "disclosure-deep",
+                            "disclosure_digest": "sha256:" + "c" * 64,
+                            "selected_by_agent_role": "deep_planner",
+                            "projection": "deep_planner",
+                            "projection_digest": "sha256:" + "d" * 64,
+                            "relevant_goal_ids": ["goal-advice"],
+                            "selection_rationale": "Terminal Deep method selection.",
+                            "selection_confidence": 0.9,
+                        },
+                    ],
+                }
+            )
+            request = self._request()
+            context = dict(request.context)
+            context["canonical_plan_resolution"] = canonical.model_dump(
+                mode="json", exclude_none=True
+            )
+            prepared, disclosure = asyncio.run(
+                coordinator.prepare_agent_request(
+                    request.model_copy(update={"context": context}),
+                    "response_composer",
+                )
+            )
+
+        self.assertEqual(disclosure.status, "loaded")
+        self.assertEqual(len(disclosure.projections), 1)
+        projection = disclosure.projections[0]
+        self.assertEqual(projection.agent_skill_id, summary.agent_skill_id)
+        self.assertEqual(
+            projection.relevant_goal_ids,
+            ("goal-weather", "goal-advice"),
+        )
+        self.assertEqual(
+            projection.selection_rationale,
+            "Terminal Deep method selection.",
+        )
+        self.assertEqual(projection.selection_confidence, 0.8)
+        self.assertEqual(
+            len(
+                prompt_agent_skill_context(
+                    prepared.context,
+                    agent_role="response_composer",
+                )["projections"]
+            ),
+            1,
+        )
+
     def test_planner_selection_is_reused_for_tool_result_without_model_call(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -108,6 +108,91 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_missing_resource_provider_clarifies_without_hard_model_failure(self):
+        goal_id = "goal-resource"
+        reason = "Fetch and hand over the red mug."
+        satisfaction = {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+            "unmet_goal_ids": [],
+            "unmet_requirements": [],
+            "rationale": reason,
+        }
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": reason,
+            "response_text": "",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 2.0},
+                    "timing": "sequential",
+                    "source_goal_ids": [goal_id],
+                    "reason_summary": reason,
+                }
+            ],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {
+                goal_id: {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["walk"],
+                    "satisfaction": satisfaction,
+                    "rationale": reason,
+                }
+            },
+            "goal_satisfaction": satisfaction,
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        run_request = request(reason, goal_ids=[goal_id])
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": reason,
+                    "source_text": reason,
+                    "resource_responsibility": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "responsibility_variant": "fetch_and_deliver_object",
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "red mug",
+                        },
+                        "source": {"status": "unknown"},
+                        "recipient": {"description": "requester"},
+                        "delivery_mode": "physical_handover",
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                }
+            ],
+        }
+
+        plan = asyncio.run(
+            DeepPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(
+            plan.metadata["reason"],
+            "resource_responsibility_capability_unavailable",
+        )
+        self.assertTrue(plan.metadata["resource_contract_unavailable"])
+        self.assertNotIn("failure_class", plan.metadata)
+
     def test_prior_validator_capability_contract_precedes_catalog_truncation(self):
         run_request = request("Walk briefly.")
         context = dict(run_request.context)
@@ -231,10 +316,29 @@ class DeepPlannerResolverTests(unittest.TestCase):
             1,
         )[1].split("Verified tool-memory index JSON", 1)[0]
 
+        self.assertLessEqual(len(catalog_section.strip()), 12003)
         self.assertIn("soridormi.walk_velocity", catalog_section)
         self.assertIn("vx_mps", catalog_section)
         self.assertIn('"maximum":0.25', catalog_section)
         self.assertNotIn("duplicated", catalog_section)
+
+    def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
+        prompt = DeepPlannerResolver(object(), object())._prompt(
+            request("Find a restaurant that is open now near People's Square."),
+            [],
+            feedback=[],
+            response_schema={},
+            expected_goal_ids=["goal-action"],
+        )
+
+        self.assertIn(
+            "Clarification is only for ambiguous user meaning or missing material information that the user can supply",
+            prompt,
+        )
+        self.assertIn(
+            "no exact available capability covers the required outcome, return unavailable",
+            prompt,
+        )
 
     def test_resolution_mismatch_feedback_carries_selected_capability_schema(self):
         feedback = DeepPlannerResolver._validation_error_items(
@@ -346,6 +450,57 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(mismatch["actual_strategy"], "safe_default")
         self.assertIn("strategy user_supplied", mismatch["corrective_contract"])
+
+    def test_numeric_repair_feedback_forbids_borrowing_sibling_goal_value(self):
+        feedback = DeepPlannerResolver._validation_error_items(
+            ValueError(
+                "numeric user_supplied parameter resolution is not present in "
+                "its authoritative source Goal"
+            ),
+            raw={
+                "steps": [
+                    {
+                        "step_id": "turn",
+                        "capability_id": "soridormi.turn_in_place",
+                        "args": {"duration_s": 2.0},
+                    }
+                ],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "turn",
+                        "parameter": "duration_s",
+                        "strategy": "user_supplied",
+                        "value": 2.0,
+                        "source_goal_ids": ["goal-turn"],
+                    }
+                ],
+            },
+            expected_goal_ids_for_turn=["goal-turn", "goal-look"],
+            capability_payload=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "duration_s": {
+                                "type": "number",
+                                "default": 2.0,
+                            }
+                        },
+                    },
+                }
+            ],
+        )
+
+        mismatch = next(
+            item
+            for item in feedback
+            if item["type"] == "unsupported_user_supplied_provenance"
+        )
+        self.assertEqual(mismatch["source_goal_ids"], ["goal-turn"])
+        self.assertEqual(mismatch["catalog_parameter_schema"]["default"], 2.0)
+        self.assertIn("Never borrow a sibling Goal", mismatch["corrective_contract"])
+        self.assertIn("strategy schema_default", mismatch["corrective_contract"])
 
     def test_deep_decoder_requires_explicit_step_timing(self):
         schema = DeepPlannerResolver._response_schema(
@@ -475,6 +630,58 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(feedback, [])
 
+        singleton_feedback = [
+            {
+                "type": "parallel_capability_not_declared_safe",
+                "capability_id": "soridormi.walk_forward",
+                "parallel_step_count": 1,
+            }
+        ]
+        self.assertFalse(
+            DeepPlannerResolver._requires_safety_revision(singleton_feedback)
+        )
+        self.assertFalse(
+            DeepPlannerResolver._requires_sequential_safety_revision(
+                singleton_feedback
+            )
+        )
+
+    def test_single_parallel_label_is_repaired_without_safety_adjustment(self):
+        parallel = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Walk forward.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "timing": "parallel",
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        repaired = {
+            **parallel,
+            "steps": [{**parallel["steps"][0], "timing": "sequential"}],
+        }
+        ollama = SequencedOllama([parallel, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("Walk forward.")
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].timing, "sequential")
+        self.assertEqual(plan.metadata["plan_relation"], "exact")
+        self.assertFalse(plan.metadata["user_confirmation_required"])
+        self.assertIn("parallel_step_count", ollama.prompts[1][0])
+        self.assertIn("malformed scheduling annotation", ollama.prompts[1][0])
+
     def test_mixed_plan_does_not_require_duplicate_per_goal_satisfaction(self):
         goal_ids = ["goal-blink", "goal-song"]
         raw = {
@@ -601,6 +808,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn('"plan_relation":"safe_adjustment"', prompt)
         self.assertIn('"user_confirmation_required":true', prompt)
         self.assertIn("requires no executable speech-transport step", prompt)
+        self.assertIn("closed applicability contract", prompt)
+        self.assertIn("current status do not broaden its domain", prompt)
         self.assertIn("do not reject solely", prompt)
         self.assertIn(
             "unavailable or refused outcome explicitly represents the Goal",

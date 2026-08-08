@@ -2588,6 +2588,55 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("rewrite them prospectively", rendered)
         self.assertEqual(payload["model"], "test-model")
 
+    async def test_fast_speech_review_receives_advisory_ability_semantics(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        decision = RouteDecision(
+            route="robot_action",
+            intent="capability:soridormi.walk_forward",
+            confidence=0.95,
+        )
+        candidate = FastSpeech(
+            text="I'll pick up the red mug and bring it to you.",
+            purpose="acknowledge",
+            commitment="prelude_only",
+            claim_state="none",
+            claimed_capability_ids=[],
+            claimed_goal_ids=[],
+            must_not_claim_completion=True,
+        )
+
+        payload = interpreter.build_fast_speech_review_payload(
+            RouteRequest(
+                text="Pick up the red mug and bring it to me.",
+                language="en-US",
+                context={
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "route": "robot_action",
+                            "description": "Walk forward for a bounded duration.",
+                            "effects": ["locomotion"],
+                        }
+                    ]
+                },
+            ),
+            decision,
+            candidate,
+        )
+        rendered = "\n".join(
+            str(message.get("content") or "") for message in payload["messages"]
+        )
+
+        self.assertIn("advisory pre-association hypothesis", rendered)
+        self.assertIn("do not promise that outcome or a method", rendered)
+        self.assertIn("soridormi.walk_forward", rendered)
+        self.assertIn("Walk forward for a bounded duration", rendered)
+
     async def test_memory_fast_speech_fails_closed_until_commit(self) -> None:
         class MemoryInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:

@@ -127,10 +127,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    and phrase tables may retrieve candidates or validate and reject model
    output, but they must not decide ordinary robot intent or planning by
    themselves.
-3. **General competence beats case patches.** Reported utterances and scenario
+3. **Generality comes before specialization.** Reported utterances and scenario
    fixtures are probes into broad robot abilities, not the product goal by
-   themselves. A fix should improve the reusable capability class behind the
-   failure, such as robust intent understanding, stable catalog grounding,
+   themselves. Every bug fix and feature should first identify the reusable
+   semantic rule or capability behind the observed case. Generalize the behavior,
+   not the exception. A fix should improve the reusable capability class behind
+   the failure, such as robust intent understanding, stable catalog grounding,
    natural uncertainty handling, composable high-level action planning,
    truthful embodied speech, or valid end-to-end evidence. Do not tune Chromie
    only to pass the last visible sentence while leaving the underlying ability
@@ -174,6 +176,46 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or execution authority. All effects still use exact registered capabilities,
    Trusted Capability Runtime validation, and provider evidence. Skill retrieval may narrow
    candidates; it must not become phrase-based semantic selection.
+14. **Use less to solve more.** Complexity is a cost, not evidence of progress.
+   Prefer the smallest general solution that correctly solves the real problem.
+   New modules, managers, abstractions, state machines, policy layers, and
+   frameworks must justify their permanent maintenance cost. Prefer fewer
+   concepts, clearer ownership, stronger invariants, and reuse or consolidation
+   of existing logic when those choices remain correct.
+15. **Restore invariants within the intended architecture.** A defect repair
+   should identify the violated invariant and restore it with the smallest
+   general change that fits the intended architecture. Minimal repair is the
+   default, not a reason to preserve an architecture that the project owner has
+   explicitly chosen to change. When an architectural direction is specified,
+   move responsibility to that design and remove obsolete paths rather than
+   layering compatibility machinery around the old design.
+16. **Design fully, implement incrementally.** Document long-term architecture,
+   ownership, evolution paths, and extension points in enough detail to keep the
+   destination clear. Current runtime code should implement only complexity
+   required by current validated needs. Design the future; do not prematurely
+   build hypothetical future machinery.
+17. **Solve behavior at the highest suitable semantic layer.** For semantic and
+   conversational behavior, consider general prompts, bounded context, memory,
+   and cognitive contracts before procedural exceptions. Prefer teaching the
+   Cognitive Core one reusable rule over teaching Host code another case.
+   Deterministic code remains responsible for mechanical correctness, safety,
+   authorization, exact state transitions, and other invariants that must not
+   depend on model judgment.
+18. **Mechanisms report reality; cognition decides behavior.** Runtime mechanisms
+   provide trustworthy facts about what was requested, scheduled, delivered,
+   committed, completed, failed, cancelled, or observed. Cognitive layers decide
+   meaning, communication, prioritization, and ordinary behavior from those
+   facts. Low-level mechanisms must not quietly become owners of social or
+   semantic judgment, and cognition must not invent runtime facts.
+19. **Separate policy from mechanism.** Policy states what should happen and why;
+   mechanisms provide the reusable means and trustworthy state needed to carry
+   it out. Do not scatter one behavioral policy across special-case checks, and
+   do not create a universal policy framework merely because one isolated rule
+   needs enforcement. Generalize the rule before generalizing the machinery.
+20. **Prompt complexity is still complexity.** LLM instructions are part of the
+   architecture and accumulate maintenance cost just like code. Do not replace a
+   code mountain with a prompt mountain. Prefer concise, general semantic rules
+   over growing collections of scenario-specific instructions and examples.
 
 ## Non-goals
 

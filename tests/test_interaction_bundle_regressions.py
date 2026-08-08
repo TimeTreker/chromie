@@ -102,6 +102,50 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
             "performance",
         )
 
+    def test_optional_coordination_id_without_delivery_role_is_pruned(self) -> None:
+        plan = self._mixed_plan()
+        raw = {
+            "response_plan": {
+                "immediate": {
+                    "text": "Let me check that first.",
+                    "speech_act": "acknowledge",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-move", "goal-song"],
+                    "coordination_id": "coord-malformed-optional",
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "lane_coordination": [
+                {
+                    "coordination_id": "coord-malformed-optional",
+                    "lanes": ["speaking", "activity"],
+                }
+            ],
+            "confidence": 1.0,
+            "rationale": "Optional overlap omitted the required speech role.",
+        }
+
+        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
+            raw,
+            plan=plan,
+        )
+        output = ResponseComposerModelOutput.model_validate(normalized)
+
+        assert output.response_plan.immediate is not None
+        self.assertIsNone(output.response_plan.immediate.coordination_id)
+        self.assertEqual(output.response_plan.immediate.delivery_role, "response")
+        reconciled, kept, reasons = ResponseComposerResolver._reconcile_lane_coordination(
+            response_plan=output.response_plan,
+            lane_coordination=output.lane_coordination,
+            social_attention_plan=output.social_attention_plan,
+            plan=plan,
+        )
+        self.assertEqual(kept, [])
+        self.assertTrue(reasons)
+        assert reconciled.immediate is not None
+        self.assertEqual(reconciled.immediate.text, "Let me check that first.")
+
     def test_invalid_optional_social_group_is_pruned_not_turn_fatal(self) -> None:
         plan = self._mixed_plan()
         response_plan = ResponsePlan(

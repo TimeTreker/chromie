@@ -5,6 +5,13 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
+from agent.app.planner_contract import (
+    PlannerModelOutput,
+    ResourceResponsibilityCapabilityGroundingError,
+    ResourceResponsibilityCapabilityUnavailableError,
+    canonical_goal_grounding,
+    validate_resource_responsibility_capability_grounding,
+)
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.resource import (
     AcquireAndDeliverResource,
@@ -21,6 +28,72 @@ class _NoopOllama:
 
 
 class ResourceAcquisitionContractTests(unittest.TestCase):
+    @staticmethod
+    def _planner_output(capability_id: str) -> PlannerModelOutput:
+        goal_id = "goal-resource"
+        satisfaction = {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+            "unmet_goal_ids": [],
+            "unmet_requirements": [],
+            "rationale": "The declared Capability covers the resource Goal.",
+        }
+        return PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Fetch and deliver the red mug.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "fetch",
+                        "capability_id": capability_id,
+                        "args": {},
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Execute the resource responsibility.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["fetch"],
+                        "satisfaction": satisfaction,
+                        "rationale": "The exact provider Capability is selected.",
+                    }
+                },
+                "goal_satisfaction": satisfaction,
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+
+    @staticmethod
+    def _resource_goal() -> dict:
+        return {
+            "goal_id": "goal-resource",
+            "description": "Fetch the red mug and hand it to the requester.",
+            "resource_responsibility": {
+                "responsibility_type": "acquire_and_deliver_resource",
+                "responsibility_variant": "fetch_and_deliver_object",
+                "resource": {
+                    "kind": "physical_object",
+                    "description": "the red mug",
+                },
+                "source": {"status": "unknown"},
+                "recipient": {"description": "requester"},
+                "delivery_mode": "physical_handover",
+            },
+        }
+
     def test_contract_is_provider_neutral_and_rejects_backend_fields(self) -> None:
         responsibility = AcquireAndDeliverResource(
             resource=ResourceDescriptor(
@@ -72,6 +145,154 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 source=ResourceSource(status="provider_resolved"),
                 delivery_mode="physical_handover",
             )
+
+    def test_generic_motion_cannot_claim_typed_resource_responsibility(self) -> None:
+        output = self._planner_output("soridormi.walk_forward")
+
+        with self.assertRaisesRegex(
+            ResourceResponsibilityCapabilityUnavailableError,
+            "resource responsibility Capability contract mismatch",
+        ):
+            validate_resource_responsibility_capability_grounding(
+                output,
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "hints": {
+                            "semantic_scope": {},
+                            "resource_contract": {},
+                        },
+                    }
+                ],
+            )
+
+    def test_wrong_selection_distinguishes_an_available_matching_provider(self) -> None:
+        output = self._planner_output("soridormi.walk_forward")
+
+        with self.assertRaises(ResourceResponsibilityCapabilityGroundingError) as caught:
+            validate_resource_responsibility_capability_grounding(
+                output,
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "hints": {
+                            "semantic_scope": {},
+                            "resource_contract": {},
+                        },
+                    },
+                    {
+                        "capability_id": "soridormi.fetch_and_deliver_object",
+                        "hints": {
+                            "semantic_scope": {
+                                "responsibility_type": (
+                                    "acquire_and_deliver_resource"
+                                ),
+                                "resource_kinds": ["physical_object"],
+                                "delivery": "physical_handover",
+                            },
+                            "resource_contract": {
+                                "result_field": "resource_outcome"
+                            },
+                        },
+                    },
+                ],
+            )
+
+        self.assertNotIsInstance(
+            caught.exception,
+            ResourceResponsibilityCapabilityUnavailableError,
+        )
+        self.assertIn(
+            "matching_capability_ids=soridormi.fetch_and_deliver_object",
+            str(caught.exception),
+        )
+
+    def test_planner_grounding_preserves_new_resource_responsibility(self) -> None:
+        resource_goal = self._resource_goal()
+        authoritative_goals = canonical_goal_grounding(
+            {
+                "goal_association_resolution": {
+                    "associations": [],
+                    "new_goals": [resource_goal],
+                }
+            }
+        )
+
+        self.assertEqual(
+            authoritative_goals[0]["resource_responsibility"],
+            resource_goal["resource_responsibility"],
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "resource responsibility Capability contract mismatch",
+        ):
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output("soridormi.walk_forward"),
+                authoritative_goals=authoritative_goals,
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "hints": {
+                            "semantic_scope": {},
+                            "resource_contract": {},
+                        },
+                    }
+                ],
+            )
+
+    def test_planner_grounding_preserves_retained_resource_responsibility(self) -> None:
+        resource_goal = self._resource_goal()
+        authoritative_goals = canonical_goal_grounding(
+            {
+                "goal_association_resolution": {
+                    "associations": [
+                        {
+                            "relationship": "continue",
+                            "target_goal_ids": ["goal-resource"],
+                        }
+                    ],
+                    "new_goals": [],
+                },
+                "active_goal_snapshots": [
+                    {
+                        "goal_id": "goal-resource",
+                        "goal": resource_goal,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            authoritative_goals[0]["resource_responsibility"],
+            resource_goal["resource_responsibility"],
+        )
+
+    def test_exact_resource_capability_declares_scope_and_result_contract(self) -> None:
+        output = self._planner_output("soridormi.fetch_and_deliver_object")
+
+        validate_resource_responsibility_capability_grounding(
+            output,
+            authoritative_goals=[self._resource_goal()],
+            capabilities=[
+                {
+                    "capability_id": "soridormi.fetch_and_deliver_object",
+                    "hints": {
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                            "delivery": "physical_handover",
+                        }
+                    },
+                    "metadata": {
+                        "resource_contract": {
+                            "result_field": "resource_outcome",
+                        }
+                    },
+                }
+            ],
+        )
 
 
     def test_responsibility_variant_is_explicit_and_backward_compatible(self) -> None:

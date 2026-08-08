@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
     EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+    ResourceResponsibilityCapabilityUnavailableError,
     canonical_goal_grounding,
     canonical_plan_response_schema,
     coordinated_action_goal_ids,
@@ -38,6 +39,7 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    normalize_schema_default_parameter_provenance,
     parallel_plan_contract_errors,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
@@ -47,6 +49,7 @@ from .planner_contract import (
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
+    validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
 )
@@ -205,6 +208,22 @@ class DeepPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
+                raw, provenance_repairs = (
+                    normalize_schema_default_parameter_provenance(
+                        raw,
+                        authoritative_goals=canonical_goal_grounding(
+                            request.context
+                        ),
+                        capability_payload=payload,
+                    )
+                )
+                if provenance_repairs:
+                    logger.info(
+                        "deep_planner_schema_default_provenance_normalized "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        self._bounded(provenance_repairs, 2000),
+                    )
                 self._validate_parallel_timing_preservation(
                     raw,
                     context=request.context,
@@ -215,6 +234,7 @@ class DeepPlannerResolver:
                         request=request,
                         plan_id=plan_id,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        capability_payload=payload,
                     )
                 )
             except Exception as exc:
@@ -231,6 +251,20 @@ class DeepPlannerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
+                if isinstance(
+                    exc, ResourceResponsibilityCapabilityUnavailableError
+                ):
+                    return self._clarify(
+                        plan_id,
+                        request,
+                        "resource_responsibility_capability_unavailable",
+                        unresolved=[str(exc)],
+                        attempts=attempt + 1,
+                        metadata={
+                            "execution_allowed": False,
+                            "resource_contract_unavailable": True,
+                        },
+                    )
                 semantic_replan = self._is_semantic_replan_error(exc)
                 if attempt < self.max_replans and semantic_replan:
                     contract_repair_attempted = True
@@ -564,6 +598,43 @@ class DeepPlannerResolver:
                             ),
                         }
                     )
+            if "numeric user_supplied parameter resolution is not present" in str(exc):
+                for resolution in raw.get("parameter_resolutions") or []:
+                    if not isinstance(resolution, dict):
+                        continue
+                    if str(resolution.get("strategy") or "") != "user_supplied":
+                        continue
+                    step_id = str(resolution.get("step_id") or "").strip()
+                    step = steps.get(step_id)
+                    if not isinstance(step, dict):
+                        continue
+                    capability_id = str(step.get("capability_id") or "").strip()
+                    parameter = str(resolution.get("parameter") or "").strip()
+                    parameter_schema = (
+                        schemas.get(capability_id, {})
+                        .get("properties", {})
+                        .get(parameter, {})
+                    )
+                    feedback.append(
+                        {
+                            "type": "unsupported_user_supplied_provenance",
+                            "step_id": step_id,
+                            "capability_id": capability_id,
+                            "parameter": parameter,
+                            "resolution_value": resolution.get("value"),
+                            "source_goal_ids": list(
+                                resolution.get("source_goal_ids") or []
+                            ),
+                            "catalog_parameter_schema": parameter_schema,
+                            "corrective_contract": (
+                                "This value is absent from every cited owning Goal. "
+                                "Never borrow a sibling Goal's quantity. If the owning "
+                                "Goal omitted this optional parameter, omit the argument "
+                                "and resolution, or use the exact catalog default with "
+                                "strategy schema_default and no source_goal_ids."
+                            ),
+                        }
+                    )
         unique: list[dict[str, Any]] = []
         seen: set[tuple[str, tuple[Any, ...]]] = set()
         for item in feedback:
@@ -667,7 +738,15 @@ class DeepPlannerResolver:
             "parallel_resource_claim_conflict",
             "safety_revision_contract_not_satisfied",
         }
-        return any(isinstance(item, dict) and item.get("type") in safety_types for item in feedback)
+        return any(
+            isinstance(item, dict)
+            and item.get("type") in safety_types
+            and not (
+                item.get("type") == "parallel_capability_not_declared_safe"
+                and item.get("parallel_step_count") == 1
+            )
+            for item in feedback
+        )
 
     @staticmethod
     def _requires_sequential_safety_revision(
@@ -679,7 +758,13 @@ class DeepPlannerResolver:
             "parallel_resource_claim_conflict",
         }
         return any(
-            isinstance(item, dict) and item.get("type") in concurrency_types for item in feedback
+            isinstance(item, dict)
+            and item.get("type") in concurrency_types
+            and not (
+                item.get("type") == "parallel_capability_not_declared_safe"
+                and item.get("parallel_step_count") == 1
+            )
+            for item in feedback
         )
 
     @classmethod
@@ -1060,7 +1145,7 @@ class DeepPlannerResolver:
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"{skill_section}"
-            f"Executable capability catalog JSON:\n{self._bounded(prompt_capabilities, 16000)}\n\n"
+            f"Executable capability catalog JSON:\n{self._bounded(prompt_capabilities, 12000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"
             "The active task bindings are historical Host/runtime context. Their "
@@ -1071,14 +1156,14 @@ class DeepPlannerResolver:
             f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
-            "When validation feedback says parallel execution is not affirmatively safe, never silently change parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
+            "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The FINAL AUTHORITATIVE USER TURN owns the current communicative act. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
             f"{route_effect_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
-            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
-            "parameters semantically when justified; otherwise return a specific natural clarification. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material step argument, including location, date, target, person, and entity identity, must equal the matching binding; do not replace a binding with a value from older memory or re-resolve the original reference. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
+            "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech authored by Response Composer. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, treat the entire acquire-and-deliver outcome as one semantic responsibility. Select only an exact registered Capability whose declared semantic_scope covers that resource kind, acquisition, and delivery. Never substitute a partial primitive such as walking for physical fetch-and-deliver, or generic conversation for external information retrieval. Provider-internal stages such as navigation, search, grasp, carry, evidence retrieval, evaluation, and final delivery are not separate Goals or planner steps unless the selected Capability contract explicitly exposes them as independently authoritative outcomes. The Goal is provider-neutral: choose from the catalog by exact supported semantics, never from a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope metadata is authoritative applicability evidence. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
+            "parameters semantically when justified; otherwise return a specific natural clarification. Clarification is only for ambiguous user meaning or missing material information that the user can supply and whose answer can enable a matching catalog capability. When the Goal is already clear but no exact available capability covers the required outcome, return unavailable rather than asking for preferences, refinements, or details that cannot create the missing provider. Canonical Goal object.bindings are authoritative resolved parameters from Goal Association. Every material step argument, including location, date, target, person, and entity identity, must equal the matching binding; do not replace a binding with a value from older memory or re-resolve the original reference. For chromie.weather.lookup, keep args.location exactly equal to the canonical location binding. When the user or discourse context clearly supplies a hierarchical place, you may also provide location_context with locality, admin1, country, and aliases for that same place; never use it to select a different place. For chromie.memory.retrieve_verified_tool_result, resolved Goal bindings such as location and date belong inside the single material_args object. They are not missing direct step arguments, so do not emit separate location or date parameter_resolutions. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
@@ -1249,6 +1334,7 @@ class DeepPlannerResolver:
         request: AgentRunRequest,
         plan_id: str,
         expected_goal_ids_for_turn: list[str],
+        capability_payload: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         model_output = validate_planner_model_output(
             self._normalize_execute_transport_speech(raw),
@@ -1268,6 +1354,12 @@ class DeepPlannerResolver:
             model_output,
             authoritative_goals=canonical_goal_grounding(request.context),
         )
+        if capability_payload is not None:
+            validate_resource_responsibility_capability_grounding(
+                model_output,
+                authoritative_goals=canonical_goal_grounding(request.context),
+                capabilities=capability_payload,
+            )
         validate_external_response_evidence_boundary(
             model_output,
             context=request.context,

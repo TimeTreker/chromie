@@ -760,8 +760,17 @@ def _planner_selection_for_role(
     summaries_by_id: dict[str, AgentSkillSummary] = {
         item.agent_skill_id: item for item in registry.list_summaries()
     }
-    selected: list[SelectedAgentSkill] = []
-    candidates: list[AgentSkillSummary] = []
+    # A terminal Deep Plan intentionally preserves ordered Fast provenance and
+    # appends Deep provenance. The same approved Skill may therefore appear once
+    # per planner role in the immutable Plan, while a downstream Agent may load
+    # only one projection for that Skill ID. Validate every retained provenance
+    # record first, then collapse it by package identity. The later (terminal)
+    # planner record supplies the rationale and confidence; relevant Goal scope
+    # is the stable union of every planner selection for the same method.
+    provenance_by_id: dict[str, PlanAgentSkillProvenance] = {}
+    goal_ids_by_id: dict[str, list[str]] = {}
+    confidence_by_id: dict[str, float] = {}
+    ordered_ids: list[str] = []
     source_selection_ids: list[str] = []
     for provenance in plan.selected_agent_skills:
         summary = summaries_by_id.get(provenance.agent_skill_id)
@@ -773,19 +782,38 @@ def _planner_selection_for_role(
             or agent_role not in summary.available_projections
         ):
             return None
+        if provenance.agent_skill_id not in provenance_by_id:
+            ordered_ids.append(provenance.agent_skill_id)
+            goal_ids_by_id[provenance.agent_skill_id] = []
+            confidence_by_id[provenance.agent_skill_id] = provenance.selection_confidence
+        provenance_by_id[provenance.agent_skill_id] = provenance
+        confidence_by_id[provenance.agent_skill_id] = min(
+            confidence_by_id[provenance.agent_skill_id],
+            provenance.selection_confidence,
+        )
+        scoped_goal_ids = goal_ids_by_id[provenance.agent_skill_id]
+        for goal_id in provenance.relevant_goal_ids:
+            if goal_id not in scoped_goal_ids:
+                scoped_goal_ids.append(goal_id)
+        source_selection_ids.append(provenance.selection_id)
+
+    selected: list[SelectedAgentSkill] = []
+    candidates: list[AgentSkillSummary] = []
+    for agent_skill_id in ordered_ids:
+        provenance = provenance_by_id[agent_skill_id]
+        summary = summaries_by_id[agent_skill_id]
         selected.append(
             SelectedAgentSkill(
                 agent_skill_id=provenance.agent_skill_id,
                 version=provenance.version,
                 projection=agent_role,
                 content_digest=provenance.content_digest,
-                relevant_goal_ids=provenance.relevant_goal_ids,
+                relevant_goal_ids=tuple(goal_ids_by_id[agent_skill_id]),
                 rationale=provenance.selection_rationale,
-                confidence=provenance.selection_confidence,
+                confidence=confidence_by_id[agent_skill_id],
             )
         )
         candidates.append(summary)
-        source_selection_ids.append(provenance.selection_id)
 
     if not selected:
         return None

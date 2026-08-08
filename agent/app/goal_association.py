@@ -124,8 +124,11 @@ _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
     {
         "invalid_action_collection_binding",
         "invalid_location_binding_provenance",
+        "embodied_responsibility_decomposition",
         "mixed_capability_and_spoken_responsibilities",
         "multi_embodied_responsibility_review",
+        "recommendation_route_spoken_responsibility_review",
+        "tool_route_spoken_responsibility_review",
         "invalid_typed_execution_contract",
     }
 )
@@ -151,9 +154,18 @@ _EXECUTION_CONTRACT_PROMPT = (
     "reminder that Chromie can author without fresh external, private, or runtime "
     "evidence are spoken_response. capability_dependent requires actual evidence "
     "from a registered non-vocal capability; model knowledge is not by itself a "
-    "lookup or retrieval operation. Every media_playback "
+    "lookup or retrieval operation. Information whose truth depends on current "
+    "external state, such as live availability, opening status, prices, schedules, "
+    "nearby options, or current conditions, is capability_dependent rather than a "
+    "model-authored spoken_response. If no matching provider is available, preserve "
+    "that evidence responsibility so downstream planning can report the limitation; "
+    "never downgrade it to an ungrounded conversational answer. Every media_playback "
     "Goal also requires one exact media_operation; every other Goal uses "
-    "media_operation=none."
+    "media_operation=none. A negative instruction that limits what Chromie may say "
+    "while completing another requested outcome is a constraint on that outcome, "
+    "not an independently satisfiable spoken_response. Preserve that constraint in "
+    "the surviving Goal description; never invent a separate Goal merely to "
+    "acknowledge the prohibition."
 )
 
 
@@ -730,6 +742,104 @@ class GoalAssociationModelOutput(BaseModel):
         return self
 
 
+class GoalIndependenceCandidateDecision(BaseModel):
+    """Model-owned completion-mode judgment for one validated Goal candidate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_goal_index: int = Field(ge=0)
+    completion_mode: Literal[
+        "positive_effect",
+        "independently_requested_authored_content",
+        "capability_result_delivery_only",
+        "silence_or_omission_only",
+    ]
+    audible_content_summary: str = Field(default="", max_length=500)
+    final_goal_description: str = Field(default="", max_length=1000)
+    reason_summary: str = Field(min_length=1, max_length=1000)
+
+    @field_validator(
+        "audible_content_summary",
+        "final_goal_description",
+        "reason_summary",
+        mode="before",
+    )
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+class GoalIndependenceModelOutput(BaseModel):
+    """Focused model-owned judgment over already validated Goal candidates."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_decisions: list[GoalIndependenceCandidateDecision] = Field(
+        min_length=1,
+        max_length=8,
+    )
+    reason_summary: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("candidate_decisions")
+    @classmethod
+    def unique_candidate_indices(
+        cls,
+        value: list[GoalIndependenceCandidateDecision],
+    ) -> list[GoalIndependenceCandidateDecision]:
+        indices = [item.candidate_goal_index for item in value]
+        if len(indices) != len(set(indices)):
+            raise ValueError("candidate_decisions must use unique Goal indices")
+        return value
+
+
+class GoalBindingAuditItem(BaseModel):
+    """Model-owned material bindings for one already segmented Goal candidate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_goal_index: int = Field(ge=0)
+    bindings: list[GoalAssociationModelBinding] = Field(
+        default_factory=list,
+        max_length=16,
+    )
+    reason_summary: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("reason_summary", mode="before")
+    @classmethod
+    def normalize_reason_summary(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+
+class GoalBindingAuditOutput(BaseModel):
+    """Focused model-owned audit of explicit Goal material parameters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_bindings: list[GoalBindingAuditItem] = Field(min_length=1, max_length=8)
+    reason_summary: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("goal_bindings")
+    @classmethod
+    def unique_goal_indices(
+        cls,
+        value: list[GoalBindingAuditItem],
+    ) -> list[GoalBindingAuditItem]:
+        indices = [item.candidate_goal_index for item in value]
+        if len(indices) != len(set(indices)):
+            raise ValueError("goal_bindings must use unique Goal indices")
+        return value
+
+    @field_validator("reason_summary", mode="before")
+    @classmethod
+    def normalize_reason_summary(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+
 class GoalAssociationResolver:
     """Resolve continuity before creation without mutating runtime state."""
 
@@ -815,6 +925,7 @@ class GoalAssociationResolver:
         contract_repair_succeeded = False
         contract_repair_strategy = ""
         semantic_review_attempted = False
+        semantic_review_attempt_count = 0
         optional_referent_recovery: list[dict[str, Any]] = []
 
         try:
@@ -944,6 +1055,7 @@ class GoalAssociationResolver:
             review_candidate = repair_raw or initial_raw
             if review_candidate is None:
                 raise ValueError("goal-association review candidate is missing")
+            accepted_raw = review_candidate
             model_output = output_type.model_validate(review_candidate)
             review_triggers = self._semantic_review_triggers(
                 model_output,
@@ -952,6 +1064,7 @@ class GoalAssociationResolver:
             )
             if review_triggers:
                 semantic_review_attempted = True
+                semantic_review_attempt_count = 1
                 logger.info(
                     "goal_association_semantic_review_start sid=%s triggers=%s",
                     request.sid,
@@ -996,12 +1109,100 @@ class GoalAssociationResolver:
                 )
                 optional_referent_recovery.extend(recovered)
                 semantic_review_raw = reviewed
+                accepted_raw = reviewed
                 resolution = await self._validate_contract_output(
                     reviewed,
                     request=request,
                     turn_id=turn_id,
                     output_type=output_type,
                 )
+                residual_review_triggers = (
+                    self._residual_semantic_review_triggers(
+                        output_type.model_validate(reviewed)
+                    )
+                )
+                if residual_review_triggers:
+                    semantic_review_attempt_count += 1
+                    logger.info(
+                        "goal_association_independence_review_start sid=%s "
+                        "triggers=%s",
+                        request.sid,
+                        ",".join(residual_review_triggers),
+                    )
+                    adjudication_raw = await self.ollama.generate(
+                        self._build_independence_review_prompt(
+                            request=request,
+                            raw=reviewed,
+                            triggers=residual_review_triggers,
+                        ),
+                        system=self._independence_review_system_prompt(output_type),
+                        options=generation_options,
+                        response_format=self._independence_response_schema(
+                            len(reviewed.get("new_goals") or [])
+                        ),
+                        prompt_family="goal_association.independence_adjudication",
+                        turn_id=request.sid,
+                        attempt=4,
+                    )
+                    if not isinstance(adjudication_raw, dict):
+                        raise OllamaGenerationError(
+                            "goal-association independence review response is not "
+                            "a JSON object",
+                            failure_class="structured_output_invalid",
+                            failure_domain="model_contract",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                        )
+                    adjudication = GoalIndependenceModelOutput.model_validate(
+                        adjudication_raw
+                    )
+                    candidate_goal_count = len(reviewed.get("new_goals") or [])
+                    decision_by_index = {
+                        item.candidate_goal_index: item
+                        for item in adjudication.candidate_decisions
+                    }
+                    expected_indices = set(range(candidate_goal_count))
+                    if set(decision_by_index) != expected_indices:
+                        raise ValueError(
+                            "independence review must adjudicate every candidate Goal "
+                            "index exactly once"
+                        )
+                    adjudicated = copy.deepcopy(reviewed)
+                    adjudicated["new_goals"] = [
+                        {
+                            **reviewed["new_goals"][index],
+                            "description": (
+                                decision.final_goal_description
+                                or reviewed["new_goals"][index]["description"]
+                            ),
+                        }
+                        for index in range(candidate_goal_count)
+                        if (
+                            decision := decision_by_index[index]
+                        ).completion_mode
+                        not in {
+                            "capability_result_delivery_only",
+                            "silence_or_omission_only",
+                        }
+                    ]
+                    if not adjudicated["new_goals"]:
+                        raise ValueError(
+                            "independence review removed every candidate Goal"
+                        )
+                    adjudicated["reason_summary"] = adjudication.reason_summary
+                    accepted_raw = adjudicated
+                    semantic_review_raw = adjudicated
+                    resolution = await self._validate_contract_output(
+                        adjudicated,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                    logger.info(
+                        "goal_association_independence_review_done sid=%s "
+                        "status=success",
+                        request.sid,
+                    )
                 review_metadata = dict(resolution.metadata)
                 if repair_attempted:
                     review_metadata["contract_repair"] = {
@@ -1014,18 +1215,106 @@ class GoalAssociationResolver:
                     "attempted": True,
                     "succeeded": True,
                     "strategy": (
-                        "model_owned_fresh_goal_resegmentation"
+                        "model_owned_goal_independence_adjudication"
+                        if semantic_review_attempt_count > 1
+                        else "model_owned_fresh_goal_resegmentation"
                         if fresh_resegmentation
                         else "model_owned_goal_association_review"
                     ),
                     "triggers": review_triggers,
-                    "attempt_count": 1,
+                    "residual_triggers": residual_review_triggers,
+                    "attempt_count": semantic_review_attempt_count,
                 }
                 resolution = resolution.model_copy(
                     update={"metadata": review_metadata}
                 )
                 logger.info(
                     "goal_association_semantic_review_done sid=%s status=success",
+                    request.sid,
+                )
+            if self._binding_audit_required(accepted_raw):
+                semantic_review_attempted = True
+                semantic_review_attempt_count += 1
+                logger.info(
+                    "goal_association_binding_audit_start sid=%s",
+                    request.sid,
+                )
+                binding_audit_raw = await self.ollama.generate(
+                    self._build_binding_audit_prompt(
+                        request=request,
+                        raw=accepted_raw,
+                    ),
+                    system=self._binding_audit_system_prompt(),
+                    options=generation_options,
+                    response_format=self._binding_audit_response_schema(
+                        len(accepted_raw.get("new_goals") or [])
+                    ),
+                    prompt_family="goal_association.binding_audit",
+                    turn_id=request.sid,
+                    attempt=5,
+                )
+                if not isinstance(binding_audit_raw, dict):
+                    raise OllamaGenerationError(
+                        "goal-association binding audit response is not a JSON object",
+                        failure_class="structured_output_invalid",
+                        failure_domain="model_contract",
+                        architecture_attribution="not_evaluated",
+                        retryable=True,
+                    )
+                binding_audit = GoalBindingAuditOutput.model_validate(
+                    binding_audit_raw
+                )
+                goal_count = len(accepted_raw.get("new_goals") or [])
+                audit_by_index = {
+                    item.candidate_goal_index: item
+                    for item in binding_audit.goal_bindings
+                }
+                if set(audit_by_index) != set(range(goal_count)):
+                    raise ValueError(
+                        "binding audit must cover every candidate Goal index exactly once"
+                    )
+                audited = copy.deepcopy(accepted_raw)
+                for index, goal in enumerate(audited["new_goals"]):
+                    existing = {
+                        str(item.get("name") or "").strip(): item
+                        for item in list(goal.get("bindings") or [])
+                        if isinstance(item, dict)
+                        and str(item.get("name") or "").strip()
+                    }
+                    for binding in audit_by_index[index].bindings:
+                        existing.setdefault(
+                            binding.name,
+                            binding.model_dump(
+                                mode="json",
+                                exclude_none=True,
+                            ),
+                        )
+                    goal["bindings"] = list(existing.values())
+                accepted_raw = audited
+                semantic_review_raw = audited
+                pre_audit_metadata = dict(resolution.metadata)
+                resolution = await self._validate_contract_output(
+                    audited,
+                    request=request,
+                    turn_id=turn_id,
+                    output_type=output_type,
+                )
+                audit_metadata = {
+                    **pre_audit_metadata,
+                    **dict(resolution.metadata),
+                }
+                audit_metadata["binding_audit"] = {
+                    "attempted": True,
+                    "succeeded": True,
+                    "strategy": "model_owned_material_parameter_audit",
+                    "trigger": "compound_executable_goal_without_bindings",
+                    "attempt_count": 1,
+                }
+                resolution = resolution.model_copy(
+                    update={"metadata": audit_metadata}
+                )
+                logger.info(
+                    "goal_association_binding_audit_done sid=%s status=success",
                     request.sid,
                 )
         except Exception as exc:
@@ -1304,8 +1593,30 @@ class GoalAssociationResolver:
             "spoken_response",
         }.issubset(responsibility_kinds):
             triggers.append("mixed_capability_and_spoken_responsibilities")
+        if (
+            getattr(getattr(request, "route_decision", None), "route", "") == "tool"
+            and model_output.new_goals
+            and responsibility_kinds == {"spoken_response"}
+        ):
+            # The route is advisory, but a tool-routed turn that was reduced to
+            # ordinary authored speech has crossed an evidence-responsibility
+            # boundary. The model, not the Host, re-segments the authoritative
+            # turn and decides whether current evidence is actually required.
+            triggers.append("tool_route_spoken_responsibility_review")
+        if (
+            getattr(getattr(request, "route_decision", None), "intent", "")
+            == "recommendation"
+            and model_output.new_goals
+            and responsibility_kinds == {"spoken_response"}
+        ):
+            # A recommendation route is still advisory, but it is a useful typed
+            # signal that the first Goal DTO needs an independent evidence-needs
+            # review. This does not classify the Goal or select a provider: the
+            # second model call re-segments the authoritative turn from scratch.
+            triggers.append("recommendation_route_spoken_responsibility_review")
         executable_goal_count = sum(
             goal.responsibility_kind == "executable_action"
+            and goal.resource_responsibility is None
             for goal in model_output.new_goals
         )
         if executable_goal_count == 1:
@@ -1316,6 +1627,20 @@ class GoalAssociationResolver:
             # Ask the model to re-segment from authoritative context without
             # treating the first DTO as evidence.
             triggers.append("multi_embodied_responsibility_review")
+        has_resource_work = any(
+            goal.resource_responsibility is not None
+            for goal in model_output.new_goals
+        )
+        has_ordinary_spoken = any(
+            goal.responsibility_kind == "spoken_response"
+            and goal.output_mode == "speech"
+            and not goal.provider_required
+            for goal in model_output.new_goals
+        )
+        if has_resource_work and has_ordinary_spoken:
+            triggers.append(
+                "mixed_resource_work_and_ordinary_spoken_responsibilities"
+            )
         if (
             isinstance(model_output, GoalAssociationModelOutput)
             and model_output.decision == "create_goals"
@@ -1335,6 +1660,37 @@ class GoalAssociationResolver:
         ):
             triggers.append("candidate_goal_clarification_continuity")
         return triggers
+
+    @staticmethod
+    def _residual_semantic_review_triggers(
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
+    ) -> list[str]:
+        """Request one bounded model adjudication for a residual risky split.
+
+        The typed combination is only a review trigger. The Host does not decide
+        whether the ordinary spoken responsibility is genuine; the focused model
+        review may preserve a real independent answer or remove a constraint that
+        was incorrectly promoted into another Goal.
+        """
+
+        has_capability_work = any(
+            goal.responsibility_kind in {
+                "executable_action",
+                "capability_dependent",
+            }
+            for goal in model_output.new_goals
+        )
+        has_ordinary_spoken = any(
+            goal.responsibility_kind == "spoken_response"
+            and goal.output_mode == "speech"
+            and not goal.provider_required
+            for goal in model_output.new_goals
+        )
+        return (
+            ["mixed_capability_work_and_ordinary_spoken_responsibilities"]
+            if has_capability_work and has_ordinary_spoken
+            else []
+        )
 
     @staticmethod
     def _validation_error_json(exc: Exception) -> str:
@@ -1373,7 +1729,6 @@ class GoalAssociationResolver:
             if error.get("type") != "goal_execution_contract":
                 return False
         return True
-
 
     @staticmethod
     def _response_schema(
@@ -1626,12 +1981,12 @@ class GoalAssociationResolver:
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
             "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a spoken_response Goal; Response Composer owns that surface. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Set source_status=known only when the user or discourse already supplies the source; set unknown when source information is required but absent; use provider_resolved when the exact source is intentionally chosen by the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
+            "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Resource identity is not source evidence: naming or pointing at the desired object or information does not by itself say where it is or which source supplies it. Set source_status=known only when the user or discourse supplies an actual source, and then source_description or source_binding_names is mandatory. Set unknown when a required source is absent, including an unresolved demonstrative whose referent or location is not established. Use provider_resolved only when source selection is intentionally delegated to the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put every user-visible parameter such as count, duration, speed, direction, target, or requested content into both the natural-language description and a typed binding. When the user states an unambiguous quantity in words, normalize its binding value to the equivalent numeric string without units; the model owns that semantic normalization. Description text alone is not parameter provenance for planning. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
             "When the user introduces or explicitly corrects a salient entity, emit referent_updates. Use operation=correct with target_referent_ids when a new value supersedes an earlier referent in the current discourse; the old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
             "Use resolved_references only for indirect references whose denotation must be selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, return decision=clarify rather than selecting a value from stale evidence or recency alone. "
-            "Each new Goal must include typed bindings for material entities and parameters already resolved here. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
+            "Each new Goal must include typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. For weather, a resolved place belongs in a binding named location. Downstream planners must receive the explicit binding rather than an unresolved expression. "
             "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. Clarify only when the user's intended location is genuinely underdetermined in the dialogue. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -1735,7 +2090,7 @@ class GoalAssociationResolver:
             + output_instructions
             + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, media_operation, bindings, and optional provider-neutral resource_responsibility only. executable_action is Activity-lane body or media work; spoken_response is Speaking-lane authored speech or vocal performance; capability_dependent is Activity-lane work whose result requires a capability; other uses execution_lane=none and output_mode=other. output_mode=speech is the only vocal mode that may set provider_required=false. media_playback requires one exact media_operation and every non-media Goal uses media_operation=none. Singing, humming, recitation, expressive speech, and nonverbal vocalization require provider_required=true and cannot be completed by generic speech output. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Resource identity is not source evidence. source_status=known requires an actual user- or discourse-supplied source and a nonempty source_description or source_binding_names; use unknown when a required source is absent, and provider_resolved only when source selection is deliberately delegated. Preserve every explicit count, duration, speed, direction, target, and other material parameter in a typed binding as well as the description; normalize an unambiguous worded quantity to a numeric-string binding value without units. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -1835,13 +2190,22 @@ class GoalAssociationResolver:
             "concerns, not extra Goals. A mere acknowledgement, confirmation, promise "
             "of willingness, or progress prelude for executable work is owned by "
             "Response Composer and is not a Goal. Identity shapes expression only and "
-            "never proves that a physical responsibility is available. Simultaneous or ordered framing does "
+            "never proves that a physical responsibility is available. A prohibition "
+            "on saying or repeating content while another action is performed is not "
+            "a request for a verbal acknowledgement. Keep it in the action Goal's "
+            "description as an expression constraint and do not create a sibling "
+            "spoken_response Goal for it. Simultaneous or ordered framing does "
             "not merge independently observable outcomes. Preserve each responsibility "
             "exactly once and preserve its temporal relationship in the descriptions "
             "without making one Goal claim completion of its siblings. For embodied "
-            "work, independently review whether movement, acquiring or manipulating an "
-            "object, and returning are separate observable responsibilities; keep each "
-            "separate when it can succeed or fail independently.\n\n"
+            "work, keep a genuinely independent requested movement or manipulation "
+            "outcome separate. However, navigating, locating, grasping, carrying, "
+            "returning, and handing over are provider-owned stages of one physical "
+            "resource-delivery Goal when the human outcome is to obtain an object and "
+            "make it available to a recipient. Do not split pickup and handoff merely "
+            "because those provider stages can fail separately. A report that is "
+            "requested only after that effect finishes is delivery owned by the same "
+            "effect Goal, not an independently satisfiable spoken_response.\n\n"
             "A location named directly in the final authoritative user turn must remain "
             "a complete verbatim contiguous binding value in the user's language. Never "
             "translate, transliterate, shorten, or expand it. Do not ask for provider "
@@ -1858,9 +2222,26 @@ class GoalAssociationResolver:
             "fully bound replacement Goal. Do not infer a correction from words, "
             "syntax, or binding inequality alone; decide from user meaning and supplied "
             "discourse evidence.\n\n"
+            "Resource identity is not source evidence. For every resource_responsibility, "
+            "source_status=known is valid only when the user or discourse supplied an "
+            "actual source and source_description or source_binding_names is nonempty. "
+            "Use unknown when a required source is absent, including an unresolved "
+            "demonstrative, and provider_resolved only when source selection is deliberately "
+            "delegated. When the human outcome is physical acquisition and handoff, "
+            "return one Goal with resource_kind=physical_object and "
+            "delivery_mode=physical_handover; retain a contingent completion report in "
+            "that Goal's description. Preserve every explicit count, duration, speed, direction, target, "
+            "and other material parameter in a typed binding as well as the description; "
+            "normalize an unambiguous worded quantity to a numeric-string binding value "
+            "without units.\n\n"
             "The Host is asking for a semantic judgment, not prescribing merge or "
             "separation. Preserve every genuinely independent responsibility, all "
-            "valid associations, and all valid discourse updates. Return only JSON "
+            "valid associations, and all valid discourse updates. Before returning, "
+            "audit every Goal description against its bindings: if the description "
+            "preserves an explicit count, duration, speed, direction, target, or "
+            "other material parameter from the authoritative turn, omitting its typed "
+            "binding is invalid. Worded quantities must be normalized to numeric-string "
+            "binding values; description text alone is never enough. Return only JSON "
             f"with {output_fields}. The exact schema is enforced out-of-band.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
@@ -1874,6 +2255,219 @@ class GoalAssociationResolver:
             + "Tool-result contents are intentionally absent. Do not use remembered "
             "capability results to decide Goal structure or claim completion.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_independence_review_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+        triggers: list[str],
+    ) -> str:
+        context = request.context if isinstance(request.context, dict) else {}
+        return (
+            "Adjudicate one residual Goal-independence question. The typed Host "
+            "trigger is review evidence only; "
+            "it does not prove that the current split is wrong.\n\n"
+            f"Review triggers JSON:\n{self._bounded_json(triggers, 800)}\n\n"
+            "Candidate DTO JSON:\n"
+            f"{self._bounded_json(raw, 7000)}\n\n"
+            "Apply this independence test to every ordinary spoken_response beside "
+            "embodied or capability-dependent work: if the body action occurred, or "
+            "if the capability work occurred, and Chromie otherwise stayed silent, "
+            "did the user independently ask to "
+            "hear authored content that can be truthfully completed without the pending "
+            "capability result? Preserve "
+            "the spoken Goal when the answer is yes, such as a requested joke, answer, "
+            "greeting, reassurance, or other independently acceptable content. An "
+            "instruction not to say, repeat, mention, explain, or provide some content "
+            "sets a boundary on delivery; it does not request a verbal acknowledgement "
+            "of that boundary. Keep such a restriction in the affected surviving Goal "
+            "description and remove any Goal whose only outcome is silence, omission, "
+            "or acknowledgement of the prohibition. A boundary is not an independent "
+            "spoken outcome merely because the user can notice or accept compliance. "
+            "Speaking-lane authored content requires positive words, information, or a "
+            "vocal performance that the user actually asked to hear; silence and not "
+            "mentioning a topic produce no speaking-lane output. A report, explanation, "
+            "evaluation, or recommendation whose truth or content depends on the pending "
+            "capability result is delivery owned by that capability Goal, not an "
+            "independent spoken Goal. This includes a contingent completion report: "
+            "an instruction to notify, report, or tell the user when pending work is "
+            "finished can be authored truthfully only from that work's execution "
+            "result, so classify it as capability_result_delivery_only even though "
+            "the eventual report is audible. Do not treat the requested timing of a "
+            "result-dependent report as independently authored content. Do not remove "
+            "genuinely requested "
+            "independent speech. Preserve every explicit material action binding, "
+            "including normalized worded quantities, and all valid associations and "
+            "discourse updates. Do not add a capability, provider, execution step, or "
+            "completion claim.\n\n"
+            "Return one candidate_decisions item for every zero-based candidate Goal "
+            "index. Use completion_mode=positive_effect for embodied or capability "
+            "outcomes. Use independently_requested_authored_content only when the user "
+            "positively requested content that must be audibly produced, and summarize "
+            "that requested content in audible_content_summary. Use "
+            "capability_result_delivery_only when the apparent spoken outcome can be "
+            "authored only after and from a pending capability result; exclude that "
+            "candidate because the capability Goal owns result delivery. Use "
+            "silence_or_omission_only when compliance consists only of withholding, "
+            "omitting, or not repeating content. Descriptive fields on an excluded "
+            "candidate are ignored. For every kept candidate, use final_goal_description "
+            "to preserve any delivery constraint on its surviving Goal; if it is empty, "
+            "the Host retains the candidate's already validated description. The "
+            "completion-mode decisions are semantic; the Host will apply them "
+            "mechanically without interpreting any Goal. Return only the "
+            "exact JSON object enforced out-of-band.\n\n"
+            "Recent conversation JSON:\n"
+            f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @staticmethod
+    def _independence_response_schema(goal_count: int) -> dict[str, Any]:
+        schema = copy.deepcopy(GoalIndependenceModelOutput.model_json_schema())
+        properties = schema.setdefault("properties", {})
+        decisions = properties.get("candidate_decisions")
+        if isinstance(decisions, dict):
+            decisions["minItems"] = max(1, goal_count)
+            decisions["maxItems"] = max(1, goal_count)
+        decision_schema = schema.get("$defs", {}).get(
+            "GoalIndependenceCandidateDecision"
+        )
+        if isinstance(decision_schema, dict):
+            decision_schema["required"] = [
+                "candidate_goal_index",
+                "completion_mode",
+                "audible_content_summary",
+                "final_goal_description",
+                "reason_summary",
+            ]
+            index_schema = decision_schema.get("properties", {}).get(
+                "candidate_goal_index"
+            )
+            if isinstance(index_schema, dict):
+                index_schema["enum"] = list(range(max(0, goal_count)))
+        schema["required"] = [
+            "candidate_decisions",
+            "reason_summary",
+        ]
+        schema["additionalProperties"] = False
+        return schema
+
+    @staticmethod
+    def _independence_review_system_prompt(
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+    ) -> str:
+        contract_name = (
+            "Goal Segmentation"
+            if output_type is GoalSegmentationModelOutput
+            else "Goal Association"
+        )
+        return (
+            f"You are Chromie's focused {contract_name} independence adjudicator. "
+            "Use semantic reasoning to distinguish independently requested spoken "
+            "content from capability-result delivery and from a constraint on what "
+            "should not be spoken. Preserve all "
+            "genuine embodied and conversational responsibilities and their typed "
+            "bindings. A speaking responsibility must require positive audible content "
+            "that can be completed independently of pending capability evidence; "
+            "a contingent report that pending work has finished depends on execution "
+            "evidence and is capability_result_delivery_only, not independently "
+            "authored content. "
+            "silence, omission, and not repeating a topic are delivery constraints even "
+            "when the user explicitly requests them. Return one completion-mode decision "
+            "for every zero-based candidate Goal index, final descriptions for kept "
+            "Goals, and a concise reason as JSON. The Host "
+            "validates structure and mechanically applies your semantic selection; "
+            "it owns no semantic choice."
+        )
+
+    @staticmethod
+    def _binding_audit_required(raw: dict[str, Any]) -> bool:
+        """Trigger model review for an unbound executable Goal in a compound turn.
+
+        Compound segmentation plus an empty executable binding list is a
+        mechanical provenance-risk signal only. The Host does not inspect words
+        or decide whether a parameter exists, its name, value, meaning, or owning
+        Goal; the focused model audit does. This keeps worded quantities from
+        passing accidentally through a matching Capability schema default.
+        """
+
+        goals = raw.get("new_goals")
+        if not isinstance(goals, list):
+            return False
+        executable = [
+            item
+            for item in goals
+            if isinstance(item, dict)
+            and item.get("responsibility_kind") == "executable_action"
+        ]
+        if len(goals) < 2 or not executable:
+            return False
+        return any(not item.get("bindings") for item in executable)
+
+    def _build_binding_audit_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+    ) -> str:
+        return (
+            "Audit explicit material parameter bindings for an already segmented "
+            "Goal DTO. The Host detected only a mechanical risk: this compound set "
+            "contains at least one executable Goal with no typed bindings. That "
+            "trigger does not decide whether a material parameter exists or what "
+            "any word or number means.\n\n"
+            "Return one goal_bindings item for every candidate Goal index exactly "
+            "once. For each item, return the complete list of explicit material "
+            "parameters belonging to that Goal: counts, durations, speeds, directions, "
+            "targets, distances, quantities, and other user-supplied arguments. "
+            "Normalize an unambiguous worded quantity to a numeric-string value. A "
+            "duration binding should use the semantic parameter name duration_s and a "
+            "count should use count when those meanings are explicit. Use an empty "
+            "bindings list only when that Goal truly has no explicit material "
+            "parameter. Do not invent defaults, infer provider-specific values, merge "
+            "or split Goals, change descriptions, select capabilities, or claim "
+            "completion. The Host will merge your model-authored bindings by Goal index "
+            "and preserve every already validated binding. Return only the exact JSON "
+            "object enforced out-of-band.\n\n"
+            f"Candidate Goal DTO JSON:\n{self._bounded_json(raw.get('new_goals') or [], 7000)}\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    @staticmethod
+    def _binding_audit_response_schema(goal_count: int) -> dict[str, Any]:
+        schema = copy.deepcopy(GoalBindingAuditOutput.model_json_schema())
+        properties = schema.setdefault("properties", {})
+        items = properties.get("goal_bindings")
+        if isinstance(items, dict):
+            items["minItems"] = max(1, goal_count)
+            items["maxItems"] = max(1, goal_count)
+        item_schema = schema.get("$defs", {}).get("GoalBindingAuditItem")
+        if isinstance(item_schema, dict):
+            item_schema["required"] = [
+                "candidate_goal_index",
+                "bindings",
+                "reason_summary",
+            ]
+            index_schema = item_schema.get("properties", {}).get(
+                "candidate_goal_index"
+            )
+            if isinstance(index_schema, dict):
+                index_schema["enum"] = list(range(max(0, goal_count)))
+        schema["required"] = ["goal_bindings", "reason_summary"]
+        schema["additionalProperties"] = False
+        return schema
+
+    @staticmethod
+    def _binding_audit_system_prompt() -> str:
+        return (
+            "You are Chromie's focused Goal binding-provenance auditor. Use semantic "
+            "reasoning over the authoritative turn and already segmented Goals. Return "
+            "all and only explicit material bindings for every Goal index. Do not plan, "
+            "select capabilities, alter Goal structure, or invent defaults. Return JSON only."
         )
 
     @staticmethod

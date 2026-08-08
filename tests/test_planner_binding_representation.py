@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 
 from agent.app.planner_contract import (
+    EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
     PlannerModelOutput,
+    normalize_schema_default_parameter_provenance,
     validate_explicit_numeric_parameter_grounding,
     validate_goal_binding_argument_grounding,
 )
@@ -95,6 +97,118 @@ def _weather_goal() -> dict:
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
+    def test_numeric_grounding_prompt_forbids_sibling_goal_borrowing(self):
+        self.assertIn(
+            "Never borrow a numeric literal or typed binding from a sibling Goal",
+            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+        )
+        self.assertIn(
+            "strategy=schema_default and no source_goal_ids",
+            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+        )
+
+    def test_exact_catalog_default_repairs_false_user_provenance_only(self):
+        raw = {
+            "steps": [
+                {
+                    "step_id": "turn",
+                    "capability_id": "soridormi.turn_in_place",
+                    "args": {"duration_s": 2.0},
+                }
+            ],
+            "parameter_resolutions": [
+                {
+                    "step_id": "turn",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 2.0,
+                    "source_goal_ids": ["goal-turn"],
+                }
+            ],
+        }
+        normalized, repairs = normalize_schema_default_parameter_provenance(
+            raw,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-turn",
+                    "description": "Turn in place.",
+                    "success_criteria": ["Turn in place."],
+                    "object": {},
+                },
+                {
+                    "goal_id": "goal-look",
+                    "description": "Look at me for 2 seconds.",
+                    "success_criteria": ["Look at me for 2 seconds."],
+                    "object": {
+                        "bindings": {
+                            "duration_s": {
+                                "entity_type": "duration_seconds",
+                                "value": "2",
+                            }
+                        }
+                    },
+                },
+            ],
+            capability_payload=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "input_schema": {
+                        "properties": {
+                            "duration_s": {"type": "number", "default": 2.0}
+                        }
+                    },
+                }
+            ],
+        )
+
+        resolution = normalized["parameter_resolutions"][0]
+        self.assertEqual(resolution["strategy"], "schema_default")
+        self.assertEqual(resolution["source_goal_ids"], [])
+        self.assertEqual(len(repairs), 1)
+        self.assertEqual(raw["parameter_resolutions"][0]["strategy"], "user_supplied")
+
+    def test_nondefault_value_does_not_repair_false_user_provenance(self):
+        raw = {
+            "steps": [
+                {
+                    "step_id": "turn",
+                    "capability_id": "soridormi.turn_in_place",
+                    "args": {"duration_s": 3.0},
+                }
+            ],
+            "parameter_resolutions": [
+                {
+                    "step_id": "turn",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 3.0,
+                    "source_goal_ids": ["goal-turn"],
+                }
+            ],
+        }
+        normalized, repairs = normalize_schema_default_parameter_provenance(
+            raw,
+            authoritative_goals=[
+                {"goal_id": "goal-turn", "description": "Turn in place."}
+            ],
+            capability_payload=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "input_schema": {
+                        "properties": {
+                            "duration_s": {"type": "number", "default": 2.0}
+                        }
+                    },
+                }
+            ],
+        )
+
+        self.assertEqual(
+            normalized["parameter_resolutions"][0]["strategy"],
+            "user_supplied",
+        )
+        self.assertEqual(repairs, [])
+
     def test_numeric_grounding_reports_all_missing_goal_values_together(self):
         goal_id = "goal-walk"
         output = PlannerModelOutput.model_validate(
@@ -238,6 +352,78 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     }
                 ],
             )
+
+    def test_worded_count_uses_typed_numeric_binding_as_provenance(self):
+        goal_id = "goal-blink"
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Blink twice.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "blink",
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Blink the requested count.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "blink",
+                        "parameter": "count",
+                        "strategy": "user_supplied",
+                        "value": 2,
+                        "confidence": 1.0,
+                        "blocking": False,
+                        "rationale": "Copied from the typed Goal binding.",
+                        "source_goal_ids": [goal_id],
+                    }
+                ],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["blink"],
+                        "satisfaction": _satisfaction(goal_id),
+                        "rationale": "The blink capability covers the request.",
+                    }
+                },
+                "goal_satisfaction": _satisfaction(goal_id),
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+        goal = {
+            "goal_id": goal_id,
+            "description": "Blink twice.",
+            "success_criteria": [],
+            "object": {
+                "bindings": {
+                    "count": {
+                        "entity_type": "count",
+                        "value": "2",
+                    }
+                }
+            },
+        }
+
+        validate_explicit_numeric_parameter_grounding(
+            output,
+            authoritative_goals=[goal],
+        )
+        validate_goal_binding_argument_grounding(
+            output,
+            authoritative_goals=[goal],
+        )
 
     def test_typed_list_binding_accepts_equivalent_json_array_argument(self):
         validate_goal_binding_argument_grounding(

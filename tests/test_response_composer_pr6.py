@@ -410,6 +410,54 @@ class ResponseComposerResolverTests(unittest.TestCase):
             ollama.prompts[1][0],
         )
 
+    def test_effectful_pre_execution_stage_requires_audible_communication(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-nod"],
+            steps=[
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-nod"],
+                }
+            ],
+        )
+
+        with self.assertRaisesRegex(ValueError, "speech_act=none"):
+            ResponseComposerResolver._validate_pending_response_contract(
+                ResponsePlan(
+                    immediate=ResponseStage(
+                        text="Okay.",
+                        speech_act="none",
+                        covers_goal_ids=["goal-nod"],
+                    )
+                ),
+                plan=canonical,
+                context={},
+            )
+
+        with self.assertRaisesRegex(ValueError, "punctuation-only placeholders"):
+            ResponseComposerResolver._validate_pending_response_contract(
+                ResponsePlan(
+                    immediate=ResponseStage(
+                        text="...",
+                        speech_act="acknowledge",
+                        covers_goal_ids=["goal-nod"],
+                    )
+                ),
+                plan=canonical,
+                context={},
+            )
+
+        schema = ResponseComposerResolver._response_schema(canonical, context={})
+        self.assertNotIn(
+            "none",
+            schema["$defs"]["ResponseStage"]["properties"]["speech_act"][
+                "enum"
+            ],
+        )
+
     def test_clarification_decoder_schema_matches_runtime_coordination_contract(self):
         canonical = CanonicalPlan(
             plan_id="clarify-without-goal",
@@ -704,6 +752,70 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(stage.reused_speech_event_id, "speech-walk")
         self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
         self.assertEqual(len(ollama.prompts), 4)
+
+    def test_pure_activity_preserves_unscheduled_core_fast_speech_after_composer_failure(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-nod"],
+            steps=[
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                }
+            ],
+        )
+        invalid = {
+            "response_plan": {
+                "immediate": {
+                    "text": "...",
+                    "speech_act": "acknowledge",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-nod"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "confidence": 1.0,
+            "rationale": "The model emitted a punctuation-only placeholder.",
+        }
+        ollama = FakeOllama(invalid)
+        composition_request = request(canonical)
+        composition_request.route_decision = RouteDecision(
+            route="robot_action",
+            intent="capability:soridormi.nod_yes",
+            confidence=0.95,
+            source="llm",
+            fast_speech={
+                "text": "Okay, I'll nod twice.",
+                "purpose": "acknowledge",
+                "commitment": "prelude_only",
+                "claim_state": "none",
+                "claimed_capability_ids": [],
+                "claimed_goal_ids": [],
+                "must_not_claim_completion": True,
+            },
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(composition_request)
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertTrue(result.metadata["fail_soft_primary_activity"])
+        assert result.composition is not None
+        stage = result.composition.response_plan.pre_action
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(stage.text, "Okay, I'll nod twice.")
+        self.assertEqual(stage.speech_act, "acknowledge")
+        self.assertEqual(stage.commitment_state, "none")
+        self.assertFalse(stage.reuse_current_turn_speech)
+        self.assertEqual(stage.covers_goal_ids, ["goal-nod"])
+        self.assertTrue(
+            result.composition.metadata["core_authored_fast_speech_used"]
+        )
+        self.assertEqual(len(ollama.prompts), 2)
 
     def test_mixed_plan_reuses_fast_speech_for_uncovered_execute_goal(self):
         canonical = CanonicalPlan(
@@ -1604,6 +1716,172 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(
             result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
             "我会眨两次眼。为什么机器人怕水？",
+        )
+
+    def test_effectful_reviewer_cannot_drop_mixed_execute_goal_coverage(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-review-coverage",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-blink", "goal-leaves"],
+            steps=[
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                {
+                    "goal_id": "goal-leaves",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "Leaves reveal other pigments as chlorophyll fades.",
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+        )
+        first_candidate = {
+            "response_plan": {
+                "immediate": {
+                    "text": "*(Blinks twice)* Leaves reveal other pigments as chlorophyll fades.",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-blink", "goal-leaves"],
+                }
+            }
+        }
+        dropped_review = {
+            "response_plan": {
+                "immediate": {
+                    "text": "Leaves reveal other pigments as chlorophyll fades.",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-leaves"],
+                }
+            }
+        }
+        repaired_candidate = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "我会眨两次眼；秋天叶绿素褪去后，其他色素就显出来了。",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-blink", "goal-leaves"],
+                }
+            }
+        }
+        ollama = ScriptedOllama(
+            [first_candidate, dropped_review, repaired_candidate, dropped_review]
+        )
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "soridormi.blink_eyes",
+                                "safety_class": "low_risk_effect",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 4)
+        stage = result.composition.response_plan.pre_action  # type: ignore[union-attr]
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(set(stage.covers_goal_ids), {"goal-blink", "goal-leaves"})
+        self.assertNotIn("*(Blinks twice)*", stage.text)
+        self.assertIn("typed responsibility bookkeeping", ollama.prompts[1][0])
+
+    def test_mixed_authored_response_preserves_pending_execute_goal_without_extra_speech(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-bookkeeping-coverage",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-blink", "goal-leaves"],
+            steps=[
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                {
+                    "goal_id": "goal-leaves",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "秋天叶绿素褪去后，其他色素会显出来。",
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+        )
+        candidate = {
+            "response_plan": {
+                "immediate": {
+                    "text": "秋天叶绿素褪去后，其他色素会显出来。",
+                    "speech_act": "statement",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-leaves"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([candidate, candidate])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(
+                request(
+                    canonical,
+                    context={
+                        "execution_capabilities": [
+                            {
+                                "capability_id": "soridormi.blink_eyes",
+                                "safety_class": "low_risk_effect",
+                            }
+                        ]
+                    },
+                )
+            )
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        stage = result.composition.response_plan.immediate  # type: ignore[union-attr]
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(set(stage.covers_goal_ids), {"goal-blink", "goal-leaves"})
+        self.assertEqual(stage.text, candidate["response_plan"]["immediate"]["text"])
+        self.assertIn(
+            "mixed_execute_goal_coverage_extended_on_truthful_response_stage",
+            result.composition.metadata["mixed_coverage_repair_reasons"],  # type: ignore[union-attr]
         )
 
     def test_mixed_execute_and_clarify_composes_one_truthful_response(self):

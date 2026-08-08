@@ -734,6 +734,67 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_missing_resource_provider_escalates_without_hard_model_failure(self):
+        goal_id = "goal-resource"
+        reason = "Fetch and hand over the red mug."
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary=reason,
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    [goal_id],
+                    reason,
+                )
+            ],
+            goal_outcomes={
+                goal_id: execute_outcome(goal_id, ["walk"], reason)
+            },
+            goal_satisfaction=exact_satisfaction([goal_id], reason),
+        )
+        run_request = request(reason, goal_ids=[goal_id])
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": reason,
+                    "source_text": reason,
+                    "resource_responsibility": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "responsibility_variant": "fetch_and_deliver_object",
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "red mug",
+                        },
+                        "source": {"status": "unknown"},
+                        "recipient": {"description": "requester"},
+                        "delivery_mode": "physical_handover",
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                }
+            ],
+        }
+
+        plan = asyncio.run(
+            FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.escalation_reason,
+            "resource_responsibility_capability_unavailable",
+        )
+        self.assertEqual(plan.steps, [])
+        self.assertTrue(plan.metadata["resource_contract_unavailable"])
+        self.assertNotIn("failure_class", plan.metadata)
+
     def test_schema_invalid_capability_args_get_bounded_model_repair(self):
         invalid = {
             "disposition": "execute",
@@ -1788,7 +1849,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         ["goal-walk"],
                         "Walk forward for the requested duration.",
                     ),
-                    "timing": "parallel",
+                    "timing": "sequential",
                 }
             ],
             goal_outcomes={
@@ -1941,7 +2002,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ollama.prompts[1][0],
         )
 
-    def test_single_parallel_labeled_step_needs_no_concurrency_metadata(self):
+    def test_single_parallel_labeled_step_requires_provider_parallel_metadata(self):
         raw = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -1991,8 +2052,16 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.steps[0].timing, "parallel")
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.escalation_reason, "parallel_execution_contract_unavailable")
+        self.assertEqual(
+            plan.metadata["parallel_contract_errors"][0]["type"],
+            "parallel_capability_not_declared_safe",
+        )
+        self.assertEqual(
+            plan.metadata["parallel_contract_errors"][0]["parallel_step_count"],
+            1,
+        )
 
     def test_multi_goal_fast_execute_terminates_without_repair(self):
         raw = multi_goal_plan(
