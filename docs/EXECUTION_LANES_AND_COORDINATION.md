@@ -202,14 +202,13 @@ that selects `decision=express` but contains neither a valid body behavior nor
 before nested DTO validation. The empty auxiliary expression is dropped while
 the immutable mixed or Activity Plan remains available to Runtime.
 
-Eligible `robot_action` and `deep_thought` fast acknowledgements receive an
-independent semantic review before playback. Persona may shape wording but may
-not invent another errand, destination, person, object, household activity, or
-unsupported ability. Tool and memory routes suppress model-authored pre-effect
-speech entirely because typed fields and same-model review cannot prove an
-ordinary sentence stayed within missing evidence or an uncommitted effect. The
-Host may use its bounded low-commitment generic cache for any suppressed,
-unavailable, or invalid dynamic acknowledgement.
+Eligible `tool`, `robot_action`, and `deep_thought` fast acknowledgements receive
+an independent semantic review before playback. Persona may shape wording but
+may not invent another errand, destination, person, object, household activity,
+unsupported ability, or external result. Tool speech is restricted to the typed
+`acknowledge_and_check`/`checking_only` act; memory speech remains suppressed
+until commit. The Host may use its bounded low-commitment generic cache for any
+suppressed, unavailable, or invalid dynamic acknowledgement.
 
 ## Runtime behavior
 

@@ -22,6 +22,15 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
         episode = EpisodeRecord(
             episode_id="episode_badwalk",
             conversation_id="conv-1",
+            metadata={
+                "interaction_session_evidence": {
+                    "source_sid": "sid-1",
+                    "evidence_event_id": "evt_interaction_session_source",
+                    "policy_id": "chromie.interaction_session_capture",
+                    "policy_version": "12.0.0",
+                    "policy_sha256": "a" * 64,
+                }
+            },
             turns=[
                 EpisodeTurnRecord(
                     sid="sid-1",
@@ -74,6 +83,12 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
         candidate = scenario_candidate_from_episode(episode, evaluation)
         self.assertEqual(candidate["suite"], "dialogue")
         self.assertEqual(candidate["review"]["source_episode_id"], "episode_badwalk")
+        self.assertEqual(
+            candidate["review"]["source_interaction_session_evidence"][
+                "evidence_event_id"
+            ],
+            "evt_interaction_session_source",
+        )
         forbidden = candidate["turns"][0]["expect"]["forbidden_skills"]
         self.assertIn("soridormi.look_at_person", forbidden)
         self.assertIn("soridormi.nod_yes", forbidden)

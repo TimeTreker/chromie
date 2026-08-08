@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "id": "missing_restaurant_recommendation_closes_truthfully",
+  "suite": "goal_interpretation",
+  "level": "integration",
+  "description": "A request for nearby restaurant recommendations closes with a concise model-authored limitation when the catalog has no matching external-information ability.",
+  "tags": [
+    "missing-ability",
+    "external-information",
+    "terminal-closure",
+    "recommendation",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "不知道该去什么地方吃饭，附近有啥好吃的？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 83,
+      "capabilities": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "agent_id": "chromie.tool",
+          "description": "Retrieve current weather for a supplied place.",
+          "route": "tool",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "read_only",
+            "weather_lookup"
+          ],
+          "safety_class": "safe_read",
+          "requires_confirmation": false
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "chat",
+          "intent": "respond_to_user",
+          "confidence": 0.95,
+          "language": "zh-CN"
+        }
+      },
+      {
+        "stage": "capability_grounding_review",
+        "decision": {
+          "route": "clarify",
+          "intent": "missing_or_unsupported_ability",
+          "confidence": 1.0,
+          "speak_first": "我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",
+          "metadata": {
+            "desired_abilities": [
+              {
+                "ability_id": "local.restaurant_recommendation",
+                "intent": "查找并推荐用户附近的优质餐厅",
+                "status": "missing_ability",
+                "confidence": 1.0,
+                "reason": "当前能力目录没有餐厅搜索或本地商家推荐能力。"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "clarify",
+    "intent": "missing_or_unsupported_ability",
+    "source": "llm",
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "capability_grounding_review"
+    ],
+    "fast_speech_present": false,
+    "metadata_json_contains": [
+      "local.restaurant_recommendation",
+      "missing_ability",
+      "当前能力目录没有餐厅搜索或本地商家推荐能力"
+    ],
+    "task_types_forbid": [
+      "task.use_tool",
+      "task.execute_skill"
+    ]
+  }
+}

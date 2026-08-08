@@ -239,6 +239,10 @@ class ResponseStage(BaseModel):
     commitment_state: CommitmentState = "none"
     must_not_claim_completion: bool = True
     reuse_current_turn_speech: bool = False
+    reused_speech_event_id: str | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     covers_task_ids: list[str] = Field(default_factory=list)
     covers_goal_ids: list[str] = Field(default_factory=list)
     claims: list[str] = Field(default_factory=list)
@@ -256,7 +260,13 @@ class ResponseStage(BaseModel):
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("text", "speech_act", "coordination_id", mode="before")
+    @field_validator(
+        "text",
+        "speech_act",
+        "coordination_id",
+        "reused_speech_event_id",
+        mode="before",
+    )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -297,6 +307,10 @@ class ResponseStage(BaseModel):
                 "terminal claims require must_not_claim_completion=false"
             )
         if self.reuse_current_turn_speech:
+            if not self.reused_speech_event_id:
+                raise ValueError(
+                    "reused current-turn speech requires reused_speech_event_id"
+                )
             if not self.must_not_claim_completion or self.commitment_state in terminal:
                 raise ValueError(
                     "reused current-turn speech may acknowledge pending work only"
@@ -305,6 +319,10 @@ class ResponseStage(BaseModel):
                 raise ValueError(
                     "reused current-turn speech must remain an uncoordinated response"
                 )
+        elif self.reused_speech_event_id:
+            raise ValueError(
+                "reused_speech_event_id requires reuse_current_turn_speech=true"
+            )
         if self.coordination_id and self.delivery_role == "response":
             raise ValueError(
                 "coordinated speech requires activity_companion or performance role"

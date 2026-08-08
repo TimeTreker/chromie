@@ -224,12 +224,24 @@ context, and an independent semantic/style review must preserve or truthfully
 repair it. The typed `claim_state`, `claimed_capability_ids`, and
 `claimed_goal_ids` are necessary claim controls; before Goals and Plans exist
 they must be `none`, empty, and empty. They are not proof that the ordinary
-sentence stayed prospective. Tool and memory routes therefore suppress dynamic
-pre-effect speech until trusted evidence or a committed result exists. The Host
-validates typed fields, turn correlation, internal-token safety, and lifecycle
-state without inferring meaning from a phrase blacklist. The pre-generated
-generic cache is a transport-safe latency presentation path when dynamic speech
-is not admissible or cannot be scheduled; it never claims evidence or an effect.
+sentence stayed prospective. A tool route may therefore speak only an
+independently reviewed `acknowledge_and_check` act with `checking_only`
+commitment before evidence exists; the later result, failure, or limitation is
+a distinct act. Memory speech remains suppressed until a commit exists. The
+Host validates typed fields, turn correlation, internal-token safety, and
+lifecycle state without inferring meaning from a phrase blacklist. The
+pre-generated generic cache is a transport-safe fallback when dynamic speech is
+not admissible or cannot be scheduled; it never claims evidence or an effect.
+
+Current-turn de-duplication uses the typed speech-event identity and its
+structured purpose, stage, route, and commitment. Generated or queued speech is
+not delivery evidence. Only playback-started or playback-completed state
+satisfies the audible act. A later response stage may reference a queued event
+without resynthesizing it; if that exact event becomes `not_delivered`, Runtime
+may fulfill the same act once. Literal text equality is only a payload-integrity
+check and never decides whether two conversational responsibilities are the
+same. Distinct result, failure, limitation, clarification, confirmation,
+progress, and completion acts remain independently deliverable.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable

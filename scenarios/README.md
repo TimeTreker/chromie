@@ -25,10 +25,11 @@ nor a Level A pass alone proves natural live robot behavior.
 Eligible planning/embodied pending-work regressions should assert the typed
 `fast_speech` object as well as the final route: purpose, non-terminal
 commitment, and `must_not_claim_completion=true`. Live-text cases can set
-`require_fast_speech=true` and `expected_fast_speech_purposes`. Tool and memory
-routes instead set `forbid_fast_speech=true`: their model-authored dynamic
-speech must wait for trusted evidence or a committed result, while the Host's
-generic cache remains a separate latency presentation path.
+`require_fast_speech=true` and `expected_fast_speech_purposes`. Tool routes may
+use the exact reviewed `acknowledge_and_check`/`checking_only` contract before a
+result; it carries no result or completion authority. Memory routes still set
+`forbid_fast_speech=true` until a commit exists. The Host's generic cache remains
+a separate fallback presentation path.
 
 Create and validate scenarios with:
 

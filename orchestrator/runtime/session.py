@@ -26,6 +26,11 @@ from shared.chromie_runtime.runtime_trace import (
     runtime_tracer,
 )
 
+from .interaction_session_evidence import (
+    InteractionSessionCapturePolicySnapshot,
+    InteractionSessionEvidenceCollector,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -138,6 +143,7 @@ class SessionTracker:
         *,
         event_log_path: str | os.PathLike[str] | None = None,
         resource_sampling_mode: str | None = None,
+        interaction_session_capture: InteractionSessionEvidenceCollector | None = None,
     ):
         self.enabled = enabled
         self.current_sid: str | None = None
@@ -151,6 +157,7 @@ class SessionTracker:
         self.external_resource_snapshot_providers: list[
             tuple[TraceModule, str, Callable[..., dict[str, Any]]]
         ] = []
+        self.interaction_session_capture = interaction_session_capture
         self.checkpoint_store = TraceCheckpointStore()
         self.recovered_runtime_traces = self._recover_abandoned_runtime_traces()
 
@@ -158,6 +165,11 @@ class SessionTracker:
         previous = self.current_sid
         sid = str(uuid.uuid4())[:8]
         self.current_sid = sid
+        capture_policy = (
+            self.interaction_session_capture.begin_session(sid)
+            if self.interaction_session_capture is not None
+            else None
+        )
         self.state[sid] = {
             "t0_ms": now_ms(),
             "last_activity_ms": now_ms(),
@@ -171,8 +183,13 @@ class SessionTracker:
             "response_chars": 0,
             "interrupted": False,
             "workflow_events": [],
-            "runtime_trace": self._create_runtime_trace(sid),
+            "runtime_trace": self._create_runtime_trace(sid, capture_policy),
             "runtime_trace_event": {},
+            "interaction_session_capture_policy": (
+                capture_policy.model_dump(mode="json", exclude_none=True)
+                if capture_policy is not None
+                else {}
+            ),
         }
         if previous and previous != sid:
             prev = self.state.get(previous)
@@ -187,8 +204,19 @@ class SessionTracker:
         self._checkpoint_runtime_trace(sid)
         return sid
 
-    def _create_runtime_trace(self, sid: str) -> RuntimeTrace | None:
+    def _create_runtime_trace(
+        self,
+        sid: str,
+        capture_policy: InteractionSessionCapturePolicySnapshot | None = None,
+    ) -> RuntimeTrace | None:
         policy = TracePolicy.from_env()
+        if (
+            policy.mode == "off"
+            and capture_policy is not None
+            and capture_policy.enabled
+            and capture_policy.evidence.runtime_trace
+        ):
+            policy = TracePolicy.from_env(mode="basic")
         if policy.mode == "off":
             return None
         return RuntimeTrace(
@@ -210,6 +238,43 @@ class SessionTracker:
             return
         trace.update_correlations(values)
         self._checkpoint_runtime_trace(str(sid or ""))
+
+    def capture_input_audio(
+        self,
+        sid: str | None,
+        audio: bytes,
+        *,
+        sample_rate_hz: int,
+        channels: int,
+    ) -> dict[str, Any] | None:
+        if self.interaction_session_capture is None or not sid:
+            return None
+        return self.interaction_session_capture.capture_input_audio(
+            sid,
+            audio,
+            sample_rate_hz=sample_rate_hz,
+            channels=channels,
+        )
+
+    def attach_episode_evidence(
+        self,
+        sid: str | None,
+        episode: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if self.interaction_session_capture is None or not sid:
+            return None
+        return self.interaction_session_capture.attach_episode_evidence(
+            sid,
+            episode,
+        )
+
+    def interaction_session_capture_reference(
+        self,
+        sid: str | None,
+    ) -> dict[str, Any] | None:
+        if self.interaction_session_capture is None or not sid:
+            return None
+        return self.interaction_session_capture.session_reference(sid)
 
     def sample_resources(
         self,
@@ -430,30 +495,45 @@ class SessionTracker:
         # unfinished and the idle sweeper logged the same timeout every cycle.
         session["runtime_trace_finalized"] = True
         trace = session.get("runtime_trace")
+        snapshot = None
         if not isinstance(trace, RuntimeTrace):
             session["runtime_trace_snapshot"] = None
-            return
-        self.sample_resources(
-            sid,
-            reason="session_abandoned" if state == "abandoned" else "session_finish",
-        )
-        self._record_external_resource_snapshots(
-            sid,
-            reason="session_abandoned" if state == "abandoned" else "session_finish",
-        )
-        snapshot = trace.finish(state=state)
-        session["runtime_trace_snapshot"] = snapshot
-        retention = trace.policy.retention_decision(snapshot)
-        session["runtime_trace_retention"] = retention.as_dict()
-        if retention.emit:
-            session["runtime_trace_event"] = runtime_tracer.persist_snapshot(
-                snapshot,
-                event_subtype="voice_session",
-                producer="chromie.orchestrator",
-                severity=retention.severity,
-                retention_reason=retention.reason,
+        else:
+            self.sample_resources(
+                sid,
+                reason=(
+                    "session_abandoned" if state == "abandoned" else "session_finish"
+                ),
             )
-        self.checkpoint_store.remove(trace.trace_id)
+            self._record_external_resource_snapshots(
+                sid,
+                reason=(
+                    "session_abandoned" if state == "abandoned" else "session_finish"
+                ),
+            )
+            snapshot = trace.finish(state=state)
+            session["runtime_trace_snapshot"] = snapshot
+            retention = trace.policy.retention_decision(snapshot)
+            session["runtime_trace_retention"] = retention.as_dict()
+            if retention.emit:
+                session["runtime_trace_event"] = runtime_tracer.persist_snapshot(
+                    snapshot,
+                    event_subtype="voice_session",
+                    producer="chromie.orchestrator",
+                    severity=retention.severity,
+                    retention_reason=retention.reason,
+                )
+            self.checkpoint_store.remove(trace.trace_id)
+        if self.interaction_session_capture is not None:
+            capture_event = self.interaction_session_capture.seal_session(
+                sid,
+                termination_state=(
+                    "abandoned" if state == "abandoned" else "complete"
+                ),
+                trace_snapshot=snapshot,
+            )
+            if capture_event.get("capture_status") != "not_requested":
+                session["interaction_session_capture_event"] = capture_event
 
     def elapsed_ms(self, sid: str | None) -> float:
         state = self.state.get(sid or "")

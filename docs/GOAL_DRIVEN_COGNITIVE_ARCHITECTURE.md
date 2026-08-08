@@ -1228,14 +1228,22 @@ sentences are not response contracts. For eligible planning and embodied work,
 the Core model owns the exact dynamic wording and an independent review checks
 its ordinary meaning against the owner-approved style context. Dynamic pre-Goal
 speech must carry `claim_state=none` with empty capability and Goal claim IDs,
-but those typed fields are not sufficient evidence about sentence meaning.
-Tool and memory routes therefore suppress model-authored pre-effect speech; a
-generic Host cache may present a low-commitment cue. The Host does not classify
-ordinary wording by keywords. An immediate acknowledgement may
+but those typed fields are not sufficient evidence about sentence meaning. A
+tool route may use only the independently reviewed
+`acknowledge_and_check`/`checking_only` act before result evidence. Memory speech
+still waits for a commit; a generic Host cache may present a low-commitment
+fallback. The Host does not classify ordinary wording by keywords. An immediate acknowledgement may
 claim only hearing or evaluation, a proposal or confirmation requires a
 validated plan, starting speech requires committed execution, progress requires
 correlated runtime evidence, and final speech requires reconciled terminal
 evidence.
+
+Response stages reuse earlier current-turn speech by exact speech-event ID and
+structured act fields, not text comparison. Only playback-started or completed
+events satisfy an audible act. A scheduled event remains pending; if it never
+becomes audible, Runtime may fulfill the referenced act once. This does not
+suppress independent result, failure, limitation, clarification, confirmation,
+progress, or completion responsibilities.
 
 ### 15.2 Post-execution response
 

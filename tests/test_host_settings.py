@@ -22,6 +22,9 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                     "ORCH_TTS_CONCURRENCY": "2",
                     "ORCH_FAST_FIRST_AUDIO_CACHE_DIR": "cache/audio",
                     "RECORDINGS_DIR": "captures",
+                    "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH": "policies/session.json",
+                    "CHROMIE_RUNTIME_EVENT_ROOT": "events",
+                    "CHROMIE_DATA_LOOP_TRIGGER_ROOT": "data-loop-inbox",
                 },
             )
 
@@ -30,6 +33,15 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(settings.playback.concurrency, 2)
         self.assertEqual(settings.playback.fast_audio_cache_dir, root / "cache/audio")
         self.assertEqual(settings.evidence.recordings_dir, root / "captures")
+        self.assertEqual(
+            settings.evidence.interaction_session_capture_policy_path,
+            root / "policies/session.json",
+        )
+        self.assertEqual(settings.evidence.runtime_event_root, root / "events")
+        self.assertEqual(
+            settings.evidence.data_loop_trigger_root,
+            root / "data-loop-inbox",
+        )
         with self.assertRaises(Exception):
             settings.playback.concurrency = 3  # type: ignore[misc]
 

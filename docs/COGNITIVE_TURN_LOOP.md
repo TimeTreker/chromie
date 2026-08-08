@@ -352,6 +352,16 @@ authorizes it against the applicable correlation, commitment/evidence state,
 claim guards, and cancellation generation. It need not wait for unrelated later
 response fields.
 
+Current-turn conversational-act reuse is correlated by the exact speech-event
+ID together with its structured stage, purpose, route, intent, and commitment.
+Generated or scheduled state is not delivery evidence; only playback-started or
+completed state satisfies the audible act. A ResponseStage may reference a
+pending event without synthesizing a duplicate, and Runtime may fulfill that act
+once if the referenced event becomes `not_delivered`. Text equality is checked
+only to preserve event payload integrity. Independent result, failure,
+limitation, clarification, confirmation, progress, and completion stages retain
+their own delivery obligations.
+
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically
 pre-empt current output; an ordinary progress or result stage remains ordered

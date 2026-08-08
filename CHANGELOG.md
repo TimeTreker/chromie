@@ -23,11 +23,19 @@ remains available in Git history.
   fields to explicit session/ephemeral memory, a logged mechanical recovery may
   only remove authority; durable, profile, forget, and clear contradictions
   remain fail-closed.
-- Suppressed model-authored tool and memory speech until trusted evidence or a
-  committed result exists. Pure safe-read Response Composer Plans now emit no
-  dynamic pre-evidence stage; the optional generic Host cue owns latency
-  presentation and the Tool Result Interpreter owns one grounded answer. Mixed
-  Plans retain exact current-turn acknowledgement reuse.
+- Restored independently reviewed tool acknowledgements under the exact
+  `acknowledge_and_check`/`checking_only` claim contract while retaining memory
+  commit gating. Pure safe-read Response Composer Plans reference the exact Fast
+  speech event instead of authoring a second act; playback start is the delivery
+  boundary, an undelivered event may be fulfilled once, and later grounded
+  result or failure speech remains independent. De-duplication now uses event
+  identity and structured act state rather than text comparison.
+- Added the independently controlled, typed, versioned
+  `chromie.interaction_session_capture` Data Loop policy. Each SID snapshots its
+  policy at start, reuses existing input/trace/Episode evidence providers, and
+  seals complete, abandoned, or recovered immutable packages with explicit
+  artifact digests, missing state, governance, runtime identity, and downstream
+  candidate provenance. Debug audio and offline evaluation remain independent.
 - Added one bounded evidence-preserving repair when Tool Result Interpreter
   output is otherwise grounded but violates its response contract, and made
   decision follow-ups answer the requested decision before the smallest useful

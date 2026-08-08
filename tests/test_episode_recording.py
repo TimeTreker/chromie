@@ -33,6 +33,12 @@ class EpisodeRecorderTests(unittest.TestCase):
                         "route_confidence": 0.95,
                         "core_interpretation_latency_ms": 120.0,
                         "agent_latency_ms": 300.0,
+                        "interaction_session_evidence": {
+                            "source_sid": "sid-1",
+                            "evidence_event_id": "evt-session-1",
+                            "policy_id": "chromie.interaction_session_capture",
+                            "policy_version": "12.0.0",
+                        },
                     }
                 },
                 speech=[{"text": "Hello!"}],
@@ -95,6 +101,18 @@ class EpisodeRecorderTests(unittest.TestCase):
             self.assertIsNotNone(second_episode)
             self.assertEqual(first_episode.episode_id, second_episode.episode_id)
             self.assertEqual(len(second_episode.turns), 2)
+            self.assertEqual(
+                second_episode.metadata["interaction_session_evidence"][
+                    "evidence_event_id"
+                ],
+                "evt-session-1",
+            )
+            self.assertEqual(
+                second_episode.turns[0].metadata[
+                    "interaction_session_evidence"
+                ]["source_sid"],
+                "sid-1",
+            )
             self.assertEqual(second_episode.turns[0].user_text, "Hello.")
             self.assertEqual(second_episode.turns[1].agent.speech, ["Please confirm a safe bounded walking plan."])
             self.assertEqual(

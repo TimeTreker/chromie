@@ -1102,21 +1102,29 @@ class CanonicalPlanRuntimeAdapter:
         )
         reusable_turn_speech: dict[str, dict[str, Any]] = {}
         if isinstance(context, dict):
-            for key in ("delivered_turn_speech", "scheduled_turn_speech"):
+            # A speech-event identity selects the conversational act. Text is
+            # checked later only as payload integrity, never as de-duplication
+            # identity. Prefer playback-qualified evidence when both projections
+            # contain the same event.
+            for key in ("scheduled_turn_speech", "delivered_turn_speech"):
                 values = context.get(key)
                 if not isinstance(values, list):
                     continue
                 for item in values:
                     if not isinstance(item, dict):
                         continue
-                    text = " ".join(str(item.get("text") or "").strip().split())
+                    event_id = " ".join(
+                        str(item.get("event_id") or item.get("speech_event_id") or "")
+                        .strip()
+                        .split()
+                    )
                     status = str(item.get("status") or "").strip()
-                    if text and status in {
+                    if event_id and status in {
                         "scheduled",
                         "playback_started",
                         "playback_completed",
                     }:
-                        reusable_turn_speech[text] = dict(item)
+                        reusable_turn_speech[event_id] = dict(item)
         omitted_pre_execution_speech_phases: list[str] = []
         projected_speech_stages: list[dict[str, Any]] = []
         if effectful_pre_execution:
@@ -1259,6 +1267,7 @@ class CanonicalPlanRuntimeAdapter:
                             "coordination_id": stage.coordination_id,
                             "delivery_role": stage.delivery_role,
                             "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
+                            "reused_speech_event_id": stage.reused_speech_event_id,
                         }
                     ]
                 else:
@@ -1281,6 +1290,7 @@ class CanonicalPlanRuntimeAdapter:
                         "coordination_id": stage.coordination_id,
                         "delivery_role": stage.delivery_role,
                         "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
+                        "reused_speech_event_id": stage.reused_speech_event_id,
                     }
                     for phase, stage in stage_items
                     if stage is not None
@@ -1299,6 +1309,7 @@ class CanonicalPlanRuntimeAdapter:
                     "coordination_id": stage.coordination_id,
                     "delivery_role": stage.delivery_role,
                     "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
+                    "reused_speech_event_id": stage.reused_speech_event_id,
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1310,7 +1321,10 @@ class CanonicalPlanRuntimeAdapter:
             coordination_id = str(projected.get("coordination_id") or "").strip()
             coordination = lane_coordination_by_id.get(coordination_id)
             coordinated_speech = bool(coordination is not None and "speaking" in coordination.lanes)
-            playback_barrier = not safe_read_parallel and not coordinated_speech
+            playback_barrier = (
+                projected.get("reuse_current_turn_speech") is True
+                or (not safe_read_parallel and not coordinated_speech)
+            )
             speech_metadata = {
                 "source": projected["source"],
                 "phase": phase,
@@ -1328,12 +1342,21 @@ class CanonicalPlanRuntimeAdapter:
                 "playback_start_required_for_delivery": playback_barrier,
             }
             if projected.get("reuse_current_turn_speech") is True:
-                normalized_text = " ".join(str(projected.get("text") or "").strip().split())
-                reused = reusable_turn_speech.get(normalized_text)
+                reused_event_id = " ".join(
+                    str(projected.get("reused_speech_event_id") or "").strip().split()
+                )
+                reused = reusable_turn_speech.get(reused_event_id)
                 if reused is None:
                     raise ValueError(
                         "response stage requested current-turn speech reuse but "
-                        "no exact scheduled or delivered utterance exists"
+                        "no exact scheduled or delivered speech event exists"
+                    )
+                normalized_text = " ".join(str(projected.get("text") or "").strip().split())
+                reused_text = " ".join(str(reused.get("text") or "").strip().split())
+                if normalized_text != reused_text:
+                    raise ValueError(
+                        "response stage text does not match the referenced "
+                        "current-turn speech event"
                     )
                 raw_orders = reused.get("orders")
                 if not isinstance(raw_orders, list):
@@ -1341,8 +1364,7 @@ class CanonicalPlanRuntimeAdapter:
                 speech_metadata.update(
                     {
                         "reuse_current_turn_speech": True,
-                        "reused_speech_event_id": reused.get("event_id")
-                        or reused.get("speech_event_id"),
+                        "reused_speech_event_id": reused_event_id,
                         "reused_speech_status": reused.get("status"),
                         "reused_speech_generation": reused.get("generation"),
                         "reused_speech_orders": [

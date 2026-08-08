@@ -2374,7 +2374,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(InterpretationUnavailableError, 'placeholder capability intent'):
             await interpreter.route(RouteRequest(text="Hello, how are you."))
 
-    async def test_tool_route_missing_fast_speech_fails_closed_to_cached_prelude(self) -> None:
+    async def test_tool_route_missing_fast_speech_is_repaired_and_reviewed(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2439,19 +2439,21 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "tool")
         self.assertEqual(decision.intent, "weather_query")
-        self.assertIsNone(decision.fast_speech)
-        self.assertEqual(
-            decision.metadata["fast_speech_review"],
-            {
-                "stage": "tool_preeffect_suppressed",
-                "model_reviewed": False,
-                "speech_selected": False,
-                "policy": "tool_evidence_required_before_dynamic_speech",
-            },
-        )
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "好的，我查一下重庆今天的天气。")
+        self.assertEqual(decision.fast_speech.purpose, "acknowledge_and_check")
+        self.assertEqual(decision.fast_speech.commitment, "checking_only")
+        self.assertTrue(decision.fast_speech.must_not_claim_completion)
+        self.assertTrue(decision.metadata["fast_speech_review"]["model_reviewed"])
+        self.assertTrue(decision.metadata["fast_speech_review"]["speech_selected"])
         self.assertEqual(
             interpreter.stages,
-            ["primary_interpreter"],
+            [
+                "primary_interpreter",
+                "fast_speech_repair",
+                "fast_speech_semantic_review",
+            ],
         )
 
     async def test_robot_action_fast_speech_repair_stays_generic_before_planning(self) -> None:
@@ -2737,7 +2739,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(decision.fast_speech)
         self.assertEqual(interpreter.calls, 1)
 
-    async def test_tool_route_existing_fast_speech_is_suppressed_before_review(self) -> None:
+    async def test_tool_route_existing_fast_speech_is_semantically_reviewed(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2782,10 +2784,15 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         decision = await interpreter.route(RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"))
 
         self.assertEqual(decision.route, "tool")
-        self.assertIsNone(decision.fast_speech)
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(
+            decision.fast_speech.text,
+            "好呀，我只帮你查重庆今天的天气。",
+        )
         self.assertEqual(
             interpreter.stages,
-            ["quick_intent"],
+            ["quick_intent", "fast_speech_semantic_review"],
         )
 
 

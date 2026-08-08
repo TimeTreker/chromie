@@ -129,6 +129,14 @@ Recommended top-level shape:
 knows the intended phrase and wants to distinguish ASR failure from
 Goal Interpreter/Agent failure.
 
+When `chromie.interaction_session_capture` is enabled for a SID, Episode and turn
+metadata preserve a bounded `interaction_session_evidence` reference. It
+contains the source SID, deterministic policy activation and eventual evidence
+event IDs, and the exact policy ID/version/digest. The full policy snapshot,
+audio, RuntimeTrace, trace summary, and Episode remain separate immutable
+fact-layer artifacts; the Episode does not copy or reinterpret them. See
+[Chromie Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md).
+
 ## Deepthinking Evaluation
 
 The evaluator should run outside the realtime audio path. It can be a small
@@ -293,6 +301,13 @@ Promotion flow:
 4. `python scripts/scenario_author.py validate-all` and the relevant scenario
    runner gate must pass.
 5. The promoted scenario is committed with the code or prompt fix.
+
+If the source Episode carries interaction-Session evidence, the review and
+candidate Runtime Event retain that source reference and correlation IDs. This
+proves which governed fact-layer package supported the downstream derivation;
+it does not make the candidate an automatic policy, training sample, or accepted
+scenario. Evaluation and candidate persistence stay offline and cannot delay or
+alter realtime Session completion.
 
 ## LLM Boundaries
 

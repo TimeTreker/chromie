@@ -6,8 +6,8 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 534,
-  "expected_normalized_total": 533,
+  "expected_inventory_total": 535,
+  "expected_normalized_total": 534,
   "allowed_datasets": [
     "adapter",
     "asr_noise",
@@ -49,7 +49,7 @@
       ],
       "target_reference": "modules/goal_interpretation",
       "migration_state": "referenced_in_place",
-      "expected_inventory_count": 27
+      "expected_inventory_count": 28
     },
     {
       "name": "cognitive_turn_loop",

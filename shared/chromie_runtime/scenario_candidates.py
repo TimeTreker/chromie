@@ -51,6 +51,14 @@ def persist_scenario_candidate_event(
     conversation_id = str(
         episode.get("conversation_id") or review.get("source_conversation_id") or ""
     )
+    episode_metadata = episode.get("metadata")
+    if not isinstance(episode_metadata, Mapping):
+        episode_metadata = {}
+    session_evidence = review.get("source_interaction_session_evidence")
+    if not isinstance(session_evidence, Mapping):
+        session_evidence = episode_metadata.get("interaction_session_evidence")
+    if not isinstance(session_evidence, Mapping):
+        session_evidence = {}
     attributes = {
         "scenario_id": scenario_id,
         "suite": str(candidate.get("suite") or ""),
@@ -67,6 +75,14 @@ def persist_scenario_candidate_event(
         "episode_id": episode_id,
         "evaluation_id": evaluation_id,
         "conversation_id": conversation_id,
+        "source_session_id": str(session_evidence.get("source_sid") or ""),
+        "interaction_session_evidence_event_id": str(
+            session_evidence.get("evidence_event_id") or ""
+        ),
+        "data_loop_policy_id": str(session_evidence.get("policy_id") or ""),
+        "data_loop_policy_version": str(
+            session_evidence.get("policy_version") or ""
+        ),
     }
     return persist_runtime_event(
         event_type=SCENARIO_CANDIDATE_EVENT_TYPE,
@@ -83,6 +99,9 @@ def persist_scenario_candidate_event(
         derivation={
             "derived_from_episode": bool(episode_id),
             "derived_from_evaluation": bool(evaluation_id),
+            "derived_from_interaction_session_evidence": bool(
+                session_evidence.get("evidence_event_id")
+            ),
             "requires_human_review": True,
             "scenario_auto_promotion_allowed": False,
             "training_auto_promotion_allowed": False,

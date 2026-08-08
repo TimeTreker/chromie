@@ -20,6 +20,12 @@ class ScenarioCandidateEventTests(unittest.TestCase):
                 "source_episode_id": "episode-1",
                 "source_evaluation_id": "eval-1",
                 "source_conversation_id": "conv-1",
+                "source_interaction_session_evidence": {
+                    "source_sid": "sid-1",
+                    "evidence_event_id": "evt_interaction_session_source",
+                    "policy_id": "chromie.interaction_session_capture",
+                    "policy_version": "12.0.0",
+                },
                 "requires_human_review": True,
             },
             "promotion": {
@@ -53,6 +59,22 @@ class ScenarioCandidateEventTests(unittest.TestCase):
             manifest = json.loads((ready / "event.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["event_type"], "chromie.scenario_candidate")
             self.assertEqual(manifest["correlations"]["episode_id"], "episode-1")
+            self.assertEqual(manifest["correlations"]["source_session_id"], "sid-1")
+            self.assertEqual(
+                manifest["correlations"][
+                    "interaction_session_evidence_event_id"
+                ],
+                "evt_interaction_session_source",
+            )
+            self.assertEqual(
+                manifest["correlations"]["data_loop_policy_version"],
+                "12.0.0",
+            )
+            self.assertTrue(
+                manifest["derivation"][
+                    "derived_from_interaction_session_evidence"
+                ]
+            )
             self.assertFalse(manifest["derivation"]["scenario_auto_promotion_allowed"])
             payload = json.loads(
                 (ready / "scenario_candidate.json").read_text(encoding="utf-8")

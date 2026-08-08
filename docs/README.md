@@ -123,7 +123,7 @@ mechanical-contract owner.
 
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
 - [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
-- [Scenario Candidate Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md)
+- [Chromie Data Loop: Interaction Evidence and Scenario Candidates](SCENARIO_CANDIDATE_DATA_LOOP.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Benchmark Suite](../benchmarks/README.md)

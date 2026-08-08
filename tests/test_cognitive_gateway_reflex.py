@@ -202,6 +202,16 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             def trace_context(self, session_id: str) -> Any:
                 return nullcontext()
 
+            def capture_input_audio(
+                self,
+                session_id: str,
+                audio: bytes,
+                *,
+                sample_rate_hz: int,
+                channels: int,
+            ) -> None:
+                return None
+
         class _ConversationState:
             conversation_id = "conversation-reflex-priority"
 

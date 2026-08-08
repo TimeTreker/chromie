@@ -277,6 +277,11 @@ class EpisodeRecorder:
             context = {}
         conversation_id = str(context.get("conversation_id") or "local_default")
         episode = self._episodes.get(conversation_id)
+        interaction_session_evidence = context.get(
+            "interaction_session_evidence"
+        )
+        if not isinstance(interaction_session_evidence, dict):
+            interaction_session_evidence = None
         if episode is None:
             episode = EpisodeRecord(
                 conversation_id=conversation_id,
@@ -284,6 +289,15 @@ class EpisodeRecorder:
                 metadata={
                     "mind_profile_id": mind_profile.profile_id,
                     "mind_profile_version": mind_profile.version,
+                    **(
+                        {
+                            "interaction_session_evidence": dict(
+                                interaction_session_evidence
+                            )
+                        }
+                        if interaction_session_evidence is not None
+                        else {}
+                    ),
                 },
             )
             self._episodes[conversation_id] = episode
@@ -310,6 +324,15 @@ class EpisodeRecorder:
                     **episode.metadata,
                     "last_sid": session_id,
                     "last_interaction_id": response.interaction_id,
+                    **(
+                        {
+                            "interaction_session_evidence": dict(
+                                interaction_session_evidence
+                            )
+                        }
+                        if interaction_session_evidence is not None
+                        else {}
+                    ),
                 },
             },
         )
@@ -459,6 +482,17 @@ class EpisodeRecorder:
             metadata={
                 "interaction_id": response.interaction_id,
                 "route_stage": context.get("route_stage"),
+                **(
+                    {
+                        "interaction_session_evidence": dict(
+                            context["interaction_session_evidence"]
+                        )
+                    }
+                    if isinstance(
+                        context.get("interaction_session_evidence"), dict
+                    )
+                    else {}
+                ),
             },
         )
 

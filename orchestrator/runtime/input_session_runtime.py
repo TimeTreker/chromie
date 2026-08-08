@@ -234,6 +234,12 @@ class InputSessionRuntime:
             else:
                 host.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
                 host.save_audio(audio, "input", session_id=session_id)
+                host.sessions.capture_input_audio(
+                    session_id,
+                    audio,
+                    sample_rate_hz=host.target_asr_rate,
+                    channels=1,
+                )
                 # A validated new input turn invalidates old speech output, but
                 # it cannot yet decide Goal, body, or global cancellation scope.
                 host._invalidate_output_state(
@@ -347,6 +353,12 @@ class InputSessionRuntime:
                                         audio,
                                         "input",
                                         session_id=new_session_id,
+                                    )
+                                    host.sessions.capture_input_audio(
+                                        new_session_id,
+                                        audio,
+                                        sample_rate_hz=host.target_asr_rate,
+                                        channels=1,
                                     )
                                     host.session_log(
                                         new_session_id,

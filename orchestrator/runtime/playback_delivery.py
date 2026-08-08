@@ -107,7 +107,14 @@ class PlaybackDeliveryLifecycle:
         text = str(normalized_text or "").strip()
         if not sid or not orders or not text:
             return None
-        event_seed = f"{sid}|{generation}|{orders[0]}|{stage}|{purpose}|{text}"
+        # The event identity is a structured conversational-act and transport
+        # correlation key. Wording is payload integrity, not de-duplication
+        # identity, so changing punctuation or whitespace cannot define a new
+        # delivered act.
+        event_seed = (
+            f"{sid}|{generation}|{orders[0]}|{stage}|{purpose}|"
+            f"{route}|{intent}|{commitment}"
+        )
         event_id = "speech_event_" + hashlib.sha256(
             event_seed.encode("utf-8")
         ).hexdigest()[:20]

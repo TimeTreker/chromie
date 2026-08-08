@@ -2630,10 +2630,11 @@ class OllamaGoalInterpreter:
         Structural FastSpeech fields cannot prove that ordinary wording stayed
         within the user's request. Deep-thought acknowledgements can invent
         unsupported facts or side errands just as embodied speech can invent
-        started motion. Tool and memory speech is suppressed before this boundary
-        because evidence or a committed effect must precede dynamic wording. When
-        semantic review is disabled or fails, suppress the remaining dynamic
-        utterance so the Host may use its low-commitment cached fallback.
+        started motion. A tool acknowledgement may describe only understanding
+        and evaluation; it cannot claim a result. Memory speech remains suppressed
+        until a commit exists. When semantic review is disabled or fails, suppress
+        the remaining dynamic utterance so the Host may use its low-commitment
+        cached fallback.
         """
 
         target_route = _pending_work_fast_speech_target_route(decision)
@@ -2735,12 +2736,8 @@ class OllamaGoalInterpreter:
         decision: RouteDecision,
     ) -> RouteDecision:
         fail_closed_route = _pending_work_fast_speech_target_route(decision)
-        if fail_closed_route in {"memory", "tool"}:
-            policy = (
-                "memory_commit_required_before_speech"
-                if fail_closed_route == "memory"
-                else "tool_evidence_required_before_dynamic_speech"
-            )
+        if fail_closed_route == "memory":
+            policy = "memory_commit_required_before_speech"
             logger.info(
                 "goal_interpreter_fast_speech_suppressed route=%s intent=%s "
                 "reason=%s sid=%s",

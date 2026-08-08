@@ -1123,7 +1123,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         assistant.fast_first_tool_response_enabled = True
-        self.assertIsNone(
+        self.assertEqual(
             assistant._fast_first_response_text(
                 RouteDecision(
                     route="tool",
@@ -1140,9 +1140,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ),
                 "重庆今天天气怎么样？",
-            )
+            ),
+            "好的，我查一下重庆今天的天气。",
         )
-        self.assertIsNone(
+        self.assertEqual(
             assistant._fast_first_response_text(
                 RouteDecision(
                     route="tool",
@@ -1159,7 +1160,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ),
                 "what's the weather today in chongqing",
-            )
+            ),
+            "OK, I’ll check Chongqing’s weather today.",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -1245,7 +1247,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    def test_tool_fast_first_response_fails_closed_even_when_enabled(self) -> None:
+    def test_tool_fast_first_response_requires_enablement_and_typed_contract(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
         assistant.core_generated_fast_speech_enabled = True
@@ -1273,11 +1275,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         assistant.fast_first_tool_response_enabled = True
-        self.assertIsNone(
+        self.assertEqual(
             assistant._fast_first_response_text(
                 decision,
                 "今天北京天气怎么样？",
-            )
+            ),
+            "好的，我查一下北京今天的天气。",
         )
 
     def test_dynamic_fast_speech_is_default_off_and_requires_full_contract(self) -> None:
@@ -1366,8 +1369,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    def test_tool_fast_speech_fails_closed_until_evidence(self) -> None:
-        self.assertIsNone(
+    def test_tool_fast_speech_accepts_typed_pre_result_acknowledgement(self) -> None:
+        self.assertEqual(
             VoiceAssistant._validated_fast_speech_payload_text(
                 {
                     "text": "Let me check the weather.",
@@ -1379,7 +1382,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "must_not_claim_completion": True,
                 },
                 route="tool",
-            )
+            ),
+            "Let me check the weather.",
         )
 
     def test_unsafe_deep_thought_speak_first_does_not_trigger_host_wording(self) -> None:
@@ -1693,6 +1697,73 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["reused"])
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 5)
+
+    async def test_undelivered_fast_speech_is_fulfilled_once_by_reused_stage(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        event = assistant._register_turn_speech_event(
+            session_id="sid-fallback",
+            generation=2,
+            orders=[5],
+            text="好，我帮你查一下。",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            commitment="checking_only",
+        )
+        self.assertIsNotNone(event)
+        assert event is not None
+        event["status"] = "not_delivered"
+        scheduled_texts: list[str] = []
+
+        async def schedule_fallback(
+            self: VoiceAssistant, text: str, session_id: str | None
+        ) -> dict[str, Any]:
+            scheduled_texts.append(text)
+            key = self.playback_start_key(3, 6, session_id)
+            waiter = asyncio.get_running_loop().create_future()
+            waiter.set_result(True)
+            self.playback_start_waiters[key] = waiter
+            return {
+                "scheduled": True,
+                "generation": 3,
+                "order": 6,
+                "orders": [6],
+            }
+
+        assistant.schedule_tts_text = MethodType(schedule_fallback, assistant)
+        result = await assistant._schedule_interaction_speech(
+            {
+                "text": "好，我帮你查一下。",
+                "metadata": {
+                    "session_id": "sid-fallback",
+                    "phase": "immediate",
+                    "speech_act": "acknowledge_and_check",
+                    "commitment_state": "evaluating",
+                    "reuse_current_turn_speech": True,
+                    "reused_speech_event_id": event["event_id"],
+                    "reused_speech_generation": 2,
+                    "reused_speech_orders": [5],
+                    "wait_for_playback_start": True,
+                },
+            }
+        )
+
+        self.assertEqual(scheduled_texts, ["好，我帮你查一下。"])
+        self.assertTrue(result["scheduled"])
+        self.assertFalse(result["reused"])
+        self.assertTrue(result["playback_started"])
+        self.assertEqual(
+            result["fallback_for_undelivered_speech_event_id"],
+            event["event_id"],
+        )
 
     def test_cognitive_core_exception_does_not_semantically_classify_embodied_text(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

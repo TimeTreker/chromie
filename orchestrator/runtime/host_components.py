@@ -11,9 +11,17 @@ from typing import Any
 
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.evidence_identity import load_runtime_evidence_identity
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
-from orchestrator.runtime.host_settings import HostSettingsSnapshot
+from orchestrator.runtime.host_settings import (
+    HostConfigurationError,
+    HostSettingsSnapshot,
+)
+from orchestrator.runtime.interaction_session_evidence import (
+    InteractionSessionEvidenceCollector,
+    LocalInteractionSessionCapturePolicyProvider,
+)
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
@@ -51,10 +59,32 @@ def build_host_support(
             min_interval_s=telemetry.accelerator_min_interval_s,
         )
     )
+    policy_provider = LocalInteractionSessionCapturePolicyProvider(
+        settings.evidence.interaction_session_capture_policy_path
+    )
+    if settings.evidence.interaction_session_capture_policy_path is not None:
+        # Fail invalid startup configuration before the realtime loop. Later
+        # refresh failures retain the provider's last valid cached snapshot.
+        startup_policy = policy_provider.resolve()
+        if startup_policy.enabled and settings.evidence.runtime_event_root is None:
+            raise HostConfigurationError(
+                "CHROMIE_RUNTIME_EVENT_ROOT is required when "
+                "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH selects "
+                "an enabled policy"
+            )
+    interaction_session_capture = InteractionSessionEvidenceCollector(
+        policy_provider=policy_provider,
+        event_root=settings.evidence.runtime_event_root,
+        trigger_root=settings.evidence.data_loop_trigger_root,
+        runtime_identity=load_runtime_evidence_identity(
+            settings.evidence.runtime_identity_path
+        ),
+    )
     sessions = SessionTracker(
         enabled=timing_enabled,
         event_log_path=settings.session.event_log_path,
         resource_sampling_mode=telemetry.system_resource_mode,
+        interaction_session_capture=interaction_session_capture,
     )
     sessions.register_resource_snapshot_provider(
         module=ACCELERATOR_SAMPLE_MODULE,

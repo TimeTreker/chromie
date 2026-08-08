@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "evidence": {
+    "episode": true,
+    "runtime_trace": true,
+    "user_input_audio": true
+  },
+  "governance": {
+    "retention_profile_id": "chromie.interaction-quality.v1",
+    "usage_purpose": "interaction_quality_evaluation"
+  },
+  "policy_id": "chromie.interaction_session_capture",
+  "policy_version": "1.0.0",
+  "schema_version": 1
+}

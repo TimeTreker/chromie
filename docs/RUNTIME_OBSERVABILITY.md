@@ -33,6 +33,13 @@ The current implementation is in `shared/chromie_runtime/`:
 - `scheduling.py` and `llm_diagnostics.py` — shared scheduling and inference
   diagnostics used by trace producers.
 
+The Host integration is in
+`orchestrator/runtime/interaction_session_evidence.py`: it owns the typed
+interaction-Session capture Policy Provider, immutable policy snapshot,
+Session-lifecycle collection, and restart recovery. The shared Runtime Event
+package remains transport/fact-layer infrastructure and does not own that
+domain trigger.
+
 No component may create a parallel trace schema for convenience. Component
 logs may remain human-readable, but retained structured evidence must use these
 shared contracts.
@@ -224,9 +231,12 @@ policies.
 ## Runtime Event packages
 
 A Runtime Event is an immutable local evidence package produced by a component.
-`persist_runtime_event()` writes payload JSON files and an `event.json` manifest
-through a staging directory, syncs them, and atomically moves the package to the
-ready directory.
+`persist_runtime_event()` writes payload JSON files and independently named
+binary/path artifacts plus an `event.json` manifest through a staging directory,
+syncs them, and atomically moves the package to the ready directory. Every
+inventory entry records an artifact ID, content type, size, and SHA-256 digest.
+Retry with the same deterministic event identity returns the committed package
+instead of producing a second effective result.
 
 The manifest includes:
 
@@ -244,6 +254,27 @@ deduplication, bandwidth/storage governance, retention, and cloud delivery.
 
 A Runtime Event is not a live command bus. It does not authorize execution or
 replace direct typed runtime contracts.
+
+## Interaction-Session evidence
+
+`chromie.interaction_session_capture` is an independently controlled Data Loop
+policy, not a global observability or Data Loop switch. The Session owner
+resolves one typed, versioned policy snapshot at SID start and finalizes it as
+complete or abandoned. Restart recovery seals only artifacts that exist and
+marks requested missing evidence explicitly; it never fabricates an Episode or
+successful trace. Logical evidence demand remains distinct from physical
+capture, so a compatible immutable artifact may be reused without merging its
+purpose, retention, or provenance.
+
+The fact-layer event keeps its manifest, input PCM16, RuntimeTrace, trace
+summary, and Episode as separate artifacts. Runtime/profile identity, policy
+digest, activation ID, SID, lifecycle timestamps, artifact digests, and
+missing/partial state make later evaluation auditable. Evaluators and scenario
+miners remain downstream and never run on the realtime collection path. Chromie
+uses Nozdormu v1.x as its current architecture baseline; CP-2026-001/v2 ideas
+inform the replaceable provider boundary but remain proposed. The policy,
+privacy, and candidate-provenance contract is owned by
+[Chromie Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md).
 
 ## Trace-to-event retention
 

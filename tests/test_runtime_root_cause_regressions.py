@@ -519,7 +519,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    def test_pure_safe_read_response_schema_suppresses_dynamic_speech(self) -> None:
+    def test_pure_safe_read_response_schema_uses_delivery_qualified_fast_act(self) -> None:
         plan = CanonicalPlan(
             plan_id="plan-weather-ack",
             planner_tier="fast",
@@ -640,43 +640,74 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         reused_plan = ResponsePlan(
             immediate=ResponseStage(
                 text="好呀，我帮你看看重庆一会儿的天气。",
-                speech_act="acknowledge",
+                speech_act="acknowledge_and_check",
                 commitment_state="evaluating",
                 must_not_claim_completion=True,
                 reuse_current_turn_speech=True,
+                reused_speech_event_id="speech_event_scheduled",
                 covers_goal_ids=["goal-weather"],
             )
         )
-        with self.assertRaisesRegex(ValueError, "must not author dynamic"):
-            ResponseComposerResolver._validate_safe_read_acknowledgement(
-                reused_plan,
-                plan=plan,
-                context=scheduled_context,
-                language="zh-CN",
-            )
+        scheduled_schema = ResponseComposerResolver._response_schema(
+            plan,
+            scheduled_context,
+        )["$defs"]["ResponsePlan"]
+        self.assertIn("immediate", scheduled_schema["required"])
+        self.assertEqual(
+            scheduled_schema["properties"]["immediate"],
+            {"$ref": "#/$defs/ResponseStage"},
+        )
+        ResponseComposerResolver._validate_safe_read_acknowledgement(
+            reused_plan,
+            plan=plan,
+            context=scheduled_context,
+            language="zh-CN",
+        )
         ResponseComposerResolver._validate_pending_response_contract(
-            ResponsePlan(),
+            reused_plan,
             plan=plan,
             context=scheduled_context,
         )
         ResponseComposerResolver._validate_reused_turn_speech(
-            ResponsePlan(),
+            reused_plan,
             context=scheduled_context,
         )
-        with self.assertRaisesRegex(ValueError, "must copy one exact"):
+        with self.assertRaisesRegex(ValueError, "requires an immediate"):
+            ResponseComposerResolver._validate_safe_read_acknowledgement(
+                ResponsePlan(),
+                plan=plan,
+                context=scheduled_context,
+                language="zh-CN",
+            )
+        with self.assertRaisesRegex(ValueError, "text must match"):
             ResponseComposerResolver._validate_reused_turn_speech(
                 ResponsePlan(
                     immediate=ResponseStage(
                         text="我换句话再说一遍。",
-                        speech_act="acknowledge",
+                        speech_act="acknowledge_and_check",
                         commitment_state="evaluating",
                         must_not_claim_completion=True,
                         reuse_current_turn_speech=True,
+                        reused_speech_event_id="speech_event_scheduled",
                         covers_goal_ids=["goal-weather"],
                     )
                 ),
                 context=scheduled_context,
             )
+        # Literal text equality is not de-duplication authority. A new stage is
+        # valid here because it does not claim to reuse the prior act identity.
+        ResponseComposerResolver._validate_reused_turn_speech(
+            ResponsePlan(
+                immediate=ResponseStage(
+                    text="好呀，我帮你看看重庆一会儿的天气。",
+                    speech_act="supplement",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=["goal-weather"],
+                )
+            ),
+            context=scheduled_context,
+        )
 
     def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
         from agent.app.deep_planner import DeepPlannerResolver

@@ -653,6 +653,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "commitment_state": "waiting_for_user",
                     "must_not_claim_completion": True,
                     "reuse_current_turn_speech": True,
+                    "reused_speech_event_id": "speech-walk",
                     "covers_goal_ids": ["goal-walk"],
                 }
             },
@@ -700,6 +701,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         assert stage is not None
         self.assertEqual(stage.commitment_state, "heard")
         self.assertTrue(stage.reuse_current_turn_speech)
+        self.assertEqual(stage.reused_speech_event_id, "speech-walk")
         self.assertEqual(stage.covers_goal_ids, ["goal-walk"])
         self.assertEqual(len(ollama.prompts), 4)
 
@@ -791,6 +793,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
         assert pre_action is not None
         self.assertEqual(pre_action.covers_goal_ids, ["goal-walk"])
         self.assertTrue(pre_action.reuse_current_turn_speech)
+        self.assertEqual(
+            pre_action.reused_speech_event_id,
+            "speech-mixed-walk",
+        )
         self.assertEqual(pre_action.text, "好，我准备往前走十五秒。")
         self.assertIn(
             "mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech",
@@ -1194,10 +1200,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
             response_plan_schema["properties"]["pre_action"],
             {"type": "null"},
         )
-        self.assertIn("emit no response stage before execution", ollama.prompts[0][0])
+        self.assertIn("never author another pre-evidence act", ollama.prompts[0][0])
         self.assertIsNone(result.composition.response_plan.immediate)
         self.assertTrue(
-            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
+            result.composition.metadata["pure_safe_read_fast_act_reference_only"]
         )
         self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
@@ -1242,7 +1248,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIsNone(result.composition.response_plan.immediate)
         self.assertTrue(result.metadata["fail_soft_primary_activity"])
         self.assertTrue(
-            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
+            result.composition.metadata["pure_safe_read_fast_act_reference_only"]
         )
         self.assertEqual(len(ollama.prompts), 2)
         self.assertIn(
@@ -1286,7 +1292,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
         self.assertFalse(result.metadata["safe_read_semantic_review_succeeded"])
 
-    def test_pure_safe_read_does_not_reuse_scheduled_dynamic_speech(self):
+    def test_pure_safe_read_references_scheduled_fast_act(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1298,7 +1304,23 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 }
             ],
         )
-        ollama = ScriptedOllama([{"response_plan": {}}])
+        ollama = ScriptedOllama(
+            [
+                {
+                    "response_plan": {
+                        "immediate": {
+                            "text": "好呀，我正在查西雅图的天气。",
+                            "speech_act": "acknowledge_and_check",
+                            "commitment_state": "evaluating",
+                            "must_not_claim_completion": True,
+                            "reuse_current_turn_speech": True,
+                            "reused_speech_event_id": "speech-weather",
+                            "covers_goal_ids": ["goal-weather"],
+                        }
+                    }
+                }
+            ]
+        )
 
         result = asyncio.run(
             ResponseComposerResolver(ollama).resolve(
@@ -1316,6 +1338,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                                 "status": "scheduled",
                                 "stage": "fast_first",
                                 "route": "tool",
+                                "purpose": "acknowledge_and_check",
                                 "text": "好呀，我正在查西雅图的天气。",
                                 "speech_event_id": "speech-weather",
                                 "generation": 1,
@@ -1330,7 +1353,10 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         assert result.composition is not None
         stage = result.composition.response_plan.immediate
-        self.assertIsNone(stage)
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertTrue(stage.reuse_current_turn_speech)
+        self.assertEqual(stage.reused_speech_event_id, "speech-weather")
         self.assertFalse(result.metadata["contract_repair_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
 
@@ -1378,6 +1404,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                                 "status": "scheduled",
                                 "stage": "fast_first",
                                 "route": "tool",
+                                "purpose": "acknowledge_and_check",
                                 "text": "好呀，我正在查重庆今天的天气。",
                                 "speech_event_id": "speech-weather-safe",
                                 "generation": 2,
@@ -1393,9 +1420,12 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["fail_soft_primary_activity"])
         assert result.composition is not None
         stage = result.composition.response_plan.immediate
-        self.assertIsNone(stage)
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertTrue(stage.reuse_current_turn_speech)
+        self.assertEqual(stage.reused_speech_event_id, "speech-weather-safe")
         self.assertTrue(
-            result.composition.metadata["pure_safe_read_dynamic_speech_suppressed"]
+            result.composition.metadata["pure_safe_read_fast_act_reference_only"]
         )
         self.assertEqual(
             [step.skill_id for step in result.composition.canonical_plan.steps],

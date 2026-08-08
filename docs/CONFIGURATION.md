@@ -103,8 +103,8 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
-| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable the low-latency acknowledgement policy for slow work. Planning and embodied work may use reviewed Core-authored dynamic speech. Tool and memory work suppresses model-authored pre-effect speech until trusted evidence or a committed result exists, but may use the generic Host cache below. |
-| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Allow reviewed Core-authored dynamic `fast_speech`/`speak_first` before eligible slower planning or embodied work. Tool and memory routes fail closed to no dynamic pre-effect speech because typed fields and same-model review do not prove the temporal meaning of ordinary wording; their authoritative speech follows tool evidence or memory commit. Bare strings and partial objects remain parseable on the wire but are never playable by themselves. Immediate audio requires an allowed `purpose`, non-terminal `commitment`, `claim_state=none`, empty capability/Goal claim IDs, `must_not_claim_completion=true`, and transport-safe text. The Host does not use phrase rules to select meaning. |
+| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable the low-latency acknowledgement policy for slow work. Planning and embodied work may use reviewed Core-authored dynamic speech. Tool work may use only the reviewed `acknowledge_and_check`/`checking_only` act before evidence; memory speech waits for commit. The generic Host cache remains a fallback. |
+| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `1` | Allow reviewed Core-authored dynamic `fast_speech`/`speak_first` before eligible slow work. Tool Fast speech is limited to acknowledgement and evaluation, never result or completion; memory routes remain silent until commit. Bare strings and partial objects remain parseable on the wire but are never playable by themselves. Immediate audio requires an allowed `purpose`, non-terminal `commitment`, `claim_state=none`, empty capability/Goal claim IDs, `must_not_claim_completion=true`, and transport-safe text. The Host does not use phrase rules to select meaning. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Enable startup-primed in-memory PCM acknowledgements as a last-resort latency presentation path when dynamic speech is not admissible, absent, invalid, or cannot be scheduled. Cache entries are generic and cannot claim a tool result, memory commit, physical effect, or completion. |
 | `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | After dynamic fast speech cannot be scheduled, wait this long before playing the cached fallback; suppress it when the final response becomes ready first. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
@@ -274,7 +274,7 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
 | `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale fast-interpreter outputs. |
 | `AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
-| `AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED` | `1`; when eligible planning or physical pending work omits typed `fast_speech`, run one bounded Core call for a non-terminal acknowledgement. The repair cannot change route, bindings, or safety policy, and physical speech remains a safety prelude rather than an execution claim. Tool and memory routes never use this repair: dynamic speech waits for tool evidence or memory commit, while an already-primed generic Host cue remains optional. |
+| `AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED` | `1`; when eligible slow work omits typed `fast_speech`, run one bounded Core call for a non-terminal acknowledgement. The repair cannot change route, bindings, or safety policy. Tool repair must return `acknowledge_and_check`/`checking_only` and pass independent semantic review; memory routes never use this repair before commit. An already-primed generic Host cue remains optional. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, the embedded Goal Interpreter logs the full raw LLM JSON output after the default bounded raw-output summary. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, the embedded Goal Interpreter logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
@@ -551,8 +551,25 @@ with `off` does not continue a received carrier. Existing stage-specific
 | `CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS` | `1000`; provider collection timeout, bounded to `50..30000` milliseconds. |
 | `CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S` | `5`; minimum refresh interval used to prevent redundant provider calls across concurrent sessions. |
 | `CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR` | Empty by default. When set, active voice-session traces are atomically checkpointed for process-restart recovery. |
-| `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction traces, incidents, episode snapshots, and scenario candidates. Packages are finalized under `ready/<event_id>/`. |
+| `ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH` | Unset by default, which resolves to a typed disabled policy. When set, names one local JSON policy with ID `chromie.interaction_session_capture`; the Host validates it at startup. An enabled policy requires `CHROMIE_RUNTIME_EVENT_ROOT`. |
+| `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction-Session evidence, traces, incidents, episode snapshots, and scenario candidates. Packages, including immutable binary artifacts, are finalized under `ready/<event_id>/`. |
 | `CHROMIE_DATA_LOOP_TRIGGER_ROOT` | Optional external data-loop filesystem inbox. A trigger file confirms local handoff only; it does not prove cloud upload. |
+
+The interaction-Session policy is independent of trace retention, episode
+recording, scenario mining, incident capture, and aggregate telemetry; it is not
+a global Data Loop switch. Copy and review
+[`config/data_loop/interaction_session_capture.example.json`](../config/data_loop/interaction_session_capture.example.json)
+rather than editing the default-off example in place. Schema version 1 requires
+the exact policy ID, a non-empty version, evidence selections for user audio,
+RuntimeTrace, and Episode, plus `retention_profile_id` and `usage_purpose`.
+Supported local combinations are disabled with or without a Runtime Event root,
+or enabled with a writable Runtime Event root and optional trigger root. One
+effective snapshot is resolved at SID start; file changes apply only to the next
+SID. Invalid startup configuration fails clearly, while a failed later refresh
+keeps the last valid snapshot. A future signed/cloud-cached provider should
+replace the local path provider and retire this environment key without changing
+Session lifecycle or evidence-provider contracts. See
+[Chromie Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md).
 
 Current coverage includes the goal-driven cognitive/model path, detached voice
 sessions, VAD/ASR, execution/action providers, TTS/playback, first audible and
@@ -707,7 +724,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_WS_RETRY_DELAY_MS` | `300`. |
 | `ORCH_SESSION_TIMING_LOGS` | `true` in the host example. |
 | `ORCH_EVENT_LOG_PATH` | Empty by default; when set, append correlated session events as JSON Lines. |
-| `ORCH_SAVE_AUDIO` | `false`. |
+| `ORCH_SAVE_AUDIO` | `false`; operator/debug WAV retention only. It neither enables nor disables policy-governed Data Loop audio. |
 | `RECORDINGS_DIR` | `recordings`, resolved from repository root when relative. |
 
 Audio jack, USB, Bluetooth, and other external-device detection remains owned by

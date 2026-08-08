@@ -3151,6 +3151,14 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH",
+      "owners": [
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
       "boolean": true,
       "category": "profile_constant",
       "key": "ORCH_DEEP_PLANNER_MODE",
@@ -4868,10 +4876,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 146,
       "public_choice": 9,
-      "service_internal": 246
+      "service_internal": 247
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 458
+    "total_keys": 459
   }
 }

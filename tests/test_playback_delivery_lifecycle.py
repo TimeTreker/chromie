@@ -37,6 +37,35 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["status"], "playback_started")
 
+    def test_speech_event_identity_is_structured_not_wording_based(self) -> None:
+        lifecycle = PlaybackDeliveryLifecycle()
+        first = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            generation=2,
+            orders=[4],
+            normalized_text="I will check that.",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="weather_query",
+            commitment="checking_only",
+        )
+        second = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            generation=2,
+            orders=[4],
+            normalized_text="Okay, let me look.",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="weather_query",
+            commitment="checking_only",
+        )
+
+        assert first is not None and second is not None
+        self.assertEqual(first["event_id"], second["event_id"])
+        self.assertNotEqual(first["text"], second["text"])
+
     async def test_timeout_does_not_cancel_late_barrier_future(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()
         waiter = lifecycle.create_playback_start_waiter(

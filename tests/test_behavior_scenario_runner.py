@@ -29,9 +29,9 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 403)
+        self.assertEqual(len(all_cases), 404)
         self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(goal_interpretation_cases), 27)
+        self.assertEqual(len(goal_interpretation_cases), 28)
         self.assertEqual(len(cognitive_core_dialogue_cases), 3)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 29)

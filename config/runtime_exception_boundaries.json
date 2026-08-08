@@ -1960,6 +1960,33 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/interaction_session_evidence.py",
+      "symbol": "InteractionSessionEvidenceCollector.begin_session",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Log an unavailable local or future remote Policy Provider and bind this SID to an explicit typed disabled snapshot without interrupting the voice Session.",
+      "review_status": "reviewed",
+      "body_sha256": "853361de5c31c02d5c41fe48c95892741bfa333d3105914bb9a48685e677ba67",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/interaction_session_evidence.py",
+      "symbol": "InteractionSessionEvidenceCollector.seal_session",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map an arbitrary injected or future Runtime Event persister failure into explicit failed evidence state without changing Session completion semantics.",
+      "review_status": "reviewed",
+      "body_sha256": "bf673c7a884568a70dde18271863b3f97d1d93cc17cefe3c9f5fa94facd33675",
+      "failure_signals": [
+        "state_update"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/memory.py",
       "symbol": "ProtectedDurableMemoryStore.load",
       "ordinal": 1,
@@ -2403,6 +2430,6 @@
       ]
     }
   ],
-  "reviewed_at": "2026-08-06",
+  "reviewed_at": "2026-08-08",
   "review_contract": "Classification and normalized source handler body reviewed; any handler body or failure-signal change requires re-audit."
 }

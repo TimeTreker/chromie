@@ -390,6 +390,9 @@ class EvidenceSettings:
     cognitive_path: Path
     runtime_identity_path: Path
     recordings_dir: Path
+    interaction_session_capture_policy_path: Path | None = None
+    runtime_event_root: Path | None = None
+    data_loop_trigger_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -1075,6 +1078,21 @@ class HostSettingsSnapshot:
                     values,
                     "RECORDINGS_DIR",
                     "recordings",
+                    project_root=project_root,
+                ),
+                interaction_session_capture_policy_path=_optional_path(
+                    values,
+                    "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH",
+                    project_root=project_root,
+                ),
+                runtime_event_root=_optional_path(
+                    values,
+                    "CHROMIE_RUNTIME_EVENT_ROOT",
+                    project_root=project_root,
+                ),
+                data_loop_trigger_root=_optional_path(
+                    values,
+                    "CHROMIE_DATA_LOOP_TRIGGER_ROOT",
                     project_root=project_root,
                 ),
             ),

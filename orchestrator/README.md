@@ -232,8 +232,10 @@ the Core must author one typed, non-terminal `fast_speech` acknowledgement from
 the current turn and approved mind/style context. The Host validates and queues
 that reviewed dynamic sentence before slow Goal Association, planning, and
 execution. One bounded Core repair may fill the field when the first output
-omits it. Tool and memory routes deliberately suppress model-authored pre-effect
-speech: their dynamic answer must follow trusted tool evidence or memory commit.
+omits it. Tool routes may use the exact independently reviewed
+`acknowledge_and_check`/`checking_only` contract before result evidence; this
+acknowledges understanding and evaluation only. Memory speech still waits for a
+committed update. Results and failures remain separate evidence-bound acts.
 
 At startup the Orchestrator may also prime a small speaker-specific
 English/Chinese acknowledgement cache through the configured TTS service and
@@ -254,17 +256,18 @@ started, so the ordinary wording must remain prospective; typed
 `claim_state=none` cannot excuse a sentence that says Chromie is already inside
 an ongoing movement. The queued dynamic utterance is projected into Response
 Composer context as a non-evidentiary current-turn commitment. If it already
-serves the required acknowledgement, the Composer copies the exact text with
-`reuse_current_turn_speech=true`; Runtime reuses the existing TTS event and its
-playback-start barrier instead of synthesizing or speaking it twice. Final result
-or failure speech remains new, evidence-bounded speech.
+serves the required acknowledgement, the Composer references the exact speech
+event with `reuse_current_turn_speech=true` and `reused_speech_event_id`;
+Runtime reuses an audible event, waits for a pending one, or fulfills the act
+once if that event becomes `not_delivered`. Playback start, not generation or
+scheduling, satisfies the audible act. Text is checked only for event payload
+integrity and is not the de-duplication key. Final result or failure speech
+remains a distinct, evidence-bounded act.
 
-Pure safe-read Plans have a stricter boundary: Response Composer emits no
-model-authored pre-evidence stage. The optional generic Host cue owns latency
-presentation and the Tool Result Interpreter owns the single grounded
-post-execution answer. This avoids treating structurally valid fields or a
-same-model review as proof that an ordinary sentence did not already claim the
-result.
+Pure safe-read Plans never author a second pre-evidence act. They may carry the
+exact pending Fast-event reference so its delivery can be verified without
+delaying the read itself. The Tool Result Interpreter still owns the single
+grounded post-execution answer.
 
 Complete non-effectful spoken-response Goals already use the direct Core branch
 after Goal Association, without Fast or Deep Planner. Runtime records that path
@@ -429,8 +432,12 @@ That profile proves only one source-bound physical microphone-to-audible chat
 loop and always reports `release_qualified=false`. The verifier's default
 profile remains the complete seven-case voice/MuJoCo matrix.
 
-Audio capture retention is controlled by `ORCH_SAVE_AUDIO`; both recordings and
-session events may contain private speech and require review before sharing.
+Operator/debug WAV retention is controlled by `ORCH_SAVE_AUDIO`. Policy-governed
+Data Loop input audio is independent: it is default-off, reuses the exact
+validated VAD buffer without another microphone path, and requires an enabled
+`chromie.interaction_session_capture` snapshot. Both forms may contain private
+speech and require governance review before collection or sharing. See
+[Chromie Data Loop](../docs/SCENARIO_CANDIDATE_DATA_LOOP.md).
 
 The static, non-routing responsibility ontology used by the Orchestrator is
 documented in the [Chromie High-Level Ability Registry](../docs/chromie_ability_registry.md).

@@ -2117,6 +2117,46 @@ class VoiceAssistant:
                     "playback_started",
                     "playback_completed",
                 }
+                if not playback_started:
+                    status_after_wait = current_status()
+                    reused_request = {
+                        "scheduled": True,
+                        "generation": generation,
+                        "order": orders[0],
+                        "orders": orders,
+                    }
+                    if status_after_wait == "scheduled":
+                        self._cancel_scheduled_playback_before_start(
+                            reused_request,
+                            session_id=session_id,
+                            reason="reused_speech_delivery_not_observed",
+                        )
+                        status_after_wait = current_status()
+                    if status_after_wait in {
+                        "playback_started",
+                        "playback_completed",
+                    }:
+                        playback_started = True
+                    elif status_after_wait in {"not_delivered", ""}:
+                        fallback_metadata = dict(metadata)
+                        fallback_metadata["reuse_current_turn_speech"] = False
+                        fallback_metadata.pop("reused_speech_generation", None)
+                        fallback_metadata.pop("reused_speech_orders", None)
+                        fallback_metadata.pop("reused_speech_status", None)
+                        fallback_metadata.pop("reused_speech_event_id", None)
+                        fallback_metadata[
+                            "fallback_for_undelivered_speech_event_id"
+                        ] = event_id
+                        fallback_args = dict(args)
+                        fallback_args["metadata"] = fallback_metadata
+                        fallback = await self._schedule_interaction_speech(
+                            fallback_args
+                        )
+                        fallback["reused"] = False
+                        fallback[
+                            "fallback_for_undelivered_speech_event_id"
+                        ] = event_id
+                        return fallback
             return {
                 "scheduled": True,
                 "reused": True,
@@ -2152,9 +2192,23 @@ class VoiceAssistant:
                     else "interaction_speech"
                 ),
                 purpose=(
-                    str(metadata.get("delivery_role") or "response")
+                    str(
+                        metadata.get("speech_act")
+                        or metadata.get("delivery_role")
+                        or "response"
+                    )
                     if isinstance(metadata, dict)
                     else "response"
+                ),
+                route=(
+                    str(metadata.get("route") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                intent=(
+                    str(metadata.get("intent") or "")
+                    if isinstance(metadata, dict)
+                    else ""
                 ),
                 commitment=(
                     str(metadata.get("commitment_state") or "")
@@ -2783,6 +2837,15 @@ class VoiceAssistant:
         errors: list[str] | None = None,
     ) -> None:
         conversation_state = getattr(self, "conversation_state", None)
+        capture_reference = self.sessions.interaction_session_capture_reference(
+            session_id
+        )
+        if capture_reference is not None:
+            metadata = dict(response.metadata)
+            experience_context = dict(metadata.get("experience_context") or {})
+            experience_context["interaction_session_evidence"] = capture_reference
+            metadata["experience_context"] = experience_context
+            response = response.model_copy(update={"metadata": metadata})
         self.sessions.update_trace_correlations(
             session_id,
             conversation_id=getattr(conversation_state, "conversation_id", None),
@@ -2826,6 +2889,10 @@ class VoiceAssistant:
                 episode_id=episode.episode_id,
                 conversation_id=episode.conversation_id,
                 interaction_id=response.interaction_id,
+            )
+            self.sessions.attach_episode_evidence(
+                session_id,
+                episode.model_dump(mode="json"),
             )
             self.session_log(
                 session_id,
@@ -3008,13 +3075,13 @@ class VoiceAssistant:
         claimed_goal_ids = payload.get("claimed_goal_ids")
         if claimed_capability_ids != [] or claimed_goal_ids != []:
             return None
-        # Tool and memory wording becomes authoritative only after matching
-        # evidence or a committed update exists. Pre-effect dynamic speech
-        # therefore fails closed regardless of structurally valid claim fields;
-        # the existing generic cached cue may still cover latency.
-        if str(route or "").strip().casefold() in {"memory", "tool"}:
+        # Memory wording becomes authoritative only after a committed update.
+        # Tool speech may carry only the exact typed acknowledgement contract
+        # below; it never carries result or completion authority.
+        if str(route or "").strip().casefold() == "memory":
             return None
         route_contracts = {
+            "tool": ("acknowledge_and_check", "checking_only"),
             "robot_action": ("acknowledge", "prelude_only"),
             "deep_thought": ("thinking", "prelude_only"),
         }

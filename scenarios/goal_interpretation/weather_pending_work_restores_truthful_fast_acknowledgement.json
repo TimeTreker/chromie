@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "id": "weather_pending_work_suppresses_dynamic_fast_speech",
+  "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A weather lookup suppresses model-authored dynamic speech before trusted evidence exists, even when pending-work repair is enabled; the Host cache remains a separate generic latency path.",
+  "description": "A slow weather lookup repairs and independently reviews one typed acknowledgement that claims only understanding and evaluation before result evidence exists.",
   "tags": [
     "reported-live-voice",
     "weather",
@@ -55,6 +55,28 @@
             }
           }
         }
+      },
+      {
+        "stage": "fast_speech_repair",
+        "decision": {
+          "fast_speech": {
+            "text": "好呀，我帮你查一下北京今天有没有下雨。",
+            "purpose": "acknowledge_and_check",
+            "commitment": "checking_only",
+            "must_not_claim_completion": true
+          }
+        }
+      },
+      {
+        "stage": "fast_speech_semantic_review",
+        "decision": {
+          "fast_speech": {
+            "text": "好呀，我帮你查一下北京今天有没有下雨。",
+            "purpose": "acknowledge_and_check",
+            "commitment": "checking_only",
+            "must_not_claim_completion": true
+          }
+        }
       }
     ]
   },
@@ -62,13 +84,19 @@
     "route": "tool",
     "intent": "capability:chromie.weather.lookup",
     "source": "llm",
-    "llm_calls": 1,
+    "llm_calls": 3,
     "llm_stages": [
-      "quick_intent"
+      "quick_intent",
+      "fast_speech_repair",
+      "fast_speech_semantic_review"
     ],
-    "fast_speech_present": false,
+    "fast_speech_present": true,
+    "fast_speech_purpose": "acknowledge_and_check",
+    "fast_speech_commitment": "checking_only",
+    "fast_speech_must_not_claim_completion": true,
     "metadata_json_contains": [
-      "tool_evidence_required_before_dynamic_speech"
+      "fast_speech_semantic_review",
+      "model_reviewed"
     ],
     "task_types_include": [
       "task.use_tool"

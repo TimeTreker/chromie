@@ -5,7 +5,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from shared.chromie_runtime.runtime_events import persist_runtime_event
+from shared.chromie_runtime.runtime_events import (
+    RuntimeEventArtifact,
+    persist_runtime_event,
+)
 
 
 class RuntimeEventTests(unittest.TestCase):
@@ -51,6 +54,53 @@ class RuntimeEventTests(unittest.TestCase):
             )
             self.assertEqual(result["capture_status"], "failed")
             self.assertIn("payload name", result["error"])
+
+    def test_persists_binary_artifact_and_reuses_deterministic_event(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            arguments = {
+                "event_type": "chromie.test",
+                "event_subtype": "binary_evidence",
+                "severity": "info",
+                "producer": "chromie.tests",
+                "payloads": {"sample.json": {"value": 1}},
+                "artifacts": {
+                    "sample.pcm16": RuntimeEventArtifact(
+                        source=b"\x01\x00\x02\x00",
+                        content_type="audio/L16",
+                    )
+                },
+                "event_root": root / "events",
+                "event_id": "evt_deterministic_test",
+            }
+
+            first = persist_runtime_event(**arguments)
+            retry = persist_runtime_event(**arguments)
+
+            self.assertEqual(first["capture_status"], "complete")
+            self.assertTrue(retry["idempotent_reuse"])
+            self.assertEqual(retry["event_id"], first["event_id"])
+            ready = Path(first["payload_root"])
+            self.assertEqual((ready / "sample.pcm16").read_bytes(), b"\x01\x00\x02\x00")
+            manifest = json.loads((ready / "event.json").read_text())
+            artifacts = {item["path"]: item for item in manifest["files"]}
+            self.assertEqual(artifacts["sample.pcm16"]["content_type"], "audio/L16")
+            self.assertEqual(artifacts["sample.pcm16"]["size_bytes"], 4)
+            self.assertEqual(len(artifacts["sample.pcm16"]["sha256"]), 64)
+
+    def test_rejects_parent_directory_artifact_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result = persist_runtime_event(
+                event_type="chromie.test",
+                event_subtype="bad_artifact",
+                severity="warning",
+                producer="chromie.tests",
+                payloads={},
+                artifacts={"..": RuntimeEventArtifact(source=b"unsafe")},
+                event_root=Path(directory) / "events",
+            )
+            self.assertEqual(result["capture_status"], "failed")
+            self.assertIn("artifact name", result["error"])
 
 
 if __name__ == "__main__":

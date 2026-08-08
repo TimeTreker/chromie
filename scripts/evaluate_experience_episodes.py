@@ -494,6 +494,11 @@ def scenario_candidate_from_episode(
     evaluation: EpisodeEvaluation,
 ) -> dict[str, Any]:
     scenario_id = _scenario_id_from_episode(episode, evaluation)
+    interaction_session_evidence = episode.metadata.get(
+        "interaction_session_evidence"
+    )
+    if not isinstance(interaction_session_evidence, dict):
+        interaction_session_evidence = None
     turns = []
     for turn in episode.turns:
         selected_skills = [item.skill_id for item in turn.agent.selected_skills]
@@ -559,6 +564,15 @@ def scenario_candidate_from_episode(
             "requires_human_review": True,
             "reviewed_by": None,
             "reviewed_at": None,
+            **(
+                {
+                    "source_interaction_session_evidence": dict(
+                        interaction_session_evidence
+                    )
+                }
+                if interaction_session_evidence is not None
+                else {}
+            ),
         },
         "promotion": {
             "regression_allowed": False,

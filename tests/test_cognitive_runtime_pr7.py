@@ -1000,10 +1000,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response_plan=ResponsePlan(
                 immediate=ResponseStage(
                     text=fast_text,
-                    speech_act="acknowledge",
+                    speech_act="acknowledge_and_check",
                     commitment_state="evaluating",
                     must_not_claim_completion=True,
                     reuse_current_turn_speech=True,
+                    reused_speech_event_id="speech_event_weather_reuse",
                     covers_goal_ids=plan.goal_ids,
                 )
             ),
@@ -1024,6 +1025,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                             "event_id": "speech_event_weather_reuse",
                             "status": "scheduled",
                             "text": fast_text,
+                            "purpose": "acknowledge_and_check",
                             "generation": 6,
                             "orders": [11],
                         }
@@ -1082,6 +1084,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     commitment_state="heard",
                     must_not_claim_completion=True,
                     reuse_current_turn_speech=True,
+                    reused_speech_event_id="speech_event_walk_reuse",
                     covers_goal_ids=plan.goal_ids,
                 )
             ),
@@ -1102,6 +1105,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                             "event_id": "speech_event_walk_reuse",
                             "status": "scheduled",
                             "text": fast_text,
+                            "purpose": "acknowledge",
                             "generation": 7,
                             "orders": [12],
                         }
