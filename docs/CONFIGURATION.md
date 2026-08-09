@@ -385,8 +385,8 @@ canonical plan copy, and its fingerprint remain host-owned.
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
 | `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
-| `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default. Enable raw text only under an explicit privacy decision. |
-| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. |
+| `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
+| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
 | `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 
 `scripts/start_chromie.sh` generates

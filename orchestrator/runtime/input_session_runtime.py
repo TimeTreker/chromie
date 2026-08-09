@@ -17,7 +17,7 @@ import numpy as np
 
 from orchestrator.audio_injection import read_audio_packet
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
-from orchestrator.runtime.session import now_ms
+from orchestrator.runtime.session import now_ms, record_session_workflow_stage
 from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
@@ -250,6 +250,7 @@ class InputSessionRuntime:
                     log_event=True,
                 )
 
+            asr_workflow_started_ms = now_ms()
             try:
                 async with runtime_tracer.span(
                     module=ASR_TRACE_MODULE,
@@ -281,6 +282,21 @@ class InputSessionRuntime:
                     if result.get("type") == "error":
                         asr_span.set_status("error")
                         host.session_log(session_id, "asr_error: asr_ms=%.1f error=%s", asr_done_ms - asr_start_ms, result)
+                        record_session_workflow_stage(
+                            host,
+                            session_id,
+                            stage="asr",
+                            started_monotonic_ms=asr_workflow_started_ms,
+                            finished_monotonic_ms=asr_done_ms,
+                            status="failed",
+                            input_payload={
+                                "audio_duration_ms": duration_ms,
+                                "audio_bytes": len(audio),
+                                "sample_rate_hz": host.target_asr_rate,
+                            },
+                            output_payload=result,
+                            errors=[result],
+                        )
                         if playback_candidate:
                             await self._release_playback_duck(
                                 generation=playback_generation_at_start,
@@ -306,6 +322,28 @@ class InputSessionRuntime:
                                 if started_during_playback
                                 else None
                             ),
+                        )
+                        record_session_workflow_stage(
+                            host,
+                            session_id,
+                            stage="asr",
+                            started_monotonic_ms=asr_workflow_started_ms,
+                            finished_monotonic_ms=asr_done_ms,
+                            status=("echo_suppressed" if likely_echo else "accepted"),
+                            input_payload={
+                                "audio_duration_ms": duration_ms,
+                                "audio_bytes": len(audio),
+                                "sample_rate_hz": host.target_asr_rate,
+                            },
+                            output_payload={
+                                "result_type": "final",
+                                "user_text": user_text,
+                                "text_chars": len(user_text),
+                                "likely_tts_echo": likely_echo,
+                                "echo_ratio": echo_ratio,
+                                "echo_coverage": echo_coverage,
+                            },
+                            errors=[],
                         )
                         if likely_echo:
                             host.session_log(
@@ -376,6 +414,26 @@ class InputSessionRuntime:
                                         playback_generation_at_start,
                                         confirmed_speech_to_silence_ms,
                                     )
+                                    record_session_workflow_stage(
+                                        host,
+                                        new_session_id,
+                                        stage="asr",
+                                        started_monotonic_ms=asr_workflow_started_ms,
+                                        finished_monotonic_ms=asr_done_ms,
+                                        status="accepted",
+                                        input_payload={
+                                            "audio_duration_ms": duration_ms,
+                                            "audio_bytes": len(audio),
+                                            "sample_rate_hz": host.target_asr_rate,
+                                            "started_during_playback": True,
+                                        },
+                                        output_payload={
+                                            "result_type": "final",
+                                            "user_text": user_text,
+                                            "text_chars": len(user_text),
+                                        },
+                                        errors=[],
+                                    )
                                 session_id = new_session_id
                             host._launch_routed_turn(user_text, session_id)
                         else:
@@ -386,13 +444,46 @@ class InputSessionRuntime:
                                     session_id=session_id,
                                     reason="asr_empty",
                                 )
-                    elif playback_candidate:
-                        await self._release_playback_duck(
-                            generation=playback_generation_at_start,
-                            session_id=session_id,
-                            reason="unsupported_asr_result",
+                    else:
+                        record_session_workflow_stage(
+                            host,
+                            session_id,
+                            stage="asr",
+                            started_monotonic_ms=asr_workflow_started_ms,
+                            finished_monotonic_ms=asr_done_ms,
+                            status="unsupported_result",
+                            input_payload={
+                                "audio_duration_ms": duration_ms,
+                                "audio_bytes": len(audio),
+                                "sample_rate_hz": host.target_asr_rate,
+                            },
+                            output_payload=result,
+                            errors=[{"reason": "unsupported_asr_result"}],
                         )
+                        if playback_candidate:
+                            await self._release_playback_duck(
+                                generation=playback_generation_at_start,
+                                session_id=session_id,
+                                reason="unsupported_asr_result",
+                            )
             except Exception as exc:
+                record_session_workflow_stage(
+                    host,
+                    session_id,
+                    stage="asr",
+                    started_monotonic_ms=asr_workflow_started_ms,
+                    finished_monotonic_ms=now_ms(),
+                    status="failed",
+                    input_payload={
+                        "audio_duration_ms": duration_ms,
+                        "audio_bytes": len(audio),
+                        "sample_rate_hz": host.target_asr_rate,
+                    },
+                    output_payload=None,
+                    errors=[
+                        {"error_type": type(exc).__name__, "error": str(exc)}
+                    ],
+                )
                 if playback_candidate:
                     await self._release_playback_duck(
                         generation=playback_generation_at_start,

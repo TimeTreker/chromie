@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -36,6 +37,27 @@ logger = logging.getLogger(__name__)
 
 def now_ms() -> float:
     return time.perf_counter() * 1000.0
+
+
+def record_session_workflow_stage(
+    host: Any,
+    session_id: str | None,
+    **stage: Any,
+) -> None:
+    """Retain optional workflow evidence without changing runtime behavior."""
+
+    sessions = getattr(host, "sessions", None)
+    recorder = getattr(sessions, "record_cognitive_stage", None)
+    if not callable(recorder):
+        return
+    try:
+        recorder(session_id, **stage)
+    except Exception as exc:
+        logger.warning(
+            "Could not retain session workflow stage %s: %s",
+            stage.get("stage", "unknown"),
+            exc,
+        )
 
 
 class SessionEventWriter:
@@ -98,8 +120,16 @@ class SessionTracker:
         "session_start",
         "session_interrupted_by_new_session",
         "vad_valid_end",
+        "asr_send_start",
+        "asr_send_done",
         "asr_final",
+        "asr_error",
+        "asr_exception",
         "context_snapshot",
+        "cognitive_gateway_attention_done",
+        "cognitive_core_start",
+        "cognitive_core_done",
+        "cognitive_core_exception",
         "goal_interpretation_start",
         "goal_interpretation_done",
         "fast_first_response_schedule",
@@ -134,6 +164,7 @@ class SessionTracker:
         "playback_start",
         "playback_end",
         "playback_stream_incomplete",
+        "session_idle_timeout",
         "session_done",
     )
 
@@ -142,6 +173,8 @@ class SessionTracker:
         enabled: bool = True,
         *,
         event_log_path: str | os.PathLike[str] | None = None,
+        workflow_report_root: str | os.PathLike[str] | None = None,
+        workflow_report_include_text: bool = False,
         resource_sampling_mode: str | None = None,
         interaction_session_capture: InteractionSessionEvidenceCollector | None = None,
     ):
@@ -149,6 +182,13 @@ class SessionTracker:
         self.current_sid: str | None = None
         self.state: dict[str, dict[str, Any]] = {}
         self.event_writer = SessionEventWriter(event_log_path)
+        self.workflow_report_root = (
+            Path(workflow_report_root).expanduser().resolve()
+            if workflow_report_root
+            else None
+        )
+        self.workflow_report_include_text = bool(workflow_report_include_text)
+        self._workflow_report_lock = threading.Lock()
         self.resource_sampler = (
             SystemResourceSampler(resource_sampling_mode)
             if resource_sampling_mode is not None
@@ -172,6 +212,7 @@ class SessionTracker:
         )
         self.state[sid] = {
             "t0_ms": now_ms(),
+            "started_at_utc": datetime.now(timezone.utc).isoformat(),
             "last_activity_ms": now_ms(),
             "scheduled_tts": 0,
             "queued_tts": 0,
@@ -183,6 +224,8 @@ class SessionTracker:
             "response_chars": 0,
             "interrupted": False,
             "workflow_events": [],
+            "cognitive_workflow_stages": [],
+            "correlations": {"session_id": sid},
             "runtime_trace": self._create_runtime_trace(sid, capture_policy),
             "runtime_trace_event": {},
             "interaction_session_capture_policy": (
@@ -233,6 +276,15 @@ class SessionTracker:
 
     def update_trace_correlations(self, sid: str | None, **values: Any) -> None:
         session = self.state.get(sid or "") or {}
+        correlations = session.setdefault("correlations", {})
+        if isinstance(correlations, dict):
+            correlations.update(
+                {
+                    str(key): value
+                    for key, value in values.items()
+                    if value not in (None, "")
+                }
+            )
         trace = session.get("runtime_trace")
         if not isinstance(trace, RuntimeTrace) or session.get("runtime_trace_finalized"):
             return
@@ -490,6 +542,10 @@ class SessionTracker:
         session = self.state.get(sid)
         if not session or session.get("runtime_trace_finalized"):
             return
+        self._finalize_workflow_report(
+            sid,
+            termination_state=("abandoned" if state == "abandoned" else "complete"),
+        )
         # Lifecycle finalization is required even when runtime tracing is off.
         # Previously a session without a RuntimeTrace stayed perpetually
         # unfinished and the idle sweeper logged the same timeout every cycle.
@@ -598,6 +654,7 @@ class SessionTracker:
                 summary = self._workflow_timing_summary(graph)
                 if summary:
                     self.log(sid, "session_workflow_summary: %s", summary)
+            self._finalize_workflow_report(sid, termination_state="complete")
             self.trace_mark(
                 sid,
                 "session_finished",
@@ -873,3 +930,559 @@ class SessionTracker:
             f"nodes={len(nodes)} edges={max(0, len(nodes) - 1)} "
             f"total_ms={total_ms:.1f} slowest={slowest or 'none'}"
         )
+
+    def record_cognitive_stage(
+        self,
+        sid: str | None,
+        *,
+        stage: str,
+        started_monotonic_ms: float,
+        finished_monotonic_ms: float,
+        status: str,
+        input_payload: Any = None,
+        output_payload: Any = None,
+        errors: list[Any] | None = None,
+        attempt: int = 1,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Retain one observed cognitive boundary without affecting execution.
+
+        The caller supplies already-owned DTOs and monotonic timestamps. The
+        Session owner only serializes evidence; it never infers meaning,
+        changes a plan, or authorizes a Capability.
+        """
+
+        if not sid:
+            return
+        session = self.state.get(sid)
+        if not session or session.get("workflow_report_finalized"):
+            return
+        t0_ms = float(session.get("t0_ms") or started_monotonic_ms)
+        started_elapsed_ms = max(0.0, float(started_monotonic_ms) - t0_ms)
+        finished_elapsed_ms = max(
+            started_elapsed_ms,
+            float(finished_monotonic_ms) - t0_ms,
+        )
+        record = {
+            "stage": " ".join(str(stage or "cognitive_stage").strip().split()),
+            "attempt": max(1, int(attempt)),
+            "status": " ".join(str(status or "unknown").strip().split()),
+            "started_elapsed_ms": round(started_elapsed_ms, 3),
+            "finished_elapsed_ms": round(finished_elapsed_ms, 3),
+            "duration_ms": round(finished_elapsed_ms - started_elapsed_ms, 3),
+            "input": self._workflow_evidence_value(input_payload),
+            "output": self._workflow_evidence_value(output_payload),
+            "errors": self._workflow_evidence_value(list(errors or [])),
+            "metadata": self._workflow_evidence_value(dict(metadata or {})),
+        }
+        stages = session.setdefault("cognitive_workflow_stages", [])
+        if not isinstance(stages, list):
+            stages = []
+            session["cognitive_workflow_stages"] = stages
+        stages.append(record)
+        session["last_activity_ms"] = now_ms()
+
+    def _workflow_evidence_value(
+        self,
+        value: Any,
+        *,
+        key: str = "",
+        depth: int = 0,
+    ) -> Any:
+        if hasattr(value, "model_dump"):
+            try:
+                value = value.model_dump(mode="json", exclude_none=True)
+            except (AttributeError, TypeError, ValueError):
+                value = str(value)
+        normalized_key = key.casefold()
+        safe_string_keys = {
+            "authority",
+            "capability_id",
+            "classification",
+            "disposition",
+            "error_type",
+            "event",
+            "execution_lane",
+            "failure_stage",
+            "interaction_id",
+            "intent",
+            "operation",
+            "output_mode",
+            "provider_id",
+            "reason_code",
+            "request_id",
+            "result_type",
+            "route",
+            "session_id",
+            "severity",
+            "sid",
+            "skill_id",
+            "stage",
+            "status",
+            "termination_state",
+            "trace_id",
+            "turn_id",
+            "type",
+        }
+        string_key_is_structural = (
+            normalized_key in safe_string_keys
+            or normalized_key.endswith("_id")
+            or normalized_key.endswith("_ids")
+            or normalized_key.endswith("_version")
+            or normalized_key.endswith("_sha256")
+            or normalized_key.endswith("_at_utc")
+        )
+        if (
+            not self.workflow_report_include_text
+            and (
+                normalized_key
+                in {
+                    "text",
+                    "user_text",
+                    "source_text",
+                    "description",
+                    "response_text",
+                    "clarification",
+                    "speech",
+                    "message",
+                }
+                or (isinstance(value, str) and not string_key_is_structural)
+            )
+            and value not in (None, "", [], {})
+        ):
+            serialized = (
+                value
+                if isinstance(value, str)
+                else json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+            )
+            return {
+                "redacted": True,
+                "chars": len(serialized),
+                "sha256_16": hashlib.sha256(
+                    serialized.encode("utf-8", errors="replace")
+                ).hexdigest()[:16],
+            }
+        if depth >= 10:
+            return "<depth-limit>"
+        if isinstance(value, dict):
+            return {
+                str(item_key): self._workflow_evidence_value(
+                    item_value,
+                    key=str(item_key),
+                    depth=depth + 1,
+                )
+                for item_key, item_value in list(value.items())[:160]
+            }
+        if isinstance(value, (list, tuple, set)):
+            return [
+                self._workflow_evidence_value(item, key=key, depth=depth + 1)
+                for item in list(value)[:160]
+            ]
+        if isinstance(value, str):
+            return value if len(value) <= 12000 else value[:11997].rstrip() + "..."
+        if value is None or isinstance(value, (bool, int, float)):
+            return value
+        return str(value)
+
+    def _workflow_report(self, sid: str, *, termination_state: str) -> dict[str, Any]:
+        session = self.state.get(sid) or {}
+        graph = self._workflow_graph(sid)
+        stages = session.get("cognitive_workflow_stages")
+        if not isinstance(stages, list):
+            stages = []
+        retained_stages = [
+            dict(item) for item in stages if isinstance(item, dict)
+        ]
+        trusted_runtime_stages = [
+            item
+            for item in retained_stages
+            if item.get("stage") == "trusted_capability_runtime"
+        ]
+        dispatch_blocked = any(
+            item.get("stage") == "canonical_plan_rejection"
+            and isinstance(item.get("metadata"), dict)
+            and item["metadata"].get("dispatch_allowed") is False
+            for item in retained_stages
+        )
+        provider_start_observed = any(
+            isinstance(item.get("metadata"), dict)
+            and item["metadata"].get("provider_start_observed") is True
+            for item in trusted_runtime_stages
+        )
+        return {
+            "schema_version": 1,
+            "sid": sid,
+            "termination_state": termination_state,
+            "started_at_utc": str(session.get("started_at_utc") or ""),
+            "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+            "total_ms": round(self.elapsed_ms(sid), 3),
+            "correlations": self._workflow_evidence_value(
+                dict(session.get("correlations") or {})
+            ),
+            "privacy": {
+                "raw_text_included": self.workflow_report_include_text,
+                "classification": "private_runtime_evidence",
+                "safe_to_publish_without_review": False,
+            },
+            "cognitive_stages": retained_stages,
+            "runtime_timeline": self._workflow_evidence_value(
+                list(graph.get("nodes") or [])
+            ),
+            "outcome": {
+                "scheduled_tts": int(session.get("scheduled_tts", 0)),
+                "queued_tts": int(session.get("queued_tts", 0)),
+                "played_tts": int(session.get("played_tts", 0)),
+                "failed_tts": int(session.get("failed_tts", 0)),
+                "skipped_tts": int(session.get("skipped_tts", 0)),
+                "response_chars": int(session.get("response_chars", 0)),
+                "interrupted": bool(session.get("interrupted", False)),
+                "trusted_runtime_observed": bool(trusted_runtime_stages),
+                "provider_start_observed": provider_start_observed,
+                "dispatch_blocked_before_provider": (
+                    dispatch_blocked and not provider_start_observed
+                ),
+            },
+        }
+
+    @staticmethod
+    def _workflow_stage_label(stage: str) -> str:
+        return " ".join(part.capitalize() for part in str(stage).split("_"))
+
+    def _render_workflow_report_markdown(self, report: dict[str, Any]) -> str:
+        stages = report.get("cognitive_stages")
+        if not isinstance(stages, list):
+            stages = []
+        runtime = report.get("runtime_timeline")
+        if not isinstance(runtime, list):
+            runtime = []
+        flow_items: list[tuple[float, str, str]] = []
+        for item in stages:
+            if not isinstance(item, dict):
+                continue
+            flow_items.append(
+                (
+                    float(item.get("started_elapsed_ms") or 0.0),
+                    self._workflow_stage_label(str(item.get("stage") or "stage")),
+                    str(item.get("status") or "unknown"),
+                )
+            )
+        visible_runtime_events = {
+            "asr_final",
+            "cognitive_skill_proposed",
+            "skill_runtime_done",
+            "skill_result",
+            "tts_schedule",
+            "playback_start",
+            "playback_end",
+            "session_done",
+        }
+        for item in runtime:
+            if not isinstance(item, dict):
+                continue
+            event = str(item.get("event") or "")
+            if event not in visible_runtime_events:
+                continue
+            flow_items.append(
+                (
+                    float(item.get("elapsed_ms") or 0.0),
+                    self._workflow_stage_label(event),
+                    str(item.get("severity") or "info"),
+                )
+            )
+        flow_items.sort(key=lambda item: item[0])
+        flow_lines: list[str] = []
+        for index, (elapsed_ms, label, status) in enumerate(flow_items):
+            if index:
+                flow_lines.extend(["          │", "          ▼"])
+            flow_lines.append(f"{label} [{status}] +{elapsed_ms:.1f} ms")
+
+        lines = [
+            "# Chromie interaction-session workflow",
+            "",
+            f"- SID: `{report.get('sid')}`",
+            f"- State: `{report.get('termination_state')}`",
+            f"- Started: `{report.get('started_at_utc')}`",
+            f"- Finished: `{report.get('finished_at_utc')}`",
+            f"- Total: `{float(report.get('total_ms') or 0.0):.1f} ms`",
+            f"- Correlations: `{json.dumps(report.get('correlations') or {}, ensure_ascii=False, sort_keys=True)}`",
+            "- Privacy: private runtime evidence; review before sharing.",
+            "",
+            "## Flow",
+            "",
+            "```text",
+            *(flow_lines or ["No retained workflow stages."]),
+            "```",
+            "",
+            "## Outcome",
+            "",
+            "```json",
+            json.dumps(
+                report.get("outcome") or {},
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            "```",
+            "",
+            "## Cognitive stages",
+            "",
+        ]
+        for item in stages:
+            if not isinstance(item, dict):
+                continue
+            label = self._workflow_stage_label(str(item.get("stage") or "stage"))
+            lines.extend(
+                [
+                    f"### {label} — attempt {item.get('attempt', 1)}",
+                    "",
+                    (
+                        f"Timeline: `+{float(item.get('started_elapsed_ms') or 0.0):.1f} ms` "
+                        f"→ `+{float(item.get('finished_elapsed_ms') or 0.0):.1f} ms` "
+                        f"(`{float(item.get('duration_ms') or 0.0):.1f} ms`), "
+                        f"status `{item.get('status')}`."
+                    ),
+                    "",
+                    "Input:",
+                    "",
+                    "```json",
+                    json.dumps(
+                        item.get("input"),
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                    ),
+                    "```",
+                    "",
+                    "Output:",
+                    "",
+                    "```json",
+                    json.dumps(
+                        item.get("output"),
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                    ),
+                    "```",
+                ]
+            )
+            errors = item.get("errors")
+            if errors:
+                lines.extend(
+                    [
+                        "",
+                        "Errors:",
+                        "",
+                        "```json",
+                        json.dumps(
+                            errors,
+                            ensure_ascii=False,
+                            indent=2,
+                            sort_keys=True,
+                        ),
+                        "```",
+                    ]
+                )
+            lines.append("")
+
+        lines.extend(["## Runtime timeline", ""])
+        for item in runtime:
+            if not isinstance(item, dict):
+                continue
+            message = item.get("message")
+            rendered_message = (
+                message
+                if isinstance(message, str)
+                else json.dumps(message, ensure_ascii=False, sort_keys=True)
+            )
+            lines.append(
+                f"- `+{float(item.get('elapsed_ms') or 0.0):.1f} ms` "
+                f"**{item.get('event')}** [{item.get('severity')}]: "
+                f"{rendered_message}"
+            )
+        lines.append("")
+        return "\n".join(lines)
+
+    def _finalize_workflow_report(
+        self,
+        sid: str,
+        *,
+        termination_state: str,
+    ) -> dict[str, Any]:
+        session = self.state.get(sid)
+        if not session:
+            return {}
+        existing = session.get("workflow_report")
+        if session.get("workflow_report_finalized") and isinstance(existing, dict):
+            return existing
+        report = self._workflow_report(sid, termination_state=termination_state)
+        markdown = self._render_workflow_report_markdown(report)
+        paths: dict[str, str] = {}
+        if self.workflow_report_root is not None:
+            try:
+                self.workflow_report_root.mkdir(parents=True, exist_ok=True)
+                started = re.sub(
+                    r"[^0-9A-Za-z]+",
+                    "",
+                    str(report.get("started_at_utc") or "session"),
+                )[:20]
+                stem = f"{started or 'session'}-{sid}"
+                json_path = self.workflow_report_root / f"{stem}.json"
+                markdown_path = self.workflow_report_root / f"{stem}.md"
+                with self._workflow_report_lock:
+                    json_temp = json_path.with_suffix(".json.tmp")
+                    markdown_temp = markdown_path.with_suffix(".md.tmp")
+                    json_temp.write_text(
+                        json.dumps(
+                            report,
+                            ensure_ascii=False,
+                            indent=2,
+                            sort_keys=True,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                    markdown_temp.write_text(markdown, encoding="utf-8")
+                    os.replace(json_temp, json_path)
+                    os.replace(markdown_temp, markdown_path)
+                paths = {"json": str(json_path), "markdown": str(markdown_path)}
+            except Exception as exc:  # evidence capture must not break runtime
+                logger.warning("Could not write session workflow report: %s", exc)
+        report["paths"] = paths
+        session["workflow_report"] = report
+        session["workflow_report_markdown"] = markdown
+        session["workflow_report_paths"] = paths
+        session["workflow_report_finalized"] = True
+        conversation_paths = self._write_conversation_workflow_report(sid)
+        if conversation_paths:
+            session["conversation_workflow_report_paths"] = conversation_paths
+        self.event_writer.write(
+            sid=sid,
+            elapsed_ms=self.elapsed_ms(sid),
+            message="session_workflow_report: state=%s stages=%s runtime_events=%s",
+            args=(
+                termination_state,
+                len(report["cognitive_stages"]),
+                len(report["runtime_timeline"]),
+            ),
+            extra={"report": report, "report_paths": paths},
+        )
+        return report
+
+    def _write_conversation_workflow_report(self, sid: str) -> dict[str, str]:
+        """Refresh the multi-turn view for the SID's existing conversation.
+
+        The conversation ID already belongs to ConversationState and only
+        correlates finalized per-SID facts here. This rollup never decides when
+        a conversation starts, ends, or changes meaning.
+        """
+
+        if self.workflow_report_root is None:
+            return {}
+        session = self.state.get(sid) or {}
+        correlations = session.get("correlations")
+        if not isinstance(correlations, dict):
+            return {}
+        conversation_id = str(correlations.get("conversation_id") or "").strip()
+        if not conversation_id:
+            return {}
+        session_reports: list[dict[str, Any]] = []
+        for candidate in self.state.values():
+            candidate_correlations = candidate.get("correlations")
+            candidate_report = candidate.get("workflow_report")
+            if (
+                isinstance(candidate_correlations, dict)
+                and candidate_correlations.get("conversation_id") == conversation_id
+                and isinstance(candidate_report, dict)
+                and candidate.get("workflow_report_finalized")
+            ):
+                session_reports.append(
+                    {
+                        key: value
+                        for key, value in candidate_report.items()
+                        if key != "paths"
+                    }
+                )
+        session_reports.sort(
+            key=lambda item: (
+                str(item.get("started_at_utc") or ""),
+                str(item.get("sid") or ""),
+            )
+        )
+        if not session_reports:
+            return {}
+        rollup = {
+            "schema_version": 1,
+            "conversation_id": conversation_id,
+            "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "session_count": len(session_reports),
+            "sessions": session_reports,
+            "privacy": {
+                "raw_text_included": self.workflow_report_include_text,
+                "classification": "private_runtime_evidence",
+                "safe_to_publish_without_review": False,
+            },
+        }
+        markdown_lines = [
+            "# Chromie interactive-session workflow",
+            "",
+            f"- Conversation: `{conversation_id}`",
+            f"- Updated: `{rollup['updated_at_utc']}`",
+            f"- Interaction SIDs: `{len(session_reports)}`",
+            "- Privacy: private runtime evidence; review before sharing.",
+            "",
+        ]
+        for index, item in enumerate(session_reports, start=1):
+            markdown_lines.extend(
+                [
+                    f"## Turn {index} — SID `{item.get('sid')}`",
+                    "",
+                    self._render_workflow_report_markdown(item),
+                    "",
+                ]
+            )
+        safe_conversation_id = re.sub(
+            r"[^0-9A-Za-z_.-]+",
+            "-",
+            conversation_id,
+        ).strip("-._")[:80]
+        conversation_digest = hashlib.sha256(
+            conversation_id.encode("utf-8", errors="replace")
+        ).hexdigest()[:10]
+        safe_conversation_id = (
+            f"{safe_conversation_id}-{conversation_digest}"
+            if safe_conversation_id
+            else conversation_digest
+        )
+        json_path = (
+            self.workflow_report_root
+            / f"conversation-{safe_conversation_id}.json"
+        )
+        markdown_path = (
+            self.workflow_report_root
+            / f"conversation-{safe_conversation_id}.md"
+        )
+        try:
+            self.workflow_report_root.mkdir(parents=True, exist_ok=True)
+            with self._workflow_report_lock:
+                json_temp = json_path.with_suffix(".json.tmp")
+                markdown_temp = markdown_path.with_suffix(".md.tmp")
+                json_temp.write_text(
+                    json.dumps(
+                        rollup,
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                markdown_temp.write_text(
+                    "\n".join(markdown_lines),
+                    encoding="utf-8",
+                )
+                os.replace(json_temp, json_path)
+                os.replace(markdown_temp, markdown_path)
+        except Exception as exc:  # evidence capture must not break runtime
+            logger.warning("Could not write conversation workflow report: %s", exc)
+            return {}
+        return {"json": str(json_path), "markdown": str(markdown_path)}

@@ -418,6 +418,49 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIn("orchestrator.canonical_plan_adapter", modules)
         self.assertIn("total", result.timings_ms)
 
+    def test_workflow_sink_receives_owned_stage_inputs_outputs_and_timing(self):
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[respond_plan()],
+        )
+        observed: list[tuple[str, dict]] = []
+
+        def retain_stage(sid: str, **stage: object) -> None:
+            self.assertEqual(sid, "sid-pr7")
+            observed.append((str(stage["stage"]), dict(stage)))
+
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat"}),
+            ),
+            workflow_stage_sink=retain_stage,
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "applied")
+        stage_names = [item[0] for item in observed]
+        self.assertEqual(
+            stage_names,
+            [
+                "goal_association",
+                "fast_planner",
+                "canonical_plan_validation",
+                "response_composer",
+                "runtime_adapter",
+            ],
+        )
+        for _, stage in observed:
+            self.assertIn("input_payload", stage)
+            self.assertIn("output_payload", stage)
+            self.assertGreaterEqual(
+                float(stage["finished_monotonic_ms"]),
+                float(stage["started_monotonic_ms"]),
+            )
+
     def test_interaction_context_reaches_association_planner_and_composer(self):
         ledger = InteractionLedger()
         ledger.record_playback_event(

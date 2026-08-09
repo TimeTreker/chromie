@@ -403,11 +403,21 @@ error lines red when attached to a color-capable terminal. Set
 `ORCH_CLI_COLOR=1` to force Orchestrator session color or `ORCH_CLI_COLOR=0` to
 disable it. Agent and Goal Interpretation Ollama diagnostics also respect
 `CHROMIE_CLI_COLOR=1` for forced color, falling back to the same auto/NO_COLOR
-terminal behavior. Finished sessions also write
-`session_workflow` and `session_workflow_graph` evidence covering
-VAD, ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Trusted Capability Runtime, TTS, playback, per-stage deltas, and
-final timing. The operator console keeps only a compact
-`session_workflow_summary` line with the slowest steps.
+terminal behavior. Finished sessions also write `session_workflow` and
+`session_workflow_graph` events plus paired JSON/Markdown reports under
+`.chromie/evidence/cognitive-runtime/session-workflows/`. The reports show the
+ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Goal Association,
+Fast/Deep Planner, canonical validation/rejection, Response Composer, Trusted
+Capability Runtime, TTS, playback, per-stage input/output, diagnostics, and
+timing observed for that SID. They state whether validation blocked dispatch
+and report provider start only from an actual runtime trace event. Abandoned
+sessions are retained too, and each completed SID refreshes a rolling
+conversation-correlated report so follow-up turns appear in the same ordered
+flow. Raw conversation follows
+`ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT`; both formats are private evidence. The
+operator console keeps only a compact `session_workflow_summary` line with the
+slowest steps. `scripts/collect_debug_bundle.sh` includes the latest report
+pairs.
 
 Run the complete guided matrix with:
 

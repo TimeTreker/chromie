@@ -318,6 +318,29 @@ inform the replaceable provider boundary but remain proposed. The policy,
 privacy, and candidate-provenance contract is owned by
 [Chromie Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md).
 
+When cognitive evidence is enabled, the same Session owner also writes one
+JSON workflow fact layer and one human-readable Markdown flow when each SID
+becomes complete or abandoned. These reports retain monotonic start/finish
+timing plus the already-owned input DTO, output DTO, status, diagnostics, and
+attempt number for ASR, Gateway attention, Goal Interpretation, Goal
+Association and state commit, Fast/Deep Planning, canonical-plan validation or
+rejection, Response Composition, runtime adaptation, fallback speech, and the
+Trusted Capability Runtime. The existing runtime event timeline adds TTS,
+playback, and provider-result observations. A canonical-plan rejection records
+that dispatch was blocked; provider start is reported only when a Trusted
+Capability Runtime trace actually contains a provider-start event.
+
+Reports are stored beside the configured cognitive evidence file under
+`session-workflows/` and retain existing session, conversation, turn, and trace
+correlations. Each completed SID also refreshes a conversation-correlated
+rolling JSON/Markdown view, so a failure and the user's later follow-up remain
+inspectable in one ordered flow without inventing a second conversation
+boundary. `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` governs raw conversational
+text in both report formats; when disabled, textual values and runtime log
+messages are replaced by length and digest evidence. The files remain private
+runtime evidence and are not safe to publish without review. Report capture is
+best-effort, does not infer semantics, and cannot authorize or alter execution.
+
 ## Trace-to-event retention
 
 Trace policy may retain:
