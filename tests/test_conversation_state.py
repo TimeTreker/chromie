@@ -17,16 +17,16 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class ConversationStateTests(unittest.TestCase):
-    def test_explicit_reset_starts_new_conversation_and_clears_history(self) -> None:
+    def test_natural_language_reset_is_not_classified_by_host(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
         manager.record_user_turn("s1", "check the weather", route="tool", intent="weather_query")
         original_id = manager.conversation_id
 
         boundary = manager.prepare_for_user_text("new topic", "s2")
 
-        self.assertTrue(boundary["started_new"])
-        self.assertNotEqual(manager.conversation_id, original_id)
-        self.assertEqual(manager.get_history(), [])
+        self.assertFalse(boundary["started_new"])
+        self.assertEqual(manager.conversation_id, original_id)
+        self.assertNotEqual(manager.get_history(), [])
 
     def test_scoped_referents_coexist_and_correction_only_backgrounds_target(self) -> None:
         manager = ConversationStateManager(base_conversation_id="discourse")
@@ -223,14 +223,10 @@ class ConversationStateTests(unittest.TestCase):
         self.assertFalse(boundary["started_new"])
         self.assertEqual(boundary["reason"], "kept_default")
 
-    def test_last_task_phrase_does_not_create_host_task_association(self) -> None:
+    def test_missing_typed_relation_does_not_create_host_task_association(self) -> None:
         manager = ConversationStateManager()
 
-        relation = manager._infer_task_relation(
-            "Please continue the last task I told you.",
-            route="chat",
-            metadata={},
-        )
+        relation = manager._model_task_relation({})
 
         self.assertIsNone(relation)
 
@@ -517,7 +513,7 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(updated)
         self.assertEqual(manager.snapshot()["active_pending_tasks"], [])
 
-    def test_session_memory_summarizes_active_task_and_reset_clears_it(self) -> None:
+    def test_session_memory_summarizes_active_task_and_typed_boundary_clears_it(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
         manager.record_user_turn("s1", "walk forward", route="robot_action", intent="capability:soridormi.walk_velocity")
         manager.record_pending_task(
@@ -533,7 +529,7 @@ class ConversationStateTests(unittest.TestCase):
         self.assertEqual(memory["recent_user_request"], "walk forward")
         self.assertEqual(memory["current_task"]["summary"], "soridormi.walk_velocity")
 
-        boundary = manager.prepare_for_user_text("new session", "s2")
+        boundary = manager.start_new_conversation(reason="typed_reset", sid="s2")
 
         self.assertTrue(boundary["started_new"])
         self.assertIsNone(manager.snapshot()["session_memory"]["current_task"])
@@ -575,7 +571,7 @@ class ConversationStateTests(unittest.TestCase):
         self.assertNotIn("messy way", summary)
         self.assertNotIn("replay this raw sentence", str(memory["extracted_memory"]))
 
-    def test_extracted_memory_clears_on_reset(self) -> None:
+    def test_extracted_memory_clears_on_typed_boundary(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
         manager.record_user_turn(
             "s1",
@@ -595,7 +591,7 @@ class ConversationStateTests(unittest.TestCase):
 
         self.assertIn("current session", manager.snapshot()["session_memory"]["memory_summary"])
 
-        manager.prepare_for_user_text("new session", "s2")
+        manager.start_new_conversation(reason="typed_reset", sid="s2")
 
         self.assertEqual(manager.snapshot()["session_memory"]["memory_summary"], "None")
         self.assertEqual(manager.snapshot()["extracted_memory"], [])

@@ -732,7 +732,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             preserved["confirmation"]["confirmation_id"],
             replacement.confirmation_id,
         )
-        approved = dialogue.resolve("yes")
+        approved = dialogue.resolve("confirm")
         self.assertEqual(approved.decision, "approved")
         self.assertEqual(
             approved.confirmed_request_ids,

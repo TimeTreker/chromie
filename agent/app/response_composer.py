@@ -41,7 +41,6 @@ try:
     from chromie_contracts.semantic_task import (
         ResponsePlan,
         ResponseStage,
-        pending_action_stage_direction_claims,
     )
     from chromie_contracts.social_attention import (
         SocialAttentionBehavior,
@@ -65,7 +64,6 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.semantic_task import (
         ResponsePlan,
         ResponseStage,
-        pending_action_stage_direction_claims,
     )
     from shared.chromie_contracts.social_attention import (
         SocialAttentionBehavior,
@@ -371,12 +369,6 @@ class ResponseComposerResolver:
                     context=request.context,
                     plan=plan,
                 )
-                premature_claims = self._pending_action_claim_errors(
-                    model_output.response_plan,
-                    plan=plan,
-                )
-                if premature_claims:
-                    raise ValueError("; ".join(premature_claims))
                 self._validate_spoken_language(
                     model_output.response_plan,
                     request=request,
@@ -1756,36 +1748,6 @@ class ResponseComposerResolver:
                         },
                     ]
         return schema
-
-    @staticmethod
-    def _pending_action_claim_errors(
-        response_plan: ResponsePlan,
-        *,
-        plan: CanonicalPlan,
-    ) -> list[str]:
-        if not plan.steps:
-            return []
-        pending_skill_ids = [step.skill_id for step in plan.steps]
-        stage_items = [
-            ("immediate", response_plan.immediate),
-            ("pre_action", response_plan.pre_action),
-            *[("progress", stage) for stage in response_plan.progress],
-            ("final", response_plan.final),
-        ]
-        errors: list[str] = []
-        for phase, stage in stage_items:
-            if stage is None or not stage.must_not_claim_completion:
-                continue
-            claims = pending_action_stage_direction_claims(
-                stage.text,
-                pending_skill_ids,
-            )
-            if claims:
-                errors.append(
-                    "pending physical action stage direction claims completion: "
-                    f"{phase}:" + ",".join(claims)
-                )
-        return errors
 
     @staticmethod
     def _direct_goal_association(

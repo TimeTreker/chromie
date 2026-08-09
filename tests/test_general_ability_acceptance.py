@@ -363,7 +363,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(any("Fast Planner path mismatch" in item for item in errors))
         self.assertTrue(any("Deep Planner invocation mismatch" in item for item in errors))
         self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
-        self.assertTrue(any("stage direction" in item for item in errors))
 
     def test_user_outcome_scope_retains_internal_path_mismatch_as_diagnostic(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

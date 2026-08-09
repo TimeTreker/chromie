@@ -166,7 +166,16 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             runtime.write_text("MotionPlannerAgent = object\n", encoding="utf-8")
             catalog = root / "agent" / "app" / "capabilities" / "catalog.py"
             catalog.parent.mkdir(parents=True)
-            catalog.write_text("def _semantic_action_score(): pass\n", encoding="utf-8")
+            catalog.write_text(
+                "_STOP_WORDS = {'please'}\n"
+                "def _semantic_action_score(): pass\n",
+                encoding="utf-8",
+            )
+            validator = root / "agent" / "app" / "capabilities" / "validator.py"
+            validator.write_text(
+                "def normalize_enum_string(value): return {'quickly': 'quick'}.get(value, value)\n",
+                encoding="utf-8",
+            )
             interpreter = (
                 root
                 / "agent"
@@ -214,7 +223,10 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             )
             conversation = root / "agent" / "app" / "agents" / "conversation.py"
             conversation.write_text(
+                "import re\n"
                 "class ConversationAgent:\n"
+                "    ACTION_PHRASES = ('walk', 'blink')\n"
+                "    bad_prefixes = ('assistant:',)\n"
                 "    def _fallback_reply(self): return 'That sounds tiring.'\n",
                 encoding="utf-8",
             )
@@ -224,6 +236,12 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 'decision.speak_first = "What do you mean?"\n',
                 encoding="utf-8",
             )
+            route_contract = root / "shared" / "chromie_contracts" / "route.py"
+            route_contract.parent.mkdir(parents=True, exist_ok=True)
+            route_contract.write_text(
+                "def reject_contract_marker_as_spoken_text(): pass\n",
+                encoding="utf-8",
+            )
 
             findings = policies.audit_semantic_authority_boundaries(root)
 
@@ -231,6 +249,11 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         self.assertIn(policies.RULE_HOST_SEMANTIC_AUTHORITY, rule_ids)
         self.assertIn(policies.RULE_LEGACY_PHRASE_AGENTS, rule_ids)
         self.assertIn(policies.RULE_MEMORY_MODEL_AUTHORED, rule_ids)
+        symbols = {item.symbol for item in findings}
+        self.assertIn("_STOP_WORDS", symbols)
+        self.assertIn("normalize_enum_string", symbols)
+        self.assertIn("reject_contract_marker_as_spoken_text", symbols)
+        self.assertIn("bad_prefixes =", symbols)
 
     def test_model_facing_skill_id_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -159,6 +159,6 @@ final `InteractionResponse` contains committed speech or skills.
 ## Non-Goals
 
 - Do not make Chromie claim it can execute all human abilities.
-- Do not make lexical catalog search choose normal intent by itself.
+- Do not rank or filter capabilities from user-text lexical overlap; give the declared catalog to the responsible model.
 - Do not auto-create Soridormi skills from missing-ability proposals.
 - Do not bypass confirmation, preflight, provider validation, or safety gates.

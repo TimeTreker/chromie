@@ -6,7 +6,7 @@ from agent.app.capabilities.validator import normalize_args_for_schema, validate
 
 
 class CapabilityArgsValidatorTests(unittest.TestCase):
-    def test_normalizes_schema_enum_adverbs_recursively(self) -> None:
+    def test_does_not_rewrite_schema_enum_values_from_language_aliases(self) -> None:
         schema = {
             "type": "object",
             "properties": {
@@ -48,11 +48,15 @@ class CapabilityArgsValidatorTests(unittest.TestCase):
             schema,
         )
 
-        self.assertTrue(changed)
-        self.assertEqual(normalized["speed"], "quick")
-        self.assertEqual(normalized["nested"]["pace"], "slow")
-        self.assertEqual(normalized["steps"][0]["pace"], "normal")
+        self.assertFalse(changed)
+        self.assertEqual(normalized["speed"], "quickly")
+        self.assertEqual(normalized["nested"]["pace"], "slowly")
+        self.assertEqual(normalized["steps"][0]["pace"], "normal speed")
         self.assertEqual(normalized["unknown"], "quickly")
+        self.assertIn(
+            "args.speed must be one of ['slow', 'normal', 'medium', 'quick', 'fast_limited']",
+            validate_args_for_schema(normalized, schema),
+        )
 
     def test_preserves_unmatched_enum_values_for_runtime_validation(self) -> None:
         normalized, changed = normalize_args_for_schema(

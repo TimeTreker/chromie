@@ -57,7 +57,10 @@
           "confidence": 0.0,
           "language": "zh-CN",
           "source": "llm",
-          "metadata": {"core_semantic_handoff": {"status": "planner_required"}}
+          "metadata": {
+            "task_relation": "new_task",
+            "core_semantic_handoff": {"status": "planner_required"}
+          }
         },
         "ollama_reply": {
           "decision": "clarify",

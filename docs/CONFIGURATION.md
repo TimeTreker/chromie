@@ -160,7 +160,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0` and preserve a fast/quality topology, using `gemma4:e2b` and `gemma4:12b` respectively for quality stages. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0` and preserve a fast/quality topology, using `gemma4:e4b` and `gemma4:12b` respectively for quality stages. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -170,8 +170,8 @@ source-controlled `assets/tts/voices` catalog before service creation.
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The maintained RTX 5090 and RTX 4090 Laptop profiles both opt out: RTX 5090 keeps
 `qwen3:4b` plus `gemma4:12b` resident when memory permits, while RTX 4090 Laptop
-keeps the same fast/quality role split with `qwen3:4b` and the smaller
-`gemma4:e2b` but limits Ollama to one resident 32768-token runner at a time.
+keeps the same fast/quality role split with `qwen3:4b` and sparse
+`gemma4:e4b` but limits Ollama to one resident 32768-token runner at a time.
 Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
 only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
@@ -275,7 +275,6 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Goal Interpreter budget for one catalog snapshot; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Goal-Interpreter-side cache for the prompt catalog snapshot. The fast Goal Interpretation path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Goal Interpretation prompt size. |
 | `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
 | `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale fast-interpreter outputs. |
 | `AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
@@ -294,7 +293,7 @@ not selected by phrase rules.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e2b` and RTX 5090 uses `gemma4:12b` for higher-quality continuity-before-creation and independent-goal segmentation. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b` for higher-quality continuity-before-creation and independent-goal segmentation. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a non-authoritative clarification result. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -650,8 +649,7 @@ retained. See
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
-| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. Fast Goal Interpretation uses the common catalog snapshot instead of per-query catalog matching. |
-| `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
+| `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
 | `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
 | `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
 | `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
@@ -797,7 +795,6 @@ cancellation scope.
 | `ORCH_CONVERSATION_MAX_MEMORY_ENTRIES` | `24`; maximum process-local extracted memory entries retained in the current conversation. |
 | `ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS` | `24`; maximum scoped model-authored entity referents retained across conversation/task/Goal scopes. This is not a global location slot and does not represent robot physical state. |
 | `ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS` | `8`; maximum ordered referent IDs in the LLM-authored discourse focus stack. |
-| `ORCH_CONVERSATION_RESET_PHRASES` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
 | `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
 | `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
@@ -809,17 +806,18 @@ cancellation scope.
 `ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
 `ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
 should use the `ORCH_CONVERSATION_*` names.
-Conversation-boundary logic accepts explicit reset commands and hard-idle
-expiry only. Follow-up, correction, reference, and new-topic meaning is not
-configured through phrase lists and remains Goal Association responsibility.
+The Host starts an automatic conversation boundary only after hard-idle expiry
+with no active Goal or pending work. Natural-language reset, follow-up,
+correction, reference, and new-topic meaning remains Cognitive Core
+responsibility and is not configured through phrase lists.
 
 The task-context store never resumes physical work by itself; restored
 robot-action tasks are prompt-facing recoverable context and require fresh
 confirmation before any new action can run.
 
-Durable profile memory survives ordinary conversation resets, while session
-memory does not. The Host validates typed scope, policy, consent provenance,
-retention, and storage limits but does not infer what a user wants remembered.
+Durable profile memory survives conversation boundaries, while session memory
+does not. The Host validates typed scope, policy, consent provenance, retention,
+and storage limits but does not infer what a user wants remembered.
 Durable entries are removed only by expiry or an explicitly consented forget or
 clear mutation.
 

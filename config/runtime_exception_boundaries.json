@@ -1435,6 +1435,20 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._resolve_pending_confirmation_meaning",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "A failed Goal Association confirmation interpretation returns ambiguous and cannot authorize the pending request.",
+      "review_status": "reviewed",
+      "body_sha256": "944a71aa7869931ca23edd9b34c43a65e6a6a41e0a86be929c73262153b551f3",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._run_fast_planner_report",
       "ordinal": 1,
       "classification": "fail_closed_boundary",

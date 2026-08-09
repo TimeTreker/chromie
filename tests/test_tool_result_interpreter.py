@@ -260,7 +260,7 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sentence budget", ollama.prompts[1])
         self.assertIn("Trusted evidence JSON", ollama.prompts[1])
 
-    async def test_rejects_internal_workflow_narration(self) -> None:
+    async def test_does_not_classify_workflow_narration_with_phrase_rules(self) -> None:
         ollama = _ScriptedOllama(
             {
                 "spoken_response": "请求的任务已完成。观测结果是37℃。",
@@ -278,8 +278,8 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
 
         result = await ToolResultInterpreter(ollama).interpret(self._request())
 
-        self.assertEqual(result.status, "unavailable")
-        self.assertEqual(result.spoken_response, "")
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(result.spoken_response, "请求的任务已完成。观测结果是37℃。")
 
     async def test_effectful_review_limits_result_to_completed_evidence(self) -> None:
         data = {

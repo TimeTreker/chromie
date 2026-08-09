@@ -126,9 +126,9 @@ goals, and the experience journal records outcomes for human-reviewed tuning.
 
 ## Boundaries and reset behavior
 
-Configured reset phrases clear the active conversational context. New-topic
-starters and idle thresholds can cause a fresh conversation boundary. Follow-up
-phrases help preserve context for short dependent questions.
+The Host does not infer reset, new-topic, or follow-up meaning from phrases.
+Those turns reach the Cognitive Core with the bounded conversation and Goal
+state. Automatic conversation boundaries remain mechanical.
 
 Operational interruption does not erase the entire conversation by default,
 but active interaction and pending execution metadata must be updated so an
@@ -136,11 +136,10 @@ interrupted action is not later represented as completed.
 
 Chromie starts a new conversation when:
 
-- the user says an explicit reset phrase such as `new session`, `start over`,
-  `forget that`, `新的会话`, or `换个话题`;
-- the hard idle timeout expires while any context exists;
-- the soft idle timeout expires and the next utterance looks like a new topic,
-  as long as no active task is still pending;
+- the hard idle timeout expires while context exists and no active Goal or
+  pending work remains;
+- a typed, model-owned conversation-control path explicitly requests the
+  boundary once such a path is enabled;
 - the Orchestrator process restarts, because this memory is process-local.
 
 Task context is closed or forgotten when:
@@ -175,18 +174,17 @@ ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS=24
 ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS=8
 ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=300
 ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
-ORCH_CONVERSATION_RESET_PHRASES=
 ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC=180
 ORCH_ENABLE_TASK_CONTEXT_STORE=0
 ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
 ```
 
 
-Conversation boundaries are deliberately non-semantic. The Host accepts only an
-explicit whole-utterance reset command or the hard-idle timeout. It does not use
-follow-up phrases, pronoun lists, or new-topic starters; Goal Association owns
-those meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a compatibility
-configuration value but no longer authorizes phrase-based soft-idle splitting.
+Conversation boundaries are deliberately non-semantic in the Host. It applies
+the hard-idle timeout and typed control state; it does not use reset or follow-up
+phrases, pronoun lists, or new-topic starters. Goal Association owns those
+meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a compatibility value but
+does not authorize phrase-based soft-idle splitting.
 
 Legacy `ORCH_CONTEXT_*` aliases remain accepted for compatibility. Use the
 current names in new deployments. Exact defaults and precedence are documented

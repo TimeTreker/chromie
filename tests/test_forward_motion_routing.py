@@ -12,9 +12,9 @@ from tests.test_goal_interpreter_capability_routing import _Catalog, _LlmInterpr
 
 class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_chinese_forward_motion_does_not_host_select_live_walk_skill(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
-        result = await catalog.search("你往前走个15秒。", language="zh-CN")
+        result = await catalog.search("你往前走个15秒。", language="zh-CN", limit=32)
 
         self.assertFalse(result.matched)
         self.assertEqual(result.suggested_route, "chat")

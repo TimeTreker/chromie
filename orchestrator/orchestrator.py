@@ -52,7 +52,13 @@ from orchestrator.runtime.body_recovery import (
     BodyRecoveryConfirmation,
     build_body_recovery_confirmation,
 )
-from orchestrator.runtime.confirmation import ConfirmationDialogue
+from orchestrator.runtime.confirmation import (
+    ConfirmationDialogue,
+    ConfirmationReplyMeaning,
+    PendingConfirmation,
+    confirmation_meaning_from_goal_association,
+    pending_confirmation_goal_ids,
+)
 from orchestrator.runtime.named_goal_cancellation import (
     ActiveGoalCancellationRequiresRuntimeDispatch,
     NamedGoalCancellationClosureError,
@@ -3288,9 +3294,6 @@ class VoiceAssistant:
         if any(marker in lowered for marker in (
             "soridormi.",
             "chromie.",
-            "task split",
-            "key risk",
-            "next step",
         )):
             return None
         if any(ord(char) < 32 and char not in {"\t", "\n", "\r"} for char in cleaned):
@@ -5923,37 +5926,19 @@ class VoiceAssistant:
         *,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> bool:
-        resolution = self.confirmation_dialogue.resolve(user_text)
-        if resolution.decision == "not_confirmation":
+        pending = self.confirmation_dialogue.pending
+        if pending is None:
             return False
-
-        if resolution.decision == "operational_interrupt":
-            self.session_log(
-                session_id,
-                "confirmation_rejected: confirmation_id=%s reason=%s fingerprint=%s",
-                resolution.confirmation_id,
-                resolution.decision,
-                resolution.fingerprint,
-            )
-            if resolution.confirmation_id:
-                resolve_confirmation_scope = getattr(
-                    self.conversation_state,
-                    "resolve_confirmation_scope",
-                    None,
-                )
-                handled = bool(
-                    callable(resolve_confirmation_scope)
-                    and resolve_confirmation_scope(
-                        confirmation_id=resolution.confirmation_id,
-                        decision=resolution.decision,
-                    )
-                )
-                if not handled:
-                    self.conversation_state.update_pending_task_status(
-                        metadata_key="confirmation_id",
-                        metadata_value=resolution.confirmation_id,
-                        status="cancelled",
-                    )
+        meaning = await self._resolve_pending_confirmation_meaning(
+            user_text,
+            session_id=session_id,
+            pending=pending,
+        )
+        resolution = self.confirmation_dialogue.resolve(
+            meaning,
+            expected_confirmation_id=pending.confirmation_id,
+        )
+        if resolution.decision == "not_confirmation":
             return False
 
         self.conversation_state.record_user_turn(
@@ -6040,6 +6025,74 @@ class VoiceAssistant:
         self.conversation_state.record_agent_result(session_id, response)
         self._launch_interaction(response, session_id)
         return True
+
+    async def _resolve_pending_confirmation_meaning(
+        self,
+        user_text: str,
+        *,
+        session_id: str,
+        pending: PendingConfirmation,
+    ) -> ConfirmationReplyMeaning:
+        """Ask Goal Association for meaning; never infer it from user phrases."""
+
+        pending_goal_ids = pending_confirmation_goal_ids(pending)
+        if not pending_goal_ids:
+            self.session_log(
+                session_id,
+                "confirmation_semantics_failed_closed: confirmation_id=%s reason=missing_goal_scope",
+                pending.confirmation_id,
+            )
+            return "ambiguous"
+        context = self.build_context(session_id)
+        decision = RouteDecision(
+            route="chat",
+            intent="pending_confirmation_reply",
+            confidence=1.0,
+            language="zh-CN" if self._looks_zh(user_text) else "en-US",
+            needs_agent=True,
+            should_speak=False,
+            source="llm",
+        )
+        try:
+            session = await self.get_http_session()
+            association = await self.agent_client.resolve_goal_association(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+                timeout_ms=self.goal_association_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "confirmation_semantics_failed_closed: confirmation_id=%s reason=%s error=%s",
+                pending.confirmation_id,
+                type(exc).__name__,
+                str(exc)[:300],
+            )
+            return "ambiguous"
+        meaning = confirmation_meaning_from_goal_association(
+            association,
+            pending_goal_ids=pending_goal_ids,
+        )
+        self.session_log(
+            session_id,
+            "confirmation_semantics_resolved: confirmation_id=%s meaning=%s relationships=%s targets=%s",
+            pending.confirmation_id,
+            meaning,
+            ",".join(item.relationship for item in association.associations) or "none",
+            ",".join(
+                sorted(
+                    goal_id
+                    for item in association.associations
+                    for goal_id in item.target_goal_ids
+                )
+            )
+            or "none",
+        )
+        return meaning
 
     def _revoke_pending_confirmation_for_reflex(
         self,
@@ -9153,23 +9206,6 @@ class VoiceAssistant:
             )
         return text
 
-    @staticmethod
-    def _validate_runtime_ready_greeting_semantics(text: str) -> str:
-        normalized = " ".join(str(text or "").strip().split())
-        lowered = normalized.casefold()
-        if re.search(r"(?:我是|我叫)|(?:\bi(?:['’]m|\s+am)\b|my name is)", lowered):
-            raise RuntimeError(
-                "runtime ready greeting introduced the speaker"
-            )
-        if re.search(
-            r"(?:[0-9一二三四五六七八九十]+岁|year[- ]old)",
-            lowered,
-        ):
-            raise RuntimeError(
-                "runtime ready greeting repeated the speaker age"
-            )
-        return normalized
-
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
         try:
             configured = self._validate_spoken_text_contract(
@@ -9239,15 +9275,7 @@ class VoiceAssistant:
                     one_sentence=True,
                     language=self.runtime_ready_greeting_language,
                 )
-                if re.search(
-                    r"(?:妈妈|爸爸|妈咪|爹地|主人|哥哥|姐姐|爷爷|奶奶)",
-                    generated,
-                ):
-                    raise RuntimeError(
-                        "runtime ready greeting invented an unidentified relationship"
-                    )
                 self._validate_runtime_ready_greeting_completion(generated)
-                self._validate_runtime_ready_greeting_semantics(generated)
                 return generated, f"llm:{model}"
             except Exception as exc:
                 generation_error = exc

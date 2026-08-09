@@ -20,22 +20,6 @@ RouteName = Literal[
 Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
-_FAST_SPEECH_CONTRACT_MARKERS = {
-    "checking_only",
-    "prelude_only",
-    "needs_confirmation",
-    "acknowledge",
-    "acknowledge_and_check",
-    "clarify",
-    "thinking",
-    "safety_prelude",
-}
-
-
-def _fast_speech_marker(value: str | None) -> str:
-    return "_".join(str(value or "").strip().casefold().replace("-", "_").split())
-
-
 class FastSpeech(BaseModel):
     """Core-authored process acknowledgement preserved across services."""
 
@@ -56,7 +40,7 @@ class FastSpeech(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
+    def enforce_completion_claim_boundary(self) -> "FastSpeech":
         if self.must_not_claim_completion is not True:
             raise ValueError("fast_speech must forbid completion claims")
         if self.claim_state == "completed":
@@ -69,8 +53,6 @@ class FastSpeech(BaseModel):
             str(item or "").strip() for item in self.claimed_goal_ids
             if str(item or "").strip()
         ))
-        if _fast_speech_marker(self.text) in _FAST_SPEECH_CONTRACT_MARKERS:
-            self.text = ""
         return self
 
 
@@ -185,8 +167,6 @@ class RouteDecision(BaseModel):
 
     @model_validator(mode="after")
     def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
-        if _fast_speech_marker(self.speak_first) in _FAST_SPEECH_CONTRACT_MARKERS:
-            self.speak_first = None
         if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
             self.speak_first = self.fast_speech.text.strip()
         return self

@@ -1020,7 +1020,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", response.metadata["handled_by"])
         self.assertEqual(len(ollama.calls), 1)
 
-    async def test_capability_unsupported_status_label_gets_natural_fallback_without_conversation(self) -> None:
+    async def test_capability_speech_is_not_reclassified_from_status_words(self) -> None:
         request = _request(
             text="Walk forward for 15 seconds.",
             route="robot_action",
@@ -1039,10 +1039,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ).run(request)
 
         self.assertEqual(response.metadata["capability_decision"], "unsupported")
-        self.assertEqual(
-            response.speech[0].text,
-            "I got stuck forming that answer. Please say it again.",
-        )
+        self.assertEqual(response.speech[0].text, "unsupported")
         self.assertEqual(response.skills, [])
 
     async def test_deep_thought_route_survives_capability_preflight(self) -> None:

@@ -31,20 +31,6 @@ logger = logging.getLogger("chromie.agent.tool_result_interpreter")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_])[-+]?\d+(?:\.\d+)?")
 _SENTENCE_END_RE = re.compile(r"(?:[!?。！？]+|(?<!\d)\.(?!\d))")
 
-_INTERNAL_NARRATION_MARKERS = (
-    "请求的任务",
-    "任务已完成",
-    "观测结果",
-    "执行状态",
-    "requested task",
-    "task completed",
-    "observed output",
-    "execution status",
-    "tool result",
-    "evidence id",
-)
-
-
 class ToolResultModelOutput(BaseModel):
     """Small model-facing DTO. Evidence identity and validation remain trusted."""
 
@@ -531,12 +517,6 @@ class ToolResultInterpreter:
             raise ValueError("tool result spoken response exceeds the sentence budget")
         if any(token in response for token in ("{", "}", "[", "]")):
             raise ValueError("tool result spoken response looks like a raw payload")
-        if cls._contains_unrequested_internal_narration(
-            response,
-            user_request=request.user_request,
-        ):
-            raise ValueError("tool result response narrates internal execution state")
-
         folded = response.casefold()
         forbidden = {
             item.evidence_id.casefold()
@@ -591,19 +571,6 @@ class ToolResultInterpreter:
                 raise ValueError("selected tool fact JSON Pointer traverses a scalar")
         return current
 
-    @staticmethod
-    def _contains_unrequested_internal_narration(
-        text: str,
-        *,
-        user_request: str,
-    ) -> bool:
-        folded = text.casefold()
-        request_folded = user_request.casefold()
-        return any(
-            marker in folded and marker not in request_folded
-            for marker in _INTERNAL_NARRATION_MARKERS
-        )
-
     @classmethod
     def _validated_fallback(cls, request: ToolResultInterpretationRequest) -> str:
         text = " ".join(request.fallback_response.strip().split())
@@ -611,11 +578,6 @@ class ToolResultInterpreter:
             return ""
         sentence_count = max(1, len(_SENTENCE_END_RE.findall(text)))
         if sentence_count > request.max_sentences:
-            return ""
-        if cls._contains_unrequested_internal_narration(
-            text,
-            user_request=request.user_request,
-        ):
             return ""
         return text
 

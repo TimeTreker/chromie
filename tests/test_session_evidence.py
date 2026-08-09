@@ -145,11 +145,11 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(interpretation_records[-1]["severity"], "warning")
             self.assertEqual(skill_records[-1]["severity"], "error")
 
-    def test_failure_speech_can_be_colored_yellow_in_cli(self) -> None:
+    def test_tts_text_does_not_determine_log_severity_or_color(self) -> None:
         tracker = SessionTracker(event_log_path=None)
         sid = tracker.create()
         with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
-            with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
+            with self.assertLogs("orchestrator.runtime.session", level="INFO") as info_logs:
                 tracker.log(
                     sid,
                     "tts_schedule: order=%s chars=%s scheduled_tts=%s generation=%s text=%r",
@@ -159,7 +159,8 @@ class SessionEvidenceTests(unittest.TestCase):
                     12,
                     "I cannot perform that action.",
                 )
-        self.assertTrue(any("\033[33m" in line for line in warning_logs.output))
+        self.assertTrue(any("I cannot perform that action." in line for line in info_logs.output))
+        self.assertTrue(all("\033[33m" not in line for line in info_logs.output))
 
 
     def test_llm_truncation_events_are_colored_red_in_cli(self) -> None:

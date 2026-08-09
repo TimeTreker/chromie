@@ -96,7 +96,10 @@
           "intent": "capability:soridormi.walk_forward",
           "confidence": 0.95,
           "language": "zh-CN",
-          "source": "llm"
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task"
+          }
         },
         "ollama_replies": [
           {

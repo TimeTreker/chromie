@@ -1675,7 +1675,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertNotEqual(result.composition.composition_id, "model-owned")  # type: ignore[union-attr]
         self.assertEqual(result.composition.canonical_plan, canonical)  # type: ignore[union-attr]
 
-    def test_pending_physical_stage_direction_gets_one_truthful_repair(self):
+    def test_pending_speech_is_not_reclassified_by_capability_token_rules(self):
         canonical = CanonicalPlan(
             plan_id="plan-fast-mixed-claim",
             planner_tier="fast",
@@ -1708,36 +1708,22 @@ class ResponseComposerResolverTests(unittest.TestCase):
         invalid = {
             "response_plan": {
                 "pre_action": {
-                    "text": "*Blinks twice* Why do robots avoid water?",
+                    "text": "（blinked twice）为什么机器人怕水？",
                     "commitment_state": "evaluating",
                     "must_not_claim_completion": True,
                     "covers_goal_ids": ["goal-blink", "goal-joke"],
                 }
             }
         }
-        repaired = {
-            "response_plan": {
-                "pre_action": {
-                    "text": "我会眨两次眼。为什么机器人怕水？",
-                    "commitment_state": "evaluating",
-                    "must_not_claim_completion": True,
-                    "covers_goal_ids": ["goal-blink", "goal-joke"],
-                }
-            }
-        }
-        ollama = ScriptedOllama([invalid, repaired])
+        ollama = ScriptedOllama([invalid])
 
         result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
 
         self.assertEqual(result.status, "resolved")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "pending physical action stage direction claims completion",
-            ollama.prompts[1][0],
-        )
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
             result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
-            "我会眨两次眼。为什么机器人怕水？",
+            "（blinked twice）为什么机器人怕水？",
         )
 
     def test_effectful_reviewer_cannot_drop_mixed_execute_goal_coverage(self):

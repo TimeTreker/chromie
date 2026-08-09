@@ -643,6 +643,20 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.interaction_runtime = _Runtime()
         assistant.session_log = MethodType(session_log, assistant)
         assistant._launch_interaction = MethodType(launch_interaction, assistant)
+        async def resolve_confirmation(
+            self: VoiceAssistant,
+            user_text: str,
+            *,
+            session_id: str,
+            pending: Any,
+        ) -> str:
+            del self, user_text, session_id, pending
+            return "reject"
+
+        assistant._resolve_pending_confirmation_meaning = MethodType(
+            resolve_confirmation,
+            assistant,
+        )
         natural_prompt = (
             "I can't do those actions together yet, but I can walk first and "
             "blink next. Is that okay? Say “yes” and I’ll get started!"
@@ -767,6 +781,20 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.interaction_runtime = _Runtime()
         assistant.session_log = MethodType(session_log, assistant)
         assistant._launch_interaction = MethodType(launch_interaction, assistant)
+        async def resolve_confirmation(
+            self: VoiceAssistant,
+            user_text: str,
+            *,
+            session_id: str,
+            pending: Any,
+        ) -> str:
+            del self, user_text, session_id, pending
+            return "confirm"
+
+        assistant._resolve_pending_confirmation_meaning = MethodType(
+            resolve_confirmation,
+            assistant,
+        )
         response = InteractionResponse(
             interaction_id="interaction-confirm-approved",
             skills=[

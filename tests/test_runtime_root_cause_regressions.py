@@ -915,14 +915,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ),
             "嗨，我醒啦！",
         )
-        with self.assertRaisesRegex(RuntimeError, "introduced the speaker"):
-            VoiceAssistant._validate_runtime_ready_greeting_semantics(
-                "你好，我是Chromie。"
-            )
-        with self.assertRaisesRegex(RuntimeError, "speaker age"):
-            VoiceAssistant._validate_runtime_ready_greeting_semantics(
-                "嗨，我六岁啦！"
-            )
 
     def test_wake_up_prompt_uses_grounded_time_without_unverified_state(self) -> None:
         assistant = object.__new__(VoiceAssistant)

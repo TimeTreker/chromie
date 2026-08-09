@@ -74,16 +74,6 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_CAPABILITY_MATCH_MIN_SCORE",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "acceptance_override",
       "key": "AGENT_CAPABILITY_NUM_CTX",
       "owners": [
@@ -713,16 +703,6 @@
       "boolean": false,
       "category": "service_internal",
       "key": "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -3133,15 +3113,6 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
-      "key": "ORCH_CONVERSATION_RESET_PHRASES",
-      "owners": [
-        "orchestrator/runtime/conversation_state.py",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "profile_constant",
       "key": "ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS",
       "owners": [
@@ -4876,10 +4847,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 146,
       "public_choice": 9,
-      "service_internal": 247
+      "service_internal": 244
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 459
+    "total_keys": 456
   }
 }

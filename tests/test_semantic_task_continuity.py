@@ -375,8 +375,8 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
 
         self.assertIn("task-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
-        self.assertIn("metadata.semantic_task_operations", prompt)
-        self.assertIn("never keywords, regexes", prompt)
+        self.assertIn("semantic_task_operations may advise", prompt)
+        self.assertIn("by meaning, not lexical shortcuts", prompt)
         self.assertIn("open goal", prompt)
 
 

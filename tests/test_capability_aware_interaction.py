@@ -750,6 +750,20 @@ class _AdverbSpeedOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
         assert '"quick"' in prompt
+        if "Repair the capability plan's unresolved or invalid parameters" in prompt:
+            assert "Structural parameter issues JSON" in prompt
+            assert kwargs["response_format"] == "json"
+            return {
+                "decision": "execute",
+                "speech": "Walking ahead quickly.",
+                "skills": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 1.0, "speed": "quick"},
+                    }
+                ],
+                "assessment": {"enum_mapping": "model_repair"},
+            }
         assert "Every enum argument must be copied exactly" in prompt
         assert "Map natural wording to enum tokens by semantic meaning" in prompt
         assert kwargs["response_format"] == "json"
@@ -786,7 +800,7 @@ class _ProposalAdjustedWalkOllama:
                         "duration_requested_s": 15,
                         "speed_modifier": "fast",
                     },
-                    "proposed_args": {"duration_s": 15, "speed": "quickly"},
+                    "proposed_args": {"duration_s": 15, "speed": "quick"},
                     "parameter_grounding": {
                         "duration_s": {
                             "source_text": "15 seconds",
@@ -1227,7 +1241,7 @@ def _catalog_with_invoker(invoker: Any) -> CapabilityCatalog:
             )
         ]
     )
-    return CapabilityCatalog(registry, live_invoker=invoker, min_score=0.10)
+    return CapabilityCatalog(registry, live_invoker=invoker)
 
 
 class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
@@ -1264,7 +1278,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", response.metadata["handled_by"])
         self.assertNotIn("capability_agent", response.metadata["handled_by"])
 
-    async def test_capability_plan_normalizes_schema_enum_adverbs(self) -> None:
+    async def test_capability_plan_uses_model_repair_for_invalid_enum_wording(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_AdverbSpeedOllama(),  # type: ignore[arg-type]
@@ -1293,7 +1307,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args["speed"], "quick")
-        self.assertTrue(response.skills[0].metadata["schema_normalized_args"])
+        self.assertNotIn("schema_normalized_args", response.skills[0].metadata)
 
     async def test_capability_agent_adjudicates_llm_proposal_with_bounded_adjustment(self) -> None:
         runtime = InteractionRuntime(

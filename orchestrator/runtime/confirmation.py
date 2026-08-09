@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 from uuid import uuid4
 
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
 ConfirmationDecision = Literal[
@@ -20,57 +20,9 @@ ConfirmationDecision = Literal[
     "no_pending",
     "not_confirmation",
 ]
+ConfirmationReplyMeaning = Literal["confirm", "reject", "ambiguous"]
 
-_AFFIRMATIVE_PHRASES = frozenset(
-    {
-        "yes",
-        "yes please",
-        "confirm",
-        "confirmed",
-        "proceed",
-        "go ahead",
-        "do it",
-        "ok",
-        "okay",
-        "是",
-        "是的",
-        "好",
-        "好的",
-        "确认",
-        "可以",
-        "执行",
-        "请执行",
-    }
-)
-_NEGATIVE_PHRASES = frozenset(
-    {
-        "no",
-        "no thanks",
-        "do not",
-        "don't",
-        "cancel",
-        "stop",
-        "never mind",
-        "nevermind",
-        "不",
-        "不要",
-        "取消",
-        "停止",
-        "算了",
-    }
-)
-_OPERATIONAL_INTERRUPT_PHRASES = frozenset(
-    {
-        "stop",
-        "cancel",
-        "emergency",
-        "emergency stop",
-        "停止",
-        "取消",
-        "急停",
-        "紧急停止",
-    }
-)
+
 @dataclass(frozen=True)
 class PendingConfirmation:
     confirmation_id: str
@@ -204,23 +156,29 @@ class ConfirmationDialogue:
         self._pending = None
         return pending
 
-    def resolve(self, text: str | None) -> ConfirmationResolution:
-        normalized = _normalize_reply(text)
+    def resolve(
+        self,
+        meaning: ConfirmationReplyMeaning,
+        *,
+        expected_confirmation_id: str | None = None,
+    ) -> ConfirmationResolution:
+        """Apply a typed semantic decision to the exact pending request.
+
+        Language understanding is owned by Goal Association. This class owns
+        only token lifetime, request identity, single use, and fail-closed
+        authorization.
+        """
+
         pending = self._pending
         if pending is None:
-            # Without a bound pending request, an affirmative or negative reply is
-            # ordinary conversation context, not a confirmation event. Let Goal
-            # Association interpret it instead of emitting a Host-authored status
-            # sentence in the wrong language or conversational frame.
+            return ConfirmationResolution(decision="not_confirmation")
+        if (
+            expected_confirmation_id is not None
+            and pending.confirmation_id != expected_confirmation_id
+        ):
             return ConfirmationResolution(decision="not_confirmation")
 
         self._pending = None
-        if normalized in _OPERATIONAL_INTERRUPT_PHRASES:
-            return self._resolution(
-                pending,
-                "operational_interrupt",
-                "The pending action was cancelled.",
-            )
         if pending.expires_at <= self._clock():
             return self._resolution(
                 pending,
@@ -236,14 +194,14 @@ class ConfirmationDialogue:
                 "ambiguous",
                 "The requested action changed, so I will not perform it.",
             )
-        if normalized in _AFFIRMATIVE_PHRASES:
+        if meaning == "confirm":
             return self._resolution(
                 pending,
                 "approved",
                 "Confirmed.",
                 include_request=True,
             )
-        if normalized in _NEGATIVE_PHRASES:
+        if meaning == "reject":
             return self._resolution(
                 pending,
                 "denied",
@@ -279,12 +237,56 @@ class ConfirmationDialogue:
         )
 
 
-def _normalize_reply(text: str | None) -> str:
-    normalized = " ".join((text or "").strip().casefold().split())
-    normalized = re.sub(r"[,;:，、；：]+", " ", normalized)
-    normalized = " ".join(normalized.split())
-    return re.sub(r"[.!?。！？]+$", "", normalized).strip()
+def pending_confirmation_goal_ids(
+    pending: PendingConfirmation,
+) -> set[str]:
+    """Return the exact Goals owned by the confirmation-bound requests."""
 
+    goal_ids: set[str] = set()
+    for request in pending.response.skills:
+        if request.request_id not in pending.confirmed_request_ids:
+            continue
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        raw_goal_ids = metadata.get("source_goal_ids")
+        if isinstance(raw_goal_ids, str):
+            raw_goal_ids = [raw_goal_ids]
+        if not isinstance(raw_goal_ids, list):
+            continue
+        goal_ids.update(
+            str(goal_id).strip()
+            for goal_id in raw_goal_ids
+            if str(goal_id).strip()
+        )
+    return goal_ids
+
+
+def confirmation_meaning_from_goal_association(
+    association: GoalAssociationResolution,
+    *,
+    pending_goal_ids: set[str],
+) -> ConfirmationReplyMeaning:
+    """Validate model-owned confirmation meaning against the exact scope."""
+
+    if (
+        not pending_goal_ids
+        or association.clarification
+        or association.new_goals
+        or not association.associations
+    ):
+        return "ambiguous"
+    relationships = {item.relationship for item in association.associations}
+    targeted_goal_ids = {
+        goal_id
+        for item in association.associations
+        for goal_id in item.target_goal_ids
+    }
+    if targeted_goal_ids != pending_goal_ids:
+        return "ambiguous"
+    if relationships == {"confirm"}:
+        return "confirm"
+    if relationships == {"reject"}:
+        return "reject"
+    return "ambiguous"
 
 def _request_fingerprint(
     response: InteractionResponse,

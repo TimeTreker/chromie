@@ -140,57 +140,6 @@ class SemanticRouteRepairOutput(BaseModel):
         default_factory=list, max_length=8
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_missing_ability_intent(
-        cls, value: Any
-    ) -> Any:
-        """Canonicalize model wording for the typed missing-ability branch.
-
-        The semantic repair model may express the same branch with a nearby
-        label (for example ``missing_or_supported_ability``).  Metadata carrying
-        ``desired_abilities`` is already an unambiguous declaration that the
-        model selected the missing-ability branch, so normalize it before the
-        strict branch validator runs.  This is contract normalization only; it
-        does not infer an ability from user text or catalog keywords.
-        """
-
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        intent = "_".join(
-            str(normalized.get("intent") or "")
-            .strip()
-            .casefold()
-            .replace("-", "_")
-            .split()
-        )
-        metadata = normalized.get("metadata")
-        has_desired_abilities = (
-            isinstance(metadata, dict)
-            and isinstance(metadata.get("desired_abilities"), list)
-            and bool(metadata.get("desired_abilities"))
-        )
-        missing_aliases = {
-            "missing_or_unsupported_ability",
-            "missing_or_supported_ability",
-            "missing_ability",
-            "unsupported_ability",
-            "ability_unavailable",
-            "capability_missing",
-        }
-        if has_desired_abilities or intent in missing_aliases:
-            normalized["intent"] = "missing_or_unsupported_ability"
-            # Compatibility for one release boundary: older models authored the
-            # limitation directly in speak_first.  Treat it as the limitation body
-            # so the Host can still place a localized apology before it.
-            if not str(normalized.get("limitation") or "").strip():
-                legacy = str(normalized.get("speak_first") or "").strip()
-                if legacy:
-                    normalized["limitation"] = legacy
-                    normalized["speak_first"] = None
-        return normalized
-
     @model_validator(mode="after")
     def validate_missing_ability_terminal(self) -> "SemanticRouteRepairOutput":
         is_missing = self.intent == "missing_or_unsupported_ability"
@@ -210,10 +159,6 @@ class SemanticRouteRepairOutput(BaseModel):
             if str(self.speak_first or "").strip():
                 raise ValueError(
                     "missing_or_unsupported_ability speech is Host-composed from limitation"
-                )
-            if str(self.limitation or "").rstrip().endswith(("?", "？")):
-                raise ValueError(
-                    "missing_or_unsupported_ability limitation must not ask a question"
                 )
             if self.metadata is None or not self.metadata.desired_abilities:
                 raise ValueError(
@@ -3618,11 +3563,9 @@ class OllamaGoalInterpreter:
                 exc,
             )
             return decision
-        # Ambient suppression is intentionally fail-open. A direct speech act,
-        # an unclear act, or question punctuation contradicts addressed=false
-        # and therefore cannot silently discard the already grounded route.
-        # This is a structural interaction contract, not normal intent routing.
-        direct_question_form = request.text.rstrip().endswith(("?", "？"))
+        # Ambient suppression is intentionally fail-open. The model's typed
+        # speech act owns addressedness semantics; punctuation is not a Host
+        # substitute for that decision.
         if addressed or confidence < 0.72:
             return decision
         fail_open_reason = ""
@@ -3630,8 +3573,6 @@ class OllamaGoalInterpreter:
             fail_open_reason = "direct_speech_act"
         elif speech_act == "unclear":
             fail_open_reason = "unclear_speech_act"
-        elif direct_question_form:
-            fail_open_reason = "direct_question_form"
         elif speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
             fail_open_reason = "unsupported_speech_act"
         if fail_open_reason:

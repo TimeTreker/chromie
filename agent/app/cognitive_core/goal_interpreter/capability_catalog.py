@@ -26,12 +26,10 @@ class CapabilityCatalogClient:
         base_url: str,
         *,
         timeout_ms: int = 600,
-        limit: int = 8,
         snapshot_cache_ttl_ms: int = 5000,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_s = max(0.05, int(timeout_ms) / 1000.0)
-        self.limit = max(1, min(int(limit), 32))
         self.snapshot_cache_ttl_s = max(0.0, int(snapshot_cache_ttl_ms) / 1000.0)
         self._snapshot_cache: dict[str, Any] | None = None
         self._snapshot_cache_expires_at = 0.0
@@ -46,7 +44,6 @@ class CapabilityCatalogClient:
                     json={
                         "text": text,
                         "language": language or "auto",
-                        "limit": self.limit,
                         "prefer_interaction_executable": True,
                     },
                 )

@@ -493,7 +493,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("no robot_action route or skill request is present", ollama.calls[1]["prompt"])
         self.assertIn("claims Chromie will now execute movement", ollama.calls[1]["system"])
 
-    async def test_chat_route_stage_direction_action_is_blocked_without_reviewer(self) -> None:
+    async def test_chat_route_preserves_model_speech_without_host_phrase_guard(self) -> None:
         ollama = _CapturingOllama("好的，没问题！(眨了眨眼睛) 👁️👁️")
         agent = ConversationAgent(
             AgentServices(
@@ -521,10 +521,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         result = await agent.run(request, AgentResult())
 
         self.assertEqual(len(ollama.calls), 1)
-        self.assertIn("没有生成可执行动作", result.speak_immediate[0].text)
-        self.assertIn("不会假装", result.speak_immediate[0].text)
-        self.assertNotIn("眨了眨眼睛", result.speak_immediate[0].text)
-        self.assertNotIn("👁️", result.speak_immediate[0].text)
+        self.assertEqual(result.speak_immediate[0].text, "好的，没问题！(眨了眨眼睛) 👁️👁️")
 
     async def test_subjective_preference_disclaimer_is_retried_as_robot_persona(self) -> None:
         ollama = _CapturingOllama(

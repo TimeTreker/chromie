@@ -35,10 +35,6 @@ from scripts.outcome_observations import (  # noqa: E402
     observation_type_for_skill,
     validate_expected_observations,
 )
-from shared.chromie_contracts.semantic_task import (  # noqa: E402
-    pending_action_stage_direction_claims,
-)
-
 DEFAULT_MANIFEST = ROOT / "scenarios" / "general_ability_acceptance.json"
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "general-ability"
 LEVEL_A_CLAIM = (
@@ -78,7 +74,6 @@ class TextScenarioCase:
     expected_fast_planner_path: str = ""
     expect_deep_planner_invoked: bool | None = None
     expect_no_fast_contract_failure: bool = False
-    forbid_pending_action_stage_directions: bool = False
     expected_observations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     expected_observation_sequence: tuple[str, ...] = field(default_factory=tuple)
     min_new_goal_count: int = 0
@@ -598,13 +593,6 @@ def validate_live_text_result(
         ]
         if runtime_metadata.get("fast_planner_path") == "contract_failure" or fast_failures:
             record_internal("Fast Planner contract failure remained in retained evidence")
-    if case.forbid_pending_action_stage_directions:
-        claims = pending_action_stage_direction_claims(speech, task_skills)
-        if claims:
-            errors.append(
-                "speech narrated pending physical action as completed stage direction: "
-                + ",".join(claims)
-            )
     summary["user_outcome"]["internal_diagnostics"] = internal_diagnostics
     summary["user_outcome"]["ok"] = not errors
     summary["diagnostic_evaluation"] = diagnostic_evaluation(
@@ -679,9 +667,6 @@ def _text_scenario_case(
         ),
         expect_no_fast_contract_failure=bool(
             raw.get("expect_no_fast_contract_failure", False)
-        ),
-        forbid_pending_action_stage_directions=bool(
-            raw.get("forbid_pending_action_stage_directions", False)
         ),
         expected_observations=tuple(
             dict(item)

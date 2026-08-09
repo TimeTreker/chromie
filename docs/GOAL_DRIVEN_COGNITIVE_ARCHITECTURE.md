@@ -707,15 +707,13 @@ Host-marked evidence-bound dialogue that was already delivered for that Goal.
 A verified-result index without that dialogue is provenance, not factual answer
 evidence, and requires explicit retrieval, a fresh read, or escalation.
 
-### 6.7 Explicit reset is narrower than semantic cancellation
+### 6.7 Conversation reset is a semantic control
 
-Whole-conversation reset is an operational control and requires an explicit
-whole-utterance instruction such as “start a new conversation” or “reset the
-session.” Phrases such as “算了”, “不用了”, or “never mind” are semantically
-ambiguous. They must reach Goal Association so the model can determine whether
-one goal, several goals, or the current proposal is being cancelled.
-
-A deterministic reset phrase table must never pre-empt normal goal association.
+Natural-language whole-conversation reset is a semantic decision and must reach
+the Cognitive Core. The Host may apply a validated typed reset decision, but it
+must not infer reset from a whole-utterance phrase table. Ambiguous cancellation
+or reset language reaches Goal Association so the model can determine whether
+one goal, several goals, a proposal, or the conversation is being changed.
 
 ## 7. Multi-goal segmentation
 

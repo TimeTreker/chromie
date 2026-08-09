@@ -94,14 +94,7 @@ class FastSpeech(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
-        """Drop enum/contract labels that a small LLM placed in text.
-
-        Values such as ``checking_only`` are routing contract metadata, not
-        playable speech.  Clearing the text lets the goal-interpreter repair path or the
-        downstream LLM produce natural language instead of speaking the marker.
-        """
-
+    def enforce_completion_claim_boundary(self) -> "FastSpeech":
         if self.must_not_claim_completion is not True:
             raise ValueError("fast_speech must forbid completion claims")
         if self.claim_state == "completed":
@@ -114,18 +107,6 @@ class FastSpeech(BaseModel):
             str(item or "").strip() for item in self.claimed_goal_ids
             if str(item or "").strip()
         ))
-        marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
-        if marker in {
-            "checking_only",
-            "prelude_only",
-            "needs_confirmation",
-            "acknowledge",
-            "acknowledge_and_check",
-            "clarify",
-            "thinking",
-            "safety_prelude",
-        }:
-            self.text = ""
         return self
 
 
@@ -191,19 +172,6 @@ class RouteDecision(BaseModel):
 
     @model_validator(mode="after")
     def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
-        if self.speak_first:
-            marker = "_".join(str(self.speak_first).strip().casefold().replace("-", "_").split())
-            if marker in {
-                "checking_only",
-                "prelude_only",
-                "needs_confirmation",
-                "acknowledge",
-                "acknowledge_and_check",
-                "clarify",
-                "thinking",
-                "safety_prelude",
-            }:
-                self.speak_first = None
         if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
             self.speak_first = self.fast_speech.text.strip()
         return self
@@ -307,18 +275,16 @@ def _task_proposals_for_items(task_list: list[dict[str, Any]]) -> list[dict[str,
 def _desired_ability_items(decision: RouteDecision) -> list[dict[str, Any]]:
     metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
     raw = metadata.get("desired_abilities")
-    if raw is None:
-        raw = metadata.get("ability_proposals")
     if not isinstance(raw, list):
         return []
     return [item for item in raw if isinstance(item, dict)]
 
 
 def _state_for_desired_ability_status(status: str) -> str:
-    normalized = "_".join(status.strip().lower().split())
-    if normalized in {"missing_ability", "known_missing", "not_executable", "unsupported"}:
+    normalized = status.strip()
+    if normalized == "missing_ability":
         return "missing_ability"
-    if normalized in {"forbidden", "unsafe", "refused"}:
+    if normalized == "refused":
         return "refused"
     return "advisory"
 

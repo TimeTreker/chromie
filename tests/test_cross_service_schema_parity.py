@@ -37,7 +37,7 @@ class CrossServiceSchemaParityTests(unittest.TestCase):
                 "raises": False,
             },
             {
-                "name": "contract_markers_are_not_playable",
+                "name": "spoken_text_is_not_reclassified_from_enum_words",
                 "payload": {
                     "route": "tool",
                     "fast_speech": {
@@ -52,7 +52,11 @@ class CrossServiceSchemaParityTests(unittest.TestCase):
                         }
                     ],
                 },
-                "expected": ("", None, ""),
+                "expected": (
+                    "acknowledge-and-check",
+                    "checking only",
+                    "safety prelude",
+                ),
                 "raises": False,
             },
             {

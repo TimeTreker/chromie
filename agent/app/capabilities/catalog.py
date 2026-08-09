@@ -3,8 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import math
-import re
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -64,95 +62,6 @@ SAFETY_LOCKED_PROMPT_TIER_TAGS = {
     "safety_sensitive",
 }
 
-_STOP_WORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "at",
-    "be",
-    "can",
-    "could",
-    "do",
-    "for",
-    "from",
-    "i",
-    "in",
-    "is",
-    "it",
-    "me",
-    "my",
-    "of",
-    "on",
-    "one",
-    "please",
-    "slowly",
-    "the",
-    "this",
-    "to",
-    "you",
-    "your",
-    "一",
-    "下",
-    "个",
-    "你",
-    "吗",
-    "呢",
-    "吧",
-    "可",
-    "以",
-    "会",
-    "能",
-    "我",
-    "想",
-    "请",
-    "帮",
-    "麻",
-    "烦",
-}
-
-def _normalize_token(token: str) -> str:
-    token = token.strip().lower()
-    for suffix in ("ing", "ed", "es", "s"):
-        if len(token) > len(suffix) + 2 and token.endswith(suffix):
-            token = token[: -len(suffix)]
-            break
-    if len(token) > 3 and token[-1] == token[-2]:
-        token = token[:-1]
-    return token
-
-
-def _tokens(text: str) -> set[str]:
-    raw = re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]", (text or "").lower())
-    expanded: list[str] = []
-    for token in raw:
-        expanded.extend(part for part in token.split("_") if part)
-    normalized = {
-        _normalize_token(token)
-        for token in expanded
-        if token and token not in _STOP_WORDS and not (len(token) == 1 and token.isascii())
-    }
-    normalized.discard("")
-    return normalized
-
-
-def _schema_terms(schema: dict[str, Any]) -> str:
-    terms: list[str] = []
-
-    def walk(value: Any) -> None:
-        if isinstance(value, dict):
-            for key, item in value.items():
-                if key in {"properties", "required", "enum", "description", "title"}:
-                    terms.append(str(item))
-                walk(item)
-        elif isinstance(value, list):
-            for item in value:
-                walk(item)
-
-    walk(schema)
-    return " ".join(terms)
-
-
 def json_compact(value: Any, *, max_chars: int = 420) -> str:
     text = json.dumps(value or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     if len(text) > max_chars:
@@ -187,21 +96,6 @@ class CatalogCapability(BaseModel):
     resource_claims: list[str] = Field(default_factory=list)
     execution_constraints: dict[str, Any] = Field(default_factory=dict)
 
-    def searchable_text(self) -> str:
-        return " ".join(
-            [
-                self.capability_id.replace(".", " "),
-                self.agent_id.replace(".", " "),
-                self.description,
-                " ".join(self.effects),
-                " ".join(self.tags),
-                " ".join(self.behavior_domains),
-                " ".join(str(value) for value in self.hints.values()),
-                _schema_terms(self.input_schema),
-            ]
-        )
-
-
 class CapabilityMatch(CatalogCapability):
     score: float = Field(ge=0.0, le=1.0)
 
@@ -220,7 +114,6 @@ class CapabilitySearchRequest(BaseModel):
     text: str
     language: str = "auto"
     limit: int = Field(default=8, ge=1, le=32)
-    min_score: float | None = Field(default=None, ge=0.0, le=1.0)
     refresh: bool = False
     prefer_interaction_executable: bool = True
 
@@ -243,7 +136,6 @@ class CapabilityCatalog:
         *,
         live_invoker: CapabilityInvoker | None = None,
         refresh_ttl_s: float = 30.0,
-        min_score: float = 0.16,
         prompt_tier_preset: Mapping[str, Any] | None = None,
         prompt_tier_overrides: Mapping[str, Any] | None = None,
         behavior_domain_preset: Mapping[str, Any] | None = None,
@@ -251,7 +143,6 @@ class CapabilityCatalog:
         self.registry = registry
         self.live_invoker = live_invoker
         self.refresh_ttl_s = max(1.0, float(refresh_ttl_s))
-        self.min_score = max(0.0, min(1.0, float(min_score)))
         if prompt_tier_preset is None:
             prompt_tier_preset = self.load_prompt_tier_preset(None)
         self.prompt_tier_presets = self._normalize_prompt_tier_entries(prompt_tier_preset)
@@ -332,103 +223,40 @@ class CapabilityCatalog:
         *,
         language: str = "auto",
         limit: int = 8,
-        min_score: float | None = None,
         refresh: bool = False,
         prefer_interaction_executable: bool = True,
     ) -> CapabilitySearchResult:
-        del language  # Reserved for future multilingual embeddings.
+        """Return a bounded, model-neutral view of the capability catalog.
+
+        This compatibility endpoint deliberately does not infer relevance,
+        routes, or agents from user text.  Language meaning belongs to Goal
+        Interpretation and the semantic planners, which receive the declared
+        capability contracts directly.
+        """
+
+        del language
         await self.refresh_live_named_skills(force=refresh)
         query = " ".join((text or "").strip().split())
-        query_tokens = _tokens(query)
-        threshold = self.min_score if min_score is None else float(min_score)
-        scored: list[CapabilityMatch] = []
-        for entry in self.entries():
-            if not entry.available:
-                continue
-            score = self._score(query, query_tokens, entry)
-            if score <= 0:
-                continue
-            scored.append(
-                CapabilityMatch(
-                    **entry.model_dump(mode="python"),
-                    score=round(score, 4),
-                )
-            )
-        scored.sort(
-            key=lambda item: (
-                item.score,
-                item.interaction_executable,
-                item.invocation_kind == "named_skill",
-                item.capability_id,
-            ),
-            reverse=True,
-        )
-        if prefer_interaction_executable:
-            # The normal InteractionRuntime can directly execute live named
-            # skills, while static MCP tools are routing/planning context only.
-            # Once an executable candidate clears the same relevance threshold,
-            # keep it ahead of non-executable entries even when a planning tool
-            # has slightly stronger lexical overlap. Static entries remain in
-            # the result so downstream planners still retain full context.
-            executable_matches = {
-                item.capability_id
-                for item in scored
-                if item.interaction_executable and item.score >= threshold
-            }
-            if executable_matches:
-                scored.sort(
-                    key=lambda item: (
-                        item.capability_id in executable_matches,
-                        item.score,
-                        item.invocation_kind == "named_skill",
-                        item.capability_id,
-                    ),
-                    reverse=True,
-                )
         limit = max(1, int(limit))
-        if len(scored) < limit:
-            seen = {item.capability_id for item in scored}
-            context_fill = [
-                CapabilityMatch(
-                    **entry.model_dump(mode="python"),
-                    score=0.0,
-                )
-                for entry in sorted(
-                    (item for item in self.entries() if item.available and item.capability_id not in seen),
-                    key=lambda item: (
-                        item.interaction_executable,
-                        item.invocation_kind == "named_skill",
-                        item.capability_id,
-                    ),
-                    reverse=True,
-                )
-            ]
-            scored.extend(context_fill[: max(0, limit - len(scored))])
-        if not scored:
-            scored = [
-                CapabilityMatch(
-                    **entry.model_dump(mode="python"),
-                    score=0.0,
-                )
-                for entry in sorted(
-                    (item for item in self.entries() if item.available),
-                    key=lambda item: (
-                        item.interaction_executable,
-                        item.invocation_kind == "named_skill",
-                        item.capability_id,
-                    ),
-                    reverse=True,
-                )
-            ]
-        matches = scored[:limit]
-        matched = bool(matches and matches[0].score >= threshold)
-        route = self._route_for(matches) if matched else "chat"
-        agents = self._agents_for(route, matches) if matched else []
+        available = [item for item in self.entries() if item.available]
+        available.sort(
+            key=lambda item: (
+                item.prompt_tier != "common",
+                not item.interaction_executable if prefer_interaction_executable else False,
+                item.prompt_tier_locked,
+                item.route,
+                item.capability_id,
+            )
+        )
+        matches = [
+            CapabilityMatch(**entry.model_dump(mode="python"), score=0.0)
+            for entry in available[:limit]
+        ]
         return CapabilitySearchResult(
             query=query,
-            matched=matched,
-            suggested_route=route,
-            suggested_agents=agents,
+            matched=False,
+            suggested_route="chat",
+            suggested_agents=[],
             matches=matches,
             catalog_version=self._version,
             live_refresh_error=self._last_refresh_error,
@@ -441,12 +269,8 @@ class CapabilityCatalog:
         language: str = "en",
         limit: int = 12,
     ) -> str:
-        if text:
-            result = await self.search(text, language=language, limit=limit, min_score=0.0)
-            entries: list[CatalogCapability] = list(result.matches)
-        else:
-            await self.refresh_live_named_skills()
-            entries = [item for item in self.entries() if item.available]
+        del text
+        entries = await self.prompt_entries(scope="all")
         zh = language.lower().startswith("zh")
         header = "Chromie 当前可用能力：" if zh else "Available Chromie capabilities:"
         lines = [header]
@@ -985,57 +809,3 @@ class CapabilityCatalog:
         if effects <= {"user_interaction", "audio_input", "audio_output", "read_only"} and tool.agent_id == "chromie.speech":
             return "chat"
         return "tool"
-
-    def _score(
-        self,
-        query: str,
-        query_tokens: set[str],
-        entry: CatalogCapability,
-    ) -> float:
-        if not query_tokens:
-            return 0.0
-        searchable = entry.searchable_text().lower()
-        doc_tokens = _tokens(searchable)
-        overlap = query_tokens & doc_tokens
-        coverage = len(overlap) / max(1, len(query_tokens))
-        precision = len(overlap) / max(1, min(len(doc_tokens), 12))
-        score = 0.72 * coverage + 0.18 * precision
-        normalized_query = " ".join(sorted(query_tokens))
-        if normalized_query and normalized_query in searchable:
-            score += 0.1
-        name_tokens = _tokens(entry.capability_id.replace(".", " "))
-        if query_tokens & name_tokens:
-            score += 0.08
-        if entry.interaction_executable:
-            score += 0.03
-        return max(0.0, min(1.0, score))
-
-    def _route_for(self, matches: list[CapabilityMatch]) -> CapabilityRoute:
-        if not matches:
-            return "chat"
-        weighted: dict[CapabilityRoute, float] = {}
-        for match in matches[:4]:
-            weighted[match.route] = weighted.get(match.route, 0.0) + match.score
-        return max(weighted, key=weighted.get)
-
-    def _agents_for(
-        self,
-        route: CapabilityRoute,
-        matches: list[CapabilityMatch],
-    ) -> list[str]:
-        if route == "tool":
-            return ["tool_agent", "speaker_agent"]
-        if route == "memory":
-            return ["memory_agent", "speaker_agent"]
-        if route == "chat":
-            return ["conversation_agent", "speaker_agent"]
-
-        agents = ["capability_agent"]
-        if route == "robot_action" and any(
-            match.safety_class in {"physical_motion", "safety_critical"}
-            or "physical_motion" in match.effects
-            for match in matches[:4]
-        ):
-            agents.append("safety_agent")
-        agents.append("speaker_agent")
-        return agents

@@ -54,7 +54,7 @@ def _catalog() -> CapabilityCatalog:
             )
         ]
     )
-    return CapabilityCatalog(registry, live_invoker=_Invoker(), min_score=0.0)
+    return CapabilityCatalog(registry, live_invoker=_Invoker())
 
 
 class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
@@ -194,7 +194,7 @@ class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.skill_id for item in response.skills], ["soridormi.inspect_object"])
         metadata = response.skills[0].metadata
         self.assertTrue(metadata["requires_live_perception"])
-        self.assertEqual(metadata["perception_dependency"], "locate_object")
+        self.assertEqual(metadata["perception_dependency"], "find")
         self.assertEqual(metadata["physical_state_source"], "soridormi_runtime")
         self.assertTrue(metadata["chromie_must_not_provide_physical_coordinates"])
         self.assertTrue(metadata["soridormi_owns_pose_estimation"])

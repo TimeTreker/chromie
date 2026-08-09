@@ -4,23 +4,13 @@ from typing import Any
 
 LIVE_PERCEPTION_CONTRACT_VERSION = "live_perception_dependency_v1"
 _DEFAULT_DEPENDENCY = "runtime_observation"
-_DEPENDENCY_ALIASES = {
-    "find": "locate_object",
-    "find_object": "locate_object",
-    "locate": "locate_object",
-    "locate_target": "locate_object",
-    "object_location": "locate_object",
-    "scan": "inspect_scene",
-    "search": "locate_object",
-    "see": "inspect_scene",
-}
 
 
 def normalize_perception_dependency(value: Any) -> str:
-    text = "_".join(str(value or "").strip().lower().replace("-", "_").split())
-    if not text:
-        return _DEFAULT_DEPENDENCY
-    return _DEPENDENCY_ALIASES.get(text, text)
+    """Preserve the exact typed dependency declared by the model/provider."""
+
+    text = str(value or "").strip()
+    return text or _DEFAULT_DEPENDENCY
 
 
 def live_perception_dependency_from_metadata(
