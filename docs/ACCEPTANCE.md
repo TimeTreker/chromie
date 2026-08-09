@@ -449,6 +449,29 @@ python scripts/scenario_author.py prompt --suite interaction --count 20
 The prompt command is for generating reviewed candidate JSON with an LLM; the
 LLM is not used as the pass/fail judge during regression runs.
 
+That restriction applies to the deterministic `scenarios/` regression runner:
+scenario generation must not silently become its oracle. It does not prohibit
+the separately owned hybrid benchmark method. A normalized benchmark with
+`oracle_policy.mode=semantic_review` or `hybrid` may retain live module or
+integration output and apply a versioned LLM or human judgment for declared
+semantic dimensions. In that path there is no single fixed response truth; the
+scenario declares an acceptable behavior region and the reviewer judges meaning
+from the retained result and evidence. Deterministic schema, safety,
+authorization, capability, execution-truth, provenance, and LLM-integrity
+failures remain non-overridable.
+
+For a model-role qualification such as Goal Association, build the cohort from
+Chromie's actual Goal lifecycle, Speaking and Activity lanes, identity and body
+truth, uncertainty rules, capabilities, and retained interaction context. Run
+every candidate through the same explicit benchmark adapter, package the raw
+report with `python -m benchmarks.review package`, retain reviewer identity and
+rationale, and apply the review with `python -m benchmarks.review apply`.
+Prefer blinded independent reviewers for model comparison. A single LLM session
+may produce useful diagnostic evidence, but it must be reported as one-reviewer
+evidence and cannot close independent semantic adjudication or release
+qualification. The authoritative workflow and multi-model commands are in
+[Chromie-specific semantic qualification workflow](CHROMIE_BENCHMARK_SUITE.md#chromie-specific-semantic-qualification-workflow).
+
 The target organization, common case contract, distribution metrics, and staged
 rollout are defined in the
 [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) and its

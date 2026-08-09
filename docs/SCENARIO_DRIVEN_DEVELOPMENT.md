@@ -45,6 +45,17 @@ quality is reviewed by an LLM or human from retained evidence. A scenario must
 not use phrase lists as a substitute for judging intent or naturalness. See
 [Hybrid oracle execution](CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execution).
 
+When fixed expected responses would overconstrain valid model behavior, use the
+[Chromie-specific semantic qualification workflow](CHROMIE_BENCHMARK_SUITE.md#chromie-specific-semantic-qualification-workflow).
+Generate the cohort from Chromie's actual identity, Goal state, execution lanes,
+capabilities, interaction contract, and retained failures rather than from
+generic assistant prompts. Record the acceptable meaning and forbidden region,
+run the real module or integration boundary, retain the unedited result, and
+have a declared reviewer judge only the semantic dimensions. Exact DTO and
+safety facts still use deterministic assertions. One-session LLM judgment is
+diagnostic evidence, not independent qualification, and must be labeled as
+such.
+
 Existing scenario directories remain authoritative during staged migration.
 The benchmark inventory will index and classify them before any physical move.
 

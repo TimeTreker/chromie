@@ -357,6 +357,63 @@ Generate its deterministic coverage report with:
 python -m benchmarks.datasets.social_attention.validate
 ```
 
+## Daily conversation semantic dataset v1
+
+`datasets/daily_conversation/scenarios/` is the maintained Git-controlled
+daily-life communication asset. It contains 120 Chromie-specific integration
+scenarios: ten cases in each of twelve cohorts, with 60 Chinese and 60 English
+cases. Coverage includes presence, family and home, school and learning,
+routines, meals and wellbeing, emotional support, play and creativity,
+identity and robotic-body truth, practical information and tools, communication
+preferences, multi-turn continuity, and uncertainty repair.
+
+These scenarios intentionally provide no canonical response strings. Each case
+defines an acceptable semantic region, forbidden behavior, deterministic hard
+boundaries, and dimensions for retained LLM or human adjudication. The source
+records LLM authoring/review provenance and explicitly remains a dataset
+candidate until independent review and execution evidence qualify a declared
+model or release claim. Scenario content has no Runtime policy authority.
+
+Focused source checks are:
+
+```bash
+python -m pytest -q benchmarks/tests/test_daily_conversation_dataset.py
+python -m benchmarks.inventory.core --check
+python -m benchmarks.adapters.normalize --check
+```
+
+Execute all 120 cases through an explicit project adapter and retain the real
+outputs for semantic review:
+
+```bash
+python scripts/run_daily_conversation_benchmark.py \
+  --command "python scripts/my_chromie_daily_conversation_adapter.py" \
+  --model candidate-model-id \
+  --prompt-revision current-prompt-revision \
+  --output-dir .chromie/benchmarks/daily-conversation/run-id
+```
+
+The adapter receives each normalized scenario on standard input and must invoke
+the real module or integration boundary under test. The runner writes
+`normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
+bundle to Codex or another declared LLM/human reviewer, fill the generated
+`review-template.json`, and apply the retained semantic verdict with
+`python -m benchmarks.review apply`. The reviewer judges the actual output
+against the acceptable semantic region; it does not compare against a fixed
+answer string. `--id`, `--cohort`, and `--language` support focused diagnostic
+runs, while the default executes the complete dataset.
+
+To extend coverage, add exactly one scenario object per JSON file below
+`datasets/daily_conversation/scenarios/<cohort>/`. Name the file after the last
+segment of its scenario ID; for example,
+`daily.v1.family_home.where_is_dad` belongs in
+`scenarios/family_home/where_is_dad.json`. Dataset-wide provenance and coverage
+live in `datasets/daily_conversation/dataset.json`, not in a scenario file.
+The runner and inventory discover `**/*.json` recursively, so adding or
+reorganizing scenario data never requires a Python change. Keep scenario IDs
+unique and update the dataset and migration manifest counts when intentionally
+changing the maintained cohort size.
+
 
 ## End-to-end evidence profiles
 
