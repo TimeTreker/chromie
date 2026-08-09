@@ -105,7 +105,7 @@ topology, reserves its complete declared output budget plus a 2048-token safety
 margin before inference, and rejects prompt or completion truncation as an
 LLM-budget failure. RTX 5090 retains the `qwen3:4b` fast model plus
 `gemma4:12b` quality model while CosyVoice is active. RTX 4090 Laptop preserves
-the same role split with `gemma4:e2b` as its smaller quality model, but only one
+the same role split with `gemma4:e4b` as its sparse quality model, but only one
 32K Ollama runner may remain resident at a time while CosyVoice shares the 16 GB
 GPU. The supervised launcher clears stale Ollama runners before the first TTS
 synthesis probe. The prior launcher-wide compact override is reserved only for
@@ -126,7 +126,7 @@ the detected profile.
 | `nvidia_ada` | RTX 4080/4070 class | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `rtx4090` | Desktop RTX 4090 | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx4090_laptop` | RTX 4090 Laptop GPU | `gemma4:e2b` | `qwen3:4b` | 4096 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `gemma4:e4b` | `qwen3:4b` | 4096 |
 | `rtx5090` | Desktop RTX 5090 | `gemma4:12b` | `qwen3:4b` | 8192 |
 | `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
@@ -136,7 +136,7 @@ The quality model is used by Goal Association, Deep Planner, Response Composer,
 tool-result interpretation, and review. The fast model is used by Goal
 Interpretation, Fast Planner, Task Continuity, and Social Attention unless the
 profile explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop
-uses `gemma4:e2b` so both maintained voice profiles preserve the same role
+uses `gemma4:e4b` so both maintained voice profiles preserve the same role
 boundaries within their different VRAM envelopes. Camera frames are not yet part
 of the runtime input contract.
 Input preflight

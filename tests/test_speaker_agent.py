@@ -52,7 +52,7 @@ class SpeakerAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(updated.speak_immediate, [])
 
-    async def test_filters_internal_plan_labels_before_tts(self) -> None:
+    async def test_preserves_model_language_while_filtering_internal_skill_ids(self) -> None:
         result = AgentResult()
         result.add_speak_immediate(
             'I\'ll get moving. Execute soridormi.walk_forward with speed="quick".'
@@ -69,8 +69,19 @@ class SpeakerAgentTests(unittest.IsolatedAsyncioTestCase):
             result,
         )
 
-        self.assertEqual(len(updated.speak_immediate), 1)
-        self.assertEqual(updated.speak_immediate[0].text, "I'll get moving.")
+        self.assertEqual(
+            [item.text for item in updated.speak_immediate],
+            [
+                'I\'ll get moving. Execute with speed="quick".',
+                "Task Split: 1.",
+                'Execute with speed="quick".',
+                "Key Risk: duration is near a safety limit.",
+                "Next Step: initiating the walk command now.",
+            ],
+        )
+        self.assertTrue(
+            all("soridormi" not in item.text for item in updated.speak_immediate)
+        )
 
 
 if __name__ == "__main__":

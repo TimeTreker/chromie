@@ -268,7 +268,6 @@ capability_catalog = CapabilityCatalog(
     capability_registry,
     live_invoker=capability_catalog_invoker,
     refresh_ttl_s=settings.capability_catalog_refresh_sec,
-    min_score=settings.capability_match_min_score,
     prompt_tier_preset=CapabilityCatalog.load_prompt_tier_preset(
         settings.capability_prompt_tier_preset
     ),
@@ -844,7 +843,6 @@ async def capability_search(request: CapabilitySearchRequest) -> CapabilitySearc
         request.text,
         language=request.language,
         limit=request.limit,
-        min_score=request.min_score,
         refresh=request.refresh,
         prefer_interaction_executable=request.prefer_interaction_executable,
     )

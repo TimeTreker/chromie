@@ -284,11 +284,6 @@ class Settings(BaseModel):
         ge=1.0,
         le=3600.0,
     )
-    capability_match_min_score: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_MATCH_MIN_SCORE", "0.16")),
-        ge=0.0,
-        le=1.0,
-    )
     capability_match_limit: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_MATCH_LIMIT", "8")),
         ge=1,
@@ -579,9 +574,6 @@ class GoalInterpreterSettings(BaseModel):
     )
     capability_catalog_cache_ttl_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
-    )
-    capability_match_limit: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT", "8"))
     )
     post_interrupt_review_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()

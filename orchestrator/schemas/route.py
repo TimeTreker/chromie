@@ -46,7 +46,7 @@ class FastSpeech(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
+    def enforce_completion_claim_boundary(self) -> "FastSpeech":
         if self.must_not_claim_completion is not True:
             raise ValueError("fast_speech must forbid completion claims")
         if self.claim_state == "completed":
@@ -59,18 +59,6 @@ class FastSpeech(BaseModel):
             str(item or "").strip() for item in self.claimed_goal_ids
             if str(item or "").strip()
         ))
-        marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
-        if marker in {
-            "checking_only",
-            "prelude_only",
-            "needs_confirmation",
-            "acknowledge",
-            "acknowledge_and_check",
-            "clarify",
-            "thinking",
-            "safety_prelude",
-        }:
-            self.text = ""
         return self
 
 
@@ -114,21 +102,6 @@ class RouteDecision(BaseModel):
 
     @model_validator(mode="after")
     def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
-        contract_markers = {
-            "checking_only",
-            "prelude_only",
-            "needs_confirmation",
-            "acknowledge",
-            "acknowledge_and_check",
-            "clarify",
-            "thinking",
-            "safety_prelude",
-        }
-        marker = "_".join(
-            str(self.speak_first or "").strip().casefold().replace("-", "_").split()
-        )
-        if marker in contract_markers:
-            self.speak_first = None
         if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
             self.speak_first = self.fast_speech.text.strip()
         return self

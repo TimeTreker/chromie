@@ -66,8 +66,8 @@ running.
 | `POST` | `/agent-skills/disclose` | Load only exact projections from a validated selection under digest and prompt-budget checks; it does not mutate Plans or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named capabilities and refresh status. |
-| `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
-| `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
+| `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
+| `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog LLM context; `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`, including bounded same-tier revision. |

@@ -323,15 +323,19 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("provider_id", capability.hints["semantic_scope"])
 
-    async def test_refreshes_live_named_skills_and_routes_motion(self) -> None:
+    async def test_refreshes_live_named_skills_without_routing_from_query_text(self) -> None:
         invoker = _Invoker()
-        catalog = CapabilityCatalog(_registry(), live_invoker=invoker, min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
 
-        result = await catalog.search("move forward slowly for one second", language="en")
+        result = await catalog.search(
+            "move forward slowly for one second",
+            language="en",
+            limit=32,
+        )
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.suggested_route, "robot_action")
-        self.assertIn("capability_agent", result.suggested_agents)
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        self.assertEqual(result.suggested_agents, [])
         self.assertTrue(
             any(
                 match.capability_id == "soridormi.walk_forward"
@@ -343,7 +347,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invoker.calls, 1)
 
     async def test_prompt_tiers_mark_common_skills_for_fast_goal_interpreter(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         common = await catalog.prompt_entries(scope="common")
         all_entries = await catalog.prompt_entries(scope="all")
@@ -385,7 +389,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(
             _registry(),
             live_invoker=_Invoker(),
-            min_score=0.10,
             prompt_tier_preset={
                 "prompt_tiers": {
                     "soridormi.blink_eyes": {
@@ -409,7 +412,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(
             _registry(),
             live_invoker=_Invoker(),
-            min_score=0.10,
             prompt_tier_overrides={
                 "prompt_tiers": {
                     "soridormi.walk_forward": {
@@ -451,7 +453,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(
             _registry(),
             live_invoker=_SafetyLockedInvoker(),
-            min_score=0.10,
             prompt_tier_overrides={
                 "prompt_tiers": {
                     "soridormi.calibrate_floor": {
@@ -479,7 +480,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_chromie_speak_is_common_and_executable_for_goal_interpreter_tasks(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
-        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+        catalog = CapabilityCatalog(registry, live_invoker=None)
 
         common = await catalog.prompt_entries(scope="common")
         speak = next(item for item in common if item.capability_id == "chromie.speak")
@@ -490,7 +491,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_weather_lookup_tool_is_common_goal_interpreter_visible_tool(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
-        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+        catalog = CapabilityCatalog(registry, live_invoker=None)
 
         common = await catalog.prompt_entries(scope="common")
         weather = next(item for item in common if item.capability_id == "chromie.weather.lookup")
@@ -509,7 +510,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_verified_memory_read_is_a_tool_not_a_memory_write_route(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
-        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+        catalog = CapabilityCatalog(registry, live_invoker=None)
 
         common = await catalog.prompt_entries(scope="common")
         retrieval = next(
@@ -545,7 +546,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
                 )
             ]
         )
-        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+        catalog = CapabilityCatalog(registry, live_invoker=None)
 
         snapshot = await catalog.snapshot()
         writer = next(
@@ -556,37 +557,45 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(writer["route"], "memory")
 
-    async def test_chinese_weather_query_matches_weather_lookup_tool(self) -> None:
+    async def test_chinese_weather_query_receives_catalog_without_host_match(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
-        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+        catalog = CapabilityCatalog(registry, live_invoker=None)
 
-        result = await catalog.search("今天重庆天气怎么样？", language="zh-CN")
+        result = await catalog.search("今天重庆天气怎么样？", language="zh-CN", limit=32)
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.suggested_route, "tool")
-        self.assertIn("tool_agent", result.suggested_agents)
-        self.assertEqual(result.matches[0].capability_id, "chromie.weather.lookup")
-        self.assertEqual(result.matches[0].route, "tool")
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        weather = next(
+            item for item in result.matches
+            if item.capability_id == "chromie.weather.lookup"
+        )
+        self.assertEqual(weather.route, "tool")
+        self.assertEqual(weather.score, 0.0)
 
     async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search(
             "Please perform a nodding gesture two times.",
             language="en",
+            limit=32,
             prefer_interaction_executable=True,
         )
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.matches[0].capability_id, "soridormi.nod_yes")
-        self.assertTrue(result.matches[0].requires_confirmation)
+        self.assertFalse(result.matched)
+        nod = next(
+            item for item in result.matches
+            if item.capability_id == "soridormi.nod_yes"
+        )
+        self.assertTrue(nod.requires_confirmation)
 
     async def test_chinese_head_shake_query_returns_live_skill_context_without_rule_match(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search(
             "你能摇头吗",
             language="zh-CN",
+            limit=32,
             prefer_interaction_executable=True,
         )
 
@@ -601,11 +610,12 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_chinese_blink_query_returns_context_without_host_rule_match(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search(
             "眨两小眼睛。",
             language="zh-CN",
+            limit=32,
             prefer_interaction_executable=True,
         )
 
@@ -620,22 +630,29 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    async def test_prefers_relevant_executable_skill_over_planning_only_tool(self) -> None:
+    async def test_query_words_do_not_score_or_route_catalog_entries(self) -> None:
         catalog = CapabilityCatalog(
             _registry_with_planning_tool(),
             live_invoker=_Invoker(),
-            min_score=0.10,
         )
 
         result = await catalog.search(
             "Walk forward at 0.15 speed for 5 seconds.",
             language="en",
+            limit=32,
             prefer_interaction_executable=True,
         )
 
-        self.assertTrue(result.matched)
-        self.assertEqual(result.matches[0].capability_id, "soridormi.walk_forward")
-        self.assertTrue(result.matches[0].interaction_executable)
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        self.assertTrue(all(match.score == 0.0 for match in result.matches))
+        self.assertTrue(
+            any(
+                match.capability_id == "soridormi.walk_forward"
+                and match.interaction_executable
+                for match in result.matches
+            )
+        )
         self.assertTrue(
             any(
                 match.capability_id == "soridormi.motion.create_plan"
@@ -645,7 +662,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_inventory_question_still_returns_catalog_context(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search("What can you do?", language="en")
 
@@ -654,7 +671,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(match.interaction_executable for match in result.matches))
 
     async def test_identity_question_apostrophe_s_does_not_match_duration_schema(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search("Who are you? What's your name?", language="en")
 
@@ -663,7 +680,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(match.score >= 0.10 for match in result.matches))
 
     async def test_context_distinguishes_executable_from_planning_only(self) -> None:
-        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         context = await catalog.llm_context(text="walk forward", language="en")
 
@@ -675,7 +692,6 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(
             _registry(),
             live_invoker=_Invoker(),
-            min_score=0.10,
         )
 
         snapshot = await catalog.snapshot()

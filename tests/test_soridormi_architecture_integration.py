@@ -171,7 +171,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         chromie_intent = invoker.calls[1][1]["chromie_intent"]
         self.assertTrue(chromie_intent["requires_live_perception"])
-        self.assertEqual(chromie_intent["perception_dependency"], "locate_object")
+        self.assertEqual(chromie_intent["perception_dependency"], "locate_target")
         self.assertEqual(chromie_intent["physical_state_source"], "soridormi_runtime")
         self.assertTrue(
             chromie_intent["chromie_must_not_provide_physical_coordinates"]

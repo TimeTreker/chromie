@@ -191,7 +191,6 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(
             build_chromie_registry(),
             live_invoker=_CatalogInvoker(),
-            min_score=0.0,
         )
 
         walk = await catalog.get_capability("soridormi.walk_forward", refresh=True)

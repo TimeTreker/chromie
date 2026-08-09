@@ -37,7 +37,6 @@ PROMPT_CATALOG_ALL_LIMIT = 96
 capability_catalog = CapabilityCatalogClient(
     settings.capability_catalog_url,
     timeout_ms=settings.capability_catalog_timeout_ms,
-    limit=settings.capability_match_limit,
     snapshot_cache_ttl_ms=settings.capability_catalog_cache_ttl_ms,
 )
 
@@ -501,22 +500,6 @@ def _request_language(request: RouteRequest) -> str:
     return language
 
 
-def _unique_capability_suffix_match(raw_intent: str, by_id: dict[str, dict[str, Any]]) -> str:
-    normalized = (raw_intent or "").strip()
-    if not normalized:
-        return ""
-    aliases = {
-        normalized.casefold(),
-        normalized.casefold().replace(" ", "_").replace("-", "_"),
-    }
-    matches = [
-        capability_id
-        for capability_id in by_id
-        if capability_id.rsplit(".", 1)[-1].casefold() in aliases
-    ]
-    return matches[0] if len(matches) == 1 else ""
-
-
 def _capability_available(item: dict) -> bool:
     return item.get("available") is not False
 
@@ -619,38 +602,12 @@ def _goal_interpretation_action_schema_errors(args: Any, schema: Any) -> list[st
 
 
 def _safe_thinking_speak_first(text: str | None, *, language: str) -> str | None:
+    del language
     cleaned = " ".join((text or "").strip().split())
     if not cleaned:
         return None
     if len(cleaned) > 120:
         cleaned = cleaned[:120].rstrip()
-    normalized = cleaned.casefold()
-    action_claim_terms = (
-        "done",
-        "completed",
-        "executing",
-        "moving",
-        "walking",
-        "turning",
-        "blinking",
-        "nodding",
-        "i did",
-        "i will do it",
-        "doing it now",
-        "已",
-        "已经",
-        "完成",
-        "执行",
-        "正在",
-        "开始",
-        "走",
-        "移动",
-        "眨",
-        "点头",
-        "转",
-    )
-    if any(term in normalized for term in action_claim_terms):
-        return None
     return cleaned
 
 
@@ -699,8 +656,6 @@ def _validate_llm_capability_decision(
         if raw_intent in by_id:
             selected_id = raw_intent
             normalized_reason = "validator normalized exact capability intent"
-        else:
-            selected_id = _unique_capability_suffix_match(raw_intent, by_id)
     if selected_id and raw_intent != f"capability:{selected_id}":
         decision.intent = f"capability:{selected_id}"
         decision.reason = (

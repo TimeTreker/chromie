@@ -4,7 +4,6 @@ import copy
 import json
 import logging
 import os
-import re
 import time
 from collections import deque
 from pathlib import Path
@@ -97,31 +96,6 @@ def _now_ms() -> float:
     return time.time() * 1000.0
 
 
-def _split_phrases(value: str | None, defaults: tuple[str, ...]) -> tuple[str, ...]:
-    if not value:
-        return defaults
-    phrases = [part.strip().lower() for part in value.split("|") if part.strip()]
-    return tuple(phrases) if phrases else defaults
-
-
-DEFAULT_RESET_PHRASES = (
-    "new topic",
-    "new session",
-    "start a new session",
-    "start a new conversation",
-    "reset conversation",
-    "reset session",
-    "clear session",
-    "clear conversation",
-    "新的会话",
-    "新会话",
-    "开始新的会话",
-    "开始新会话",
-    "重置会话",
-    "清空会话",
-)
-
-
 class ConversationStateManager:
     """Host-side conversation state and consent-bound profile memory.
 
@@ -132,8 +106,8 @@ class ConversationStateManager:
     remembered or classify follow-ups from user phrases.
 
     The orchestrator still creates one SID per VAD utterance. This manager adds
-    a separate conversation_id that spans SIDs until an explicit reset command
-    or the deterministic hard-idle timeout starts a new conversation.
+    a separate conversation_id that spans SIDs until the deterministic
+    hard-idle timeout starts a new conversation.
     """
 
     def __init__(
@@ -157,7 +131,6 @@ class ConversationStateManager:
         durable_memory_enabled: bool = False,
         durable_memory_path: str | os.PathLike[str] | None = None,
         durable_memory_max_entries: int = 64,
-        reset_phrases: tuple[str, ...] = DEFAULT_RESET_PHRASES,
     ) -> None:
         self.base_conversation_id = base_conversation_id or "local_default"
         self.enabled = enabled
@@ -180,8 +153,6 @@ class ConversationStateManager:
             durable_memory_path
         )
         self.durable_memory_max_entries = max(1, int(durable_memory_max_entries))
-        self.reset_phrases = tuple(p.lower() for p in reset_phrases)
-
         self._conversation_seq = 1
         self.conversation_id = self.base_conversation_id
         self.started_ms = _now_ms()
@@ -233,7 +204,6 @@ class ConversationStateManager:
             durable_memory_enabled=settings.durable_memory_enabled,
             durable_memory_path=settings.durable_memory_path,
             durable_memory_max_entries=settings.durable_memory_max_entries,
-            reset_phrases=settings.reset_phrases,
         )
 
     @classmethod
@@ -277,7 +247,6 @@ class ConversationStateManager:
             durable_memory_max_entries=int(
                 os.getenv("ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES", "64")
             ),
-            reset_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_RESET_PHRASES"), DEFAULT_RESET_PHRASES),
         )
 
     @staticmethod
@@ -2554,19 +2523,6 @@ class ConversationStateManager:
             )
         )
 
-    def _looks_like_meaningful_task_text(self, text: str | None) -> bool:
-        normalized = self._normalized(text)
-        if not normalized:
-            return False
-        if len(normalized) <= 2:
-            return False
-        if normalized in {"ok", "okay", "done", "then", "or", "and", "the", "um", "uh"}:
-            return False
-        words = normalized.split()
-        if len(words) <= 2 and normalized.endswith((",", ";", ":")):
-            return False
-        return True
-
     @staticmethod
     def _string_list(value: Any) -> list[str]:
         if value is None:
@@ -2618,29 +2574,19 @@ class ConversationStateManager:
             return intent
         return "conversation"
 
-    def _infer_task_relation(
+    def _model_task_relation(
         self,
-        text: str,
-        *,
-        route: str | None,
         metadata: dict[str, Any] | None,
     ) -> str | None:
-        """Compatibility relation inference without semantic phrase matching.
+        """Accept only a model-authored typed task relationship.
 
-        Normal task continuation and modification must arrive as structured model
-        output. This fallback only opens a task for an explicitly effectful route
-        or records a side conversation; it never binds a follow-up to an existing
-        task through keywords, regexes, pronouns, or recency.
+        Creation, continuation, modification, and side-conversation meaning
+        never falls back to routes, keywords, regexes, pronouns, or recency.
         """
 
         relation = self._task_relation_from_metadata(metadata)
         if relation:
             return relation
-        if not self._looks_like_meaningful_task_text(text):
-            return None
-        route = str(route or "").strip()
-        if route in {"robot_action", "tool", "memory", "deep_thought"}:
-            return "new_task"
         return None
 
     def _record_task_context_from_user_turn(
@@ -2654,7 +2600,7 @@ class ConversationStateManager:
     ) -> None:
         if not self.enabled or route == "ignore":
             return
-        relation = self._infer_task_relation(text, route=route, metadata=metadata)
+        relation = self._model_task_relation(metadata)
         if relation is None:
             return
 
@@ -2788,17 +2734,6 @@ class ConversationStateManager:
         if changed:
             self._pending_tasks = deque(retained, maxlen=max(1, self.max_pending_tasks))
 
-    def is_explicit_reset(self, text: str | None) -> bool:
-        # Conversation reset is an operational control, so require one explicit
-        # whole-utterance command. Goal cancellation, replacement, and ordinary
-        # discourse references remain model-authored.
-        normalized = self._normalized(text).strip(" \t\r\n.,!?;:，。！？；：")
-        return normalized in {
-            phrase.strip().lower().strip(" \t\r\n.,!?;:，。！？；：")
-            for phrase in self.reset_phrases
-            if phrase.strip()
-        }
-
     def start_new_conversation(self, *, reason: str, sid: str | None = None) -> dict[str, Any]:
         self._conversation_seq += 1
         self.conversation_id = f"{self.base_conversation_id}-{self._conversation_seq:04d}"
@@ -2821,11 +2756,10 @@ class ConversationStateManager:
         }
 
     def prepare_for_user_text(self, text: str | None, sid: str | None = None) -> dict[str, Any]:
-        """Apply only deterministic conversation-boundary controls.
+        """Apply only the deterministic hard-idle conversation boundary.
 
-        Explicit whole-utterance reset and hard idle expiry are operational
-        controls. Follow-up, correction, and new-topic semantics are preserved
-        for Goal Association instead of being classified by Host phrases.
+        Follow-up, correction, reset, and new-topic semantics are preserved for
+        Goal Association instead of being classified by Host phrases.
         """
         if not self.enabled:
             return {"started_new": False, "reason": "disabled", "conversation_id": self.conversation_id, "sid": sid}
@@ -2833,11 +2767,6 @@ class ConversationStateManager:
         now = _now_ms()
         self._prune_completed_tasks(now)
         idle_sec = (now - self.last_activity_ms) / 1000.0
-        normalized = self._normalized(text)
-
-        if self.is_explicit_reset(normalized):
-            return self.start_new_conversation(reason="explicit_reset", sid=sid)
-
         if self._active_pending_tasks():
             self.last_split_reason = "kept_active_pending_task"
             return {"started_new": False, "reason": "active_pending_task", "conversation_id": self.conversation_id, "sid": sid}
@@ -3301,8 +3230,8 @@ class ConversationStateManager:
                 "last_error": self._durable_memory.last_error,
             },
             "forgetting_policy": {
-                "explicit_reset_clears_history_and_tasks": True,
-                "explicit_reset_clears_durable_profile_memory": False,
+                "conversation_boundary_clears_history_and_tasks": True,
+                "conversation_boundary_clears_durable_profile_memory": False,
                 "durable_profile_requires_explicit_forget_or_clear": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "completed_task_retention_sec": self.completed_task_retention_sec,

@@ -339,7 +339,7 @@ class ToolAgent(BaseAgent):
                     self._weather_extraction_prompt(request),
                     system=self._weather_extraction_system(),
                     options={"temperature": 0, "top_p": 0.9, "num_predict": 160},
-                    response_format="json",
+                    response_format=self._weather_extraction_schema(),
                 )
                 if isinstance(raw, dict):
                     logger.info(
@@ -393,19 +393,29 @@ class ToolAgent(BaseAgent):
 
     @staticmethod
     def _normalize_date(value: Any) -> str:
-        normalized = str(value or "today").strip().casefold().replace("_", "-")
-        if normalized in {"tomorrow", "next-day", "next day", "明天"}:
-            return "tomorrow"
-        return "today"
+        normalized = str(value or "today").strip().casefold()
+        return normalized if normalized in {"today", "tomorrow"} else "today"
 
     @staticmethod
     def _normalize_units(value: Any) -> str:
         normalized = str(value or "metric").strip().casefold()
-        if normalized in {"imperial", "fahrenheit", "f"}:
-            return "imperial"
-        if normalized in {"auto"}:
-            return "auto"
-        return "metric"
+        return normalized if normalized in {"metric", "imperial", "auto"} else "metric"
+
+    @staticmethod
+    def _weather_extraction_schema() -> dict[str, Any]:
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["location", "date", "units"],
+            "properties": {
+                "location": {"type": "string"},
+                "date": {"type": "string", "enum": ["today", "tomorrow"]},
+                "units": {
+                    "type": "string",
+                    "enum": ["metric", "imperial", "auto"],
+                },
+            },
+        }
 
     @staticmethod
     def _weather_extraction_system() -> str:

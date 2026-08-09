@@ -686,8 +686,24 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             (
                 "_semantic_action_score",
                 "_is_forward_motion_query",
+                "_STOP_WORDS",
+                "def _tokens",
+                "def _score",
+                "def _route_for(",
+                "def _agents_for",
+                "searchable_text",
             ),
-            "capability candidate retrieval may not contain phrase-to-Capability semantic boosts",
+            "capability retrieval may expose declared contracts but may not score or route user language",
+        ),
+        "agent/app/capabilities/validator.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "normalize_enum_string",
+                "def enum_key",
+                "def enum_joined_key",
+                "aliases =",
+            ),
+            "Capability arguments require exact schema values; handwritten language aliases may not repair model output",
         ),
         "agent/app/cognitive_core/goal_interpreter/model_interpreter.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -699,8 +715,10 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "Use route=tool and intent=weather_query for weather lookup",
                 "For weather/tool lookup",
                 "Use tool for changing external facts, including current weather",
+                "direct_question_form",
+                "missing_aliases",
             ),
-            "general Goal Interpretation may not contain weather-specific Host routing policy",
+            "Goal Interpretation may not contain domain routing or punctuation/alias semantic fallbacks",
         ),
         "orchestrator/runtime/interaction_coordinator.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -733,8 +751,12 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "is_followup_reference",
                 "is_new_topic_like",
                 "soft_idle_new_topic",
+                "DEFAULT_RESET_PHRASES",
+                "ORCH_CONVERSATION_RESET_PHRASES",
+                "is_explicit_reset",
+                "_looks_like_meaningful_task_text",
             ),
-            "conversation boundaries may use explicit reset and idle expiry but may not classify discourse semantics",
+            "conversation state may apply typed model decisions and hard idle expiry but may not classify discourse or reset semantics",
         ),
         "orchestrator/runtime/abilities.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -775,8 +797,78 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "I am still working on the previous task.",
                 "That sounds tiring.",
                 "I remember the previous context",
+                "_ACTION_REQUEST_RE",
+                "_ACTION_CLAIM_RE",
+                "_guard_unrouted_physical_action_response",
+                "bad_prefixes =",
             ),
-            "unavailable-model fallback must remain operational and may not infer conversational meaning",
+            "ConversationAgent may use model-authored meaning and operational fallback only, not phrase classification",
+        ),
+        "agent/app/agents/capability.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ('label in {"unsupported"',),
+            "CapabilityAgent may validate typed decisions but may not reclassify model speech from label words",
+        ),
+        "agent/app/agents/deepthinking.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("bad_prefixes =",),
+            "DeepThinkingAgent may preserve model-authored speech but may not rewrite it from phrase prefixes",
+        ),
+        "agent/app/cognitive_core/goal_interpreter/engine.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_unique_capability_suffix_match",
+                "action_claim_terms",
+            ),
+            "Goal Interpretation may validate exact model output but may not guess capabilities or speech meaning from words",
+        ),
+        "orchestrator/runtime/confirmation.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_AFFIRMATIVE_PHRASES",
+                "_NEGATIVE_PHRASES",
+                "_OPERATIONAL_INTERRUPT_PHRASES",
+                "_normalize_reply",
+            ),
+            "confirmation language meaning must come from typed Goal Association output",
+        ),
+        "shared/chromie_contracts/semantic_task.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "pending_action_stage_direction_claims",
+                "_STAGE_DIRECTION_PATTERN",
+                "_SKILL_TOKEN_STOPWORDS",
+            ),
+            "semantic contracts may carry typed claims but may not infer them from speech tokens",
+        ),
+        "shared/chromie_contracts/route.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_FAST_SPEECH_CONTRACT_MARKERS",
+                "_fast_speech_marker",
+                "reject_contract_marker_as_spoken_text",
+            ),
+            "route contracts may validate typed fields but may not reclassify model speech from marker words",
+        ),
+        "shared/chromie_contracts/perception.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("_DEPENDENCY_ALIASES",),
+            "perception contracts must preserve exact typed dependencies instead of applying semantic aliases",
+        ),
+        "agent/app/response_composer.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("_pending_action_claim_errors",),
+            "Response Composer claim meaning must remain model-authored and typed",
+        ),
+        "agent/app/schema.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_INTERNAL_PLAN_LABEL_RE",
+                "_INTERNAL_EXECUTION_RE",
+                "reject_contract_marker_as_spoken_text",
+                "contract_markers =",
+            ),
+            "spoken-text sanitization may remove mechanical identifiers but may not classify natural-language meaning",
         ),
         "agent/app/cognitive_core/goal_interpreter/schema.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -784,8 +876,38 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 'decision.speak_first = "你是指什么？"',
                 'decision.speak_first = "What do you mean?"',
                 "Core-authored process acknowledgement",
+                'metadata.get("ability_proposals")',
+                'normalized in {"missing_ability"',
+                "reject_contract_marker_as_spoken_text",
+                "contract_markers =",
             ),
-            "Goal Interpretation contracts may preserve model speech but may not synthesize clarification wording",
+            "Goal Interpretation contracts may preserve exact typed model output but may not synthesize wording or semantic aliases",
+        ),
+        "orchestrator/schemas/route.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "reject_contract_marker_as_spoken_text",
+                "contract_markers =",
+            ),
+            "route schemas may validate typed fields but may not reclassify model speech from marker words",
+        ),
+        "agent/app/tool_result_interpreter.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "_INTERNAL_NARRATION_MARKERS",
+                "_contains_unrequested_internal_narration",
+            ),
+            "tool-result meaning must not be accepted or rejected through phrase lists",
+        ),
+        "orchestrator/runtime/session.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("_looks_like_failure_speech",),
+            "observability severity must use structured events rather than user-facing phrase classification",
+        ),
+        "orchestrator/runtime/host_settings.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("reset_phrases", "ORCH_CONVERSATION_RESET_PHRASES"),
+            "runtime configuration may not expose semantic phrase tables",
         ),
         "agent/app/social_attention.py": (
             RULE_CANONICAL_CAPABILITY_ID,
@@ -812,6 +934,103 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                         message=message,
                     )
                 )
+
+    semantic_rule_paths = (
+        "agent/app/agents/conversation.py",
+        "agent/app/agents/capability.py",
+        "agent/app/capabilities/catalog.py",
+        "agent/app/capabilities/validator.py",
+        "agent/app/cognitive_core/goal_interpreter/engine.py",
+        "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+        "agent/app/cognitive_core/goal_interpreter/schema.py",
+        "agent/app/response_composer.py",
+        "agent/app/schema.py",
+        "agent/app/tool_result_interpreter.py",
+        "orchestrator/orchestrator.py",
+        "orchestrator/runtime/confirmation.py",
+        "orchestrator/runtime/conversation_state.py",
+        "orchestrator/runtime/session.py",
+        "orchestrator/schemas/route.py",
+        "shared/chromie_contracts/semantic_task.py",
+        "shared/chromie_contracts/route.py",
+        "shared/chromie_contracts/perception.py",
+    )
+    strict_no_regex_paths = {
+        "agent/app/agents/conversation.py",
+        "agent/app/agents/capability.py",
+        "agent/app/capabilities/catalog.py",
+        "agent/app/capabilities/validator.py",
+        "agent/app/response_composer.py",
+        "orchestrator/runtime/confirmation.py",
+        "orchestrator/runtime/conversation_state.py",
+        "shared/chromie_contracts/semantic_task.py",
+    }
+    forbidden_name_fragments = (
+        "phrase",
+        "keyword",
+        "action_claim",
+        "stage_direction",
+        "confirmation_words",
+        "reply_words",
+        "question_form",
+        "suffix_match",
+        "greeting_semantics",
+        "internal_narration",
+        "failure_speech",
+    )
+    for relative in semantic_rule_paths:
+        path = root / relative
+        if not path.is_file():
+            continue
+        tree, parse_findings = _parse_python(path, root)
+        findings.extend(parse_findings)
+        if tree is None:
+            continue
+        if relative in strict_no_regex_paths:
+            for module_name, node in _imported_module_names(tree):
+                if module_name.split(".", 1)[0] in {"re", "regex"}:
+                    findings.append(
+                        PolicyFinding(
+                            rule_id=RULE_HOST_SEMANTIC_AUTHORITY,
+                            path=relative,
+                            line=getattr(node, "lineno", 0) or 0,
+                            symbol="<module>",
+                            message=(
+                                "semantic owner may not import regex; move mechanical "
+                                "parsing to its contract owner and language meaning to the model"
+                            ),
+                        )
+                    )
+        seen_names: set[tuple[str, int]] = set()
+        for node in ast.walk(tree):
+            candidate_name = ""
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                candidate_name = node.name
+            elif isinstance(node, ast.Name) and isinstance(
+                node.ctx, (ast.Store, ast.Param)
+            ):
+                candidate_name = node.id
+            lowered = candidate_name.casefold()
+            if not candidate_name or not any(
+                fragment in lowered for fragment in forbidden_name_fragments
+            ):
+                continue
+            key = (candidate_name, getattr(node, "lineno", 0) or 0)
+            if key in seen_names:
+                continue
+            seen_names.add(key)
+            findings.append(
+                PolicyFinding(
+                    rule_id=RULE_HOST_SEMANTIC_AUTHORITY,
+                    path=relative,
+                    line=key[1],
+                    symbol=candidate_name,
+                    message=(
+                        "ordinary language meaning may not be implemented as a "
+                        "phrase, keyword, or speech-pattern rule"
+                    ),
+                )
+            )
 
     memory_path = root / "agent/app/agents/memory.py"
     tree, parse_findings = _parse_python(memory_path, root)

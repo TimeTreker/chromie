@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from orchestrator.runtime.confirmation import ConfirmationDialogue
+from orchestrator.runtime.confirmation import (
+    ConfirmationDialogue,
+    confirmation_meaning_from_goal_association,
+)
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -21,6 +25,47 @@ def _response() -> InteractionResponse:
 
 
 class ConfirmationDialogueTests(unittest.TestCase):
+    def test_goal_association_confirmation_requires_exact_pending_scope(self) -> None:
+        def resolution(relationship: str, goal_ids: list[str]) -> GoalAssociationResolution:
+            return GoalAssociationResolution.model_validate(
+                {
+                    "turn_id": "turn-confirm",
+                    "associations": [
+                        {
+                            "association_id": "assoc-confirm",
+                            "relationship": relationship,
+                            "target_goal_ids": goal_ids,
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "confidence": 0.99,
+                }
+            )
+
+        pending = {"goal-walk", "goal-blink"}
+
+        self.assertEqual(
+            confirmation_meaning_from_goal_association(
+                resolution("confirm", ["goal-walk", "goal-blink"]),
+                pending_goal_ids=pending,
+            ),
+            "confirm",
+        )
+        self.assertEqual(
+            confirmation_meaning_from_goal_association(
+                resolution("reject", ["goal-walk", "goal-blink"]),
+                pending_goal_ids=pending,
+            ),
+            "reject",
+        )
+        self.assertEqual(
+            confirmation_meaning_from_goal_association(
+                resolution("confirm", ["goal-walk"]),
+                pending_goal_ids=pending,
+            ),
+            "ambiguous",
+        )
+
     def test_begin_uses_semantic_alternative_prompt_override(self) -> None:
         dialogue = ConfirmationDialogue(ttl_s=20, clock=lambda: 100.0)
 
@@ -46,8 +91,8 @@ class ConfirmationDialogueTests(unittest.TestCase):
             conversation_id="conversation-1",
         )
 
-        resolution = dialogue.resolve("Yes!")
-        replay = dialogue.resolve("yes")
+        resolution = dialogue.resolve("confirm")
+        replay = dialogue.resolve("confirm")
 
         self.assertEqual(resolution.decision, "approved")
         self.assertEqual(resolution.confirmed_request_ids, {"nod-1"})
@@ -55,47 +100,12 @@ class ConfirmationDialogueTests(unittest.TestCase):
         self.assertEqual(resolution.fingerprint, pending.fingerprint)
         self.assertEqual(replay.decision, "not_confirmation")
 
-    def test_affirmative_without_pending_confirmation_reaches_goal_association(self) -> None:
+    def test_typed_meaning_without_pending_confirmation_is_not_confirmation(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
 
-        self.assertEqual(dialogue.resolve("yes").decision, "not_confirmation")
-        self.assertEqual(dialogue.resolve("好的").decision, "not_confirmation")
-        self.assertEqual(dialogue.resolve("no").decision, "not_confirmation")
-
-    def test_operational_stop_without_pending_confirmation_reaches_goal_interpreter(self) -> None:
-        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
-
-        self.assertEqual(dialogue.resolve("Stop!").decision, "not_confirmation")
-        self.assertEqual(dialogue.resolve("Cancel.").decision, "not_confirmation")
-        self.assertEqual(
-            dialogue.resolve("Emergency stop!").decision,
-            "not_confirmation",
-        )
-
-    def test_operational_interrupt_cancels_pending_and_reaches_goal_interpreter(self) -> None:
-        for phrase in ("Stop!", "Cancel.", "Emergency stop!", "急停！"):
-            with self.subTest(phrase=phrase):
-                dialogue = ConfirmationDialogue(clock=lambda: 100.0)
-                pending = dialogue.begin(
-                    _response(),
-                    confirmed_request_ids={"nod-1"},
-                    origin_session_id="sid-1",
-                    conversation_id="conversation-1",
-                )
-
-                resolution = dialogue.resolve(phrase)
-
-                self.assertEqual(
-                    resolution.decision,
-                    "operational_interrupt",
-                )
-                self.assertEqual(
-                    resolution.confirmation_id,
-                    pending.confirmation_id,
-                )
-                self.assertIsNone(resolution.response)
-                self.assertIsNone(dialogue.pending)
-                self.assertEqual(dialogue.resolve("yes").decision, "not_confirmation")
+        self.assertEqual(dialogue.resolve("confirm").decision, "not_confirmation")
+        self.assertEqual(dialogue.resolve("reject").decision, "not_confirmation")
+        self.assertEqual(dialogue.resolve("ambiguous").decision, "not_confirmation")
 
     def test_denial_and_ambiguous_reply_never_return_request(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
@@ -106,7 +116,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
             conversation_id="conversation-1",
         )
 
-        denied = dialogue.resolve("No, thanks.")
+        denied = dialogue.resolve("reject")
         self.assertEqual(denied.decision, "denied")
         self.assertIsNone(denied.response)
 
@@ -116,7 +126,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
             origin_session_id="sid-2",
             conversation_id="conversation-1",
         )
-        ambiguous = dialogue.resolve("yes, but do it three times")
+        ambiguous = dialogue.resolve("ambiguous")
         self.assertEqual(ambiguous.decision, "ambiguous")
         self.assertIsNone(ambiguous.response)
 
@@ -146,7 +156,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
         )
         now[0] = 106.0
 
-        self.assertEqual(dialogue.resolve("yes").decision, "expired")
+        self.assertEqual(dialogue.resolve("confirm").decision, "expired")
 
         pending = dialogue.begin(
             _response(),
@@ -156,7 +166,24 @@ class ConfirmationDialogueTests(unittest.TestCase):
         )
         pending.response.skills[0].args["count"] = 3
 
-        self.assertEqual(dialogue.resolve("yes").decision, "ambiguous")
+        self.assertEqual(dialogue.resolve("confirm").decision, "ambiguous")
+
+    def test_expected_confirmation_id_prevents_cross_request_authorization(self) -> None:
+        dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+        pending = dialogue.begin(
+            _response(),
+            confirmed_request_ids={"nod-1"},
+            origin_session_id="sid-1",
+            conversation_id="conversation-1",
+        )
+
+        resolution = dialogue.resolve(
+            "confirm",
+            expected_confirmation_id="confirm_replaced",
+        )
+
+        self.assertEqual(resolution.decision, "not_confirmation")
+        self.assertEqual(dialogue.pending, pending)
 
     def test_fallback_prompt_is_natural_and_omits_runtime_internals(self) -> None:
         response = _response()

@@ -298,7 +298,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                     },
                     {
                         "capability_id": "soridormi.walk_forward",
-                        "args": {"duration_s": 15, "speed": "quickly"},
+                        "args": {"duration_s": 15, "speed": "quick"},
                         "timing": "sequential",
                         "reason": "The user asked Chromie to walk forward.",
                     }

@@ -136,8 +136,7 @@ execution authority.
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Goal Interpretation actions are always adapter-only. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named capabilities while keeping the last known-good catalog. |
-| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
-| `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |
+| `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound the model-neutral catalog preview attached at the native interaction boundary; it does not score user language. |
 | `AGENT_CAPABILITY_NUM_CTX` | `24576` | Verification-mode context window for LLM capability selection prompts. Optimize downward only after feasibility and latency evidence are both acceptable. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | `512` | Output budget for LLM capability-selection JSON. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | `160` | Output budget for semantic capability-plan review JSON. |

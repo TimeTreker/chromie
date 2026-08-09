@@ -75,6 +75,17 @@ The maintained source contracts and compatibility state are owned by
 `docs/STATUS.md`; `/interaction` and `/run` remain emergency-only compatibility
 surfaces and must not become ordinary semantic fallback.
 
+The current working tree also removes Host/Agent natural-language rule tables
+from ordinary behavior. Action-request/action-claim regexes, confirmation and
+conversation-reset phrase lists, lexical capability scoring, schema-enum word
+aliases, speech-marker rewrites, and related phrase-based response checks are
+gone. Goal Association and the Cognitive Core now own those meanings through
+typed output; exact schema/ID checks remain mechanical. Only the deterministic protective
+reflex matches language for stop, cancel, emergency, silence, and unusable input. This source
+change has no current-revision live-model, microphone, speaker, simulator, or
+physical-robot evidence; `docs/STATUS.md` owns the final automated evidence and
+limits.
+
 ## Resume commands
 
 From the repository root:
@@ -114,7 +125,8 @@ unless the command actually ran against that target and retained its evidence.
 ## Next engineering work
 
 Complete, publish, and review Issue #22 without widening its evidence-owner
-scope. Then qualify the RTX 4090 Laptop model-role change and retain a
+scope. Then qualify the configured RTX 4090 Laptop `gemma4:e4b` model-role
+change and retain a
 same-model warm/cold prefix measurement;
 separate prompt evaluation from model load and never call a repeated digest a
 provider cache hit.

@@ -107,13 +107,7 @@ class _CapabilityPlanReview(BaseModel):
 
 
 def _natural_speech_or_empty(value: str) -> str:
-    text = " ".join((value or "").strip().split())
-    if not text:
-        return ""
-    label = text.strip(" .!?:;，。！？：；").lower().replace("-", "_")
-    if label in {"unsupported", "not_supported", "clarify", "execute", "none", "null", "n/a", "na"}:
-        return ""
-    return text
+    return " ".join((value or "").strip().split())
 
 
 class CapabilityAgent(BaseAgent):
@@ -132,7 +126,6 @@ class CapabilityAgent(BaseAgent):
             search_text,
             language=self.language(request),
             limit=self.services.capability_match_limit,
-            min_score=0.0,
             prefer_interaction_executable=True,
         )
         request.route_decision.candidate_capabilities = [

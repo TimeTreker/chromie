@@ -376,7 +376,6 @@
                 "chromie.grounded-external-information",
                 "chromie.weather-information"
               ],
-              "forbid_pending_action_stage_directions": true,
               "description": "The new turn must preserve walking, blinking, and spoken performance without stale weather provenance or partial overclaim."
             }
           ]
@@ -650,7 +649,6 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true,
           "expected_observations": [
             {
               "type": "social_attention.gaze",
@@ -693,7 +691,6 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true,
           "expected_observations": [
             {
               "type": "social_attention.nod",
@@ -736,7 +733,6 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true,
           "expected_observations": [
             {
               "type": "locomotion.walk_forward",
@@ -778,7 +774,6 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true,
           "expected_observations": [
             {
               "type": "social_attention.blink",

@@ -342,17 +342,17 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:e2b")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:e4b")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e4b")
+        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:e4b")
+        self.assertEqual(values["AGENT_TOOL_RESULT_INTERPRETER_MODEL"], "gemma4:e4b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3:4b", "gemma4:e2b"],
+            ["qwen3:4b", "gemma4:e4b"],
         )
         for key in (
             "OLLAMA_CONTEXT_LENGTH",

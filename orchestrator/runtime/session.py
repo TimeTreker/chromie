@@ -752,9 +752,6 @@ class SessionTracker:
             if route == "robot_action" and intent == "capability:chromie.speak":
                 return logging.WARNING
 
-        if event_name == "tts_schedule" and self._looks_like_failure_speech(rendered):
-            return logging.WARNING
-
         if any(token in lowered for token in ("status=blocked", "status=rejected", "status=timeout")):
             return logging.WARNING
         return logging.INFO
@@ -772,22 +769,6 @@ class SessionTracker:
             return int(float(cls._field_value(rendered, key)))
         except (TypeError, ValueError):
             return 0
-
-    @staticmethod
-    def _looks_like_failure_speech(rendered: str) -> bool:
-        lowered = rendered.casefold()
-        return any(
-            phrase in lowered
-            for phrase in (
-                "i cannot perform that action",
-                "i can't perform that action",
-                "cannot perform that action",
-                "can't perform that action",
-                "no executable action was produced",
-                "will not pretend i did it",
-                "i am not able to perform",
-            )
-        )
 
     @staticmethod
     def _colorize_for_cli(line: str, level: int) -> str:

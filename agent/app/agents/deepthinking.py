@@ -1050,7 +1050,7 @@ class DeepThinkingAgent(BaseAgent):
             policy = {
                 key: forgetting_policy.get(key)
                 for key in (
-                    "explicit_reset_clears_history_and_tasks",
+                    "conversation_boundary_clears_history_and_tasks",
                     "hard_idle_timeout_sec",
                     "soft_idle_new_topic_timeout_sec",
                     "completed_task_retention_sec",
@@ -1325,19 +1325,4 @@ class DeepThinkingAgent(BaseAgent):
         response = " ".join((response or "").strip().strip('"').split())
         if not response:
             return "我没太听清，你能再说一遍吗？" if zh else "I did not catch that. Could you say it again?"
-
-        bad_prefixes = [
-            "assistant:",
-            "chromie:",
-            "response:",
-            "spoken response:",
-            "助手：",
-            "回答：",
-        ]
-        lowered = response.lower()
-        for prefix in bad_prefixes:
-            if lowered.startswith(prefix):
-                response = response[len(prefix) :].strip()
-                break
-
         return response

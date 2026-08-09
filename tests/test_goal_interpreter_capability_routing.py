@@ -233,7 +233,7 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
         self.assertIn("safety_agent", decision.agents)
 
-    async def test_hybrid_llm_normalizes_unique_compact_catalog_suffix_without_search_match(self) -> None:
+    async def test_hybrid_llm_does_not_guess_capability_from_compact_suffix(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -287,9 +287,10 @@ class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(catalog.search_calls, 0)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertEqual(decision.intent, "semantic_capability_planning")
+        self.assertNotEqual(decision.intent, "capability:soridormi.blink_eyes")
         self.assertIn("capability_agent", decision.agents)
-        self.assertIn("validator normalized catalog capability intent", decision.reason or "")
+        self.assertIn("missing_catalog_skill", decision.reason or "")
 
     async def test_hybrid_llm_delegates_rare_catalog_skill_from_fast_interpreter(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main

@@ -134,21 +134,6 @@ def _device(values: Mapping[str, str], name: str) -> int | str | None:
         return raw
 
 
-def _phrases(
-    values: Mapping[str, str],
-    name: str,
-    defaults: tuple[str, ...],
-) -> tuple[str, ...]:
-    raw = _text(values, name, "")
-    if not raw:
-        return defaults
-    return tuple(
-        phrase
-        for item in raw.split("|")
-        if (phrase := " ".join(item.strip().split()))
-    ) or defaults
-
-
 def _choice(
     values: Mapping[str, str],
     name: str,
@@ -228,7 +213,6 @@ class ConversationSettings:
     durable_memory_enabled: bool
     durable_memory_path: Path
     durable_memory_max_entries: int
-    reset_phrases: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -452,15 +436,6 @@ class HostSettingsSnapshot:
                 "AGENT_SOCIAL_ATTENTION_MODE must be off, report_only, or on; "
                 f"got {social_mode!r}"
             )
-        default_reset_phrases = (
-            "new conversation",
-            "start a new conversation",
-            "reset conversation",
-            "clear conversation",
-            "新对话",
-            "重新开始对话",
-            "清空对话",
-        )
         mind_profile_path = _optional_path(
             values, "ORCH_MIND_PROFILE_PATH", project_root=project_root
         ) or (project_root / "config" / "mind" / "chromie_default.json").resolve()
@@ -869,9 +844,6 @@ class HostSettingsSnapshot:
                     "ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES",
                     64,
                     minimum=1,
-                ),
-                reset_phrases=_phrases(
-                    values, "ORCH_CONVERSATION_RESET_PHRASES", default_reset_phrases
                 ),
             ),
             mind=MindSettings(

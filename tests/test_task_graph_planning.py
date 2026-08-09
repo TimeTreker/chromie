@@ -449,7 +449,6 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                 capability_catalog=CapabilityCatalog(
                     registry,
                     live_invoker=None,
-                    min_score=0.10,
                 ),
                 task_graph_planner=TaskGraphPlanner(registry, ollama),  # type: ignore[arg-type]
             )
@@ -560,7 +559,6 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                         capability_catalog=CapabilityCatalog(
                             registry,
                             live_invoker=None,
-                            min_score=0.10,
                         ),
                         task_graph_planner=TaskGraphPlanner(
                             registry, ollama
@@ -605,7 +603,6 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                 capability_catalog=CapabilityCatalog(
                     registry,
                     live_invoker=LiveSkillInvoker(),
-                    min_score=0.10,
                 ),
                 task_graph_planner=RaisingPlanner(),  # type: ignore[arg-type]
                 legacy_capability_fallback_enabled=True,

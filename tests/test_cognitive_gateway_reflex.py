@@ -329,8 +329,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 events.append("confirmation_cancel")
                 return self.dialogue.cancel()
 
-            def resolve(self, text: str) -> Any:
-                return self.dialogue.resolve(text)
+            def resolve(self, meaning: str) -> Any:
+                return self.dialogue.resolve(meaning)  # type: ignore[arg-type]
 
         confirmation_dialogue = _ConfirmationDialogue()
 
@@ -342,7 +342,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 events.append("skill_runtime_cancel_scope")
                 if with_pending_confirmation:
                     approval_during_provider_cancel.append(
-                        confirmation_dialogue.resolve("yes").decision
+                        confirmation_dialogue.resolve("confirm").decision
                     )
                 return CancellationDispatchReceipt(
                     source_turn_id=directive.source_turn_id,

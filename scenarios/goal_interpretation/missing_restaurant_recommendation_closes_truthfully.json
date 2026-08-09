@@ -53,7 +53,7 @@
           "route": "clarify",
           "intent": "missing_or_unsupported_ability",
           "confidence": 1.0,
-          "speak_first": "我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",
+          "limitation": "我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",
           "metadata": {
             "desired_abilities": [
               {

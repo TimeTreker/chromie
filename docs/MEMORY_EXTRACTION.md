@@ -224,5 +224,5 @@ The first implemented slice should prove:
 - a user correction revises the memory summary used by the next turn;
 - runtime-confirmed outcomes can update task memory;
 - model speech alone cannot mark a physical action as completed;
-- reset phrases and idle expiry remove or expire session memory;
+- typed conversation boundaries and hard-idle expiry remove or expire session memory;
 - docs, unit tests, and scenario fixtures describe the same behavior.

@@ -72,7 +72,7 @@ class MissingAbilityClarifyTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("不会猜", result.speak_immediate[0].text)
         self.assertEqual(result.actions, [])
 
-    async def test_conversation_guard_blocks_chinese_fake_execution_claim_if_reached(self) -> None:
+    async def test_conversation_agent_does_not_classify_action_language_with_rules(self) -> None:
         agent = ConversationAgent(
             AgentServices(
                 ollama=_BadOllama(),  # type: ignore[arg-type]
@@ -98,16 +98,19 @@ class MissingAbilityClarifyTerminalTests(unittest.IsolatedAsyncioTestCase):
         result = await agent.run(request, AgentResult())
 
         self.assertEqual(len(result.speak_immediate), 1)
-        self.assertIn("不会假装", result.speak_immediate[0].text)
-        self.assertNotIn("执行指令", result.speak_immediate[0].text)
-        self.assertNotIn("soridormi", result.speak_immediate[0].text.casefold())
+        self.assertNotIn("不会假装", result.speak_immediate[0].text)
+        self.assertIn("向前走15秒钟", result.speak_immediate[0].text)
+        self.assertIn("执行指令", result.speak_immediate[0].text)
 
-    def test_sanitize_spoken_text_drops_chinese_internal_execution_tail(self) -> None:
+    def test_sanitize_spoken_text_removes_internal_id_without_semantic_truncation(self) -> None:
         text = sanitize_spoken_text(
             "好的，没问题。 我会向前走15秒钟。 执行指令： soridormi.walk forward(duration s=15.0, speed='normal')"
         )
 
-        self.assertEqual(text, "好的，没问题。 我会向前走15秒钟。")
+        self.assertEqual(
+            text,
+            "好的，没问题。 我会向前走15秒钟。 执行指令： forward(duration s=15.0, speed='normal')",
+        )
 
 
 if __name__ == "__main__":

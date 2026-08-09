@@ -72,33 +72,26 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                 }
             )
 
-    def test_missing_ability_alias_is_canonicalized_before_branch_validation(self) -> None:
-        output = SemanticRouteRepairOutput.model_validate(
-            {
-                "route": "clarify",
-                "intent": "missing_or_supported_ability",
-                "confidence": 1.0,
-                "speak_first": (
-                    "我明白你想找附近好玩的地方，不过我现在还没有本地地点搜索和推荐能力。"
-                ),
-                "metadata": {
-                    "desired_abilities": [
-                        {
-                            "ability_id": "local.place_recommendation",
-                            "intent": "推荐用户附近好玩的地方",
-                            "status": "missing_ability",
-                            "confidence": 1.0,
-                            "reason": "当前能力目录没有本地地点搜索能力。",
-                        }
-                    ]
-                },
-            }
-        )
-
-        self.assertEqual(
-            output.intent,
-            "missing_or_unsupported_ability",
-        )
+    def test_missing_ability_alias_is_rejected_instead_of_reclassified(self) -> None:
+        with self.assertRaises(ValueError):
+            SemanticRouteRepairOutput.model_validate(
+                {
+                    "route": "clarify",
+                    "intent": "missing_or_supported_ability",
+                    "confidence": 1.0,
+                    "metadata": {
+                        "desired_abilities": [
+                            {
+                                "ability_id": "local.place_recommendation",
+                                "intent": "推荐用户附近好玩的地方",
+                                "status": "missing_ability",
+                                "confidence": 1.0,
+                                "reason": "当前能力目录没有本地地点搜索能力。",
+                            }
+                        ]
+                    },
+                }
+            )
 
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -1447,7 +1440,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(reviewed, original)
 
-    async def test_inactive_question_form_fails_open_on_inconsistent_ambient_act(self) -> None:
+    async def test_inactive_addressedness_uses_typed_speech_act_not_punctuation(self) -> None:
         class FalseQuestionInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
@@ -1479,7 +1472,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         reviewed = await interpreter._review_inactive_addressedness(request, original)
 
-        self.assertIs(reviewed, original)
+        self.assertEqual(reviewed.route, "ignore")
+        self.assertEqual(reviewed.intent, "ambient_speech")
 
     async def test_inactive_malformed_addressedness_review_fails_open(self) -> None:
         class MalformedReviewInterpreter(OllamaGoalInterpreter):
@@ -3554,9 +3548,9 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     "message": {
                         "content": (
                             '{"route":"clarify",'
-                            '"intent":"missing_or_supported_ability",'
+                            '"intent":"missing_or_unsupported_ability",'
                             '"confidence":1.0,'
-                            '"speak_first":"我明白你想找附近好吃的餐厅，不过我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",'
+                            '"limitation":"我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",'
                             '"metadata":{"desired_abilities":[{'
                             '"ability_id":"local.restaurant_recommendation",'
                             '"intent":"查找并推荐用户附近的优质餐厅",'
