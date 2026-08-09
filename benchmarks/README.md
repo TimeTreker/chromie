@@ -406,8 +406,13 @@ bundle to Codex or another declared LLM/human reviewer, fill the generated
 `review-template.json`, and apply the retained semantic verdict with
 `python -m benchmarks.review apply`. The reviewer judges the actual output
 against the acceptable semantic region; it does not compare against a fixed
-answer string. `--id`, `--cohort`, and `--language` support focused diagnostic
-runs, while the default executes the complete dataset.
+answer string. Every review must also distinguish scenario/oracle, prompt or
+MindProfile, missing context, contract/schema, runtime/provider, and isolated
+model-inference causes. One failed output never proves that the model is at
+fault; when the retained prompt, raw output, validation error, and upstream
+evidence cannot isolate the cause, attribution remains `unresolved`. `--id`,
+`--cohort`, and `--language` support focused diagnostic runs, while the default
+executes the complete dataset.
 
 To extend coverage, add exactly one scenario object per JSON file below
 `datasets/daily_conversation/scenarios/<cohort>/`. Name the file after the last

@@ -179,4 +179,9 @@ print(json.dumps({
     assert bundle["scenarios"][0]["execution_result"]["observations"][
         "primary_outcome"
     ] == "Good morning! I'm right here."
-    assert (output_dir / "review/review-template.json").exists()
+    template = json.loads(
+        (output_dir / "review/review-template.json").read_text(encoding="utf-8")
+    )
+    attribution = template["reviews"][0]["failure_attribution"]
+    assert attribution["primary_category"] == "unresolved"
+    assert attribution["model_inference_fault"] == "unresolved"

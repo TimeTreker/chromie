@@ -108,6 +108,7 @@ def aggregate_semantic_reviews(
                     "verdict": str(row["verdict"]),
                     "rationale": str(row.get("rationale") or ""),
                     "evidence_refs": list(row.get("evidence_refs") or []),
+                    "failure_attribution": dict(row.get("failure_attribution") or {}),
                 }
             )
         verdicts = [str(row["verdict"]) for row in vote_rows]
@@ -199,6 +200,42 @@ def aggregate_semantic_reviews(
                 if text and text not in root_causes:
                     root_causes.append(text)
         agreement_count = max(counts.values(), default=0)
+        attribution_rows = [
+            row["failure_attribution"]
+            for row in vote_rows
+            if isinstance(row.get("failure_attribution"), Mapping)
+        ]
+        model_fault_votes = [
+            str(row.get("model_inference_fault") or "unresolved")
+            for row in attribution_rows
+        ]
+        category_votes = [
+            str(row.get("primary_category") or "unresolved") for row in attribution_rows
+        ]
+        attribution_evidence = sorted(
+            {
+                str(ref)
+                for row in attribution_rows
+                for ref in (row.get("evidence_refs") or [])
+                if str(ref).strip()
+            }
+        )
+        attribution_complete = (
+            len(attribution_rows) >= minimum_reviewers
+            and len(vote_families) >= minimum_model_families
+        )
+        model_fault = (
+            model_fault_votes[0]
+            if attribution_complete
+            and model_fault_votes
+            and len(set(model_fault_votes)) == 1
+            else "unresolved"
+        )
+        primary_category = (
+            category_votes[0]
+            if attribution_complete and category_votes and len(set(category_votes)) == 1
+            else ("mixed" if attribution_complete and category_votes else "unresolved")
+        )
         reviews.append(
             {
                 "scenario_id": scenario_id,
@@ -214,6 +251,17 @@ def aggregate_semantic_reviews(
                 "evidence_refs": evidence_refs,
                 "dimensions": dimensions,
                 "findings": findings,
+                "failure_attribution": {
+                    "primary_category": primary_category,
+                    "model_inference_fault": model_fault,
+                    "confidence": ("medium" if model_fault != "unresolved" else "low"),
+                    "rationale": (
+                        "Conservative attribution consensus; model inference is "
+                        "resolved only when all qualifying reviewers agree."
+                    ),
+                    "evidence_refs": attribution_evidence,
+                    "judge_votes": attribution_rows,
+                },
                 "likely_root_causes": root_causes,
                 "judge_votes": vote_rows,
                 "agreement": {

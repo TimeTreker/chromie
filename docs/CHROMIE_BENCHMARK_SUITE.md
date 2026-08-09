@@ -748,6 +748,22 @@ clarity, capability description, architecture, provider behavior, or genuine
 validation defects. Adding an input-specific Host rule is prohibited except for
 narrow deterministic operational controls already defined by the Charter.
 
+A scenario verdict and a failure attribution are separate conclusions. A fail
+or partial verdict does not by itself establish deficient model inference. The
+review must inspect, in order, the scenario/oracle against its authority sources,
+the exact prompt and MindProfile projection, supplied context and harness state,
+schema and repair contract, runtime/provider evidence, and the retained raw model
+output. It records one primary category (`scenario_or_oracle`,
+`prompt_or_profile`, `context_or_harness`, `contract_or_schema`,
+`runtime_or_provider`, `model_inference`, `mixed`, or `unresolved`) and separately
+states whether a model-inference fault is `supported`, `not_supported`, or
+`unresolved`. Model inference is supported only when retained evidence isolates
+the model output violating a clear, internally consistent instruction after
+upstream prompt, context, contract, and runtime causes have been checked. A
+different model passing the same case is comparative evidence, not sufficient
+proof by itself. Missing prompt or raw-output evidence requires `unresolved`, not
+speculation.
+
 
 The implemented mining workflow preserves each candidate as an immutable,
 pending-review artifact. Candidate indexing reports similarity clusters,

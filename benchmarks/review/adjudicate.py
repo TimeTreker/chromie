@@ -7,6 +7,23 @@ from typing import Any, Mapping
 from benchmarks.contracts import ContractError
 
 VALID_VERDICTS = frozenset({"pass", "partial", "fail", "insufficient_evidence"})
+VALID_FAILURE_ATTRIBUTION_CATEGORIES = frozenset(
+    {
+        "none",
+        "scenario_or_oracle",
+        "prompt_or_profile",
+        "context_or_harness",
+        "contract_or_schema",
+        "runtime_or_provider",
+        "model_inference",
+        "mixed",
+        "unresolved",
+    }
+)
+VALID_MODEL_INFERENCE_FAULT_STATES = frozenset(
+    {"supported", "not_supported", "unresolved"}
+)
+VALID_ATTRIBUTION_CONFIDENCE = frozenset({"low", "medium", "high"})
 
 
 def _reviews_by_id(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:

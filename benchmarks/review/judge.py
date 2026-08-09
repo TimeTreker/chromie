@@ -7,7 +7,12 @@ import time
 from typing import Any, Mapping
 
 from benchmarks.contracts import ContractError
-from benchmarks.review.adjudicate import VALID_VERDICTS
+from benchmarks.review.adjudicate import (
+    VALID_ATTRIBUTION_CONFIDENCE,
+    VALID_FAILURE_ATTRIBUTION_CATEGORIES,
+    VALID_MODEL_INFERENCE_FAULT_STATES,
+    VALID_VERDICTS,
+)
 from benchmarks.review.consensus import aggregate_semantic_reviews
 from benchmarks.review.prompting import render_review_prompt
 from benchmarks.review.providers import (
@@ -118,6 +123,38 @@ def _validate_review_entry(
         raise ContractError(
             f"semantic reviewer {scenario_id!r} findings/root causes must be arrays"
         )
+    attribution = raw.get("failure_attribution")
+    if not isinstance(attribution, Mapping):
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} requires failure_attribution"
+        )
+    primary_category = str(attribution.get("primary_category") or "").strip()
+    model_fault = str(attribution.get("model_inference_fault") or "").strip()
+    attribution_confidence = str(attribution.get("confidence") or "").strip()
+    attribution_rationale = str(attribution.get("rationale") or "").strip()
+    attribution_evidence = attribution.get("evidence_refs")
+    if primary_category not in VALID_FAILURE_ATTRIBUTION_CATEGORIES:
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} has invalid attribution category"
+        )
+    if model_fault not in VALID_MODEL_INFERENCE_FAULT_STATES:
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} has invalid model-inference attribution"
+        )
+    if attribution_confidence not in VALID_ATTRIBUTION_CONFIDENCE:
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} has invalid attribution confidence"
+        )
+    if not attribution_rationale:
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} requires attribution rationale"
+        )
+    if not isinstance(attribution_evidence, list) or any(
+        not isinstance(item, str) or not item.strip() for item in attribution_evidence
+    ):
+        raise ContractError(
+            f"semantic reviewer {scenario_id!r} attribution evidence_refs must be strings"
+        )
     return {
         "scenario_id": scenario_id,
         "verdict": verdict,
@@ -125,6 +162,13 @@ def _validate_review_entry(
         "evidence_refs": [str(item) for item in evidence_refs],
         "dimensions": normalized_dimensions,
         "findings": [dict(item) for item in findings if isinstance(item, Mapping)],
+        "failure_attribution": {
+            "primary_category": primary_category,
+            "model_inference_fault": model_fault,
+            "confidence": attribution_confidence,
+            "rationale": attribution_rationale,
+            "evidence_refs": [str(item) for item in attribution_evidence],
+        },
         "likely_root_causes": [
             str(item).strip() for item in root_causes if str(item).strip()
         ],
