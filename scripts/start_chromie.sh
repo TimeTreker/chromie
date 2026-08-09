@@ -486,6 +486,23 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}
   echo "[chromie] CosyVoice shared-GPU cognition: ${COSYVOICE_BRAIN_MODEL} context=${COSYVOICE_BRAIN_NUM_CTX} (one resident Ollama model/runner)."
 fi
 
+cat <<EOF_MODEL_ROLES
+[chromie] Effective cognitive model roles:
+Role                               | Model
+-----------------------------------+--------------------------------
+Cognitive Gateway attention        | ${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL}
+Fast intent (Goal Interpreter)     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL}
+Goal Interpreter review            | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL}
+Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
+Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL}
+Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL}
+Response Composer                  | ${EFFECTIVE_RESPONSE_COMPOSER_MODEL}
+Tool Result Interpreter            | ${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL}
+Task Continuity                    | ${EFFECTIVE_TASK_CONTINUITY_MODEL}
+Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
+Response Review                    | ${EFFECTIVE_RESPONSE_REVIEW_MODEL}
+EOF_MODEL_ROLES
+
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE
 CHROMIE_TTS_BACKEND=${TTS_BACKEND}
 TTS_VOICE_ROOT=${TTS_VOICE_ROOT}

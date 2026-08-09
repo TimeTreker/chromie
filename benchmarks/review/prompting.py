@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from benchmarks.contracts import ContractError
 
-PROMPT_PROTOCOL_VERSION = "chromie-semantic-review-v1"
+PROMPT_PROTOCOL_VERSION = "chromie-semantic-review-v2"
 _TEXT_SUFFIXES = frozenset(
     {".json", ".jsonl", ".log", ".txt", ".md", ".csv", ".tsv", ".yaml", ".yml"}
 )
@@ -176,7 +176,11 @@ def render_review_prompt(
         "Judge only the declared semantic dimensions from retained evidence. "
         "Deterministic failures and hard-gate results are non-overridable. "
         "Do not require exact wording unless the scenario declares text as a contract. "
-        "Do not infer missing evidence. Return JSON only, without markdown fences."
+        "Do not infer missing evidence. A failed scenario alone is not evidence of a "
+        "model-inference fault: check scenario/oracle validity, prompt or MindProfile "
+        "instructions, supplied context, schemas, runtime, and raw model output. Mark "
+        "model_inference_fault=unresolved unless retained evidence isolates it. Return "
+        "JSON only, without markdown fences."
     )
     dimensions = (
         scenario_case.get("review_request", {}).get("semantic_dimensions", [])
@@ -203,6 +207,19 @@ def render_review_prompt(
                 "evidence_refs": ["specific evidence"],
             }
         ],
+        "failure_attribution": {
+            "primary_category": (
+                "none | scenario_or_oracle | prompt_or_profile | context_or_harness | "
+                "contract_or_schema | runtime_or_provider | model_inference | mixed | "
+                "unresolved"
+            ),
+            "model_inference_fault": "supported | not_supported | unresolved",
+            "confidence": "low | medium | high",
+            "rationale": "Evidence-grounded attribution, not a score restatement",
+            "evidence_refs": [
+                "prompt, raw output, validation, runtime, or authority evidence"
+            ],
+        },
         "likely_root_causes": ["bounded hypothesis, clearly identified as inference"],
     }
     user_prompt = (

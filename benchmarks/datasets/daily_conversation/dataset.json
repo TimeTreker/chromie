@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "dataset_id": "chromie.daily_conversation.v1",
+  "description": "Chromie-specific daily-life communication scenarios with acceptable semantic regions and hybrid LLM adjudication; no canonical response strings.",
+  "authoring": {
+    "origin": "llm_generated_and_reviewed",
+    "reviewer_kind": "llm",
+    "review_status": "reviewed_dataset_candidate",
+    "independent_semantic_qualification": false,
+    "release_qualification": "independent_review_and_execution_required",
+    "runtime_policy_authority": false
+  },
+  "coverage_contract": {
+    "minimum_scenarios": 100,
+    "expected_scenarios": 150,
+    "cohorts": {
+      "greetings_presence": 10,
+      "family_home": 10,
+      "school_learning": 10,
+      "routines_plans": 10,
+      "meals_wellbeing": 10,
+      "feelings_support": 10,
+      "play_creativity": 10,
+      "identity_body": 10,
+      "practical_information_tools": 10,
+      "preferences_boundaries": 10,
+      "multi_turn_continuity": 10,
+      "uncertainty_repair": 10,
+      "friends_social_life": 10,
+      "shared_space_etiquette": 10,
+      "casual_chat_curiosity": 10
+    },
+    "languages": {
+      "en-US": 75,
+      "zh-CN": 75
+    },
+    "canonical_response_strings": 0
+  }
+}

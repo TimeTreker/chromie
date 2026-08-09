@@ -203,6 +203,14 @@ Tags are multi-valued. A polite bilingual weather request can belong to
 `information_qa`, `tools`, `style_matrix`, and `bilingual_and_asr_noise`
 without duplicating the scenario body.
 
+The maintained Git-controlled daily communication asset is
+[`benchmarks/datasets/daily_conversation/scenarios/`](../benchmarks/datasets/daily_conversation/scenarios/).
+It provides 150 Chromie-specific Chinese and English semantic scenarios across
+fifteen daily-life cohorts. They define acceptable behavior regions and hybrid
+review rubrics, not canonical response strings. Their LLM-reviewed-candidate
+status is dataset coverage, not independent model qualification or release
+evidence.
+
 ## 6. Scenario contract
 
 Each reviewed benchmark case should carry, as applicable:
@@ -224,6 +232,24 @@ Each reviewed benchmark case should carry, as applicable:
 - distribution cohort and aggregation rules;
 - provenance: generated, mined, reported bug, or manually authored;
 - reviewer status and rationale.
+
+Semantic scenario content must be specific to Chromie's product identity and
+owned boundaries. Candidate cohorts should be derived from the Project Charter,
+the Human-Like Interaction Contract, the Goal-driven architecture, the current
+MindProfile and Social Interaction Style, retained failures, and the exact
+capability and evidence surfaces under qualification. Generic assistant trivia,
+abstract JSON obedience, or an unrelated agent benchmark is not evidence that a
+model can act as Chromie's Goal Association, Planner, Response Composer, Tool
+Result Interpreter, or Social Attention owner.
+
+An LLM may generate candidate scenario variations, but generation does not make
+them authoritative. Review must reject candidates that merely paraphrase one
+visible phrase, assume capabilities Chromie does not own, encode one model's
+preferred DTO wording, or omit the state that makes the semantic decision hard.
+Useful variation changes Goal lifecycle, discourse reference, language,
+emotion, available capability evidence, independent Speaking and Activity
+responsibilities, or another declared semantic dimension while preserving the
+same general ability under test.
 
 User politeness is contextual evidence, not a direct action command. A polite
 user does not require a gesture; a rude or impatient user does not authorize
@@ -267,6 +293,16 @@ not a single expected string or gesture. A scenario may define:
 
 Exact wording should be asserted only when the text itself is a contract, such
 as an explicit safety notice or protocol token.
+
+For model-produced speech, Goal Association, planning, interpretation, and
+Social Attention output, the scenario should normally state what meaning must
+be preserved, what alternatives are acceptable, and what must not happen. It
+must not use one authored sentence or one model's serialized DTO as static
+truth. For example, a running-body-Goal correction may require preservation of
+the existing Goal, the new direction or pace, and replanning responsibility
+without requiring one English description. An identity question may require
+ordinary Speaking work, truthful robotic-body grounding, and no invented role
+without prescribing Chromie's final sentence.
 
 An executor's own `primary_task_passed=true` is not sufficient to pass a
 declared semantic oracle. The evaluator must review the retained conversation,
@@ -326,6 +362,56 @@ python -m benchmarks.review apply \
 always remains `fail`; semantic review may diagnose it but cannot convert it to
 pass. The reviewer is evaluation-only and never participates in production
 cognition.
+
+#### Chromie-specific semantic qualification workflow
+
+Use retained LLM adjudication when a model or module must be evaluated on
+meaning that cannot be represented honestly by one fixed response. This method
+is suitable for Goal Association and segmentation, response quality, tool-result
+interpretation, conversational continuity, uncertainty handling, identity and
+style, and other declared semantic dimensions. It does not replace exact
+contract, safety, authorization, lifecycle, capability, or evidence checks.
+
+The required workflow is:
+
+1. Define the Chromie ability and owner being qualified. Generate a diverse
+   cohort from Chromie's identity, Goal lifecycle, execution lanes, retained
+   interaction state, capabilities, and known evidence boundaries.
+2. Review each candidate scenario before execution. Record an acceptable
+   behavior region, forbidden behavior, deterministic invariants, semantic
+   dimensions, and the evidence the reviewer will need. Do not provide a
+   canonical response string.
+3. Execute every candidate model through the same real module or integration
+   boundary. Retain the input, bounded context, model and prompt identity, full
+   typed output, repair and review metadata, latency, and relevant correlated
+   artifacts. A hand-written ideal output is not substituted for execution.
+4. Apply deterministic gates first. Invalid DTOs, unauthorized effects,
+   missing execution evidence, safety violations, and critical LLM-integrity
+   failures remain hard failures.
+5. Give the unchanged scenario, rubric, execution result, and bounded evidence
+   to a retained LLM or human reviewer. The reviewer judges only the declared
+   dimensions and returns `pass`, `partial`, `fail`, or
+   `insufficient_evidence`, with rationale and evidence references.
+6. Apply the review through the maintained non-overridable adjudication path
+   and retain both raw and reviewed reports. Compare models by the verdict
+   distribution, hard-failure families, repair behavior, and latency rather
+   than collapsing the cohort into exact-text accuracy.
+
+For comparative model qualification, reviewer prompts should hide candidate
+model identity when practical and use the same evidence capsule and rubric for
+every candidate. A reviewer must not judge its own production output when an
+independent reviewer is available. One LLM reviewer, including an interactive
+coding session, is useful diagnostic evidence when its identity and limitation
+are retained; it is not independent semantic closure. Model-selection or
+release claims require the declared independent human or multi-model review
+policy, and disagreements remain visible rather than being rewritten into a
+static answer key.
+
+Candidate cohorts may remain local evidence while they are being explored.
+Promotion into a maintained dataset requires normal scenario review,
+provenance, duplicate and coverage checks, and a stable general-ability reason.
+The retained verdict never authorizes production behavior and must not be used
+to add scenario-ID, phrase, or expected-answer branches to Runtime code.
 
 #### 7.3.1 Independent multi-LLM adjudication
 
@@ -661,6 +747,22 @@ fix classes are model choice, prompt principles, context quality, contract
 clarity, capability description, architecture, provider behavior, or genuine
 validation defects. Adding an input-specific Host rule is prohibited except for
 narrow deterministic operational controls already defined by the Charter.
+
+A scenario verdict and a failure attribution are separate conclusions. A fail
+or partial verdict does not by itself establish deficient model inference. The
+review must inspect, in order, the scenario/oracle against its authority sources,
+the exact prompt and MindProfile projection, supplied context and harness state,
+schema and repair contract, runtime/provider evidence, and the retained raw model
+output. It records one primary category (`scenario_or_oracle`,
+`prompt_or_profile`, `context_or_harness`, `contract_or_schema`,
+`runtime_or_provider`, `model_inference`, `mixed`, or `unresolved`) and separately
+states whether a model-inference fault is `supported`, `not_supported`, or
+`unresolved`. Model inference is supported only when retained evidence isolates
+the model output violating a clear, internally consistent instruction after
+upstream prompt, context, contract, and runtime causes have been checked. A
+different model passing the same case is comparative evidence, not sufficient
+proof by itself. Missing prompt or raw-output evidence requires `unresolved`, not
+speculation.
 
 
 The implemented mining workflow preserves each candidate as an immutable,

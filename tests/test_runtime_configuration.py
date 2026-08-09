@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -467,6 +468,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertNotIn('wait_for_tcp 127.0.0.1 9001 900 "ASR"', launcher)
         self.assertIn("warm_tts_candidate", launcher)
         self.assertIn("reset_ollama_before_tts_warmup", launcher)
+
         self.assertIn(
             "Resetting Ollama runners before the shared-GPU TTS synthesis probe",
             launcher,
@@ -512,6 +514,49 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT", verifier)
         self.assertIn("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", verifier)
         self.assertNotIn('check_value "$name"', verifier)
+
+    def test_start_chromie_logs_effective_cognitive_model_roles(self) -> None:
+        launcher = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Effective cognitive model roles:", launcher)
+        expected_roles = {
+            "Cognitive Gateway attention": (
+                "EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL"
+            ),
+            "Fast intent (Goal Interpreter)": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
+            "Goal Interpreter review": (
+                "EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
+            ),
+            "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
+            "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
+            "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",
+            "Response Composer": "EFFECTIVE_RESPONSE_COMPOSER_MODEL",
+            "Tool Result Interpreter": "EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL",
+            "Task Continuity": "EFFECTIVE_TASK_CONTINUITY_MODEL",
+            "Social Attention": "EFFECTIVE_SOCIAL_ATTENTION_MODEL",
+            "Response Review": "EFFECTIVE_RESPONSE_REVIEW_MODEL",
+        }
+        for role, variable in expected_roles.items():
+            with self.subTest(role=role):
+                self.assertRegex(
+                    launcher,
+                    rf"{re.escape(role)}\s+\| \$\{{{variable}\}}",
+                )
+        self.assertIn("Role                               | Model", launcher)
+        self.assertIn(
+            "-----------------------------------+--------------------------------",
+            launcher,
+        )
+        summary_index = launcher.index("Effective cognitive model roles:")
+        self.assertGreater(
+            summary_index,
+            launcher.index(
+                'EFFECTIVE_RESPONSE_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"'
+            ),
+        )
+        self.assertLess(summary_index, launcher.index('cat > "$SERVICE_OVERRIDE"'))
 
     def test_runtime_verifier_checks_timezone_environment_and_mount(self) -> None:
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(

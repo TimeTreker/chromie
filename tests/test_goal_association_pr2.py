@@ -126,6 +126,11 @@ class GoalExecutionContractTests(unittest.TestCase):
                 "provider_required",
             }.issubset(required)
         )
+        output_description = schema["$defs"]["GoalAssociationModelGoal"][
+            "properties"
+        ]["output_mode"]["description"]
+        self.assertIn("work owned by this Goal", output_description)
+        self.assertIn("capability_work", output_description)
 
 
 class FakeOllama:
@@ -3434,6 +3439,10 @@ class GoalAssociationResolverTests(unittest.TestCase):
             association_schema["properties"]["target_goal_ids"]["items"]["enum"],
             ["goal-a"],
         )
+        self.assertEqual(
+            association_schema["properties"]["target_goal_ids"]["minItems"],
+            1,
+        )
 
     def test_model_failure_is_safe_and_advisory(self):
         ollama = FakeOllama(RuntimeError("offline"))
@@ -3535,6 +3544,15 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
         self.assertIn("politeness preamble", prompt)
         self.assertIn("identity and personality shape expression only", prompt)
         self.assertIn("one Goal when one capability result can satisfy both", prompt)
+        self.assertIn("not the channel later used to deliver its result", prompt)
+        self.assertIn(
+            "capability_dependent/activity/capability_work/true",
+            prompt,
+        )
+        self.assertIn(
+            "Never set output_mode=speech merely because a capability result",
+            prompt,
+        )
         self.assertIn("ledger-goal-marker", prompt)
         system_prompt = resolver._system_prompt(GoalSegmentationModelOutput)
         self.assertIn(

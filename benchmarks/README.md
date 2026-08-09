@@ -357,6 +357,98 @@ Generate its deterministic coverage report with:
 python -m benchmarks.datasets.social_attention.validate
 ```
 
+## Daily conversation semantic dataset v1
+
+`datasets/daily_conversation/scenarios/` is the maintained Git-controlled
+daily-life communication asset. It contains 150 Chromie-specific integration
+scenarios: ten cases in each of fifteen cohorts, with 75 Chinese and 75 English
+cases. Coverage includes presence, family and home, school and learning,
+routines, meals and wellbeing, emotional support, play and creativity,
+identity and robotic-body truth, practical information and tools, communication
+preferences, multi-turn continuity, uncertainty repair, friendships and peer
+communication, shared-space etiquette, and casual conversation and curiosity.
+
+These scenarios intentionally provide no canonical response strings. Each case
+defines an acceptable semantic region, forbidden behavior, deterministic hard
+boundaries, and dimensions for retained LLM or human adjudication. The source
+records LLM authoring/review provenance and explicitly remains a dataset
+candidate until independent review and execution evidence qualify a declared
+model or release claim. Scenario content has no Runtime policy authority.
+
+Focused source checks are:
+
+```bash
+python -m pytest -q benchmarks/tests/test_daily_conversation_dataset.py
+python -m benchmarks.inventory.core --check
+python -m benchmarks.adapters.normalize --check
+```
+
+Execute cases through the maintained safe live-text adapter and retain the real
+outputs for semantic review:
+
+```bash
+export CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT=.chromie/benchmarks/daily-conversation/run-id/artifacts
+python scripts/run_daily_conversation_benchmark.py \
+  --command "python scripts/daily_conversation_live_adapter.py" \
+  --model candidate-model-id \
+  --prompt-revision current-prompt-revision \
+  --output-dir .chromie/benchmarks/daily-conversation/run-id
+```
+
+The live adapter receives each normalized scenario on standard input and uses
+the maintained Host text path with cognitive-runtime apply, shared conversation
+state for multi-turn cases, no speaker, and preview-only execution. It therefore
+exercises routing, Goal Association, planning, and response composition without
+executing proposed effects. It also verifies the quality-model identity exposed
+by Agent health and that the fixed fast roles remain `qwen3:4b`. The runner writes
+`normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
+bundle to Codex or another declared LLM/human reviewer, fill the generated
+`review-template.json`, and apply the retained semantic verdict with
+`python -m benchmarks.review apply`. The reviewer judges the actual output
+against the acceptable semantic region; it does not compare against a fixed
+answer string. Every review must also distinguish scenario/oracle, prompt or
+MindProfile, missing context, contract/schema, runtime/provider, and isolated
+model-inference causes. One failed output never proves that the model is at
+fault; when the retained prompt, raw output, validation error, and upstream
+evidence cannot isolate the cause, attribution remains `unresolved`. `--id`,
+`--cohort`, and `--language` support focused diagnostic runs, while the default
+executes the complete dataset.
+
+When diagnosing whether a failure comes from basic model semantics or from the
+production prompt/DTO/coordinator surface, run the same cases through the
+isolated semantic probe first:
+
+```bash
+export CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT=.chromie/benchmarks/daily-conversation/probe-model/artifacts
+python scripts/run_daily_conversation_benchmark.py \
+  --command "python scripts/daily_conversation_semantic_probe_adapter.py" \
+  --model candidate-model-id \
+  --prompt-revision semantic-probe-v1 \
+  --output-dir .chromie/benchmarks/daily-conversation/probe-model
+```
+
+The probe supplies the user episode, bounded `scenario_state`, registered
+capability names, and Chromie's maintained identity/evidence rules through a
+small structured contract. It explicitly excludes primary outcomes, forbidden
+behavior labels, and review rubrics from the candidate prompt. This is a
+diagnostic counterfactual, not integration or release evidence: a semantic-probe
+pass followed by a live-adapter failure points toward the production context,
+schema, workflow, or coordination boundary, while failure at both boundaries is
+stronger model-inference evidence only after the fixture and prompt are judged
+sufficient. Retain and semantically review both outputs; never convert a probe
+score into a live robot claim.
+
+To extend coverage, add exactly one scenario object per JSON file below
+`datasets/daily_conversation/scenarios/<cohort>/`. Name the file after the last
+segment of its scenario ID; for example,
+`daily.v1.family_home.where_is_dad` belongs in
+`scenarios/family_home/where_is_dad.json`. Dataset-wide provenance and coverage
+live in `datasets/daily_conversation/dataset.json`, not in a scenario file.
+The runner and inventory discover `**/*.json` recursively, so adding or
+reorganizing scenario data never requires a Python change. Keep scenario IDs
+unique and update the dataset and migration manifest counts when intentionally
+changing the maintained cohort size.
+
 
 ## End-to-end evidence profiles
 

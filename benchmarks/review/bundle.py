@@ -218,6 +218,16 @@ def write_review_bundle(
                     for dimension in case["review_request"]["semantic_dimensions"]
                 },
                 "findings": [],
+                "failure_attribution": {
+                    "primary_category": "unresolved",
+                    "model_inference_fault": "unresolved",
+                    "confidence": "low",
+                    "rationale": (
+                        "Inspect scenario, prompt/profile, context, contracts, runtime, "
+                        "and raw model output before attributing failure."
+                    ),
+                    "evidence_refs": [],
+                },
                 "likely_root_causes": [],
             }
             for case in bundle["scenarios"]
@@ -234,6 +244,9 @@ def write_review_bundle(
         "insufficient_evidence.\n"
         "Do not override deterministic failures or require exact conversational "
         "wording.\n"
+        "For every review, complete failure_attribution. A failed scenario by "
+        "itself does not prove a model-inference fault; use unresolved when the "
+        "retained evidence cannot isolate the cause.\n"
         "For independent API judges, run: python -m benchmarks.review judge "
         "--bundle . --reviewers <config.json> --output-dir judgments\n"
         "For separately produced reviews, run: python -m benchmarks.review "

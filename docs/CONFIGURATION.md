@@ -231,6 +231,11 @@ Inside Docker, use Compose service names such as
 `http://chromie-llm:11434`; do not copy host loopback URLs into container
 configuration.
 
+After resolving the hardware profile and any shared-GPU TTS override,
+`scripts/start_chromie.sh` prints the effective cognitive role-to-model mapping
+before starting services. The displayed models are the same effective values
+written to the Agent and Orchestrator runtime overrides.
+
 ## Cognitive Gateway attention review inside Agent
 
 | Variable | Default or profile behavior |

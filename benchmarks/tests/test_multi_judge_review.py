@@ -108,6 +108,15 @@ def _review(
                     }
                 },
                 "findings": [],
+                "failure_attribution": {
+                    "primary_category": "none" if verdict == "pass" else "unresolved",
+                    "model_inference_fault": (
+                        "not_supported" if verdict == "pass" else "unresolved"
+                    ),
+                    "confidence": "high" if verdict == "pass" else "low",
+                    "rationale": "The retained output directly satisfies the scenario.",
+                    "evidence_refs": ["000-events.jsonl"],
+                },
                 "likely_root_causes": [],
             }
         ],
@@ -220,6 +229,8 @@ def test_prompt_capsule_is_provider_neutral_and_contains_retained_evidence(
         bundle_dir=bundle_dir,
     )
     assert "independent evaluator" in system
+    assert "failed scenario alone is not evidence" in system
+    assert "failure_attribution" in user
     assert "I remembered blue" in user
     assert metadata["scenario_id"] == "case.001"
     assert len(metadata["prompt_sha256"]) == 64
@@ -265,6 +276,22 @@ def test_unanimous_policy_fails_closed_on_disagreement() -> None:
         minimum_reviewers=2,
     )
     assert consensus["reviews"][0]["verdict"] == "insufficient_evidence"
+
+
+def test_attribution_consensus_requires_reviewers_to_agree_on_model_fault() -> None:
+    agreed = aggregate_semantic_reviews(
+        [_review("openai", "pass"), _review("claude", "pass")],
+        minimum_reviewers=2,
+    )["reviews"][0]["failure_attribution"]
+    disputed = aggregate_semantic_reviews(
+        [_review("openai", "pass"), _review("claude", "fail")],
+        minimum_reviewers=2,
+    )["reviews"][0]["failure_attribution"]
+
+    assert agreed["model_inference_fault"] == "not_supported"
+    assert agreed["primary_category"] == "none"
+    assert disputed["model_inference_fault"] == "unresolved"
+    assert disputed["primary_category"] == "mixed"
 
 
 def test_ensemble_cannot_override_deterministic_failure() -> None:
