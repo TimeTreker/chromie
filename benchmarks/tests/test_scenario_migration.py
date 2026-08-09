@@ -28,7 +28,7 @@ def test_migration_manifest_reconciles_inventory_and_normalized_counts() -> None
     assert report["runtime_policy_authority"] is False
     assert report["release_claims_changed"] is False
     assert report["source_counts"]["social_attention_v1"] == 128
-    assert report["source_counts"]["daily_conversation_v1"] == 120
+    assert report["source_counts"]["daily_conversation_v1"] == 150
 
 
 def test_every_compatibility_entrypoint_has_a_removal_schedule() -> None:

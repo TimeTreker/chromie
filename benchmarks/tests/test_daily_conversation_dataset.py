@@ -31,7 +31,7 @@ def test_daily_conversation_dataset_meets_declared_coverage() -> None:
     coverage = dataset["coverage_contract"]
 
     assert dataset["dataset_id"] == "chromie.daily_conversation.v1"
-    assert len(scenarios) == coverage["expected_scenarios"] == 120
+    assert len(scenarios) == coverage["expected_scenarios"] == 150
     assert len(scenarios) >= coverage["minimum_scenarios"] == 100
     assert Counter(item["metadata"]["cohort"] for item in scenarios) == coverage["cohorts"]
     assert Counter(item["metadata"]["language"] for item in scenarios) == coverage["languages"]
@@ -71,7 +71,7 @@ def test_daily_conversation_cases_are_unique_chromie_semantic_assets() -> None:
 def test_daily_conversation_stores_exactly_one_scenario_per_file() -> None:
     paths = _scenario_paths(DATASET_ROOT)
 
-    assert len(paths) == 120
+    assert len(paths) == 150
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert isinstance(payload, dict)
@@ -95,7 +95,7 @@ def test_daily_conversation_dataset_normalizes_through_common_contract() -> None
             )
         )
 
-    assert len(normalized) == 120
+    assert len(normalized) == 150
     assert all(item["datasets"] == ["daily_conversation"] for item in normalized)
     assert all(item["oracle_policy"]["mode"] == "hybrid" for item in normalized)
     assert all(item["expectations"]["primary_outcomes"] for item in normalized)

@@ -360,12 +360,13 @@ python -m benchmarks.datasets.social_attention.validate
 ## Daily conversation semantic dataset v1
 
 `datasets/daily_conversation/scenarios/` is the maintained Git-controlled
-daily-life communication asset. It contains 120 Chromie-specific integration
-scenarios: ten cases in each of twelve cohorts, with 60 Chinese and 60 English
+daily-life communication asset. It contains 150 Chromie-specific integration
+scenarios: ten cases in each of fifteen cohorts, with 75 Chinese and 75 English
 cases. Coverage includes presence, family and home, school and learning,
 routines, meals and wellbeing, emotional support, play and creativity,
 identity and robotic-body truth, practical information and tools, communication
-preferences, multi-turn continuity, and uncertainty repair.
+preferences, multi-turn continuity, uncertainty repair, friendships and peer
+communication, shared-space etiquette, and casual conversation and curiosity.
 
 These scenarios intentionally provide no canonical response strings. Each case
 defines an acceptable semantic region, forbidden behavior, deterministic hard
@@ -382,7 +383,7 @@ python -m benchmarks.inventory.core --check
 python -m benchmarks.adapters.normalize --check
 ```
 
-Execute all 120 cases through an explicit project adapter and retain the real
+Execute all 150 cases through an explicit project adapter and retain the real
 outputs for semantic review:
 
 ```bash

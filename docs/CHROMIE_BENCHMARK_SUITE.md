@@ -205,8 +205,8 @@ without duplicating the scenario body.
 
 The maintained Git-controlled daily communication asset is
 [`benchmarks/datasets/daily_conversation/scenarios/`](../benchmarks/datasets/daily_conversation/scenarios/).
-It provides 120 Chromie-specific Chinese and English semantic scenarios across
-twelve daily-life cohorts. They define acceptable behavior regions and hybrid
+It provides 150 Chromie-specific Chinese and English semantic scenarios across
+fifteen daily-life cohorts. They define acceptable behavior regions and hybrid
 review rubrics, not canonical response strings. Their LLM-reviewed-candidate
 status is dataset coverage, not independent model qualification or release
 evidence.

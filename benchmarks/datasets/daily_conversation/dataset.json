@@ -12,7 +12,7 @@
   },
   "coverage_contract": {
     "minimum_scenarios": 100,
-    "expected_scenarios": 120,
+    "expected_scenarios": 150,
     "cohorts": {
       "greetings_presence": 10,
       "family_home": 10,
@@ -25,11 +25,14 @@
       "practical_information_tools": 10,
       "preferences_boundaries": 10,
       "multi_turn_continuity": 10,
-      "uncertainty_repair": 10
+      "uncertainty_repair": 10,
+      "friends_social_life": 10,
+      "shared_space_etiquette": 10,
+      "casual_chat_curiosity": 10
     },
     "languages": {
-      "en-US": 60,
-      "zh-CN": 60
+      "en-US": 75,
+      "zh-CN": 75
     },
     "canonical_response_strings": 0
   }
