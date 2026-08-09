@@ -1179,6 +1179,66 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raised.exception.failure_class, "output_truncated")
         self.assertFalse(raised.exception.retryable)
 
+    async def test_structured_generate_fallback_preserves_chat_request_contract(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+            num_ctx=8192,
+            num_predict=512,
+            keep_alive="10m",
+        )
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "response": '{"route":"chat","intent":"greeting","confidence":1.0}',
+            "done": True,
+            "prompt_eval_count": 100,
+            "eval_count": 20,
+        }
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        schema = SemanticRouteRepairOutput.model_json_schema()
+        payload = {
+            "model": "test-model",
+            "stream": False,
+            "think": False,
+            "format": schema,
+            "keep_alive": "10m",
+            "messages": [
+                {"role": "system", "content": "fixed contract"},
+                {"role": "user", "content": "current turn"},
+            ],
+            "options": {
+                "temperature": 0,
+                "num_ctx": 8192,
+                "num_predict": 512,
+            },
+        }
+
+        with mock.patch(
+            "agent.app.cognitive_core.goal_interpreter.model_interpreter.httpx.AsyncClient",
+            return_value=context,
+        ):
+            result = await interpreter._structured_generate_from_chat_payload(
+                payload,
+                stage="semantic_route_repair",
+            )
+
+        called_url = http_client.post.await_args.args[0]
+        called_payload = http_client.post.await_args.kwargs["json"]
+        self.assertEqual(called_url, "http://example.invalid/api/generate")
+        self.assertEqual(called_payload["model"], payload["model"])
+        self.assertEqual(called_payload["format"], schema)
+        self.assertEqual(called_payload["options"], payload["options"])
+        self.assertEqual(called_payload["keep_alive"], "10m")
+        self.assertEqual(called_payload["system"], "fixed contract")
+        self.assertEqual(called_payload["prompt"], "User:\ncurrent turn")
+        self.assertEqual(result["message"]["content"], response.json.return_value["response"])
+
     async def test_route_does_not_translate_budget_failure_into_chat_fallback(self) -> None:
         class BudgetFailureInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict, *, stage: str) -> dict:
@@ -3178,6 +3238,238 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("robot.common_00", rendered)
         self.assertIn("robot.common_13", rendered)
         self.assertIn("chromie.external.lookup", rendered)
+
+    def test_semantic_repair_preserves_query_matches_and_full_catalog(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Walk forward for fifteen seconds.",
+            language="en",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "route": "robot_action",
+                        "description": "Walk forward for a bounded duration.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "chromie.speak",
+                        "route": "chat",
+                        "description": "Speak to the user.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+                "full_ability_catalog": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "route": "robot_action",
+                        "description": "Blink the simulated eyes.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+            },
+        )
+
+        payload = interpreter.build_semantic_route_repair_payload(
+            request,
+            RouteDecision(route="chat", intent="general_conversation", confidence=0.95),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+        )
+        rendered = json.dumps(payload, ensure_ascii=False)
+
+        self.assertLess(
+            rendered.index("soridormi.walk_forward"),
+            rendered.index("chromie.speak"),
+        )
+        self.assertIn("soridormi.blink_eyes", rendered)
+
+    def test_semantic_repair_preserves_optional_numeric_capability_contract(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Walk forward for fifteen seconds.",
+            language="en",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "route": "robot_action",
+                        "description": "Narrow query match for walking.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ],
+                "full_ability_catalog": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "route": "robot_action",
+                        "description": "Walk forward for a bounded duration.",
+                        "available": True,
+                        "interaction_executable": True,
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "speed": {
+                                    "type": "string",
+                                    "enum": ["slow", "normal", "quick"],
+                                    "default": "normal",
+                                },
+                                "duration_s": {
+                                    "type": "number",
+                                    "minimum": 0.5,
+                                    "maximum": 20.0,
+                                    "default": 2.0,
+                                },
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+
+        payload = interpreter.build_semantic_route_repair_payload(
+            request,
+            RouteDecision(route="chat", intent="general_conversation", confidence=0.95),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+        )
+        rendered = json.dumps(payload, ensure_ascii=False)
+
+        self.assertIn(
+            "duration_s:number:min=0.5:max=20.0:default=2.0",
+            rendered,
+        )
+
+    async def test_semantic_repair_retries_schema_incompatible_chat_via_generate(self) -> None:
+        class GenerateCompatibleInterpreter(OllamaGoalInterpreter):
+            async def _chat(self, payload: dict, *, stage: str) -> dict:
+                return {"message": {"content": "I can help with that."}}
+
+            async def _structured_generate_from_chat_payload(
+                self,
+                payload: dict,
+                *,
+                stage: str,
+            ) -> dict:
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action",'
+                            '"intent":"capability:soridormi.walk_forward",'
+                            '"confidence":0.98,'
+                            '"actions":[{"capability_id":"soridormi.walk_forward",'
+                            '"args":{"duration_s":15},"sequence":0,'
+                            '"timing":"sequential","confidence":0.98}]}'
+                        )
+                    }
+                }
+
+        interpreter = GenerateCompatibleInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="qwen35-chat-schema-incompatible",
+            text="Walk forward for fifteen seconds.",
+            language="en",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "route": "robot_action",
+                        "description": "Walk forward for a bounded duration.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ]
+            },
+        )
+
+        reviewed = await interpreter._review_generic_chat_affordance(
+            request,
+            RouteDecision(
+                route="chat",
+                intent="general_conversation",
+                confidence=0.95,
+                source="llm",
+            ),
+        )
+
+        self.assertEqual(reviewed.route, "robot_action")
+        self.assertEqual(reviewed.intent, "capability:soridormi.walk_forward")
+        self.assertEqual(
+            reviewed.metadata["generic_chat_affordance_review"]["structured_transport"],
+            "generate_compatibility_fallback",
+        )
+
+    async def test_failed_generic_chat_grounding_review_fails_closed(self) -> None:
+        class InvalidReviewInterpreter(OllamaGoalInterpreter):
+            async def _chat(self, payload: dict, *, stage: str) -> dict:
+                return {"message": {"content": "not structured output"}}
+
+            async def _structured_generate_from_chat_payload(
+                self,
+                payload: dict,
+                *,
+                stage: str,
+            ) -> dict:
+                return {"message": {"content": "still not structured output"}}
+
+        interpreter = InvalidReviewInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="invalid-capability-review",
+            text="Please do the requested body action.",
+            language="en",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "route": "robot_action",
+                        "description": "Walk forward for a bounded duration.",
+                        "available": True,
+                        "interaction_executable": True,
+                    }
+                ]
+            },
+        )
+
+        reviewed = await interpreter._review_generic_chat_affordance(
+            request,
+            RouteDecision(
+                route="chat",
+                intent="general_conversation",
+                confidence=0.95,
+                source="llm",
+            ),
+        )
+
+        self.assertEqual(reviewed.route, "clarify")
+        self.assertEqual(reviewed.intent, "clarify_uncertain_request")
+        self.assertTrue(reviewed.metadata["llm_clarification_required"])
 
     async def test_generic_chat_review_emits_terminal_missing_ability(self) -> None:
         class RestaurantInterpreter(OllamaGoalInterpreter):

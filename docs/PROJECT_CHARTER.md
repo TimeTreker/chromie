@@ -141,7 +141,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    the observed failure, expected contract, earliest responsible boundary,
    evidence-backed root cause, and the mechanism by which the change restores
    the contract. The explanation must distinguish the initiating trigger, root
-   cause, downstream symptoms, contributing conditions, and evidence limits. A
+   cause, downstream symptoms, contributing conditions, and evidence limits.
+   It must explicitly attribute the primary root cause to **LLM/model
+   behavior**, **logic/workflow/contract design**, **code implementation**, or
+   a **mixed causal chain**, and explain the evidence for that attribution. A
+   wrong or malformed model output is not automatically an LLM root cause: when
+   a maintained contract, validator, fallback, or workflow should have contained
+   that expected model failure, the earliest missing or incorrect containment
+   boundary owns the root cause. Conversely, call it a code defect only when the
+   implementation violates an otherwise correct owned contract or workflow. A
    patch without this explanation and regression evidence is incomplete.
 5. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.

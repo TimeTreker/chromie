@@ -15,12 +15,13 @@ organized by capability, risk, and retained evidence.
 
 ## Current priorities
 
-1. Complete and retain Issues
+1. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
-   [#18](https://github.com/TimeTreker/chromie/issues/18) as the layered-prompt
-   architecture and runtime contracts. Same-model timing evidence must remain
-   separate from cross-model reload measurement; neither Issue may claim
-   cross-model KV reuse or model-reload savings from prompt layering.
+   [#18](https://github.com/TimeTreker/chromie/issues/18), then complete
+   [#20](https://github.com/TimeTreker/chromie/issues/20) before qualifying a
+   replacement model profile. Same-model timing evidence must remain separate
+   from cross-model reload measurement; no prompt-prefix result may claim
+   cross-model KV reuse or model-reload savings.
 2. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
    Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
    ordered MuJoCo execution, provider-start deterministic cancellation, and
@@ -120,6 +121,11 @@ Exit criteria:
 
 ### Interpretation and capability grounding
 
+- Issue [#20](https://github.com/TimeTreker/chromie/issues/20) owns the current
+  P0 containment line: schema-bound semantic review must use a transport that
+  the selected Ollama model actually honors, advisory route narrowing must not
+  destroy the supplied recovery catalog, and an unresolved typed effectful Goal
+  must never become a successful zero-step response.
 - Treat non-empty interpretation failure as `interpretation_unavailable`.
 - Permit semantic repair to return only strictly typed, catalog-backed action
   proposals for `robot_action`.
@@ -130,6 +136,12 @@ Exit criteria:
 Exit criteria:
 
 - no fallback invents an ordinary semantic lane;
+- malformed structured review either receives one same-contract transport
+  compatibility retry or fails closed;
+- candidate ordering remains advisory while the supplied common/full catalog
+  stays available to semantic repair;
+- an effectful Goal has an owned executable step, delivered evidence for the
+  same Goal, or an explicit clarify/escalate/unavailable/refused outcome;
 - compound body requests retain ordered exact capabilities;
 - missing abilities remain honest terminal outcomes;
 - behavior scenarios cover unavailable, repair, and rejection paths.
