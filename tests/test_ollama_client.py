@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from unittest import mock
 
@@ -112,6 +113,63 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"relationship": "continue"})
         request_payload = http_client.post.call_args.kwargs["json"]
         self.assertEqual(request_payload["format"], schema)
+
+    async def test_generate_logs_correlated_complete_prompt_and_raw_output(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = '{"response":"{\\"decision\\":\\"continue\\"}"}'
+        response.json.return_value = {
+            "response": '{"decision":"continue"}',
+            "done_reason": "stop",
+            "prompt_eval_count": 12,
+            "eval_count": 4,
+        }
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        schema = {
+            "type": "object",
+            "properties": {"decision": {"type": "string"}},
+            "required": ["decision"],
+        }
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ), self.assertLogs("chromie.agent.ollama", level="INFO") as logs:
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="gemma4:12b",
+                purpose="goal_association",
+            ).generate(
+                "complete user prompt",
+                system="complete system prompt",
+                response_format=schema,
+                prompt_family="goal_association.primary",
+                turn_id="daily-benchmark-case",
+                attempt=1,
+            )
+
+        self.assertEqual(result, {"decision": "continue"})
+        evidence_line = next(
+            line for line in logs.output if "llm_call_evidence " in line
+        )
+        record = json.loads(evidence_line.split("llm_call_evidence ", 1)[1])
+        self.assertEqual(record["purpose"], "goal_association")
+        self.assertEqual(record["stage"], "goal_association.primary")
+        self.assertEqual(record["request"]["system"], "complete system prompt")
+        self.assertEqual(record["request"]["prompt"], "complete user prompt")
+        self.assertEqual(record["request"]["format"], schema)
+        self.assertEqual(
+            record["response"]["raw_model_output"],
+            '{"decision":"continue"}',
+        )
+        self.assertEqual(
+            record["response"]["parsed_output"], {"decision": "continue"}
+        )
+        self.assertEqual(record["correlations"]["turn_id"], "daily-benchmark-case")
 
     async def test_generate_rejects_truncated_text_output_and_retains_incident_evidence(self) -> None:
         response = mock.Mock()

@@ -72,6 +72,57 @@ collect_soridormi_docker_logs() {
   done < "$containers"
 }
 
+extract_llm_call_evidence() {
+  local destination="$1"
+  shift
+  python - "$destination" "$@" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+destination = Path(sys.argv[1])
+marker = "llm_call_evidence "
+records = {}
+order = []
+for source_value in sys.argv[2:]:
+    source = Path(source_value)
+    if not source.is_file():
+        continue
+    for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+        marker_index = line.find(marker)
+        if marker_index < 0:
+            continue
+        candidate = line[marker_index + len(marker):].lstrip()
+        try:
+            record, _ = json.JSONDecoder().raw_decode(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        call_id = str(record.get("call_id") or "")
+        if not call_id:
+            continue
+        if call_id not in records:
+            order.append(call_id)
+            records[call_id] = record
+            records[call_id]["_bundle_sources"] = []
+        sources = records[call_id]["_bundle_sources"]
+        source_name = source.name
+        if source_name not in sources:
+            sources.append(source_name)
+
+if records:
+    destination.write_text(
+        "".join(
+            json.dumps(records[call_id], ensure_ascii=False, sort_keys=True)
+            + "\n"
+            for call_id in order
+        ),
+        encoding="utf-8",
+    )
+PY
+}
+
 sanitize_env() {
   local source="$1"
   local destination="$2"
@@ -138,6 +189,12 @@ docker ps -a --no-trunc \
   > "$WORK/docker_containers.txt" 2>&1 || true
 collect_soridormi_docker_logs
 
+extract_llm_call_evidence \
+  "$WORK/llm_calls.jsonl" \
+  "$WORK/chromie-agent.log" \
+  "$WORK/chromie-launcher.log" \
+  "$WORK/docker_compose.log"
+
 ps -ef > "$WORK/processes.txt" 2>&1 || true
 ss -ltnp > "$WORK/listening_ports.txt" 2>&1 || true
 curl -fsS http://127.0.0.1:8092/health > "$WORK/agent_health.json" 2>/dev/null || true
@@ -164,6 +221,12 @@ Git commit: $(git rev-parse HEAD 2>/dev/null || echo unknown)
 
 Collect this bundle immediately after reproducing the problem while services are
 still running. Environment files are included only in redacted form.
+
+When model calls occurred in the retained log window, llm_calls.jsonl contains
+their complete prompts, response schemas, and raw model outputs correlated by
+call, trace, turn, role, and stage. This is private runtime evidence and can
+contain family conversation or memory. Inspect and sanitize it before sharing;
+it is not safe to publish by default.
 
 When the paired voice-to-MuJoCo launcher has been used, this bundle also includes
 its Chromie and Soridormi launcher logs. Fresh Docker logs, state, and published

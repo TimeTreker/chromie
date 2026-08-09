@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,12 +16,16 @@ from ...settings import agent_service_settings
 
 try:
     from chromie_runtime.llm_diagnostics import (
+        log_llm_call_evidence,
+        new_llm_call_id,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
     from chromie_runtime.log_colors import colorize_for_cli
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.llm_diagnostics import (
+        log_llm_call_evidence,
+        new_llm_call_id,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
@@ -2237,13 +2242,50 @@ class OllamaGoalInterpreter:
         }
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
-        async with httpx.AsyncClient(
-            timeout=timeout_s or max(self.timeout_s, 0.1),
-            trust_env=False,
-        ) as client:
-            response = await client.post(f"{self.ollama_url}/api/generate", json=payload)
-            response.raise_for_status()
-            return response.json()
+        call_id = new_llm_call_id("goal_interpreter")
+        started = time.perf_counter()
+        data: dict[str, Any] | None = None
+        try:
+            async with httpx.AsyncClient(
+                timeout=timeout_s or max(self.timeout_s, 0.1),
+                trust_env=False,
+            ) as client:
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate", json=payload
+                )
+                response.raise_for_status()
+                data = response.json()
+        except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
+            log_llm_call_evidence(
+                logger,
+                call_id=call_id,
+                purpose="goal_interpreter",
+                stage="startup_warm",
+                transport="ollama.generate",
+                request=payload,
+                response=data,
+                status="failed",
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations={},
+                error={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            )
+            raise
+        log_llm_call_evidence(
+            logger,
+            call_id=call_id,
+            purpose="goal_interpreter",
+            stage="startup_warm",
+            transport="ollama.generate",
+            request=payload,
+            response=data,
+            status="accepted",
+            elapsed_ms=(time.perf_counter() - started) * 1000.0,
+            correlations={},
+        )
+        return data
 
     async def _chat(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
         timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
@@ -2391,18 +2433,52 @@ class OllamaGoalInterpreter:
         generate_payload["system"] = "\n\n".join(system_parts)
         generate_payload["prompt"] = "\n\n".join(prompt_parts)
         timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
-        async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
-            response = await client.post(
-                f"{self.ollama_url}/api/generate",
-                json=generate_payload,
+        call_id = new_llm_call_id("goal_interpreter")
+        started = time.perf_counter()
+        data: dict[str, Any] | None = None
+        try:
+            async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json=generate_payload,
+                )
+                response.raise_for_status()
+                generated = response.json()
+            data = {
+                **generated,
+                "message": {"content": str(generated.get("response") or "")},
+            }
+            self._validate_completion(payload, data, stage=stage)
+        except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
+            log_llm_call_evidence(
+                logger,
+                call_id=call_id,
+                purpose="goal_interpreter",
+                stage=f"{stage}.generate_compatibility_fallback",
+                transport="ollama.generate",
+                request=generate_payload,
+                response=data,
+                status="failed",
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations={},
+                error={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
             )
-            response.raise_for_status()
-            generated = response.json()
-        data = {
-            **generated,
-            "message": {"content": str(generated.get("response") or "")},
-        }
-        self._validate_completion(payload, data, stage=stage)
+            raise
+        log_llm_call_evidence(
+            logger,
+            call_id=call_id,
+            purpose="goal_interpreter",
+            stage=f"{stage}.generate_compatibility_fallback",
+            transport="ollama.generate",
+            request=generate_payload,
+            response=data,
+            status="accepted",
+            elapsed_ms=(time.perf_counter() - started) * 1000.0,
+            correlations={},
+        )
         return data
 
     async def _semantic_route_repair_output(
@@ -2455,14 +2531,54 @@ class OllamaGoalInterpreter:
         stage: str,
         request: RouteRequest | None = None,
     ) -> dict[str, Any]:
+        call_id = new_llm_call_id("goal_interpreter")
+        started = time.perf_counter()
         self._log_payload_profile(payload, stage=stage, request=request)
         try:
-            data = await self._chat(payload, stage=stage)
-        except TypeError as exc:
-            if "unexpected keyword argument 'stage'" not in str(exc):
-                raise
-            data = await self._chat(payload)  # type: ignore[call-arg]
+            try:
+                data = await self._chat(payload, stage=stage)
+            except TypeError as exc:
+                if "unexpected keyword argument 'stage'" not in str(exc):
+                    raise
+                data = await self._chat(payload)  # type: ignore[call-arg]
+        except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
+            log_llm_call_evidence(
+                logger,
+                call_id=call_id,
+                purpose="goal_interpreter",
+                stage=stage,
+                transport="ollama.chat",
+                request=payload,
+                response=None,
+                status="failed",
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations={"sid": request.sid if request is not None else None},
+                error={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            )
+            raise
         self._log_response_summary(data, stage=stage, request=request)
+        content = str(data.get("message", {}).get("content") or "")
+        parsed_output: Any = None
+        try:
+            parsed_output = _extract_json_object(content)
+        except (ValidationError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+        log_llm_call_evidence(
+            logger,
+            call_id=call_id,
+            purpose="goal_interpreter",
+            stage=stage,
+            transport="ollama.chat",
+            request=payload,
+            response=data,
+            status="accepted",
+            elapsed_ms=(time.perf_counter() - started) * 1000.0,
+            correlations={"sid": request.sid if request is not None else None},
+            parsed_output=parsed_output,
+        )
         return data
 
     @staticmethod

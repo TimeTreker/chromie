@@ -130,6 +130,8 @@ from shared.chromie_contracts.semantic_authority import (
     context_with_semantic_authority,
 )
 from shared.chromie_runtime.llm_diagnostics import (
+    log_llm_call_evidence,
+    new_llm_call_id,
     ollama_completion_diagnostics,
     ollama_prompt_preflight_diagnostics,
 )
@@ -2372,10 +2374,43 @@ class VoiceAssistant:
                 "top_p": self.host_settings.model_generation.direct_top_p,
             },
         }
+        llm_call_id = new_llm_call_id("orchestrator_direct")
+        evidence_started = time.perf_counter()
+        evidence_recorded = False
+        response_buffer = ""
+
+        def record_llm_evidence(
+            *,
+            status: str,
+            response_payload: dict[str, Any] | None = None,
+            parsed_output: Any = None,
+            error: dict[str, Any] | None = None,
+        ) -> None:
+            nonlocal evidence_recorded
+            if evidence_recorded:
+                return
+            complete_response = dict(response_payload or {})
+            if response_buffer:
+                complete_response["response"] = response_buffer
+            log_llm_call_evidence(
+                logger,
+                call_id=llm_call_id,
+                purpose="orchestrator_direct_response",
+                stage="direct_voice_fallback",
+                transport="ollama.generate_stream",
+                request=payload,
+                response=complete_response,
+                status=status,
+                elapsed_ms=(time.perf_counter() - evidence_started) * 1000.0,
+                correlations={"session_id": session_id},
+                parsed_output=parsed_output,
+                error=error,
+            )
+            evidence_recorded = True
+
         logger.info("[%s] LLM processing: %s", session_id, user_text)
         if reset_playback:
             await self.reset_playback_ordering()
-        response_buffer = ""
         suppressed_thinking_chars = 0
         llm_start_ms = now_ms()
         self.session_log(
@@ -2419,6 +2454,15 @@ class VoiceAssistant:
                 "failure_domain=llm_budget result_trusted=false detail=%s",
                 blocking_preflight.render(),
             )
+            record_llm_evidence(
+                status="rejected_preflight",
+                error={
+                    "error_type": "PromptBudgetExceeded",
+                    "message": blocking_preflight.render(),
+                    "failure_class": "prompt_budget_exceeded",
+                    "failure_domain": "llm_budget",
+                },
+            )
             self.maybe_session_done(session_id)
             return
 
@@ -2442,6 +2486,19 @@ class VoiceAssistant:
                         resp.status,
                         body,
                     )
+                    record_llm_evidence(
+                        status="provider_error",
+                        response_payload={
+                            "status_code": resp.status,
+                            "error_body": body,
+                        },
+                        error={
+                            "error_type": "OllamaHttpError",
+                            "message": body,
+                            "failure_class": "http_error",
+                            "failure_domain": "inference_transport",
+                        },
+                    )
                     self.maybe_session_done(session_id)
                     return
                 async for line in resp.content:
@@ -2450,6 +2507,13 @@ class VoiceAssistant:
                             session_id,
                             "llm_drop_stale_stream: current_sid=%s",
                             self.session_id,
+                        )
+                        record_llm_evidence(
+                            status="cancelled_stale_session",
+                            error={
+                                "error_type": "StaleSession",
+                                "message": "stream no longer belongs to the active session",
+                            },
                         )
                         return
                     if not line:
@@ -2510,6 +2574,24 @@ class VoiceAssistant:
                                 else "prompt_truncated",
                                 blocking_completion.render(),
                             )
+                            record_llm_evidence(
+                                status="rejected_completion",
+                                response_payload={
+                                    **data,
+                                    "thinking": "",
+                                },
+                                error={
+                                    "error_type": "CompletionBudgetExceeded",
+                                    "message": blocking_completion.render(),
+                                    "failure_class": (
+                                        "output_truncated"
+                                        if blocking_completion.event
+                                        == "llm_output_truncated"
+                                        else "prompt_truncated"
+                                    ),
+                                    "failure_domain": "llm_budget",
+                                },
+                            )
                             self.maybe_session_done(session_id)
                             return
 
@@ -2539,6 +2621,16 @@ class VoiceAssistant:
                                 len(response_buffer),
                                 suppressed_thinking_chars,
                                 exc,
+                            )
+                            record_llm_evidence(
+                                status="rejected_contract",
+                                response_payload=envelope_data,
+                                error={
+                                    "error_type": type(exc).__name__,
+                                    "message": str(exc),
+                                    "failure_class": "structured_output_validation",
+                                    "failure_domain": "model_contract",
+                                },
                             )
                             self.maybe_session_done(session_id)
                             return
@@ -2589,9 +2681,21 @@ class VoiceAssistant:
                             data.get("eval_count"),
                             data.get("eval_duration"),
                         )
+                        record_llm_evidence(
+                            status="accepted",
+                            response_payload=envelope_data,
+                            parsed_output={"text": spoken_text},
+                        )
                         self.maybe_session_done(session_id)
                         return
         except asyncio.CancelledError:
+            record_llm_evidence(
+                status="cancelled",
+                error={
+                    "error_type": "CancelledError",
+                    "message": "direct LLM request was cancelled",
+                },
+            )
             raise
         except Exception as exc:
             state = self.sessions.state.get(session_id or "")
@@ -2599,7 +2703,22 @@ class VoiceAssistant:
                 state["llm_done"] = True
             logger.error("LLM processing failed: %s", exc, exc_info=True)
             self.session_log(session_id, "llm_exception: error=%s", exc)
+            record_llm_evidence(
+                status="failed",
+                error={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            )
             self.maybe_session_done(session_id)
+        if not evidence_recorded:
+            record_llm_evidence(
+                status="incomplete_stream",
+                error={
+                    "error_type": "IncompleteStream",
+                    "message": "Ollama stream ended without a terminal completion record",
+                },
+            )
 
     def _build_direct_llm_prompt(
         self,

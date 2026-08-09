@@ -764,6 +764,20 @@ different model passing the same case is comparative evidence, not sufficient
 proof by itself. Missing prompt or raw-output evidence requires `unresolved`, not
 speculation.
 
+Runtime and live-scenario diagnosis should collect the correlated model-call
+capsule immediately after reproduction:
+
+```bash
+./scripts/collect_debug_bundle.sh
+```
+
+The resulting private archive contains `llm_calls.jsonl` when model calls were
+present in the retained log window. Reviewers match its call, trace, turn, role,
+and stage fields to the scenario artifacts, then inspect the exact prompt,
+schema, raw output, parsed output, repair attempts, and downstream result in the
+root-cause order above. The file can contain conversation and memory content and
+must be inspected or sanitized before it leaves the operator's machine.
+
 
 The implemented mining workflow preserves each candidate as an immutable,
 pending-review artifact. Candidate indexing reports similarity clusters,

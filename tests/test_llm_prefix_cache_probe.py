@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from shared.chromie_runtime.llm_diagnostics import PrefixCacheTracker
+from shared.chromie_runtime.llm_diagnostics import (
+    PrefixCacheTracker,
+    llm_call_evidence_payload,
+)
 
 
 class PrefixCacheTrackerTests(unittest.TestCase):
@@ -97,6 +100,56 @@ class PrefixCacheTrackerTests(unittest.TestCase):
         assert finish is not None
         self.assertIsNone(finish.fields["prompt_eval_duration_ms"])
         self.assertIsNone(finish.fields["load_duration_ms"])
+
+    def test_retains_complete_prompt_schema_output_and_correlations(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {"decision": {"type": "string"}},
+        }
+        record = llm_call_evidence_payload(
+            call_id="llmcall_test_1",
+            purpose="goal_association",
+            stage="goal_association.primary",
+            transport="ollama.generate",
+            request={
+                "model": "gemma4:12b",
+                "system": "complete system contract",
+                "prompt": "complete private user context",
+                "format": schema,
+                "options": {"num_ctx": 4096, "num_predict": 512},
+            },
+            response={
+                "response": '{"decision":"continue"}',
+                "done_reason": "stop",
+                "prompt_eval_count": 120,
+                "eval_count": 8,
+                "context": [1, 2, 3],
+            },
+            parsed_output={"decision": "continue"},
+            status="accepted",
+            elapsed_ms=123.4567,
+            correlations={
+                "trace_id": "trace-1",
+                "turn_id": "daily-benchmark-case-1",
+            },
+        )
+
+        self.assertEqual(record["request"]["system"], "complete system contract")
+        self.assertEqual(record["request"]["prompt"], "complete private user context")
+        self.assertEqual(record["request"]["format"], schema)
+        self.assertEqual(
+            record["response"]["raw_model_output"],
+            '{"decision":"continue"}',
+        )
+        self.assertEqual(
+            record["response"]["parsed_output"], {"decision": "continue"}
+        )
+        self.assertNotIn("context", record["response"]["provider_response"])
+        self.assertEqual(
+            record["response"]["omitted_provider_fields"], ["context"]
+        )
+        self.assertEqual(record["correlations"]["trace_id"], "trace-1")
+        self.assertFalse(record["privacy"]["safe_to_publish_without_review"])
 
     def test_completion_metrics_are_converted_from_nanoseconds(self) -> None:
         start = self.tracker.begin(

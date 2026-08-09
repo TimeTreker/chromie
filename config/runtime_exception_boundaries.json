@@ -206,7 +206,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "8fba0480a8adff38be93bf97ccbebd883237c4dd14d611953a526e80da78a6c0",
+      "body_sha256": "59e7aac5c3837d512879db0b6b2641dd07c07078de09ba3f7c90acb6cd1cffcf",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",
@@ -1691,7 +1691,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "9711d984ca5720ae2055980d6eb4c835be847693de12ee95f6ecbff72c29cc91",
+      "body_sha256": "b0c0832df0adbd20971f088920a7fa4e5a7fd767de0515b48318beb14421393e",
       "failure_signals": [
         "diagnostic",
         "state_update"

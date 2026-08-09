@@ -100,6 +100,29 @@ Compose file explicitly.
 ./scripts/compose.sh ps
 ```
 
+## Collecting LLM Prompt And Output Evidence
+
+Every runtime model call prints one machine-readable `llm_call_evidence` record
+to its owning service log. The record keeps the complete model-facing prompt,
+response schema and options, exact raw model output, parsed output when
+available, and correlation fields such as role, stage, call, trace, turn, and
+session IDs.
+
+Immediately after reproducing a problem or completing a live scenario run,
+collect the logs with:
+
+```bash
+./scripts/collect_debug_bundle.sh
+```
+
+The archive in `~/Downloads` includes a deduplicated `llm_calls.jsonl` when the
+retained log window contains model calls. Use that file with the scenario and
+runtime artifacts to decide whether the earliest fault was the prompt/profile,
+supplied context, schema, provider, model output, or downstream workflow.
+
+`llm_calls.jsonl` is private: it can contain family conversation and memory. Do
+not upload or publish the raw bundle without reviewing and sanitizing it.
+
 ## Text Input To MuJoCo
 
 Use this when you want to skip microphone and ASR while still testing routing,

@@ -18,6 +18,7 @@ import httpx
 try:
     from chromie_runtime.llm_diagnostics import (
         PrefixCacheTracker,
+        log_llm_call_evidence,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
@@ -26,6 +27,7 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.llm_diagnostics import (
         PrefixCacheTracker,
+        log_llm_call_evidence,
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
@@ -301,6 +303,11 @@ class OllamaClient:
             if snapshot is not None
             else ""
         )
+        trace_correlations = (
+            dict(snapshot.trace.get("correlations") or {})
+            if snapshot is not None
+            else {}
+        )
         start_probe = _PREFIX_CACHE_TRACKER.begin(
             purpose=self.purpose,
             prompt_family=family,
@@ -351,6 +358,13 @@ class OllamaClient:
                     options=request_options,
                     response_format=response_format,
                     prefix_probe_call_id=call_id,
+                    evidence_context={
+                        **trace_correlations,
+                        "trace_id": trace_id or None,
+                        "turn_id": turn_id,
+                        "prompt_family": family,
+                        "attempt": attempt,
+                    },
                 )
             finally:
                 active_error = sys.exc_info()[1]
@@ -393,6 +407,7 @@ class OllamaClient:
         options: dict[str, Any] | None = None,
         response_format: ResponseFormat = "text",
         prefix_probe_call_id: str | None = None,
+        evidence_context: dict[str, Any] | None = None,
     ) -> str | dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
@@ -418,6 +433,36 @@ class OllamaClient:
         response_format_label = "json_schema" if isinstance(response_format, dict) else response_format
         url = f"{self.base_url}/api/generate"
         timeout = httpx.Timeout(self.timeout_ms / 1000.0)
+        evidence_started = time.perf_counter()
+        evidence_recorded = False
+
+        def record_evidence(
+            *,
+            status: str,
+            response_payload: dict[str, Any] | None = None,
+            parsed_output: Any = None,
+            error: dict[str, Any] | None = None,
+        ) -> None:
+            nonlocal evidence_recorded
+            if evidence_recorded:
+                return
+            log_llm_call_evidence(
+                logger,
+                call_id=prefix_probe_call_id or "llmcall_untracked",
+                purpose=self.purpose,
+                stage=str(
+                    (evidence_context or {}).get("prompt_family") or self.purpose
+                ),
+                transport="ollama.generate",
+                request=payload,
+                response=response_payload,
+                status=status,
+                elapsed_ms=(time.perf_counter() - evidence_started) * 1000.0,
+                correlations=evidence_context,
+                parsed_output=parsed_output,
+                error=error,
+            )
+            evidence_recorded = True
 
         prompt_preview = " ".join(prompt.split())[:160]
         request_options = dict(options or {})
@@ -497,6 +542,14 @@ class OllamaClient:
                 num_predict,
                 blocking_preflight.fields.get("required_context_tokens"),
             )
+            record_evidence(
+                status="rejected_preflight",
+                error={
+                    "error_type": type(failure).__name__,
+                    "message": str(failure),
+                    **failure.metadata(),
+                },
+            )
             raise failure
 
         started = time.perf_counter()
@@ -562,6 +615,18 @@ class OllamaClient:
                     num_ctx,
                     num_predict,
                     response_error[:300],
+                )
+                record_evidence(
+                    status="provider_error",
+                    response_payload={
+                        "status_code": response.status_code,
+                        "error_body": response.text,
+                    },
+                    error={
+                        "error_type": type(failure).__name__,
+                        "message": str(failure),
+                        **failure.metadata(),
+                    },
                 )
                 raise failure
 
@@ -660,9 +725,27 @@ class OllamaClient:
                     num_ctx,
                     num_predict,
                 )
+                record_evidence(
+                    status="rejected_completion",
+                    response_payload=data,
+                    error={
+                        "error_type": type(failure).__name__,
+                        "message": str(failure),
+                        **failure.metadata(),
+                    },
+                )
                 raise failure
 
-        except OllamaGenerationError:
+        except OllamaGenerationError as exc:
+            if not evidence_recorded:
+                record_evidence(
+                    status="failed",
+                    error={
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                        **exc.metadata(),
+                    },
+                )
             raise
         except httpx.TimeoutException as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -691,6 +774,14 @@ class OllamaClient:
                 num_ctx,
                 num_predict,
             )
+            record_evidence(
+                status="failed",
+                error={
+                    "error_type": type(failure).__name__,
+                    "message": str(failure),
+                    **failure.metadata(),
+                },
+            )
             raise failure from exc
         except Exception as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -707,15 +798,24 @@ class OllamaClient:
                 failure["architecture_attribution"],
                 failure["retryable"],
             )
+            record_evidence(
+                status="failed",
+                error={
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                    **failure,
+                },
+            )
             raise
 
         if response_format == "text":
+            record_evidence(status="accepted", response_payload=data)
             return text
 
         if structured_output:
             try:
                 parsed = self._parse_json(text)
-            except json.JSONDecodeError as exc:
+            except (json.JSONDecodeError, ValueError) as exc:
                 logger.error(
                     "ollama_structured_output_invalid purpose=%s failure_class=structured_output_invalid "
                     "failure_domain=model_contract architecture_attribution=not_evaluated "
@@ -725,11 +825,25 @@ class OllamaClient:
                     len(text),
                     exc,
                 )
+                record_evidence(
+                    status="rejected_contract",
+                    response_payload=data,
+                    error={
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                        **llm_failure_metadata(exc),
+                    },
+                )
                 raise
             logger.info(
                 "ollama_generate_json_parsed purpose=%s keys=%s",
                 self.purpose,
                 list(parsed.keys()),
+            )
+            record_evidence(
+                status="accepted",
+                response_payload=data,
+                parsed_output=parsed,
             )
             return parsed
 

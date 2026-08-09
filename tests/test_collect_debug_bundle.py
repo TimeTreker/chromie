@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -52,7 +53,11 @@ class CollectDebugBundleTest(unittest.TestCase):
                     shift || true
                     case "$command_name" in
                       compose)
-                        printf 'fake compose output: %s\\n' "$*"
+                        if [[ "$*" == "logs chromie-agent --tail=5000" ]]; then
+                          printf '%s\\n' 'chromie-agent | llm_call_evidence {"schema_version":1,"event":"chromie.llm_call_evidence","call_id":"llmcall_test_bundle","purpose":"goal_association","stage":"goal_association.primary","transport":"ollama.generate","status":"accepted","request":{"model":"gemma4:12b","system":"complete system prompt","prompt":"complete user prompt"},"response":{"raw_model_output":"{\\"decision\\":\\"continue\\"}"},"correlations":{"turn_id":"daily-case"}}'
+                        else
+                          printf 'fake compose output: %s\\n' "$*"
+                        fi
                         ;;
                       ps)
                         if [[ " $* " == *" --filter name=soridormi "* ]]; then
@@ -115,6 +120,7 @@ class CollectDebugBundleTest(unittest.TestCase):
                     f"{bundle_root}/soridormi-simulator.docker.log",
                     f"{bundle_root}/soridormi_docker_containers.txt",
                     f"{bundle_root}/voice_mujoco_run.env.redacted.txt",
+                    f"{bundle_root}/llm_calls.jsonl",
                 }
                 self.assertTrue(expected.issubset(members))
 
@@ -143,6 +149,19 @@ class CollectDebugBundleTest(unittest.TestCase):
                 redacted_text = redacted.read().decode("utf-8")
                 self.assertIn("SORIDORMI_TOKEN=<redacted>", redacted_text)
                 self.assertNotIn("SORIDORMI_TOKEN=secret", redacted_text)
+
+                llm_calls = archive.extractfile(f"{bundle_root}/llm_calls.jsonl")
+                self.assertIsNotNone(llm_calls)
+                llm_record = json.loads(llm_calls.read().decode("utf-8").strip())
+                self.assertEqual(llm_record["call_id"], "llmcall_test_bundle")
+                self.assertEqual(
+                    llm_record["request"]["system"], "complete system prompt"
+                )
+                self.assertEqual(
+                    llm_record["response"]["raw_model_output"],
+                    '{"decision":"continue"}',
+                )
+                self.assertIn("chromie-agent.log", llm_record["_bundle_sources"])
 
 
 if __name__ == "__main__":

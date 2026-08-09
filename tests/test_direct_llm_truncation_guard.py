@@ -206,6 +206,39 @@ class DirectLlmTruncationGuardTests(unittest.TestCase):
         self.assertEqual(spoken, [])
         self.assertTrue(any("llm_spoken_output_rejected" in line for line in logs))
 
+    def test_direct_fallback_logs_complete_prompt_and_raw_stream_output(self) -> None:
+        assistant, _http, spoken, _session_logs = self._assistant(
+            [
+                {
+                    "response": '{"text":"Complete answer."}',
+                    "done": True,
+                    "done_reason": "stop",
+                    "prompt_eval_count": 20,
+                    "eval_count": 3,
+                }
+            ]
+        )
+
+        with self.assertLogs("chromie-orchestrator", level="INFO") as logs:
+            asyncio.run(assistant.process_llm_tts("hello", "sid"))
+
+        self.assertEqual(spoken, ["Complete answer."])
+        evidence_line = next(
+            line for line in logs.output if "llm_call_evidence " in line
+        )
+        record = json.loads(evidence_line.split("llm_call_evidence ", 1)[1])
+        self.assertEqual(record["purpose"], "orchestrator_direct_response")
+        self.assertEqual(record["request"]["prompt"], "Answer the user.")
+        self.assertEqual(
+            record["response"]["raw_model_output"],
+            '{"text":"Complete answer."}',
+        )
+        self.assertEqual(
+            record["response"]["parsed_output"],
+            {"text": "Complete answer."},
+        )
+        self.assertEqual(record["correlations"]["session_id"], "sid")
+
 
 if __name__ == "__main__":
     unittest.main()

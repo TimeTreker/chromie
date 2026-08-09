@@ -439,13 +439,28 @@ Soridormi launcher additionally enables `robot_action`, yielding
 `chat,memory,robot_action,tool`; neither profile enables the legacy semantic fallback.
 
 
-Goal Interpretation observability logs are intentionally split into safe summaries and explicit debug output.
-By default, each Goal Interpreter LLM call emits `goal_interpreter_prompt_profile`,
-`goal_interpreter_llm_raw_summary`, and `goal_interpreter_normalize_result`. These lines show whether
-the prompt contained the `fast_speech`, `tool`, and `weather_query` contracts,
-how many catalog items were visible, what route/intent the raw model JSON
-contained, and whether normalization changed the final route. Full raw model
-JSON and prompt text require the debug flags above.
+Every runtime inference attempt now emits one single-line `llm_call_evidence`
+JSON record at the model-client boundary. The record correlates the exact
+prompt-bearing request, response schema, options, raw model output, parsed JSON
+when available, provider metadata, model, role/purpose, stage, call ID, and
+available trace/turn/session IDs. The embedded Goal Interpreter and the Host's
+direct response fallback emit the same evidence shape even though they use
+specialized Ollama transports. Provider `context` token vectors are omitted;
+they are not model-authored semantic output and can dwarf the useful record.
+
+These complete records are private diagnostic evidence and can contain family
+conversation or memory. `scripts/collect_debug_bundle.sh` extracts and
+deduplicates them as `llm_calls.jsonl`; the file is not safe to publish without
+operator review and sanitization. A record's `root_cause_attribution` remains
+`unreviewed`: capture never converts a bad result into an LLM-fault claim.
+
+Goal Interpretation additionally keeps its compact human-oriented observability
+lines. Each call emits `goal_interpreter_prompt_profile`,
+`goal_interpreter_llm_raw_summary`, and `goal_interpreter_normalize_result` so an
+operator can quickly see prompt features, catalog visibility, raw route/intent,
+and normalization changes. The two Goal Interpreter debug flags above control
+only the older bounded human-readable prompt/raw duplicates; they do not weaken
+the complete correlated evidence record.
 
 Cognitive Gateway owns the hard operational filter and focused addressedness
 review before Core entry. Interrupt, silence, and unusable-audio handling stay

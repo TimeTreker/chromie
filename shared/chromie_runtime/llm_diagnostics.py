@@ -5,8 +5,14 @@ import json
 import logging
 import threading
 import time
+import uuid
 from dataclasses import dataclass
-from typing import Any, Iterable
+from datetime import datetime, timezone
+from typing import Any, Iterable, Mapping
+
+
+LLM_CALL_EVIDENCE_SCHEMA_VERSION = 1
+LLM_CALL_EVIDENCE_LOG_MARKER = "llm_call_evidence"
 
 
 _TRUNCATION_DONE_REASONS = {
@@ -18,6 +24,132 @@ _TRUNCATION_DONE_REASONS = {
     "context_window",
     "limit",
 }
+
+
+def new_llm_call_id(namespace: str = "runtime") -> str:
+    """Return a process-independent ID for one provider inference attempt."""
+
+    safe_namespace = "".join(
+        character if character.isalnum() else "_"
+        for character in str(namespace or "runtime")
+    ).strip("_") or "runtime"
+    return f"llmcall_{safe_namespace}_{uuid.uuid4().hex[:16]}"
+
+
+def _json_compatible(value: Any) -> Any:
+    return json.loads(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+    )
+
+
+def _raw_model_output(response: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(response, Mapping):
+        return None
+    direct = response.get("response")
+    if isinstance(direct, str):
+        return direct
+    message = response.get("message")
+    if isinstance(message, Mapping) and isinstance(message.get("content"), str):
+        return str(message["content"])
+    return None
+
+
+def llm_call_evidence_payload(
+    *,
+    call_id: str,
+    purpose: str,
+    stage: str,
+    transport: str,
+    request: Mapping[str, Any],
+    response: Mapping[str, Any] | None,
+    status: str,
+    elapsed_ms: float | None = None,
+    correlations: Mapping[str, Any] | None = None,
+    parsed_output: Any = None,
+    error: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build one private, exact prompt/output record for root-cause review.
+
+    Ollama's ``context`` token vector is deliberately omitted because it is not
+    model-authored output and can dwarf the semantic evidence. The complete
+    prompt-bearing request and exact raw model text remain intact.
+    """
+
+    provider_response = dict(response or {})
+    omitted_provider_fields: list[str] = []
+    if "context" in provider_response:
+        provider_response.pop("context", None)
+        omitted_provider_fields.append("context")
+    raw_output = _raw_model_output(response)
+    request_value = _json_compatible(dict(request))
+    response_value = _json_compatible(provider_response)
+    record: dict[str, Any] = {
+        "schema_version": LLM_CALL_EVIDENCE_SCHEMA_VERSION,
+        "event": "chromie.llm_call_evidence",
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "call_id": str(call_id),
+        "purpose": str(purpose),
+        "stage": str(stage),
+        "transport": str(transport),
+        "status": str(status),
+        "correlations": _json_compatible(dict(correlations or {})),
+        "request": request_value,
+        "request_reference": cognition_text_reference(request_value),
+        "response": {
+            "raw_model_output": raw_output,
+            "raw_model_output_reference": cognition_text_reference(raw_output),
+            "parsed_output": _json_compatible(parsed_output),
+            "provider_response": response_value,
+            "omitted_provider_fields": omitted_provider_fields,
+        },
+        "elapsed_ms": round(float(elapsed_ms), 3)
+        if elapsed_ms is not None
+        else None,
+        "error": _json_compatible(dict(error or {})) if error else None,
+        "privacy": {
+            "classification": "private_runtime_evidence",
+            "contains_complete_prompt": True,
+            "contains_raw_model_output": raw_output is not None,
+            "safe_to_publish_without_review": False,
+        },
+        "root_cause_attribution": "unreviewed",
+    }
+    return record
+
+
+def log_llm_call_evidence(
+    logger: logging.Logger,
+    **values: Any,
+) -> dict[str, Any] | None:
+    """Emit one single-line JSON record without affecting model execution."""
+
+    try:
+        record = llm_call_evidence_payload(**values)
+        logger.info(
+            "%s %s",
+            LLM_CALL_EVIDENCE_LOG_MARKER,
+            json.dumps(
+                record,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+        return record
+    except (TypeError, ValueError, OverflowError) as exc:
+        logger.warning(
+            "llm_call_evidence_failed call_id=%s error_type=%s error=%s",
+            values.get("call_id"),
+            type(exc).__name__,
+            exc,
+        )
+        return None
 
 
 @dataclass(frozen=True)
@@ -396,7 +528,7 @@ class PrefixCacheTracker:
         with self._lock:
             self._sequence += 1
             sequence = self._sequence
-            call_id = f"llmcall_{sequence:08d}"
+            call_id = new_llm_call_id("agent")
             previous_call = self._last_call
             previous_family = self._last_by_family.get(family_key)
             common_lower_bound = 0

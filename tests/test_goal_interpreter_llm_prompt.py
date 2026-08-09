@@ -1106,6 +1106,55 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
 
 class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_logged_call_retains_complete_messages_and_raw_output(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="qwen3:4b",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="daily-benchmark-identity-case",
+            text="Who are you?",
+            language="en-US",
+            context={},
+        )
+        payload = interpreter.build_payload(request)
+        raw_output = '{"route":"chat","intent":"identity","confidence":0.9}'
+        response = {
+            "model": "qwen3:4b",
+            "message": {"content": raw_output},
+            "done": True,
+            "done_reason": "stop",
+        }
+
+        with mock.patch.object(
+            interpreter,
+            "_chat",
+            new=mock.AsyncMock(return_value=response),
+        ), self.assertLogs(
+            "chromie.agent.goal_interpreter.llm", level="INFO"
+        ) as logs:
+            result = await interpreter._chat_logged(
+                payload,
+                stage="quick_intent",
+                request=request,
+            )
+
+        self.assertEqual(result, response)
+        evidence_line = next(
+            line for line in logs.output if "llm_call_evidence " in line
+        )
+        record = json.loads(evidence_line.split("llm_call_evidence ", 1)[1])
+        self.assertEqual(record["purpose"], "goal_interpreter")
+        self.assertEqual(record["stage"], "quick_intent")
+        self.assertEqual(record["request"]["messages"], payload["messages"])
+        self.assertEqual(record["request"]["format"], payload["format"])
+        self.assertEqual(record["response"]["raw_model_output"], raw_output)
+        self.assertEqual(
+            record["correlations"]["sid"], "daily-benchmark-identity-case"
+        )
+
     async def test_direct_chat_rejects_declared_request_that_cannot_fit(self) -> None:
         with mock.patch.dict(
             "os.environ",
