@@ -250,7 +250,11 @@ time.sleep(2)
     profile = _manifest().get("live_service_text")
     report = E2EBenchmarkRunner(
         CommandE2EExecutor(
-            [sys.executable, str(adapter)],
+            # Keep this contract test about a timeout *after* the adapter has
+            # persisted checkpoint evidence.  ``-S`` avoids environment-specific
+            # site/plugin startup cost consuming the deliberately short deadline
+            # before the fixture can reach its first boundary.
+            [sys.executable, "-S", str(adapter)],
             timeout_s=0.8,
             artifact_root=tmp_path / "artifacts",
         ),

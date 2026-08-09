@@ -234,7 +234,7 @@ barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
 ## Typed Goal completion contract
 
-Goal Association now projects five separate facts instead of overloading
+Validated Goals retain five separate completion facts instead of overloading
 `responsibility_kind`:
 
 ```text
@@ -247,11 +247,15 @@ provider_required    exact provider evidence required beyond ordinary speech
 media_operation      play | pause | resume | seek | stop | volume | status | none
 ```
 
-The structured model schema requires all five fields. A bounded legacy mapping
-exists only for retained replay and old test DTOs; it does not select a lane from
-user wording. `output_mode=speech` uses the maintained Chromie response-delivery
-path with `provider_required=false`. Mode-specific vocal outputs use Speaking
-with `provider_required=true`. `chromie.vocal.perform` is the exact source
+The live model schema exposes the semantic completion choice `output_mode` and,
+only when needed for media lifecycle semantics, `media_operation`. The Host
+deterministically materializes `responsibility_kind`, `execution_lane`, and
+`provider_required` from `output_mode`; those redundant system invariants are
+not independent LLM decisions. A bounded legacy mapping keeps retained replay
+and old test DTOs readable without reopening that model-facing state space.
+`output_mode=speech` materializes ordinary Speaking delivery without a
+mode-specific provider requirement. Mode-specific vocal outputs materialize
+Speaking with provider evidence required. `chromie.vocal.perform` is the exact source
 contract for qualified provider execution, but the default catalog remains
 unavailable and advertises no modes. Planner may execute one such Goal only when
 a qualified declaration advertises the authoritative `output_mode`; otherwise

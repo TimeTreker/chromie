@@ -185,7 +185,7 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. Every new Goal also declares five typed completion facts.
+are rejected. Every validated new Goal retains five typed completion facts.
 `responsibility_kind` is `executable_action`, `spoken_response`,
 `capability_dependent`, or `other`; `execution_lane` is `speaking`, `activity`,
 or `none`; `output_mode` distinguishes ordinary speech, expressive speech,
@@ -193,9 +193,14 @@ recitation, singing, humming, nonverbal vocalization, body action, media
 playback, capability work, or other; `provider_required` says whether an
 exact registered Capability Provider beyond ordinary authored speech delivery
 must return completion evidence; and `media_operation` is one exact persistent
-playback operation for `media_playback` or `none` for every other output mode.
-The live decoder schema requires all five fields, while retained legacy DTOs
-receive only a bounded compatibility mapping.
+playback operation for `media_playback` or `none` otherwise. The live
+model-facing decoder chooses `output_mode` plus `media_operation` only when
+media lifecycle semantics require it. The Host then deterministically
+materializes `responsibility_kind`, `execution_lane`, and `provider_required`
+from that semantic choice. This keeps system invariants out of model output and
+makes contradictory completion tuples unrepresentable at the live decoder
+boundary while retained legacy DTOs remain readable through bounded
+compatibility materialization.
 Mode-specific vocal output remains Speaking but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
 delivery of a capability result remains part of that capability-dependent Goal
