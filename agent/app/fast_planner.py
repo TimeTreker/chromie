@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
-from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .clients.ollama_client import LayeredPrompt, OllamaClient, llm_failure_metadata
 from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
@@ -234,7 +234,7 @@ class FastPlannerResolver:
                     else response_schema
                 )
                 raw = await self.ollama.generate(
-                    self._prompt(
+                    self._layered_prompt(
                         request,
                         capability_payload,
                         response_schema=response_schema,
@@ -861,6 +861,46 @@ class FastPlannerResolver:
             "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
             f"{validation_errors or '[]'}\n"
             "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
+        )
+
+    def _layered_prompt(
+        self,
+        request: AgentRunRequest,
+        capabilities: list[dict[str, Any]],
+        *,
+        response_schema: dict[str, Any],
+        previous_raw: Any = None,
+        validation_errors: str = "",
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
+        )
+        capability_contract = (
+            agent_skill_prompt_section(context, agent_role="fast_planner")
+            + "Executable common capability catalog JSON:\n"
+            + self._bounded(capabilities, 9000)
+            + "\n\n"
+        )
+        rendered = self._prompt(
+            request,
+            capabilities,
+            response_schema=response_schema,
+            previous_raw=previous_raw,
+            validation_errors=validation_errors,
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+                EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+            ),
+            capability_contract=(capability_contract,),
         )
 
     @staticmethod

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from pydantic_core import PydanticCustomError
 
 from .clients.ollama_client import (
+    LayeredPrompt,
     OllamaClient,
     OllamaGenerationError,
     llm_failure_metadata,
@@ -930,7 +931,7 @@ class GoalAssociationResolver:
 
         try:
             raw = await self.ollama.generate(
-                self._build_prompt(request, candidate_goals, output_type=output_type),
+                self._layered_prompt(request, candidate_goals, output_type=output_type),
                 system=self._system_prompt(output_type),
                 options=generation_options,
                 response_format=response_schema,
@@ -1009,7 +1010,7 @@ class GoalAssociationResolver:
                     )
                 else:
                     repaired = await self.ollama.generate(
-                        self._build_repair_prompt(
+                        self._layered_repair_prompt(
                             request=request,
                             candidate_goals=candidate_goals,
                             turn_id=turn_id,
@@ -2093,6 +2094,83 @@ class GoalAssociationResolver:
             + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Resource identity is not source evidence. source_status=known requires an actual user- or discourse-supplied source and a nonempty source_description or source_binding_names; use unknown when a required source is absent, and provider_resolved only when source selection is deliberately delegated. Preserve every explicit count, duration, speed, direction, target, and other material parameter in a typed binding as well as the description; normalize an unambiguous worded quantity to a numeric-string binding value without units. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _layered_prompt(
+        self,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
+        *,
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = self._stable_identity_world_layer(context)
+        skill_contract = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
+        rendered = self._build_prompt(
+            request,
+            candidate_goals,
+            output_type=output_type,
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+                _EXECUTION_CONTRACT_PROMPT,
+            ),
+            capability_contract=(skill_contract,),
+        )
+
+    def _layered_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        candidate_goals: list[dict[str, Any]],
+        turn_id: str,
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        raw: dict[str, Any],
+        validation_error: str,
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = self._stable_identity_world_layer(context)
+        skill_contract = agent_skill_prompt_section(
+            context,
+            agent_role="goal_association",
+        )
+        rendered = self._build_repair_prompt(
+            request=request,
+            candidate_goals=candidate_goals,
+            turn_id=turn_id,
+            output_type=output_type,
+            raw=raw,
+            validation_error=validation_error,
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+                _EXECUTION_CONTRACT_PROMPT,
+            ),
+            capability_contract=(skill_contract,),
+        )
+
+    @staticmethod
+    def _stable_identity_world_layer(context: dict[str, Any]) -> str:
+        return (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
         )
 
     def _build_semantic_review_prompt(

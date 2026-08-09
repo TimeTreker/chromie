@@ -12,11 +12,10 @@ Effects remain authorized only by trusted Host and provider boundaries.
 
 ## Current checkpoint
 
-The semantic Issue stack was merged to `main` on 2026-08-07 as PRs #8 through
-#11. The merge commits are `2bb7a14`, `832afa1`, `0514f3c`, and `e3d57ff`.
-Issues #1, #5, #6, and #7 are closed. Retained evidence from their feature
-revisions remains revision-bound rather than being relabelled as merge-revision
-evidence.
+Issues [#17](https://github.com/TimeTreker/chromie/issues/17) and [#18](https://github.com/TimeTreker/chromie/issues/18) own the active layered
+prompt contract and runtime implementation. `LayeredPrompt` now promotes exact
+stable fragments before volatile turn state and `OllamaClient` records only
+reuse candidates and provider timings, never inferred cache hits.
 
 The post-merge audit of `e3d57ff` established:
 
@@ -129,6 +128,10 @@ Do not report GPU, microphone, speaker, MuJoCo, or physical-provider validation
 unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
+
+Issues #17 and #18 completed their design, source, docs, and non-live checks. Next,
+qualify the RTX 4090 Laptop model-role change and retain a same-model warm/cold
+prefix measurement; separate prompt evaluation from model load and never call a repeated digest a provider cache hit.
 
 The merged Issues retain clean, revision-bound source and highest-safe automated
 evidence for the walk/sing/blink defect, reversible barge-in, the exact

@@ -506,6 +506,63 @@ canonical value and referent ID selected by Goal Association from the supplied
 bounded discourse state. The Host checks provenance shape; it does not extract a
 place name, choose a referent, or decide the user's meaning.
 
+### 5.2 Stable-to-volatile model prompt ordering
+
+Issue [#17](https://github.com/TimeTreker/chromie/issues/17) owns the architecture
+and documentation contract; dependent Issue
+[#18](https://github.com/TimeTreker/chromie/issues/18) owns the runtime boundary
+and evidence. Prompt layering is an inference-efficiency contract inside the
+Cognitive Core; it does not create another semantic authority or cache a model
+decision.
+
+Every Agent request through the maintained Ollama boundary must be designed in
+this order:
+
+| Layer | Content owner | Mutability and invalidation |
+|---|---|---|
+| 0. Constitutional foundation | Cognitive constitution | Stable Chromie identity, proposal/evidence rules, and authority invariants only; any contract revision invalidates the prefix. |
+| 1. Exact identity/world projection | Identity and world-context owners | Owner-approved identity, personality, relationship, and genuine world assumptions only while their exact rendered version is unchanged. Age, relationship, locale, policy, or world updates invalidate the projection. |
+| 2. Agent operating contract | Exact prompt family | Goal Association, Fast Planner, Deep Planner, Response Composer, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
+| 3. Exact capability contract | Capability/Agent Skill/schema owners | Bounded catalog, schema, and Agent Skill projections only while exact availability, content, ordering, and version remain unchanged. Any difference invalidates the projection. |
+| 4. Session context | Core context assembly | Conversation, active and retained Goals, discourse state, memory indexes, scene observations, runtime state, and evidence. Always volatile. |
+| 5. Current turn | Admitted turn and current attempt | Authoritative user input, current time, temporary observations, validation feedback, and attempt-local repair state. Always last and volatile. |
+
+Layers 0 through 3 are a stable-prefix candidate only when the same model and
+prompt family receive an identical final rendering. “Stable” is a property of
+exact content, not of a field name. Capability availability, owner-approved
+identity/personality data, relationship facts, locale, and world assumptions
+may change and must change the stable-prefix digest when they do.
+
+Layer 0 may say that Chromie is the single user-facing identity, that model
+output is a proposal until validated, and that effects require trusted
+evidence. It must not contain a scene description, current time, owner
+observation, relationship state, active Goal, capability availability, or
+execution result. Layers 4 and 5 never move ahead of a supposedly stable block.
+The current action intent belongs to the authoritative Goal/turn suffix; making
+it explicit can improve inspectability, but prefix ordering does not itself fix
+an incorrect Goal Association decision.
+
+Ollama owns the provider KV/prompt cache. Chromie supplies an identical leading
+request sequence to make reuse possible; it does not invent a cache-key API,
+retain KV tensors, or infer a cache hit from matching source characters.
+Different models cannot share that state, and unloading a runner can discard
+it. Prompt layering therefore cannot remove a Qwen-to-Gemma model reload and
+must be evaluated separately from model residency.
+
+The final assembled request is still subject to the complete existing context
+budget, schema decoder, repair, validation, confirmation, and fail-closed
+contracts. Each layer is counted exactly once. A local version or SHA-256 digest
+is invalidation and observability evidence only, not an Ollama cache key. Stable
+placement never upgrades prompt text into policy or execution authority.
+
+The Agent implements this contract with `LayeredPrompt`. The existing Ollama
+`system` text is layer 0; exact identity/personality projections, fixed role
+contracts, and exact Skill/catalog fragments are promoted ahead of one volatile
+suffix. `OllamaClient` is the only final renderer. JSON Schema and generation
+options remain out-of-band Ollama request fields: their digest participates in
+the stable request-contract comparison, but their bytes are not falsely counted
+as a model prompt prefix.
+
 ## 6. Goal continuity
 
 ### 6.1 Association precedes segmentation

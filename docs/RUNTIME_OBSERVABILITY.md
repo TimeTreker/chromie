@@ -186,6 +186,48 @@ Errors record exception type, bounded message, cancellation state, and any
 producer-owned failure classification already available. Sensitive payloads and
 full private tracebacks are not required in retained runtime events.
 
+### Ollama prompt-prefix evidence
+
+Issue [#17](https://github.com/TimeTreker/chromie/issues/17) defines the
+observability contract and dependent Issue
+[#18](https://github.com/TimeTreker/chromie/issues/18) owns its implementation.
+The `llm_prefix_probe_start` event now retains both the legacy raw request proxy
+and declared stable-layer evidence; `llm_prefix_probe_finish` correlates the
+provider timing response.
+
+The runtime integration must retain two deliberately different evidence
+classes:
+
+- declared-layer evidence records layer 0 through 3 character and UTF-8 byte
+  counts and SHA-256 digests, plus whether the same model and prompt family
+  previously declared the same stable prefix;
+- provider completion evidence records Ollama's `prompt_eval_count`,
+  `prompt_eval_duration`, `load_duration`, `eval_count`, `eval_duration`, and
+  `total_duration` when Ollama returns them.
+
+The existing raw system-plus-prompt character windows remain a source-request
+proxy. Neither an exact declared-layer digest nor a raw common-character prefix
+is a provider-confirmed cache hit because Ollama applies a model template and
+tokenization after Chromie's request boundary. Logs must use wording such as
+`stable_prefix_repeat` or `reuse_candidate`, never `cache_hit`, unless a future
+provider supplies direct cache-hit evidence.
+
+`reuse_candidate=true` requires an exact declared stable-prefix repeat and an
+exact `request_contract_digest` repeat for the same model and prompt family.
+The request-contract digest covers structured format and generation options but
+does not pretend those out-of-band bytes are prompt tokens. Ollama's returned
+`prompt_eval_count` is the only token count retained by this boundary and covers
+the complete rendered input, not only the stable layers.
+
+Prompt text is not added to retained attributes. Digests, bounded counts,
+model and artifact identity, Ollama version, prompt family, call correlation,
+structured format/options identity, runner residency, and timing are
+sufficient. A valid benchmark compares repeated requests for the same resident
+model and exact stable prefix, retains the changed volatile suffix, and reports
+model load time separately. It also includes deliberately changed stable
+projections and cold-runner controls. Cross-model calls, unloaded runners, cold
+starts, and raw prefix similarity must not be averaged into a KV-reuse claim.
+
 ## Collection modes
 
 `CHROMIE_RUNTIME_TRACE_MODE` supports:

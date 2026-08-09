@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
-from .clients.ollama_client import OllamaClient, llm_failure_metadata
+from .clients.ollama_client import LayeredPrompt, OllamaClient, llm_failure_metadata
 from .agent_skills import agent_skill_prompt_section
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
@@ -190,7 +190,7 @@ class ResponseComposerResolver:
             raw: Any = None
             try:
                 raw = await self.ollama.generate(
-                    self._prompt(
+                    self._layered_prompt(
                         request,
                         plan,
                         previous_raw=previous_raw,
@@ -1800,7 +1800,7 @@ class ResponseComposerResolver:
             raw: Any = None
             try:
                 raw = await self.ollama.generate(
-                    self._direct_prompt(
+                    self._layered_direct_prompt(
                         request,
                         association,
                         previous_raw=previous_raw,
@@ -2042,6 +2042,40 @@ class ResponseComposerResolver:
             + repair
             + "Return JSON with response_plan, social_attention_plan, lane_coordination=[], confidence, "
             "and rationale only."
+        )
+
+    def _layered_direct_prompt(
+        self,
+        request: AgentRunRequest,
+        association: GoalAssociationResolution,
+        *,
+        previous_raw: Any = None,
+        validation_errors: str = "",
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
+        )
+        rendered = self._direct_prompt(
+            request,
+            association,
+            previous_raw=previous_raw,
+            validation_errors=validation_errors,
+        )
+        promoted = LayeredPrompt.promote(
+            rendered,
+            operating_contract=(
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+            ),
+        )
+        return LayeredPrompt(
+            identity_world=(identity_world,),
+            operating_contract=promoted.operating_contract,
+            volatile_suffix=promoted.volatile_suffix,
         )
 
     @staticmethod
@@ -2686,6 +2720,41 @@ class ResponseComposerResolver:
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, social_attention_plan, lane_coordination, confidence, and rationale only."
+        )
+
+    def _layered_prompt(
+        self,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        *,
+        previous_raw: Any = None,
+        validation_errors: str = "",
+    ) -> LayeredPrompt:
+        context = request.context if isinstance(request.context, dict) else {}
+        identity_world = (
+            "Owner-approved Chromie identity JSON:\n"
+            f"{bounded_identity_json(context)}\n\n"
+            "Owner-approved Personality Expression JSON:\n"
+            f"{bounded_personality_json(context)}\n\n"
+        )
+        skill_contract = agent_skill_prompt_section(
+            context,
+            agent_role="response_composer",
+        )
+        rendered = self._prompt(
+            request,
+            plan,
+            previous_raw=previous_raw,
+            validation_errors=validation_errors,
+        )
+        return LayeredPrompt.promote(
+            rendered,
+            identity_world=(identity_world,),
+            operating_contract=(
+                IDENTITY_SEMANTIC_CONTRACT,
+                PERSONALITY_SEMANTIC_CONTRACT,
+            ),
+            capability_contract=(skill_contract,),
         )
 
     def _safe_read_semantic_review_prompt(
