@@ -247,6 +247,10 @@ preflight checks the selected `CHROMIE_CONDA_ENV` (default
 launcher repeats the same check before installing dependencies or warming
 models. An incompatible environment is an operational blocker, not evidence;
 select or create a conforming environment and rerun from a clean revision.
+The runner owns one generated `speech` operator-mode environment for both the
+service stack and host Orchestrator. This keeps the retained runtime profile,
+running service fingerprint, effective host environment, and captured runtime
+identity on the same configuration authority.
 
 The default verifier still requires the full seven-case matrix, Soridormi
 source binding, and both applied `chat` and `robot_action` lanes. The separate
@@ -266,7 +270,9 @@ Gateway/Core processing bound to that identity, applied `chat`, zero executable
 skills, correlated TTS playback completion, exact command/artifact digests, and
 an operator audible-output verdict. It rejects synthetic input, critical model
 failure, truncation, post-authority fallback, stale playback, dirty/mismatched
-source, missing runtime identity, artifact tampering, or executable work.
+source, missing runtime identity, artifact tampering, or executable work. The
+successful `chromie.speak` delivery result is part of validated speech, not an
+executable body/tool skill; any other skill result still fails this profile.
 
 A passing narrow profile supports only this claim: one reviewed
 current-revision speech-only conversation completed through the physical audio

@@ -17,6 +17,7 @@ from scripts.voice_acceptance import (
     CASES,
     CheckResult,
     FULL_CASE_ORDER,
+    acceptance_runtime_environment,
     acceptance_readiness,
     analyze_case,
     build_parser,
@@ -474,6 +475,16 @@ def write_live_voice_fixture(root: Path) -> None:
             "cognitive_interaction_ready: speech=1 skills=0 requires_confirmation=False",
             sid,
         ),
+        event(
+            "skill_runtime_done",
+            "skill_runtime_done: status=completed results=1 traces=1 runtime_ms=20.0",
+            sid,
+        ),
+        event(
+            "skill_result",
+            "skill_result: request_id=speak-1 skill_id=chromie.speak status=completed",
+            sid,
+        ),
         *tts_completion_events(sid, "The Moon has lower gravity than Earth."),
     ]
     (root / "events.jsonl").write_text(
@@ -507,6 +518,19 @@ def _update_jsonl(path: Path, updater) -> None:
 
 
 class VoiceInteractionAcceptanceTests(unittest.TestCase):
+    def test_acceptance_uses_one_speech_runtime_for_services_and_orchestrator(
+        self,
+    ) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"CHROMIE_OPERATOR_MODE": "services", "TEST_SENTINEL": "retained"},
+            clear=True,
+        ):
+            environment = acceptance_runtime_environment()
+
+        self.assertEqual(environment["CHROMIE_OPERATOR_MODE"], "speech")
+        self.assertEqual(environment["TEST_SENTINEL"], "retained")
+
     def test_host_runtime_requires_python_311_or_newer(self) -> None:
         self.assertFalse(runtime_is_supported((3, 10, 20)))
         self.assertTrue(runtime_is_supported((3, 11, 0)))
@@ -2032,6 +2056,36 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 ],
             )
 
+        def add_body_skill_result(root: Path) -> None:
+            _update_jsonl(
+                root / "events.jsonl",
+                lambda events: [
+                    *events,
+                    event(
+                        "skill_result",
+                        "skill_result: request_id=nod-1 "
+                        "skill_id=soridormi.nod_yes status=completed",
+                        "live-speech",
+                    ),
+                ],
+            )
+
+        def claim_unretained_skill_result(root: Path) -> None:
+            _update_jsonl(
+                root / "events.jsonl",
+                lambda events: [
+                    {
+                        **item,
+                        "message": str(item["message"]).replace(
+                            "results=1", "results=2"
+                        ),
+                    }
+                    if item.get("event") == "skill_runtime_done"
+                    else item
+                    for item in events
+                ],
+            )
+
         def add_stale_playback(root: Path) -> None:
             _update_jsonl(
                 root / "events.jsonl",
@@ -2086,6 +2140,8 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         for label, mutate in {
             "partial playback": remove_playback_end,
             "executable skill": add_skill,
+            "body skill runtime result": add_body_skill_result,
+            "unretained skill runtime result": claim_unretained_skill_result,
             "stale playback": add_stale_playback,
             "critical model timeout": add_timeout,
             "truncated model output": add_truncation,

@@ -77,6 +77,14 @@ MAX_CONFIRMED_SPEECH_TO_SILENCE_MS = 250.0
 SUPERVISED_TTS_WARMUP_TEXT = "Hello."
 
 
+def acceptance_runtime_environment() -> dict[str, str]:
+    """Return one generated-runtime owner for services and Orchestrator."""
+
+    environment = os.environ.copy()
+    environment["CHROMIE_OPERATOR_MODE"] = "speech"
+    return environment
+
+
 def _missing_automatic_runtime_packages(mode: str) -> list[str]:
     packages = ["websockets"]
     if mode == "acoustic" and HostSpeakerPlayer.available_backend() is None:
@@ -3233,6 +3241,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
     audio_driver: AcceptanceAudioDriver | None = None
     orchestrator_log = evidence_dir / "orchestrator.log"
     final_status = "failed"
+    runtime_environment = acceptance_runtime_environment()
 
     try:
         if args.dry_run:
@@ -3269,6 +3278,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
         run_command(
             ["./scripts/build_runtime_env.sh"],
             evidence_dir / "runtime-env.log",
+            env=runtime_environment,
             check=True,
             timeout=120,
         )
@@ -3295,7 +3305,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
             timeout=30,
         )
         if args.start_services:
-            service_env = os.environ.copy()
+            service_env = runtime_environment.copy()
             if service_overrides:
                 service_env["CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE"] = str(
                     service_override_path
@@ -3424,7 +3434,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 ),
             )
 
-        environment = os.environ.copy()
+        environment = runtime_environment.copy()
         environment["ORCH_RUNTIME_OVERRIDE_FILE"] = str(override_path)
         with orchestrator_log.open("w", encoding="utf-8") as handle:
             process = subprocess.Popen(

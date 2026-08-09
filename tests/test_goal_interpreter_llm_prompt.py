@@ -3688,6 +3688,40 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("speak_first", payload["format"]["properties"])
         self.assertIn("limitation", payload["format"]["properties"])
 
+    def test_semantic_repair_keeps_stable_general_knowledge_in_chat(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="slow-review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        payload = interpreter.build_semantic_route_repair_payload(
+            RouteRequest(
+                text="Tell me one short fact about the Moon.",
+                context={"common_ability_catalog": []},
+            ),
+            RouteDecision(
+                route="chat",
+                intent="provide_factual_response",
+                confidence=0.95,
+            ),
+            reason="chat_or_social_framing_requires_capability_grounding_review",
+        )
+        rendered = "\n".join(
+            str(message.get("content") or "") for message in payload["messages"]
+        )
+
+        self.assertIn(
+            "Stable general-knowledge questions that can be answered from model "
+            "knowledge or reasoning remain chat",
+            rendered,
+        )
+        self.assertIn(
+            "asking for a fact does not by itself request a lookup",
+            rendered,
+        )
+
     async def test_standalone_greeting_remains_chat_after_focused_review(self) -> None:
         class GreetingInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:

@@ -95,6 +95,11 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _message_field(message: str, name: str) -> str | None:
+    match = re.search(rf"(?:^|\s){re.escape(name)}=([^\s]+)", message)
+    return match.group(1) if match else None
+
+
 def _validate_artifact_manifest(
     evidence_dir: Path,
     *,
@@ -366,10 +371,32 @@ def _validate_live_voice_turn(
                 f"Speech-only Core resolution has critical failure class {failure_class!r}"
             )
 
+    speech_skill_results = [
+        item
+        for item in session_runtime
+        if item.get("event") == "skill_result"
+        and re.search(
+            r"(?:^|\s)skill_id=chromie\.speak(?:\s|$)",
+            str(item.get("message") or ""),
+        )
+        and re.search(
+            r"(?:^|\s)status=completed(?:\s|$)",
+            str(item.get("message") or ""),
+        )
+    ]
     for item in session_runtime:
         event_name = str(item.get("event") or "")
         message = str(item.get("message") or "")
-        if event_name.startswith(
+        runtime_result_count = _message_field(message, "results")
+        expected_speech_runtime_event = (
+            event_name == "skill_result" and item in speech_skill_results
+        ) or (
+            event_name == "skill_runtime_done"
+            and bool(speech_skill_results)
+            and _message_field(message, "status") == "completed"
+            and runtime_result_count == str(len(speech_skill_results))
+        )
+        if not expected_speech_runtime_event and event_name.startswith(
             ("cognitive_skill_", "confirmation_", "skill_", "soridormi_")
         ):
             errors.append(

@@ -79,6 +79,12 @@ class ContextAwareModel:
 
 
 class AgentSkillSelectionTests(unittest.TestCase):
+    def test_selection_prompt_does_not_treat_general_knowledge_as_external(self):
+        prompt = AgentSkillSelectionService._system_prompt("response_composer")
+
+        self.assertIn("stable general knowledge", prompt)
+        self.assertIn("use no_skill", prompt)
+
     def _write_package(
         self,
         root: Path,
