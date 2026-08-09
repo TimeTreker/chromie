@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -72,6 +71,11 @@ class RuntimeFailurePathTests(unittest.TestCase):
         violations: list[str] = []
         for source_root in MAINTAINED_RUNTIME_ROOTS:
             for path in source_root.rglob("*.py"):
+                if any(
+                    part in {"__pycache__", ".git", ".venv", "venv"}
+                    for part in path.parts
+                ):
+                    continue
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Assert):

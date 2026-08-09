@@ -126,6 +126,65 @@ class PrefixCacheTrackerTests(unittest.TestCase):
         self.assertEqual(finish.fields["load_duration_ms"], 1.0)
         self.assertEqual(finish.fields["total_duration_ms"], 8.0)
 
+    def test_declared_stable_prefix_repeat_is_only_a_reuse_candidate(self) -> None:
+        layers = (
+            ("layer0_constitutional_foundation", "system"),
+            ("layer1_identity_world", "identity"),
+            ("layer2_operating_contract", "role"),
+            ("layer3_capability_contract", "catalog"),
+        )
+        first = self.tracker.begin(
+            purpose="fast_planner",
+            prompt_family="fast_planner.primary",
+            model="qwen3:4b",
+            system="system",
+            prompt="identityrolecatalogturn one",
+            declared_stable_layers=layers,
+            request_contract_digest="sha256:contract",
+        )
+        self.tracker.finish(first.fields["call_id"], status="completed")
+
+        second = self.tracker.begin(
+            purpose="fast_planner",
+            prompt_family="fast_planner.primary",
+            model="qwen3:4b",
+            system="system",
+            prompt="identityrolecatalogturn two",
+            declared_stable_layers=layers,
+            request_contract_digest="sha256:contract",
+        )
+
+        self.assertTrue(second.fields["stable_prefix_repeat"])
+        self.assertTrue(second.fields["request_contract_repeat"])
+        self.assertTrue(second.fields["reuse_candidate"])
+        self.assertNotIn("cache_hit", second.fields)
+
+    def test_changed_request_contract_is_not_a_reuse_candidate(self) -> None:
+        layers = (("layer0_constitutional_foundation", "system"),)
+        first = self.tracker.begin(
+            purpose="goal_association",
+            prompt_family="goal_association.primary",
+            model="gemma4:12b",
+            system="system",
+            prompt="turn one",
+            declared_stable_layers=layers,
+            request_contract_digest="sha256:schema-one",
+        )
+        self.tracker.finish(first.fields["call_id"], status="completed")
+        second = self.tracker.begin(
+            purpose="goal_association",
+            prompt_family="goal_association.primary",
+            model="gemma4:12b",
+            system="system",
+            prompt="turn two",
+            declared_stable_layers=layers,
+            request_contract_digest="sha256:schema-two",
+        )
+
+        self.assertTrue(second.fields["stable_prefix_repeat"])
+        self.assertFalse(second.fields["request_contract_repeat"])
+        self.assertFalse(second.fields["reuse_candidate"])
+
 
 if __name__ == "__main__":
     unittest.main()

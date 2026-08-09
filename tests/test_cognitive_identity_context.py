@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from agent.app.clients.ollama_client import LayeredPrompt
 from agent.app.cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
@@ -152,6 +153,80 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertIn("identity.identity_answer_guidance", prompt)
         self.assertIn("Owner-approved Personality Expression JSON", prompt)
         self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
+
+    def test_cognitive_role_layers_stay_stable_when_only_turn_text_changes(
+        self,
+    ) -> None:
+        changed = self.request.model_copy(update={"text": "第二个问题"})
+        plan = CanonicalPlan(
+            plan_id="plan-layered-prefix",
+            planner_tier="deep",
+            disposition="respond",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-identity"],
+            goal_summary="Answer the identity question.",
+            response_text="我叫 Chromie。",
+            steps=[],
+        )
+        goal = GoalAssociationResolver(_Dummy())
+        fast = FastPlannerResolver(_Dummy(), _Dummy())
+        deep = DeepPlannerResolver(_Dummy(), _Dummy())
+        composer = ResponseComposerResolver(_Dummy())
+        pairs = (
+            (
+                goal._layered_prompt(
+                    self.request,
+                    [],
+                    output_type=GoalSegmentationModelOutput,
+                ),
+                goal._layered_prompt(
+                    changed,
+                    [],
+                    output_type=GoalSegmentationModelOutput,
+                ),
+                goal._system_prompt(GoalSegmentationModelOutput),
+            ),
+            (
+                fast._layered_prompt(self.request, [], response_schema={}),
+                fast._layered_prompt(changed, [], response_schema={}),
+                fast._system_prompt(),
+            ),
+            (
+                deep._layered_prompt(
+                    self.request,
+                    [],
+                    feedback=[],
+                    response_schema={},
+                    expected_goal_ids=["goal-identity"],
+                ),
+                deep._layered_prompt(
+                    changed,
+                    [],
+                    feedback=[],
+                    response_schema={},
+                    expected_goal_ids=["goal-identity"],
+                ),
+                deep._system_prompt(),
+            ),
+            (
+                composer._layered_prompt(self.request, plan),
+                composer._layered_prompt(changed, plan),
+                composer._system_prompt(),
+            ),
+        )
+
+        for first, second, system in pairs:
+            self.assertIsInstance(first, LayeredPrompt)
+            self.assertEqual(
+                first.stable_layer_items(system=system),
+                second.stable_layer_items(system=system),
+            )
+            self.assertNotEqual(first.volatile_suffix, second.volatile_suffix)
+            self.assertLess(
+                second.render().index("Owner-approved Chromie identity JSON"),
+                second.render().index("第二个问题"),
+            )
 
 
 if __name__ == "__main__":

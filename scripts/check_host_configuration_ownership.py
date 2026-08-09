@@ -80,6 +80,11 @@ def check(root: Path = ROOT) -> list[str]:
     owned = _direct_env_keys(root / HOST_SETTINGS.relative_to(ROOT))
     discovered: dict[str, list[str]] = {}
     for path in sorted((root / "orchestrator").rglob("*.py")):
+        if any(
+            part in {"__pycache__", ".git", ".venv", "venv"}
+            for part in path.parts
+        ):
+            continue
         if path == root / HOST_SETTINGS.relative_to(ROOT):
             continue
         for key in sorted(_direct_env_keys(path)):

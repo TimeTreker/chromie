@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
 import sys
 import time
+from dataclasses import dataclass
 from typing import Any, Literal
 
 
@@ -34,6 +36,93 @@ except ImportError:  # pragma: no cover - repository development path
 logger = logging.getLogger("chromie.agent.ollama")
 
 ResponseFormat = Literal["text", "json"] | dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LayeredPrompt:
+    """Stable prompt layers plus the volatile session/turn suffix.
+
+    Ollama still owns tokenization and KV-cache lifetime.  This value only makes
+    the request prefix explicit so role-local builders cannot accidentally put
+    turn state ahead of otherwise reusable material.
+    """
+
+    identity_world: tuple[str, ...] = ()
+    operating_contract: tuple[str, ...] = ()
+    capability_contract: tuple[str, ...] = ()
+    volatile_suffix: str = ""
+
+    @classmethod
+    def promote(
+        cls,
+        rendered_prompt: str,
+        *,
+        identity_world: tuple[str, ...] = (),
+        operating_contract: tuple[str, ...] = (),
+        capability_contract: tuple[str, ...] = (),
+    ) -> "LayeredPrompt":
+        """Move exact rendered fragments ahead of the volatile suffix once."""
+
+        suffix = str(rendered_prompt)
+        layers = (identity_world, operating_contract, capability_contract)
+        for fragments in layers:
+            for fragment in fragments:
+                if not fragment:
+                    continue
+                if fragment not in suffix:
+                    raise ValueError(
+                        "stable prompt fragment is absent from rendered prompt"
+                    )
+                suffix = suffix.replace(fragment, "", 1)
+        return cls(
+            identity_world=tuple(item for item in identity_world if item),
+            operating_contract=tuple(
+                item for item in operating_contract if item
+            ),
+            capability_contract=tuple(
+                item for item in capability_contract if item
+            ),
+            volatile_suffix=suffix,
+        )
+
+    @staticmethod
+    def _join(fragments: tuple[str, ...]) -> str:
+        content = "".join(fragments).rstrip()
+        return f"{content}\n\n" if content else ""
+
+    def stable_layer_items(
+        self,
+        *,
+        system: str | None,
+    ) -> tuple[tuple[str, str], ...]:
+        return (
+            ("layer0_constitutional_foundation", system or ""),
+            ("layer1_identity_world", self._join(self.identity_world)),
+            ("layer2_operating_contract", self._join(self.operating_contract)),
+            ("layer3_capability_contract", self._join(self.capability_contract)),
+        )
+
+    def render(self) -> str:
+        return "".join(
+            (
+                self._join(self.identity_world),
+                self._join(self.operating_contract),
+                self._join(self.capability_contract),
+                self.volatile_suffix,
+            )
+        )
+
+    def __str__(self) -> str:
+        return self.render()
+
+    def __contains__(self, value: object) -> bool:
+        return isinstance(value, str) and value in self.render()
+
+    def casefold(self) -> str:
+        return self.render().casefold()
+
+    def index(self, value: str, *bounds: int) -> int:
+        return self.render().index(value, *bounds)
 
 
 class OllamaGenerationError(RuntimeError):
@@ -173,7 +262,7 @@ class OllamaClient:
 
     async def generate(
         self,
-        prompt: str,
+        prompt: str | LayeredPrompt,
         *,
         system: str | None = None,
         options: dict[str, Any] | None = None,
@@ -183,6 +272,25 @@ class OllamaClient:
         attempt: int | None = None,
     ) -> str | dict[str, Any]:
         request_options = self._effective_options(options)
+        layered_prompt = prompt if isinstance(prompt, LayeredPrompt) else None
+        rendered_prompt = layered_prompt.render() if layered_prompt else prompt
+        declared_stable_layers = (
+            layered_prompt.stable_layer_items(system=system)
+            if layered_prompt is not None
+            else None
+        )
+        request_contract_digest = "sha256:" + hashlib.sha256(
+            json.dumps(
+                {
+                    "options": request_options,
+                    "response_format": response_format,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+        ).hexdigest()
         response_format_label = (
             "json_schema" if isinstance(response_format, dict) else response_format
         )
@@ -198,7 +306,9 @@ class OllamaClient:
             prompt_family=family,
             model=self.model,
             system=system,
-            prompt=prompt,
+            prompt=rendered_prompt,
+            declared_stable_layers=declared_stable_layers,
+            request_contract_digest=request_contract_digest,
             trace_id=trace_id or None,
             turn_id=turn_id,
             attempt=attempt,
@@ -215,8 +325,18 @@ class OllamaClient:
                 "model": self.model,
                 "response_format": response_format_label,
                 "timeout_ms": self.timeout_ms,
-                "prompt_chars": len(prompt),
+                "prompt_chars": len(rendered_prompt),
                 "system_chars": len(system or ""),
+                "declared_stable_prefix_chars": start_probe.fields.get(
+                    "declared_stable_prefix_chars"
+                ),
+                "declared_stable_prefix_digest": start_probe.fields.get(
+                    "declared_stable_prefix_digest"
+                ),
+                "stable_prefix_repeat": start_probe.fields.get(
+                    "stable_prefix_repeat"
+                ),
+                "reuse_candidate": start_probe.fields.get("reuse_candidate"),
                 "num_ctx": request_options.get("num_ctx"),
                 "num_predict": request_options.get("num_predict"),
                 "llm_call_id": call_id,
@@ -226,7 +346,7 @@ class OllamaClient:
             finish_probe = None
             try:
                 result = await self._generate(
-                    prompt,
+                    rendered_prompt,
                     system=system,
                     options=request_options,
                     response_format=response_format,

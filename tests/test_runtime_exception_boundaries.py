@@ -74,6 +74,21 @@ class RuntimeExceptionBoundaryInventoryTests(unittest.TestCase):
             [],
         )
 
+    def test_runtime_scan_excludes_virtual_environments(self) -> None:
+        root = self._root("def run():\n    return 1\n")
+        ignored = root / "orchestrator" / ".venv" / "lib" / "dependency.py"
+        ignored.parent.mkdir(parents=True)
+        ignored.write_text(
+            "def dependency():\n"
+            "    try:\n"
+            "        work()\n"
+            "    except Exception:\n"
+            "        return None\n",
+            encoding="utf-8",
+        )
+
+        self.assertEqual(scan_broad_handlers(root), [])
+
     def test_stale_inventory_entry_fails(self) -> None:
         root = self._root("def run():\n    return 1\n")
         inventory = self._write_inventory(
@@ -94,6 +109,7 @@ class RuntimeExceptionBoundaryInventoryTests(unittest.TestCase):
         )
         findings = audit_runtime_exception_boundaries(root, inventory_path=inventory)
         self.assertTrue(any("stale" in item.message for item in findings))
+
     def test_wrong_hash_algorithm_fails(self) -> None:
         root = self._root(
             "def run():\n    try:\n        work()\n    except Exception:\n        return None\n"

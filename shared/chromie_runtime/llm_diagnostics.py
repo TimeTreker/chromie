@@ -319,6 +319,10 @@ class _PrefixHistory:
     proxy_chars: int
     full_digest: str
     window_digests: dict[int, str]
+    declared_stable_prefix_chars: int | None
+    declared_stable_prefix_bytes: int | None
+    declared_stable_prefix_digest: str | None
+    request_contract_digest: str | None
 
 
 @dataclass
@@ -353,6 +357,8 @@ class PrefixCacheTracker:
         model: str,
         system: str | None,
         prompt: str | None,
+        declared_stable_layers: Iterable[tuple[str, str]] | None = None,
+        request_contract_digest: str | None = None,
         trace_id: str | None = None,
         turn_id: str | None = None,
         attempt: int | None = None,
@@ -360,6 +366,32 @@ class PrefixCacheTracker:
         proxy = _prefix_proxy(system, prompt)
         window_digests = _prefix_digests(proxy)
         full_digest = hashlib.sha256(proxy.encode("utf-8")).hexdigest()
+        stable_layers = tuple(declared_stable_layers or ())
+        stable_layer_chars = {
+            name: len(content) for name, content in stable_layers
+        }
+        stable_layer_bytes = {
+            name: len(content.encode("utf-8")) for name, content in stable_layers
+        }
+        stable_layer_digests = {
+            name: "sha256:"
+            + hashlib.sha256(content.encode("utf-8")).hexdigest()
+            for name, content in stable_layers
+        }
+        stable_descriptor = "".join(
+            f"{name}\0{content}\0" for name, content in stable_layers
+        )
+        declared_stable_prefix_chars = (
+            sum(stable_layer_chars.values()) if stable_layers else None
+        )
+        declared_stable_prefix_bytes = (
+            sum(stable_layer_bytes.values()) if stable_layers else None
+        )
+        declared_stable_prefix_digest = (
+            hashlib.sha256(stable_descriptor.encode("utf-8")).hexdigest()
+            if stable_layers
+            else None
+        )
         family_key = (model, prompt_family)
         with self._lock:
             self._sequence += 1
@@ -387,6 +419,10 @@ class PrefixCacheTracker:
                 proxy_chars=len(proxy),
                 full_digest=full_digest,
                 window_digests=window_digests,
+                declared_stable_prefix_chars=declared_stable_prefix_chars,
+                declared_stable_prefix_bytes=declared_stable_prefix_bytes,
+                declared_stable_prefix_digest=declared_stable_prefix_digest,
+                request_contract_digest=request_contract_digest,
             )
             self._last_call = history
             self._last_by_family[family_key] = history
@@ -394,6 +430,19 @@ class PrefixCacheTracker:
                 history=history,
                 started_monotonic=time.perf_counter(),
             )
+        stable_prefix_repeat = bool(
+            declared_stable_prefix_digest
+            and previous_family is not None
+            and previous_family.declared_stable_prefix_digest
+            == declared_stable_prefix_digest
+            and previous_family.declared_stable_prefix_bytes
+            == declared_stable_prefix_bytes
+        )
+        request_contract_repeat = bool(
+            request_contract_digest
+            and previous_family is not None
+            and previous_family.request_contract_digest == request_contract_digest
+        )
         return PrefixCacheProbe(
             event="llm_prefix_probe_start",
             fields={
@@ -421,6 +470,29 @@ class PrefixCacheTracker:
                     sequence - previous_family.sequence
                     if previous_family is not None
                     else None
+                ),
+                "declared_stable_prefix": bool(stable_layers),
+                "declared_stable_prefix_chars": declared_stable_prefix_chars,
+                "declared_stable_prefix_bytes": declared_stable_prefix_bytes,
+                "declared_stable_prefix_digest": (
+                    "sha256:" + declared_stable_prefix_digest
+                    if declared_stable_prefix_digest
+                    else None
+                ),
+                "declared_stable_layer_chars": (
+                    stable_layer_chars if stable_layers else None
+                ),
+                "declared_stable_layer_bytes": (
+                    stable_layer_bytes if stable_layers else None
+                ),
+                "declared_stable_layer_digests": (
+                    stable_layer_digests if stable_layers else None
+                ),
+                "stable_prefix_repeat": stable_prefix_repeat,
+                "request_contract_digest": request_contract_digest,
+                "request_contract_repeat": request_contract_repeat,
+                "reuse_candidate": (
+                    stable_prefix_repeat and request_contract_repeat
                 ),
                 "previous_call_id": (previous_call.call_id if previous_call else None),
                 "previous_purpose": (previous_call.purpose if previous_call else None),

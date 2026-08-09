@@ -15,7 +15,13 @@ organized by capability, risk, and retained evidence.
 
 ## Current priorities
 
-1. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
+1. Complete and retain Issues
+   [#17](https://github.com/TimeTreker/chromie/issues/17) and
+   [#18](https://github.com/TimeTreker/chromie/issues/18) as the layered-prompt
+   architecture and runtime contracts. Same-model timing evidence must remain
+   separate from cross-model reload measurement; neither Issue may claim
+   cross-model KV reuse or model-reload savings from prompt layering.
+2. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
    Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
    ordered MuJoCo execution, provider-start deterministic cancellation, and
    safe-idle recovery. The dependency-complete source gate and rebuilt clean
@@ -23,27 +29,27 @@ organized by capability, risk, and retained evidence.
    independent semantic reviewer remains an explicit non-release gap. Hard
    semantic, delivery-evidence, safety, provider, or provenance failures remain
    non-averageable blockers.
-2. Keep every admitted non-operational turn on one Goal-driven semantic path.
+3. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-3. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
+4. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
    default-provider distinction evidence; real modes remain a separate target
    evidence track.
-4. Preserve Issue #7's source-qualified peer media-playback contract and its
+5. Preserve Issue #7's source-qualified peer media-playback contract and its
    clean default-provider distinction evidence. Real operations remain a
    separate target-evidence track; singing remains Speaking, existing-audio
    playback remains Activity, and ordinary TTS is neither kind of evidence.
-5. Preserve exact provider-prefixed capability identity from model proposal
+6. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
    neutral late-binding alias merely to relocate implementation.
-6. Close source-bound and target-bound evidence separately. A passing source
+7. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-7. Reduce compatibility surfaces only after the maintained path has equivalent
+8. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-8. Keep documentation, benchmarks, static analysis, configuration ownership,
+9. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations
@@ -66,6 +72,33 @@ These foundations are maintained only while their automated contracts remain
 passing.
 
 ## Active source work
+
+### Layered prompt prefix integration — source complete
+
+Issue [#17](https://github.com/TimeTreker/chromie/issues/17) owns the design and
+Issue [#18](https://github.com/TimeTreker/chromie/issues/18) owns the completed
+source integration and its explicit target-evidence boundary. The architecture defines six ordered layers: a
+constitutional foundation; exact identity/world projection; exact Agent role;
+exact capability/Skill/schema projection; session context; and current turn.
+Only identical rendered layers 0 through 3 form a stable-prefix candidate.
+Preserve the current model-facing contracts and deterministic validation; do
+not add a Host semantic cache, a runtime flag, or a compatibility path.
+
+Exit criteria:
+
+- each layer has one owner, allowed content, mutability rule, and invalidation
+  condition;
+- current time, session state, Goals, memory, observations, evidence, validator
+  feedback, and current user input remain volatile;
+- owner identity/world and capability projections are stable only while their
+  exact rendered content is unchanged;
+- hashes are defined as non-sensitive invalidation/observability evidence, not
+  a provider cache-key API or cache-hit claim; and
+- `OllamaClient` owns exact assembly, context accounting, non-sensitive layer
+  digests, request-contract identity, and provider timing correlation; and
+- focused non-live regressions pass; the same-model RTX 4090 Laptop measurement
+  remains part of the next model-profile qualification and must distinguish
+  source completion from target evidence.
 
 ### Semantic authority closure
 

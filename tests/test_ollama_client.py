@@ -5,10 +5,51 @@ from unittest import mock
 
 import httpx
 
-from agent.app.clients.ollama_client import OllamaClient, OllamaGenerationError
+from agent.app.clients.ollama_client import (
+    LayeredPrompt,
+    OllamaClient,
+    OllamaGenerationError,
+)
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_renders_stable_layers_before_volatile_suffix(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = '{"response":"ready","done_reason":"stop"}'
+        response.json.return_value = {
+            "response": "ready",
+            "done_reason": "stop",
+        }
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        prompt = LayeredPrompt(
+            identity_world=("identity\n",),
+            operating_contract=("role\n",),
+            capability_contract=("catalog\n",),
+            volatile_suffix="turn",
+        )
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="test-model",
+            ).generate(prompt, system="constitution")
+
+        self.assertEqual(result, "ready")
+        payload = http_client.post.call_args.kwargs["json"]
+        self.assertEqual(payload["system"], "constitution")
+        self.assertEqual(
+            payload["prompt"],
+            "identity\n\nrole\n\ncatalog\n\nturn",
+        )
+
     async def test_generate_ignores_host_proxy_environment(self) -> None:
         response = mock.Mock()
         response.status_code = 200
@@ -78,8 +119,10 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         response.text = '{"response":"partial","done_reason":"length","eval_count":8}'
         response.json.return_value = {"response": "partial", "done_reason": "length", "eval_count": 8}
         response.raise_for_status.return_value = None
-        http_client = mock.AsyncMock(); http_client.post.return_value = response
-        context = mock.AsyncMock(); context.__aenter__.return_value = http_client
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
         with mock.patch("agent.app.clients.ollama_client.httpx.AsyncClient", return_value=context), mock.patch.dict("os.environ", {"CHROMIE_CLI_COLOR": "1"}, clear=False):
             with self.assertLogs("chromie.agent.ollama", level="ERROR") as error_logs:
                 with self.assertRaises(OllamaGenerationError) as raised:

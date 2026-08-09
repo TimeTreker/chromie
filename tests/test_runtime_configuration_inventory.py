@@ -3,16 +3,32 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.runtime_configuration_inventory import build_inventory
+from scripts.runtime_configuration_inventory import build_inventory, discover
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class RuntimeConfigurationInventoryTests(unittest.TestCase):
+    def test_discovery_excludes_virtual_environments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "orchestrator" / "runtime.py"
+            source.parent.mkdir(parents=True)
+            source.write_text('os.getenv("OWNED_SETTING")\n', encoding="utf-8")
+            ignored = root / "orchestrator" / ".venv" / "lib" / "dependency.py"
+            ignored.parent.mkdir(parents=True)
+            ignored.write_text('os.getenv("DEPENDENCY_SETTING")\n', encoding="utf-8")
+
+            keys, owners, _ = discover(root)
+
+        self.assertEqual(keys, {"OWNED_SETTING"})
+        self.assertEqual(owners["OWNED_SETTING"], {"orchestrator/runtime.py"})
+
     def test_inventory_covers_discovered_keys_with_declared_categories(self) -> None:
         inventory = build_inventory(ROOT)
         entries = inventory["entries"]

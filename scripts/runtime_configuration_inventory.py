@@ -10,7 +10,6 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 SURFACE_PATH = ROOT / "config" / "runtime_configuration_surface.json"
@@ -134,7 +133,14 @@ def discover(root: Path = ROOT) -> tuple[set[str], dict[str, set[str]], dict[str
 
     source_paths: list[Path] = []
     for top in ("agent", "asr", "hardware", "orchestrator", "scripts", "shared", "tts"):
-        source_paths.extend((root / top).rglob("*.py"))
+        source_paths.extend(
+            path
+            for path in (root / top).rglob("*.py")
+            if not any(
+                part in {"__pycache__", ".git", ".venv", "venv"}
+                for part in path.parts
+            )
+        )
     for path in sorted(source_paths):
         relative = path.relative_to(root).as_posix()
         for key in python_env_keys(path):
