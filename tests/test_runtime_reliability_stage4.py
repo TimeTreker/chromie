@@ -278,18 +278,56 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
 
 
-    async def test_pre_dispatch_selected_weather_capability_never_becomes_missing_ability(self) -> None:
+    async def test_pre_dispatch_selected_weather_capability_uses_user_facing_failure_composer(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         self._configure_model_generation(assistant)
         assistant.failure_response_model = "gemma4:e2b"
         assistant.llm_url = "http://localhost:11434/api/generate"
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(), assistant
+        )
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()), assistant
+        )
+        assistant._direct_llm_identity_json = MethodType(
+            lambda self: '{"name":"Chromie"}', assistant
+        )
+        assistant._direct_llm_mind_summary = MethodType(
+            lambda self: "smart, warm, and six years old", assistant
+        )
         assistant.session_log = MethodType(lambda self, *args: None, assistant)
 
-        async def unexpected_session(self: VoiceAssistant) -> None:
-            del self
-            raise AssertionError("pre-dispatch failure must use the trusted host response")
+        class FakeResponse:
+            status = 200
 
-        assistant.get_http_session = MethodType(unexpected_session, assistant)
+            async def __aenter__(self) -> "FakeResponse":
+                return self
+
+            async def __aexit__(self, *args: Any) -> None:
+                del args
+
+            async def text(self) -> str:
+                return json.dumps(
+                    {
+                        "response": json.dumps(
+                            {"text": "这次还没查到结果，我先不乱说。"},
+                            ensure_ascii=False,
+                        ),
+                        "done_reason": "stop",
+                    },
+                    ensure_ascii=False,
+                )
+
+        class FakeSession:
+            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
+                self.url = url
+                self.payload = json
+                return FakeResponse()
+
+        session = FakeSession()
+        assistant.get_http_session = MethodType(
+            lambda self: asyncio.sleep(0, result=session), assistant
+        )
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
@@ -318,10 +356,12 @@ class CognitiveFailureResponseComposerTests(unittest.IsolatedAsyncioTestCase):
 
         assert response is not None
         spoken = " ".join(item.text for item in response.speech)
-        self.assertEqual(response.metadata["source"], "host_pre_dispatch_capability_failure")
-        self.assertIn("还没开始查", spoken)
+        self.assertEqual(response.metadata["source"], "llm_cognitive_failure_response")
+        self.assertIn("还没查到结果", spoken)
+        self.assertNotIn("安排", spoken)
         self.assertNotIn("不会", spoken)
         self.assertNotIn("没学会", spoken)
+        self.assertIn("Do not expose internal planning, arrangement", session.payload["prompt"])
         facts = response.metadata["failure_facts"]
         self.assertEqual(
             facts["selected_capability_ids"],

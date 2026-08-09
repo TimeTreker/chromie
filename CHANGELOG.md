@@ -16,6 +16,13 @@ remains available in Git history.
 - Replaced scenario-answer instructions in coordinated-action review with
   general semantic entailment and Capability-contract principles; concrete
   distinctions remain benchmark/regression responsibilities.
+- Reduced Goal Association's live completion contract to the semantic
+  `output_mode` choice (plus media operation when applicable); the Host now
+  materializes `responsibility_kind`, `execution_lane`, and `provider_required`
+  deterministically instead of asking the LLM to copy a valid tuple.
+- Removed route-specific hard-coded pre-dispatch failure speech; the bounded
+  failure composer now receives the trusted facts and must describe only the
+  user-visible missing result/effect without exposing planner/workflow language.
 
 ### Post-merge audit remediation
 

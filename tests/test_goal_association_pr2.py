@@ -111,26 +111,37 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertIsNotNone(goal.resource_responsibility)
 
-    def test_live_decoder_schema_requires_typed_execution_fields(self):
+    def test_live_decoder_schema_exposes_semantic_mode_not_host_invariants(self):
         schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,
             [],
             [],
         )
-        required = set(schema["$defs"]["GoalAssociationModelGoal"]["required"])
-        self.assertTrue(
-            {
-                "responsibility_kind",
-                "execution_lane",
-                "output_mode",
-                "provider_required",
-            }.issubset(required)
-        )
-        output_description = schema["$defs"]["GoalAssociationModelGoal"][
-            "properties"
-        ]["output_mode"]["description"]
-        self.assertIn("work owned by this Goal", output_description)
+        goal_schema = schema["$defs"]["GoalAssociationModelGoal"]
+        required = set(goal_schema["required"])
+        properties = set(goal_schema["properties"])
+
+        self.assertIn("output_mode", required)
+        self.assertNotIn("responsibility_kind", properties)
+        self.assertNotIn("execution_lane", properties)
+        self.assertNotIn("provider_required", properties)
+        output_description = goal_schema["properties"]["output_mode"]["description"]
+        self.assertIn("Semantic work that completes this Goal", output_description)
         self.assertIn("capability_work", output_description)
+
+    def test_output_mode_materializes_host_execution_invariants(self):
+        goal = GoalAssociationModelGoal.model_validate(
+            {
+                "description": "Check tomorrow's weather in Shanghai",
+                "output_mode": "capability_work",
+                "bindings": [],
+            }
+        )
+
+        self.assertEqual(goal.responsibility_kind, "capability_dependent")
+        self.assertEqual(goal.execution_lane, "activity")
+        self.assertTrue(goal.provider_required)
+        self.assertEqual(goal.media_operation, "none")
 
 
 class FakeOllama:
@@ -848,7 +859,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         self.assertIn("No previous Goal DTO is supplied", repair_prompt)
         self.assertIn("invalid_typed_execution_contract", repair_prompt)
-        self.assertIn("The only valid typed tuples are", repair_prompt)
+        self.assertIn("output_mode is the completion discriminant", repair_prompt)
+        self.assertNotIn("The only valid typed tuples are", repair_prompt)
         self.assertNotIn('"responsibility_kind":"capability_dependent"', repair_prompt)
         self.assertEqual(
             result.metadata["contract_repair"]["strategy"],
@@ -1836,12 +1848,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Blink twice.",
-                            "responsibility_kind": "executable_action",
+                            "output_mode": "body_action",
                             "bindings": [],
                         },
                         {
                             "description": "Explain why leaves change color.",
-                            "responsibility_kind": "spoken_response",
+                            "output_mode": "speech",
                             "bindings": [],
                         },
                     ]
@@ -1854,7 +1866,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Blink.",
-                            "responsibility_kind": "executable_action",
+                            "output_mode": "body_action",
                             "bindings": [],
                         }
                     ]
@@ -2203,7 +2215,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         goal_schema = ollama.prompts[0][1]["response_format"]["$defs"][
             "GoalAssociationModelGoal"
         ]
-        self.assertIn("responsibility_kind", goal_schema["required"])
+        self.assertIn("output_mode", goal_schema["required"])
+        self.assertNotIn("responsibility_kind", goal_schema["properties"])
 
     def test_three_executable_actions_trigger_review_and_preserve_spoken_performance(self):
         initial = {
@@ -2316,7 +2329,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         review_prompt, review_kwargs = ollama.prompts[1]
         self.assertIn("No previous Goal DTO is supplied", review_prompt)
         self.assertNotIn("DTO to review JSON", review_prompt)
-        self.assertIn("channel and evidence that complete", review_prompt)
+        self.assertIn("semantic work and evidence that complete", review_prompt)
         self.assertIn("vocal performance", review_prompt)
         self.assertEqual(
             review_kwargs["prompt_family"],
@@ -2421,7 +2434,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description, responsibility_kind, execution_lane, output_mode, provider_required, media_operation, bindings, and optional provider-neutral resource_responsibility only",
+            "Each new_goals item contains description, output_mode, optional media_operation, bindings, and optional provider-neutral resource_responsibility only",
             ollama.prompts[1][0],
         )
 
@@ -3031,7 +3044,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "responsibility_kind", "execution_lane", "output_mode", "provider_required", "media_operation", "bindings", "resource_responsibility"},
+            {"description", "output_mode", "media_operation", "bindings", "resource_responsibility"},
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(
@@ -3544,13 +3557,17 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
         self.assertIn("politeness preamble", prompt)
         self.assertIn("identity and personality shape expression only", prompt)
         self.assertIn("one Goal when one capability result can satisfy both", prompt)
-        self.assertIn("not the channel later used to deliver its result", prompt)
+        self.assertIn("not by the channel used later to report that outcome", prompt)
         self.assertIn(
-            "capability_dependent/activity/capability_work/true",
+            "output_mode is the completion discriminant",
             prompt,
         )
         self.assertIn(
-            "Never set output_mode=speech merely because a capability result",
+            "The fact that a capability result will later be spoken",
+            prompt,
+        )
+        self.assertNotIn(
+            "capability_dependent/activity/capability_work/true",
             prompt,
         )
         self.assertIn("ledger-goal-marker", prompt)

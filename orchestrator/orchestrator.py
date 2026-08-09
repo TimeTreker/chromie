@@ -6597,47 +6597,6 @@ class VoiceAssistant:
                 "no_motion_reason",
                 "no_trusted_interaction_response_was_constructed",
             )
-        if (
-            failure_facts.get("failure_before_provider_dispatch") is True
-            and failure_facts.get("exact_capability_selected") is True
-        ):
-            if language.startswith("zh"):
-                if decision.route == "tool":
-                    text = "刚才没把查询安排好，所以还没开始查。"
-                elif decision.route == "robot_action":
-                    text = "刚才没把动作安排好，所以还没开始动。"
-                else:
-                    text = "刚才没把这件事安排好，所以还没开始。"
-            else:
-                if decision.route == "tool":
-                    text = (
-                        "I could not arrange the lookup correctly, so it did not "
-                        "start."
-                    )
-                elif decision.route == "robot_action":
-                    text = (
-                        "I could not arrange the action correctly, so it did not "
-                        "start."
-                    )
-                else:
-                    text = (
-                        "I could not arrange that work correctly, so it did not "
-                        "start."
-                    )
-            response = self._host_speech_response(
-                text,
-                style="warning",
-                source="host_pre_dispatch_capability_failure",
-            )
-            return response.model_copy(
-                update={
-                    "metadata": {
-                        **response.metadata,
-                        "failure_facts": failure_facts,
-                        "semantic_fallback": True,
-                    }
-                }
-            )
         phase = (
             "after one or more requested actions were attempted but did not complete"
             if execution_started
@@ -6658,15 +6617,16 @@ class VoiceAssistant:
             "Say simply what failed in natural childlike language, preserve the honest "
             "no-guess/no-forced-motion boundary. If user_input_understood is true, never "
             "say that Chromie did not hear or understand the request. If user_should_repeat "
-            "is false, do not ask the user to repeat the same words; say that Chromie "
-            "understood but could not arrange or complete the requested work this time. "
+            "is false, do not ask the user to repeat the same words; say only the "
+            "user-visible failure or missing result/effect that is supported by the facts. "
             "When provider_request_count is zero, do not imply that Chromie tried to move, "
-            "query, or contact a provider; the request failed before dispatch. Explain only "
-            "that she understood but could not get the work arranged this time. When "
+            "query, or contact a provider; the request failed before dispatch. Express only "
+            "the user-visible boundary that no verified result or requested effect happened. "
+            "Do not expose internal planning, arrangement, schema, or workflow language. When "
             "exact_capability_selected or capability_available_at_interpretation is true, "
             "the ability exists: never say Chromie cannot do it, does not know how, has not "
-            "learned it, or lacks the ability. Do not turn an internal arrangement failure "
-            "into a weather, network, or provider failure. system_retry_possible describes "
+            "learned it, or lacks the ability. Do not invent a weather, network, or provider "
+            "failure when none was observed. system_retry_possible describes "
             "an internal property and never by itself asks the user to repeat or approve. "
             "Invite one retry only when user_action_required is true. Return only a JSON "
             "object with one field named text.\n\n"
