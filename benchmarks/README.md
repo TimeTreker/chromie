@@ -383,19 +383,24 @@ python -m benchmarks.inventory.core --check
 python -m benchmarks.adapters.normalize --check
 ```
 
-Execute all 150 cases through an explicit project adapter and retain the real
+Execute cases through the maintained safe live-text adapter and retain the real
 outputs for semantic review:
 
 ```bash
+export CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT=.chromie/benchmarks/daily-conversation/run-id/artifacts
 python scripts/run_daily_conversation_benchmark.py \
-  --command "python scripts/my_chromie_daily_conversation_adapter.py" \
+  --command "python scripts/daily_conversation_live_adapter.py" \
   --model candidate-model-id \
   --prompt-revision current-prompt-revision \
   --output-dir .chromie/benchmarks/daily-conversation/run-id
 ```
 
-The adapter receives each normalized scenario on standard input and must invoke
-the real module or integration boundary under test. The runner writes
+The live adapter receives each normalized scenario on standard input and uses
+the maintained Host text path with cognitive-runtime apply, shared conversation
+state for multi-turn cases, no speaker, and preview-only execution. It therefore
+exercises routing, Goal Association, planning, and response composition without
+executing proposed effects. It also verifies the quality-model identity exposed
+by Agent health and that the fixed fast roles remain `qwen3:4b`. The runner writes
 `normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
 bundle to Codex or another declared LLM/human reviewer, fill the generated
 `review-template.json`, and apply the retained semantic verdict with
