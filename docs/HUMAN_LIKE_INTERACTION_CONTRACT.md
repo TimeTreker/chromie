@@ -234,15 +234,25 @@ lifecycle state without inferring meaning from a phrase blacklist. The
 pre-generated generic cache is a transport-safe fallback when dynamic speech is
 not admissible or cannot be scheduled; it never claims evidence or an effect.
 
-Current-turn de-duplication uses the typed speech-event identity and its
-structured purpose, stage, route, and commitment. Generated or queued speech is
-not delivery evidence. Only playback-started or playback-completed state
-satisfies the audible act. A later response stage may reference a queued event
-without resynthesizing it; if that exact event becomes `not_delivered`, Runtime
-may fulfill the same act once. Literal text equality is only a payload-integrity
-check and never decides whether two conversational responsibilities are the
-same. Distinct result, failure, limitation, clarification, confirmation,
-progress, and completion acts remain independently deliverable.
+Current-turn de-duplication uses the typed speech-event identity and its turn,
+structured purpose, stage, route, commitment, source Goal IDs, Plan provenance,
+claims, and completion restriction. Generated or queued speech is not delivery
+evidence. Only playback-started or playback-completed state satisfies the
+audible act. A later response stage may reference a queued event without
+resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
+fulfill the same act once. Pre-Goal Fast speech remains explicitly unbound, but
+already Goal-bound speech cannot be reassigned to unrelated work. Literal text
+equality is only a payload-integrity check and never decides whether two
+conversational responsibilities are the same. Distinct result, failure,
+limitation, clarification, confirmation, progress, and completion acts remain
+independently deliverable.
+
+Natural continuity comes from projecting owner-qualified facts into the Core,
+not from a prompt-only “do not repeat” rule or a second general memory store.
+Speech delivery, Activity proposal/commit state, trusted Activity outcomes, and
+recent auxiliary Social Attention evidence keep separate lifecycle and
+authority. In particular, a spoken promise is observable conversation state but
+never proof that the Activity started or completed.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable

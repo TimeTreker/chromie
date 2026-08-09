@@ -353,7 +353,12 @@ claim guards, and cancellation generation. It need not wait for unrelated later
 response fields.
 
 Current-turn conversational-act reuse is correlated by the exact speech-event
-ID together with its structured stage, purpose, route, intent, and commitment.
+ID together with its turn, structured stage, purpose, route, intent,
+commitment, source Goal IDs, canonical Plan identity/fingerprint, delivery
+role, claim types, and completion-claim restriction. An event created before
+Goal Association remains explicitly unbound; the Host does not invent Goal or
+Plan provenance after delivery. Once an event is Goal-bound, a later response
+stage cannot reassign it to unrelated canonical Goals or a different Plan.
 Generated or scheduled state is not delivery evidence; only playback-started or
 completed state satisfies the audible act. A ResponseStage may reference a
 pending event without synthesizing a duplicate, and Runtime may fulfill that act
@@ -361,6 +366,15 @@ once if the referenced event becomes `not_delivered`. Text equality is checked
 only to preserve event payload integrity. Independent result, failure,
 limitation, clarification, confirmation, progress, and completion stages retain
 their own delivery obligations.
+
+Cross-lane awareness is a read-only projection of specialized evidence owners,
+not a second writable interaction-state authority. Playback lifecycle owns
+audible speech facts, `TaskProposalLedger` owns proposed and Host-committed
+Activity work, recent auxiliary-behavior evidence owns Social Attention
+cooldown/repetition facts, and `ExecutionOutcomeBundle` owns trusted Activity
+results. Response composition consumes the relevant projections, but a speech
+event can never become execution or completion evidence and no lane may append
+meaning to another owner's record.
 
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically

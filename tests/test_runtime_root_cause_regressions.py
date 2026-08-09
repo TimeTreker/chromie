@@ -684,6 +684,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         ResponseComposerResolver._validate_reused_turn_speech(
             reused_plan,
             context=scheduled_context,
+            plan=plan,
         )
         with self.assertRaisesRegex(ValueError, "requires an immediate"):
             ResponseComposerResolver._validate_safe_read_acknowledgement(
@@ -706,6 +707,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     )
                 ),
                 context=scheduled_context,
+                plan=plan,
             )
         # Literal text equality is not de-duplication authority. A new stage is
         # valid here because it does not claim to reuse the prior act identity.
@@ -720,7 +722,40 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 )
             ),
             context=scheduled_context,
+            plan=plan,
         )
+
+        goal_bound_context = {
+            **context,
+            "delivered_turn_speech": [
+                {
+                    "event_id": "speech_event_other_goal",
+                    "stage": "pre_action",
+                    "purpose": "acknowledge_and_check",
+                    "status": "playback_started",
+                    "text": "I will handle the other request.",
+                    "source_goal_ids": ["goal-other"],
+                    "canonical_plan_id": "plan-other",
+                    "canonical_plan_fingerprint": "fingerprint-other",
+                }
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "cannot be reassigned"):
+            ResponseComposerResolver._validate_reused_turn_speech(
+                ResponsePlan(
+                    immediate=ResponseStage(
+                        text="I will handle the other request.",
+                        speech_act="acknowledge_and_check",
+                        commitment_state="evaluating",
+                        must_not_claim_completion=True,
+                        reuse_current_turn_speech=True,
+                        reused_speech_event_id="speech_event_other_goal",
+                        covers_goal_ids=["goal-weather"],
+                    )
+                ),
+                context=goal_bound_context,
+                plan=plan,
+            )
 
     def test_deep_planner_cannot_silently_drop_parallel_timing(self) -> None:
         from agent.app.deep_planner import DeepPlannerResolver

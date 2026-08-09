@@ -1323,11 +1323,22 @@ correlated runtime evidence, and final speech requires reconciled terminal
 evidence.
 
 Response stages reuse earlier current-turn speech by exact speech-event ID and
-structured act fields, not text comparison. Only playback-started or completed
-events satisfy an audible act. A scheduled event remains pending; if it never
-becomes audible, Runtime may fulfill the referenced act once. This does not
-suppress independent result, failure, limitation, clarification, confirmation,
-progress, or completion responsibilities.
+structured act fields, not text comparison. The playback event preserves turn,
+source Goal IDs, canonical Plan identity/fingerprint, delivery role, claims,
+and the completion-claim restriction emitted by the Core. Pre-Goal Fast speech
+stays explicitly unbound; Goal-bound speech cannot later be reassigned to an
+unrelated Goal or Plan. Only playback-started or completed events satisfy an
+audible act. A scheduled event remains pending; if it never becomes audible,
+Runtime may fulfill the referenced act once. This does not suppress independent
+result, failure, limitation, clarification, confirmation, progress, or
+completion responsibilities.
+
+This cross-lane continuity does not create a general mutable interaction
+ledger. Speaking reads playback-qualified speech evidence, Activity reads
+`TaskProposalLedger` and trusted execution outcomes, Social Attention reads its
+bounded recent auxiliary-behavior evidence, and final composition reads the
+reconciled `ExecutionOutcomeBundle`. These owner-specific records may be
+projected together for cognition, but none substitutes for another authority.
 
 ### 15.2 Post-execution response
 

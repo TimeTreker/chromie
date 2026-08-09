@@ -32,6 +32,18 @@ unresolved effectful zero-step outcomes before canonical planning. Focused
 regressions pass 191/191, the applicable Level A classes pass 13/13, and the
 canonical gate passes; `docs/STATUS.md` owns the exact evidence limits.
 
+Issue [#22](https://github.com/TimeTreker/chromie/issues/22) is implemented as a
+stacked source change after #20. The originating cross-lane continuity proposal
+was mapped onto existing authorities rather than creating a second mutable
+interaction ledger. Core-authored speech now retains turn, Goal, canonical
+Plan, role, claim, and completion-restriction provenance through playback;
+Goal-bound events cannot be reused for unrelated Goals or Plans. Playback,
+`TaskProposalLedger`, recent auxiliary Social Attention evidence, and
+`ExecutionOutcomeBundle` remain the distinct speech, Activity proposal,
+auxiliary behavior, and trusted execution owners. Focused tests pass 135/135,
+the applicable Level A classes pass 25/25, and the canonical gate passes 102
+benchmarks, 2,156 maintained tests, and 20 legacy Agent tests.
+
 The earlier post-merge audit and paired closure are retained in
 `docs/STATUS.md`, their implementation/evidence authority. In summary, clean
 Chromie `a36444b` and Soridormi `fa8080d2` retained exact compound MuJoCo
@@ -83,8 +95,9 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-Publish and review Issue #20 without widening its fail-closed scope. Then
-qualify the RTX 4090 Laptop model-role change and retain a same-model warm/cold prefix measurement;
+Publish and review Issue #20 without widening its fail-closed scope, then review
+the stacked Issue #22 provenance closure. After both land, qualify the RTX 4090
+Laptop model-role change and retain a same-model warm/cold prefix measurement;
 separate prompt evaluation from model load and never call a repeated digest a
 provider cache hit.
 

@@ -808,6 +808,14 @@ class VoiceAssistant:
         route: str = "",
         intent: str = "",
         commitment: str = "",
+        turn_id: str | None = None,
+        source_goal_ids: list[str] | None = None,
+        canonical_plan_id: str = "",
+        canonical_plan_fingerprint: str = "",
+        goal_association_fingerprint: str = "",
+        delivery_role: str = "response",
+        claims: list[str] | None = None,
+        must_not_claim_completion: bool | None = None,
     ) -> dict[str, Any] | None:
         return self._playback_state().register_turn_speech_event(
             session_id=session_id,
@@ -819,6 +827,14 @@ class VoiceAssistant:
             route=route,
             intent=intent,
             commitment=commitment,
+            turn_id=turn_id,
+            source_goal_ids=source_goal_ids,
+            canonical_plan_id=canonical_plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint,
+            goal_association_fingerprint=goal_association_fingerprint,
+            delivery_role=delivery_role,
+            claims=claims,
+            must_not_claim_completion=must_not_claim_completion,
         )
 
     def _update_turn_speech_event_for_playback(
@@ -2214,6 +2230,49 @@ class VoiceAssistant:
                     str(metadata.get("commitment_state") or "")
                     if isinstance(metadata, dict)
                     else ""
+                ),
+                turn_id=(
+                    str(metadata.get("turn_id") or session_id or "")
+                    if isinstance(metadata, dict)
+                    else str(session_id or "")
+                ),
+                source_goal_ids=(
+                    list(metadata.get("source_goal_ids") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("source_goal_ids"), list)
+                    else []
+                ),
+                canonical_plan_id=(
+                    str(metadata.get("canonical_plan_id") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                canonical_plan_fingerprint=(
+                    str(metadata.get("canonical_plan_fingerprint") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                goal_association_fingerprint=(
+                    str(metadata.get("goal_association_fingerprint") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                delivery_role=(
+                    str(metadata.get("delivery_role") or "response")
+                    if isinstance(metadata, dict)
+                    else "response"
+                ),
+                claims=(
+                    list(metadata.get("claims") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("claims"), list)
+                    else []
+                ),
+                must_not_claim_completion=(
+                    metadata.get("must_not_claim_completion")
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("must_not_claim_completion"), bool)
+                    else None
                 ),
             )
             if speech_event is not None:
