@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 import time
 from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Literal, Protocol
+from typing import Any, Awaitable, Callable, Literal, Protocol
 
 from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field
@@ -45,6 +47,8 @@ from shared.chromie_contracts.user_turn import (
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 from orchestrator.runtime.evidence_identity import runtime_identity_reference
+
+logger = logging.getLogger(__name__)
 
 CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
 CognitiveRuntimeStatus = Literal[
@@ -1866,6 +1870,7 @@ class GoalDrivenRuntimeCoordinator:
         context_refresh: Callable[[], dict[str, Any]] | None = None,
         delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
         interaction_ledger: Any | None = None,
+        workflow_stage_sink: Callable[..., None] | None = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
@@ -1873,11 +1878,144 @@ class GoalDrivenRuntimeCoordinator:
         self.goal_state_apply = goal_state_apply
         self.context_refresh = context_refresh
         self.delivered_turn_speech_provider = delivered_turn_speech_provider
+        self.workflow_stage_sink = workflow_stage_sink
         self.interaction_ledger = interaction_ledger or getattr(
             getattr(adapter, "interaction_runtime", None),
             "interaction_ledger",
             None,
         )
+
+    @staticmethod
+    def _workflow_output_status(output: Any) -> str:
+        metadata = getattr(output, "metadata", None)
+        if isinstance(metadata, dict):
+            metadata_status = str(metadata.get("status") or "").strip()
+            if metadata_status:
+                return metadata_status
+            if metadata.get("failure_class"):
+                return "failed"
+        status = str(getattr(output, "status", "") or "").strip()
+        if status:
+            return status
+        disposition = str(getattr(output, "disposition", "") or "").strip()
+        if disposition == "escalate":
+            return "escalated"
+        return "accepted"
+
+    @staticmethod
+    def _workflow_output_errors(output: Any) -> list[Any]:
+        metadata = getattr(output, "metadata", None)
+        if not isinstance(metadata, dict):
+            return []
+        errors: list[Any] = []
+        for key in (
+            "error",
+            "initial_validation_errors",
+            "validation_feedback",
+            "stage_diagnostics",
+        ):
+            value = metadata.get(key)
+            if value not in (None, "", [], {}):
+                errors.append({key: value})
+        return errors
+
+    def _record_workflow_stage(
+        self,
+        *,
+        sid: str,
+        stage: str,
+        started_monotonic_ms: float,
+        finished_monotonic_ms: float,
+        status: str,
+        input_payload: Any,
+        output_payload: Any,
+        errors: list[Any],
+        attempt: int,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if self.workflow_stage_sink is None:
+            return
+        try:
+            self.workflow_stage_sink(
+                sid,
+                stage=stage,
+                started_monotonic_ms=started_monotonic_ms,
+                finished_monotonic_ms=finished_monotonic_ms,
+                status=status,
+                input_payload=input_payload,
+                output_payload=output_payload,
+                errors=errors,
+                attempt=attempt,
+                metadata=metadata,
+            )
+        except Exception as exc:
+            # Evidence capture must never change cognitive execution semantics.
+            logger.warning(
+                "Could not retain cognitive workflow stage %s: %s",
+                stage,
+                exc,
+            )
+            return
+
+    async def _observe_workflow_stage(
+        self,
+        *,
+        sid: str,
+        stage: str,
+        input_payload: Any,
+        operation: Awaitable[Any],
+        attempt: int = 1,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
+        started_monotonic_ms = time.perf_counter() * 1000.0
+        try:
+            output = await operation
+        except asyncio.CancelledError:
+            self._record_workflow_stage(
+                sid=sid,
+                stage=stage,
+                started_monotonic_ms=started_monotonic_ms,
+                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                status="cancelled",
+                input_payload=input_payload,
+                output_payload=None,
+                errors=[{"reason": "operation_cancelled"}],
+                attempt=attempt,
+                metadata=metadata,
+            )
+            raise
+        except Exception as exc:
+            self._record_workflow_stage(
+                sid=sid,
+                stage=stage,
+                started_monotonic_ms=started_monotonic_ms,
+                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                status="failed",
+                input_payload=input_payload,
+                output_payload=None,
+                errors=[
+                    {
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    }
+                ],
+                attempt=attempt,
+                metadata=metadata,
+            )
+            raise
+        self._record_workflow_stage(
+            sid=sid,
+            stage=stage,
+            started_monotonic_ms=started_monotonic_ms,
+            finished_monotonic_ms=time.perf_counter() * 1000.0,
+            status=self._workflow_output_status(output),
+            input_payload=input_payload,
+            output_payload=output,
+            errors=self._workflow_output_errors(output),
+            attempt=attempt,
+            metadata=metadata,
+        )
+        return output
 
     @staticmethod
     def _context_turn_id(context: dict[str, Any], sid: str) -> str:
@@ -2340,14 +2478,24 @@ class GoalDrivenRuntimeCoordinator:
 
         try:
             stage = time.perf_counter()
-            association = await self.agent_client.resolve_goal_association(
-                session,
-                text=text,
-                route_decision=route_decision,
+            association = await self._observe_workflow_stage(
                 sid=sid,
-                context=context,
-                history=history,
-                timeout_ms=self.policy.goal_association_timeout_ms,
+                stage="goal_association",
+                input_payload={
+                    "user_text": text,
+                    "route_decision": route_decision,
+                    "active_goal_snapshots": context.get("active_goal_snapshots", []),
+                    "history_turn_count": len(history),
+                },
+                operation=self.agent_client.resolve_goal_association(
+                    session,
+                    text=text,
+                    route_decision=route_decision,
+                    sid=sid,
+                    context=context,
+                    history=history,
+                    timeout_ms=self.policy.goal_association_timeout_ms,
+                ),
             )
             timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
             association_status = str((association.metadata or {}).get("status") or "resolved")
@@ -2385,6 +2533,7 @@ class GoalDrivenRuntimeCoordinator:
                 if has_named_goal_cancellation:
                     goal_state_commit_stage = "deferred_named_goal_cancellation"
                 else:
+                    commit_started_ms = time.perf_counter() * 1000.0
                     try:
                         goal_state_results = self.goal_state_apply(
                             association,
@@ -2395,6 +2544,22 @@ class GoalDrivenRuntimeCoordinator:
                             source=("goal_driven_cognitive_runtime_goal_association"),
                         )
                     except Exception as exc:
+                        self._record_workflow_stage(
+                            sid=sid,
+                            stage="goal_state_commit",
+                            started_monotonic_ms=commit_started_ms,
+                            finished_monotonic_ms=time.perf_counter() * 1000.0,
+                            status="failed",
+                            input_payload={"goal_association": association},
+                            output_payload=None,
+                            errors=[
+                                {
+                                    "error_type": type(exc).__name__,
+                                    "error": str(exc),
+                                }
+                            ],
+                            attempt=1,
+                        )
                         raise CognitiveStageFailure(
                             "goal_association_commit",
                             {
@@ -2406,6 +2571,17 @@ class GoalDrivenRuntimeCoordinator:
                                 "error": str(exc)[:300],
                             },
                         ) from exc
+                    self._record_workflow_stage(
+                        sid=sid,
+                        stage="goal_state_commit",
+                        started_monotonic_ms=commit_started_ms,
+                        finished_monotonic_ms=time.perf_counter() * 1000.0,
+                        status="accepted",
+                        input_payload={"goal_association": association},
+                        output_payload={"goal_state_results": goal_state_results},
+                        errors=[],
+                        attempt=1,
+                    )
                     rejected = [
                         item
                         for item in goal_state_results
@@ -2517,14 +2693,24 @@ class GoalDrivenRuntimeCoordinator:
                         dict(item) for item in delivered_turn_speech if isinstance(item, dict)
                     ]
                     stage = time.perf_counter()
-                    composition_resolution = await self.agent_client.compose_response_plan(
-                        session,
-                        text=text,
-                        route_decision=route_decision,
+                    composition_resolution = await self._observe_workflow_stage(
                         sid=sid,
-                        context=composition_context,
-                        history=history,
-                        timeout_ms=(self.policy.response_composer_timeout_ms),
+                        stage="response_composer",
+                        input_payload={
+                            "user_text": text,
+                            "goal_association": association,
+                            "direct_response": True,
+                            "delivered_turn_speech": delivered_turn_speech,
+                        },
+                        operation=self.agent_client.compose_response_plan(
+                            session,
+                            text=text,
+                            route_decision=route_decision,
+                            sid=sid,
+                            context=composition_context,
+                            history=history,
+                            timeout_ms=(self.policy.response_composer_timeout_ms),
+                        ),
                     )
                     timings["response_composer"] = (time.perf_counter() - stage) * 1000.0
                     if composition_resolution.status != "resolved" or not isinstance(
@@ -2561,11 +2747,19 @@ class GoalDrivenRuntimeCoordinator:
                                 },
                             )
                         stage = time.perf_counter()
-                        interaction = await self.adapter.build_direct_response(
-                            composition=(composition_resolution.composition),
-                            session_id=sid,
-                            language=language,
-                            context=composition_context,
+                        interaction = await self._observe_workflow_stage(
+                            sid=sid,
+                            stage="runtime_adapter",
+                            input_payload={
+                                "goal_association": association,
+                                "response_composition": composition_resolution,
+                            },
+                            operation=self.adapter.build_direct_response(
+                                composition=(composition_resolution.composition),
+                                session_id=sid,
+                                language=language,
+                                context=composition_context,
+                            ),
                         )
                         timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
                         if goal_state_commit_stage == "goal_association":
@@ -2608,14 +2802,26 @@ class GoalDrivenRuntimeCoordinator:
                     )
 
                 stage = time.perf_counter()
-                fast_plan = await self.agent_client.resolve_fast_plan(
-                    session,
-                    text=text,
-                    route_decision=route_decision,
+                fast_plan = await self._observe_workflow_stage(
                     sid=sid,
-                    context=planning_context,
-                    history=history,
-                    timeout_ms=self.policy.fast_planner_timeout_ms,
+                    stage="fast_planner",
+                    input_payload={
+                        "user_text": text,
+                        "route_decision": route_decision,
+                        "goal_association": association,
+                        "interaction_context": planning_context.get(
+                            "interaction_context", {}
+                        ),
+                    },
+                    operation=self.agent_client.resolve_fast_plan(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=planning_context,
+                        history=history,
+                        timeout_ms=self.policy.fast_planner_timeout_ms,
+                    ),
                 )
                 timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
                 fast_failure = self._optional_stage_failure_metadata(
@@ -2648,14 +2854,27 @@ class GoalDrivenRuntimeCoordinator:
                         ]
                     deep_context["deep_planner_invocation_reason"] = deep_reason
                     stage = time.perf_counter()
-                    terminal_plan = await self.agent_client.resolve_deep_plan(
-                        session,
-                        text=text,
-                        route_decision=route_decision,
+                    terminal_plan = await self._observe_workflow_stage(
                         sid=sid,
-                        context=deep_context,
-                        history=history,
-                        timeout_ms=self.policy.deep_planner_timeout_ms,
+                        stage="deep_planner",
+                        input_payload={
+                            "user_text": text,
+                            "goal_association": association,
+                            "fast_plan": fast_plan,
+                            "validation_feedback": deep_context.get(
+                                "runtime_validator_feedback", []
+                            ),
+                            "invocation_reason": deep_reason,
+                        },
+                        operation=self.agent_client.resolve_deep_plan(
+                            session,
+                            text=text,
+                            route_decision=route_decision,
+                            sid=sid,
+                            context=deep_context,
+                            history=history,
+                            timeout_ms=self.policy.deep_planner_timeout_ms,
+                        ),
                     )
                     timings["deep_planner"] = (time.perf_counter() - stage) * 1000.0
                     deep_failure = self._optional_stage_failure_metadata(
@@ -2690,7 +2909,26 @@ class GoalDrivenRuntimeCoordinator:
                         **path_metadata(),
                     },
                 )
-            runtime_errors = await self.adapter.validation_errors(terminal_plan)
+            runtime_errors = await self._observe_workflow_stage(
+                sid=sid,
+                stage="canonical_plan_validation",
+                input_payload={"canonical_plan": terminal_plan},
+                operation=self.adapter.validation_errors(terminal_plan),
+                metadata={"phase": "pre_dispatch"},
+            )
+            if runtime_errors:
+                self._record_workflow_stage(
+                    sid=sid,
+                    stage="canonical_plan_rejection",
+                    started_monotonic_ms=time.perf_counter() * 1000.0,
+                    finished_monotonic_ms=time.perf_counter() * 1000.0,
+                    status="rejected",
+                    input_payload={"canonical_plan": terminal_plan},
+                    output_payload={"validation_errors": runtime_errors},
+                    errors=list(runtime_errors),
+                    attempt=1,
+                    metadata={"dispatch_allowed": False},
+                )
             replan_count = 0
             while runtime_errors and replan_count < self.policy.host_replan_budget:
                 replan_count += 1
@@ -2705,14 +2943,26 @@ class GoalDrivenRuntimeCoordinator:
                 deep_context["deep_planner_invocation_reason"] = "host_replan"
                 deep_planner_invocation_reasons.append("host_replan")
                 stage = time.perf_counter()
-                terminal_plan = await self.agent_client.resolve_deep_plan(
-                    session,
-                    text=text,
-                    route_decision=route_decision,
+                terminal_plan = await self._observe_workflow_stage(
                     sid=sid,
-                    context=deep_context,
-                    history=history,
-                    timeout_ms=self.policy.deep_planner_timeout_ms,
+                    stage="deep_planner",
+                    input_payload={
+                        "user_text": text,
+                        "goal_association": association,
+                        "fast_plan": fast_plan,
+                        "validation_feedback": runtime_errors,
+                        "invocation_reason": "host_replan",
+                    },
+                    operation=self.agent_client.resolve_deep_plan(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=deep_context,
+                        history=history,
+                        timeout_ms=self.policy.deep_planner_timeout_ms,
+                    ),
+                    attempt=replan_count + 1,
                 )
                 timings[f"runtime_replan_{replan_count}"] = (time.perf_counter() - stage) * 1000.0
                 deep_failure = self._optional_stage_failure_metadata(
@@ -2745,7 +2995,27 @@ class GoalDrivenRuntimeCoordinator:
                             **path_metadata(),
                         },
                     )
-                runtime_errors = await self.adapter.validation_errors(terminal_plan)
+                runtime_errors = await self._observe_workflow_stage(
+                    sid=sid,
+                    stage="canonical_plan_validation",
+                    input_payload={"canonical_plan": terminal_plan},
+                    operation=self.adapter.validation_errors(terminal_plan),
+                    attempt=replan_count + 1,
+                    metadata={"phase": "host_replan"},
+                )
+                if runtime_errors:
+                    self._record_workflow_stage(
+                        sid=sid,
+                        stage="canonical_plan_rejection",
+                        started_monotonic_ms=time.perf_counter() * 1000.0,
+                        finished_monotonic_ms=time.perf_counter() * 1000.0,
+                        status="rejected",
+                        input_payload={"canonical_plan": terminal_plan},
+                        output_payload={"validation_errors": runtime_errors},
+                        errors=list(runtime_errors),
+                        attempt=replan_count + 1,
+                        metadata={"dispatch_allowed": False},
+                    )
             if runtime_errors:
                 raise ValueError(
                     "runtime validation rejected canonical plan: "
@@ -2814,14 +3084,26 @@ class GoalDrivenRuntimeCoordinator:
                 dict(item) for item in delivered_turn_speech if isinstance(item, dict)
             ]
             stage = time.perf_counter()
-            composition_resolution = await self.agent_client.compose_response_plan(
-                session,
-                text=text,
-                route_decision=route_decision,
+            composition_resolution = await self._observe_workflow_stage(
                 sid=sid,
-                context=composition_context,
-                history=history,
-                timeout_ms=self.policy.response_composer_timeout_ms,
+                stage="response_composer",
+                input_payload={
+                    "user_text": text,
+                    "canonical_plan": terminal_plan,
+                    "execution_capabilities": composition_context.get(
+                        "execution_capabilities", []
+                    ),
+                    "delivered_turn_speech": delivered_turn_speech,
+                },
+                operation=self.agent_client.compose_response_plan(
+                    session,
+                    text=text,
+                    route_decision=route_decision,
+                    sid=sid,
+                    context=composition_context,
+                    history=history,
+                    timeout_ms=self.policy.response_composer_timeout_ms,
+                ),
             )
             timings["response_composer"] = (time.perf_counter() - stage) * 1000.0
             if (
@@ -2861,12 +3143,20 @@ class GoalDrivenRuntimeCoordinator:
                         },
                     )
                 stage = time.perf_counter()
-                interaction = await self.adapter.build_response(
-                    plan=terminal_plan,
-                    composition=composition_resolution.composition,
-                    session_id=sid,
-                    language=language,
-                    context=composition_context,
+                interaction = await self._observe_workflow_stage(
+                    sid=sid,
+                    stage="runtime_adapter",
+                    input_payload={
+                        "canonical_plan": terminal_plan,
+                        "response_composition": composition_resolution,
+                    },
+                    operation=self.adapter.build_response(
+                        plan=terminal_plan,
+                        composition=composition_resolution.composition,
+                        session_id=sid,
+                        language=language,
+                        context=composition_context,
+                    ),
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
                 if goal_state_commit_stage == "goal_association":

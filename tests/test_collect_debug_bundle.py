@@ -23,8 +23,16 @@ class CollectDebugBundleTest(unittest.TestCase):
             bin_dir = Path(temp_dir) / "bin"
             scripts_dir = root / "scripts"
             voice_logs = root / ".chromie" / "voice-mujoco" / "logs"
+            workflow_reports = (
+                root
+                / ".chromie"
+                / "evidence"
+                / "cognitive-runtime"
+                / "session-workflows"
+            )
             scripts_dir.mkdir(parents=True)
             voice_logs.mkdir(parents=True)
+            workflow_reports.mkdir(parents=True)
             home.mkdir()
             bin_dir.mkdir()
 
@@ -39,6 +47,14 @@ class CollectDebugBundleTest(unittest.TestCase):
             )
             (root / ".chromie" / "voice-mujoco" / "run.env").write_text(
                 "SORIDORMI_REPO=/tmp/soridormi\nSORIDORMI_TOKEN=secret\n",
+                encoding="utf-8",
+            )
+            (workflow_reports / "20260810-session1.json").write_text(
+                '{"schema_version":1,"sid":"session1"}\n',
+                encoding="utf-8",
+            )
+            (workflow_reports / "20260810-session1.md").write_text(
+                "# Session workflow\n",
                 encoding="utf-8",
             )
 
@@ -121,6 +137,8 @@ class CollectDebugBundleTest(unittest.TestCase):
                     f"{bundle_root}/soridormi_docker_containers.txt",
                     f"{bundle_root}/voice_mujoco_run.env.redacted.txt",
                     f"{bundle_root}/llm_calls.jsonl",
+                    f"{bundle_root}/session-workflows/20260810-session1.json",
+                    f"{bundle_root}/session-workflows/20260810-session1.md",
                 }
                 self.assertTrue(expected.issubset(members))
 

@@ -85,6 +85,14 @@ def build_host_support(
     sessions = SessionTracker(
         enabled=timing_enabled,
         event_log_path=settings.session.event_log_path,
+        workflow_report_root=(
+            settings.evidence.cognitive_path.parent / "session-workflows"
+            if settings.evidence.cognitive_enabled
+            else None
+        ),
+        workflow_report_include_text=(
+            settings.evidence.cognitive_include_text
+        ),
         resource_sampling_mode=telemetry.system_resource_mode,
         interaction_session_capture=interaction_session_capture,
     )

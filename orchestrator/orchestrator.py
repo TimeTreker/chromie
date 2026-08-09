@@ -102,7 +102,7 @@ from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingPolicy,
     execute_default_runtime_ready_orientation,
 )
-from orchestrator.runtime.session import now_ms
+from orchestrator.runtime.session import now_ms, record_session_workflow_stage
 from shared.chromie_runtime.accelerator_telemetry import (
     ACCELERATOR_SAMPLE_MODULE,
 )
@@ -683,6 +683,7 @@ class VoiceAssistant:
             # canonical-plan/runtime boundary.
             goal_state_apply=self._apply_cognitive_goal_association_stage,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
+            workflow_stage_sink=host_support.sessions.record_cognitive_stage,
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
@@ -4255,6 +4256,21 @@ class VoiceAssistant:
             safe_response = self._agent_exception_safe_response(
                 decision, user_text=user_text
             )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="fallback_speech",
+                started_monotonic_ms=now_ms(),
+                finished_monotonic_ms=now_ms(),
+                status="selected",
+                input_payload={
+                    "failure_stage": "authority_boundary",
+                    "fallback_reason": resolution.fallback_reason,
+                    "user_text": user_text,
+                },
+                output_payload=safe_response,
+                errors=[],
+            )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -4310,6 +4326,7 @@ class VoiceAssistant:
         decision = decision.model_copy(update={"metadata": metadata})
 
         if resolution.status != "applied" or resolution.interaction_response is None:
+            fallback_started_ms = now_ms()
             hedge_scheduled = await self._settle_fast_first_audio_hedge(
                 fast_first_hedge,
                 decision=decision,
@@ -4339,6 +4356,22 @@ class VoiceAssistant:
                     style="warning",
                     source="host_cognitive_runtime_fail_closed",
                 )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="fallback_speech",
+                started_monotonic_ms=fallback_started_ms,
+                finished_monotonic_ms=now_ms(),
+                status="selected",
+                input_payload={
+                    "cognitive_runtime_status": resolution.status,
+                    "failure_stage": resolution.metadata.get("failure_stage"),
+                    "fallback_reason": resolution.fallback_reason,
+                    "user_text": user_text,
+                },
+                output_payload=safe_response,
+                errors=list(resolution.metadata.get("stage_diagnostics") or []),
+            )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -4541,6 +4574,23 @@ class VoiceAssistant:
                     style="warning",
                     source="host_cognitive_runtime_commit_failure",
                 )
+            )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="fallback_speech",
+                started_monotonic_ms=now_ms(),
+                finished_monotonic_ms=now_ms(),
+                status="selected",
+                input_payload={
+                    "failure_stage": "host_commit",
+                    "fallback_reason": resolution.fallback_reason,
+                    "user_text": user_text,
+                },
+                output_payload=safe_response,
+                errors=[
+                    {"error_type": type(exc).__name__, "error": str(exc)}
+                ],
             )
             self.conversation_state.record_user_turn(
                 session_id,
@@ -5210,6 +5260,8 @@ class VoiceAssistant:
             turn_capture,
             context_snapshot,
         )
+        attention_started_ms = now_ms()
+        attention_errors: list[dict[str, str]] = []
         try:
             review_attention = self.agent_client.review_attention
             attention_review = await review_attention(
@@ -5217,6 +5269,9 @@ class VoiceAssistant:
                 request=attention_request,
             )
         except Exception as exc:
+            attention_errors.append(
+                {"error_type": type(exc).__name__, "error": str(exc)}
+            )
             logger.warning(
                 "Cognitive Gateway attention review failed open: %s",
                 exc,
@@ -5225,6 +5280,20 @@ class VoiceAssistant:
                 attention_request,
                 reason=f"attention review unavailable: {type(exc).__name__}",
             )
+        record_session_workflow_stage(
+            self,
+            session_id,
+            stage="cognitive_gateway_attention",
+            started_monotonic_ms=attention_started_ms,
+            finished_monotonic_ms=now_ms(),
+            status=("failed_open" if attention_errors else "accepted"),
+            input_payload={
+                "user_turn": turn_capture,
+                "context_snapshot": context_snapshot,
+            },
+            output_payload=attention_review,
+            errors=attention_errors,
+        )
         turn_envelope = gateway.admit_attention(
             turn_capture,
             context_snapshot,
@@ -5299,7 +5368,40 @@ class VoiceAssistant:
                 core_interpretation.authority,
                 core_interpretation.projection_digest[:12],
             )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="goal_interpretation",
+                started_monotonic_ms=core_start_ms,
+                finished_monotonic_ms=now_ms(),
+                status="accepted",
+                input_payload={
+                    "user_turn_envelope": turn_envelope,
+                    "context_snapshot": context_snapshot,
+                },
+                output_payload={
+                    "core_interpretation": core_interpretation,
+                    "route_decision": decision,
+                },
+                errors=[],
+            )
         except Exception as exc:
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="goal_interpretation",
+                started_monotonic_ms=core_start_ms,
+                finished_monotonic_ms=now_ms(),
+                status="failed",
+                input_payload={
+                    "user_turn_envelope": turn_envelope,
+                    "context_snapshot": context_snapshot,
+                },
+                output_payload=None,
+                errors=[
+                    {"error_type": type(exc).__name__, "error": str(exc)}
+                ],
+            )
             self.session_log(session_id, "cognitive_core_exception: core_ms=%.1f error=%s", now_ms() - core_start_ms, exc)
             logger.warning("Cognitive Core interpretation failed; falling back safely: %s", exc)
             safe_response = self._cognitive_core_exception_safe_response(
@@ -5321,6 +5423,22 @@ class VoiceAssistant:
                 "cognitive_core_exception_safe_fallback: embodied=%s text=%r",
                 bool(safe_response.metadata.get("embodied_request")),
                 user_text,
+            )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="fallback_speech",
+                started_monotonic_ms=now_ms(),
+                finished_monotonic_ms=now_ms(),
+                status="selected",
+                input_payload={
+                    "failure_stage": "goal_interpretation",
+                    "user_text": user_text,
+                },
+                output_payload=safe_response,
+                errors=[
+                    {"error_type": type(exc).__name__, "error": str(exc)}
+                ],
             )
             self.conversation_state.record_agent_result(session_id, safe_response)
             self._launch_interaction(safe_response, session_id)
@@ -7908,10 +8026,82 @@ class VoiceAssistant:
         provider_status: dict[str, Any] | None = None
         cognitive_closure_attempted = False
         try:
-            execution = await self.interaction_runtime.execute(
-                response,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
+            runtime_input = {
+                "interaction_response": response,
+                "confirmed_request_ids": sorted(confirmed_request_ids or []),
+                "execution_generation": execution_generation,
+            }
+            try:
+                execution = await self.interaction_runtime.execute(
+                    response,
+                    session_id=session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                )
+            except asyncio.CancelledError:
+                record_session_workflow_stage(
+                    self,
+                    session_id,
+                    stage="trusted_capability_runtime",
+                    started_monotonic_ms=started_ms,
+                    finished_monotonic_ms=now_ms(),
+                    status="cancelled",
+                    input_payload=runtime_input,
+                    output_payload=None,
+                    errors=[{"reason": "interaction_cancelled"}],
+                    metadata={
+                        "request_count": len(response.skills),
+                        "provider_start_observed": False,
+                    },
+                )
+                raise
+            except Exception as exc:
+                record_session_workflow_stage(
+                    self,
+                    session_id,
+                    stage="trusted_capability_runtime",
+                    started_monotonic_ms=started_ms,
+                    finished_monotonic_ms=now_ms(),
+                    status="failed",
+                    input_payload=runtime_input,
+                    output_payload=None,
+                    errors=[
+                        {"error_type": type(exc).__name__, "error": str(exc)}
+                    ],
+                    metadata={
+                        "request_count": len(response.skills),
+                        "provider_start_observed": False,
+                    },
+                )
+                raise
+            provider_start_observed = any(
+                event.type == "started"
+                for trace in execution.traces
+                for event in trace.events
+            )
+            record_session_workflow_stage(
+                self,
+                session_id,
+                stage="trusted_capability_runtime",
+                started_monotonic_ms=started_ms,
+                finished_monotonic_ms=now_ms(),
+                status=execution.status,
+                input_payload=runtime_input,
+                output_payload=execution,
+                errors=[
+                    {
+                        "request_id": result.request_id,
+                        "capability_id": result.capability_id,
+                        "status": result.status,
+                        "reason_code": result.reason_code,
+                        "message": result.message,
+                    }
+                    for result in execution.results
+                    if result.status not in {"completed", "success"}
+                ],
+                metadata={
+                    "request_count": len(response.skills),
+                    "provider_start_observed": provider_start_observed,
+                },
             )
             self.session_log(
                 session_id,

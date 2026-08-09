@@ -7,10 +7,239 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from orchestrator.runtime.session import SessionTracker
+from orchestrator.runtime.session import SessionTracker, now_ms
 
 
 class SessionEvidenceTests(unittest.TestCase):
+    def test_finished_session_writes_structured_and_human_workflow_reports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tracker = SessionTracker(
+                event_log_path=root / "events.jsonl",
+                workflow_report_root=root / "session-workflows",
+                workflow_report_include_text=True,
+            )
+            sid = tracker.create()
+            tracker.update_trace_correlations(
+                sid,
+                conversation_id="conversation-7",
+                turn_id="turn-2",
+            )
+            tracker.log(
+                sid,
+                "asr_final: asr_ms=%.1f text_chars=%s text=%r",
+                18.0,
+                11,
+                "Please walk",
+            )
+            started = now_ms()
+            tracker.record_cognitive_stage(
+                sid,
+                stage="asr",
+                started_monotonic_ms=started,
+                finished_monotonic_ms=started + 18.0,
+                status="accepted",
+                input_payload={"audio_duration_ms": 900.0},
+                output_payload={"user_text": "Please walk"},
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="goal_association",
+                started_monotonic_ms=started + 19.0,
+                finished_monotonic_ms=started + 29.0,
+                status="resolved",
+                input_payload={"user_text": "Please walk"},
+                output_payload={"disposition": "new_goal", "goal_id": "goal-1"},
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="canonical_plan_rejection",
+                started_monotonic_ms=started + 30.0,
+                finished_monotonic_ms=started + 31.0,
+                status="rejected",
+                input_payload={"canonical_plan": {"plan_id": "plan-1"}},
+                output_payload={"validation_errors": ["numeric mismatch"]},
+                errors=["numeric mismatch"],
+                metadata={"dispatch_allowed": False},
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="fallback_speech",
+                started_monotonic_ms=started + 32.0,
+                finished_monotonic_ms=started + 33.0,
+                status="selected",
+                input_payload={"failure_stage": "canonical_plan_validation"},
+                output_payload={"speech": "I could not safely dispatch that plan."},
+            )
+            tracker.state[sid]["llm_done"] = True
+
+            tracker.maybe_done(sid)
+
+            json_paths = list(
+                (root / "session-workflows").glob(f"*-{sid}.json")
+            )
+            markdown_paths = list(
+                (root / "session-workflows").glob(f"*-{sid}.md")
+            )
+            self.assertEqual(len(json_paths), 1)
+            self.assertEqual(len(markdown_paths), 1)
+            report = json.loads(json_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(report["sid"], sid)
+            self.assertEqual(report["termination_state"], "complete")
+            self.assertEqual(
+                report["correlations"]["conversation_id"],
+                "conversation-7",
+            )
+            self.assertEqual(
+                [stage["stage"] for stage in report["cognitive_stages"]],
+                [
+                    "asr",
+                    "goal_association",
+                    "canonical_plan_rejection",
+                    "fallback_speech",
+                ],
+            )
+            self.assertTrue(report["outcome"]["dispatch_blocked_before_provider"])
+            self.assertFalse(report["outcome"]["provider_start_observed"])
+            self.assertEqual(
+                report["cognitive_stages"][0]["output"]["user_text"],
+                "Please walk",
+            )
+            markdown = markdown_paths[0].read_text(encoding="utf-8")
+            self.assertIn("Goal Association [resolved]", markdown)
+            self.assertIn("Canonical Plan Rejection [rejected]", markdown)
+            self.assertIn("          ▼", markdown)
+            self.assertIn("Please walk", markdown)
+            self.assertIn("dispatch_blocked_before_provider", markdown)
+
+    def test_conversation_workflow_rollup_combines_multiple_finished_sids(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_root = Path(temp_dir) / "session-workflows"
+            tracker = SessionTracker(
+                workflow_report_root=report_root,
+                workflow_report_include_text=True,
+            )
+            for index, user_text in enumerate(("First turn", "Why did it fail?")):
+                sid = tracker.create()
+                tracker.update_trace_correlations(
+                    sid,
+                    conversation_id="conversation-shared",
+                    turn_id=f"turn-{index + 1}",
+                )
+                started = now_ms()
+                tracker.record_cognitive_stage(
+                    sid,
+                    stage="goal_association",
+                    started_monotonic_ms=started,
+                    finished_monotonic_ms=started + 1.0,
+                    status="resolved",
+                    input_payload={"user_text": user_text},
+                    output_payload={"disposition": "continue"},
+                )
+                tracker.state[sid]["llm_done"] = True
+                tracker.maybe_done(sid)
+
+            rollup_path = next(
+                report_root.glob("conversation-conversation-shared-*.json")
+            )
+            markdown_path = next(
+                report_root.glob("conversation-conversation-shared-*.md")
+            )
+            rollup = json.loads(rollup_path.read_text(encoding="utf-8"))
+            self.assertEqual(rollup["session_count"], 2)
+            self.assertEqual(
+                [
+                    item["cognitive_stages"][0]["input"]["user_text"]
+                    for item in rollup["sessions"]
+                ],
+                ["First turn", "Why did it fail?"],
+            )
+            markdown = markdown_path.read_text(encoding="utf-8")
+            self.assertIn("Turn 1", markdown)
+            self.assertIn("Turn 2", markdown)
+            self.assertIn("Why did it fail?", markdown)
+
+    def test_workflow_report_redacts_text_from_stages_and_runtime_timeline(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            tracker = SessionTracker(
+                workflow_report_root=root / "session-workflows",
+                workflow_report_include_text=False,
+            )
+            sid = tracker.create()
+            tracker.log(
+                sid,
+                "asr_final: asr_ms=1.0 text_chars=18 text=%r",
+                "private family fact",
+            )
+            started = now_ms()
+            tracker.record_cognitive_stage(
+                sid,
+                stage="response_composer",
+                started_monotonic_ms=started,
+                finished_monotonic_ms=started + 1.0,
+                status="accepted",
+                input_payload={
+                    "user_text": "private family fact",
+                    "args": {"recipient": "private person"},
+                },
+                output_payload={"speech": "private response"},
+                errors=[{"error": "private model diagnostic"}],
+            )
+            tracker.state[sid]["llm_done"] = True
+
+            tracker.maybe_done(sid)
+
+            report_path = next((root / "session-workflows").glob("*.json"))
+            markdown_path = next((root / "session-workflows").glob("*.md"))
+            report_text = report_path.read_text(encoding="utf-8")
+            markdown = markdown_path.read_text(encoding="utf-8")
+            for private_text in (
+                "private family fact",
+                "private person",
+                "private response",
+                "private model diagnostic",
+            ):
+                self.assertNotIn(private_text, report_text)
+                self.assertNotIn(private_text, markdown)
+            report = json.loads(report_text)
+            stage = report["cognitive_stages"][0]
+            self.assertTrue(stage["input"]["user_text"]["redacted"])
+            self.assertTrue(stage["input"]["args"]["recipient"]["redacted"])
+            self.assertTrue(report["runtime_timeline"][1]["message"]["redacted"])
+
+    def test_interrupted_session_writes_one_abandoned_workflow_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_root = Path(temp_dir) / "session-workflows"
+            tracker = SessionTracker(workflow_report_root=report_root)
+            first_sid = tracker.create()
+            tracker.record_cognitive_stage(
+                first_sid,
+                stage="goal_association",
+                started_monotonic_ms=now_ms(),
+                finished_monotonic_ms=now_ms(),
+                status="cancelled",
+                errors=[{"reason": "newer_session"}],
+            )
+
+            tracker.create()
+            tracker.finalize_active_sessions(reason="test_shutdown")
+
+            matching = list(report_root.glob(f"*-{first_sid}.json"))
+            self.assertEqual(len(matching), 1)
+            report = json.loads(matching[0].read_text(encoding="utf-8"))
+            self.assertEqual(report["termination_state"], "abandoned")
+            self.assertEqual(
+                report["cognitive_stages"][0]["status"],
+                "cancelled",
+            )
+
     def test_session_tracker_writes_correlated_jsonl_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "events.jsonl"

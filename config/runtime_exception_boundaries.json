@@ -1363,6 +1363,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "record_session_workflow_stage",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.session",
+      "contract": "Keep optional Session workflow evidence from changing ASR, cognition, fallback, or execution behavior while retaining a visible warning when the real recorder fails.",
+      "review_status": "reviewed",
+      "body_sha256": "7c1d3718a57f4fc602bc2e8723075b6a4526e3d9037f972676bc340c73b55b22",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._record_soridormi_post_status",
       "ordinal": 1,
@@ -1552,7 +1565,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "cc1f55296180d226afa3e79c1e8b90cb773bb0501a9da41ee6289700e855ff21",
+      "body_sha256": "b53054b7fa71bf1b07d302c2e5a707aa87894d11ad85462572403760c6d89e18",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1602,6 +1615,19 @@
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant.execute_interaction_response",
       "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator",
+      "contract": "Retain the Trusted Capability Runtime failure as workflow evidence, then re-raise it unchanged to the existing fail-closed owner.",
+      "review_status": "reviewed",
+      "body_sha256": "cec30bb54cec8c713c555cf9bb28a918f20159866656403746c5a830f485e751",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant.execute_interaction_response",
+      "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -1614,7 +1640,7 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 2,
+      "ordinal": 3,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -1630,7 +1656,7 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant.execute_interaction_response",
-      "ordinal": 3,
+      "ordinal": 4,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
@@ -1661,7 +1687,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "153a82c3731ce29e96d922946dcde4d57848620b4041b15653e8a71eaf3db6b3",
+      "body_sha256": "d2f7f61261caeb4d27302942be1afba831e1069474f017d5fbdedf93541b0f06",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -1675,7 +1701,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "b12d01f556f8f59d49dd8e94bc725d31f6c306a68e42eebc265800a45d48cea4",
+      "body_sha256": "eef576828836e30a81741a09f7984f5e122c96004ed97654b66d08a6dfafb004",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1774,13 +1800,40 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._observe_workflow_stage",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Retain a cancelled or failed cognitive stage and re-raise the original failure without changing planning semantics.",
+      "review_status": "reviewed",
+      "body_sha256": "a83f5623d58064d918f2d162265886bbc451da0875dd457b3af9d993660efc07",
+      "failure_signals": [
+        "bare_reraise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._record_workflow_stage",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Keep optional workflow-evidence persistence from changing cognitive execution while retaining a visible warning when evidence is lost.",
+      "review_status": "reviewed",
+      "body_sha256": "fee010da9506b260e3401c25c4d017189cb4ca60d2cd247c5e89a705ab776540",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "26566bda6acc71b2483be1a6d16ec71888cc080036eb7ea1fff05a2331e5650e",
+      "body_sha256": "999b78b48326401ec07eb3affa0de11d012371df36960cb639109b3579322b61",
       "failure_signals": [
         "raise"
       ]
@@ -1955,7 +2008,7 @@
       "owner": "orchestrator.input_session_runtime",
       "contract": "Fail closed on ASR transport or result-processing failure, release any reversible acoustic duck without inventing a user turn, retain diagnostics, and discard the failed WebSocket before later reuse.",
       "review_status": "reviewed",
-      "body_sha256": "9f6aeaa909ee4aff89badca2dda4d3835d95bb531669f4615adb06f65c1c7d19",
+      "body_sha256": "e9153aaf421754cc780ea3fadf7ac0fa1dd58bed5d493f82fc08b7e33c2ea698",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -2274,6 +2327,19 @@
     },
     {
       "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionTracker._finalize_workflow_report",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.session",
+      "contract": "Preserve session closure when optional JSON/Markdown workflow persistence fails, and retain a visible evidence-loss warning.",
+      "review_status": "reviewed",
+      "body_sha256": "37c61b91541cec69b8a731921735179f1ebc6077c84cb665b26e682e776de561",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
       "symbol": "SessionTracker._record_external_resource_snapshots",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
@@ -2296,6 +2362,20 @@
       "review_status": "reviewed",
       "body_sha256": "76f03103cde88be44cab359e0b325234483cb8f7b7b78f9af1875e39868ad88b",
       "failure_signals": [
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "SessionTracker._write_conversation_workflow_report",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.session",
+      "contract": "Preserve per-SID evidence and session closure when optional conversation-rollup persistence fails, while retaining a visible evidence-loss warning.",
+      "review_status": "reviewed",
+      "body_sha256": "cce1baf45e0aa605b9fffbc67d19b3d5fb6cde4da0b52265e809156e568b25b9",
+      "failure_signals": [
+        "diagnostic",
         "return"
       ]
     },

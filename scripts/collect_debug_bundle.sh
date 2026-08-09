@@ -19,6 +19,24 @@ copy_tail() {
   fi
 }
 
+copy_recent_workflow_reports() {
+  local source_dir="$ROOT/.chromie/evidence/cognitive-runtime/session-workflows"
+  local destination_dir="$WORK/session-workflows"
+  [[ -d "$source_dir" ]] || return 0
+  mkdir -p "$destination_dir"
+  while IFS= read -r report; do
+    [[ -f "$report" ]] || continue
+    cp "$report" "$destination_dir/"
+  done < <(
+    find "$source_dir" -maxdepth 1 -type f \
+      \( -name '*.json' -o -name '*.md' \) \
+      -printf '%T@ %p\n' \
+      | sort -nr \
+      | awk 'NR <= 20' \
+      | cut -d' ' -f2-
+  )
+}
+
 safe_filename() {
   printf '%s' "$1" | tr -c '[:alnum:]_.-' '_'
 }
@@ -173,6 +191,7 @@ copy_tail .chromie/experience/episodes.jsonl episodes.tail.jsonl 200
 copy_tail .chromie/experience/experience.jsonl experience.tail.jsonl 500
 copy_tail .chromie/experience/mind_update_proposals.jsonl mind_update_proposals.tail.jsonl 200
 copy_tail .chromie/evidence/cognitive-runtime/events.jsonl cognitive_runtime_events.tail.jsonl 1000
+copy_recent_workflow_reports
 copy_tail .chromie/voice-runtime/orchestrator-events.jsonl orchestrator_events.tail.jsonl 1000
 copy_tail .chromie/voice-mujoco/logs/orchestrator-events.jsonl voice_mujoco_orchestrator_events.tail.jsonl 1000
 copy_tail .chromie/voice-mujoco/logs/chromie.log chromie-launcher.log 5000
@@ -227,6 +246,12 @@ their complete prompts, response schemas, and raw model outputs correlated by
 call, trace, turn, role, and stage. This is private runtime evidence and can
 contain family conversation or memory. Inspect and sanitize it before sharing;
 it is not safe to publish by default.
+
+When completed or abandoned interaction sessions have retained workflow
+evidence, session-workflows/ contains the latest JSON fact layers and matching
+human-readable Markdown flows. Raw conversational text follows
+ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT. These files remain private runtime
+evidence even when text is redacted.
 
 When the paired voice-to-MuJoCo launcher has been used, this bundle also includes
 its Chromie and Soridormi launcher logs. Fresh Docker logs, state, and published
