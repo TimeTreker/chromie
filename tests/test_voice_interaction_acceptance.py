@@ -35,6 +35,7 @@ from scripts.voice_acceptance import (
     run_acceptance,
     service_runtime_overrides,
     tts_health_ready,
+    warm_supervised_tts_delivery,
     wait_for_any_event,
     wait_for_case_checks,
     wait_for_confirmation_prompt_completion,
@@ -586,6 +587,24 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         command = execvpe.call_args.args[1]
         self.assertEqual(command[-3:], ["--mode", "acoustic", "--allow-dirty"])
 
+    def test_supervised_mode_reexecs_for_tts_warmup_when_needed(self) -> None:
+        with (
+            mock.patch(
+                "scripts.voice_acceptance.importlib.util.find_spec",
+                return_value=None,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.shutil.which",
+                return_value="/usr/bin/conda",
+            ),
+            mock.patch("scripts.voice_acceptance.os.execvpe") as execvpe,
+            mock.patch.dict("os.environ", {}, clear=True),
+        ):
+            ensure_acceptance_runtime(["--mode", "supervised", "--allow-dirty"])
+
+        command = execvpe.call_args.args[1]
+        self.assertEqual(command[-3:], ["--mode", "supervised", "--allow-dirty"])
+
     def test_acoustic_mode_reexecs_when_playback_dependency_is_missing(self) -> None:
         def find_spec(name: str) -> object | None:
             return object() if name == "websockets" else None
@@ -976,6 +995,47 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
         )
         self.assertFalse(ready)
         self.assertIn("not alive", detail)
+
+    def test_supervised_tts_warmup_uses_effective_runtime_speaker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runtime_env = root / ".env.runtime"
+            runtime_env.write_text(
+                "TTS_SPEAKER_ID=chromie_mixed\n",
+                encoding="utf-8",
+            )
+            output_dir = root / "warmup"
+            fixture = AudioFixture(
+                text="Hello.",
+                pcm16=b"\x01\x00" * 32,
+                sample_rate=24000,
+                channels=1,
+                path=output_dir / "01-hello.wav",
+            )
+            with mock.patch(
+                "scripts.voice_acceptance.generate_tts_fixtures",
+                return_value={"Hello.": fixture},
+            ) as generate:
+                result = warm_supervised_tts_delivery(
+                    "ws://127.0.0.1:5000",
+                    runtime_env_path=runtime_env,
+                    output_dir=output_dir,
+                    fallback_speaker_id="default",
+                    default_sample_rate=44100,
+                    timeout_s=180.0,
+                )
+
+            self.assertEqual(result["speaker_id"], "chromie_mixed")
+            self.assertEqual(result["pcm_bytes"], 64)
+            self.assertEqual(result["playback"], "disabled")
+            self.assertEqual(
+                generate.call_args.kwargs["speaker_id"],
+                "chromie_mixed",
+            )
+            manifest = json.loads(
+                (output_dir / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["purpose"], "supervised_response_delivery_warmup")
 
     def test_synthetic_audio_driver_replays_retained_output_pcm(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

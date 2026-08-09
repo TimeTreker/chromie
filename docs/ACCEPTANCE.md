@@ -1321,6 +1321,14 @@ For each utterance the runner displays a countdown and `SPEAK NOW`, waits for
 session's Goal Interpretation, interaction, skill, playback, cancellation, and completion
 events. It asks for an audible/visual operator verdict only after all machine
 checks pass. Missing ASR or required runtime events automatically fail the case.
+Before opening the microphone, supervised mode also waits for the live TTS
+worker and performs one retained, no-playback synthesis with the effective
+`TTS_SPEAKER_ID` from generated `.env.runtime`. This primes the same response
+voice the Orchestrator will use; `tts-readiness.log` and
+`tts-warmup/manifest.json` distinguish provider readiness or cold-start failure
+from microphone, cognition, and playback evidence. A failed warm-up stops before
+the operator is asked to speak rather than weakening the playback-start safety
+deadline.
 
 Only a clean, passing `supervised` bundle can satisfy a human-supervised
 voice-device release verifier:

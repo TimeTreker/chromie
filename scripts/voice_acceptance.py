@@ -53,6 +53,7 @@ from scripts.acceptance_audio import (
     write_pcm16_wav,
 )
 from scripts.benchmark_tts import request_health as request_tts_health
+from scripts.generate_runtime_env import parse_env_file
 
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "voice"
 AUTOMATIC_MODES = {"synthetic", "virtual-mic", "acoustic"}
@@ -73,6 +74,7 @@ RUNTIME_REEXEC_ENV = "CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"
 LIVE_VOICE_PROFILE = "current-revision-live-voice"
 MAX_VAD_START_TO_DUCK_MS = 250.0
 MAX_CONFIRMED_SPEECH_TO_SILENCE_MS = 250.0
+SUPERVISED_TTS_WARMUP_TEXT = "Hello."
 
 
 def _missing_automatic_runtime_packages(mode: str) -> list[str]:
@@ -96,7 +98,7 @@ def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
         mode_index = argv.index("--mode") + 1
         if mode_index < len(argv):
             mode = argv[mode_index]
-    if mode not in AUTOMATIC_MODES:
+    if mode not in ACCEPTANCE_MODES:
         return
     missing_packages = _missing_automatic_runtime_packages(mode)
     if not missing_packages:
@@ -522,6 +524,44 @@ def wait_for_tts_readiness(
         f"TTS did not become application-ready within {timeout_s:.0f}s after "
         f"{attempts} attempts: {last_detail}; see {log_path}"
     )
+
+
+def warm_supervised_tts_delivery(
+    endpoint: str,
+    *,
+    runtime_env_path: Path,
+    output_dir: Path,
+    fallback_speaker_id: str,
+    default_sample_rate: int,
+    timeout_s: float,
+) -> dict[str, Any]:
+    """Prime the exact supervised response voice before opening the microphone."""
+
+    runtime_values = parse_env_file(runtime_env_path)
+    speaker_id = str(runtime_values.get("TTS_SPEAKER_ID") or fallback_speaker_id)
+    started = time.monotonic()
+    fixtures = generate_tts_fixtures(
+        texts=(SUPERVISED_TTS_WARMUP_TEXT,),
+        output_dir=output_dir,
+        tts_url=endpoint,
+        speaker_id=speaker_id,
+        default_sample_rate=default_sample_rate,
+        timeout_s=timeout_s,
+    )
+    fixture = fixtures[SUPERVISED_TTS_WARMUP_TEXT]
+    result = {
+        "schema_version": 1,
+        "purpose": "supervised_response_delivery_warmup",
+        "speaker_id": speaker_id,
+        "text": SUPERVISED_TTS_WARMUP_TEXT,
+        "sample_rate": fixture.sample_rate,
+        "channels": fixture.channels,
+        "pcm_bytes": len(fixture.pcm16),
+        "elapsed_ms": round((time.monotonic() - started) * 1000.0, 3),
+        "playback": "disabled",
+    }
+    write_json(output_dir / "manifest.json", result)
+    return result
 
 
 def acceptance_readiness(
@@ -3308,12 +3348,33 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 check=True,
                 timeout=60,
             )
-        if args.mode in AUTOMATIC_MODES:
+        if args.mode in {*AUTOMATIC_MODES, "supervised"}:
             wait_for_tts_readiness(
                 args.tts_url,
                 timeout_s=args.service_timeout_s,
                 log_path=evidence_dir / "tts-readiness.log",
             )
+        if args.mode == "supervised":
+            print(
+                "Warming the configured response voice with no playback before "
+                "opening the microphone...",
+                flush=True,
+            )
+            warmup = warm_supervised_tts_delivery(
+                args.tts_url,
+                runtime_env_path=ROOT / ".env.runtime",
+                output_dir=evidence_dir / "tts-warmup",
+                fallback_speaker_id=args.tts_speaker_id,
+                default_sample_rate=args.tts_sample_rate,
+                timeout_s=args.tts_timeout_s,
+            )
+            print(
+                "Supervised response voice ready: "
+                f"speaker={warmup['speaker_id']} pcm_bytes={warmup['pcm_bytes']} "
+                f"elapsed_ms={warmup['elapsed_ms']}",
+                flush=True,
+            )
+        if args.mode in AUTOMATIC_MODES:
             prompts = [
                 step.prompt
                 for case_id in selected

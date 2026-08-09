@@ -62,6 +62,10 @@ profile (`chromie_zh`, `chromie_en`, and `chromie_mixed`) before the microphone
 opens. Warming only `speaker_id=default` with a Chinese language hint primes the
 Chinese profile but leaves the first English or mixed request cold under shared
 GPU load.
+The supervised voice-acceptance runner independently performs a retained
+no-playback warm-up for the effective `TTS_SPEAKER_ID` after service readiness
+and before starting its microphone-owning Orchestrator. This keeps acceptance
+self-contained when `--start-services` is used instead of the normal launcher.
 
 When a request is cancelled, Chromie first holds the singleton worker lock for
 a bounded drain. A nearly complete result is discarded without unloading the
