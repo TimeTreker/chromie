@@ -414,6 +414,30 @@ evidence cannot isolate the cause, attribution remains `unresolved`. `--id`,
 `--cohort`, and `--language` support focused diagnostic runs, while the default
 executes the complete dataset.
 
+When diagnosing whether a failure comes from basic model semantics or from the
+production prompt/DTO/coordinator surface, run the same cases through the
+isolated semantic probe first:
+
+```bash
+export CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT=.chromie/benchmarks/daily-conversation/probe-model/artifacts
+python scripts/run_daily_conversation_benchmark.py \
+  --command "python scripts/daily_conversation_semantic_probe_adapter.py" \
+  --model candidate-model-id \
+  --prompt-revision semantic-probe-v1 \
+  --output-dir .chromie/benchmarks/daily-conversation/probe-model
+```
+
+The probe supplies the user episode, bounded `scenario_state`, registered
+capability names, and Chromie's maintained identity/evidence rules through a
+small structured contract. It explicitly excludes primary outcomes, forbidden
+behavior labels, and review rubrics from the candidate prompt. This is a
+diagnostic counterfactual, not integration or release evidence: a semantic-probe
+pass followed by a live-adapter failure points toward the production context,
+schema, workflow, or coordination boundary, while failure at both boundaries is
+stronger model-inference evidence only after the fixture and prompt are judged
+sufficient. Retain and semantically review both outputs; never convert a probe
+score into a live robot claim.
+
 To extend coverage, add exactly one scenario object per JSON file below
 `datasets/daily_conversation/scenarios/<cohort>/`. Name the file after the last
 segment of its scenario ID; for example,

@@ -148,7 +148,13 @@ _EXECUTION_CONTRACT_PROMPT = (
     "capability_dependent/activity/capability_work/true; "
     "spoken_response/speaking/speech/false; "
     "spoken_response/speaking/<mode-specific-vocal>/true; and "
-    "other/none/other/false. Never use capability_dependent merely because an "
+    "other/none/other/false. These tuples describe the work owned by the Goal, "
+    "not the channel later used to deliver its result. For every "
+    "capability_dependent Goal, copy the entire tuple exactly as "
+    "capability_dependent/activity/capability_work/true. Never set "
+    "output_mode=speech merely because a capability result will eventually be "
+    "spoken; speech is reserved for a Goal whose owned outcome is a direct "
+    "authored spoken response. Never use capability_dependent merely because an "
     "exact provider is required: provider_required describes evidence need, while "
     "the human completion mode determines responsibility_kind. Stable general "
     "knowledge, reasoning, creative content, and an immediate conversational "
@@ -465,8 +471,10 @@ class GoalAssociationModelGoal(BaseModel):
     output_mode: GoalOutputMode | None = Field(
         default=None,
         description=(
-            "The requested completion mode. Vocal modes remain Speaking even when "
-            "coordinated with body work; media playback remains Activity."
+            "The work owned by this Goal, not the later channel used to deliver a "
+            "result. capability_dependent always owns capability_work even when "
+            "its result will eventually be spoken. Vocal modes remain Speaking "
+            "even when coordinated with body work; media playback remains Activity."
         ),
     )
     provider_required: bool | None = Field(
@@ -1783,6 +1791,11 @@ class GoalAssociationResolver:
                             "enum": active_ids,
                         }
                         target_ids["uniqueItems"] = True
+                        if "relationship" in node_properties and active_ids:
+                            # Every association addresses retained Goal state.
+                            # An empty array can never satisfy the DTO, so expose
+                            # that mechanical fact to the structured decoder.
+                            target_ids["minItems"] = 1
                     target_referents = node_properties.get("target_referent_ids")
                     if isinstance(target_referents, dict):
                         target_referents["items"] = {

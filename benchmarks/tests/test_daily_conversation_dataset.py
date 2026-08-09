@@ -68,6 +68,19 @@ def test_daily_conversation_cases_are_unique_chromie_semantic_assets() -> None:
         assert "required_response" not in item
 
 
+def test_identity_oracle_and_pronoun_episode_follow_runtime_authorities() -> None:
+    scenarios = {item["id"]: item for item in _load()["scenarios"]}
+
+    identity = scenarios["daily.v1.identity_body.are_you_an_ai"]
+    assert "owner-approved first-person identity" in identity["primary_outcome"]
+    assert "Reject the AI-assistant label" in identity["primary_outcome"]
+    assert "preserve the exact configured name" in identity["primary_outcome"]
+
+    pronoun = scenarios["daily.v1.multi_turn_continuity.pronoun_two_people"]
+    assert pronoun["inputs"]["turns"][0].startswith("Chromie，")
+    assert pronoun["inputs"]["turns"][1] == "她说想喝茶。"
+
+
 def test_daily_conversation_stores_exactly_one_scenario_per_file() -> None:
     paths = _scenario_paths(DATASET_ROOT)
 

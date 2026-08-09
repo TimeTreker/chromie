@@ -151,6 +151,8 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         self.assertIn('"name":"Chromie"', prompt)
         self.assertIn('"age_description":"6 years old"', prompt)
         self.assertIn("identity.identity_answer_guidance", prompt)
+        self.assertIn("configured identity.name is an immutable proper name", prompt)
+        self.assertIn("never translate, transliterate, localize", prompt)
         self.assertIn("Owner-approved Personality Expression JSON", prompt)
         self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
 
