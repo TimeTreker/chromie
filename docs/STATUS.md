@@ -215,9 +215,9 @@ and operator rollback evidence shows that no maintained profile depends on it.
   evidence exists.
 - Keep dependency-complete Ruff and Mypy execution available in the maintained
   CI environment.
-- Continue replacing development-only mutable runtime aliases with resolved
-  digests in publishable provenance rather than pretending local aliases are
-  immutable.
+- Continue replacing development-only mutable runtime aliases with resolved publishable digests.
+- Issue [#28](https://github.com/TimeTreker/chromie/issues/28) retains the Goal Association invalid-completion-tuple and fallback-speech provider-start evidence defects separately from model-role qualification
+  [#24](https://github.com/TimeTreker/chromie/issues/24); implementation is deferred.
 
 ## Open target evidence
 
