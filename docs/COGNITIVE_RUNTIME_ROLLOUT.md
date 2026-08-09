@@ -90,9 +90,12 @@ pending execution alone is not an unmet planning requirement.
 
 User-facing response transport is outside task planning. `chromie.speak` is
 excluded from both planner capability schemas and rejected if a planner emits
-it as a step. A conversational part of a mixed goal is represented by a
-goal-scoped `respond` outcome and `response_text`; the Response Composer owns
-its user-facing speech plan.
+it as a step. A direct conversational part of a mixed goal is represented by a
+goal-scoped `respond` outcome and `response_text`. Executable outcomes may also
+carry prospective `response_text` when they add a still-needed conversational
+act. Response Composer coordinates and realizes that speech from the immutable
+Plan and Interaction Context; planner-authored text never becomes execution
+evidence.
 
 ## 2. Authority boundaries
 

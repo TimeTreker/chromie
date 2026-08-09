@@ -114,9 +114,12 @@ common prompt even when an experience overlay requests `common`. The initial
 preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
 `chromie.speak` remains common and interaction-executable for legacy/native
 `InteractionResponse` compatibility, but the Goal-driven Fast and Deep Planner
-schemas exclude it as response transport. A mixed conversational/body turn uses
-a goal-scoped `respond` outcome plus executable body steps; the Response
-Composer owns the speech plan. Search scores are relevance signals for catalog
+schemas exclude it as a task-plan response-transport leaf. A mixed
+conversational/body turn may use a goal-scoped `respond` outcome plus executable
+body steps, and executable planner outcomes may carry prospective
+`response_text` for a new conversational delta. Response Composer coordinates
+final delivery against Interaction Context; none of that speech authorizes or
+proves the body effect. Search scores are relevance signals for catalog
 inspection endpoints, not Goal Interpretation execution authorization.
 
 `POST /agent-skills/disclose` accepts a previously validated selection and loads

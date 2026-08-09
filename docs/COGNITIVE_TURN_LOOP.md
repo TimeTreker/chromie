@@ -376,12 +376,14 @@ provider-backed Speaking outcomes. No entry edits or upgrades another owner's
 evidence.
 
 Before Goal Association, recent session events form volatile Interaction
-Context. After canonical Goal IDs exist, Runtime projects only events bound to
-those Goals plus explicitly unbound Fast speech from the same turn. Goal
-Association, Fast Planner, Deep Planner, and Response Composer use the bounded
-projection to decide the still-needed delta. Scheduled speech remains distinct
-from audible speech, committed work remains distinct from terminal evidence,
-and a speech event can never become execution or completion evidence.
+Context for Goal Interpretation and Goal Association. After canonical Goal IDs
+exist, Runtime projects only events bound to those Goals plus explicitly unbound
+Fast speech from the same turn. Fast Planner, Deep Planner, Tool Result
+Interpreter, Response Composer, and other later cognitive stages receive the
+bounded Goal-scoped projection to decide the still-needed delta. Scheduled
+speech remains distinct from audible speech, committed work remains distinct
+from terminal evidence, and a speech event can never become execution or
+completion evidence.
 
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically
@@ -404,10 +406,14 @@ satisfied. Speech such as "I'm starting" requires committed execution state;
 planning output alone is insufficient.
 
 Pre-execution speech is never execution evidence and never closes an effectful
-goal. A non-effectful conversational turn may move directly to
-`READY_TO_RESPOND`; its Core-owned answer is final for that turn and is grounded
-in the admitted input and any validated context or retrieval evidence, not in a
-fictional execution result.
+goal. Fast or Deep Planning may carry a prospective `response_text` alongside
+executable steps when that text represents a still-needed conversational delta;
+`chromie.speak` still does not become a task-plan leaf. Response Composer uses
+the Plan and Interaction Context to realize, supplement, reuse, or omit that
+speech according to what is actually new. A non-effectful conversational turn
+may move directly to `READY_TO_RESPOND`; its Core-owned answer is final for that
+turn and is grounded in the admitted input and any validated context or retrieval
+evidence, not in a fictional execution result.
 
 An immediate acknowledgement may claim only hearing or evaluation. A proposal
 or confirmation requires a validated plan and the applicable confirmation

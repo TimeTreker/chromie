@@ -418,10 +418,12 @@ class ToolResultInterpreterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.metadata["effectful_semantic_review"])
         self.assertEqual(len(ollama.prompts), 2)
         review_prompt = ollama.prompts[1]
-        self.assertIn("completed flag proves only that exact Capability request", review_prompt)
-        self.assertIn("no_motion=true", review_prompt)
+        self.assertIn("completion signal proves only the declared outcome", review_prompt)
+        self.assertIn("selected trusted facts", review_prompt)
+        self.assertIn("Interaction Context", review_prompt)
         self.assertIn("plan IDs", review_prompt)
         self.assertIn("Identity affects voice only", review_prompt)
+        self.assertNotIn("exact physical distance, pickup, carrying, return", review_prompt)
 
     async def test_rejects_unknown_fact_pointer(self) -> None:
         ollama = _ScriptedOllama(

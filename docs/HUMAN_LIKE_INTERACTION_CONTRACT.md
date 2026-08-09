@@ -388,24 +388,25 @@ never a candidate spoken response.
 The Cognitive Gateway admits a turn but does not author semantic speech. For
 eligible planning or embodied work, Goal Interpretation may emit one typed,
 non-terminal `fast_speech` process acknowledgement; one bounded Core repair may
-add it without changing the chosen route, bindings, or safety policy. Tool and
-memory routes suppress that dynamic field before playback because no pre-effect
-model sentence can claim evidence or a commit yet. The Host may schedule a
-validated generic cached acknowledgement instead, but does not invent or
-rewrite a semantic sentence.
+add or suppress it without changing the chosen route, bindings, or safety
+policy. It must inspect recent Interaction Context and leave the act absent when
+an equivalent acknowledgement is already delivered or pending and nothing new
+needs saying. Route-specific safety may still forbid claims that lack the
+required commit or evidence, but no normal tool/effect route is muted merely
+because it is executable.
 
-Chromie may say she is checking something only when a real tool call will be made
-with validated arguments. For a pure safe read, Response Composer emits no
-dynamic pre-evidence stage and the read does not wait for TTS synthesis or
-playback. A valid generic cached cue remains the optional latency presentation
-path. After execution, Tool Result Interpretation receives only trusted evidence
-and owns the single grounded answer. A mixed Plan may still reuse an exact
-independently valid current-turn utterance with
-`reuse_current_turn_speech=true`; Runtime reuses the existing TTS event without
-scheduling duplicate audio. Host code validates capability safety, arguments,
-truth state, concurrency, and evidence binding. Physical or externally
-effectful work uses only a reviewed safety prelude or confirmation request before
-execution and keeps its confirmation and delivery barriers.
+Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
+the same delta rule. An executable Plan may carry prospective `response_text`;
+that text is conversational intent, never an executable step and never evidence
+that work started or completed. For a pure safe read, a new prospective
+acknowledgement may be scheduled when it adds a still-needed act, while an
+already delivered or pending equivalent is reused or omitted. The read itself
+need not wait for optional acknowledgement playback. After execution, Tool
+Result Interpretation receives trusted evidence plus Interaction Context and
+speaks only the new grounded result/failure delta rather than replaying the
+pre-action acknowledgement. Host code validates capability safety, arguments,
+truth state, concurrency, evidence binding, and any required effect/delivery
+barrier.
 
 Natural:
 

@@ -156,10 +156,9 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("not a phrase table", prompt)
         self.assertIn("CapabilityAgent", prompt)
         self.assertIn("candidate proposals", prompt)
-        self.assertIn("not authoritative grounding", prompt)
+        self.assertIn("execution authority", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("robot_action", prompt)
-        self.assertIn("ordered actions[]", prompt)
         self.assertIn("confidence", prompt)
         self.assertIn("supplied-memory recall", prompt)
         self.assertIn("durable_with_explicit_consent", prompt)
@@ -167,7 +166,6 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Memory writes", prompt)
         self.assertIn("Recall is chat", prompt)
         self.assertNotIn("intent=weather_query", prompt)
-        self.assertIn("Catalog entries", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
         self.assertIn("Return one compact JSON object", prompt)
@@ -385,7 +383,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("not final goal meaning", prompt)
         self.assertIn("Return calibrated confidence", prompt)
         self.assertIn("fast_speech", prompt)
-        self.assertIn("fast_speech acknowledgement", prompt)
+        self.assertIn("still-needed conversational acknowledgement", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
@@ -2642,10 +2640,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Identity and personality shape voice only", repair_rendered)
         self.assertIn("Do not use a universal or canned acknowledgement", repair_rendered)
-        self.assertIn("do not return null", repair_rendered)
+        self.assertIn("return fast_speech=null", repair_rendered)
         self.assertIn("claim_state=none", repair_rendered)
         self.assertIn("Review meaning, not keywords", review_rendered)
-        self.assertIn("Preserve the valid acknowledgement", review_rendered)
+        self.assertIn("still-needed acknowledgement", review_rendered)
         self.assertIn("the body action definitely has not started", review_rendered)
         self.assertIn("ordinary sentence meaning", review_rendered)
         self.assertIn("rewrite it prospectively", review_rendered)
@@ -2846,10 +2844,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(decision.fast_speech)
         self.assertFalse(decision.metadata["fast_speech_review"]["speech_selected"])
-        self.assertTrue(
-            decision.metadata["fast_speech_review"][
-                "fail_closed_to_cached_fallback"
-            ]
+        self.assertTrue(decision.metadata["fast_speech_review"]["model_reviewed"])
+        self.assertEqual(
+            decision.metadata["fast_speech_review"]["reason"],
+            "no_still_needed_delta",
         )
 
     async def test_tool_route_missing_fast_speech_does_not_add_interpreter_latency_by_default(self) -> None:
@@ -3080,18 +3078,27 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("must not semantically claim", rendered)
         self.assertIn("Goal Association and planning have not happened yet", rendered)
-        self.assertIn("silence is not valid here", rendered)
+        self.assertIn("return fast_speech=null", rendered)
+        self.assertIn("no still-needed speech delta", rendered)
         self.assertIn("never phrase matching", rendered)
         self.assertIn("purpose=acknowledge_and_check", rendered)
         self.assertIn("commitment=checking_only", rendered)
         speech_schema = payload["format"]["properties"]["fast_speech"]
+        speech_choice = next(
+            branch for branch in speech_schema["anyOf"] if branch.get("type") == "object"
+        )
+        self.assertTrue(
+            any(branch.get("type") == "null" for branch in speech_schema["anyOf"])
+        )
         self.assertEqual(
-            speech_schema["properties"]["purpose"]["enum"],
+            speech_choice["properties"]["purpose"]["enum"],
             ["acknowledge_and_check"],
         )
-        self.assertEqual(speech_schema["properties"]["claim_state"]["const"], "none")
         self.assertEqual(
-            speech_schema["properties"]["claimed_capability_ids"]["maxItems"],
+            speech_choice["properties"]["claim_state"]["const"], "none"
+        )
+        self.assertEqual(
+            speech_choice["properties"]["claimed_capability_ids"]["maxItems"],
             0,
         )
         self.assertEqual(payload["model"], "quick-model")

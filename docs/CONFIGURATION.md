@@ -427,11 +427,12 @@ task creation. This prevents an ordinary side conversation routed through
 `deep_thought` from becoming a new task merely because no semantic operation was
 needed. ResponsePlan immediate speech is accepted only when its task scope,
 commitment, and evidence claims are consistent with trusted host task state.
-For a pure safe-read execution Plan, Response Composer emits no dynamic
-pre-evidence speech stage; the optional generic Host cue and the grounded
-post-execution result are the only speech owners. Mixed Plans may reuse an
-already validated current-turn acknowledgement, but cannot turn a typed
-`claim_state=none` field into permission for result-shaped wording.
+Pure safe-read execution uses the same Interaction Context delta contract as
+other work. An already audible or pending acknowledgement is reused by event
+identity rather than repeated; when no equivalent act exists, a cognitive stage
+may author one new prospective acknowledgement or correction. No pre-evidence
+speech may turn `claim_state=none`, a Plan, or a committed request into a result,
+completion, or provider-evidence claim.
 The common profile runs the unified Goal-driven Runtime in authoritative
 `apply` mode for `chat,memory,tool`. The standalone continuity resolver remains off
 because continuity is an integrated stage of the unified runtime. The maintained

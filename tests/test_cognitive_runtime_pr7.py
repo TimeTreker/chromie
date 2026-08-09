@@ -917,13 +917,14 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(client.calls, ["association", "fast"])
         self.assertEqual(runtime.ensure_calls, [])
 
-    def test_exact_execute_plan_rejects_planner_owned_speech(self):
+    def test_exact_execute_plan_preserves_prospective_response_text(self):
         top_level_payload = execute_plan().model_dump(mode="json")
-        top_level_payload["response_text"] = "I am already carrying this out."
-        with self.assertRaisesRegex(
-            ValueError, "exact execute plans must not carry response_text"
-        ):
-            CanonicalPlan.model_validate(top_level_payload)
+        top_level_payload["response_text"] = "I can start with the supported action."
+        top_level = CanonicalPlan.model_validate(top_level_payload)
+        self.assertEqual(
+            top_level.response_text,
+            "I can start with the supported action.",
+        )
 
         goal_outcome_payload = execute_plan().model_dump(mode="json")
         goal_outcome_payload["goal_outcomes"] = [
@@ -931,14 +932,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "goal_id": "goal-1",
                 "disposition": "execute",
                 "coverage": "complete",
-                "response_text": "I am already carrying this out.",
+                "response_text": "I can start with the supported action.",
                 "step_ids": ["blink"],
             }
         ]
-        with self.assertRaisesRegex(
-            ValueError, "execute goal outcomes must not carry response_text"
-        ):
-            CanonicalPlan.model_validate(goal_outcome_payload)
+        per_goal = CanonicalPlan.model_validate(goal_outcome_payload)
+        self.assertEqual(
+            per_goal.goal_outcomes[0].response_text,
+            "I can start with the supported action.",
+        )
 
     def test_safe_read_preserves_model_owned_specific_pre_action_speech(self):
         plan = CanonicalPlan(

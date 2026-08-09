@@ -85,8 +85,10 @@ Raw model tokens, partial JSON, and incomplete response contracts are not valid
 TTS input. The Host may submit an independently schema-valid, semantically
 admissible `fast_speech` or `ResponseStage` earlier only after authorization
 against the applicable correlation, commitment/evidence, claim, and
-cancellation state. Tool/memory and pure safe-read dynamic pre-effect speech is
-not admissible; a generic cached cue may be played without claiming a result.
+cancellation state. Dynamic pre-effect speech is admissible only when it is a
+still-needed prospective conversational delta and does not repeat an equivalent
+audible/pending act or claim unsupported evidence; memory commit claims remain
+commit-gated. A generic cached cue may be played without claiming a result.
 Provider PCM transport can deliver chunks incrementally, but retained audible-
 latency evidence still requires correlated first-PCM and playback events. Both
 semantic scheduling and transport must preserve ordered

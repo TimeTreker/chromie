@@ -224,6 +224,26 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    architecture and accumulate maintenance cost just like code. Do not replace a
    code mountain with a prompt mountain. Prefer concise, general semantic rules
    over growing collections of scenario-specific instructions and examples.
+21. **Cognition advances by the still-needed delta.** Every model-driven cognitive
+   stage reasons from the authoritative Goal state plus Interaction Context and
+   proposes only what remains meaningfully unsaid or undone. Actually delivered
+   speech and trusted terminal execution evidence may satisfy prior work;
+   generated text, scheduled speech, Plans, and committed requests do not become
+   delivery or completion merely because they exist. Repetition is legitimate
+   only when meaning requires it, such as an explicit repeat, retry after failure,
+   correction, changed state, new evidence, clarification, or another genuinely
+   new conversational responsibility. This is one shared continuity rule, not a
+   growing set of pairwise module-suppression rules.
+22. **Prompts teach principles; models supply ordinary semantic knowledge.**
+   Production prompts state general reasoning and evidence contracts, while
+   authoritative Capability descriptions, schemas, runtime state, and provider
+   evidence state Chromie-specific facts the model cannot safely guess. Ordinary
+   distinctions and world semantics remain model reasoning. Concrete examples
+   such as one action differing from another belong primarily in regression and
+   benchmark scenarios, not in a production-prompt answer library. If a complete,
+   internally consistent prompt and correct system facts still produce a wrong
+   semantic inference, measure and attribute that model failure instead of
+   automatically hiding it behind another example-specific instruction.
 
 ## Non-goals
 

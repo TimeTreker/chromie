@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Interaction-delta cognition contract
+
+- Restored planner-authored prospective `response_text` for executable Plans;
+  response transport remains outside task steps, while Interaction Context—not a
+  blanket execute-speech ban—prevents duplicate acknowledgements.
+- Made the shared Interaction Ledger / still-needed-delta rule explicit across
+  Goal Interpretation, Goal Association, Fast and Deep Planning, Tool Result
+  Interpretation, and Response Composition.
+- Replaced scenario-answer instructions in coordinated-action review with
+  general semantic entailment and Capability-contract principles; concrete
+  distinctions remain benchmark/regression responsibilities.
+
 ### Post-merge audit remediation
 
 - Registered every normally scheduled interaction utterance in the same
@@ -25,11 +37,11 @@ remains available in Git history.
   remain fail-closed.
 - Restored independently reviewed tool acknowledgements under the exact
   `acknowledge_and_check`/`checking_only` claim contract while retaining memory
-  commit gating. Pure safe-read Response Composer Plans reference the exact Fast
-  speech event instead of authoring a second act; playback start is the delivery
-  boundary, an undelivered event may be fulfilled once, and later grounded
-  result or failure speech remains independent. De-duplication now uses event
-  identity and structured act state rather than text comparison.
+  commit gating. Playback start remains the delivery boundary and de-duplication
+  uses event identity and structured act state rather than text comparison. The
+  Interaction-delta contract above supersedes the temporary pure-safe-read mute:
+  later stages reuse an equivalent Fast act, or may author only a genuinely new
+  prospective conversational delta before grounded result/failure speech.
 - Added the independently controlled, typed, versioned
   `chromie.interaction_session_capture` Data Loop policy. Each SID snapshots its
   policy at start, reuses existing input/trace/Episode evidence providers, and

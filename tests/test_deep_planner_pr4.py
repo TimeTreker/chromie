@@ -877,14 +877,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
         prompt = ollama.prompts[0][0]
         self.assertIn('"plan_relation":"safe_adjustment"', prompt)
         self.assertIn('"user_confirmation_required":true', prompt)
-        self.assertIn("requires no executable speech-transport step", prompt)
-        self.assertIn("closed applicability contract", prompt)
-        self.assertIn("current status do not broaden its domain", prompt)
-        self.assertIn("do not reject solely", prompt)
-        self.assertIn(
-            "unavailable or refused outcome explicitly represents the Goal",
-            prompt,
-        )
+        self.assertIn("ordinary world knowledge", prompt)
+        self.assertIn("supplied Capability contracts", prompt)
+        self.assertIn("Do not broaden a Capability", prompt)
+        self.assertIn("confirmation-bound plan relation", prompt)
+        self.assertNotIn("walking is not running", prompt)
 
     def test_semantic_coverage_rejection_replans_without_safety_adjustment(self):
         goal_ids = ["goal-walk", "goal-sing"]
@@ -1580,13 +1577,17 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             vocal_outcome["properties"]["response_text"]["maxLength"],
-            0,
+            800,
+        )
+        self.assertIn(
+            "never substitutes for the provider-required vocal performance",
+            vocal_outcome["properties"]["response_text"]["description"],
         )
         self.assertEqual(
             vocal_outcome["properties"]["step_ids"]["maxItems"],
             0,
         )
-        self.assertEqual(schema["properties"]["response_text"]["maxLength"], 0)
+        self.assertEqual(schema["properties"]["response_text"]["maxLength"], 800)
 
 
     def test_missing_goal_outcomes_mixed_plan_repairs_under_required_schema(self):
@@ -1661,7 +1662,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         outcome = schema["$defs"]["PlannerModelGoalOutcome"]
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
 
-    def test_deep_adapter_removes_execute_transport_speech_before_validation(self):
+    def test_deep_adapter_preserves_execute_response_text_for_later_delta_review(self):
         resolver = DeepPlannerResolver(SequencedOllama([]), FullCatalog())
         normalized = resolver._normalize(
             {
@@ -1669,7 +1670,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk forward for 15 seconds.",
-                "response_text": "好的，我现在开始走。",
+                "response_text": "好，我可以先做这个动作。",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -1682,7 +1683,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal-action": {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "已经执行完成。",
+                        "response_text": "好，我可以先做这个动作。",
                         "step_ids": ["walk"],
                     }
                 },
@@ -1701,63 +1702,65 @@ class DeepPlannerResolverTests(unittest.TestCase):
             expected_goal_ids_for_turn=["goal-action"],
         )
 
-        self.assertEqual(normalized["response_text"], "")
-        self.assertEqual(normalized["goal_outcomes"][0]["response_text"], "")
+        self.assertEqual(normalized["response_text"], "好，我可以先做这个动作。")
+        self.assertEqual(
+            normalized["goal_outcomes"][0]["response_text"],
+            "好，我可以先做这个动作。",
+        )
         self.assertEqual(
             normalized["steps"][0]["capability_id"],
             "soridormi.walk_forward",
         )
 
-    def test_model_outcome_rejects_execute_response_text_before_materialization(self):
-        with self.assertRaisesRegex(
-            ValueError, "execute goal outcome must not carry response_text"
-        ):
-            validate_planner_model_output(
-                {
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "confidence": 0.95,
-                    "response_text": "",
-                    "steps": [
-                        {
-                            "step_id": "blink",
-                            "capability_id": "soridormi.blink_eyes",
-                            "args": {"count": 1},
-                            "source_goal_ids": ["goal-greet"],
-                        }
-                    ],
-                    "goal_outcomes": {
-                        "goal-greet": {
-                            "disposition": "execute",
-                            "coverage": "complete",
-                            "response_text": "Hello!",
-                            "unresolved": [],
-                            "step_ids": ["blink"],
-                            "satisfaction": {
-                                "score": 1.0,
-                                "status": "exact",
-                                "satisfied_goal_ids": ["goal-greet"],
-                                "unmet_goal_ids": [],
-                                "unmet_requirements": [],
-                                "rationale": "Complete.",
-                            },
-                            "rationale": "Greet.",
-                        }
-                    },
-                    "goal_satisfaction": {
-                        "score": 1.0,
-                        "status": "exact",
-                        "satisfied_goal_ids": ["goal-greet"],
-                        "unmet_goal_ids": [],
-                        "unmet_requirements": [],
-                        "rationale": "Complete.",
-                    },
-                    "plan_relation": "exact",
-                    "user_confirmation_required": False,
+    def test_model_outcome_accepts_execute_response_text_before_materialization(self):
+        output = validate_planner_model_output(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 0.95,
+                "response_text": "Hello!",
+                "steps": [
+                    {
+                        "step_id": "blink",
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "source_goal_ids": ["goal-greet"],
+                    }
+                ],
+                "goal_outcomes": {
+                    "goal-greet": {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "Hello!",
+                        "unresolved": [],
+                        "step_ids": ["blink"],
+                        "satisfaction": {
+                            "score": 1.0,
+                            "status": "exact",
+                            "satisfied_goal_ids": ["goal-greet"],
+                            "unmet_goal_ids": [],
+                            "unmet_requirements": [],
+                            "rationale": "Complete.",
+                        },
+                        "rationale": "Greet and blink.",
+                    }
                 },
-                planner_tier="deep",
-                expected_goal_ids_for_turn=["goal-greet"],
-            )
+                "goal_satisfaction": {
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-greet"],
+                    "unmet_goal_ids": [],
+                    "unmet_requirements": [],
+                    "rationale": "Complete.",
+                },
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            },
+            planner_tier="deep",
+            expected_goal_ids_for_turn=["goal-greet"],
+        )
+        self.assertEqual(output.response_text, "Hello!")
+        self.assertEqual(output.goal_outcomes["goal-greet"].response_text, "Hello!")
 
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])
@@ -2036,7 +2039,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             ["execute", "respond"],
         )
         self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("owned by Response Composer", ollama.prompts[1][0])
+        self.assertIn("Generic speech transport is never an executable", ollama.prompts[1][0])
         skill_enum = ollama.prompts[0][1]["response_format"]["$defs"][
             "PlannerModelStep"
         ]["properties"]["capability_id"]["enum"]

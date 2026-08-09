@@ -283,8 +283,9 @@ class ToolResultInterpreter:
             f"Detailed sentence budget: {request.detailed_max_sentences}\n"
             f"Exact validation failure: {type(validation_error).__name__}: {validation_error}\n"
             f"Previous output JSON: {self._bounded(previous_output, 5000)}\n"
+            f"Goal-scoped Interaction Context JSON: {self._bounded(request.context.get('interaction_context') or {}, 8000)}\n"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
-            "Return JSON only."
+            "Preserve only the still-needed post-evidence conversational delta; do not replay an acknowledgement, promise, or already delivered result when it adds nothing new. Return JSON only."
         )
 
     @staticmethod
@@ -318,8 +319,9 @@ class ToolResultInterpreter:
         conversation_hints = {
             key: value
             for key, value in request.context.items()
-            if key != "agent_skill_disclosure"
+            if key not in {"agent_skill_disclosure", "interaction_context"}
         }
+        interaction_context = request.context.get("interaction_context") or {}
         return (
             "Interpret trusted tool results as Chromie's natural spoken answer.\n"
             f"User request: {request.user_request}\n"
@@ -328,8 +330,10 @@ class ToolResultInterpreter:
             f"Chromie personality JSON: {self._bounded(personality, 4200)}\n"
             f"{skill_section}"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
+            f"Goal-scoped Interaction Context JSON: {self._bounded(interaction_context, 8000)}\n"
             f"Conversation hints JSON: {self._bounded(conversation_hints, 2600)}\n\n"
-            "First understand the exact question the user asked. Choose answer_mode=direct "
+            "First understand the exact question the user asked and the still-needed conversational delta. Interaction Context tells you what Chromie already said, what was only scheduled, what provider work was committed, and what trusted terminal evidence now completed or failed. Generated or scheduled speech is not proof that it was heard, and committed work is not completion. Do not replay an acknowledgement, promise, or already delivered result when no new information, correction, retry or failure explanation, changed state, or clarification makes repetition useful. "
+            "Choose answer_mode=direct "
             "for a narrow question, summary for a normal overview, and detailed only when the "
             "user explicitly asks for detail. For a yes/no, qualitative, comparative, comfort, "
             "or decision-shaped question, say the direct conclusion first. Then add only one or "
@@ -343,7 +347,7 @@ class ToolResultInterpreter:
             "available_scalar_json_pointers. The pointer root is the evidence data object itself; "
             "never add a /data prefix and never invent or modify a field name. Preserve numbers "
             "and named facts exactly. "
-            "Conclusions may be phrased naturally but must be supported by selected facts and the immutable per-goal outcomes in the supplied CanonicalPlan. A completed boolean proves only the exact Capability step that produced it; it does not prove an unsupported distance, object acquisition, carrying, return trip, safety guarantee, or completion of another requested responsibility. A no_motion value means no physical movement occurred even when the provider request completed. Identity and personality shape expression only and never expand capability or evidence. Normally use one short sentence; use a second sentence only when it adds something genuinely useful. Return JSON only."
+            "Conclusions may be phrased naturally but must be entailed by the selected exact facts, immutable per-goal Plan outcomes, and supplied Capability semantics. A provider completion signal proves only the declared outcome of the Capability that produced it. Do not broaden that evidence from an argument name, rationale, identity, superficial similarity, or ordinary expectation, and do not infer an undeclared effect, guarantee, resource transition, or completion of another responsibility. Treat explicit provider facts such as no_motion according to their declared meaning even when the request itself completed. Identity and personality shape expression only and never expand capability or evidence. Normally use one short sentence; use a second sentence only when it adds something genuinely useful. Return JSON only."
         )
 
     @staticmethod
@@ -376,12 +380,14 @@ class ToolResultInterpreter:
             "Judge semantic entailment, not wording overlap. Every user-facing claim "
             "must follow from the selected exact evidence facts and the immutable "
             "CanonicalPlan outcomes.\n\n"
-            "A provider completed flag proves only that exact Capability request. It "
-            "does not prove an exact physical distance, pickup, carrying, return, "
-            "safe completion, or another requested responsibility unless those facts "
-            "are explicitly present in trusted evidence and owned by matching Plan "
-            "steps. no_motion=true means no physical motion occurred. Do not repeat a "
-            "pre-action promise as if it were a result. Do not expose provider names, "
+            "A provider completion signal proves only the declared outcome of that "
+            "Capability request. Keep every effect, guarantee, resource transition, and "
+            "cross-Goal conclusion within the supplied Capability semantics, selected "
+            "trusted facts, and matching Plan ownership; never infer extra completion "
+            "from an argument, rationale, identity, or superficial similarity. Treat "
+            "explicit provider facts such as no_motion according to their declared "
+            "meaning. Use Interaction Context to avoid replaying a pre-action promise or "
+            "an already delivered result as if it were new. Do not expose provider names, "
             "plan IDs, request IDs, internal summaries, or execution diagnostics. "
             "Identity affects voice only and never grants ability. State the completed "
             "subset and any Plan-declared limitation honestly, in concrete everyday "
@@ -390,6 +396,8 @@ class ToolResultInterpreter:
             f"Target language: {request.language}\n\n"
             "Immutable CanonicalPlan JSON:\n"
             f"{self._bounded(request.context.get('canonical_plan_resolution') or {}, 10000)}\n\n"
+            "Goal-scoped Interaction Context JSON:\n"
+            f"{self._bounded(request.context.get('interaction_context') or {}, 8000)}\n\n"
             "Trusted evidence JSON:\n"
             f"{self._bounded(evidence_payload, 14000)}\n\n"
             "Candidate ToolResultModelOutput JSON:\n"
@@ -409,9 +417,11 @@ class ToolResultInterpreter:
     def _system_prompt() -> str:
         return (
             "You are Chromie's evidence-bound result interpreter. Tool output is trusted evidence, "
-            "not response text. Answer the original user question first, in Chromie's owner-approved "
-            "personality, with the fewest relevant grounded facts. Never invent facts "
-            "or expose internal workflow language."
+            "not response text. Use Goal-scoped Interaction Context to produce only the still-needed "
+            "post-evidence conversational delta: new result, failure, correction, changed state, or "
+            "clarification, without replaying an already fulfilled communicative act. Answer the "
+            "original user question first, in Chromie's owner-approved personality, with the fewest "
+            "relevant grounded facts. Never invent facts or expose internal workflow language."
         )
 
     @classmethod

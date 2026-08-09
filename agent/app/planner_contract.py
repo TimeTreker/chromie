@@ -161,10 +161,11 @@ class PlannerCommunicationReview(BaseModel):
         return self
 
 
-# Response Composer owns user-facing speech in the goal-driven pipeline.  These
-# runtime transport skills are valid in legacy/native InteractionResponse task
-# lists, but they are not task-plan leaves: conversational goals use a
-# ``respond`` outcome and model-authored ``response_text`` instead.
+# Generic response transport is not a task-plan leaf. These runtime transport
+# capabilities remain valid in legacy/native InteractionResponse task lists, but
+# Fast/Deep planners express conversational intent through ``response_text`` or
+# a ``respond`` outcome. Executable outcomes may also carry prospective
+# ``response_text``; that speech never authorizes or proves the effect.
 RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS = frozenset({"chromie.speak"})
 RESPONSE_COMPOSER_OWNED_SKILL_IDS = RESPONSE_COMPOSER_OWNED_CAPABILITY_IDS
 
@@ -276,11 +277,6 @@ class PlannerModelGoalOutcome(BaseModel):
         if self.disposition == "execute":
             if self.coverage != "complete" or not self.step_ids:
                 raise ValueError("execute goal outcome requires complete coverage and step_ids")
-            if self.response_text.strip():
-                raise ValueError(
-                    "execute goal outcome must not carry response_text; "
-                    "Response Composer owns pre-execution speech"
-                )
         elif self.disposition == "respond":
             if self.coverage != "complete" or not self.response_text.strip():
                 raise ValueError(
@@ -386,7 +382,7 @@ class PlannerModelOutput(BaseModel):
         ]
         if response_transport_steps:
             raise ValueError(
-                "response transport skills are owned by Response Composer; "
+                "generic response transport is not an executable task-plan capability; "
                 "represent conversational goals with respond outcomes and response_text: "
                 + ",".join(response_transport_steps)
             )
@@ -851,12 +847,6 @@ def validate_goal_responsibility_outcomes(
                 "ordinary TTS, media playback, or a body step: "
                 f"{goal_id}"
             )
-        if outcome.response_text.strip():
-            raise ValueError(
-                "provider-required vocal goal outcome must leave response_text "
-                "empty; Response Composer owns truthful limitation speech: "
-                f"{goal_id}"
-            )
         owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
         if outcome.disposition == "execute":
             expected_mode = next(
@@ -892,18 +882,13 @@ def validate_goal_responsibility_outcomes(
             raise ValueError(
                 f"non-executing provider-required vocal outcome cannot own plan steps: {goal_id}"
             )
-    if provider_vocal_goal_ids and output.plan_relation == "exact" and output.response_text.strip():
-        raise ValueError(
-            "exact plan with a provider-required vocal goal must leave top-level "
-            "response_text empty; Response Composer owns truthful limitation speech"
-        )
     for goal_id, operation in sorted(provider_media_goal_operations.items()):
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
             raise ValueError(
                 f"provider-required media Goal requires an explicit outcome: {goal_id}"
             )
-        if outcome.disposition == "respond" or outcome.response_text.strip():
+        if outcome.disposition == "respond":
             raise ValueError(
                 "media playback Goal cannot be completed by response text, ordinary "
                 f"TTS, or vocal performance: {goal_id}"
@@ -1468,45 +1453,31 @@ async def review_coordinated_action_plan_coverage(
         {
             "responsibility": (
                 "Audit whether the proposed Plan completely represents every "
-                "material responsibility in the authoritative coordinated-action "
-                "Goals. Judge semantics, not words. A requested action, spoken "
-                "performance, duration, ordering, or concurrency relation that can "
-                "succeed or fail separately must be accounted for. Reject a Plan "
-                "that claims complete or exact coverage while omitting any such "
-                "responsibility. Reject a step assigned to a Goal when the supplied "
-                "Capability semantics do not actually implement that Goal; a step "
-                "reason cannot invent an unstated feature. Treat each supplied "
-                "Capability's semantic_type, semantic_scope.domain, supported request "
-                "kinds, when_to_use, and when_not_to_use as a closed applicability "
-                "contract rather than illustrative wording. Reject a domain-specific "
-                "read Capability when the Goal asks for another domain; shared "
-                "arguments such as location, date, or current status do not broaden "
-                "its domain. Reject requested "
-                "concurrency unless the Plan either uses capabilities with explicit "
-                "compatible parallel declarations or records an explicit safe "
-                "adjustment/alternative for user confirmation. When that adjustment "
-                "contract is explicit, confirmation-bound, and explained, do not "
-                "reject solely because its retained steps are sequential; the changed "
-                "timing is represented for the user to approve. A person's age, family role, personality, or self-concept is never evidence that a physical Capability exists. Only the supplied executable Capability semantics can establish ability. An exact distance, object acquisition, carrying, return trip, or safety result must be implemented by the supplied Capability semantics and represented by owned steps; duration or a generic movement step cannot be treated as proof of an unsupported distance or another physical responsibility. "
-                "An explicit ordered relation in the authoritative turn or Goals must "
-                "remain sequential. Capability parallel-safety is permission to honor "
-                "requested concurrency, never evidence that concurrency was requested; "
-                "reject an exact Plan that labels ordered actions parallel. Every explicit "
-                "typed Goal binding is authoritative. Reject exact satisfaction when a "
-                "step argument replaces that binding with a catalog minimum, maximum, or "
-                "default, even if the replacement is executable. A Goal whose typed "
-                "resource_responsibility must be covered by an exact Capability "
-                "whose supplied semantic_scope supports that resource kind, acquisition, "
-                "and delivery. A locomotion step cannot acquire or deliver information, "
-                "and a response promise cannot replace requested authored content. A Goal whose "
-                "responsibility_kind is spoken_response is completed by its respond "
-                "outcome response_text and requires no executable speech-transport "
-                "step. Still reject a promise, acknowledgement, title, or stage "
-                "direction that does not contain the requested authored response or "
-                "performance itself. An unavailable or refused outcome explicitly represents the Goal but leaves it unmet; it requires no executable step and is not by itself an adjustment or alternative. Accept that terminal representation when satisfaction also keeps the Goal unmet and no response_text falsely promises or claims the unavailable work. Treat movement mode, expression, spoken performance, "
-                "and simultaneity as material when the user requested them; walking is not "
-                "running unless the supplied Capability semantics explicitly say so. Do not "
-                "propose or authorize replacement steps."
+                "material responsibility in the authoritative Goals. Judge semantics "
+                "using ordinary world knowledge together with the supplied Capability "
+                "contracts; do not match phrases or treat capability names as answers. "
+                "A Plan may claim exact coverage only when every material Goal "
+                "requirement is entailed by the declared semantics and arguments of "
+                "its selected Capabilities, or by trusted evidence explicitly supplied "
+                "to this review. Do not broaden a Capability from its name, rationale, "
+                "identity/personality context, shared argument names, or superficial "
+                "similarity. Do not infer undeclared effects, guarantees, resources, "
+                "state transitions, or completion of another responsibility. Preserve "
+                "authoritative typed bindings, requested ordering/concurrency, output "
+                "modes, and resource responsibilities. Capability parallel-safety is "
+                "permission to honor requested concurrency, never evidence that "
+                "concurrency was requested. A response_text may communicate a new "
+                "prospective acknowledgement, limitation, clarification, or other "
+                "conversational delta, but it never substitutes for an effectful or "
+                "provider-backed responsibility and never proves execution. A direct "
+                "spoken_response Goal is completed by its respond outcome rather than "
+                "a response-transport task step. Unavailable or refused outcomes may "
+                "represent an unmet Goal only when satisfaction remains non-exact and "
+                "the wording does not promise the unavailable work. For a material "
+                "adjustment or alternative, require the explicit confirmation-bound "
+                "plan relation. Reject any exact Plan that omits or contradicts one of "
+                "these semantic responsibilities. Do not propose or authorize "
+                "replacement steps."
             ),
             "user_text": request_text,
             "language": language,
@@ -2334,6 +2305,15 @@ def canonical_plan_response_schema(
                 "refused",
             ]
 
+    planner_response_text = properties.get("response_text")
+    if isinstance(planner_response_text, dict) and requires_execution:
+        planner_response_text["description"] = (
+            "Optional prospective conversational delta for executable work. Use "
+            "Interaction Context to avoid repeating already delivered or pending "
+            "speech. This field never satisfies the effectful Goal and never proves "
+            "execution or an external result."
+        )
+
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
@@ -2346,25 +2326,6 @@ def canonical_plan_response_schema(
         if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
     }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_skills
-
-    if provider_vocal_goal_set:
-        planner_response_text = properties.get("response_text")
-        if isinstance(planner_response_text, dict):
-            planner_response_text["maxLength"] = 0
-            planner_response_text["description"] = (
-                "An exact plan containing a provider-required vocal Goal leaves "
-                "user-facing limitation speech to Response Composer."
-            )
-
-    if requires_execution:
-        planner_response_text = properties.get("response_text")
-        if isinstance(planner_response_text, dict):
-            planner_response_text["maxLength"] = 0
-            planner_response_text["description"] = (
-                "Tool-route planning never speaks or predicts a tool result. "
-                "Response Composer owns any tiny pre-execution acknowledgement, "
-                "and verified post-execution speech is grounded in tool evidence."
-            )
 
     # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
     # emits a complete map.  Fast Planner uses one flat decoder-compatible shape:
@@ -2482,7 +2443,6 @@ def canonical_plan_response_schema(
             branch_props = branch["properties"]
             if outcome_name == "execute":
                 branch_props["coverage"] = {"enum": ["complete"]}
-                branch_props["response_text"] = {"maxLength": 0}
                 branch_props["step_ids"] = {"minItems": 1}
             elif outcome_name == "respond":
                 branch_props["coverage"] = {"enum": ["complete"]}
@@ -2592,10 +2552,12 @@ def canonical_plan_response_schema(
                         ]
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
-                        response_text_field["maxLength"] = 0
+                        response_text_field["maxLength"] = 800
                         response_text_field["description"] = (
-                            "Planner outcomes on a tool route contain no speech "
-                            "and never predict the tool result."
+                            "Optional prospective conversational delta. Use Interaction "
+                            "Context to avoid repeating an already delivered or pending "
+                            "act; never use this field to satisfy the tool Goal or claim "
+                            "its result before evidence."
                         )
                     branches = specialized.get("oneOf")
                     if isinstance(branches, list):
@@ -2652,10 +2614,10 @@ def canonical_plan_response_schema(
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
                         response_text_field.pop("minLength", None)
-                        response_text_field["maxLength"] = 0
+                        response_text_field["maxLength"] = 800
                         response_text_field["description"] = (
-                            "Provider-required vocal outcomes contain no speech. "
-                            "Response Composer owns truthful limitation wording."
+                            "Optional conversational delta; it never substitutes for "
+                            "the provider-required vocal performance."
                         )
                     step_ids_field = specialized_properties.get("step_ids")
                     if isinstance(step_ids_field, dict) and not vocal_capability_available:
@@ -2692,10 +2654,10 @@ def canonical_plan_response_schema(
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
                         response_text_field.pop("minLength", None)
-                        response_text_field["maxLength"] = 0
+                        response_text_field["maxLength"] = 800
                         response_text_field["description"] = (
-                            "Provider-required media outcomes contain no speech. "
-                            "Response Composer owns truthful lifecycle wording."
+                            "Optional conversational delta; it never substitutes for "
+                            "the provider-required media operation."
                         )
                     step_ids_field = specialized_properties.get("step_ids")
                     if isinstance(step_ids_field, dict) and not media_capability_available:
@@ -2887,13 +2849,15 @@ def fast_multi_goal_response_schema(
     # otherwise simple plans consume most of the decoder budget.  Keep the
     # semantic judgments model-authored while bounding their representation.
     bound_text(properties, "goal_summary", 240)
-    bound_text(properties, "response_text", 0 if requires_execution else 800)
+    bound_text(properties, "response_text", 800)
     if requires_execution:
         response_text_field = properties.get("response_text")
         if isinstance(response_text_field, dict):
             response_text_field["description"] = (
-                "Tool-route planning contains no user-facing speech and never "
-                "predicts a tool result."
+                "Optional prospective conversational delta for executable work. "
+                "Use Interaction Context to avoid repeating already delivered or "
+                "pending speech; never use it to satisfy the tool Goal or predict "
+                "the result before evidence."
             )
     bound_text(properties, "escalation_reason", 240)
     top_unresolved = properties.get("unresolved")
@@ -3201,10 +3165,10 @@ def fast_multi_goal_response_schema(
                     disposition_field["enum"] = ["execute", "clarify", "escalate"]
                 response_text_field = specialized_outcome_properties.get("response_text")
                 if isinstance(response_text_field, dict):
-                    response_text_field["maxLength"] = 0
+                    response_text_field["maxLength"] = 800
                     response_text_field["description"] = (
-                        "Tool-route planner outcomes contain no speech and never "
-                        "predict tool evidence."
+                        "Optional prospective conversational delta; it does not "
+                        "complete the tool Goal and must not predict tool evidence."
                     )
                 branches = specialized_outcome.get("oneOf")
                 if isinstance(branches, list):

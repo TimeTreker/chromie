@@ -5171,6 +5171,16 @@ class VoiceAssistant:
 
         session = await self.get_http_session()
         context = self.build_context(session_id)
+        interaction_ledger = getattr(
+            getattr(self, "cognitive_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+        if interaction_ledger is not None:
+            context["interaction_context"] = interaction_ledger.context(
+                str(session_id or ""),
+                turn_id=turn_capture.turn_id,
+            ).model_dump(mode="json")
         turn_capture = gateway.with_conversation_id(
             turn_capture,
             context.get("conversation_id"),
@@ -7568,6 +7578,19 @@ class VoiceAssistant:
             else {}
         )
         normal_char_budget = 72 if language.lower().startswith("zh") else 200
+        goal_ids = list(plan.executable_goal_ids())
+        interaction_context: dict[str, Any] = {}
+        interaction_ledger = getattr(
+            getattr(self, "cognitive_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+        if interaction_ledger is not None:
+            interaction_context = interaction_ledger.context(
+                str(session_id or bundle.turn_id),
+                goal_ids=goal_ids,
+                turn_id=str(getattr(bundle, "turn_id", "") or ""),
+            ).model_dump(mode="json")
         interpretation_request = ToolResultInterpretationRequest(
             sid=str(session_id or ""),
             user_request=user_request,
@@ -7602,6 +7625,7 @@ class VoiceAssistant:
                 )
                 or {},
                 "canonical_plan_resolution": plan.prompt_projection(),
+                "interaction_context": interaction_context,
             },
         )
         try:
@@ -7630,7 +7654,6 @@ class VoiceAssistant:
             self._resolve_tool_result_pointer(selected.data, reference.json_pointer)
 
         fingerprint = str(bundle.outcome_id).replace(" ", "")[:12] or "result"
-        goal_ids = list(plan.executable_goal_ids())
         status = (
             "ok"
             if bundle.aggregate_status == "completed"

@@ -264,10 +264,13 @@ scheduling, satisfies the audible act. Text is checked only for event payload
 integrity and is not the de-duplication key. Final result or failure speech
 remains a distinct, evidence-bounded act.
 
-Pure safe-read Plans never author a second pre-evidence act. They may carry the
-exact pending Fast-event reference so its delivery can be verified without
-delaying the read itself. The Tool Result Interpreter still owns the single
-grounded post-execution answer.
+Pure safe-read and other executable Plans use the same still-needed-delta rule as
+all cognitive stages. If the exact Fast acknowledgement is already audible or
+pending, later stages reference/reuse that event instead of repeating its meaning.
+If no equivalent act exists, a Planner or Response Composer may author one new
+prospective acknowledgement or correction, but it still cannot claim a result
+before provider evidence. Tool Result Interpretation then contributes only the
+new grounded post-execution result, failure, or correction that remains necessary.
 
 Complete non-effectful spoken-response Goals already use the direct Core branch
 after Goal Association, without Fast or Deep Planner. Runtime records that path

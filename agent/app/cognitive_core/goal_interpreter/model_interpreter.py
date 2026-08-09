@@ -1383,6 +1383,10 @@ class OllamaGoalInterpreter:
         mind = request.context.get("mind", {})
         session_context = _goal_interpretation_prompt_context(request.context)
         context_json = _bounded_json(session_context, max_chars=520)
+        interaction_context_json = _bounded_json(
+            request.context.get("interaction_context") or {},
+            max_chars=3200,
+        )
         active_tasks_json = _bounded_json_array(
             _compact_active_task_snapshots(request.context),
             max_chars=1800,
@@ -1402,6 +1406,7 @@ class OllamaGoalInterpreter:
             "Session Context Group:\n"
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
+            f"Recent Interaction Context JSON:{interaction_context_json}\n"
             f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
@@ -1411,13 +1416,13 @@ class OllamaGoalInterpreter:
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use active and recent Goals semantically, never keywords, regexes, overlap, or recency alone. Safe-read status follow-ups preserve exact arguments and resume only without completed evidence; completed-Goal references use delivered evidence without reopening or rereading. New or corrected lookup bindings inherit the external-read responsibility and require fresh exact reads; never relabel old results. When the user supplies an exact replacement binding, preserve it verbatim. Provider canonicalization or ambiguity belongs to the capability, not this boundary. Clarify only genuinely underdetermined user meaning. One responsibility is one route item.\n"
+            "Use active/recent Goals and Interaction Context by meaning, not lexical shortcuts. Heard speech and trusted terminal effects count as done; scheduled speech and planned/committed work do not. Produce only the still-needed delta. Repeat or retry only for explicit repetition, failure, correction, changed state, new evidence, or clarification. Safe-read follow-ups preserve exact bindings and require fresh reads after corrections. When the user supplies an exact replacement binding, preserve it verbatim. Provider canonicalization belongs downstream. Clarify only genuinely underdetermined meaning. One responsibility is one route item.\n"
             "Capability Affordance Proposal:\n"
-            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone social acts stay chat; social framing attached to a substantive request never replaces its substantive lane. Bind an exact capability only for an explicit execution method with one clear match. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. For current external facts, choose a trusted lookup by meaning and context, not keywords. Exact match: route=tool and intent=capability:<exact capability_id>, not a domain label. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Treat the Common Ability Catalog as a compact body/tool affordance interface: candidate proposals, not authoritative grounding and not a phrase table. capability_inquiry is only about Chromie's abilities. Availability questions stay chat; supported execution requests use robot_action. Bind exact capabilities only for clear execution methods. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify. Missing or ambiguous methods preserve an open goal for CapabilityAgent. For current external facts, choose an available trusted lookup capability by meaning and context; do not map a topic keyword to a tool. Exact match: route=tool and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or emit low-level motor/control fields.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. route=memory writes; supplied-memory recall is route=chat. memory_update follows its typed schema: session/ephemeral by default; durable profile only with explicit current-turn consent. routes[] split responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marks unknown) only for explicit capabilities. metadata.semantic_task_operations may contain operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, reason_summary. create requires goal.description and source_text; later operations use supplied task IDs. Pending work requires fast_speech acknowledgement; no silence or canned wording. Lifecycle pairs: tool=acknowledge_and_check/checking_only; robot_action=acknowledge/prelude_only; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Before Goals exist, use claim_state=none with empty claim IDs; never claim result, motion, memory commit, or completion. fast_speech/speak_first use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Pending work may include fast_speech only for a still-needed conversational acknowledgement: inspect Interaction Context and omit an equivalent already audible or pending act; otherwise author one natural new act. Lifecycle pairs: tool=acknowledge_and_check/checking_only; robot_action=acknowledge/prelude_only; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Before Goals exist use claim_state=none and empty claim IDs; never claim result, motion, memory commit, or completion. fast_speech/speak_first use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, progress text, markdown, or text outside JSON."
         )
 
     @staticmethod
@@ -1488,6 +1493,10 @@ class OllamaGoalInterpreter:
             max_chars=1200,
         )
         mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
+        interaction_context = _bounded_json(
+            request.context.get("interaction_context") or {},
+            max_chars=3200,
+        )
         return {
             "model": self.model,
             "stream": False,
@@ -1497,10 +1506,15 @@ class OllamaGoalInterpreter:
                 "additionalProperties": False,
                 "required": ["fast_speech"],
                 "properties": {
-                    "fast_speech": self._fast_speech_choice_schema(
-                        purpose=expected_purpose,
-                        commitment=expected_commitment,
-                    )
+                    "fast_speech": {
+                        "anyOf": [
+                            self._fast_speech_choice_schema(
+                                purpose=expected_purpose,
+                                commitment=expected_commitment,
+                            ),
+                            {"type": "null"},
+                        ]
+                    }
                 },
             },
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
@@ -1509,9 +1523,10 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "Current Job:\n"
-                        "- You are Chromie's fast-speech repairer and author. The pending work requires one immediate natural acknowledgement; silence is not valid here.\n"
+                        "- You are Chromie's fast-speech repairer and author. Decide whether any conversational acknowledgement is still needed before Goal Association and planning.\n"
                         f"- The current semantic lane is route={target_route}. Goal Association and planning have not happened yet.\n"
-                        "- Choose the exact wording yourself from the supplied owner-approved mind and style context, current user turn, language, and situation. Do not use a universal or canned acknowledgement.\n"
+                        "- Inspect Recent Interaction Context first. Heard speech counts as already said; scheduled speech is pending, not heard. If an equivalent acknowledgement is already audible or pending and there is no correction, changed state, new evidence, clarification, explicit repeat, or retry reason, return fast_speech=null.\n"
+                        "- Otherwise choose one natural new acknowledgement from the supplied mind/style, current turn, language, and situation. Do not use a universal or canned acknowledgement.\n"
                         "- Do not change route, intent, metadata, tool arguments, capabilities, or safety policy.\n\n"
                         "Authority Boundary:\n"
                         "- This is before authoritative Goals, Plans, authorization, execution, and results.\n"
@@ -1520,8 +1535,8 @@ class OllamaGoalInterpreter:
                         "- Do not add any task, errand, destination, person, object, household activity, or physical action that the user did not request and the interpretation decision did not select.\n"
                         "- Do not predict weather, measurements, conditions, recommendations, conclusions, or other external facts before matching provider evidence exists.\n"
                         "- Identity and personality shape voice only; they never prove ability or create another responsibility.\n- For read-only work, mention only exact model-authored bindings already present in the interpretation decision.\n"
-                        "- Set claim_state=none and leave claimed_capability_ids and claimed_goal_ids empty.\n"
-                        "- Return one natural sentence; do not return null.\n\n"
+                        "- When fast_speech is present, set claim_state=none and leave claimed_capability_ids and claimed_goal_ids empty.\n"
+                        "- Return null only for no still-needed speech delta; otherwise return exactly one natural sentence.\n\n"
                         "Style Boundary:\n"
                         "- Apply the supplied mind/personality settings naturally. Chromie should sound like herself—a warm six-year-old child in her family—not customer service, an adult operator, or a robot status system.\n"
                         "- Do not announce her age or role unless the user asks about identity. Do not force childish vocabulary.\n"
@@ -1540,6 +1555,7 @@ class OllamaGoalInterpreter:
                         f"Owner-approved mind and style context JSON: {mind_context}\n"
                         f"Existing interpretation decision JSON: {decision_json}\n"
                         f"Bounded session context JSON: {session_context}\n"
+                        f"Recent Interaction Context JSON: {interaction_context}\n"
                         f"Common ability catalog JSON: {abilities_json}"
                     ),
                 },
@@ -1563,6 +1579,10 @@ class OllamaGoalInterpreter:
             target_route
         ]
         mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
+        interaction_context = _bounded_json(
+            request.context.get("interaction_context") or {},
+            max_chars=3200,
+        )
         abilities_json = _bounded_json(
             _compact_candidate_capabilities(
                 _review_capabilities_from_request(request), limit=12
@@ -1578,10 +1598,15 @@ class OllamaGoalInterpreter:
                 "additionalProperties": False,
                 "required": ["fast_speech"],
                 "properties": {
-                    "fast_speech": self._fast_speech_choice_schema(
-                        purpose=expected_purpose,
-                        commitment=expected_commitment,
-                    )
+                    "fast_speech": {
+                        "anyOf": [
+                            self._fast_speech_choice_schema(
+                                purpose=expected_purpose,
+                                commitment=expected_commitment,
+                            ),
+                            {"type": "null"},
+                        ]
+                    }
                 },
             },
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
@@ -1590,7 +1615,8 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "You are Chromie's independent fast-speech semantic and style reviewer. Goal Association and planning have not happened yet. Review meaning, not keywords.\n"
-                        "- Preserve the valid acknowledgement or naturally rewrite it in Chromie's supplied style; do not remove it or return null.\n"
+                        "- Inspect Recent Interaction Context first. If the candidate repeats an equivalent acknowledgement already audible or pending and there is no correction, changed state, new evidence, clarification, explicit repeat, or retry reason, return fast_speech=null.\n"
+                        "- Otherwise preserve a valid still-needed acknowledgement or naturally rewrite it in Chromie's supplied style.\n"
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
                         "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Remove every invented side task, errand, destination, person, object, household activity, or physical action, even when it sounds caring or fits the personality.\n"
                         "- Any exact capability in the interpretation decision is an advisory pre-association hypothesis. Compare the requested human outcome with the supplied ability descriptions. If the selected ability semantics do not cover the outcome, do not promise that outcome or a method; use a low-commitment acknowledgement that Chromie understood and will work out what is actually possible.\n"
@@ -1598,7 +1624,7 @@ class OllamaGoalInterpreter:
                         "- For memory work, the memory update has not been committed at this boundary. Require an explicitly prospective or intentional grammatical construction about what Chromie will do next. The acknowledgement may say that Chromie heard the request and is going to remember or note it, but it must not say or imply that the fact is already remembered, noted, recorded, stored, saved, or updated. Reject completed aspect, resultative constructions, and present or past states that imply completion; rewrite them prospectively.\n"
                         "- For robot_action, the body action definitely has not started at this boundary. Judge the ordinary sentence meaning, not only the typed fields. If the candidate places Chromie already inside an ongoing movement or action, rewrite it prospectively as hearing, preparing, or getting ready to try the understood request.\n"
                         "- Never preserve present-progressive action wording merely because commitment=prelude_only or claim_state=none is structurally valid. The words and the typed contract must agree.\n"
-                        "- Do not replace every case with one standard acknowledgement. The pending work still requires one acknowledgement.\n"
+                        "- Do not replace every case with one standard acknowledgement. Speech is optional when there is no still-needed conversational delta.\n"
                         "- Identity shapes expression only and never grants capability.\n"
                         "- Return JSON only."
                     ),
@@ -1613,6 +1639,7 @@ class OllamaGoalInterpreter:
                         f"{_bounded_json(candidate.model_dump(mode='json'), max_chars=1800)}\n"
                         "Interpretation decision JSON: "
                         f"{_bounded_json(decision.model_dump(mode='json', exclude_none=True), max_chars=2600)}\n"
+                        f"Recent Interaction Context JSON: {interaction_context}\n"
                         f"Common ability catalog JSON: {abilities_json}"
                     ),
                 },
@@ -2964,9 +2991,24 @@ class OllamaGoalInterpreter:
             )
             raw_fast_speech = parsed.get("fast_speech")
             if raw_fast_speech is None:
-                raise ValueError(
-                    "fast speech reviewer returned null for required pending-work speech"
+                suppressed = _decision_without_goal_interpretation_fast_speech(
+                    decision,
+                    reason_suffix="fast speech omitted because no new conversational delta remained",
+                    stage="fast_speech_semantic_review",
                 )
+                metadata = dict(suppressed.metadata or {})
+                metadata["fast_speech_review"] = {
+                    "stage": "fast_speech_semantic_review",
+                    "model_reviewed": True,
+                    "speech_selected": False,
+                    "reason": "no_still_needed_delta",
+                }
+                logger.info(
+                    "goal_interpreter_fast_speech_review_done route=%s intent=%s selected=false",
+                    decision.route,
+                    decision.intent,
+                )
+                return suppressed.model_copy(update={"metadata": metadata})
             reviewed = FastSpeech.model_validate(raw_fast_speech)
             if not _fast_speech_matches_route_contract(target_route, reviewed):
                 raise ValueError("reviewed fast_speech violates pre-plan claim contract")
@@ -3081,9 +3123,25 @@ class OllamaGoalInterpreter:
                     )
                     raw_fast_speech = parsed.get("fast_speech")
                     if raw_fast_speech is None:
-                        raise ValueError(
-                            "required pending-work fast_speech was null"
+                        prepared = _decision_without_goal_interpretation_fast_speech(
+                            decision,
+                            reason_suffix="fast speech omitted because no new conversational delta remained",
+                            stage="fast_speech_repair",
                         )
+                        metadata = dict(prepared.metadata or {})
+                        metadata["fast_speech_review"] = {
+                            "stage": "fast_speech_repair",
+                            "model_reviewed": True,
+                            "speech_selected": False,
+                            "reason": "no_still_needed_delta",
+                        }
+                        prepared = prepared.model_copy(update={"metadata": metadata})
+                        logger.info(
+                            "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=false",
+                            decision.route,
+                            decision.intent,
+                        )
+                        return prepared
                     fast_speech = FastSpeech.model_validate(raw_fast_speech)
                     if not _fast_speech_matches_route_contract(
                         _pending_work_fast_speech_target_route(decision),

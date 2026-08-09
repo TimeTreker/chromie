@@ -1129,11 +1129,14 @@ class DeepPlannerResolver:
                 "turn must contain at least one executable supplied tool step, or return "
                 "clarify/unavailable/refused when no valid tool plan is possible. Do not "
                 "terminate the whole turn as respond from model memory or loosely related "
-                "evidence. Every top-level and per-goal response_text must be empty on this "
-                "tool route: do not greet, self-introduce, narrate the lookup, or predict "
-                "its result. Response Composer owns optional pre-execution speech and "
-                "trusted post-execution interpretation owns the answer. A completed-evidence "
-                "follow-up that needs no execution belongs on a chat route upstream. "
+                "evidence. response_text is optional prospective conversational intent: "
+                "use Interaction Context to omit an equivalent act already delivered or "
+                "pending, and author only a genuinely new acknowledgement, limitation, "
+                "correction, confirmation need, or other delta. Never predict the tool "
+                "result or use response_text to satisfy the tool Goal. Trusted "
+                "post-execution interpretation owns factual claims from returned evidence. "
+                "A completed-evidence follow-up that needs no execution belongs on a chat "
+                "route upstream. "
                 if source_route == "tool"
                 else ""
             )
@@ -1149,7 +1152,7 @@ class DeepPlannerResolver:
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"
             f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 8000)}\n\n"
-            "Use Interaction Context to reason from Chromie's already performed, pending, failed, and spoken actions and produce only the still-needed plan delta. Preserve owner and event_type evidence strength: a proposal or committed request is not completion, scheduled speech is not audible, and execution completion must retain execution_closure evidence references. The current canonical Goals and validation feedback remain authoritative. "
+            "Use Interaction Context to reason from what Chromie actually delivered, what trusted evidence says completed or failed, what remains pending, and what is new; produce only the still-needed conversational and effectful delta. Preserve owner and event_type evidence strength: generated or scheduled speech is not proof the user heard it, a proposal or committed request is not completion, and execution completion must retain execution_closure evidence references. Repeat an act only when the current meaning justifies it, such as an explicit repeat, retry, correction, changed state, new evidence, or clarification. The current canonical Goals and validation feedback remain authoritative. "
             "The active task bindings are historical Host/runtime context. Their "
             "task_id, request_id, canonical_plan_id, and prior step IDs are not "
             "current Deep Planner step IDs. Never copy them into current "
@@ -1169,7 +1172,7 @@ class DeepPlannerResolver:
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "User-facing ordinary speech is owned by Response Composer and is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Execute that Goal only when the supplied maintained planning surface contains exact capability_id chromie.vocal.perform and its input mode enum advertises the authoritative Goal output_mode. Use one owned Speaking-lane step, copy that exact mode and authored content, and keep response_text empty. When the exact capability or requested mode is absent, use unavailable, refused, or a specific clarification outcome with zero step_ids and empty response_text; top-level response_text must also stay empty for that exact plan. Response Composer owns truthful limitation speech from the typed outcome, rationale, and unresolved evidence. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. A canonical executable_action/activity/media_playback Goal must use exactly one `chromie.media.<media_operation>` capability advertised by the qualified catalog. Existing music, recordings, streams, and sound effects remain Activity work; preserve persistent playback_id and choose play, pause, resume, seek, stop, volume, or status exactly as authored by Goal Association. Media and Speaking may overlap only under the declared duck-media mixer policy; overlap never mutates either Goal or makes playback a vocal result. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Never silently downgrade one vocal mode to another. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
+            "Generic speech transport is never an executable Activity plan step. A canonical Goal with responsibility_kind=spoken_response, output_mode=speech, and provider_required=false uses a respond outcome with the actual answer, joke, greeting, or other authored text now. Executable and provider-backed outcomes may also carry response_text when it represents a still-needed prospective acknowledgement, limitation, correction, clarification, or other conversational delta. Use Interaction Context to omit an equivalent act already delivered or pending; repeat only when new meaning, failure/retry, correction, changed state, or explicit user intent justifies it. A spoken_response Goal with provider_required=true requests a mode-specific vocal performance such as expressive speech, recitation, singing, humming, or nonverbal vocalization. Execute that Goal only when the supplied maintained planning surface contains exact capability_id chromie.vocal.perform and its input mode enum advertises the authoritative Goal output_mode. Use one owned Speaking-lane step and copy that exact mode and authored content. response_text may explain new prospective context but never substitutes for or proves the provider performance. When the exact capability or requested mode is absent, use unavailable, refused, or a specific clarification outcome with zero step_ids and state any still-needed limitation truthfully rather than promising the unavailable work. A song verse read by ordinary TTS, chromie.speak, media playback, and body gestures are not completion evidence for that mode. A canonical executable_action/activity/media_playback Goal must use exactly one `chromie.media.<media_operation>` capability advertised by the qualified catalog. Existing music, recordings, streams, and sound effects remain Activity work; preserve persistent playback_id and choose play, pause, resume, seek, stop, volume, or status exactly as authored by Goal Association. Media and Speaking may overlap only under the declared duck-media mixer policy; overlap never mutates either Goal or makes playback a vocal result. Independent body Goals may still execute under an explicit mixed per-goal outcome. When direct ordinary speech overlaps Activity execution, preserve the requested concurrency with a respond outcome plus parallel Activity steps only when providers declare safe overlap; leave cross-lane coordination to Response Composer. Never silently downgrade one vocal mode to another. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
             "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, and reason_summary. "
             "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
@@ -1345,40 +1348,6 @@ class DeepPlannerResolver:
             "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, annotations, local field mappings, or hidden reasoning."
         )
 
-    @staticmethod
-    def _normalize_execute_transport_speech(raw: dict[str, Any]) -> dict[str, Any]:
-        """Remove planner-owned speech only from execute-only transport fields.
-
-        The strict planner contract still rejects non-empty ``response_text`` on
-        execute outcomes.  Deep Planner models nevertheless sometimes duplicate
-        a pre-execution acknowledgement or premature completion claim into those
-        fields after otherwise producing a valid executable plan.  Response
-        Composer owns that transport speech, so the Deep Planner adapter removes
-        only the redundant execute-field copies before contract validation.
-        Respond outcomes and confirmation-bound adjusted plans remain untouched.
-        """
-
-        normalized = copy.deepcopy(raw)
-        outcomes = normalized.get("goal_outcomes")
-        if isinstance(outcomes, dict):
-            for value in outcomes.values():
-                if not isinstance(value, dict):
-                    continue
-                disposition = str(value.get("disposition") or "").strip()
-                step_ids = value.get("step_ids")
-                if not disposition and isinstance(step_ids, list) and step_ids:
-                    disposition = "execute"
-                if disposition == "execute":
-                    value["response_text"] = ""
-        if (
-            normalized.get("disposition") == "execute"
-            and normalized.get("plan_relation", "exact") == "exact"
-            and isinstance(normalized.get("steps"), list)
-            and normalized.get("steps")
-        ):
-            normalized["response_text"] = ""
-        return normalized
-
     def _normalize(
         self,
         raw: dict[str, Any],
@@ -1389,7 +1358,7 @@ class DeepPlannerResolver:
         capability_payload: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         model_output = validate_planner_model_output(
-            self._normalize_execute_transport_speech(raw),
+            raw,
             planner_tier="deep",
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
         )

@@ -378,19 +378,19 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             ),
         )
 
-    def test_singing_unavailability_leaves_speech_to_response_composer(self):
+    def test_singing_unavailability_may_carry_truthful_response_text(self):
         output = PlannerModelOutput.model_validate(
             {
                 "disposition": "unavailable",
                 "coverage": "uncertain",
                 "confidence": 1.0,
-                "response_text": "I am singing now.",
+                "response_text": "I can't sing with the available capabilities.",
                 "steps": [],
                 "goal_outcomes": {
                     "goal-vocal": {
                         "disposition": "unavailable",
                         "coverage": "uncertain",
-                        "response_text": "I am singing now.",
+                        "response_text": "I can't sing with the available capabilities.",
                         "unresolved": ["No singing provider is registered."],
                         "step_ids": [],
                     }
@@ -398,17 +398,14 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(
-            ValueError,
-            "must leave response_text empty",
-        ):
-            validate_goal_responsibility_outcomes(
-                output,
-                authoritative_goals=self.vocal_goal(
-                    output_mode="singing",
-                    provider_required=True,
-                ),
-            )
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=self.vocal_goal(
+                output_mode="singing",
+                provider_required=True,
+            ),
+        )
+        self.assertIn("can't sing", output.response_text)
 
     def test_ordinary_speech_still_uses_respond_outcome(self):
         output = PlannerModelOutput.model_validate(
@@ -828,7 +825,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertIn("ledger-fast-marker", prompt)
-        self.assertIn("plan only the still-needed delta", prompt)
+        self.assertIn("plan only the still-needed conversational and effectful delta", prompt)
 
     def test_effectful_zero_step_false_satisfaction_repairs_then_escalates(self):
         invalid = {
@@ -1402,7 +1399,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(plan.unresolved, ["blinking", "singing"])
         self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertIn("spoken performance", ollama.prompts[1][0])
+        self.assertIn("ordinary world knowledge", ollama.prompts[1][0])
+        self.assertIn("supplied Capability contracts", ollama.prompts[1][0])
+        self.assertNotIn("walking is not running", ollama.prompts[1][0])
 
     def test_embodied_coverage_review_rejects_walk_step_as_fetch_and_return(self):
         goal_ids = ["goal-distance", "goal-water", "goal-return"]
@@ -1516,9 +1515,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["exact 50-metre distance", "fetching water", "returning"],
         )
         review_prompt = ollama.prompts[1][0]
-        self.assertIn("age, family role, personality", review_prompt)
-        self.assertIn("object acquisition", review_prompt)
-        self.assertIn("duration or a generic movement step", review_prompt)
+        self.assertIn("ordinary world knowledge", review_prompt)
+        self.assertIn("supplied Capability contracts", review_prompt)
+        self.assertIn("Do not infer undeclared effects", review_prompt)
+        self.assertNotIn("object acquisition", review_prompt)
+        self.assertNotIn("walking is not running", review_prompt)
 
     def test_parallel_plan_without_declared_provider_support_escalates(self):
         goal_ids = ["goal-walk", "goal-blink"]
@@ -2711,7 +2712,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("owned by Response Composer", ollama.prompts[1][0])
+        self.assertIn("generic response transport", ollama.prompts[1][0])
 
     def test_live_branch_minimal_escalation_repairs_under_flat_contract(self):
         branch_minimal = {

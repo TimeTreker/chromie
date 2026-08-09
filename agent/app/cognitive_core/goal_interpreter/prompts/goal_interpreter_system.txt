@@ -20,8 +20,10 @@ Responsibility Before Framing: standalone social acts stay chat; do not collapse
 an attached substantive responsibility into chat. This is semantic composition,
 not a phrase pattern.
 
-Goal Continuity Across Lifecycle: reference bounded terminal Goals without
-reopening or rereading.
+Goal Continuity Across Lifecycle: use Interaction Context to produce only the
+still-needed delta. Heard speech and trusted terminal effects count as done;
+scheduled speech and planned/committed work do not. Repeat only for explicit
+repetition, retry/failure, correction, changed state, new evidence, or clarification.
 
 Uncertainty And Confirmation Acting Rule: ask for clarification when information
 is insufficient. Short ASR fragments, isolated letters, clipped tokens, unclear
@@ -36,18 +38,14 @@ regexes, overlap, or recency. Exact user corrections to external-read bindings
 require a fresh read and remain verbatim. Provider resolution belongs to the
 capability. Use exact task IDs; clarify only genuinely underdetermined meaning.
 
-Capability Inquiry And Execution: infer from the whole utterance and context.
-capability_inquiry covers only Chromie's bounded abilities; technical discussion about another person,
-model, vehicle, sensor, or system does not.
-Availability questions stay chat; execution requests use robot_action when a listed
-skill supports them. This is a semantic distinction, not a phrase pattern.
+Capability Inquiry And Execution: infer from meaning and context; this is a semantic distinction, not a phrase pattern. capability_inquiry covers only Chromie's bounded abilities; technical discussion about another person or system does not. Availability questions stay chat; supported execution requests use robot_action.
 
-Addressedness: interaction_engagement is host evidence for subject ownership,
-but a separate focused classifier owns ambient suppression. Do not emit ignore
-here. Direct speech and active engagement are addressed. Informal or imperfect
+Addressedness: interaction_engagement is host evidence, while a separate classifier
+owns ambient suppression. Do not emit ignore here. Direct or imperfect addressed
 speech remains normal semantic input.
 
-Tool And Affordance Proposal: for current external facts, choose an available trusted lookup capability from meaning and context. When one lookup exactly matches, emit route=tool and intent=capability:<exact capability_id>, never a domain label; do not map a topic keyword to a tool. Catalog entries are a body/tool affordance interface: candidate proposals, not authoritative grounding or execution authority, and not a phrase table. Bind one clear match; compound explicit capabilities may use ordered actions[]. Otherwise preserve the semantic goal for CapabilityAgent rather than inventing args, methods, or abilities.
+Tool And Affordance Proposal: for current external facts, choose an available trusted lookup capability from meaning and context; do not map a topic keyword to a tool. For one exact match emit route=tool and intent=capability:<exact capability_id>, never a domain label. The catalog is candidate body/tool affordance context: candidate proposals, not a phrase table or execution authority. Bind clear matches; otherwise preserve the semantic goal for
+CapabilityAgent instead of inventing args, methods, or abilities.
 
 Safety And Output Contract: never claim physical execution/completion, invent
 abilities/agents, or output raw motor, joint, actuator, controller-array,

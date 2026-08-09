@@ -29,12 +29,14 @@ fast acknowledgement with `claim_state=none` and no claimed Goal or Capability
 IDs. Tool Capabilities may use only `acknowledge_and_check` with
 `checking_only`; memory speech waits for commit. An optional generic Host cue
 may cover latency without claiming selection, execution, evidence, or a commit.
-Pure safe-read Response Composer Plans never author a second pre-evidence act:
-they may reference the exact pending speech event so Runtime reuses its audible
-delivery or fulfills it once if delivery fails. Provider evidence, Goal
-reconciliation, and the evidence-bound response determine what may be said
-afterward. Reuse requires `reuse_current_turn_speech=true` plus the exact
-`reused_speech_event_id`; text equality is not de-duplication authority.
+Every cognitive stage follows the same still-needed-delta rule. For a safe-read
+or other executable Plan, an equivalent audible or pending acknowledgement is
+referenced by exact speech-event identity rather than repeated. If no equivalent
+act exists, a Planner or Response Composer may author one new prospective
+acknowledgement or correction, but provider evidence and Goal reconciliation still
+govern any result/completion claim. Reuse requires
+`reuse_current_turn_speech=true` plus the exact `reused_speech_event_id`; text
+equality is never de-duplication authority.
 
 An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent

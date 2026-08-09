@@ -1203,9 +1203,11 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
         review_prompt = ollama.prompts[1][0]
         self.assertIn("Identity affects expression only", review_prompt)
-        self.assertIn("object acquisition", review_prompt)
+        self.assertIn("Capability contracts actually entail", review_prompt)
+        self.assertIn("undeclared effect", review_prompt)
         self.assertIn("internal safety checks", review_prompt)
         self.assertIn("do not repeat it", review_prompt)
+        self.assertNotIn("object acquisition", review_prompt)
 
     def test_effectful_clarification_is_semantically_reviewed_without_steps(self):
         canonical = CanonicalPlan(
@@ -1282,7 +1284,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertIn("role-play", review_prompt)
         self.assertTrue(result.metadata["effectful_semantic_review_succeeded"])
 
-    def test_pure_safe_read_suppresses_dynamic_speech_at_decoder_boundary(self):
+    def test_pure_safe_read_schema_allows_optional_still_needed_speech_delta(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1316,13 +1318,18 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertNotIn("immediate", response_plan_schema["required"])
         self.assertEqual(
             response_plan_schema["properties"]["immediate"],
-            {"type": "null"},
+            {
+                "anyOf": [
+                    {"$ref": "#/$defs/ResponseStage"},
+                    {"type": "null"},
+                ]
+            },
         )
         self.assertEqual(
             response_plan_schema["properties"]["pre_action"],
             {"type": "null"},
         )
-        self.assertIn("never author another pre-evidence act", ollama.prompts[0][0])
+        self.assertIn("use the same still-needed-delta rule", ollama.prompts[0][0])
         self.assertIsNone(result.composition.response_plan.immediate)
         self.assertTrue(
             result.composition.metadata["pure_safe_read_fast_act_reference_only"]
@@ -1330,7 +1337,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertFalse(result.metadata["safe_read_semantic_review_attempted"])
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_pure_safe_read_dynamic_candidate_fails_soft_without_speech(self):
+    def test_pure_safe_read_dynamic_candidate_may_survive_as_new_delta(self):
         canonical = plan(
             disposition="execute",
             goals=["goal-weather"],
@@ -1367,15 +1374,20 @@ class ResponseComposerResolverTests(unittest.TestCase):
             )
         )
         self.assertEqual(result.status, "resolved")
-        self.assertIsNone(result.composition.response_plan.immediate)
-        self.assertTrue(result.metadata["fail_soft_primary_activity"])
-        self.assertTrue(
-            result.composition.metadata["pure_safe_read_fast_act_reference_only"]
+        stage = result.composition.response_plan.immediate
+        self.assertIsNotNone(stage)
+        assert stage is not None
+        self.assertEqual(
+            stage.text,
+            "我现在就去帮你仔细看看上海今天的天气怎么样。",
         )
+        self.assertFalse(stage.reuse_current_turn_speech)
+        self.assertTrue(result.metadata["safe_read_semantic_review_attempted"])
+        self.assertTrue(result.metadata["safe_read_semantic_review_succeeded"])
         self.assertEqual(len(ollama.prompts), 2)
         self.assertIn(
-            "pure execute Plan whose pending capabilities are all safe_read",
-            ollama.prompts[1][1]["system"],
+            "still-needed pre-evidence acknowledgement",
+            ollama.prompts[1][0],
         )
 
     def test_pure_safe_read_skips_pre_evidence_semantic_review(self):

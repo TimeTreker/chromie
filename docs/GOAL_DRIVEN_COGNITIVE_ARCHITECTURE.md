@@ -244,11 +244,16 @@ physical TaskGraph execution remains sequential.
 A blink selected to express attention is not automatically part of the user’s
 goal. An explicit user request to blink is.
 
-Likewise, response transport is not a user-task step. In the maintained
-Goal-driven Runtime, a conversational goal is a `respond` outcome and the
-Response Composer owns its speech plan. A transport capability such as
-`chromie.speak` may remain available to legacy/native interaction surfaces, but
-it is not a Fast or Deep Planner leaf.
+Likewise, response transport is not a user-task step. A direct conversational
+Goal is represented by a `respond` outcome, and a transport capability such as
+`chromie.speak` may remain available to legacy/native interaction surfaces but
+is not a Fast or Deep Planner leaf. This transport boundary does **not** make
+planners mute: Fast and Deep Planning may author `response_text`, including on
+an executable Plan, when there is a new prospective conversational delta to
+communicate. That text never authorizes, executes, or proves the effect. Response
+Composer realizes and coordinates user-facing speech from the immutable Plan and
+Interaction Context; it must preserve new semantic intent while avoiding an act
+Chromie already delivered or already has pending for the same responsibility.
 
 ### 3.11 Truth over guessing
 
@@ -1003,7 +1008,8 @@ runtime evidence.
 Partial satisfaction is not authorization to execute a degraded plan.
 
 Responsibility type also constrains the outcome. A `spoken_response` Goal is
-owned by Response Composer and cannot own an executable step. A
+satisfied by authored conversational output and cannot own a generic response-transport
+executable step. A
 `capability_dependent` Goal cannot use `respond` as a shortcut around execution
 unless delivered evidence-bound dialogue names that exact Goal. This validation
 uses typed Goal and evidence provenance; it does not classify user wording.
@@ -1337,10 +1343,13 @@ completion responsibilities.
 
 `Interaction Ledger` is the bounded, append-only journal through which Chromie
 reports her own already-performed interaction history to later cognition. Its
-audience is Goal Association, Fast Planner, Deep Planner, Response Composer,
-and runtime owners. This architecture document is the authoritative owner of
-the term because the contract spans Speaking, Activity, Social Attention, and
-cognition; no component-only document can own that cross-lane boundary.
+model-facing audience includes Goal Interpretation, Goal Association, Fast
+Planner, Deep Planner, Tool Result Interpretation, Response Composer, and any
+later cognitive stage that can otherwise repeat a Goal-scoped conversational or
+effectful responsibility. Runtime owners append the qualified facts. This
+architecture document is the authoritative owner of the term because the
+contract spans Speaking, Activity, Social Attention, and cognition; no
+component-only document can own that cross-lane boundary.
 
 Every entry is immutable, replay-safe, typed by owner, lane, event type, state,
 Goal IDs, turn, Plan provenance, subject, time, and evidence references. Existing
@@ -1368,11 +1377,19 @@ journal, not another store. Runtime selects a bounded chronology for the
 relevant Goal IDs and includes same-turn unbound Fast speech without inventing
 Goal ownership. It exposes already audible speech, pending speech, Activity and
 provider-backed Speaking work, Social Attention actions, Goal/Plan history, and
-unresolved waits. Goal Association receives recent session context; after Goal
-association, planners and composition receive the Goal-scoped projection.
-Models use it to produce only the still-needed semantic, planning, or
-conversational delta while preserving the typed evidence strength of every
-event.
+unresolved waits. Before canonical Goal IDs exist, Goal Interpretation and Goal
+Association receive bounded recent session context; after association, later
+cognition receives the Goal-scoped projection.
+
+Every model stage applies the same continuity rule: combine the current Goal,
+what Chromie actually delivered, what trusted evidence says actually completed
+or failed, and any new observation, then produce only the still-needed semantic
+or effectful delta. Scheduled speech is pending rather than heard, and a Plan or
+committed request is pending rather than complete. A later stage may repeat an
+act only when the current meaning justifies it, for example an explicit repeat,
+retry, correction, changed state, new evidence, or clarification. The Ledger is
+therefore shared state, not a source of pairwise rules such as “Deep Planner must
+not repeat Fast Planner.”
 
 The current runtime retains at most 160 in-memory events per session and
 projects at most 48 recent relevant events into volatile Prompt Layer 4. This
