@@ -176,7 +176,10 @@ def iter_runtime_python(root: Path) -> Iterator[Path]:
         if not base.exists():
             continue
         for path in sorted(base.rglob("*.py")):
-            if not any(part in {"__pycache__", ".git"} for part in path.parts):
+            if not any(
+                part in {"__pycache__", ".git", ".venv", "venv"}
+                for part in path.parts
+            ):
                 yield path
 
 
