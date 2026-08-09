@@ -247,12 +247,15 @@ conversational responsibilities are the same. Distinct result, failure,
 limitation, clarification, confirmation, progress, and completion acts remain
 independently deliverable.
 
-Natural continuity comes from projecting owner-qualified facts into the Core,
-not from a prompt-only “do not repeat” rule or a second general memory store.
-Speech delivery, Activity proposal/commit state, trusted Activity outcomes, and
-recent auxiliary Social Attention evidence keep separate lifecycle and
-authority. In particular, a spoken promise is observable conversation state but
-never proof that the Activity started or completed.
+Natural continuity comes from the Goal-scoped `Interaction Context` projected
+from Chromie's append-only `Interaction Ledger`, not from a prompt-only “do not
+repeat” rule. Speech delivery, Goal/Plan resolution, Activity or
+provider-backed Speaking commitment and outcome, and Social Attention results
+retain their typed lifecycle and owner. Later cognition considers what Chromie
+already said, promised, attempted, completed, or failed and produces only the
+still-needed response or plan delta. In particular, a spoken promise is
+observable conversation state but never proof that the Activity started or
+completed, and a committed request is never terminal evidence.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable

@@ -111,6 +111,7 @@ class InteractionRuntimeCoordinator:
         catalog_refresh_ttl_s: float | None = None,
         body_recovery_max_attempts: int | None = None,
         body_recovery_confirmation_ttl_s: float | None = None,
+        interaction_ledger: Any | None = None,
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
@@ -189,6 +190,7 @@ class InteractionRuntimeCoordinator:
             )
         )
         self._catalog_lock = asyncio.Lock()
+        self.interaction_ledger = interaction_ledger
 
     async def ensure_skill_definitions(self, skill_ids: Iterable[str]) -> None:
         """Refresh provider-backed definitions needed for a canonical plan.
@@ -281,6 +283,19 @@ class InteractionRuntimeCoordinator:
             session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
+        if self.interaction_ledger is not None:
+            envelope = prepared.metadata.get("user_turn_envelope")
+            turn_id = (
+                str(envelope.get("turn_id") or "").strip()
+                if isinstance(envelope, dict)
+                else ""
+            ) or prepared.interaction_id
+            self.interaction_ledger.record_committed_requests(
+                session_id=str(session_id or turn_id),
+                turn_id=turn_id,
+                interaction_id=prepared.interaction_id,
+                requests=prepared.skills,
+            )
         if prepared.status == "error" and not prepared.skills and not prepared.speech:
             return SkillRuntimeResult(
                 interaction_id=prepared.interaction_id,

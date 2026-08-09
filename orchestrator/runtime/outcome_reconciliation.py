@@ -232,6 +232,9 @@ class ExecutionOutcomeReconciler:
                                 request.metadata.get("safety_class") or ""
                             ),
                             "effects": list(request.metadata.get("effects") or []),
+                            "execution_lane": str(
+                                request.metadata.get("execution_lane") or "activity"
+                            ),
                             "retryable_safe_read": (
                                 request.metadata.get("retryable_safe_read") is True
                             ),
@@ -326,6 +329,9 @@ class ExecutionOutcomeReconciler:
                             request.metadata.get("safety_class") or ""
                         ),
                         "effects": list(request.metadata.get("effects") or []),
+                        "execution_lane": str(
+                            request.metadata.get("execution_lane") or "activity"
+                        ),
                         "retryable_safe_read": (
                             request.metadata.get("retryable_safe_read") is True
                         ),

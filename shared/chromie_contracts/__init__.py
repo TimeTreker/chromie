@@ -72,6 +72,13 @@ from .execution_outcome import (
     aggregate_execution_status,
     execution_outcome_fingerprint,
 )
+from .interaction_ledger import (
+    InteractionContextProjection,
+    InteractionEventLane,
+    InteractionEventOwner,
+    InteractionEventType,
+    InteractionLedgerEvent,
+)
 from .semantic_authority import (
     SEMANTIC_AUTHORITY_CONTEXT_KEY,
     SemanticAuthorityClaim,
@@ -268,6 +275,11 @@ __all__ = [
     "ProviderPostconditionEvidence",
     "aggregate_execution_status",
     "execution_outcome_fingerprint",
+    "InteractionContextProjection",
+    "InteractionEventLane",
+    "InteractionEventOwner",
+    "InteractionEventType",
+    "InteractionLedgerEvent",
     "SEMANTIC_AUTHORITY_CONTEXT_KEY",
     "SemanticAuthorityClaim",
     "SemanticAuthorityOwner",

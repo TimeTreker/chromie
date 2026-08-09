@@ -1008,6 +1008,20 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
+      "contract": "Preserve trusted Social Attention execution when optional Interaction Ledger projection fails; retain a bounded diagnostic without inventing an action result.",
+      "review_status": "reviewed",
+      "body_sha256": "65995433b0b95ea552c23b53faeb5339a7bdcb21872e7df4436ef3233fa064c9",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 2,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
       "body_sha256": "8c3551e305893ed2a4e41f1b2e90027ef23620335cef664199d4e24c491ba53b",
@@ -1019,7 +1033,7 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 2,
+      "ordinal": 3,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
@@ -1034,7 +1048,21 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 3,
+      "ordinal": 4,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Preserve the validated ExecutionOutcomeBundle and normal Goal-state closure when optional Interaction Ledger projection fails; retain a bounded diagnostic without upgrading evidence.",
+      "review_status": "reviewed",
+      "body_sha256": "18eb175e23f8bc1150157fefcc431f7e0f8f6619680e89b458f329425ec7cacc",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 5,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
@@ -1049,7 +1077,7 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 4,
+      "ordinal": 6,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",

@@ -540,7 +540,7 @@ this order:
 | 1. Exact identity/world projection | Identity and world-context owners | Owner-approved identity, personality, relationship, and genuine world assumptions only while their exact rendered version is unchanged. Age, relationship, locale, policy, or world updates invalidate the projection. |
 | 2. Agent operating contract | Exact prompt family | Goal Association, Fast Planner, Deep Planner, Response Composer, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
 | 3. Exact capability contract | Capability/Agent Skill/schema owners | Bounded catalog, schema, and Agent Skill projections only while exact availability, content, ordering, and version remain unchanged. Any difference invalidates the projection. |
-| 4. Session context | Core context assembly | Conversation, active and retained Goals, discourse state, memory indexes, scene observations, runtime state, and evidence. Always volatile. |
+| 4. Session context | Core context assembly | Conversation, active and retained Goals, the Goal-scoped Interaction Context projection, discourse state, memory indexes, scene observations, runtime state, and evidence. Always volatile. |
 | 5. Current turn | Admitted turn and current attempt | Authoritative user input, current time, temporary observations, validation feedback, and attempt-local repair state. Always last and volatile. |
 
 Layers 0 through 3 are a stable-prefix candidate only when the same model and
@@ -1333,12 +1333,54 @@ Runtime may fulfill the referenced act once. This does not suppress independent
 result, failure, limitation, clarification, confirmation, progress, or
 completion responsibilities.
 
-This cross-lane continuity does not create a general mutable interaction
-ledger. Speaking reads playback-qualified speech evidence, Activity reads
-`TaskProposalLedger` and trusted execution outcomes, Social Attention reads its
-bounded recent auxiliary-behavior evidence, and final composition reads the
-reconciled `ExecutionOutcomeBundle`. These owner-specific records may be
-projected together for cognition, but none substitutes for another authority.
+### 15.1.1 Interaction Ledger and Interaction Context
+
+`Interaction Ledger` is the bounded, append-only journal through which Chromie
+reports her own already-performed interaction history to later cognition. Its
+audience is Goal Association, Fast Planner, Deep Planner, Response Composer,
+and runtime owners. This architecture document is the authoritative owner of
+the term because the contract spans Speaking, Activity, Social Attention, and
+cognition; no component-only document can own that cross-lane boundary.
+
+Every entry is immutable, replay-safe, typed by owner, lane, event type, state,
+Goal IDs, turn, Plan provenance, subject, time, and evidence references. Existing
+owners append only facts they are qualified to observe:
+
+| Owner | Ledger facts | What those facts do not prove |
+|---|---|---|
+| Cognitive Runtime | Goal association and validated Plan resolution | That a planned effect started or completed |
+| Playback Delivery | speech scheduled, playback started, or not delivered | Activity execution or completion |
+| Trusted Capability Runtime | Activity, provider-backed Speaking, or Social Attention request committed; Social Attention terminal result | Completion of an unrelated Goal |
+| Execution closure | Goal-scoped Activity or provider-backed Speaking terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
+
+The Ledger neither edits nor replaces playback evidence,
+`TaskProposalLedger`, recent auxiliary-behavior evidence, Goal state, or
+`ExecutionOutcomeBundle`. A repeated event identity must reproduce the same
+immutable content. A proposal, Plan, scheduled utterance, committed request, or
+provider postcondition never becomes completion merely because it appears in
+the Ledger. Terminal Activity entries require trusted execution evidence.
+Runtime may append a validated terminal bundle even when the separate Goal-state
+commit later fails; that event reports only the bundle's execution fact and
+does not claim that Goal state was updated.
+
+`Interaction Context` is the deterministic, model-facing projection of that
+journal, not another store. Runtime selects a bounded chronology for the
+relevant Goal IDs and includes same-turn unbound Fast speech without inventing
+Goal ownership. It exposes already audible speech, pending speech, Activity and
+provider-backed Speaking work, Social Attention actions, Goal/Plan history, and
+unresolved waits. Goal Association receives recent session context; after Goal
+association, planners and composition receive the Goal-scoped projection.
+Models use it to produce only the still-needed semantic, planning, or
+conversational delta while preserving the typed evidence strength of every
+event.
+
+The current runtime retains at most 160 in-memory events per session and
+projects at most 48 recent relevant events into volatile Prompt Layer 4. This
+is current interaction context, not durable Global Memory. Retention eviction
+does not rewrite a retained event, and no source claim is made for continuity
+across process restart. A future persistence requirement must preserve the same
+owner, replay, evidence, and bounded-projection contracts rather than silently
+promoting the Ledger into long-term memory.
 
 ### 15.2 Post-execution response
 

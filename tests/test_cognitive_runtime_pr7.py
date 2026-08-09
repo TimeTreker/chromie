@@ -14,6 +14,7 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.skill_runtime import (
     LocalSpeechSkillProvider,
@@ -417,6 +418,74 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIn("orchestrator.canonical_plan_adapter", modules)
         self.assertIn("total", result.timings_ms)
 
+    def test_interaction_context_reaches_association_planner_and_composer(self):
+        ledger = InteractionLedger()
+        ledger.record_playback_event(
+            {
+                "event_id": "speech-existing",
+                "session_id": "sid-pr7",
+                "turn_id": "turn-1",
+                "status": "playback_started",
+                "text": "你好。",
+                "source_goal_ids": ["goal-1"],
+            }
+        )
+
+        class ContextClient(ScriptedClient):
+            def __init__(self):
+                super().__init__(
+                    association=new_goal_association(),
+                    fast_plans=[respond_plan()],
+                )
+                self.association_contexts: list[dict] = []
+                self.fast_contexts: list[dict] = []
+
+            async def resolve_goal_association(self, *args, **kwargs):
+                self.association_contexts.append(
+                    dict(kwargs.get("context") or {})
+                )
+                return await super().resolve_goal_association(*args, **kwargs)
+
+            async def resolve_fast_plan(self, *args, **kwargs):
+                self.fast_contexts.append(dict(kwargs.get("context") or {}))
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        client = ContextClient()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(
+                FakeRuntime(),
+            ),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            interaction_ledger=ledger,
+        )
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            client.association_contexts[0]["interaction_context"][
+                "already_spoken"
+            ][0]["subject_id"],
+            "speech-existing",
+        )
+        self.assertIn(
+            "goal_associated",
+            {
+                item["event_type"]
+                for item in client.fast_contexts[0]["interaction_context"][
+                    "goal_history"
+                ]
+            },
+        )
+        self.assertIn(
+            "plan_resolved",
+            {
+                item["event_type"]
+                for item in client.compose_contexts[0]["interaction_context"][
+                    "goal_history"
+                ]
+            },
+        )
     def test_runtime_trace_can_emit_one_runtime_event_package(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

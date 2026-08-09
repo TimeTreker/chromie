@@ -1148,6 +1148,8 @@ class DeepPlannerResolver:
             f"Executable capability catalog JSON:\n{self._bounded(prompt_capabilities, 12000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"
+            f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 8000)}\n\n"
+            "Use Interaction Context to reason from Chromie's already performed, pending, failed, and spoken actions and produce only the still-needed plan delta. Preserve owner and event_type evidence strength: a proposal or committed request is not completion, scheduled speech is not audible, and execution completion must retain execution_closure evidence references. The current canonical Goals and validation feedback remain authoritative. "
             "The active task bindings are historical Host/runtime context. Their "
             "task_id, request_id, canonical_plan_id, and prior step IDs are not "
             "current Deep Planner step IDs. Never copy them into current "

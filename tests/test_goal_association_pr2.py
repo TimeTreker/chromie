@@ -3518,7 +3518,13 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
                 confidence=0.95,
                 source="llm",
             ),
-            context={"active_goal_snapshots": [], "history": []},
+            context={
+                "active_goal_snapshots": [],
+                "history": [],
+                "interaction_context": {
+                    "events": [{"event_id": "ledger-goal-marker"}]
+                },
+            },
         )
         prompt = resolver._build_prompt(
             tool_request,
@@ -3529,6 +3535,7 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
         self.assertIn("politeness preamble", prompt)
         self.assertIn("identity and personality shape expression only", prompt)
         self.assertIn("one Goal when one capability result can satisfy both", prompt)
+        self.assertIn("ledger-goal-marker", prompt)
         system_prompt = resolver._system_prompt(GoalSegmentationModelOutput)
         self.assertIn(
             "Conversational framing attached to a substantive responsibility",

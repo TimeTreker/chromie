@@ -367,14 +367,21 @@ only to preserve event payload integrity. Independent result, failure,
 limitation, clarification, confirmation, progress, and completion stages retain
 their own delivery obligations.
 
-Cross-lane awareness is a read-only projection of specialized evidence owners,
-not a second writable interaction-state authority. Playback lifecycle owns
-audible speech facts, `TaskProposalLedger` owns proposed and Host-committed
-Activity work, recent auxiliary-behavior evidence owns Social Attention
-cooldown/repetition facts, and `ExecutionOutcomeBundle` owns trusted Activity
-results. Response composition consumes the relevant projections, but a speech
-event can never become execution or completion evidence and no lane may append
-meaning to another owner's record.
+Cross-lane awareness is transported through the append-only `Interaction
+Ledger`. Existing owners append only typed facts they are qualified to observe:
+playback owns audible speech, Cognitive Runtime owns Goal/Plan decisions, the
+Trusted Capability Runtime owns committed provider work and Social Attention
+results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
+provider-backed Speaking outcomes. No entry edits or upgrades another owner's
+evidence.
+
+Before Goal Association, recent session events form volatile Interaction
+Context. After canonical Goal IDs exist, Runtime projects only events bound to
+those Goals plus explicitly unbound Fast speech from the same turn. Goal
+Association, Fast Planner, Deep Planner, and Response Composer use the bounded
+projection to decide the still-needed delta. Scheduled speech remains distinct
+from audible speech, committed work remains distinct from terminal evidence,
+and a speech event can never become execution or completion evidence.
 
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically

@@ -23,6 +23,7 @@ PendingAudio = tuple[int, Any, int, str | None, str | None]
 class PlaybackDeliveryLifecycle:
     """Mutable lifecycle state for one VoiceAssistant runtime."""
 
+    interaction_event_sink: Callable[[dict[str, Any]], Any] | None = None
     next_playback_order: int = 0
     synthesis_order: int = 0
     playback_generation: int = 0
@@ -187,6 +188,7 @@ class PlaybackDeliveryLifecycle:
         self.turn_speech_event_by_playback_key[
             self.key(generation, orders[0], session_id)
         ] = event_id
+        self._publish_interaction_event(event)
         return event
 
     @staticmethod
@@ -200,6 +202,20 @@ class PlaybackDeliveryLifecycle:
                 text
                 for item in values
                 if (text := " ".join(str(item or "").strip().split()))
+            }
+        )
+
+    def _publish_interaction_event(self, event: dict[str, Any]) -> None:
+        if self.interaction_event_sink is None:
+            return
+        self.interaction_event_sink(
+            {
+                **event,
+                "orders": list(event.get("orders") or []),
+                "source_goal_ids": list(
+                    event.get("source_goal_ids") or []
+                ),
+                "claims": list(event.get("claims") or []),
             }
         )
 
@@ -222,6 +238,7 @@ class PlaybackDeliveryLifecycle:
                 continue
             event["status"] = "playback_started" if started else "not_delivered"
             event["playback_reason"] = str(reason or "")
+            self._publish_interaction_event(event)
             break
 
     def delivered_turn_speech_events(

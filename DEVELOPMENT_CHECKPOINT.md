@@ -18,31 +18,37 @@ PR [#19](https://github.com/TimeTreker/chromie/pull/19). `LayeredPrompt` promote
 exact stable fragments before volatile turn state and `OllamaClient` records
 only reuse candidates and provider timings, never inferred cache hits.
 
-Issue [#20](https://github.com/TimeTreker/chromie/issues/20) owns the active P0
-correctness line before model-profile qualification. The reproduced failure is
+Issue [#20](https://github.com/TimeTreker/chromie/issues/20) is merged through
+PR [#21](https://github.com/TimeTreker/chromie/pull/21) as `ac1944d`. Its
+reproduced failure was
 a mixed chain: qwen3.5:4b ignores the semantic-review JSON schema on Ollama
 `/api/chat` while honoring the same schema through `/api/generate`; the runtime
 previously treated that expected model/transport incompatibility as permission
 to preserve an ungrounded chat decision; route-narrowed capability context
 could omit an exact recovery ability; and planner validation could accept a
-typed effectful Goal as satisfied with zero executable steps. The Issue branch
+typed effectful Goal as satisfied with zero executable steps. The merged source
 provides one same-model, same-schema transport compatibility retry,
 preserves a candidate-first lossless supplied catalog for review, and rejects
 unresolved effectful zero-step outcomes before canonical planning. Focused
 regressions pass 191/191, the applicable Level A classes pass 13/13, and the
 canonical gate passes; `docs/STATUS.md` owns the exact evidence limits.
 
-Issue [#22](https://github.com/TimeTreker/chromie/issues/22) is implemented as a
-stacked source change after #20. The originating cross-lane continuity proposal
-was mapped onto existing authorities rather than creating a second mutable
-interaction ledger. Core-authored speech now retains turn, Goal, canonical
-Plan, role, claim, and completion-restriction provenance through playback;
-Goal-bound events cannot be reused for unrelated Goals or Plans. Playback,
-`TaskProposalLedger`, recent auxiliary Social Attention evidence, and
-`ExecutionOutcomeBundle` remain the distinct speech, Activity proposal,
-auxiliary behavior, and trusted execution owners. Focused tests pass 135/135,
-the applicable Level A classes pass 25/25, and the canonical gate passes 102
-benchmarks, 2,156 maintained tests, and 20 legacy Agent tests.
+Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the active
+source line. Core-authored speech retains turn, Goal, canonical Plan, role,
+claim, and completion-restriction provenance through playback. The bounded
+append-only Interaction Ledger transports immutable owner-authored Goal/Plan,
+speech, committed capability, Social Attention, and trusted execution events;
+its Goal-scoped Interaction Context is supplied as volatile input to Goal
+Association, Fast Planner, Deep Planner, and Response Composer. It never
+replaces or upgrades playback, `TaskProposalLedger`, Goal state, Social
+Attention results, or `ExecutionOutcomeBundle` evidence. Current retention is
+in-memory only and makes no process-restart continuity claim.
+
+The Issue #22 branch passes 383 focused tests, the three relevant Level A
+classes 25/25, and the canonical gate with 102 benchmark tests, 2,168
+maintained tests, and 20 legacy Agent tests. Its remaining delivery step is
+review and merge; no live model, speaker, simulator, restart, or physical-robot
+claim is attached to this source result.
 
 The earlier post-merge audit and paired closure are retained in
 `docs/STATUS.md`, their implementation/evidence authority. In summary, clean
@@ -95,9 +101,9 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-Publish and review Issue #20 without widening its fail-closed scope, then review
-the stacked Issue #22 provenance closure. After both land, qualify the RTX 4090
-Laptop model-role change and retain a same-model warm/cold prefix measurement;
+Complete, publish, and review Issue #22 without widening its evidence-owner
+scope. Then qualify the RTX 4090 Laptop model-role change and retain a
+same-model warm/cold prefix measurement;
 separate prompt evaluation from model load and never call a repeated digest a
 provider cache hit.
 
