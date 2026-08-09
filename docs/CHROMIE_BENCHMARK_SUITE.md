@@ -778,6 +778,13 @@ schema, raw output, parsed output, repair attempts, and downstream result in the
 root-cause order above. The file can contain conversation and memory content and
 must be inspected or sanitized before it leaves the operator's machine.
 
+Coding agents must follow the executable
+[LLM-versus-workflow root-cause method](../CONTRIBUTING.md#llm-versus-workflow-root-cause-method)
+when producing that attribution. In particular, the raw model output, its
+parsed or repaired form, and the next workflow state must be compared at the
+same call/turn boundary. The final response alone cannot distinguish a model
+inference error from a prompt, context, schema, provider, or downstream-code
+error.
 
 The implemented mining workflow preserves each candidate as an immutable,
 pending-review artifact. Candidate indexing reports similarity clusters,

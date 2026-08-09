@@ -81,12 +81,14 @@ evidence-grounded report with all of the following:
 4. **Root cause at the earliest responsible boundary.** Explain the causal chain
    from the initiating trigger to the first incorrect decision or state
    transition. Distinguish the root cause from downstream symptoms, unrelated
-   failures, and contributing conditions. Explicitly classify the primary
-   attribution as `llm-model`, `logic-workflow-contract`,
-   `code-implementation`, or `mixed`, and cite the evidence that rules the other
-   categories in or out. A wrong model response is an initiating or contributing
-   failure, not sufficient proof of an LLM root cause, when an owned validation,
-   fallback, or workflow boundary was required to contain it.
+   failures, and contributing conditions. Use the benchmark attribution
+   categories `scenario_or_oracle`, `prompt_or_profile`, `context_or_harness`,
+   `contract_or_schema`, `runtime_or_provider`, `model_inference`, `mixed`, or
+   `unresolved`, and cite the evidence that rules the other categories in or
+   out. Separately record whether model-inference fault is `supported`,
+   `not_supported`, or `unresolved`. A wrong model response is an initiating or
+   contributing failure, not sufficient proof of an LLM root cause, when an
+   owned validation, fallback, or workflow boundary was required to contain it.
 5. **Fix mechanism.** Explain why the chosen change restores the violated
    contract, why it belongs at that boundary, and which behavior intentionally
    remains unchanged. Listing changed files or describing the diff is not a
@@ -102,6 +104,81 @@ A plausible story is not a root-cause finding. Each material claim must be tied
 to retained evidence or clearly marked as an inference that still needs proof.
 The final delivery may include a patch, commit, or pull request, but none of
 those artifacts replaces the required explanation.
+
+## LLM-versus-workflow root-cause method
+
+Any coding agent investigating Chromie, including an interactive Codex or
+Claude Code session, must use the following method before changing a prompt,
+model assignment, DTO, or workflow in response to model-driven behavior. The
+goal is to locate the first incorrect boundary, not to infer causality from the
+last spoken sentence.
+
+1. Retain the original single- or multi-turn scenario, the expected contract,
+   the observed user-visible result, the current Git revision, and the runtime
+   profile. Do not simplify the utterance into an easier phrase before the
+   failing run has been preserved.
+2. Reproduce through the highest safe applicable profile. Immediately collect
+   the bounded runtime evidence so later calls do not push the failure outside
+   the retained log window:
+
+   ```bash
+   ./scripts/collect_debug_bundle.sh
+   ```
+
+3. Reconstruct one chronological turn from the workflow artifacts: input and
+   Gateway admission, Goal Interpretation, Goal Association, Agent Skill
+   selection, planning, provider or tool work, result interpretation, Response
+   Composition and Review, then delivered speech or effect. Join records by
+   `session_id`, `turn_id`, `trace_id`, and `call_id`; do not attach an unrelated
+   startup warm-up or adjacent turn merely because it uses the same model.
+4. For every model call up to the first bad result, inspect the corresponding
+   `llm_calls.jsonl` record and answer all of these questions:
+
+   - Was the intended role sent to the intended model with the expected options,
+     context budget, response schema, and prompt revision?
+   - Did the exact prompt contain the necessary authoritative facts, current
+     Goal and conversation state, capability evidence, and an internally
+     consistent instruction? Check for missing, stale, duplicated, conflicting,
+     or truncated material.
+   - Did the raw model output preserve that meaning and satisfy the requested
+     contract?
+   - Did parsing, normalization, repair, validation, state application, or a
+     later module change, drop, accept, or amplify the raw output?
+   - If the model was wrong, was an owned deterministic or semantic validation
+     boundary required to reject or contain that error?
+
+5. Mark the earliest divergence with one primary category:
+
+   | Category | Evidence required |
+   |---|---|
+   | `scenario_or_oracle` | The expected result conflicts with project authority, assumes unavailable state or capability, or overconstrains valid semantic variation. |
+   | `prompt_or_profile` | Required guidance is missing, contradictory, wrongly projected, or truncated; the raw output is compatible with the defective prompt it received. |
+   | `context_or_harness` | The prompt template is sound, but the run supplied stale, incomplete, cross-turn, fabricated, or incorrectly normalized state. |
+   | `contract_or_schema` | The DTO/schema cannot express the valid result, admits a forbidden result, or repair/normalization changes otherwise valid model meaning. |
+   | `runtime_or_provider` | The code calls the wrong model/endpoint, applies wrong options, times out or truncates, mismatches a response to a call, skips a required stage, or the provider fails. |
+   | `model_inference` | The exact request is complete and internally consistent, the correct context/schema/provider path is proven, and the raw model output still violates a clear instruction or semantic contract. |
+   | `mixed` | Two or more independently evidenced causes are necessary to explain the outcome; identify the initiating fault and the failed containment boundary separately. |
+   | `unresolved` | Required prompt, raw output, correlation, state, or provider evidence is missing or ambiguous. Do not guess. |
+
+6. Verify the classification against downstream behavior. A correct raw output
+   that becomes wrong after parsing or state application is not a model fault. A
+   wrong raw output caused by missing prompt facts is not isolated model fault.
+   A wrong raw output plus a validator that was contractually required to catch
+   it may be `mixed` even though the model initiated the failure. Another model
+   passing the scenario is useful comparative evidence, but it does not prove
+   the first model caused the original failure.
+7. Retain the diagnosis with the scenario result. At minimum record the first
+   wrong component, call/model/role/stage identifiers, the relevant prompt and
+   raw-output evidence references, transformations or repairs, downstream
+   containment, primary category, model-inference state, confidence, and
+   remaining evidence gaps. Keep initiating trigger, root cause, downstream
+   symptoms, and contributing conditions distinct.
+
+The exact prompt and raw output can include private family conversation and
+memory. Inspect them locally and cite bounded evidence references in reports;
+never publish `llm_calls.jsonl` or an unredacted debug bundle without review and
+sanitization. The benchmark-specific semantic verdict and attribution contract
+is defined in [Chromie Benchmark Suite](docs/CHROMIE_BENCHMARK_SUITE.md#10-authoring-and-review-policy).
 
 ## Tests
 
