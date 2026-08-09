@@ -1028,6 +1028,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                             "purpose": "acknowledge_and_check",
                             "generation": 6,
                             "orders": [11],
+                            "source_goal_ids": ["goal-weather"],
+                            "canonical_plan_id": plan.plan_id,
+                            "canonical_plan_fingerprint": (
+                                canonical_plan_fingerprint(plan)
+                            ),
                         }
                     ]
                 },
@@ -1043,7 +1048,41 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(metadata["reused_speech_generation"], 6)
         self.assertEqual(metadata["reused_speech_orders"], [11])
+        self.assertEqual(metadata["turn_id"], "sid-weather-reuse")
+        self.assertEqual(metadata["source_goal_ids"], ["goal-weather"])
+        self.assertEqual(metadata["canonical_plan_id"], plan.plan_id)
+        self.assertEqual(
+            metadata["canonical_plan_fingerprint"],
+            canonical_plan_fingerprint(plan),
+        )
         self.assertEqual(response.speech[0].text, fast_text)
+
+        with self.assertRaisesRegex(ValueError, "cannot be reassigned"):
+            asyncio.run(
+                CanonicalPlanRuntimeAdapter(
+                    FakeRuntime([weather_definition()])
+                ).build_response(
+                    plan=plan,
+                    composition=composition,
+                    session_id="sid-weather-reuse",
+                    language="zh-CN",
+                    context={
+                        "scheduled_turn_speech": [
+                            {
+                                "event_id": "speech_event_weather_reuse",
+                                "status": "scheduled",
+                                "text": fast_text,
+                                "purpose": "acknowledge_and_check",
+                                "generation": 6,
+                                "orders": [11],
+                                "source_goal_ids": ["goal-other"],
+                                "canonical_plan_id": "plan-other",
+                                "canonical_plan_fingerprint": "fingerprint-other",
+                            }
+                        ]
+                    },
+                )
+            )
 
     def test_physical_activity_reuses_scheduled_fast_speech_and_keeps_skill(self):
         plan = CanonicalPlan(

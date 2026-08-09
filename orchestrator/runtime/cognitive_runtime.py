@@ -789,6 +789,13 @@ class CanonicalPlanRuntimeAdapter:
             for goal in association.new_goals
             if str(goal.goal_id or "").strip()
         ]
+        runtime_context = context if isinstance(context, dict) else {}
+        envelope = runtime_context.get("user_turn_envelope")
+        turn_id = (
+            str(envelope.get("turn_id") or session_id)
+            if isinstance(envelope, dict)
+            else session_id
+        )
         speech = [
             InteractionSpeech(
                 text=final.text,
@@ -796,6 +803,7 @@ class CanonicalPlanRuntimeAdapter:
                 style="brief",
                 metadata={
                     "source": "goal_driven_response_composer",
+                    "turn_id": turn_id,
                     "phase": "final",
                     "speech_act": final.speech_act,
                     "commitment_state": final.commitment_state,
@@ -813,7 +821,6 @@ class CanonicalPlanRuntimeAdapter:
             )
         ]
 
-        runtime_context = context if isinstance(context, dict) else {}
         attention = composition.social_attention_plan
         policy_mode = self._effective_social_attention_mode(composition)
         omitted_attention: list[str] = []
@@ -1004,6 +1011,13 @@ class CanonicalPlanRuntimeAdapter:
             )
 
         fingerprint = canonical_plan_fingerprint(plan)
+        runtime_context = context if isinstance(context, dict) else {}
+        envelope = runtime_context.get("user_turn_envelope")
+        turn_id = (
+            str(envelope.get("turn_id") or session_id)
+            if isinstance(envelope, dict)
+            else session_id
+        )
         alternative = str(plan.metadata.get("plan_relation") or "") in {
             "alternative",
             "safe_adjustment",
@@ -1327,6 +1341,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             speech_metadata = {
                 "source": projected["source"],
+                "turn_id": turn_id,
                 "phase": phase,
                 "speech_act": projected["speech_act"],
                 "commitment_state": projected["commitment_state"],
@@ -1357,6 +1372,38 @@ class CanonicalPlanRuntimeAdapter:
                     raise ValueError(
                         "response stage text does not match the referenced "
                         "current-turn speech event"
+                    )
+                reused_goal_ids = {
+                    normalized
+                    for item in reused.get("source_goal_ids") or []
+                    if (normalized := " ".join(str(item or "").strip().split()))
+                }
+                reassigned_goal_ids = (
+                    set(projected.get("covers_goal_ids") or []) - reused_goal_ids
+                )
+                if reused_goal_ids and reassigned_goal_ids:
+                    raise ValueError(
+                        "Goal-bound current-turn speech cannot be reassigned to "
+                        "unrelated canonical Goals: "
+                        + ", ".join(sorted(reassigned_goal_ids))
+                    )
+                reused_plan_id = " ".join(
+                    str(reused.get("canonical_plan_id") or "").strip().split()
+                )
+                if reused_plan_id and reused_plan_id != plan.plan_id:
+                    raise ValueError(
+                        "reused current-turn speech references a different "
+                        "canonical plan"
+                    )
+                reused_plan_fingerprint = " ".join(
+                    str(reused.get("canonical_plan_fingerprint") or "")
+                    .strip()
+                    .split()
+                )
+                if reused_plan_fingerprint and reused_plan_fingerprint != fingerprint:
+                    raise ValueError(
+                        "reused current-turn speech canonical-plan fingerprint "
+                        "mismatch"
                     )
                 raw_orders = reused.get("orders")
                 if not isinstance(raw_orders, list):

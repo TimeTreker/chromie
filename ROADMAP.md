@@ -18,7 +18,9 @@ organized by capability, risk, and retained evidence.
 1. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18), then complete
-   [#20](https://github.com/TimeTreker/chromie/issues/20) before qualifying a
+   [#20](https://github.com/TimeTreker/chromie/issues/20), then retain the
+   cross-lane speech-evidence provenance from
+   [#22](https://github.com/TimeTreker/chromie/issues/22) before qualifying a
    replacement model profile. Same-model timing evidence must remain separate
    from cross-model reload measurement; no prompt-prefix result may claim
    cross-model KV reuse or model-reload savings.
@@ -118,6 +120,28 @@ Exit criteria:
 - excluded lanes produce typed no-action outcomes;
 - no authoritative failure enters another semantic planner;
 - current docs and profiles describe the same lane policy.
+
+### Cross-lane current-turn evidence continuity
+
+Issue [#22](https://github.com/TimeTreker/chromie/issues/22) closes the missing
+provenance handoff between Core-authored response stages and playback-qualified
+speech evidence. Preserve the existing owner-specific records instead of adding
+a general mutable interaction ledger: playback owns audible speech,
+`TaskProposalLedger` owns Activity proposal/commit state, recent auxiliary
+evidence owns Social Attention repetition/cooldown facts, and
+`ExecutionOutcomeBundle` owns trusted Activity results.
+
+Exit criteria:
+
+- delivered response-stage speech retains exact turn, Goal, Plan, claim, and
+  completion-restriction provenance;
+- pre-Goal Fast speech remains explicitly unbound rather than receiving
+  Host-invented Goal ownership;
+- Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
+- scheduled and delivered speech remain distinct, and neither proves Activity
+  execution or completion; and
+- focused lane/runtime regressions plus the canonical source gate pass without
+  a new runtime switch, compatibility path, document, or semantic authority.
 
 ### Interpretation and capability grounding
 

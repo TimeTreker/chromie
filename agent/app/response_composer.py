@@ -356,6 +356,7 @@ class ResponseComposerResolver:
                 self._validate_reused_turn_speech(
                     model_output.response_plan,
                     context=request.context,
+                    plan=plan,
                 )
                 premature_claims = self._pending_action_claim_errors(
                     model_output.response_plan,
@@ -694,6 +695,7 @@ class ResponseComposerResolver:
         cls._validate_reused_turn_speech(
             response_plan,
             context=request.context,
+            plan=plan,
         )
         cls._validate_pending_response_contract(
             response_plan,
@@ -1064,7 +1066,7 @@ class ResponseComposerResolver:
             covers_goal_ids=ordered_missing,
         )
         repaired = response_plan.model_copy(update={"pre_action": stage})
-        cls._validate_reused_turn_speech(repaired, context=context)
+        cls._validate_reused_turn_speech(repaired, context=context, plan=plan)
         return repaired, ["mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"]
 
     @staticmethod
@@ -1106,6 +1108,7 @@ class ResponseComposerResolver:
         response_plan: ResponsePlan,
         *,
         context: dict[str, Any] | None,
+        plan: CanonicalPlan | None = None,
     ) -> None:
         reusable_by_event_id = {
             event_id: item
@@ -1143,6 +1146,37 @@ class ResponseComposerResolver:
                 raise ValueError(
                     "reused current-turn speech act must match the referenced "
                     "speech event purpose"
+                )
+            event_goal_ids = {
+                normalized
+                for item in event.get("source_goal_ids") or []
+                if (normalized := " ".join(str(item or "").strip().split()))
+            }
+            reassigned_goal_ids = set(stage.covers_goal_ids) - event_goal_ids
+            if event_goal_ids and reassigned_goal_ids:
+                raise ValueError(
+                    "Goal-bound current-turn speech cannot be reassigned to "
+                    "unrelated canonical Goals: "
+                    + ", ".join(sorted(reassigned_goal_ids))
+                )
+            if plan is None:
+                continue
+            event_plan_id = " ".join(
+                str(event.get("canonical_plan_id") or "").strip().split()
+            )
+            if event_plan_id and event_plan_id != plan.plan_id:
+                raise ValueError(
+                    "reused current-turn speech references a different canonical plan"
+                )
+            event_plan_fingerprint = " ".join(
+                str(event.get("canonical_plan_fingerprint") or "").strip().split()
+            )
+            if (
+                event_plan_fingerprint
+                and event_plan_fingerprint != canonical_plan_fingerprint(plan)
+            ):
+                raise ValueError(
+                    "reused current-turn speech canonical-plan fingerprint mismatch"
                 )
 
     @staticmethod

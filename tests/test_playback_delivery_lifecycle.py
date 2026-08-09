@@ -66,6 +66,68 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first["event_id"], second["event_id"])
         self.assertNotEqual(first["text"], second["text"])
 
+        other_goal = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            generation=2,
+            orders=[4],
+            normalized_text="Okay, let me look.",
+            stage="fast_first",
+            purpose="acknowledge_and_check",
+            route="tool",
+            intent="weather_query",
+            commitment="checking_only",
+            source_goal_ids=["goal-other"],
+        )
+        assert other_goal is not None
+        self.assertNotEqual(first["event_id"], other_goal["event_id"])
+
+    async def test_delivered_event_preserves_goal_plan_and_claim_provenance(
+        self,
+    ) -> None:
+        lifecycle = PlaybackDeliveryLifecycle()
+        lifecycle.create_playback_start_waiter(
+            generation=3,
+            order=7,
+            session_id="sid",
+        )
+        event = lifecycle.register_turn_speech_event(
+            session_id="sid",
+            turn_id="turn-weather",
+            generation=3,
+            orders=[7],
+            normalized_text="I will check the weather.",
+            stage="pre_action",
+            purpose="acknowledge_and_check",
+            commitment="evaluating",
+            source_goal_ids=["goal-weather", "goal-weather"],
+            canonical_plan_id="plan-weather",
+            canonical_plan_fingerprint="fingerprint-weather",
+            delivery_role="response",
+            claims=["checking", "checking"],
+            must_not_claim_completion=True,
+        )
+        assert event is not None
+        self.assertEqual(event["status"], "scheduled")
+        self.assertEqual(event["turn_id"], "turn-weather")
+        self.assertEqual(event["source_goal_ids"], ["goal-weather"])
+        self.assertEqual(event["claims"], ["checking"])
+
+        lifecycle.resolve_playback_start_waiter(
+            generation=3,
+            order=7,
+            session_id="sid",
+            started=True,
+            reason="playback_start",
+        )
+        delivered = lifecycle.delivered_turn_speech_events("sid")
+        self.assertEqual(len(delivered), 1)
+        self.assertEqual(delivered[0]["canonical_plan_id"], "plan-weather")
+        self.assertEqual(
+            delivered[0]["canonical_plan_fingerprint"],
+            "fingerprint-weather",
+        )
+        self.assertTrue(delivered[0]["must_not_claim_completion"])
+
     async def test_timeout_does_not_cancel_late_barrier_future(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()
         waiter = lifecycle.create_playback_start_waiter(
