@@ -55,9 +55,21 @@ The earlier post-merge audit and paired closure are retained in
 Chromie `a36444b` and Soridormi `fa8080d2` retained exact compound MuJoCo
 execution, deterministic provider-start cancellation, Goal reconciliation, and
 safe idle. The source and generated-speech gates also closed their recorded
-revision scopes. Independent semantic review, physical audio/robot evidence,
-real vocal/media providers, and release qualification remain open; do not
-reinterpret the retained simulator or generated-audio evidence as those claims.
+revision scopes.
+
+The narrow physical voice-device track is now target validated for one
+supervised English speech-only turn. Clean host revision `f8d5eae` retained
+`.chromie/acceptance/voice/20260809T122818Z`: the EDIFIER H230P microphone was
+recognized exactly by ASR, Gateway/Core produced one chat response with zero
+executable capabilities, audible playback completed, all six machine checks
+passed, the operator verdict was `pass`, and the strict
+`current-revision-live-voice` profile reported zero errors. This closes that
+microphone -> ASR -> cognition -> TTS -> speaker chain only. Broader semantic
+review, physical-device barge-in/echo and latency qualification, physical robot
+evidence, real vocal/media providers, and release qualification remain open;
+do not reinterpret one accepted physical turn or the retained simulator and
+generated-audio evidence as those broader claims. `docs/STATUS.md` owns the
+exact evidence identity and limits.
 
 The maintained source contracts and compatibility state are owned by
 `docs/STATUS.md`; `/interaction` and `/run` remain emergency-only compatibility
@@ -111,9 +123,11 @@ The merged Issues retain clean, revision-bound source and highest-safe automated
 evidence for the walk/sing/blink defect, reversible barge-in, the exact
 `chromie.vocal.perform` contract, and peer media Activity. The evidence paths,
 counts, limits, and remaining physical/provider gaps are owned by
-[Current Status](docs/STATUS.md) and [Acceptance](docs/ACCEPTANCE.md). In
-particular, generated speech and MuJoCo body results do not prove a physical
-microphone, speaker, robot, real vocal provider, or real media provider.
+[Current Status](docs/STATUS.md) and [Acceptance](docs/ACCEPTANCE.md). Generated
+speech and MuJoCo body results do not prove a physical microphone, speaker,
+robot, real vocal provider, or real media provider. The separate supervised
+bundle recorded above is the authority for its one narrow physical
+microphone-to-speaker claim.
 
 The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
 capability manifest and compatibility authority are bound to that revision.

@@ -24,6 +24,15 @@ reconciliation. Trusted Host and provider boundaries authorize effects.
 | Reversible barge-in | VAD speech start now ducks the exact playback generation without cognitive cancellation. Likely echo/noise resumes the next unplayed chunk; confirmed external speech closes the ducked stream before output-only invalidation, then routes a new session for semantic scope. Echo comparison is order-aware so a short replay is not diluted by the rest of a long response. | Focused duck/echo/device/timeout regressions, the `deterministic_safety_controls` general-ability class, runtime exception classifications, and the canonical gate cover source behavior. The focused voice runner replays retained output PCM and enforces 250 ms duck/silence budgets, clean resume completion, distinct Gateway receipts, and no stale or duplicate output. | **Target validated for generated-speech synthetic input** on clean Chromie `94718ab` in `.chromie/acceptance/voice/issue-5-94718ab-clean`: `barge-in-echo` passed 6/6 and `barge-in` passed 7/7; VAD-start-to-duck was 0.0 ms, confirmed-speech-to-silence was 8.3 ms, the resumed echo session completed 11/11 scheduled chunks, and Gateway dispatch/provider failures were zero. Physical microphone/speaker, arbitrary human pronunciation, audible device latency, and acoustic echo-path review remain open. | Development only; automated generated speech is not physical audio or release evidence. |
 | Vocal and media semantics | Goal Association separates `responsibility_kind`, `execution_lane`, `output_mode`, `provider_required`, and exact vocal/media operation. `chromie.vocal.perform` remains the qualified vocal identity. Peer media Activity uses the exact public family `chromie.media.play|pause|resume|seek|stop|volume|status`; qualified declarations own supported kinds, persistent state/progress, mixer policy, cancellation, and immutable evidence while backend identity stays private. Exact identities survive planning, Host authorization, execution, cancellation, and evidence. Singing remains Speaking, existing-audio playback remains Activity, ordinary TTS remains separate, and undeclared modes or operations fail closed. | Vocal and media fake-provider declaration/runtime/closure tests, Planner/Response Composer/projection regressions, exact cognitive-runtime scenarios, and ordinary-TTS tests cover the source contracts. Media qualification passed 15/15 focused provider tests, both focused scenarios, and the relevant `stable_capability_grounding` plus `deterministic_safety_controls` Level A classes 14/14. The canonical gate passed 2,059 maintained tests, 20 legacy Agent tests, and 102 benchmark tests. The text-to-MuJoCo runner now sends primary deterministic controls through the production Gateway reflex and retains its cancellation receipt rather than bypassing it. | **Target validated only for the default-provider distinctions and simulator body member.** Vocal evidence remains in `.chromie/acceptance/vocal-issue-6/issue-6-e558ff4-clean`. Current Issue #7 evidence under `.chromie/acceptance/media-issue-7/current-revision` retains: typed media play with an honest zero-step unavailable outcome; singing as planless Speaking with `media_operation=none`; a completed five-second Soridormi/MuJoCo walk while media stayed unavailable; and a Chinese stop-media turn that bypassed cognition, retained the exact `media_output` receipt, and left Soridormi safe-idle. No real media provider, acoustic ducking, physical microphone/speaker, or physical robot is validated. | Issues #6 and #7 meet their source and default-provider distinction criteria. The project remains development-only; this evidence qualifies neither a real vocal/media provider nor a release. |
 
+## 2026-08-09 supervised physical voice-chain acceptance
+
+| Axis | Current evidence |
+|---|---|
+| Implementation | Supervised acceptance uses the normal host device-input path, VAD and ASR, Cognitive Gateway/Core, Goal-driven response path, `chromie.speak`, and ordered device playback. The runner now validates its managed Python runtime, warms the effective response voice before opening the microphone, and keeps services and the host Orchestrator on one generated `speech` runtime authority. |
+| Automatic verification | The focused prompt, Agent Skill, voice-runner, and strict-verifier suite passed 172/172. The `tool_and_conversation_lane_discipline` Level A class passed 10/10. Repository policy, test ownership, and documentation checks passed. The full canonical suite was not rerun for this narrow change. |
+| Target validation | **Target validated for one supervised English speech-only end-to-end turn.** Clean host revision `f8d5eae61d8556dc2bae0404bc97726f60ceb0e1` retained `.chromie/acceptance/voice/20260809T122818Z`. The EDIFIER H230P physical microphone produced exact ASR text, “Tell me one short fact about the moon.”, for session `192dfb82`; Gateway/Core applied `chat`, the interaction retained one speech result and zero executable capabilities, `chromie.speak` completed, both scheduled playback parts ended, and the session closed cleanly. All six automated case checks passed and the supervising user recorded an audible `pass`. The strict `current-revision-live-voice` verifier accepted all 23 manifested artifacts with zero errors; runtime identity SHA-256 is `f06a9c798666a8f2da5235f13eefe38ed27a8b4b00cdd26b3c94992851e6b7e6`. |
+| Release readiness | Development only. This closes the narrow physical microphone -> ASR -> cognition -> TTS -> audible speaker chain for the retained turn. It does not establish broad or bilingual ASR accuracy, a latency budget, barge-in/echo behavior on physical devices, physical robot behavior, rebuilt-Agent provenance for every source change in the host revision, or release qualification. The verifier correctly reports `release_qualified=false`. |
+
 ## 2026-08-08 generated live-text ability audit
 
 The ten-case generated audit began from merged `main` revision `af013ed` and retained a 3/10 hard-gate baseline; manual trace review reduced that baseline to 2/10 because one nominal pass had parallelized an explicitly ordered request. The initiating utterances exposed shared defects in semantic resegmentation, typed resource projection, numeric and ordering provenance, capability-domain validation, and mixed response coverage. The earliest responsible boundaries were Goal Association, the canonical Goal-to-Planner projection, Planner contract validation, and Response Composer rather than individual prompts or phrases.
@@ -77,27 +86,17 @@ and evidence; the stable Project Charter is not an incident log.
 | README, checkpoint, acceptance, semantic-authority, configuration, and Orchestrator compatibility prose lagged merged behavior. Mechanical link/terminology checks did not detect the semantic mismatch. | Existing authoritative owners were corrected; no standalone audit document, environment switch, or architectural term was added. | Documentation, semantic-authority, and repository-policy gates remain required. | Not applicable. | Documentation is current only while the final gates pass. |
 | Chromie could retain traces, Episodes, debug audio, and scenario candidates independently, but it had no single governed interaction-Session fact-layer policy or auditable provenance chain between them. A generic Data Loop switch would have obscured Session trigger meaning and privacy ownership. | Added typed local Policy Provider and immutable per-SID snapshot for `chromie.interaction_session_capture`. The existing VAD buffer, RuntimeTrace, and EpisodeRecorder supply separate artifacts; complete, abandoned, and restart-recovered lifecycle paths seal deterministic Runtime Events with policy/runtime identity, digests, explicit missing state, and downstream candidate references. `ORCH_SAVE_AUDIO` and offline evaluation remain independent. | Forty-seven focused Session, Runtime Event, trace, Episode, evaluation, candidate, settings, and barge-in tests pass, including refresh isolation, binary artifact inventory, crash recovery/idempotency, partial evidence, and non-blocking persistence or notification failure. The combined canonical gate passed 2,107 maintained tests, 20 legacy Agent tests, 102 benchmark tests, static analysis, configuration, documentation, and repository policies. | Tests use synthetic PCM and local temporary storage. No policy was enabled against a physical microphone, shared deployment, or cloud destination; no consent, upload, retention-enforcement, anonymization, or deletion claim is made. | Source implementation complete; privacy-reviewed deployment evidence remains open. |
 
-The `90aa72a` comprehensive replay closes every row above whose remaining item
-was the final clean rebuilt scenario matrix or manual delivered-text inspection.
-The later clean merged-revision paired proof closes the exact compound and
-provider-start-cancellation rows at Level C. Independent semantic adjudication,
-physical audio/robot proof, provider commissioning, publishable provenance, and
-release readiness remain open and must not be inferred from this closure.
+The `90aa72a` replay closed the rows whose last gap was clean rebuilt replay or
+manual output inspection; the later paired proof closed exact compound and
+provider-start cancellation at Level C. Independent semantic adjudication,
+broader physical audio/robot proof, provider commissioning, publishable
+provenance, and release readiness remain open.
 
-The combined remediation added no current document, public environment key,
-compatibility path, or architectural term. The interaction-Session policy adds
-one service-internal provider-path key, not a boolean or global Data Loop switch.
-Documentation count remains 102 and the runtime configuration inventory now
-contains 459 keys, four modes, one public boolean, and zero aliases. Physical
-microphone/speaker behavior, physical robot behavior, real vocal/media
-providers, governed deployment retention, resolved release provenance, and
-release readiness remain explicitly unproven.
-
-The post-audit source tree passed the dependency-complete canonical gate: 13
-repository-policy families, test ownership, Ruff, Mypy, configuration ownership,
-runtime-structure ratchets, documentation checks, 102 benchmark tests, 2,095
-maintained tests, and 20 legacy Agent tests. The full Level A general-ability run
-passed 66/66 across all ten classes.
+No current document, public environment key, compatibility path, or architectural
+term was added. The inventory remains 102 documents, 459 runtime keys, four
+modes, one public boolean, and zero aliases. The post-audit gate passed all 13
+policy families, ownership, static/configuration/structure/documentation checks,
+102 benchmarks, 2,095 maintained tests, 20 legacy tests, and Level A 66/66.
 
 Clean committed revision `90aa72a` then ran the corrected strict comprehensive
 profile under `.chromie/comprehensive/20260807T135248Z`. The outer runner built
@@ -223,7 +222,7 @@ and operator rollback evidence shows that no maintained profile depends on it.
 - clean merged-revision binding for the exact compound body execution and
   provider-start voice-to-MuJoCo cancellation diagnostics retained on the dirty
   candidate tree;
-- microphone intelligibility and first-audible TTS latency;
+- broader and bilingual microphone intelligibility plus a declared first-audible TTS latency budget; the retained single-turn English physical voice chain is target validated above;
 - physical microphone/speaker barge-in, echo rejection, and resume latency;
 - mode-specific target evidence for any real vocal-performance provider;
 - operation-specific lifecycle, progress, cancellation, and mixer evidence for

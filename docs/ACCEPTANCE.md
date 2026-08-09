@@ -20,14 +20,14 @@ A higher level does not replace lower-level regression tests.
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
-| Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Clean `90aa72a` rebuilt comprehensive profile passed all mechanical voice/GPU checks with one independent-review skip; merged `a36444b` paired services remained healthy with clean logs | Not applicable | Open: physical attempts remain unintelligible for the required utterance; generated speech is not a physical claim |
+| Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Clean `90aa72a` rebuilt comprehensive profile passed all mechanical voice/GPU checks with one independent-review skip; merged `a36444b` paired services remained healthy with clean logs | Not applicable | Target validated for one supervised English physical microphone-to-audible-response turn in `20260809T122818Z`; broader accuracy, latency, and release claims remain open |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Clean rebuilt comprehensive model distribution passed its mechanical matrix; the independent semantic reviewer remains an explicit skip | Clean merged `a36444b` paired proof completed exact compound planning/execution and deterministic provider-start cancellation against Soridormi `fa8080d2` | Not claimed |
 | Interaction contracts and Trusted Capability Runtime | Yes | Text path | Clean merged-revision exact arguments, ordered execution, Goal reconciliation, cancellation, and safe-idle recovery passed | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | The `e3d57ff` diagnostic retained both Ollama models on the RTX 5090, non-empty TTS PCM, and 19/19 GPU-smoke passes; this is generated/service evidence, not physical listening | Not applicable | Historical RTX 5090 Oute evidence remains revision-bound; physical listening and comparative shared-resource target evidence remain open |
-| Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, reversible ducking, order-aware echo matching, and cancellation-authority contracts pass | Clean exact-revision synthetic `issue-5-94718ab-clean` passed echo 6/6 and external barge-in 7/7 with 0.0 ms duck and 8.3 ms confirmed silence | Can pair with sim | PipeWire virtual-mic 7/7 is historical; physical microphone/speaker, acoustic echo-path, audible latency, and live hot-plug review remain open |
+| ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | The `e3d57ff` diagnostic retained both Ollama models on the RTX 5090, non-empty TTS PCM, and 19/19 GPU-smoke passes; this is generated/service evidence, not physical listening | Not applicable | One supervised EDIFIER H230P input/output turn passed exact ASR and audible delivery; comparative shared-resource and broader physical-listening evidence remain open |
+| Audio devices and barge-in | Startup validation, runtime OS-default reselection, explicit pinning, input-boundary reset, output rollover, reversible ducking, order-aware echo matching, and cancellation-authority contracts pass | Clean exact-revision synthetic `issue-5-94718ab-clean` passed echo 6/6 and external barge-in 7/7 with 0.0 ms duck and 8.3 ms confirmed silence | Can pair with sim | The single-turn EDIFIER H230P physical input/output chain is target validated; physical acoustic echo, barge-in, audible latency, and live hot-plug review remain open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
 
@@ -195,10 +195,12 @@ Post-scenario health and a 15-minute, 1,000-line-per-source log review found all
 paired endpoints ready and no fatal startup pattern in either launcher, ASR,
 TTS, Agent, Ollama, or Soridormi Runtime MCP output. The JSON WebSocket health
 probes generated no incomplete-handshake traceback. This closes the post-merge
-audit's clean merged-revision Level C requirement. Physical microphone,
-speaker, audible acoustic behavior, physical robot safety, real vocal/media
-providers, publishable artifact provenance, independent semantic adjudication,
-and release qualification remain open Level D or release evidence tracks.
+audit's clean merged-revision Level C requirement. At that revision, physical
+microphone, speaker, audible acoustic behavior, physical robot safety, real
+vocal/media providers, publishable artifact provenance, independent semantic
+adjudication, and release qualification remained open Level D or release
+evidence tracks. The later supervised result below closes only its declared
+single speech-only physical voice turn.
 
 After the executable scenarios were aligned with the evidence-before-claim
 contract, the complete source gate passed: 102 benchmark tests, 2,095 maintained
@@ -288,6 +290,21 @@ VAD activity. The second retained ASR finals `I.` and `.`, neither containing
 the required Moon meaning, so the runner correctly stopped before cognition or
 an audible response. All three directories are diagnostic-only failures and do
 not satisfy or weaken this profile.
+
+On 2026-08-09, the supervised speech-only run
+`.chromie/acceptance/voice/20260809T122818Z` passed against clean host revision
+`f8d5eae61d8556dc2bae0404bc97726f60ceb0e1`. The EDIFIER H230P physical
+microphone produced the exact ASR transcript “Tell me one short fact about the
+moon.” for session `192dfb82`. The retained Core resolution applied `chat` with
+one speech output and no executable capabilities; `chromie.speak`, both
+playback parts, and the session completed. All six machine checks passed and the
+supervising user recorded an audible `pass`. The strict
+`current-revision-live-voice` verifier accepted 23 manifested artifacts with
+zero errors and runtime identity SHA-256
+`f06a9c798666a8f2da5235f13eefe38ed27a8b4b00cdd26b3c94992851e6b7e6`.
+This is successful end-to-end target evidence for that physical microphone ->
+ASR -> cognition -> TTS -> speaker turn; its narrow claim and exclusions remain
+those defined above.
 
 ## Level A — automated suite
 
