@@ -506,6 +506,22 @@ canonical value and referent ID selected by Goal Association from the supplied
 bounded discourse state. The Host checks provenance shape; it does not extract a
 place name, choose a referent, or decide the user's meaning.
 
+Fast Goal Interpreter route and retrieval results are advisory projections.
+Query-matched capabilities may lead the semantic-review catalog, but they do
+not erase the supplied common or full catalog. Semantic repair receives a
+candidate-first, de-duplicated union so an incorrect first route cannot remove
+the exact affordance needed to correct itself. The Host may order and validate
+that supplied evidence; it may not infer the route from the user's wording.
+
+Structured semantic review has one logical model contract even when an Ollama
+model template does not honor JSON Schema on `/api/chat`. After a structurally
+invalid chat completion, the Goal Interpreter may retry that exact model,
+schema, prompt content, decoder options, and output budget once through
+`/api/generate`. This is transport compatibility containment, not semantic
+escalation or a model-name exception. The result crosses the same catalog and
+route validators. If either transport remains malformed or ungrounded, review
+fails closed to typed clarification rather than preserving the suspect route.
+
 ### 5.2 Stable-to-volatile model prompt ordering
 
 Issue [#17](https://github.com/TimeTreker/chromie/issues/17) owns the architecture
@@ -889,6 +905,17 @@ invalid and returns to model repair. After validation, the Host adds the
 canonical identity envelope and converts the goal-keyed object to the ordered
 canonical outcome list; it does not infer semantic plan content from the user
 utterance.
+
+A typed effectful Goal cannot be declared satisfied merely because a planner
+returns complete coverage or response text. Before canonical planning, each
+`executable_action`, `capability_dependent`, or otherwise provider-required Goal
+must own an executable step, have delivered evidence-bound dialogue for that
+same Goal, or carry an explicit `clarify`, `escalate`, `unavailable`, or
+`refused` outcome. An unresolved effectful Goal with zero owned steps and no
+such evidence is a contract failure: Fast receives its bounded same-tier repair
+and then escalates; Deep receives its bounded replan and then clarifies. The
+Host validates typed Goal metadata and ownership only; it does not infer effect
+from phrases.
 
 `plan_relation` and `user_confirmation_required` are typed semantic decisions
 at the model boundary. A safe adjustment or alternative must be executable and

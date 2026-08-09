@@ -108,6 +108,69 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_effectful_zero_step_false_satisfaction_repairs_then_clarifies(self):
+        invalid = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Walk forward for fifteen seconds.",
+            "response_text": "I did it.",
+            "steps": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-walk"],
+                "unmet_goal_ids": [],
+                "unmet_requirements": [],
+                "rationale": "Incorrectly declares the physical Goal complete.",
+            },
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        ollama = SequencedOllama([invalid, invalid])
+        run_request = request(
+            "Walk forward for fifteen seconds.",
+            goal_ids=["goal-walk"],
+        )
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": "goal-walk",
+                    "description": "Walk forward for fifteen seconds.",
+                    "source_text": "Walk forward for fifteen seconds.",
+                    "metadata": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "physical_action",
+                        "provider_required": True,
+                    },
+                }
+            ],
+        }
+
+        plan = asyncio.run(
+            DeepPlannerResolver(
+                ollama,
+                FullCatalog(),
+                max_replans=1,
+            ).resolve(run_request.model_copy(update={"context": context}))
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertTrue(plan.metadata["contract_repair_attempted"])
+        self.assertIn(
+            "unresolved effectful goal requires an executable step",
+            plan.metadata["initial_validation_errors"],
+        )
+
     def test_missing_resource_provider_clarifies_without_hard_model_failure(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."

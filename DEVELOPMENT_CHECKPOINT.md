@@ -12,80 +12,34 @@ Effects remain authorized only by trusted Host and provider boundaries.
 
 ## Current checkpoint
 
-Issues [#17](https://github.com/TimeTreker/chromie/issues/17) and [#18](https://github.com/TimeTreker/chromie/issues/18) own the active layered
-prompt contract and runtime implementation. `LayeredPrompt` now promotes exact
-stable fragments before volatile turn state and `OllamaClient` records only
-reuse candidates and provider timings, never inferred cache hits.
+Issues [#17](https://github.com/TimeTreker/chromie/issues/17) and
+[#18](https://github.com/TimeTreker/chromie/issues/18) are merged on `main` in
+PR [#19](https://github.com/TimeTreker/chromie/pull/19). `LayeredPrompt` promotes
+exact stable fragments before volatile turn state and `OllamaClient` records
+only reuse candidates and provider timings, never inferred cache hits.
 
-The post-merge audit of `e3d57ff` established:
+Issue [#20](https://github.com/TimeTreker/chromie/issues/20) owns the active P0
+correctness line before model-profile qualification. The reproduced failure is
+a mixed chain: qwen3.5:4b ignores the semantic-review JSON schema on Ollama
+`/api/chat` while honoring the same schema through `/api/generate`; the runtime
+previously treated that expected model/transport incompatibility as permission
+to preserve an ungrounded chat decision; route-narrowed capability context
+could omit an exact recovery ability; and planner validation could accept a
+typed effectful Goal as satisfied with zero executable steps. The Issue branch
+provides one same-model, same-schema transport compatibility retry,
+preserves a candidate-first lossless supplied catalog for review, and rejects
+unresolved effectful zero-step outcomes before canonical planning. Focused
+regressions pass 191/191, the applicable Level A classes pass 13/13, and the
+canonical gate passes; `docs/STATUS.md` owns the exact evidence limits.
 
-- the GPU, containers, Gateway/Core/Fast-Planner greeting round trip, TTS PCM,
-  deterministic transport, and generated-speech barge-in path were live;
-- the first strict comprehensive run retained 40 passing and 8 failing checks;
-  missing host test dependencies caused the source/scenario portion of those
-  failures, while log inspection and retained scenario replay exposed the
-  implementation/orchestration defects and stale acceptance-event contract
-  recorded in `docs/STATUS.md`;
-- ordinary/final speech was played without entering the delivered-turn ledger;
-  safe-read composition could duplicate or overclaim pre-evidence speech;
-  Goal Association could anchor mechanical location defects and misclassify
-  mixed stable-knowledge/reminder turns; session-memory contract retry repeated
-  invalid output; typed pre-effect speech still made false tool/memory claims;
-  valid tool results could fail only for sentence length; weather follow-ups
-  replayed old evidence; service rebuilds could retain deleted image IDs; and
-  the voice harness required retired events; the first mechanically clean
-  comprehensive replay then exposed valid direct speech discarded by malformed
-  optional Social Attention and a prompt-only decision-first contract that the
-  deployed Fast Planner could ignore; the next mechanically clean replay then
-  exposed an otherwise complete multi-Goal response inventing an unsupported
-  user schedule as friendly reminder rationale;
-- focused regressions now cover the repaired evidence ledger, current Core and
-  Gateway event contracts, fresh model-owned Goal resegmentation, useful typed
-  contract repair with authority-reducing session recovery, tool/memory
-  pre-effect speech suppression, pure safe-read single ownership, and bounded
-  evidence-preserving result repair, authority-reducing direct auxiliary
-  validation, bounded model-owned retained-evidence communication review, and
-  Response Composer grounding against invented user circumstances;
-- the dependency-complete canonical gate passes 2,095 maintained tests, 20
-  legacy Agent tests, and 102 benchmark tests, while Level A passes 66/66 across
-  all ten general-ability classes;
-- the comprehensive runner now builds once before nested voice acceptance;
-  the first clean committed replay then exposed and removed an inapplicable
-  full seven-case MuJoCo verifier call on its three-case diagnostic bundle; its
-  next clean replay passed every mechanical check but remained blocked after
-  manual delivered-text inspection found the two semantic defects above; and
-- semantic documentation mismatches were corrected in the existing authority
-  documents instead of creating another audit owner.
-
-The final paired replay exposed three planner contract defects rather than a
-Soridormi motion defect:
-
-- Fast and Deep decoder schemas did not bind an exact capability to its provider
-  argument schema, and only Fast described explicit numeric Goal provenance;
-- Deep's unprojected catalog exceeded its prompt bound, so later capabilities
-  such as exact velocity walking were absent from the deployed "full catalog";
-- Deep's step and prose collections were not decoder-bounded, allowing one walk
-  step to repeat until the model output limit before cancellation could reach a
-  provider.
-
-Exact capability schemas, shared numeric provenance validation, structured
-bounded repair, a compact complete catalog, and bounded Deep collections close
-those boundaries. Clean commit `90aa72a` passed the canonical source gate and a
-rebuilt comprehensive profile with 46 passes, zero failures/timeouts, and one
-external-semantic-review skip. Manual inspection found no semantic blocker;
-strict status remains `incomplete`, not release-qualified. `docs/STATUS.md` owns
-paths, limits, and latency outliers. Clean-main startup exposed bare-TCP ASR/TTS
-probes creating WebSocket tracebacks called fatal by the log checker; JSON health
-probes replace them.
-
-That binding is now retained from clean merged Chromie `a36444b` and Soridormi
-`fa8080d2` under `.chromie/acceptance/post-merge-audit-final/a36444b`. Identity
-SHA-256 `4d1ba0381e8ea10a6e581f572b6c960d097e001f2aa4ff442fa55a9c00902ec9`
-binds both clean checkouts and services. Exact walk/nod/turn completed and the
-separate active walk cancelled through the Gateway stop reflex in 31.1 ms;
-Goals reconciled, safe idle held, and post-run logs were clean. This closes the
-highest-safe automated audit milestone, not independent review, physical-device,
-physical-robot, provider, or release tracks.
+The earlier post-merge audit and paired closure are retained in
+`docs/STATUS.md`, their implementation/evidence authority. In summary, clean
+Chromie `a36444b` and Soridormi `fa8080d2` retained exact compound MuJoCo
+execution, deterministic provider-start cancellation, Goal reconciliation, and
+safe idle. The source and generated-speech gates also closed their recorded
+revision scopes. Independent semantic review, physical audio/robot evidence,
+real vocal/media providers, and release qualification remain open; do not
+reinterpret the retained simulator or generated-audio evidence as those claims.
 
 The maintained source contracts and compatibility state are owned by
 `docs/STATUS.md`; `/interaction` and `/run` remain emergency-only compatibility
@@ -129,9 +83,10 @@ unless the command actually ran against that target and retained its evidence.
 
 ## Next engineering work
 
-Issues #17 and #18 completed their design, source, docs, and non-live checks. Next,
-qualify the RTX 4090 Laptop model-role change and retain a same-model warm/cold
-prefix measurement; separate prompt evaluation from model load and never call a repeated digest a provider cache hit.
+Publish and review Issue #20 without widening its fail-closed scope. Then
+qualify the RTX 4090 Laptop model-role change and retain a same-model warm/cold prefix measurement;
+separate prompt evaluation from model load and never call a repeated digest a
+provider cache hit.
 
 The merged Issues retain clean, revision-bound source and highest-safe automated
 evidence for the walk/sing/blink defect, reversible barge-in, the exact

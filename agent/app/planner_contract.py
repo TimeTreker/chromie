@@ -721,6 +721,36 @@ def planner_response_goal_ids(
     return result
 
 
+def planner_effectful_goal_ids(
+    authoritative_goals: list[dict[str, Any]],
+) -> set[str]:
+    """Return Goals that require provider evidence or an explicit terminal block.
+
+    Goal Association already owns these typed responsibility declarations.  The
+    validator does not infer an effect from user wording or select a Capability;
+    it only prevents a planner from declaring such a Goal satisfied through an
+    ordinary response while emitting no executable work.
+    """
+
+    result: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        metadata = goal.get("metadata")
+        if not goal_id or not isinstance(metadata, dict):
+            continue
+        responsibility_kind = str(
+            metadata.get("responsibility_kind") or ""
+        ).strip()
+        if (
+            responsibility_kind in {"executable_action", "capability_dependent"}
+            or bool(metadata.get("provider_required"))
+        ):
+            result.add(goal_id)
+    return result
+
+
 def planner_provider_vocal_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
@@ -933,6 +963,29 @@ def validate_goal_responsibility_outcomes(
                 "capability_dependent goal cannot use disposition=respond "
                 "without capability or delivered evidence-bound dialogue: " + goal_id
             )
+    # Keep this broad invariant last so narrower responsibility contracts retain
+    # their more actionable diagnostics.  It contains every remaining typed
+    # effectful Goal without inferring effect from user wording.
+    terminal_block_dispositions = {
+        "clarify",
+        "escalate",
+        "unavailable",
+        "refused",
+    }
+    for goal_id in sorted(planner_effectful_goal_ids(authoritative_goals)):
+        outcome = output.goal_outcomes.get(goal_id)
+        disposition = outcome.disposition if outcome is not None else output.disposition
+        owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
+        if disposition == "execute" and owned_steps:
+            continue
+        if disposition in terminal_block_dispositions:
+            continue
+        if disposition == "respond" and goal_id in evidence_goal_ids:
+            continue
+        raise ValueError(
+            "unresolved effectful goal requires an executable step or explicit "
+            "clarify/escalate/unavailable/refused evidence: " + goal_id
+        )
 
 
 class ResourceResponsibilityCapabilityGroundingError(ValueError):

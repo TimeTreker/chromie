@@ -399,25 +399,24 @@ def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[
 
 
 def _review_capabilities_from_request(request: RouteRequest) -> list[dict[str, Any]]:
-    for key in (
-        "common_ability_catalog",
-        "prompt_capabilities_common",
-        "full_ability_catalog",
-        "prompt_capabilities_all",
-    ):
-        value = request.context.get(key, [])
-        if isinstance(value, list) and value:
-            return value
-    return []
+    """Return a lossless, candidate-first recovery view of supplied abilities.
 
+    Query matches are useful ordering evidence, while the common and full
+    snapshots are authoritative availability context.  A semantic-route guess
+    must not turn that narrowing into catalog destruction: later model review
+    needs both the best matches and the remaining supplied affordances in order
+    to correct an earlier route mistake.
+    """
 
-def _capability_ids_from_request(request: RouteRequest) -> set[str]:
-    capability_ids: set[str] = set()
+    capabilities: list[dict[str, Any]] = []
+    capability_indexes: dict[str, int] = {}
+    seen_anonymous: set[str] = set()
     for key in (
-        "common_ability_catalog",
+        "candidate_capabilities",
         "prompt_capabilities_common",
-        "full_ability_catalog",
         "prompt_capabilities_all",
+        "common_ability_catalog",
+        "full_ability_catalog",
     ):
         value = request.context.get(key, [])
         if not isinstance(value, list):
@@ -425,30 +424,55 @@ def _capability_ids_from_request(request: RouteRequest) -> set[str]:
         for item in value:
             if not isinstance(item, dict):
                 continue
-            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
-            if capability_id:
-                capability_ids.add(capability_id)
-    return capability_ids
+            capability_id = str(
+                item.get("capability_id") or item.get("skill_id") or ""
+            ).strip()
+            if capability_id and capability_id in capability_indexes:
+                index = capability_indexes[capability_id]
+                merged = dict(capabilities[index])
+                for field, value in item.items():
+                    if field not in merged or value not in (None, "", [], {}):
+                        merged[field] = value
+                capabilities[index] = merged
+                continue
+            if not capability_id:
+                identity = json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                )
+                if identity in seen_anonymous:
+                    continue
+                seen_anonymous.add(identity)
+            else:
+                capability_indexes[capability_id] = len(capabilities)
+            capabilities.append(item)
+    return capabilities
+
+
+def _capability_ids_from_request(request: RouteRequest) -> set[str]:
+    return {
+        capability_id
+        for item in _review_capabilities_from_request(request)
+        if (
+            capability_id := str(
+                item.get("capability_id") or item.get("skill_id") or ""
+            ).strip()
+        )
+    }
 
 
 def _capability_route_lookup_from_request(request: RouteRequest) -> dict[str, str]:
     routes: dict[str, str] = {}
-    for key in (
-        "common_ability_catalog",
-        "prompt_capabilities_common",
-        "full_ability_catalog",
-        "prompt_capabilities_all",
-    ):
-        value = request.context.get(key, [])
-        if not isinstance(value, list):
-            continue
-        for item in value:
-            if not isinstance(item, dict):
-                continue
-            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
-            route = str(item.get("route") or "").strip()
-            if capability_id and route in ROUTE_NAMES and capability_id not in routes:
-                routes[capability_id] = route
+    for item in _review_capabilities_from_request(request):
+        capability_id = str(
+            item.get("capability_id") or item.get("skill_id") or ""
+        ).strip()
+        route = str(item.get("route") or "").strip()
+        if capability_id and route in ROUTE_NAMES and capability_id not in routes:
+            routes[capability_id] = route
     return routes
 
 
@@ -474,29 +498,18 @@ def _route_intent_contract_conflict(
 
 
 def _has_executable_non_chat_affordance(request: RouteRequest) -> bool:
-    for key in (
-        "common_ability_catalog",
-        "prompt_capabilities_common",
-        "full_ability_catalog",
-        "prompt_capabilities_all",
-    ):
-        items = request.context.get(key, [])
-        if not isinstance(items, list):
+    for item in _review_capabilities_from_request(request):
+        if str(item.get("route") or "") not in {
+            "memory",
+            "robot_action",
+            "tool",
+        }:
             continue
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("route") or "") not in {
-                "memory",
-                "robot_action",
-                "tool",
-            }:
-                continue
-            if item.get("available") is False:
-                continue
-            if item.get("interaction_executable") is False:
-                continue
-            return True
+        if item.get("available") is False:
+            continue
+        if item.get("interaction_executable") is False:
+            continue
+        return True
     return False
 
 
@@ -677,7 +690,12 @@ def _decision_without_goal_interpretation_fast_speech(
     )
 
 
-def _compact_schema_field(name: str, prop: dict[str, Any]) -> str:
+def _compact_schema_field(
+    name: str,
+    prop: dict[str, Any],
+    *,
+    include_value_contracts: bool = False,
+) -> str:
     parts = [str(name)]
     type_value = prop.get("type")
     if isinstance(type_value, list):
@@ -694,10 +712,26 @@ def _compact_schema_field(name: str, prop: dict[str, Any]) -> str:
     unit = prop.get("unit") or prop.get("units")
     if isinstance(unit, str) and unit.strip():
         parts.append(f"unit={unit.strip()[:24]}")
+    if include_value_contracts:
+        for key, label in (
+            ("minimum", "min"),
+            ("maximum", "max"),
+            ("exclusiveMinimum", "exclusive_min"),
+            ("exclusiveMaximum", "exclusive_max"),
+            ("default", "default"),
+        ):
+            value = prop.get(key)
+            if isinstance(value, (str, int, float, bool)):
+                parts.append(f"{label}={str(value)[:32]}")
     return ":".join(parts)
 
 
-def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[dict[str, Any]]:
+def _compact_prompt_capabilities(
+    candidates: Any,
+    *,
+    limit: int = 96,
+    include_value_contracts: bool = False,
+) -> list[dict[str, Any]]:
     if not isinstance(candidates, list):
         return []
     compact: list[dict[str, Any]] = []
@@ -725,13 +759,28 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
                     continue
                 enum = prop.get("enum")
                 unit = prop.get("unit") or prop.get("units")
+                has_value_contract = include_value_contracts and any(
+                    key in prop
+                    for key in (
+                        "minimum",
+                        "maximum",
+                        "exclusiveMinimum",
+                        "exclusiveMaximum",
+                        "default",
+                    )
+                )
                 if (
                     str(name) not in required_set
                     and not (isinstance(enum, list) and enum)
                     and not (isinstance(unit, str) and unit.strip())
+                    and not has_value_contract
                 ):
                     continue
-                field = _compact_schema_field(str(name), prop)
+                field = _compact_schema_field(
+                    str(name),
+                    prop,
+                    include_value_contracts=include_value_contracts,
+                )
                 if str(name) in required_set:
                     field += ":required"
                 args.append(field)
@@ -1862,14 +1911,15 @@ class OllamaGoalInterpreter:
         reason: str,
         model: str | None = None,
     ) -> dict[str, Any]:
-        # The common catalog is ordered by route, which intentionally places
-        # tool affordances after common embodied actions.  Keep the complete
-        # bounded common projection here: taking only the first few entries can
-        # hide the exact affordance that made this semantic repair necessary.
+        # Query matches lead this lossless recovery projection, followed by the
+        # common and full snapshots.  Keep a complete bounded slice here:
+        # route-specific narrowing must not hide the exact affordance that made
+        # semantic repair necessary.
         abilities_json = _bounded_json_array(
             _compact_prompt_capabilities(
                 _review_capabilities_from_request(request),
                 limit=24,
+                include_value_contracts=True,
             ),
             max_chars=3600,
         )
@@ -2244,6 +2294,20 @@ class OllamaGoalInterpreter:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()
+        self._validate_completion(payload, data, stage=stage)
+        return data
+
+    def _validate_completion(
+        self,
+        payload: dict[str, Any],
+        data: dict[str, Any],
+        *,
+        stage: str,
+    ) -> None:
+        """Apply one output-budget policy to chat and generate transports."""
+
+        options = dict(payload.get("options") or {})
+        prompt_chars = self._payload_prompt_chars(payload)
         completion = ollama_completion_diagnostics(
             options=options,
             data=data,
@@ -2291,7 +2355,97 @@ class OllamaGoalInterpreter:
                     },
                 },
             )
+
+    async def _structured_generate_from_chat_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+    ) -> dict[str, Any]:
+        """Retry one schema-bound chat request through Ollama generate.
+
+        Some Ollama model templates accept the exact JSON Schema on
+        ``/api/generate`` but ignore it on ``/api/chat``.  This fallback keeps
+        the logical prompt, model, decoder schema, and budgets unchanged.  It
+        runs only after the chat transport returned a structurally invalid
+        result, so it is compatibility containment rather than semantic
+        escalation or a model-name special case.
+        """
+
+        system_parts: list[str] = []
+        prompt_parts: list[str] = []
+        for message in payload.get("messages") or []:
+            if not isinstance(message, dict):
+                continue
+            role = str(message.get("role") or "user").strip().lower()
+            content = str(message.get("content") or "")
+            if role == "system":
+                system_parts.append(content)
+            else:
+                prompt_parts.append(f"{role.title()}:\n{content}")
+        generate_payload: dict[str, Any] = {
+            key: payload[key]
+            for key in ("model", "stream", "think", "format", "keep_alive", "options")
+            if key in payload
+        }
+        generate_payload["system"] = "\n\n".join(system_parts)
+        generate_payload["prompt"] = "\n\n".join(prompt_parts)
+        timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
+        async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
+            response = await client.post(
+                f"{self.ollama_url}/api/generate",
+                json=generate_payload,
+            )
+            response.raise_for_status()
+            generated = response.json()
+        data = {
+            **generated,
+            "message": {"content": str(generated.get("response") or "")},
+        }
+        self._validate_completion(payload, data, stage=stage)
         return data
+
+    async def _semantic_route_repair_output(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request: RouteRequest,
+    ) -> tuple[SemanticRouteRepairOutput, str]:
+        """Return one typed semantic repair with bounded transport fallback."""
+
+        reviewed = await self._chat_logged(payload, stage=stage, request=request)
+        content = str(reviewed.get("message", {}).get("content") or "")
+        try:
+            return (
+                SemanticRouteRepairOutput.model_validate(
+                    _extract_json_object(content)
+                ),
+                "chat",
+            )
+        except (ValidationError, ValueError) as chat_exc:
+            logger.warning(
+                "goal_interpreter_structured_transport_fallback "
+                "sid=%s stage=%s model=%s chat_error_type=%s raw_chars=%s raw_hash=%s",
+                request.sid,
+                stage,
+                payload.get("model") or self.model,
+                type(chat_exc).__name__,
+                len(content),
+                _short_hash(content),
+            )
+        generated = await self._structured_generate_from_chat_payload(
+            payload,
+            stage=stage,
+        )
+        self._log_response_summary(generated, stage=stage, request=request)
+        generated_content = str(generated.get("message", {}).get("content") or "")
+        return (
+            SemanticRouteRepairOutput.model_validate(
+                _extract_json_object(generated_content)
+            ),
+            "generate_compatibility_fallback",
+        )
 
 
     async def _chat_logged(
@@ -2535,7 +2689,7 @@ class OllamaGoalInterpreter:
             return decision
 
         try:
-            reviewed = await self._chat_logged(
+            minimal, structured_transport = await self._semantic_route_repair_output(
                 self.build_semantic_route_repair_payload(
                     request,
                     decision,
@@ -2545,10 +2699,7 @@ class OllamaGoalInterpreter:
                 stage="capability_grounding_review",
                 request=request,
             )
-            content = str(reviewed.get("message", {}).get("content") or "")
-            minimal = SemanticRouteRepairOutput.model_validate(
-                _extract_json_object(content)
-            )
+            _validate_missing_ability_output_against_catalog(minimal, request)
             reviewed_decision = finalize_decision(
                 RouteDecision(
                     route=minimal.route,
@@ -2579,7 +2730,14 @@ class OllamaGoalInterpreter:
                 type(exc).__name__,
                 exc,
             )
-            return decision
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=(
+                    "chat capability grounding review failed safely: "
+                    f"{type(exc).__name__}"
+                ),
+            )
 
         conflict = _route_intent_contract_conflict(request, reviewed_decision)
         if conflict is not None:
@@ -2612,6 +2770,7 @@ class OllamaGoalInterpreter:
             "original_intent": decision.intent,
             "reviewed_route": reviewed_decision.route,
             "reviewed_intent": reviewed_decision.intent,
+            "structured_transport": structured_transport,
         }
         reviewed_decision = reviewed_decision.model_copy(update={"metadata": metadata})
         reviewed_decision.reason = (
@@ -2904,7 +3063,7 @@ class OllamaGoalInterpreter:
         reason: str,
     ) -> RouteDecision:
         try:
-            repaired = await self._chat_logged(
+            minimal, structured_transport = await self._semantic_route_repair_output(
                 self.build_semantic_route_repair_payload(
                     request,
                     decision,
@@ -2912,10 +3071,6 @@ class OllamaGoalInterpreter:
                 ),
                 stage="semantic_route_repair",
                 request=request,
-            )
-            content = str(repaired.get("message", {}).get("content") or "")
-            minimal = SemanticRouteRepairOutput.model_validate(
-                _extract_json_object(content)
             )
             _validate_missing_ability_output_against_catalog(minimal, request)
             repaired_decision = finalize_decision(
@@ -3002,6 +3157,7 @@ class OllamaGoalInterpreter:
             "original_route": decision.route,
             "original_intent": decision.intent,
             "original_confidence": decision.confidence,
+            "structured_transport": structured_transport,
         }
         repaired_decision = repaired_decision.model_copy(update={"metadata": metadata})
         repair_model = self.review_model or self.model

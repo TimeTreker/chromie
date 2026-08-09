@@ -110,6 +110,7 @@ notes must state:
 Observed failure: <exact user/ASR text and wrong visible behavior>
 Expected contract: <what Chromie should have done>
 Earliest wrong component: <ASR/gateway/core/goal-interpreter/agent/orchestrator/runtime/provider/test>
+Root-cause attribution: <llm-model/logic-workflow-contract/code-implementation/mixed>
 Fix class: <architecture/contract-schema/prompt/runtime-policy/test-evidence>
 Regression boundary: <trace replay, black-box interaction, integration, or unit>
 Evidence level: <live trace, retained trace, Level A, Level B/C/D, or not run>

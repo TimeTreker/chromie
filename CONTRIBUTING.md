@@ -81,7 +81,12 @@ evidence-grounded report with all of the following:
 4. **Root cause at the earliest responsible boundary.** Explain the causal chain
    from the initiating trigger to the first incorrect decision or state
    transition. Distinguish the root cause from downstream symptoms, unrelated
-   failures, and contributing conditions.
+   failures, and contributing conditions. Explicitly classify the primary
+   attribution as `llm-model`, `logic-workflow-contract`,
+   `code-implementation`, or `mixed`, and cite the evidence that rules the other
+   categories in or out. A wrong model response is an initiating or contributing
+   failure, not sufficient proof of an LLM root cause, when an owned validation,
+   fallback, or workflow boundary was required to contain it.
 5. **Fix mechanism.** Explain why the chosen change restores the violated
    contract, why it belongs at that boundary, and which behavior intentionally
    remains unchanged. Listing changed files or describing the diff is not a

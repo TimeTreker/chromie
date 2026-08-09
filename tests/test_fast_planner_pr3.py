@@ -440,6 +440,82 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
+    def test_effectful_goal_cannot_be_declared_satisfied_with_zero_steps(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Walk forward for fifteen seconds.",
+            "response_text": "Done.",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-walk"]),
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-walk"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "unresolved effectful goal requires an executable step",
+        ):
+            validate_goal_responsibility_outcomes(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": "goal-walk",
+                        "metadata": {
+                            "responsibility_kind": "executable_action",
+                            "execution_lane": "activity",
+                            "output_mode": "physical_action",
+                            "provider_required": True,
+                        },
+                    }
+                ],
+            )
+
+    def test_effectful_goal_accepts_explicit_unavailability_without_steps(self):
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "unavailable",
+                "coverage": "uncertain",
+                "confidence": 1.0,
+                "response_text": "",
+                "steps": [],
+                "goal_outcomes": {
+                    "goal-walk": {
+                        "disposition": "unavailable",
+                        "coverage": "uncertain",
+                        "response_text": "",
+                        "unresolved": ["No available walking provider."],
+                        "step_ids": [],
+                    }
+                },
+            }
+        )
+
+        validate_goal_responsibility_outcomes(
+            output,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-walk",
+                    "metadata": {
+                        "responsibility_kind": "executable_action",
+                        "execution_lane": "activity",
+                        "output_mode": "physical_action",
+                        "provider_required": True,
+                    },
+                }
+            ],
+        )
+
     def test_capability_dependent_goal_cannot_be_completed_by_respond_outcome(self):
         raw = {
             "disposition": "respond",
@@ -734,6 +810,56 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_effectful_zero_step_false_satisfaction_repairs_then_escalates(self):
+        invalid = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Walk forward for fifteen seconds.",
+            "response_text": "I did it.",
+            "steps": [],
+            "goal_outcomes": {},
+            "goal_satisfaction": exact_satisfaction(["goal-walk"]),
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        ollama = ScriptedOllama([invalid, invalid])
+        run_request = request(
+            "Walk forward for fifteen seconds.",
+            goal_ids=["goal-walk"],
+        )
+        context = dict(run_request.context)
+        association = dict(context["goal_association_resolution"])
+        association["new_goals"] = [
+            {
+                **association["new_goals"][0],
+                "metadata": {
+                    "responsibility_kind": "executable_action",
+                    "execution_lane": "activity",
+                    "output_mode": "physical_action",
+                    "provider_required": True,
+                },
+            }
+        ]
+        context["goal_association_resolution"] = association
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+        self.assertIn(
+            "unresolved effectful goal requires an executable step",
+            plan.metadata["initial_validation_errors"],
+        )
+
     def test_missing_resource_provider_escalates_without_hard_model_failure(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."
