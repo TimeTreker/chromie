@@ -386,8 +386,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("duplicated", catalog_section)
 
     def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
+        planner_request = request(
+            "Find a restaurant that is open now near People's Square."
+        )
+        planner_request.context["interaction_context"] = {
+            "events": [{"event_id": "ledger-deep-marker"}]
+        }
         prompt = DeepPlannerResolver(object(), object())._prompt(
-            request("Find a restaurant that is open now near People's Square."),
+            planner_request,
             [],
             feedback=[],
             response_schema={},
@@ -402,6 +408,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "no exact available capability covers the required outcome, return unavailable",
             prompt,
         )
+        self.assertIn("ledger-deep-marker", prompt)
 
     def test_resolution_mismatch_feedback_carries_selected_capability_schema(self):
         feedback = DeepPlannerResolver._validation_error_items(

@@ -8,6 +8,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
+from orchestrator.runtime.interaction_ledger import InteractionLedger
 from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
 from shared.chromie_contracts.reflex import CancellationDirective
 
@@ -188,6 +189,74 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(scheduled[0]["text"], "Hello.")
         self.assertEqual(scheduled[0]["metadata"]["session_id"], "sid-1")
+
+    async def test_trusted_runtime_records_only_prepared_committed_requests(
+        self,
+    ) -> None:
+        ledger = InteractionLedger()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True},
+            interaction_ledger=ledger,
+        )
+        response = InteractionResponse(
+            interaction_id="interaction-1",
+            skills=[
+                SkillRequest(
+                    request_id="speak-1",
+                    skill_id="chromie.speak",
+                    args={"text": "Hello."},
+                    metadata={
+                        "execution_lane": "speaking",
+                        "source_goal_ids": ["goal-greet"],
+                    },
+                )
+            ],
+            metadata={
+                "user_turn_envelope": {"turn_id": "turn-1"},
+            },
+        )
+
+        result = await coordinator.execute(response, session_id="sid-1")
+
+        self.assertEqual(result.status, "completed")
+        context = ledger.context("sid-1", goal_ids=["goal-greet"])
+        self.assertEqual(
+            [item["event_type"] for item in context.activity],
+            ["speaking_action_committed"],
+        )
+        self.assertEqual(
+            context.unresolved[0]["waiting_for"],
+            "speaking_action_terminal_result",
+        )
+
+    async def test_trusted_runtime_does_not_record_a_suppressed_request(
+        self,
+    ) -> None:
+        ledger = InteractionLedger()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True},
+            interaction_ledger=ledger,
+        )
+        response = InteractionResponse(
+            interaction_id="interaction-blocked",
+            skills=[
+                SkillRequest(
+                    request_id="interrupt-leak",
+                    skill_id="session.interrupt",
+                    args={},
+                    metadata={"source_goal_ids": ["goal-blocked"]},
+                )
+            ],
+            metadata={
+                "planning_result": "blocked",
+                "user_turn_envelope": {"turn_id": "turn-blocked"},
+            },
+        )
+
+        result = await coordinator.execute(response, session_id="sid-1")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(ledger.events("sid-1"), [])
 
     async def test_unverified_deepthinking_action_promise_is_corrected_before_speech(
         self,

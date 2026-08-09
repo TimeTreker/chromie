@@ -356,6 +356,7 @@ class ResponseComposerResolver:
                 self._validate_reused_turn_speech(
                     model_output.response_plan,
                     context=request.context,
+                    plan=plan,
                 )
                 premature_claims = self._pending_action_claim_errors(
                     model_output.response_plan,
@@ -694,6 +695,7 @@ class ResponseComposerResolver:
         cls._validate_reused_turn_speech(
             response_plan,
             context=request.context,
+            plan=plan,
         )
         cls._validate_pending_response_contract(
             response_plan,
@@ -1064,7 +1066,7 @@ class ResponseComposerResolver:
             covers_goal_ids=ordered_missing,
         )
         repaired = response_plan.model_copy(update={"pre_action": stage})
-        cls._validate_reused_turn_speech(repaired, context=context)
+        cls._validate_reused_turn_speech(repaired, context=context, plan=plan)
         return repaired, ["mixed_execute_goal_coverage_recovered_from_scheduled_fast_speech"]
 
     @staticmethod
@@ -1106,6 +1108,7 @@ class ResponseComposerResolver:
         response_plan: ResponsePlan,
         *,
         context: dict[str, Any] | None,
+        plan: CanonicalPlan | None = None,
     ) -> None:
         reusable_by_event_id = {
             event_id: item
@@ -1143,6 +1146,37 @@ class ResponseComposerResolver:
                 raise ValueError(
                     "reused current-turn speech act must match the referenced "
                     "speech event purpose"
+                )
+            event_goal_ids = {
+                normalized
+                for item in event.get("source_goal_ids") or []
+                if (normalized := " ".join(str(item or "").strip().split()))
+            }
+            reassigned_goal_ids = set(stage.covers_goal_ids) - event_goal_ids
+            if event_goal_ids and reassigned_goal_ids:
+                raise ValueError(
+                    "Goal-bound current-turn speech cannot be reassigned to "
+                    "unrelated canonical Goals: "
+                    + ", ".join(sorted(reassigned_goal_ids))
+                )
+            if plan is None:
+                continue
+            event_plan_id = " ".join(
+                str(event.get("canonical_plan_id") or "").strip().split()
+            )
+            if event_plan_id and event_plan_id != plan.plan_id:
+                raise ValueError(
+                    "reused current-turn speech references a different canonical plan"
+                )
+            event_plan_fingerprint = " ".join(
+                str(event.get("canonical_plan_fingerprint") or "").strip().split()
+            )
+            if (
+                event_plan_fingerprint
+                and event_plan_fingerprint != canonical_plan_fingerprint(plan)
+            ):
+                raise ValueError(
+                    "reused current-turn speech canonical-plan fingerprint mismatch"
                 )
 
     @staticmethod
@@ -2685,6 +2719,7 @@ class ResponseComposerResolver:
             f"Language hint: {request.language or 'auto'}\n\n"
             f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.prompt_projection(), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
+            f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 8000)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"{skill_section}"
@@ -2704,6 +2739,7 @@ class ResponseComposerResolver:
             "Compose one ResponsePlan, one explicit social-attention decision, and zero or more typed lane-coordination groups. When Social Attention policy is enabled and the candidate list is non-empty, social_attention_plan must be a SocialAttentionPlan with decision=express or decision=none; never omit it or return null. decision=express is structurally valid only when it contains at least one supplied body behavior or speech_expression.mode=adapt. A reason alone is not expression. When a requested action already owns a capability, do not duplicate that same capability as auxiliary Social Attention. If a proposed body expression conflicts with primary Activity, choose another eligible untargeted candidate, adapt the response style, or return decision=none with a concrete scene reason. When policy is off or the candidate list is empty, return social_attention_plan=null. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. The verified tool-memory index contains provenance and bound arguments only, not answer facts. It may support honest wording that Chromie recently checked an exact matching subject and is retrieving it, but never state the remembered result before the memory retrieval step returns evidence. Conversation context may ground ordinary conversational repair, but never claim external facts without executed evidence. Answer the user's requested judgment or decision directly before supporting detail, and naturally acknowledge a prior context failure when the current turn calls for repair. "
             "Ground every user-specific statement in the newest turn, active Goals, or supplied conversation context. Do not invent the user's plans, schedule, preferences, relationships, experiences, feelings, or circumstances to make a response sound helpful. When a friendly supporting reason is useful but no personal fact was supplied, phrase it generally. "
+            "Use Interaction Context to account for what Chromie already said, committed, attempted, completed, or failed on the relevant Goals. Respond with only the conversational act still needed. Never promote speech, plan, committed-request, or social-action events into Activity completion; only execution_closure terminal events with evidence references can support such a claim. "
             "For a retained completed external-result Goal, treat delivered evidence-bound dialogue as the only supplied factual projection. Preserve every measurement and condition from the immutable plan and that dialogue exactly; do not substitute, infer, or embellish external details. The newest user turn remains the conversational target: when it is a reaction, feeling, acknowledgement, evaluation, or practical decision, respond to that act first and use prior facts only as useful support. Never replace the current intent with a replay of the old answer. Omit supporting detail when a direct judgment is sufficient. "
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
@@ -2803,6 +2839,8 @@ class ResponseComposerResolver:
             f"{self._bounded(request.context.get('active_goal_snapshots') or goal_association_prompt_projection(request.context), 7000)}\n\n"
             "Speech already delivered in this current turn JSON:\n"
             f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
+            "Goal-scoped Interaction Context JSON:\n"
+            f"{self._bounded(request.context.get('interaction_context') or {}, 8000)}\n\n"
             "Fast speech already scheduled in this current turn JSON (de-duplication only):\n"
             f"{self._bounded(self._scheduled_turn_speech(request.context), 2400)}\n\n"
             "Immutable CanonicalPlan JSON:\n"
@@ -2856,6 +2894,8 @@ class ResponseComposerResolver:
             f"Authoritative user turn:\n{request.text}\n\n"
             "Speech already delivered in this current turn JSON:\n"
             f"{self._bounded(self._delivered_turn_speech(request.context), 3600)}\n\n"
+            "Goal-scoped Interaction Context JSON:\n"
+            f"{self._bounded(request.context.get('interaction_context') or {}, 8000)}\n\n"
             "Fast speech already scheduled in this current turn JSON (de-duplication only; never execution evidence):\n"
             f"{self._bounded(self._scheduled_turn_speech(request.context), 2400)}\n\n"
             "Pending execution Capability semantics JSON:\n"

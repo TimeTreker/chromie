@@ -17,8 +17,10 @@ organized by capability, risk, and retained evidence.
 
 1. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
-   [#18](https://github.com/TimeTreker/chromie/issues/18), then complete
-   [#20](https://github.com/TimeTreker/chromie/issues/20) before qualifying a
+   [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue
+   [#20](https://github.com/TimeTreker/chromie/issues/20), then complete the
+   Goal-scoped cross-lane Interaction Context from
+   [#22](https://github.com/TimeTreker/chromie/issues/22) before qualifying a
    replacement model profile. Same-model timing evidence must remain separate
    from cross-model reload measurement; no prompt-prefix result may claim
    cross-model KV reuse or model-reload savings.
@@ -118,6 +120,35 @@ Exit criteria:
 - excluded lanes produce typed no-action outcomes;
 - no authoritative failure enters another semantic planner;
 - current docs and profiles describe the same lane policy.
+
+### Goal-scoped Interaction Ledger and current-turn continuity
+
+Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-only
+Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
+Association, Fast Planner, Deep Planner, and Response Composer. The Ledger
+transports facts from existing owners; it does not replace or rewrite playback,
+`TaskProposalLedger`, Social Attention results, Goal state, or
+`ExecutionOutcomeBundle` evidence.
+
+Exit criteria:
+
+- delivered response-stage speech retains exact turn, Goal, Plan, claim, and
+  completion-restriction provenance;
+- Cognitive Runtime, playback, Trusted Capability Runtime, and execution
+  closure append only typed facts they authoritatively observe;
+- replay cannot change an immutable event, and terminal Activity entries require
+  trusted execution evidence references;
+- Goal Association receives bounded recent Interaction Context and later
+  planners/composition receive the Goal-scoped projection so they can produce
+  only the still-needed delta;
+- pre-Goal Fast speech remains explicitly unbound rather than receiving
+  Host-invented Goal ownership;
+- Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
+- scheduled and delivered speech remain distinct, and neither proves Activity
+  execution or completion; and
+- focused lane/runtime/model-prompt regressions plus the canonical source gate
+  pass without a new runtime switch, compatibility path, standalone document,
+  or competing semantic/effect authority.
 
 ### Interpretation and capability grounding
 

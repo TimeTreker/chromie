@@ -810,6 +810,26 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_prompt_receives_goal_scoped_interaction_context(self):
+        planner_request = request(
+            "Walk forward for fifteen seconds.",
+            goal_ids=["goal-walk"],
+        )
+        planner_request.context["interaction_context"] = {
+            "events": [{"event_id": "ledger-fast-marker"}]
+        }
+        prompt = FastPlannerResolver(
+            FakeOllama({}),
+            FakeCatalog(),
+        )._prompt(
+            planner_request,
+            [],
+            response_schema={},
+        )
+
+        self.assertIn("ledger-fast-marker", prompt)
+        self.assertIn("plan only the still-needed delta", prompt)
+
     def test_effectful_zero_step_false_satisfaction_repairs_then_escalates(self):
         invalid = {
             "disposition": "respond",

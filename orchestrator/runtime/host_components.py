@@ -26,6 +26,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
+from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from shared.chromie_runtime.accelerator_telemetry import (
@@ -43,6 +44,7 @@ class HostSupportComponents:
     mind: MindManager
     experience: ExperienceManager
     episode_recorder: EpisodeRecorder
+    interaction_ledger: InteractionLedger
 
 
 def build_host_support(
@@ -98,6 +100,7 @@ def build_host_support(
         mind=MindManager.from_settings(settings.mind),
         experience=ExperienceManager.from_settings(settings.experience),
         episode_recorder=EpisodeRecorder.from_settings(settings.episode),
+        interaction_ledger=InteractionLedger(),
     )
 
 
@@ -113,6 +116,8 @@ def build_agent_client(settings: HostSettingsSnapshot) -> AgentClient:
 def build_interaction_runtime(
     assistant: Any,
     settings: HostSettingsSnapshot,
+    *,
+    interaction_ledger: InteractionLedger,
 ) -> InteractionRuntimeCoordinator:
     cognition = settings.cognition
     session = settings.session
@@ -138,4 +143,5 @@ def build_interaction_runtime(
         body_recovery_confirmation_ttl_s=(
             session.body_recovery_confirmation_ttl_s
         ),
+        interaction_ledger=interaction_ledger,
     )

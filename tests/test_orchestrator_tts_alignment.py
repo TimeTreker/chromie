@@ -2506,9 +2506,16 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "text": "The Moon reflects sunlight.",
                 "metadata": {
                     "session_id": "sid-final",
+                    "turn_id": "turn-final",
                     "phase": "final",
+                    "speech_act": "result",
                     "delivery_role": "response",
                     "commitment_state": "completed",
+                    "source_goal_ids": ["goal-moon"],
+                    "canonical_plan_id": "plan-moon",
+                    "canonical_plan_fingerprint": "fingerprint-moon",
+                    "claims": ["result"],
+                    "must_not_claim_completion": False,
                 },
             }
         )
@@ -2526,7 +2533,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["text"], "The Moon reflects sunlight.")
         self.assertEqual(delivered[0]["stage"], "final")
+        self.assertEqual(delivered[0]["purpose"], "result")
         self.assertEqual(delivered[0]["commitment"], "completed")
+        self.assertEqual(delivered[0]["turn_id"], "turn-final")
+        self.assertEqual(delivered[0]["source_goal_ids"], ["goal-moon"])
+        self.assertEqual(delivered[0]["canonical_plan_id"], "plan-moon")
+        self.assertEqual(
+            delivered[0]["canonical_plan_fingerprint"],
+            "fingerprint-moon",
+        )
+        self.assertEqual(delivered[0]["claims"], ["result"])
+        self.assertFalse(delivered[0]["must_not_claim_completion"])
 
     async def test_single_tts_worker_pipelines_next_chunk_during_playback(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -22,6 +23,7 @@ PendingAudio = tuple[int, Any, int, str | None, str | None]
 class PlaybackDeliveryLifecycle:
     """Mutable lifecycle state for one VoiceAssistant runtime."""
 
+    interaction_event_sink: Callable[[dict[str, Any]], Any] | None = None
     next_playback_order: int = 0
     synthesis_order: int = 0
     playback_generation: int = 0
@@ -102,18 +104,58 @@ class PlaybackDeliveryLifecycle:
         route: str = "",
         intent: str = "",
         commitment: str = "",
+        turn_id: str | None = None,
+        source_goal_ids: list[str] | None = None,
+        canonical_plan_id: str = "",
+        canonical_plan_fingerprint: str = "",
+        goal_association_fingerprint: str = "",
+        delivery_role: str = "response",
+        claims: list[str] | None = None,
+        must_not_claim_completion: bool | None = None,
     ) -> dict[str, Any] | None:
         sid = str(session_id or "").strip()
         text = str(normalized_text or "").strip()
         if not sid or not orders or not text:
             return None
+        normalized_turn_id = " ".join(str(turn_id or sid).strip().split())
+        normalized_goal_ids = self._normalized_text_values(source_goal_ids)
+        normalized_claims = self._normalized_text_values(claims)
+        normalized_plan_id = " ".join(str(canonical_plan_id or "").strip().split())
+        normalized_plan_fingerprint = " ".join(
+            str(canonical_plan_fingerprint or "").strip().split()
+        )
+        normalized_association_fingerprint = " ".join(
+            str(goal_association_fingerprint or "").strip().split()
+        )
+        normalized_delivery_role = (
+            " ".join(str(delivery_role or "response").strip().split()) or "response"
+        )
         # The event identity is a structured conversational-act and transport
         # correlation key. Wording is payload integrity, not de-duplication
         # identity, so changing punctuation or whitespace cannot define a new
         # delivered act.
-        event_seed = (
-            f"{sid}|{generation}|{orders[0]}|{stage}|{purpose}|"
-            f"{route}|{intent}|{commitment}"
+        event_seed = json.dumps(
+            {
+                "canonical_plan_fingerprint": normalized_plan_fingerprint,
+                "canonical_plan_id": normalized_plan_id,
+                "claims": normalized_claims,
+                "commitment": str(commitment or ""),
+                "delivery_role": normalized_delivery_role,
+                "generation": int(generation),
+                "goal_association_fingerprint": normalized_association_fingerprint,
+                "intent": str(intent or ""),
+                "must_not_claim_completion": must_not_claim_completion,
+                "order": int(orders[0]),
+                "purpose": str(purpose or ""),
+                "route": str(route or ""),
+                "session_id": sid,
+                "source_goal_ids": normalized_goal_ids,
+                "stage": str(stage or ""),
+                "turn_id": normalized_turn_id,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
         )
         event_id = "speech_event_" + hashlib.sha256(
             event_seed.encode("utf-8")
@@ -121,6 +163,7 @@ class PlaybackDeliveryLifecycle:
         event = {
             "event_id": event_id,
             "session_id": sid,
+            "turn_id": normalized_turn_id,
             "stage": str(stage or ""),
             "purpose": str(purpose or ""),
             "status": "scheduled",
@@ -128,6 +171,13 @@ class PlaybackDeliveryLifecycle:
             "route": str(route or ""),
             "intent": str(intent or ""),
             "commitment": str(commitment or ""),
+            "source_goal_ids": normalized_goal_ids,
+            "canonical_plan_id": normalized_plan_id,
+            "canonical_plan_fingerprint": normalized_plan_fingerprint,
+            "goal_association_fingerprint": normalized_association_fingerprint,
+            "delivery_role": normalized_delivery_role,
+            "claims": normalized_claims,
+            "must_not_claim_completion": must_not_claim_completion,
             "generation": int(generation),
             "orders": [int(order) for order in orders],
         }
@@ -138,7 +188,36 @@ class PlaybackDeliveryLifecycle:
         self.turn_speech_event_by_playback_key[
             self.key(generation, orders[0], session_id)
         ] = event_id
+        self._publish_interaction_event(event)
         return event
+
+    @staticmethod
+    def _normalized_text_values(values: Any) -> list[str]:
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, (list, tuple, set)):
+            return []
+        return sorted(
+            {
+                text
+                for item in values
+                if (text := " ".join(str(item or "").strip().split()))
+            }
+        )
+
+    def _publish_interaction_event(self, event: dict[str, Any]) -> None:
+        if self.interaction_event_sink is None:
+            return
+        self.interaction_event_sink(
+            {
+                **event,
+                "orders": list(event.get("orders") or []),
+                "source_goal_ids": list(
+                    event.get("source_goal_ids") or []
+                ),
+                "claims": list(event.get("claims") or []),
+            }
+        )
 
     def update_turn_speech_event_for_playback(
         self,
@@ -159,6 +238,7 @@ class PlaybackDeliveryLifecycle:
                 continue
             event["status"] = "playback_started" if started else "not_delivered"
             event["playback_reason"] = str(reason or "")
+            self._publish_interaction_event(event)
             break
 
     def delivered_turn_speech_events(

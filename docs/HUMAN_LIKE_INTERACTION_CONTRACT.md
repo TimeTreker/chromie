@@ -234,15 +234,28 @@ lifecycle state without inferring meaning from a phrase blacklist. The
 pre-generated generic cache is a transport-safe fallback when dynamic speech is
 not admissible or cannot be scheduled; it never claims evidence or an effect.
 
-Current-turn de-duplication uses the typed speech-event identity and its
-structured purpose, stage, route, and commitment. Generated or queued speech is
-not delivery evidence. Only playback-started or playback-completed state
-satisfies the audible act. A later response stage may reference a queued event
-without resynthesizing it; if that exact event becomes `not_delivered`, Runtime
-may fulfill the same act once. Literal text equality is only a payload-integrity
-check and never decides whether two conversational responsibilities are the
-same. Distinct result, failure, limitation, clarification, confirmation,
-progress, and completion acts remain independently deliverable.
+Current-turn de-duplication uses the typed speech-event identity and its turn,
+structured purpose, stage, route, commitment, source Goal IDs, Plan provenance,
+claims, and completion restriction. Generated or queued speech is not delivery
+evidence. Only playback-started or playback-completed state satisfies the
+audible act. A later response stage may reference a queued event without
+resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
+fulfill the same act once. Pre-Goal Fast speech remains explicitly unbound, but
+already Goal-bound speech cannot be reassigned to unrelated work. Literal text
+equality is only a payload-integrity check and never decides whether two
+conversational responsibilities are the same. Distinct result, failure,
+limitation, clarification, confirmation, progress, and completion acts remain
+independently deliverable.
+
+Natural continuity comes from the Goal-scoped `Interaction Context` projected
+from Chromie's append-only `Interaction Ledger`, not from a prompt-only “do not
+repeat” rule. Speech delivery, Goal/Plan resolution, Activity or
+provider-backed Speaking commitment and outcome, and Social Attention results
+retain their typed lifecycle and owner. Later cognition considers what Chromie
+already said, promised, attempted, completed, or failed and produces only the
+still-needed response or plan delta. In particular, a spoken promise is
+observable conversation state but never proof that the Activity started or
+completed, and a committed request is never terminal evidence.
 
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable

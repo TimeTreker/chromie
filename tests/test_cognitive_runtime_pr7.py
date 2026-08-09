@@ -14,6 +14,7 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.skill_runtime import (
     LocalSpeechSkillProvider,
@@ -417,6 +418,74 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIn("orchestrator.canonical_plan_adapter", modules)
         self.assertIn("total", result.timings_ms)
 
+    def test_interaction_context_reaches_association_planner_and_composer(self):
+        ledger = InteractionLedger()
+        ledger.record_playback_event(
+            {
+                "event_id": "speech-existing",
+                "session_id": "sid-pr7",
+                "turn_id": "turn-1",
+                "status": "playback_started",
+                "text": "你好。",
+                "source_goal_ids": ["goal-1"],
+            }
+        )
+
+        class ContextClient(ScriptedClient):
+            def __init__(self):
+                super().__init__(
+                    association=new_goal_association(),
+                    fast_plans=[respond_plan()],
+                )
+                self.association_contexts: list[dict] = []
+                self.fast_contexts: list[dict] = []
+
+            async def resolve_goal_association(self, *args, **kwargs):
+                self.association_contexts.append(
+                    dict(kwargs.get("context") or {})
+                )
+                return await super().resolve_goal_association(*args, **kwargs)
+
+            async def resolve_fast_plan(self, *args, **kwargs):
+                self.fast_contexts.append(dict(kwargs.get("context") or {}))
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        client = ContextClient()
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(
+                FakeRuntime(),
+            ),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            interaction_ledger=ledger,
+        )
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            client.association_contexts[0]["interaction_context"][
+                "already_spoken"
+            ][0]["subject_id"],
+            "speech-existing",
+        )
+        self.assertIn(
+            "goal_associated",
+            {
+                item["event_type"]
+                for item in client.fast_contexts[0]["interaction_context"][
+                    "goal_history"
+                ]
+            },
+        )
+        self.assertIn(
+            "plan_resolved",
+            {
+                item["event_type"]
+                for item in client.compose_contexts[0]["interaction_context"][
+                    "goal_history"
+                ]
+            },
+        )
     def test_runtime_trace_can_emit_one_runtime_event_package(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1028,6 +1097,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                             "purpose": "acknowledge_and_check",
                             "generation": 6,
                             "orders": [11],
+                            "source_goal_ids": ["goal-weather"],
+                            "canonical_plan_id": plan.plan_id,
+                            "canonical_plan_fingerprint": (
+                                canonical_plan_fingerprint(plan)
+                            ),
                         }
                     ]
                 },
@@ -1043,7 +1117,41 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(metadata["reused_speech_generation"], 6)
         self.assertEqual(metadata["reused_speech_orders"], [11])
+        self.assertEqual(metadata["turn_id"], "sid-weather-reuse")
+        self.assertEqual(metadata["source_goal_ids"], ["goal-weather"])
+        self.assertEqual(metadata["canonical_plan_id"], plan.plan_id)
+        self.assertEqual(
+            metadata["canonical_plan_fingerprint"],
+            canonical_plan_fingerprint(plan),
+        )
         self.assertEqual(response.speech[0].text, fast_text)
+
+        with self.assertRaisesRegex(ValueError, "cannot be reassigned"):
+            asyncio.run(
+                CanonicalPlanRuntimeAdapter(
+                    FakeRuntime([weather_definition()])
+                ).build_response(
+                    plan=plan,
+                    composition=composition,
+                    session_id="sid-weather-reuse",
+                    language="zh-CN",
+                    context={
+                        "scheduled_turn_speech": [
+                            {
+                                "event_id": "speech_event_weather_reuse",
+                                "status": "scheduled",
+                                "text": fast_text,
+                                "purpose": "acknowledge_and_check",
+                                "generation": 6,
+                                "orders": [11],
+                                "source_goal_ids": ["goal-other"],
+                                "canonical_plan_id": "plan-other",
+                                "canonical_plan_fingerprint": "fingerprint-other",
+                            }
+                        ]
+                    },
+                )
+            )
 
     def test_physical_activity_reuses_scheduled_fast_speech_and_keeps_skill(self):
         plan = CanonicalPlan(

@@ -617,12 +617,11 @@ class VoiceAssistant:
             max_utterance_ms=self.max_vad_utterance_ms,
         )
 
-        # Task, microphone buffering, and playback state live in focused
-        # collaborators. The Host keeps
-        # compatibility aliases below while lifecycle mutation is centralized
-        # and independently testable.
+        # Focused collaborators own task, microphone, playback, and ledger state;
+        # the Host keeps compatibility aliases while lifecycle mutation stays testable.
         self.input_turn_lifecycle = InputTurnLifecycle()
         self.playback_delivery = PlaybackDeliveryLifecycle(
+            interaction_event_sink=host_support.interaction_ledger.record_playback_event,
             synthesis_semaphore=asyncio.Semaphore(playback_settings.concurrency)
         )
         self._protective_reflex_failure = False
@@ -639,7 +638,7 @@ class VoiceAssistant:
         self.recordings_dir = str(recordings_dir)
         recordings_dir.mkdir(parents=True, exist_ok=True)
 
-        self.interaction_runtime = build_interaction_runtime(self, self.host_settings)
+        self.interaction_runtime = build_interaction_runtime(self, self.host_settings, interaction_ledger=host_support.interaction_ledger)
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             apply_lanes=self.cognitive_apply_lanes,
@@ -808,6 +807,14 @@ class VoiceAssistant:
         route: str = "",
         intent: str = "",
         commitment: str = "",
+        turn_id: str | None = None,
+        source_goal_ids: list[str] | None = None,
+        canonical_plan_id: str = "",
+        canonical_plan_fingerprint: str = "",
+        goal_association_fingerprint: str = "",
+        delivery_role: str = "response",
+        claims: list[str] | None = None,
+        must_not_claim_completion: bool | None = None,
     ) -> dict[str, Any] | None:
         return self._playback_state().register_turn_speech_event(
             session_id=session_id,
@@ -819,6 +826,14 @@ class VoiceAssistant:
             route=route,
             intent=intent,
             commitment=commitment,
+            turn_id=turn_id,
+            source_goal_ids=source_goal_ids,
+            canonical_plan_id=canonical_plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint,
+            goal_association_fingerprint=goal_association_fingerprint,
+            delivery_role=delivery_role,
+            claims=claims,
+            must_not_claim_completion=must_not_claim_completion,
         )
 
     def _update_turn_speech_event_for_playback(
@@ -2214,6 +2229,49 @@ class VoiceAssistant:
                     str(metadata.get("commitment_state") or "")
                     if isinstance(metadata, dict)
                     else ""
+                ),
+                turn_id=(
+                    str(metadata.get("turn_id") or session_id or "")
+                    if isinstance(metadata, dict)
+                    else str(session_id or "")
+                ),
+                source_goal_ids=(
+                    list(metadata.get("source_goal_ids") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("source_goal_ids"), list)
+                    else []
+                ),
+                canonical_plan_id=(
+                    str(metadata.get("canonical_plan_id") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                canonical_plan_fingerprint=(
+                    str(metadata.get("canonical_plan_fingerprint") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                goal_association_fingerprint=(
+                    str(metadata.get("goal_association_fingerprint") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                delivery_role=(
+                    str(metadata.get("delivery_role") or "response")
+                    if isinstance(metadata, dict)
+                    else "response"
+                ),
+                claims=(
+                    list(metadata.get("claims") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("claims"), list)
+                    else []
+                ),
+                must_not_claim_completion=(
+                    metadata.get("must_not_claim_completion")
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("must_not_claim_completion"), bool)
+                    else None
                 ),
             )
             if speech_event is not None:
@@ -6851,6 +6909,37 @@ class VoiceAssistant:
         suppress_final_reason: str | None = None,
     ) -> str:
         closure = self._cognitive_turn_closure_adapter()
+        interaction_ledger = getattr(
+            getattr(self, "interaction_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+        envelope = response.metadata.get("user_turn_envelope")
+        interaction_turn_id = (
+            str(envelope.get("turn_id") or "").strip()
+            if isinstance(envelope, dict)
+            else ""
+        ) or response.interaction_id
+        if interaction_ledger is not None:
+            try:
+                interaction_ledger.record_social_results(
+                    session_id=str(session_id or interaction_turn_id),
+                    turn_id=interaction_turn_id,
+                    interaction_id=response.interaction_id,
+                    requests=response.skills,
+                    results=execution.results,
+                )
+            except Exception as exc:
+                response.metadata["interaction_ledger_error"] = (
+                    type(exc).__name__
+                )
+                self.session_log(
+                    session_id,
+                    "interaction_ledger_social_append_failed: "
+                    "error_type=%s error=%s",
+                    type(exc).__name__,
+                    exc,
+                )
         try:
             plan = closure.canonical_plan(response)
         except Exception as exc:
@@ -6912,6 +7001,23 @@ class VoiceAssistant:
         response.metadata["execution_outcome_bundle"] = bundle.model_dump(
             mode="json"
         )
+        if interaction_ledger is not None:
+            try:
+                interaction_ledger.record_execution_outcome(
+                    bundle,
+                    session_id=str(session_id or bundle.turn_id),
+                )
+            except Exception as exc:
+                response.metadata["interaction_ledger_error"] = (
+                    type(exc).__name__
+                )
+                self.session_log(
+                    session_id,
+                    "interaction_ledger_outcome_append_failed: "
+                    "error_type=%s error=%s",
+                    type(exc).__name__,
+                    exc,
+                )
         goal_state_results: list[dict[str, Any]] = []
         try:
             goal_state_results = (

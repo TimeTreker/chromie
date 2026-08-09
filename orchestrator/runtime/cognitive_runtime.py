@@ -789,6 +789,13 @@ class CanonicalPlanRuntimeAdapter:
             for goal in association.new_goals
             if str(goal.goal_id or "").strip()
         ]
+        runtime_context = context if isinstance(context, dict) else {}
+        envelope = runtime_context.get("user_turn_envelope")
+        turn_id = (
+            str(envelope.get("turn_id") or session_id)
+            if isinstance(envelope, dict)
+            else session_id
+        )
         speech = [
             InteractionSpeech(
                 text=final.text,
@@ -796,6 +803,7 @@ class CanonicalPlanRuntimeAdapter:
                 style="brief",
                 metadata={
                     "source": "goal_driven_response_composer",
+                    "turn_id": turn_id,
                     "phase": "final",
                     "speech_act": final.speech_act,
                     "commitment_state": final.commitment_state,
@@ -813,7 +821,6 @@ class CanonicalPlanRuntimeAdapter:
             )
         ]
 
-        runtime_context = context if isinstance(context, dict) else {}
         attention = composition.social_attention_plan
         policy_mode = self._effective_social_attention_mode(composition)
         omitted_attention: list[str] = []
@@ -900,6 +907,7 @@ class CanonicalPlanRuntimeAdapter:
                                     "reason": behavior.reason,
                                     "social_attention_policy_mode": policy_mode,
                                     "execution_lane": "social_attention",
+                                    "source_goal_ids": list(goal_ids),
                                 },
                             )
                             skills.append(request)
@@ -934,13 +942,14 @@ class CanonicalPlanRuntimeAdapter:
         }
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
             metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
-        return InteractionResponse(
+        response = InteractionResponse(
             interaction_id=f"cognitive_{session_id}",
             status="ok",
             speech=speech,
             skills=skills,
             metadata=metadata,
         )
+        return response
 
     async def build_response(
         self,
@@ -1004,6 +1013,13 @@ class CanonicalPlanRuntimeAdapter:
             )
 
         fingerprint = canonical_plan_fingerprint(plan)
+        runtime_context = context if isinstance(context, dict) else {}
+        envelope = runtime_context.get("user_turn_envelope")
+        turn_id = (
+            str(envelope.get("turn_id") or session_id)
+            if isinstance(envelope, dict)
+            else session_id
+        )
         alternative = str(plan.metadata.get("plan_relation") or "") in {
             "alternative",
             "safe_adjustment",
@@ -1327,6 +1343,7 @@ class CanonicalPlanRuntimeAdapter:
             )
             speech_metadata = {
                 "source": projected["source"],
+                "turn_id": turn_id,
                 "phase": phase,
                 "speech_act": projected["speech_act"],
                 "commitment_state": projected["commitment_state"],
@@ -1357,6 +1374,38 @@ class CanonicalPlanRuntimeAdapter:
                     raise ValueError(
                         "response stage text does not match the referenced "
                         "current-turn speech event"
+                    )
+                reused_goal_ids = {
+                    normalized
+                    for item in reused.get("source_goal_ids") or []
+                    if (normalized := " ".join(str(item or "").strip().split()))
+                }
+                reassigned_goal_ids = (
+                    set(projected.get("covers_goal_ids") or []) - reused_goal_ids
+                )
+                if reused_goal_ids and reassigned_goal_ids:
+                    raise ValueError(
+                        "Goal-bound current-turn speech cannot be reassigned to "
+                        "unrelated canonical Goals: "
+                        + ", ".join(sorted(reassigned_goal_ids))
+                    )
+                reused_plan_id = " ".join(
+                    str(reused.get("canonical_plan_id") or "").strip().split()
+                )
+                if reused_plan_id and reused_plan_id != plan.plan_id:
+                    raise ValueError(
+                        "reused current-turn speech references a different "
+                        "canonical plan"
+                    )
+                reused_plan_fingerprint = " ".join(
+                    str(reused.get("canonical_plan_fingerprint") or "")
+                    .strip()
+                    .split()
+                )
+                if reused_plan_fingerprint and reused_plan_fingerprint != fingerprint:
+                    raise ValueError(
+                        "reused current-turn speech canonical-plan fingerprint "
+                        "mismatch"
                     )
                 raw_orders = reused.get("orders")
                 if not isinstance(raw_orders, list):
@@ -1645,6 +1694,8 @@ class CanonicalPlanRuntimeAdapter:
                                     ),
                                     "social_function": behavior.social_function,
                                     "canonical_plan_id": plan.plan_id,
+                                    "canonical_plan_fingerprint": fingerprint,
+                                    "source_goal_ids": list(plan.goal_ids),
                                     "target": attention.target.model_dump(
                                         mode="json", exclude_none=True
                                     ),
@@ -1782,7 +1833,7 @@ class CanonicalPlanRuntimeAdapter:
         if confirmation_prompt:
             metadata["confirmation_prompt"] = confirmation_prompt
             metadata["confirmation_prompt_source"] = "llm_wording_runtime_validated"
-        return InteractionResponse(
+        response = InteractionResponse(
             status=status_map.get(plan.disposition, "error"),
             speech=speech,
             skills=skills,
@@ -1792,6 +1843,7 @@ class CanonicalPlanRuntimeAdapter:
             ),
             metadata=metadata,
         )
+        return response
 
 
 class GoalDrivenRuntimeCoordinator:
@@ -1813,6 +1865,7 @@ class GoalDrivenRuntimeCoordinator:
         goal_state_apply: Callable[..., list[dict[str, Any]]] | None = None,
         context_refresh: Callable[[], dict[str, Any]] | None = None,
         delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
+        interaction_ledger: Any | None = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
@@ -1820,6 +1873,38 @@ class GoalDrivenRuntimeCoordinator:
         self.goal_state_apply = goal_state_apply
         self.context_refresh = context_refresh
         self.delivered_turn_speech_provider = delivered_turn_speech_provider
+        self.interaction_ledger = interaction_ledger or getattr(
+            getattr(adapter, "interaction_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+
+    @staticmethod
+    def _context_turn_id(context: dict[str, Any], sid: str) -> str:
+        envelope = context.get("user_turn_envelope")
+        if isinstance(envelope, dict):
+            turn_id = " ".join(
+                str(envelope.get("turn_id") or "").strip().split()
+            )
+            if turn_id:
+                return turn_id
+        return sid
+
+    def _interaction_context(
+        self,
+        *,
+        sid: str,
+        context: dict[str, Any],
+        goal_ids: list[str] | tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        if self.interaction_ledger is None:
+            return {}
+        projection = self.interaction_ledger.context(
+            sid,
+            goal_ids=goal_ids,
+            turn_id=self._context_turn_id(context, sid),
+        )
+        return projection.model_dump(mode="json")
 
     @staticmethod
     def _association_goal_ids(association: GoalAssociationResolution) -> list[str]:
@@ -2140,6 +2225,11 @@ class GoalDrivenRuntimeCoordinator:
         language: str,
     ) -> CognitiveRuntimeResolution:
         started = time.perf_counter()
+        context = dict(context)
+        context["interaction_context"] = self._interaction_context(
+            sid=sid,
+            context=context,
+        )
         timings: dict[str, float] = {}
         association: GoalAssociationResolution | None = None
         fast_plan: CanonicalPlan | None = None
@@ -2342,6 +2432,24 @@ class GoalDrivenRuntimeCoordinator:
                     goal_state_commit_stage = "goal_association"
 
             association_goal_ids = self._association_goal_ids(association)
+            if self.policy.mode == "apply" and self.interaction_ledger is not None:
+                self.interaction_ledger.record_goal_association(
+                    session_id=sid,
+                    turn_id=association.turn_id,
+                    interaction_id="",
+                    association_id=goal_association_fingerprint(association),
+                    goal_ids=association_goal_ids,
+                    relationships=[
+                        *[item.relationship for item in association.associations],
+                        *(["new"] if association.new_goals else []),
+                        *(["clarify"] if association.clarification else []),
+                    ],
+                )
+            planning_context["interaction_context"] = self._interaction_context(
+                sid=sid,
+                context=planning_context,
+                goal_ids=association_goal_ids,
+            )
             if association_status == "needs_clarification" or association.clarification:
                 terminal_plan = CanonicalPlan(
                     plan_id=f"plan_goal_association_{sid}",
@@ -2643,6 +2751,19 @@ class GoalDrivenRuntimeCoordinator:
                     "runtime validation rejected canonical plan: "
                     + json.dumps(runtime_errors, ensure_ascii=False)
                 )
+
+            if self.policy.mode == "apply" and self.interaction_ledger is not None:
+                self.interaction_ledger.record_plan(
+                    session_id=sid,
+                    turn_id=self._context_turn_id(planning_context, sid),
+                    interaction_id="",
+                    plan=terminal_plan,
+                )
+            planning_context["interaction_context"] = self._interaction_context(
+                sid=sid,
+                context=planning_context,
+                goal_ids=terminal_plan.goal_ids,
+            )
 
             composition_context = dict(planning_context)
             composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()

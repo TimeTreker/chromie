@@ -353,7 +353,12 @@ claim guards, and cancellation generation. It need not wait for unrelated later
 response fields.
 
 Current-turn conversational-act reuse is correlated by the exact speech-event
-ID together with its structured stage, purpose, route, intent, and commitment.
+ID together with its turn, structured stage, purpose, route, intent,
+commitment, source Goal IDs, canonical Plan identity/fingerprint, delivery
+role, claim types, and completion-claim restriction. An event created before
+Goal Association remains explicitly unbound; the Host does not invent Goal or
+Plan provenance after delivery. Once an event is Goal-bound, a later response
+stage cannot reassign it to unrelated canonical Goals or a different Plan.
 Generated or scheduled state is not delivery evidence; only playback-started or
 completed state satisfies the audible act. A ResponseStage may reference a
 pending event without synthesizing a duplicate, and Runtime may fulfill that act
@@ -361,6 +366,22 @@ once if the referenced event becomes `not_delivered`. Text equality is checked
 only to preserve event payload integrity. Independent result, failure,
 limitation, clarification, confirmation, progress, and completion stages retain
 their own delivery obligations.
+
+Cross-lane awareness is transported through the append-only `Interaction
+Ledger`. Existing owners append only typed facts they are qualified to observe:
+playback owns audible speech, Cognitive Runtime owns Goal/Plan decisions, the
+Trusted Capability Runtime owns committed provider work and Social Attention
+results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
+provider-backed Speaking outcomes. No entry edits or upgrades another owner's
+evidence.
+
+Before Goal Association, recent session events form volatile Interaction
+Context. After canonical Goal IDs exist, Runtime projects only events bound to
+those Goals plus explicitly unbound Fast speech from the same turn. Goal
+Association, Fast Planner, Deep Planner, and Response Composer use the bounded
+projection to decide the still-needed delta. Scheduled speech remains distinct
+from audible speech, committed work remains distinct from terminal evidence,
+and a speech event can never become execution or completion evidence.
 
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically
