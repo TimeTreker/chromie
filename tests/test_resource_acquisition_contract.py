@@ -4,6 +4,7 @@ import unittest
 
 from pydantic import ValidationError
 
+from agent.app.capabilities.local import chromie_manifests
 from agent.app.goal_association import GoalAssociationResolver, GoalSegmentationModelOutput
 from agent.app.planner_contract import (
     PlannerModelOutput,
@@ -83,7 +84,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             "description": "Fetch the red mug and hand it to the requester.",
             "resource_responsibility": {
                 "responsibility_type": "acquire_and_deliver_resource",
-                "responsibility_variant": "fetch_and_deliver_object",
                 "resource": {
                     "kind": "physical_object",
                     "description": "the red mug",
@@ -122,6 +122,31 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     "metadata": {"capability_id": "soridormi.fetch_object"},
                 }
             )
+
+    def test_builtin_information_providers_share_resource_responsibility(self) -> None:
+        tools = {
+            tool.name: tool
+            for manifest in chromie_manifests()
+            for tool in manifest.tools
+        }
+        for capability_id in (
+            "chromie.weather.lookup",
+            "chromie.external_information.retrieve",
+        ):
+            with self.subTest(capability_id=capability_id):
+                hints = tools[capability_id].llm_hints
+                scope = hints["semantic_scope"]
+                self.assertEqual(
+                    scope["responsibility_type"],
+                    "acquire_and_deliver_resource",
+                )
+                self.assertIn("information", scope["resource_kinds"])
+                self.assertIn("spoken_explanation", scope["delivery_modes"])
+                self.assertTrue(hints["resource_contract"])
+                self.assertEqual(
+                    hints["resource_contract"]["final_delivery_owner"],
+                    "chromie_response_layer",
+                )
 
     def test_information_and_physical_delivery_modes_are_distinct(self) -> None:
         AcquireAndDeliverResource(
@@ -183,14 +208,14 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         },
                     },
                     {
-                        "capability_id": "soridormi.fetch_and_deliver_object",
+                        "capability_id": "soridormi.acquire_and_deliver_resource",
                         "hints": {
                             "semantic_scope": {
                                 "responsibility_type": (
                                     "acquire_and_deliver_resource"
                                 ),
                                 "resource_kinds": ["physical_object"],
-                                "delivery": "physical_handover",
+                                "delivery_modes": ["physical_handover"],
                             },
                             "resource_contract": {
                                 "result_field": "resource_outcome"
@@ -205,9 +230,36 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             ResourceResponsibilityCapabilityUnavailableError,
         )
         self.assertIn(
-            "matching_capability_ids=soridormi.fetch_and_deliver_object",
+            "matching_capability_ids=soridormi.acquire_and_deliver_resource",
             str(caught.exception),
         )
+
+    def test_resource_capability_accepts_legacy_or_canonical_delivery_scope(self) -> None:
+        for scope in (
+            {
+                "responsibility_type": "acquire_and_deliver_resource",
+                "resource_kinds": ["physical_object"],
+                "delivery": "physical_handover",
+            },
+            {
+                "responsibility_type": "acquire_and_deliver_resource",
+                "resource_kinds": ["physical_object"],
+                "delivery_modes": ["physical_handover"],
+            },
+        ):
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output("soridormi.acquire_and_deliver_resource"),
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.acquire_and_deliver_resource",
+                        "hints": {
+                            "semantic_scope": scope,
+                            "resource_contract": {"result_field": "resource_outcome"},
+                        },
+                    }
+                ],
+            )
 
     def test_planner_grounding_preserves_new_resource_responsibility(self) -> None:
         resource_goal = self._resource_goal()
@@ -270,19 +322,19 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         )
 
     def test_exact_resource_capability_declares_scope_and_result_contract(self) -> None:
-        output = self._planner_output("soridormi.fetch_and_deliver_object")
+        output = self._planner_output("soridormi.acquire_and_deliver_resource")
 
         validate_resource_responsibility_capability_grounding(
             output,
             authoritative_goals=[self._resource_goal()],
             capabilities=[
                 {
-                    "capability_id": "soridormi.fetch_and_deliver_object",
+                    "capability_id": "soridormi.acquire_and_deliver_resource",
                     "hints": {
                         "semantic_scope": {
                             "responsibility_type": "acquire_and_deliver_resource",
                             "resource_kinds": ["physical_object"],
-                            "delivery": "physical_handover",
+                            "delivery_modes": ["physical_handover"],
                         }
                     },
                     "metadata": {
@@ -295,7 +347,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         )
 
 
-    def test_responsibility_variant_is_explicit_and_backward_compatible(self) -> None:
+    def test_legacy_responsibility_variant_is_input_only_compatibility(self) -> None:
         information = AcquireAndDeliverResource(
             resource=ResourceDescriptor(
                 kind="information",
@@ -311,23 +363,21 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             information.responsibility_type,
             "acquire_and_deliver_resource",
         )
-        self.assertEqual(
-            information.responsibility_variant,
-            "fetch_and_deliver_information",
+        canonical_payload = information.model_dump(mode="json")
+        self.assertNotIn("responsibility_variant", canonical_payload)
+        restored = AcquireAndDeliverResource.model_validate(
+            {
+                **canonical_payload,
+                "responsibility_variant": "fetch_and_deliver_information",
+            }
         )
-
-        legacy_payload = information.model_dump(mode="json")
-        legacy_payload.pop("responsibility_variant")
-        restored = AcquireAndDeliverResource.model_validate(legacy_payload)
-        self.assertEqual(
-            restored.responsibility_variant,
-            "fetch_and_deliver_information",
-        )
+        self.assertEqual(restored.resource.kind, "information")
+        self.assertNotIn("responsibility_variant", restored.model_dump(mode="json"))
 
         with self.assertRaises(ValidationError):
             AcquireAndDeliverResource.model_validate(
                 {
-                    **information.model_dump(mode="json"),
+                    **canonical_payload,
                     "responsibility_variant": "fetch_and_deliver_object",
                 }
             )
@@ -394,9 +444,9 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         self.assertIsNotNone(responsibility)
         assert responsibility is not None
         self.assertEqual(responsibility.resource.kind, "physical_object")
-        self.assertEqual(
-            responsibility.responsibility_variant,
-            "fetch_and_deliver_object",
+        self.assertNotIn(
+            "responsibility_variant",
+            responsibility.model_dump(mode="json"),
         )
         self.assertEqual(
             responsibility.source.bindings["source_location"]["value"],

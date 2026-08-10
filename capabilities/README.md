@@ -31,7 +31,7 @@ Soridormi task goals instead of controller recipes.
 Live Soridormi named skills may also declare provider-neutral
 `metadata.semantic_scope` and `metadata.resource_contract`. Chromie preserves
 those declarations when importing the live catalog. A complete physical-resource
-capability such as `fetch_and_deliver_object` remains absent until Soridormi
+capability such as `acquire_and_deliver_resource` remains absent until Soridormi
 actually advertises it; Chromie must not hand-add it to the checked-in snapshot
 or infer it from walking or grasping primitives. See
 [`Resource Acquisition and Delivery`](../docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).

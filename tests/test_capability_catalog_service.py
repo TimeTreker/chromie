@@ -282,7 +282,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
                     "mode": "sim",
                     "skills": [
                         {
-                            "skill_id": "fetch_and_deliver_object",
+                            "skill_id": "acquire_and_deliver_resource",
                             "description": "Acquire and deliver a described physical object.",
                             "parameters_schema": {"type": "object"},
                             "available": True,
@@ -293,7 +293,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
                                 "semantic_scope": {
                                     "responsibility_type": "acquire_and_deliver_resource",
                                     "resource_kinds": ["physical_object"],
-                                    "delivery": "physical_handover",
+                                    "delivery_modes": ["physical_handover"],
                                 },
                                 "resource_contract": {
                                     "result_field": "resource_outcome"
@@ -307,7 +307,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
 
         capability = await catalog.get_capability(
-            "soridormi.fetch_and_deliver_object",
+            "soridormi.acquire_and_deliver_resource",
             refresh=True,
         )
 

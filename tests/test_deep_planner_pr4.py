@@ -227,7 +227,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "source_text": reason,
                     "resource_responsibility": {
                         "responsibility_type": "acquire_and_deliver_resource",
-                        "responsibility_variant": "fetch_and_deliver_object",
                         "resource": {
                             "kind": "physical_object",
                             "description": "red mug",

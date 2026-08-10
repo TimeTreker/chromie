@@ -71,7 +71,7 @@
       "prompt_tier": "common",
       "reason": "Grounded external facts, places, restaurant recommendations, news, and how-to research are common read-only needs."
     },
-    "soridormi.fetch_and_deliver_object": {
+    "soridormi.acquire_and_deliver_resource": {
       "prompt_tier": "common",
       "reason": "Generic provider-owned acquisition and delivery of a physical object is a common embodied responsibility once Soridormi advertises the exact named skill."
     }

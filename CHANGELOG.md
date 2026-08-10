@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+- Collapsed physical-object and information fetch/delivery into one canonical
+  `AcquireAndDeliverResource` semantic responsibility. `resource.kind` and
+  `delivery_mode` now drive provider matching; legacy `responsibility_variant` is
+  input-only compatibility, not a planner concept. Capability semantic scopes may
+  advertise multiple `delivery_modes`, allowing Soridormi physical delivery and
+  weather/external-information acquisition to implement the same human-level
+  responsibility without sharing a provider or planning authority.
+
 ### Goal Progress Communication
 
 - Defined Fast Response as the first milestone of a shared Goal Progress

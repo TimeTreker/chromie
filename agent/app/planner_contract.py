@@ -1086,9 +1086,19 @@ def validate_resource_responsibility_capability_grounding(
                     "semantic_scope.resource_kinds does not include "
                     f"{expected_kind!r}"
                 )
-            if candidate_scope.get("delivery") != expected_delivery:
+            raw_delivery_modes = candidate_scope.get("delivery_modes")
+            candidate_delivery_modes = {
+                " ".join(str(value or "").strip().split())
+                for value in (
+                    raw_delivery_modes
+                    if isinstance(raw_delivery_modes, list)
+                    else [candidate_scope.get("delivery")]
+                )
+                if " ".join(str(value or "").strip().split())
+            }
+            if expected_delivery not in candidate_delivery_modes:
                 candidate_errors.append(
-                    "semantic_scope.delivery does not match "
+                    "semantic_scope.delivery_modes does not include "
                     f"{expected_delivery!r}"
                 )
             return candidate_errors

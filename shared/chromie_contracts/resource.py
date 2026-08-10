@@ -10,10 +10,6 @@ from .interaction import reject_forbidden_low_level_fields
 
 
 ResourceKind = Literal["physical_object", "information"]
-ResourceResponsibilityVariant = Literal[
-    "fetch_and_deliver_object",
-    "fetch_and_deliver_information",
-]
 ResourceSourceStatus = Literal["known", "unknown", "provider_resolved"]
 
 _RESOURCE_IMPLEMENTATION_FIELDS = frozenset(
@@ -156,7 +152,6 @@ class AcquireAndDeliverResource(BaseModel):
     responsibility_type: Literal["acquire_and_deliver_resource"] = (
         "acquire_and_deliver_resource"
     )
-    responsibility_variant: ResourceResponsibilityVariant | None = None
     resource: ResourceDescriptor
     source: ResourceSource
     recipient: ResourceRecipient = Field(default_factory=ResourceRecipient)
@@ -168,20 +163,39 @@ class AcquireAndDeliverResource(BaseModel):
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return _reject_resource_implementation_fields(value, path="resource.metadata")
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_responsibility_variant(cls, value: Any) -> Any:
+        """Accept the retired variant only as an input-compatibility alias.
+
+        Canonical semantics are responsibility_type + resource.kind.  Keeping a
+        second serialized discriminator creates two names for one decision and
+        invites planners/providers to route by labels instead of semantic scope.
+        """
+
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        legacy_variant = payload.pop("responsibility_variant", None)
+        if legacy_variant is None:
+            return payload
+        resource = payload.get("resource")
+        kind = resource.get("kind") if isinstance(resource, dict) else None
+        if kind in {"physical_object", "information"}:
+            expected_variant = (
+                "fetch_and_deliver_object"
+                if kind == "physical_object"
+                else "fetch_and_deliver_information"
+            )
+            if legacy_variant != expected_variant:
+                raise ValueError(
+                    "resource kind and legacy responsibility_variant disagree: "
+                    f"kind={kind} variant={legacy_variant}"
+                )
+        return payload
+
     @model_validator(mode="after")
     def validate_delivery_mode(self) -> "AcquireAndDeliverResource":
-        expected_variant: ResourceResponsibilityVariant = (
-            "fetch_and_deliver_object"
-            if self.resource.kind == "physical_object"
-            else "fetch_and_deliver_information"
-        )
-        if self.responsibility_variant is None:
-            object.__setattr__(self, "responsibility_variant", expected_variant)
-        elif self.responsibility_variant != expected_variant:
-            raise ValueError(
-                "resource kind and responsibility_variant disagree: "
-                f"kind={self.resource.kind} variant={self.responsibility_variant}"
-            )
         if (
             self.resource.kind == "physical_object"
             and self.delivery_mode != "physical_handover"

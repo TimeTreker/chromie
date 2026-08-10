@@ -698,6 +698,11 @@ def chromie_manifests(
                         "before the tool returns."
                     ),
                     "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                        "delivery_modes": ["spoken_explanation", "structured_result"],
+                        "acquisition": "structured_weather_retrieval",
+                        "provider_result": "evidence_material",
                         "domain": "weather_forecast",
                         "supported_temporal_scopes": [
                             "current",
@@ -712,6 +717,11 @@ def chromie_manifests(
                             "climate_normals",
                         ],
                         "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
+                    },
+                    "resource_contract": {
+                        "provider_role": "acquire_information",
+                        "completion_evidence": "trusted_tool_result",
+                        "final_delivery_owner": "chromie_response_layer",
                     },
                     "pre_execution_speech_guidance": (
                         "Generate natural model-owned wording for the specific lookup. "
@@ -867,7 +877,7 @@ def chromie_manifests(
                         "resource_kinds": ["information"],
                         "acquisition": "external_grounded_retrieval",
                         "provider_result": "evidence_material",
-                        "delivery": "response_composer_spoken_explanation",
+                        "delivery_modes": ["spoken_explanation", "structured_result"],
                         "supported_request_kinds": [
                             "general_research",
                             "fact_lookup",
@@ -877,6 +887,11 @@ def chromie_manifests(
                             "how_to",
                             "news",
                         ],
+                    },
+                    "resource_contract": {
+                        "provider_role": "acquire_information",
+                        "completion_evidence": "grounded_retrieval_evidence",
+                        "final_delivery_owner": "chromie_response_layer",
                     },
                     "pre_execution_speech_guidance": (
                         "Acknowledge the specific information being checked without "

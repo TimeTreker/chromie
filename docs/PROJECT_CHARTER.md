@@ -4,6 +4,17 @@ This document defines the stable purpose and boundaries of Chromie. It should
 change rarely. Current implementation and evidence belong in
 [STATUS.md](STATUS.md); delivery order belongs in [ROADMAP.md](../ROADMAP.md).
 
+### One resource responsibility, provider-scoped implementations
+
+`AcquireAndDeliverResource` is one provider-neutral human responsibility.
+`physical_object` and `information` are resource kinds, not sibling top-level
+capability concepts. Chromie owns semantic decomposition, capability selection, and
+cross-capability ordering. Providers own only the implementation plan inside the
+selected bounded capability. Capability matching is driven by declared semantic
+scope (`responsibility_type`, supported `resource_kinds`, and `delivery_modes`), not
+by capability-name conventions or Host routing rules.
+
+
 ## Mission
 
 Chromie is a local-first realtime interaction control plane for voice assistants

@@ -945,9 +945,10 @@ class GoalAssociationResolverTests(unittest.TestCase):
         responsibility = result.new_goals[0].resource_responsibility
         self.assertIsNotNone(responsibility)
         assert responsibility is not None
-        self.assertEqual(
-            responsibility.responsibility_variant,
-            "fetch_and_deliver_information",
+        self.assertEqual(responsibility.resource.kind, "information")
+        self.assertNotIn(
+            "responsibility_variant",
+            responsibility.model_dump(mode="json"),
         )
         self.assertEqual(
             responsibility.source.bindings["location"]["value"],

@@ -711,7 +711,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         registry.import_soridormi_catalog(
             [
                 {
-                    "skill_id": "fetch_and_deliver_object",
+                    "skill_id": "acquire_and_deliver_resource",
                     "description": "Acquire and deliver a physical object.",
                     "available": True,
                     "parameters_schema": {"type": "object"},
@@ -727,14 +727,14 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         provider = SoridormiMcpSkillProvider(_RecordingInvoker())
         request = SkillRequest(
             request_id="resource-incomplete",
-            skill_id="soridormi.fetch_and_deliver_object",
+            skill_id="soridormi.acquire_and_deliver_resource",
         )
         definition = registry.get(request.skill_id)
 
         missing = provider._resource_completion_failure(
             request,
             definition,
-            {"completed": True, "skill_id": "fetch_and_deliver_object"},
+            {"completed": True, "skill_id": "acquire_and_deliver_resource"},
         )
         self.assertIsNotNone(missing)
         assert missing is not None
@@ -745,7 +745,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
             definition,
             {
                 "completed": True,
-                "skill_id": "fetch_and_deliver_object",
+                "skill_id": "acquire_and_deliver_resource",
                 "resource_outcome": {
                     "resource_acquired": True,
                     "resource_delivered": False,
@@ -761,7 +761,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         registry.import_soridormi_catalog(
             [
                 {
-                    "skill_id": "fetch_and_deliver_object",
+                    "skill_id": "acquire_and_deliver_resource",
                     "description": (
                         "Acquire a described physical object and deliver it to the "
                         "intended recipient."
@@ -777,18 +777,18 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                     "parameters_schema": {
                         "type": "object",
                         "properties": {
-                            "object": {"type": "object"},
+                            "resource": {"type": "object"},
                             "source": {"type": "object"},
                             "recipient": {"type": "object"},
                         },
-                        "required": ["object", "source", "recipient"],
+                        "required": ["resource", "source", "recipient"],
                         "additionalProperties": False,
                     },
                     "metadata": {
                         "semantic_scope": {
                             "responsibility_type": "acquire_and_deliver_resource",
                             "resource_kinds": ["physical_object"],
-                            "delivery": "physical_handover",
+                            "delivery_modes": ["physical_handover"],
                         },
                         "resource_contract": {
                             "result_field": "resource_outcome",
@@ -797,7 +797,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         )
-        definition = registry.get("soridormi.fetch_and_deliver_object")
+        definition = registry.get("soridormi.acquire_and_deliver_resource")
         self.assertEqual(
             definition.metadata["semantic_scope"]["responsibility_type"],
             "acquire_and_deliver_resource",
@@ -812,7 +812,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 "soridormi.skill.execute_plan": ToolCallOutcome.success(
                     {
                         "completed": True,
-                        "skill_id": "fetch_and_deliver_object",
+                        "skill_id": "acquire_and_deliver_resource",
                         "summary": "The requested bottle was delivered.",
                         "resource_outcome": {
                             "responsibility_type": "acquire_and_deliver_resource",
@@ -835,9 +835,12 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                 skills=[
                     {
                         "request_id": "fetch-resource-1",
-                        "skill_id": "soridormi.fetch_and_deliver_object",
+                        "skill_id": "soridormi.acquire_and_deliver_resource",
                         "args": {
-                            "object": {"description": "a bottle of water"},
+                            "resource": {
+                                "kind": "physical_object",
+                                "description": "a bottle of water",
+                            },
                             "source": {
                                 "status": "known",
                                 "description": "100 meters ahead",

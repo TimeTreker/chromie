@@ -2926,13 +2926,7 @@ class GoalAssociationResolver:
                     name: binding_map[name]
                     for name in resource_item.source_binding_names
                 }
-                responsibility_variant = (
-                    "fetch_and_deliver_object"
-                    if resource_item.resource_kind == "physical_object"
-                    else "fetch_and_deliver_information"
-                )
                 resource_responsibility = AcquireAndDeliverResource(
-                    responsibility_variant=responsibility_variant,
                     resource=ResourceDescriptor(
                         kind=resource_item.resource_kind,
                         description=resource_item.resource_description,

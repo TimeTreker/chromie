@@ -12,7 +12,7 @@ The information-provider adapter `chromie.external_information.retrieve` is
 implemented but disabled until `AGENT_EXTERNAL_INFORMATION_ENABLED=1` and an
 exact provider endpoint is configured. Soridormi physical resource delivery is
 a live named-skill contract: Chromie imports it automatically when Soridormi
-advertises `fetch_and_deliver_object` through `soridormi.skill.list`.
+advertises `acquire_and_deliver_resource` with a matching physical-resource semantic scope through `soridormi.skill.list`.
 
 ## Human responsibility
 
@@ -25,13 +25,15 @@ acquire something the user needs
 ```
 
 The requested resource may be physical or informational. The stable top-level
-contract remains `AcquireAndDeliverResource`; an explicit semantic variant makes
-the two user-facing responsibilities visible without changing provider matching:
+contract is **only** `AcquireAndDeliverResource`. `physical_object` and
+`information` are resource kinds inside that responsibility, not separate
+capability concepts and not separate planning authorities:
 
 ```text
 AcquireAndDeliverResource Goal
-├── fetch_and_deliver_object
-└── fetch_and_deliver_information
+└── resource.kind
+    ├── physical_object
+    └── information
                │
                ▼
       Goal-driven Planner
@@ -79,7 +81,6 @@ separate technical surface without changing Chromie's Mind.
 ```json
 {
   "responsibility_type": "acquire_and_deliver_resource",
-  "responsibility_variant": "fetch_and_deliver_object",
   "resource": {
     "kind": "physical_object",
     "description": "a bottle of water",
@@ -104,7 +105,6 @@ Information example:
 ```json
 {
   "responsibility_type": "acquire_and_deliver_resource",
-  "responsibility_variant": "fetch_and_deliver_information",
   "resource": {
     "kind": "information",
     "description": "good nearby restaurant recommendations",
@@ -131,10 +131,12 @@ Information example:
 }
 ```
 
-The stable `responsibility_type` preserves compatibility with existing Capability
-semantic scopes. `responsibility_variant` is a semantic subtype, not a Provider,
-Capability ID, or hidden routing instruction. Legacy payloads that omit it are
-normalized from `resource.kind`; an explicit mismatched variant is rejected.
+`responsibility_type=acquire_and_deliver_resource` plus `resource.kind` is the
+canonical semantic discriminator. The old `responsibility_variant` field is accepted
+only as an input-compatibility alias for persisted/older payloads; it is validated
+against `resource.kind` and omitted from canonical serialization. Planner matching
+therefore never depends on names such as `fetch_and_deliver_object` or
+`fetch_and_deliver_information`.
 
 The semantic contract forbids provider IDs, capability IDs, coordinates, grasp
 poses, websites, search engines, execution mode, and implementation plans.
@@ -148,9 +150,9 @@ or supplies missing information for a resource responsibility.
 A fetch-and-deliver request is one Goal when navigation, locating, grasping,
 carrying, returning, and handover are provider-owned stages of one user outcome.
 Likewise, external search, evidence retrieval, evaluation, and natural
-explanation are one `fetch_and_deliver_information` Goal. Weather is in this
-variant, while the Planner still selects the exact `chromie.weather.lookup`
-Capability rather than a generic hidden router.
+explanation remain one information-resource responsibility. Weather therefore has
+`resource.kind=information`, while the Planner still selects the exact
+`chromie.weather.lookup` Capability rather than a generic hidden router.
 
 Separate Goals are still required for independently requested outcomes. For
 example, “bring the book and tell me a joke” contains one physical resource Goal
@@ -177,8 +179,9 @@ one candidate retrieved       ≠ recommendation evaluated for the user
 
 The Planner may choose:
 
-- `soridormi.fetch_and_deliver_object` when Soridormi advertises complete
-  physical resource acquisition and handover;
+- `soridormi.acquire_and_deliver_resource` when Soridormi advertises
+  `responsibility_type=acquire_and_deliver_resource`,
+  `resource_kinds=[physical_object]`, and `delivery_modes=[physical_handover]`;
 - `chromie.weather.lookup` for its exact structured weather scope;
 - `chromie.external_information.retrieve` for grounded places, restaurants,
   recommendations, news, how-to research, and general external information;
@@ -189,12 +192,14 @@ These examples are capability contracts, not Host routing rules.
 
 ## Soridormi named-skill contract
 
-Soridormi should advertise one generic named skill rather than one skill per
-object type:
+Soridormi should advertise one provider-scoped implementation of the shared
+resource responsibility rather than inventing a second top-level semantic
+concept or one skill per object type. The capability ID is provider-specific;
+the matching contract is the semantic scope:
 
 ```json
 {
-  "skill_id": "fetch_and_deliver_object",
+  "skill_id": "acquire_and_deliver_resource",
   "description": "Acquire a described physical object from a semantic source and deliver it to the intended recipient.",
   "available": true,
   "requires_confirmation": true,
@@ -207,14 +212,15 @@ object type:
   "parameters_schema": {
     "type": "object",
     "properties": {
-      "object": {
+      "resource": {
         "type": "object",
         "properties": {
+          "kind": {"type": "string", "enum": ["physical_object"]},
           "description": {"type": "string", "minLength": 1},
           "quantity": {"type": "string"},
           "attributes": {"type": "object"}
         },
-        "required": ["description"],
+        "required": ["kind", "description"],
         "additionalProperties": false
       },
       "source": {
@@ -222,7 +228,7 @@ object type:
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["known", "provider_resolved"]
+            "enum": ["known", "unknown", "provider_resolved"]
           },
           "description": {"type": "string"},
           "bindings": {"type": "object"}
@@ -240,7 +246,7 @@ object type:
         "additionalProperties": false
       }
     },
-    "required": ["object", "source", "recipient"],
+    "required": ["resource", "source", "recipient"],
     "additionalProperties": false
   },
   "resource_claims": [
@@ -253,14 +259,14 @@ object type:
       "responsibility_type": "acquire_and_deliver_resource",
       "resource_kinds": ["physical_object"],
       "acquisition": "provider_owned",
-      "delivery": "physical_handover",
-      "completion_requires": [
-        "resource_acquired",
-        "resource_delivered"
-      ]
+      "delivery_modes": ["physical_handover"],
     },
     "resource_contract": {
       "result_field": "resource_outcome",
+      "completion_requires": [
+        "resource_acquired",
+        "resource_delivered"
+      ],
       "provider_owns": [
         "navigation",
         "perception",
@@ -285,7 +291,7 @@ Successful provider evidence may include:
 ```json
 {
   "completed": true,
-  "skill_id": "fetch_and_deliver_object",
+  "skill_id": "acquire_and_deliver_resource",
   "summary": "The requested bottle was acquired and delivered.",
   "resource_outcome": {
     "responsibility_type": "acquire_and_deliver_resource",
@@ -338,6 +344,26 @@ supply final personality speech.
 Tool Result Interpreter verifies the evidence and Response Composer delivers it
 naturally. A more exact provider capability remains preferable when its scope
 matches, such as the structured weather contract.
+
+
+## Semantic planning versus provider-local planning
+
+There is one semantic planning authority. Chromie decides which user-visible
+responsibilities exist, which exact capability can satisfy each responsibility, and
+the ordering/dependencies between independent responsibilities. A selected provider
+may then plan *inside* that bounded capability contract.
+
+For example, after Chromie selects `soridormi.acquire_and_deliver_resource`,
+Soridormi may internally resolve a source, navigate, perceive, grasp, carry, recover,
+and hand over the object. Those provider-local stages are not new Chromie Goals and
+do not reinterpret the user's intent. Likewise, a weather provider may acquire and
+normalize forecast evidence while Chromie still owns evidence interpretation and
+conversational delivery. Shared abstraction does not imply a shared provider.
+
+A useful boundary test is: if a step can be independently requested, changed,
+cancelled, or judged by the user, it belongs in Chromie's semantic plan. If it exists
+only because a selected capability needs it to satisfy its own contract, it belongs
+inside the provider.
 
 ## Completion and failure
 
