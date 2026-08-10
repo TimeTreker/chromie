@@ -553,6 +553,27 @@ def _pending_work_fast_speech_target_route(decision: RouteDecision) -> str:
     )
 
 
+def _fast_speech_null_is_admissible(context: dict[str, Any]) -> bool:
+    """Allow silence only when typed speech evidence may already cover the act."""
+
+    interaction_context = context.get("interaction_context")
+    if not isinstance(interaction_context, dict):
+        return False
+    if interaction_context.get("already_spoken"):
+        return True
+    if interaction_context.get("pending_speech"):
+        return True
+    events = interaction_context.get("events")
+    if not isinstance(events, list):
+        return False
+    return any(
+        isinstance(event, dict)
+        and str(event.get("event_type") or "")
+        in {"speech_scheduled", "speech_playback_started"}
+        for event in events
+    )
+
+
 def _decision_with_goal_interpretation_fast_speech(
     decision: RouteDecision,
     fast_speech: FastSpeech,
@@ -1442,6 +1463,45 @@ class OllamaGoalInterpreter:
             request.context.get("interaction_context") or {},
             max_chars=3200,
         )
+        speech_choice_schema = self._fast_speech_choice_schema(
+            purpose=expected_purpose,
+            commitment=expected_commitment,
+        )
+        null_is_admissible = _fast_speech_null_is_admissible(request.context)
+        fast_speech_schema = (
+            {"anyOf": [speech_choice_schema, {"type": "null"}]}
+            if null_is_admissible
+            else speech_choice_schema
+        )
+        delta_instruction = (
+            "If an equivalent acknowledgement is already audible or pending and "
+            "there is no correction, changed state, new evidence, clarification, "
+            "explicit repeat, or retry reason, return fast_speech=null."
+            if null_is_admissible
+            else (
+                "The typed Interaction Context contains no audible or pending speech, "
+                "so this newly accepted pending work still requires one acknowledgement; "
+                "fast_speech must not be null."
+            )
+        )
+        selection_instruction = (
+            "Otherwise, for newly accepted nontrivial pending work, normally choose "
+            "one brief natural acknowledgement from the supplied mind/style, current "
+            "turn, language, and situation. Return null only when speaking would add "
+            "no meaningful conversational delta."
+            if null_is_admissible
+            else (
+                "For this newly accepted nontrivial pending work, choose one brief "
+                "natural acknowledgement from the supplied mind/style, current turn, "
+                "language, and situation."
+            )
+        )
+        output_delta_instruction = (
+            "Return null only for no still-needed speech delta; otherwise return "
+            "exactly one natural sentence."
+            if null_is_admissible
+            else "Return exactly one natural sentence; null is outside this fresh-turn contract."
+        )
         return {
             "model": self.model,
             "stream": False,
@@ -1451,15 +1511,7 @@ class OllamaGoalInterpreter:
                 "additionalProperties": False,
                 "required": ["fast_speech"],
                 "properties": {
-                    "fast_speech": {
-                        "anyOf": [
-                            self._fast_speech_choice_schema(
-                                purpose=expected_purpose,
-                                commitment=expected_commitment,
-                            ),
-                            {"type": "null"},
-                        ]
-                    }
+                    "fast_speech": fast_speech_schema,
                 },
             },
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
@@ -1470,8 +1522,9 @@ class OllamaGoalInterpreter:
                         "Current Job:\n"
                         "- You are Chromie's fast-speech repairer and author. Decide whether any conversational acknowledgement is still needed before Goal Association and planning.\n"
                         f"- The current semantic lane is route={target_route}. Goal Association and planning have not happened yet.\n"
-                        "- Inspect Recent Interaction Context first. Heard speech counts as already said; scheduled speech is pending, not heard. If an equivalent acknowledgement is already audible or pending and there is no correction, changed state, new evidence, clarification, explicit repeat, or retry reason, return fast_speech=null.\n"
-                        "- Otherwise, for newly accepted nontrivial pending work, normally choose one brief natural acknowledgement from the supplied mind/style, current turn, language, and situation. Return null only when speaking would add no meaningful conversational delta. Do not use a universal or canned acknowledgement.\n"
+                        "- Inspect Recent Interaction Context first. Heard speech counts as already said; scheduled speech is pending, not heard. "
+                        f"{delta_instruction}\n"
+                        f"- {selection_instruction} Do not use a universal or canned acknowledgement.\n"
                         "- Do not change route, intent, metadata, tool arguments, capabilities, or safety policy.\n\n"
                         "Authority Boundary:\n"
                         "- This is before authoritative Goals, Plans, authorization, execution, and results.\n"
@@ -1481,7 +1534,7 @@ class OllamaGoalInterpreter:
                         "- Do not predict weather, measurements, conditions, recommendations, conclusions, or other external facts before matching provider evidence exists.\n"
                         "- Identity and personality shape voice only; they never prove ability or create another responsibility.\n- For read-only work, mention only exact model-authored bindings already present in the interpretation decision.\n"
                         "- When fast_speech is present, set claim_state=none and leave claimed_capability_ids and claimed_goal_ids empty.\n"
-                        "- Return null only for no still-needed speech delta; otherwise return exactly one natural sentence.\n\n"
+                        f"- {output_delta_instruction}\n\n"
                         "Style Boundary:\n"
                         "- Apply the supplied mind/personality settings naturally. Chromie should sound like herself—a warm six-year-old child in her family—not customer service, an adult operator, or a robot status system.\n"
                         "- Do not announce her age or role unless the user asks about identity. Do not force childish vocabulary.\n"
@@ -1534,8 +1587,30 @@ class OllamaGoalInterpreter:
             ),
             max_chars=1800,
         )
+        speech_choice_schema = self._fast_speech_choice_schema(
+            purpose=expected_purpose,
+            commitment=expected_commitment,
+        )
+        null_is_admissible = _fast_speech_null_is_admissible(request.context)
+        fast_speech_schema = (
+            {"anyOf": [speech_choice_schema, {"type": "null"}]}
+            if null_is_admissible
+            else speech_choice_schema
+        )
+        repetition_instruction = (
+            "If the candidate repeats an equivalent acknowledgement already "
+            "audible or pending and there is no correction, changed state, new "
+            "evidence, clarification, explicit repeat, or retry reason, return "
+            "fast_speech=null."
+            if null_is_admissible
+            else (
+                "The typed Interaction Context contains no audible or pending speech. "
+                "This fresh pending-work acknowledgement must not be null; rewrite an "
+                "unsafe candidate into a truthful prospective acknowledgement."
+            )
+        )
         return {
-            "model": self.model,
+            "model": self.review_model or self.model,
             "stream": False,
             "think": False,
             "format": {
@@ -1543,15 +1618,7 @@ class OllamaGoalInterpreter:
                 "additionalProperties": False,
                 "required": ["fast_speech"],
                 "properties": {
-                    "fast_speech": {
-                        "anyOf": [
-                            self._fast_speech_choice_schema(
-                                purpose=expected_purpose,
-                                commitment=expected_commitment,
-                            ),
-                            {"type": "null"},
-                        ]
-                    }
+                    "fast_speech": fast_speech_schema,
                 },
             },
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
@@ -1560,7 +1627,8 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "You are Chromie's independent fast-speech semantic and style reviewer. Goal Association and planning have not happened yet. Review meaning, not keywords.\n"
-                        "- Inspect Recent Interaction Context first. If the candidate repeats an equivalent acknowledgement already audible or pending and there is no correction, changed state, new evidence, clarification, explicit repeat, or retry reason, return fast_speech=null.\n"
+                        "- Inspect Recent Interaction Context first. "
+                        f"{repetition_instruction}\n"
                         "- Otherwise preserve a valid still-needed acknowledgement or naturally rewrite it in Chromie's supplied style.\n"
                         "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. It must not imply that an action is planned, authorized, started, completed, safe, or within Chromie's ability.\n"
                         "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Remove every invented side task, errand, destination, person, object, household activity, or physical action, even when it sounds caring or fits the personality.\n"
@@ -2936,6 +3004,10 @@ class OllamaGoalInterpreter:
             )
             raw_fast_speech = parsed.get("fast_speech")
             if raw_fast_speech is None:
+                if not _fast_speech_null_is_admissible(request.context):
+                    raise ValueError(
+                        "fresh pending work review omitted required fast_speech"
+                    )
                 suppressed = _decision_without_goal_interpretation_fast_speech(
                     decision,
                     reason_suffix="fast speech omitted because no new conversational delta remained",
@@ -3068,6 +3140,10 @@ class OllamaGoalInterpreter:
                     )
                     raw_fast_speech = parsed.get("fast_speech")
                     if raw_fast_speech is None:
+                        if not _fast_speech_null_is_admissible(request.context):
+                            raise ValueError(
+                                "fresh pending work omitted required fast_speech"
+                            )
                         prepared = _decision_without_goal_interpretation_fast_speech(
                             decision,
                             reason_suffix="fast speech omitted because no new conversational delta remained",
