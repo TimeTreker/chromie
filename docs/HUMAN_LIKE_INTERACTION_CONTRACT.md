@@ -427,6 +427,34 @@ one conversation is serialized at that semantic-state boundary. A fast follow-up
 therefore use the earlier utterance immediately and, once available, the earlier
 validated Goal instead of guessing a missing entity from model memory.
 
+### Truthful limitation and result-state separation
+
+A missing Capability is a conversationally complete outcome, not a failed search. If
+Goal Interpretation understands the requested outcome but the live Capability catalog
+has no exact implementation, the turn terminates before Goal Association and planning
+with a typed capability-limitation act. The model owns natural wording and may acknowledge
+what the user wanted, but runtime retains these facts unchanged:
+
+| State | Capability | Execution | Result | Allowed meaning |
+|---|---|---|---|---|
+| capability unavailable | unavailable | not attempted | not observed | understood Goal + current limitation |
+| execution failure | available or selected | attempted | not observed | attempted work did not complete |
+| empty result | available | attempted | empty, trusted | successful query produced no matches |
+| success | available | attempted | available, trusted | supported result/effect |
+
+These states are not stylistic alternatives. Response Composer and bounded failure speech
+may verbalize them but may not collapse one into another. A no-results claim therefore
+requires provider execution plus trusted empty-result evidence. When no provider request
+was dispatched, the response may state only understanding and the supported limitation or
+processing failure. Host/runtime code enforces the typed state and speech envelope without
+using a phrase blacklist.
+
+The missing-ability repair schema exposes the same cross-field invariants as its Pydantic
+decoder: `missing_or_unsupported_ability` requires `route=clarify`, a complete limitation,
+missing-ability metadata, and zero actions. Any non-empty action list requires
+`route=robot_action`. This makes invalid repair states unrepresentable to constrained
+generation instead of relying on a later repair to discover them.
+
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same Goal Progress Communication rule. The initial acknowledgement is only the
 first milestone. When a later stage owns a new, trustworthy and user-relevant

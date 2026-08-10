@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import unittest
 
+from jsonschema import Draft202012Validator
+
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
     SemanticRouteRepairOutput,
     _payload_message_texts,
+    _semantic_route_repair_response_schema,
     _semantic_route_spoken_text,
     _validate_missing_ability_output_against_catalog,
 )
@@ -69,20 +72,19 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
         self.assertIn("A bare location", system_text)
         self.assertIn("must not equal or reuse any capability_id", system_text)
         self.assertIn("must not ask a follow-up question", system_text)
-        self.assertIn("我现在还没学会这个呢", system_text)
-        self.assertIn("localized apology", system_text)
+        self.assertIn("first acknowledge the understood user outcome", system_text)
+        self.assertIn("Capability-unavailable, execution-failed, and empty-result", system_text)
         self.assertIn("Limitation and metadata are allowed only", system_text)
-        self.assertIn("我无法直接查询", system_text)
+        self.assertIn("speech-delivery capability never satisfies", system_text)
         self.assertIn("must not claim that learning has started", system_text)
 
-
-    def test_missing_ability_speech_places_apology_before_limitation(self) -> None:
+    def test_missing_ability_speech_preserves_model_authored_complete_response(self) -> None:
         output = SemanticRouteRepairOutput.model_validate(
             {
                 "route": "clarify",
                 "intent": "missing_or_unsupported_ability",
                 "confidence": 1.0,
-                "limitation": "我现在还没学会怎么帮你找好吃的餐厅呢。",
+                "limitation": "我知道你想让我帮你找附近好吃的餐厅，不过这个我现在还不会查，对不起呀。",
                 "metadata": {
                     "desired_abilities": [
                         {
@@ -99,8 +101,67 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
 
         self.assertEqual(
             _semantic_route_spoken_text(output, language="zh-CN"),
-            "对不起呀，我现在还没学会怎么帮你找好吃的餐厅呢。",
+            "我知道你想让我帮你找附近好吃的餐厅，不过这个我现在还不会查，对不起呀。",
         )
+
+
+    def test_model_facing_schema_rejects_log_shaped_missing_ability_invalid_states(self) -> None:
+        schema = _semantic_route_repair_response_schema()
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+
+        valid_missing = {
+            "route": "clarify",
+            "intent": "missing_or_unsupported_ability",
+            "confidence": 1.0,
+            "speak_first": None,
+            "limitation": (
+                "我知道你想让我帮你找附近好吃的地方，不过这个我现在还不会查，对不起呀。"
+            ),
+            "metadata": {
+                "desired_abilities": [
+                    {
+                        "ability_id": "local.restaurant_recommendation",
+                        "intent": "推荐用户附近的餐厅",
+                        "status": "missing_ability",
+                        "confidence": 1.0,
+                        "reason": "当前能力目录没有本地商家搜索能力。",
+                    }
+                ]
+            },
+            "actions": [],
+        }
+        self.assertEqual(list(validator.iter_errors(valid_missing)), [])
+
+        chat_speech_substitution = {
+            "route": "chat",
+            "intent": "N/A",
+            "confidence": 1.0,
+            "speak_first": None,
+            "limitation": None,
+            "metadata": None,
+            "actions": [
+                {
+                    "capability_id": "chromie.speak",
+                    "args": {"text": "capability limitation"},
+                    "sequence": 0,
+                    "timing": "sequential",
+                    "confidence": 1.0,
+                }
+            ],
+        }
+        self.assertTrue(list(validator.iter_errors(chat_speech_substitution)))
+
+        malformed_missing = {
+            "route": "chat",
+            "intent": "missing_or_unsupported_ability",
+            "confidence": 1.0,
+            "speak_first": None,
+            "limitation": None,
+            "metadata": valid_missing["metadata"],
+            "actions": [],
+        }
+        self.assertTrue(list(validator.iter_errors(malformed_missing)))
 
     def test_missing_ability_id_cannot_reuse_available_weather_capability(self) -> None:
         request = RouteRequest(

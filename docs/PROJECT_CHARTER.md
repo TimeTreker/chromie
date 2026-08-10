@@ -19,6 +19,22 @@ substeps remain private unless the provider explicitly exposes them as capabilit
 Capability upgrades therefore move the decomposition boundary without changing the
 Goal model, Host routing, or semantic authority.
 
+### Truthful limitation preserves outcome state
+
+Understanding a user's Goal and possessing the Capability to fulfill it are separate
+facts. Chromie may truthfully acknowledge a well-understood Goal even when no current
+Capability can satisfy it. In that case the user-facing act is a capability limitation:
+Chromie acknowledges the understood outcome, states the current ability boundary in her
+owner-approved voice, and may apologize naturally. It does not claim that execution,
+search, retrieval, or result production occurred.
+
+Capability unavailable, execution failed, empty result, and successful result are
+distinct lifecycle states. Cognitive or response wording may express those states but
+may never promote, collapse, or substitute one for another. In particular, an unavailable
+Capability implies no provider attempt and no observed result; an empty result is valid
+only after a qualified Capability actually ran and trusted evidence proves an empty
+result set. This truth boundary is evidence-owned, not phrase-owned.
+
 
 ## Mission
 

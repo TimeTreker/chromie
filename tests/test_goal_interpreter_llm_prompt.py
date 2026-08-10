@@ -3122,7 +3122,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                             '{"route":"clarify",'
                             '"intent":"missing_or_unsupported_ability",'
                             '"confidence":1.0,'
-                            '"limitation":"我现在还没有餐厅搜索和推荐能力，所以这次不能给你可靠的推荐。",'
+                            '"limitation":"我知道你想让我帮你找附近好吃的餐厅，不过这个我现在还不会查，对不起呀。",'
                             '"metadata":{"desired_abilities":[{'
                             '"ability_id":"local.restaurant_recommendation",'
                             '"intent":"查找并推荐用户附近的优质餐厅",'
@@ -3155,8 +3155,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.intent, "missing_or_unsupported_ability")
-        self.assertTrue((decision.speak_first or "").startswith("对不起呀，"))
-        self.assertIn("餐厅搜索和推荐能力", decision.speak_first or "")
+        self.assertTrue((decision.speak_first or "").startswith("我知道你想"))
+        self.assertIn("这个我现在还不会查", decision.speak_first or "")
         self.assertEqual(decision.actions, [])
         self.assertEqual(
             decision.metadata["desired_abilities"][0]["ability_id"],

@@ -1340,6 +1340,15 @@ Before effectful execution, a response plan may contain:
 
 Prospective planning output cannot contain a final completion claim.
 
+A clear request whose required Capability is absent has an earlier terminal path. Goal
+Interpretation may acknowledge the understood outcome and return
+`missing_or_unsupported_ability`; Cognitive Runtime then emits one capability-limitation
+interaction with no Goal Association, Plan, or provider request. The interaction records
+`capability_state=unavailable`, `execution_state=not_attempted`, and
+`result_state=not_observed`. This state is categorically different from an executed query
+whose trusted result is empty. Speech delivery can express the distinction but cannot
+change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
+
 The Host may schedule a complete, schema-valid source-authored `fast_speech` or
 `ResponseStage` only after mechanical validation authorizes it against the
 applicable turn/Goal correlation, commitment or evidence state, claim guards,

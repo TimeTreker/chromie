@@ -730,6 +730,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             interaction.metadata["task_proposals"][0]["state"],
             "missing_ability",
         )
+        self.assertTrue(interaction.metadata["goal_understood"])
+        self.assertEqual(interaction.metadata["capability_state"], "unavailable")
+        self.assertEqual(interaction.metadata["execution_state"], "not_attempted")
+        self.assertEqual(interaction.metadata["result_state"], "not_observed")
+        self.assertFalse(interaction.metadata["execution_attempted"])
+        self.assertIn(
+            "capability_unavailable",
+            interaction.speech[0].metadata["claims"],
+        )
         audited = annotate_task_proposal_ledger(interaction)
         ledger = TaskProposalLedger.model_validate(
             audited.metadata["task_proposal_ledger"]

@@ -6543,8 +6543,15 @@ class VoiceAssistant:
             }
         execution_started = failure_facts.get("execution_started") is True
         selected_capability_ids = _selected_capability_ids(decision)
+        missing_ability = (
+            decision.intent == "missing_or_unsupported_ability"
+            or bool((decision.metadata or {}).get("desired_abilities"))
+        )
+        if selected_capability_ids:
+            missing_ability = False
         understanding_completed = bool(
-            selected_capability_ids
+            missing_ability
+            or selected_capability_ids
             or resolution.goal_association is not None
             or resolution.fast_plan is not None
             or resolution.terminal_plan is not None
@@ -6577,19 +6584,32 @@ class VoiceAssistant:
         failure_facts.setdefault(
             "capability_available_at_interpretation", bool(selected_capability_ids)
         )
-        missing_ability = (
-            decision.intent == "missing_or_unsupported_ability"
-            or bool((decision.metadata or {}).get("desired_abilities"))
-        )
-        if selected_capability_ids:
-            missing_ability = False
         failure_facts.setdefault("missing_ability", missing_ability)
-        failure_facts.setdefault(
-            "provider_dispatch_started", execution_started or provider_request_count > 0
+        provider_dispatch_started = execution_started or provider_request_count > 0
+        capability_state = (
+            "unavailable"
+            if missing_ability
+            else "available"
+            if selected_capability_ids
+            else "unknown"
         )
+        execution_state = (
+            "attempted" if provider_dispatch_started else "not_attempted"
+        )
+        result_state = (
+            "available"
+            if failure_facts.get("verified_result_available") is True
+            else "not_observed"
+        )
+        # These facts are derived from trusted runtime state and are not caller-
+        # or model-overridable wording hints. Keep one authoritative triplet.
+        failure_facts["capability_state"] = capability_state
+        failure_facts["execution_state"] = execution_state
+        failure_facts["result_state"] = result_state
+        failure_facts.setdefault("provider_dispatch_started", provider_dispatch_started)
         failure_facts.setdefault(
             "failure_before_provider_dispatch",
-            not execution_started and provider_request_count == 0,
+            not provider_dispatch_started,
         )
         failure_facts.setdefault(
             "system_retry_possible", bool(failure_facts.get("retryable"))
@@ -6624,17 +6644,25 @@ class VoiceAssistant:
             "say that Chromie did not hear or understand the request. If user_should_repeat "
             "is false, do not ask the user to repeat the same words; say only the "
             "user-visible failure or missing result/effect that is supported by the facts. "
-            "When provider_request_count is zero, do not imply that Chromie tried to move, "
-            "query, or contact a provider; the request failed before dispatch. Express only "
-            "the user-visible boundary that no verified result or requested effect happened. "
+            "Treat capability_state, execution_state, and result_state as separate, "
+            "non-interchangeable facts. In particular, unavailable + not_attempted + "
+            "not_observed is a capability limitation, not an empty search result or an "
+            "execution failure. When capability_state is unavailable, first acknowledge the "
+            "understood user outcome, then state naturally that Chromie cannot perform that "
+            "ability yet, with a brief apology when appropriate. When provider_request_count "
+            "is zero, do not imply that Chromie tried to move, query, or contact a provider; "
+            "the request failed before dispatch. result_state=not_observed means no result was "
+            "obtained at all; it must never be rewritten as a successful query with zero "
+            "matches. Express only the user-visible boundary supported by these typed facts. "
             "Do not expose internal planning, arrangement, schema, or workflow language. When "
             "exact_capability_selected or capability_available_at_interpretation is true, "
             "the ability exists: never say Chromie cannot do it, does not know how, has not "
             "learned it, or lacks the ability. Do not invent a weather, network, or provider "
             "failure when none was observed. system_retry_possible describes "
             "an internal property and never by itself asks the user to repeat or approve. "
-            "Invite one retry only when user_action_required is true. Return only a JSON "
-            "object with one field named text.\n\n"
+            "Invite one retry only when user_action_required is true. Return only the "
+            "schema-valid JSON object and repeat the supplied capability_state, execution_state, "
+            "and result_state exactly alongside text.\n\n"
             f"Owner-approved identity JSON: {self._direct_llm_identity_json()}\n"
             f"Owner-approved mind summary: {self._direct_llm_mind_summary()}\n"
             f"Trusted failure facts JSON: {json.dumps(failure_facts, ensure_ascii=False, sort_keys=True)}\n"
@@ -6645,7 +6673,14 @@ class VoiceAssistant:
             "prompt": prompt,
             "stream": False,
             "think": False,
-            "format": self._spoken_text_response_schema(max_chars=120),
+            "format": self._spoken_text_response_schema(
+                max_chars=120,
+                semantic_state={
+                    "capability_state": capability_state,
+                    "execution_state": execution_state,
+                    "result_state": result_state,
+                },
+            ),
             "keep_alive": self.host_settings.model_generation.keep_alive,
             "options": {
                 "num_ctx": self.host_settings.model_generation.failure_response_num_ctx,
@@ -6684,6 +6719,11 @@ class VoiceAssistant:
                 one_sentence=True,
                 require_terminal_punctuation=True,
                 language=language,
+                expected_semantic_state={
+                    "capability_state": capability_state,
+                    "execution_state": execution_state,
+                    "result_state": result_state,
+                },
             )
             cjk_count = sum(
                 1
@@ -9180,17 +9220,28 @@ class VoiceAssistant:
         return stats
 
     @staticmethod
-    def _spoken_text_response_schema(*, max_chars: int) -> dict[str, Any]:
+    def _spoken_text_response_schema(
+        *,
+        max_chars: int,
+        semantic_state: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        properties: dict[str, Any] = {
+            "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": max_chars,
+            }
+        }
+        required = ["text"]
+        for key, value in (semantic_state or {}).items():
+            if key == "text":
+                raise ValueError("semantic_state must not redefine text")
+            properties[key] = {"type": "string", "const": value}
+            required.append(key)
         return {
             "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": max_chars,
-                }
-            },
-            "required": ["text"],
+            "properties": properties,
+            "required": required,
             "additionalProperties": False,
         }
 
@@ -9239,6 +9290,7 @@ class VoiceAssistant:
         require_terminal_punctuation: bool = False,
         language: str | None = None,
         suppressed_thinking_chars: int = 0,
+        expected_semantic_state: dict[str, str] | None = None,
     ) -> str:
         thinking = data.get("thinking")
         if isinstance(thinking, str):
@@ -9265,9 +9317,21 @@ class VoiceAssistant:
             raise RuntimeError(
                 f"{purpose} returned non-JSON output; refusing to speak it"
             ) from exc
-        if not isinstance(envelope, dict) or set(envelope) != {"text"}:
+        expected_state = dict(expected_semantic_state or {})
+        expected_keys = {"text", *expected_state}
+        if not isinstance(envelope, dict) or set(envelope) != expected_keys:
             raise RuntimeError(
                 f"{purpose} returned an invalid spoken-output envelope"
+            )
+        mismatched_state = {
+            key: {"expected": value, "actual": envelope.get(key)}
+            for key, value in expected_state.items()
+            if envelope.get(key) != value
+        }
+        if mismatched_state:
+            raise RuntimeError(
+                f"{purpose} changed authoritative semantic state: "
+                + json.dumps(mismatched_state, ensure_ascii=False, sort_keys=True)
             )
         return self._validate_spoken_text_contract(
             envelope.get("text", ""),

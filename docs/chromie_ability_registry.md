@@ -58,10 +58,12 @@ The ontology never writes the sentence spoken to the user.
 - normal answers, clarification, confirmation, progress, unavailable, and
   failure speech belong to Response Composer or the bounded model-owned speech
   path;
-- a terminal missing-ability response states the model-authored limitation only
-  after a localized Host-owned apology, so an honest capability boundary is not
-  delivered as a blunt refusal; it still must not ask for unusable parameters or
-  promise that the ability is already being learned;
+- a terminal missing-ability response is one complete model-authored conversational
+  act: it first acknowledges the understood user outcome, then states the current
+  capability limitation in Chromie's owner-approved voice, with a natural apology
+  when appropriate. The Host does not prepend a fixed apology or rewrite the failure
+  state. The response must not imply that a provider was queried, that execution was
+  attempted, or that an empty result was observed;
 - final factual speech waits for trusted Evidence;
 - the Host may schedule, cancel, validate, and deliver speech, but it does not
   select wording from ontology templates.
@@ -95,6 +97,12 @@ Provider gates.
 The Host does not infer body availability from dry-run mode, simulator identity,
 hardware identity, or a launcher profile. See
 [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md).
+
+A speech Capability is never a substitute for a missing substantive Capability.
+`chromie.speak` can deliver a truthful limitation, but it cannot satisfy a request for
+external retrieval, recommendation, navigation, manipulation, or another effect merely
+by describing that request. The missing-ability terminal therefore carries no executable
+actions.
 
 ## Fast response and Social Attention
 
