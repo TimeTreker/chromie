@@ -93,18 +93,6 @@
                 }
               }
             }
-          },
-          {
-            "stage": "fast_speech_semantic_review",
-            "decision": {
-              "fast_speech": {
-                "text": "Okay, I will check today's weather in Beijing.",
-                "purpose": "acknowledge_and_check",
-                "commitment": "checking_only",
-                "must_not_claim_completion": true
-              },
-              "reason_summary": "A brief acknowledgement adds useful interaction progress while the weather lookup is pending."
-            }
           }
         ]
       },
@@ -112,10 +100,9 @@
         "route": "tool",
         "intent": "weather_query",
         "source": "llm",
-        "llm_calls": 2,
+        "llm_calls": 1,
         "llm_stages": [
-          "quick_intent",
-          "fast_speech_semantic_review"
+          "quick_intent"
         ],
         "fast_speech_present": true,
         "fast_speech_purpose": "acknowledge_and_check",

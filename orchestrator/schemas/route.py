@@ -23,10 +23,10 @@ class RouteRequest(BaseModel):
 
 
 class FastSpeech(BaseModel):
-    """A short Core-generated user-facing prelude for fast-first TTS.
+    """The Goal Interpreter's source-authored first progress notification.
 
-    This is a process acknowledgement, not an answer, tool result, memory commit,
-    or physical execution claim.
+    This is Goal Progress Communication, not a task result, memory commit,
+    physical execution claim, clarification, or Social Attention.
     """
 
     text: str = ""

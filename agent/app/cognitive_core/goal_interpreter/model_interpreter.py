@@ -84,7 +84,6 @@ REVIEW_STAGES = {
     "post_interrupt_review",
     "semantic_route_repair",
     "capability_grounding_review",
-    "fast_speech_semantic_review",
 }
 
 
@@ -488,155 +487,6 @@ def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
     return ""
 
 
-
-FAST_SPEECH_REPAIR_ROUTES = {
-    "tool",
-    "robot_action",
-    "deep_thought",
-    "memory",
-}
-
-FAST_SPEECH_ROUTE_CONTRACTS = {
-    "tool": ("acknowledge_and_check", "checking_only"),
-    "robot_action": ("acknowledge", "prelude_only"),
-    "deep_thought": ("thinking", "prelude_only"),
-    "memory": ("acknowledge", "prelude_only"),
-}
-
-
-def _fast_speech_matches_route_contract(
-    route: str,
-    fast_speech: FastSpeech | None,
-) -> bool:
-    expected = FAST_SPEECH_ROUTE_CONTRACTS.get(route)
-    if expected is None or fast_speech is None:
-        return False
-    purpose, commitment = expected
-    return bool(str(fast_speech.text or "").strip()) and (
-        fast_speech.purpose == purpose
-        and fast_speech.commitment == commitment
-        and fast_speech.claim_state == "none"
-        and not fast_speech.claimed_capability_ids
-        and not fast_speech.claimed_goal_ids
-        and fast_speech.must_not_claim_completion is True
-    )
-
-
-def _decision_has_route_valid_fast_speech(decision: RouteDecision) -> bool:
-    if _fast_speech_matches_route_contract(decision.route, decision.fast_speech):
-        return True
-    return any(
-        _fast_speech_matches_route_contract(item.route, item.fast_speech)
-        for item in (decision.routes or [])
-    )
-
-
-def _decision_needs_goal_interpretation_fast_speech(decision: RouteDecision) -> bool:
-    if _decision_has_route_valid_fast_speech(decision):
-        return False
-    if decision.route in FAST_SPEECH_REPAIR_ROUTES:
-        return True
-    return any(item.route in FAST_SPEECH_REPAIR_ROUTES for item in (decision.routes or []))
-
-
-def _pending_work_fast_speech_target_route(decision: RouteDecision) -> str:
-    if decision.route in FAST_SPEECH_ROUTE_CONTRACTS:
-        return decision.route
-    return next(
-        (
-            item.route
-            for item in (decision.routes or [])
-            if item.route in FAST_SPEECH_ROUTE_CONTRACTS
-        ),
-        "deep_thought",
-    )
-
-
-def _decision_with_goal_interpretation_fast_speech(
-    decision: RouteDecision,
-    fast_speech: FastSpeech,
-    *,
-    reason_suffix: str,
-    stage: str,
-    replace_existing: bool = False,
-) -> RouteDecision:
-    updated_items = []
-    attached_to_item = False
-    for item in decision.routes or []:
-        if (
-            not attached_to_item
-            and item.route in FAST_SPEECH_REPAIR_ROUTES
-            and (
-                replace_existing
-                or not _fast_speech_matches_route_contract(
-                    item.route,
-                    item.fast_speech,
-                )
-            )
-        ):
-            item = item.model_copy(update={"fast_speech": fast_speech})
-            attached_to_item = True
-        updated_items.append(item)
-
-    metadata = dict(decision.metadata or {})
-    metadata.setdefault("fast_speech_resolution", {})
-    if isinstance(metadata["fast_speech_resolution"], dict):
-        metadata["fast_speech_resolution"].update(
-            {
-                "stage": stage,
-                "model_generated": True,
-                "commitment": fast_speech.commitment,
-                "purpose": fast_speech.purpose,
-                "claim_state": fast_speech.claim_state,
-                "claimed_capability_ids": list(fast_speech.claimed_capability_ids),
-                "claimed_goal_ids": list(fast_speech.claimed_goal_ids),
-            }
-        )
-    reason = (f"{decision.reason}; " if decision.reason else "") + reason_suffix
-    return decision.model_copy(
-        update={
-            "fast_speech": fast_speech,
-            "routes": updated_items,
-            "metadata": metadata,
-            "reason": reason,
-        }
-    )
-
-
-def _decision_without_goal_interpretation_fast_speech(
-    decision: RouteDecision,
-    *,
-    reason_suffix: str,
-    stage: str,
-) -> RouteDecision:
-    previous_text = str(
-        getattr(decision.fast_speech, "text", "") or ""
-    ).strip()
-    updated_items = [
-        item.model_copy(update={"fast_speech": None})
-        if item.route in FAST_SPEECH_REPAIR_ROUTES
-        else item
-        for item in (decision.routes or [])
-    ]
-    metadata = dict(decision.metadata or {})
-    metadata["fast_speech_review"] = {
-        "stage": stage,
-        "model_reviewed": True,
-        "speech_selected": False,
-    }
-    speak_first = decision.speak_first
-    if previous_text and str(speak_first or "").strip() == previous_text:
-        speak_first = None
-    reason = (f"{decision.reason}; " if decision.reason else "") + reason_suffix
-    return decision.model_copy(
-        update={
-            "fast_speech": None,
-            "speak_first": speak_first,
-            "routes": updated_items,
-            "metadata": metadata,
-            "reason": reason,
-        }
-    )
 
 
 def _compact_schema_field(
@@ -1267,7 +1117,6 @@ class OllamaGoalInterpreter:
         confidence_threshold: float,
         slow_review_recovery_enabled: bool = True,
         generic_chat_review_enabled: bool = True,
-        pending_work_fast_speech_repair_enabled: bool = False,
         num_ctx: int = 4096,
         num_predict: int = 512,
         keep_alive: str | None = None,
@@ -1284,9 +1133,6 @@ class OllamaGoalInterpreter:
         self.confidence_threshold = confidence_threshold
         self.slow_review_recovery_enabled = slow_review_recovery_enabled
         self.generic_chat_review_enabled = bool(generic_chat_review_enabled)
-        self.pending_work_fast_speech_repair_enabled = bool(
-            pending_work_fast_speech_repair_enabled
-        )
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
         self.prompt_chars_per_token_estimate = (
@@ -1360,153 +1206,14 @@ class OllamaGoalInterpreter:
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use active/recent Goals and Interaction Context by meaning. Heard speech and trusted terminal effects count as done; scheduled speech and planned/committed work do not. Produce only the still-needed delta. Fast speech is the first Goal Progress Communication milestone: once a nontrivial Goal is understood and still needs downstream work, one tiny prospective acknowledgement may tell the person Chromie got it and is taking it forward. It is neither Social Attention nor clarification/confirmation. Omit it when an answer is immediate, an equivalent act is delivered/pending, or it would be filler, repetition, or verbosity. Repeat only for new meaning such as retry/failure, correction, changed state, evidence, clarification, or explicit repetition. Preserve exact corrected bindings; provider canonicalization stays downstream. Clarify only genuine ambiguity. One responsibility is one route item.\n"
+            "Use Goals and Interaction Context by meaning; emit only the still-needed delta. Heard speech and trusted terminal effects count as done; scheduled speech and planned/committed work do not. Fast speech is the first Goal Progress Communication milestone and a polite notification: once a nontrivial Goal is understood and still needs downstream work, normally give one tiny prospective acknowledgement. Missing results limit claims, not responsiveness. Omit it for an immediate substantive answer, an equivalent notification delivered/pending, explicit user silence, or empty repetition. It is not Social Attention or clarification/confirmation. Repeat only for new meaning such as failure/retry, correction, changed state, evidence, clarification, or explicit repetition. Preserve exact corrected bindings; clarify only real ambiguity; one responsibility is one route item.\n"
             "Capability Affordance Proposal:\n"
             "Treat the Common Ability Catalog as a compact body/tool affordance interface: candidate proposals, not authoritative grounding and not a phrase table. capability_inquiry is only about Chromie's abilities. Availability questions stay chat; supported execution requests use robot_action. Bind exact capabilities only for clear execution methods. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify. Missing or ambiguous methods preserve an open goal for CapabilityAgent. For current external facts, choose an available trusted lookup capability by meaning and context; do not map a topic keyword to a tool. Exact match: route=tool and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or emit low-level motor/control fields.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Pending work may include fast_speech as the first Goal Progress Communication milestone: a brief prospective acknowledgement that the understood nontrivial Goal is being taken forward. It is not confirmation and does not claim execution. Omit it for an immediate answer, an equivalent delivered/pending act, or filler/repetition/verbosity. Lifecycle pairs: tool=acknowledge_and_check/checking_only; robot_action=acknowledge/prelude_only; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Before Goals exist use claim_state=none and empty claim IDs; never claim result, motion, memory commit, or completion. fast_speech/speak_first use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. For understood nontrivial downstream work, normally include one brief fast_speech notification. It is not confirmation and cannot claim execution or unavailable results; missing results do not justify silence. Omit it for an immediate substantive answer, equivalent delivered/pending notification, explicit user silence, or empty repetition. Lifecycle pairs: tool=acknowledge_and_check/checking_only; robot_action=acknowledge/prelude_only; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Before Goals exist use claim_state=none and empty claim IDs; never claim result, motion, memory commit, or completion. fast_speech/speak_first use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, progress text, scratchpad, markdown, or text outside JSON."
         )
-
-    @staticmethod
-    def _fast_speech_choice_schema(
-        *,
-        purpose: str,
-        commitment: str,
-    ) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "text",
-                "purpose",
-                "commitment",
-                "claim_state",
-                "claimed_capability_ids",
-                "claimed_goal_ids",
-                "must_not_claim_completion",
-            ],
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120,
-                },
-                "purpose": {"type": "string", "enum": [purpose]},
-                "commitment": {
-                    "type": "string",
-                    "enum": [commitment],
-                },
-                "claim_state": {"type": "string", "const": "none"},
-                "claimed_capability_ids": {
-                    "type": "array",
-                    "maxItems": 0,
-                    "items": {"type": "string"},
-                },
-                "claimed_goal_ids": {
-                    "type": "array",
-                    "maxItems": 0,
-                    "items": {"type": "string"},
-                },
-                "must_not_claim_completion": {"const": True},
-            },
-        }
-
-    def build_fast_speech_review_payload(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-        candidate: FastSpeech | None,
-    ) -> dict[str, Any]:
-        target_route = _pending_work_fast_speech_target_route(decision)
-        expected_purpose, expected_commitment = FAST_SPEECH_ROUTE_CONTRACTS[
-            target_route
-        ]
-        mind_context = _bounded_json(request.context.get("mind", {}), max_chars=2200)
-        interaction_context = _bounded_json(
-            request.context.get("interaction_context") or {},
-            max_chars=3200,
-        )
-        abilities_json = _bounded_json(
-            _compact_candidate_capabilities(
-                _review_capabilities_from_request(request), limit=12
-            ),
-            max_chars=1800,
-        )
-        speech_choice_schema = self._fast_speech_choice_schema(
-            purpose=expected_purpose,
-            commitment=expected_commitment,
-        )
-        fast_speech_schema = {
-            "anyOf": [speech_choice_schema, {"type": "null"}],
-        }
-        candidate_json = (
-            _bounded_json(candidate.model_dump(mode="json"), max_chars=1800)
-            if candidate is not None
-            else "null"
-        )
-        return {
-            "model": self.model,
-            "stream": False,
-            "think": False,
-            "format": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["fast_speech", "reason_summary"],
-                "properties": {
-                    "fast_speech": fast_speech_schema,
-                    "reason_summary": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 320,
-                    },
-                },
-            },
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Chromie's independent fast-speech semantic-delta and style reviewer. Goal Association and planning have not happened yet. Review meaning, not keywords.\n"
-                        "- Treat both candidate speech and candidate silence as proposals, never as proof. Decide whether a still-needed conversational act exists by comparing the latest accepted pending work with Recent Interaction Context semantically.\n"
-                        "- Heard speech counts as delivered; scheduled speech is pending rather than heard, but an equivalent pending act must not be scheduled twice. The mere presence of any earlier speech is never enough to suppress a new act: suppress only when its meaning is already covered.\n"
-                        "- If an equivalent acknowledgement is already delivered or pending and there is no explicit repeat, retry after failure, correction, changed state, new evidence, or clarification need, return fast_speech=null.\n"
-                        "- Fast speech is the initial Goal Progress Communication milestone, not task confirmation and not Social Attention. When the interpretation has sufficiently understood a nontrivial Goal that must continue through later work, a tiny prospective acknowledgement can be valuable because it tells the person that Chromie got the Goal and is taking it forward.\n"
-                        "- Fast speech is still optional. Return fast_speech=null when a substantive answer is already immediate, an equivalent acknowledgement is already delivered or pending, or another line would be filler, paraphrase, repetition, or verbosity. Do not treat a clear request itself as a reason for silence: clarity is what makes a truthful acknowledgement possible.\n"
-                        "- Weigh responsiveness and politeness together with brevity. Optimize for natural human interaction, not minimum word count.\n"
-                        "- The spoken text must agree with claim_state=none and empty capability/goal claim arrays. At this boundary authoritative Goals, Plans, provider results, effect commits, and completion evidence do not yet exist, so wording may acknowledge understanding or evaluation but must not assert any state transition or external fact that requires that missing evidence.\n"
-                        "- The acknowledgement must be semantically entailed by the latest user input and the interpretation decision. Do not add a responsibility, object, destination, method, conclusion, or side task that the user did not request or the supplied context does not establish.\n"
-                        "- Any exact capability in the interpretation decision is an advisory pre-association hypothesis. Compare the requested human outcome with the supplied ability descriptions; never broaden a capability beyond its declared semantics or promise an unsupported outcome or method.\n"
-                        "- Judge ordinary sentence meaning and grammatical aspect, not only typed fields. Uncommitted or unexecuted work must remain prospective; structural fields such as commitment or claim_state cannot excuse wording that implies an effect is already ongoing or complete.\n"
-                        "- Do not replace every case with one standard acknowledgement. Speech is optional even when work remains pending; silence is valid when it is the better conversational choice.\n"
-                        "- Return reason_summary as one short semantic explanation of why speech or silence is the better current interaction delta. It is an audit summary, not hidden chain-of-thought.\n"
-                        "- Identity shapes expression only and never grants capability.\n"
-                        "- Return JSON only."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Latest user input: {request.text}\n"
-                        f"Language hint: {request.language or 'auto'}\n"
-                        f"Owner-approved mind and style context JSON: {mind_context}\n"
-                        "Candidate fast_speech JSON (null is a silence proposal, not a verdict): "
-                        f"{candidate_json}\n"
-                        "Interpretation decision JSON: "
-                        f"{_bounded_json(decision.model_dump(mode='json', exclude_none=True), max_chars=2600)}\n"
-                        f"Recent Interaction Context JSON: {interaction_context}\n"
-                        f"Common ability catalog JSON: {abilities_json}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": min(256, max(96, self.num_predict)),
-            },
-        }
 
     @staticmethod
     def _route_response_schema() -> dict[str, Any]:
@@ -1648,7 +1355,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only. Required keys are route, intent, and confidence; metadata and fast_speech are allowed when they change downstream routing or immediate user acknowledgement.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- fast_speech, when present, must be a short process acknowledgement only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
+                        "- fast_speech, when present, must be a short prospective Goal-progress notification only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Never choose interrupt or ignore.\n"
                         "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
@@ -1767,7 +1474,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only with required keys route, intent, and confidence. metadata and fast_speech are allowed for tool lookups.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- fast_speech must be a short process acknowledgement only; never claim tool results, physical completion, or memory commit.\n"
+                        "- fast_speech must be a short prospective Goal-progress notification only; never claim tool results, physical completion, or memory commit.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"
@@ -2787,209 +2494,6 @@ class OllamaGoalInterpreter:
         )
         return reviewed_decision
 
-    async def _review_pending_fast_speech(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        """Review both speech and silence as semantic-delta proposals.
-
-        Structural FastSpeech fields cannot prove that ordinary wording stayed
-        within the user's request, and absence of FastSpeech cannot prove that
-        no acknowledgement is still needed. The same bounded reviewer therefore
-        judges both proposals against the latest accepted pending work and typed
-        Interaction Context. It may preserve/rewrite one prospective act or return
-        null when equivalent meaning is already delivered/pending or no new act is
-        useful. Host code does not infer semantic equivalence from route names,
-        wording, or the mere presence of prior speech.
-        """
-
-        target_route = _pending_work_fast_speech_target_route(decision)
-        if target_route not in FAST_SPEECH_ROUTE_CONTRACTS:
-            return decision
-        candidate = decision.fast_speech
-        if not _fast_speech_matches_route_contract(target_route, candidate):
-            candidate = next(
-                (
-                    item.fast_speech
-                    for item in (decision.routes or [])
-                    if item.route == target_route
-                    and _fast_speech_matches_route_contract(
-                        target_route, item.fast_speech
-                    )
-                ),
-                None,
-            )
-        missing_candidate = candidate is None
-        if missing_candidate and not _decision_needs_goal_interpretation_fast_speech(
-            decision
-        ):
-            return decision
-        if missing_candidate and not self.pending_work_fast_speech_repair_enabled:
-            return decision
-        if not self.slow_review_recovery_enabled:
-            if candidate is None:
-                metadata = dict(decision.metadata or {})
-                metadata["required_fast_speech_missing"] = True
-                metadata["fast_speech_review"] = {
-                    "stage": "fast_speech_semantic_review_disabled",
-                    "model_reviewed": False,
-                    "speech_selected": False,
-                    "reason": "semantic_delta_review_disabled",
-                }
-                return decision.model_copy(update={"metadata": metadata})
-            return _decision_without_goal_interpretation_fast_speech(
-                decision,
-                reason_suffix="unreviewed pending-work fast speech suppressed",
-                stage="fast_speech_semantic_review_disabled",
-            )
-        logger.info(
-            "goal_interpreter_fast_speech_review_start route=%s intent=%s sid=%s candidate=%s",
-            decision.route,
-            decision.intent,
-            request.sid,
-            "speech" if candidate is not None else "silence",
-        )
-        try:
-            data = await self._chat_logged(
-                self.build_fast_speech_review_payload(request, decision, candidate),
-                stage="fast_speech_semantic_review",
-                request=request,
-            )
-            parsed = _extract_json_object(
-                str(data.get("message", {}).get("content") or "")
-            )
-            raw_fast_speech = parsed.get("fast_speech")
-            reason_summary = " ".join(str(parsed.get("reason_summary") or "").strip().split())
-            if not reason_summary:
-                raise ValueError("fast speech semantic review requires reason_summary")
-            if raw_fast_speech is None:
-                suppressed = _decision_without_goal_interpretation_fast_speech(
-                    decision,
-                    reason_suffix="semantic delta review found no new acknowledgement needed",
-                    stage="fast_speech_semantic_review",
-                )
-                metadata = dict(suppressed.metadata or {})
-                metadata["fast_speech_review"] = {
-                    "stage": "fast_speech_semantic_review",
-                    "model_reviewed": True,
-                    "candidate_kind": "speech" if candidate is not None else "silence",
-                    "speech_selected": False,
-                    "reason_summary": reason_summary,
-                }
-                logger.info(
-                    "goal_interpreter_fast_speech_review_done route=%s intent=%s selected=false",
-                    decision.route,
-                    decision.intent,
-                )
-                return suppressed.model_copy(update={"metadata": metadata})
-            reviewed = FastSpeech.model_validate(raw_fast_speech)
-            if not _fast_speech_matches_route_contract(target_route, reviewed):
-                raise ValueError("reviewed fast_speech violates pre-plan claim contract")
-        except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
-            logger.warning(
-                "goal_interpreter_fast_speech_review_failed route=%s intent=%s error=%s",
-                decision.route,
-                decision.intent,
-                exc,
-            )
-            suppressed = _decision_without_goal_interpretation_fast_speech(
-                decision,
-                reason_suffix="invalid pending-work fast speech suppressed",
-                stage="fast_speech_semantic_review_failed",
-            )
-            metadata = dict(suppressed.metadata or {})
-            review = metadata.get("fast_speech_review")
-            if not isinstance(review, dict):
-                review = {}
-            review["error_type"] = type(exc).__name__
-            review["candidate_kind"] = "speech" if candidate is not None else "silence"
-            review["fail_closed_to_cached_fallback"] = True
-            metadata["fast_speech_review"] = review
-            return suppressed.model_copy(update={"metadata": metadata})
-        reviewed_decision = _decision_with_goal_interpretation_fast_speech(
-            decision,
-            reviewed,
-            reason_suffix="fast speech semantic delta independently reviewed",
-            stage="fast_speech_semantic_review",
-            replace_existing=True,
-        )
-        metadata = dict(reviewed_decision.metadata or {})
-        metadata["fast_speech_review"] = {
-            "stage": "fast_speech_semantic_review",
-            "model_reviewed": True,
-            "candidate_kind": "speech" if candidate is not None else "silence",
-            "speech_selected": True,
-            "reason_summary": reason_summary,
-            "claim_state": reviewed.claim_state,
-            "claimed_capability_ids": list(reviewed.claimed_capability_ids),
-            "claimed_goal_ids": list(reviewed.claimed_goal_ids),
-        }
-        logger.info(
-            "goal_interpreter_fast_speech_review_done route=%s intent=%s selected=true text_chars=%s",
-            decision.route,
-            decision.intent,
-            len(reviewed.text),
-        )
-        return reviewed_decision.model_copy(update={"metadata": metadata})
-
-    async def _resolve_pending_fast_speech(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        """Apply one semantic-delta gate to pending-work speech or silence.
-
-        Missing FastSpeech is not repaired by a separate model call. When recovery
-        is enabled, the same semantic reviewer that validates authored speech also
-        reviews silence and may author the one still-needed acknowledgement. This
-        keeps the decision symmetric and avoids adding a second LLM stage merely
-        because the quick model omitted a field.
-        """
-
-        fail_closed_route = _pending_work_fast_speech_target_route(decision)
-        if fail_closed_route == "memory":
-            policy = "memory_commit_required_before_speech"
-            logger.info(
-                "goal_interpreter_fast_speech_suppressed route=%s intent=%s "
-                "reason=%s sid=%s",
-                decision.route,
-                decision.intent,
-                policy,
-                request.sid,
-            )
-            suppressed = _decision_without_goal_interpretation_fast_speech(
-                decision,
-                reason_suffix=(
-                    f"pre-effect {fail_closed_route} fast speech suppressed; "
-                    "cached prelude or authoritative result response required"
-                ),
-                stage=f"{fail_closed_route}_preeffect_suppressed",
-            )
-            metadata = dict(suppressed.metadata or {})
-            review = dict(metadata.get("fast_speech_review") or {})
-            review.update(
-                {
-                    "model_reviewed": False,
-                    "policy": policy,
-                }
-            )
-            metadata["fast_speech_review"] = review
-            return suppressed.model_copy(update={"metadata": metadata})
-
-        if (
-            _decision_needs_goal_interpretation_fast_speech(decision)
-            and not self.pending_work_fast_speech_repair_enabled
-        ):
-            logger.info(
-                "goal_interpreter_fast_speech_missing route=%s intent=%s "
-                "semantic_delta_review=disabled",
-                decision.route,
-                decision.intent,
-            )
-            return decision
-        return await self._review_pending_fast_speech(request, decision)
-
     def _safe_semantic_clarification(
         self,
         request: RouteRequest,
@@ -3647,14 +3151,14 @@ class OllamaGoalInterpreter:
                 request,
                 decision,
             )
-            return await self._resolve_pending_fast_speech(request, recovered)
+            return recovered
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
             recovered = await self._recover_deterministic_only_decision(request, decision)
-            return await self._resolve_pending_fast_speech(request, recovered)
+            return recovered
 
         if decision.route == "robot_action" and _is_placeholder_capability_intent(decision.intent):
             recovered = await self._recover_placeholder_capability_decision(request, decision)
-            return await self._resolve_pending_fast_speech(request, recovered)
+            return recovered
 
-        return await self._resolve_pending_fast_speech(request, decision)
+        return decision

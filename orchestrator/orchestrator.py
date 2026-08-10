@@ -324,9 +324,6 @@ class VoiceAssistant:
         self.fast_first_response_enabled = (
             cognition_settings.fast_first_response_enabled
         )
-        self.fast_first_tool_response_enabled = (
-            cognition_settings.fast_first_tool_response_enabled
-        )
         self.core_generated_fast_speech_enabled = (
             cognition_settings.core_generated_fast_speech_enabled
         )
@@ -687,14 +684,13 @@ class VoiceAssistant:
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
-            "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
+            "confirmation_ttl_s=%.1f fast_first_response=%s "
             "core_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
             "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
-            self.fast_first_tool_response_enabled,
             self.core_generated_fast_speech_enabled,
             self.fast_first_audio_cache.enabled,
             self.fast_first_audio_hedge_ms,
@@ -3259,15 +3255,14 @@ class VoiceAssistant:
         claimed_goal_ids = payload.get("claimed_goal_ids")
         if claimed_capability_ids != [] or claimed_goal_ids != []:
             return None
-        # Memory wording becomes authoritative only after a committed update.
-        # Tool speech may carry only the exact typed acknowledgement contract
-        # below; it never carries result or completion authority.
-        if str(route or "").strip().casefold() == "memory":
-            return None
+        # Route-specific typed fields constrain authority but do not decide
+        # whether a polite notification is semantically useful. A memory prelude
+        # remains purely prospective and cannot claim that a commit already happened.
         route_contracts = {
             "tool": ("acknowledge_and_check", "checking_only"),
             "robot_action": ("acknowledge", "prelude_only"),
             "deep_thought": ("thinking", "prelude_only"),
+            "memory": ("acknowledge", "prelude_only"),
         }
         expected = route_contracts.get(str(route or ""))
         if expected is not None:
@@ -3281,11 +3276,11 @@ class VoiceAssistant:
 
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
-        """Apply only transport-safe checks to model-reviewed immediate speech.
+        """Apply only transport-safe checks to source-authored immediate speech.
 
-        Semantic claim authority is carried by the typed FastSpeech fields and
-        independently reviewed in the Cognitive Core. The Host deliberately
-        does not infer meaning from phrases, keywords, punctuation, or style.
+        Semantic wording is owned by Goal Interpretation. Typed FastSpeech fields
+        carry the mechanical claim boundary; the Host deliberately does not add a
+        second semantic LLM or infer meaning from phrases, keywords, or punctuation.
         """
 
         cleaned = " ".join((text or "").strip().split())
@@ -3459,16 +3454,9 @@ class VoiceAssistant:
             return None
         if decision.route in {"interrupt", "ignore"}:
             return None
-        # Generative TTS can take longer than a small read-only tool call. Keep
-        # tool acknowledgements opt-in so a weather result is not queued behind
-        # a slower “I am checking” synthesis. Deep reasoning and guarded action
-        # preludes remain independently available.
-        if (
-            decision.route == "tool"
-            and not getattr(self, "fast_first_tool_response_enabled", False)
-        ):
-            return None
-
+        # Goal Interpretation owns whether a separate Fast Response is useful.
+        # The Host does not add route-specific suppression for tool work; it only
+        # validates and schedules a source-authored notification.
         interpretation_text = self._goal_interpretation_fast_speech_text(
             decision,
             task_snapshots=task_snapshots,

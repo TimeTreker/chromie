@@ -21,7 +21,7 @@ Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 class FastSpeech(BaseModel):
-    """Core-authored process acknowledgement preserved across services."""
+    """Source-authored first Goal Progress Communication notification."""
 
     text: str = ""
     purpose: str | None = None

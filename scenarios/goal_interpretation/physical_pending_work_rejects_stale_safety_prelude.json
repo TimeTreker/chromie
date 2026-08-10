@@ -3,7 +3,7 @@
   "id": "physical_pending_work_rejects_stale_safety_prelude",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A physical request whose quick interpretation omits Fast speech sends silence through semantic-delta review; the reviewer may preserve silence before authoritative Goals and Plans exist.",
+  "description": "A physical request may carry one source-authored prospective Fast Response, while authoritative planning and confirmation remain downstream; no second speech reviewer exists.",
   "tags": [
     "pending-work",
     "claim-free",
@@ -17,7 +17,6 @@
   },
   "stub": {
     "interpretation_mode": "hybrid",
-    "pending_work_fast_speech_repair_enabled": true,
     "catalog": {
       "catalog_version": 82,
       "capabilities": [
@@ -44,14 +43,16 @@
           "route": "robot_action",
           "intent": "capability:soridormi.walk_forward",
           "confidence": 0.96,
-          "language": "zh-CN"
-        }
-      },
-      {
-        "stage": "fast_speech_semantic_review",
-        "decision": {
-          "fast_speech": null,
-          "reason_summary": "Silence is the better interaction choice before authoritative planning because another prelude would add no useful conversational delta."
+          "language": "zh-CN",
+          "fast_speech": {
+            "text": "好呀，我知道啦。",
+            "purpose": "acknowledge",
+            "commitment": "prelude_only",
+            "claim_state": "none",
+            "claimed_capability_ids": [],
+            "claimed_goal_ids": [],
+            "must_not_claim_completion": true
+          }
         }
       }
     ]
@@ -60,14 +61,16 @@
     "route": "robot_action",
     "intent": "capability:soridormi.walk_forward",
     "source": "llm",
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "fast_speech_semantic_review"
+      "quick_intent"
     ],
-    "fast_speech_present": false,
+    "fast_speech_present": true,
     "task_types_include": [
       "task.execute_skill"
-    ]
+    ],
+    "fast_speech_purpose": "acknowledge",
+    "fast_speech_commitment": "prelude_only",
+    "fast_speech_must_not_claim_completion": true
   }
 }

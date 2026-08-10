@@ -2044,34 +2044,6 @@ class GoalDrivenRuntimeCoordinator:
         )
         return projection.model_dump(mode="json")
 
-    @staticmethod
-    def _fast_interaction_decision(route_decision: Any) -> dict[str, Any]:
-        """Project the reviewed speech-or-silence judgment without claiming delivery."""
-
-        metadata = getattr(route_decision, "metadata", None)
-        metadata = metadata if isinstance(metadata, dict) else {}
-        review = metadata.get("fast_speech_review")
-        review = review if isinstance(review, dict) else {}
-
-        selected = getattr(route_decision, "fast_speech", None) is not None
-        if not selected:
-            for item in getattr(route_decision, "routes", None) or []:
-                if getattr(item, "fast_speech", None) is not None:
-                    selected = True
-                    break
-
-        if not review and not selected:
-            return {}
-        return {
-            "speech_selected": selected,
-            "semantic_reviewed": bool(review.get("model_reviewed")),
-            "candidate_kind": str(review.get("candidate_kind") or ""),
-            "reason_summary": " ".join(
-                str(review.get("reason_summary") or "").strip().split()
-            ),
-            "review_stage": str(review.get("stage") or ""),
-            "delivery_evidence_authority": "interaction_context",
-        }
 
     @staticmethod
     def _association_goal_ids(association: GoalAssociationResolution) -> list[str]:
@@ -2396,9 +2368,6 @@ class GoalDrivenRuntimeCoordinator:
         context["interaction_context"] = self._interaction_context(
             sid=sid,
             context=context,
-        )
-        context["fast_interaction_decision"] = self._fast_interaction_decision(
-            route_decision
         )
         timings: dict[str, float] = {}
         association: GoalAssociationResolution | None = None

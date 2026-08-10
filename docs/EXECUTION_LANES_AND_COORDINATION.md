@@ -192,8 +192,8 @@ confirmation, or applies to mixed, clarification, or confirmation-bound Plans.
 For a non-confirmation `mixed` Plan, the requested spoken outcome and the
 pending Activity acknowledgement may occupy separate ResponsePlan stages. If
 the model covers all non-execute Goals but omits only execute Goal coverage, the
-Host may reuse an exact independently reviewed current-turn `robot_action` fast
-utterance as `pre_action` coverage. It may not invent text, cover a clarification
+Host may reuse an exact source-authored, mechanically validated current-turn
+`robot_action` Fast Response as `pre_action` coverage. It may not invent text, cover a clarification
 or unavailable Goal mechanically, or change the immutable Capability Plan.
 
 Optional Social Attention is likewise not execution authority. A model output

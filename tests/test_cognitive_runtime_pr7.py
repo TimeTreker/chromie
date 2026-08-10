@@ -461,40 +461,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 float(stage["started_monotonic_ms"]),
             )
 
-    def test_fast_interaction_decision_projects_reviewed_reason_without_claiming_delivery(self):
-        decision = type(
-            "Decision",
-            (),
-            {
-                "fast_speech": None,
-                "routes": [],
-                "metadata": {
-                    "fast_speech_review": {
-                        "stage": "fast_speech_semantic_review",
-                        "model_reviewed": True,
-                        "candidate_kind": "silence",
-                        "speech_selected": False,
-                        "reason_summary": "Silence avoids a redundant prelude.",
-                    }
-                },
-            },
-        )()
-
-        projection = GoalDrivenRuntimeCoordinator._fast_interaction_decision(decision)
-
-        self.assertFalse(projection["speech_selected"])
-        self.assertTrue(projection["semantic_reviewed"])
-        self.assertEqual(projection["candidate_kind"], "silence")
-        self.assertEqual(
-            projection["reason_summary"],
-            "Silence avoids a redundant prelude.",
-        )
-        self.assertEqual(
-            projection["delivery_evidence_authority"],
-            "interaction_context",
-        )
-        self.assertNotIn("delivered", projection)
-
     def test_interaction_context_reaches_association_planner_and_composer(self):
         ledger = InteractionLedger()
         ledger.record_playback_event(

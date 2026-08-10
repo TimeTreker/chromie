@@ -78,9 +78,6 @@ goal_interpreter = OllamaGoalInterpreter(
     confidence_threshold=settings.confidence_threshold,
     slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
     generic_chat_review_enabled=settings.generic_chat_review_enabled,
-    pending_work_fast_speech_repair_enabled=(
-        settings.pending_work_fast_speech_repair_enabled
-    ),
     num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,
     keep_alive=settings.llm_keep_alive,

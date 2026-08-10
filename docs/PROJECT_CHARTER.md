@@ -245,18 +245,29 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    semantic inference, measure and attribute that model failure instead of
    automatically hiding it behind another example-specific instruction.
 
-23. **Goal progress communication is a shared cognitive responsibility.** Once a
-   nontrivial Goal is understood, the first useful acknowledgement is only the
-   earliest possible progress milestone. Later cognitive or execution stages may
-   surface a new user-relevant milestone, limitation, wait state, failure,
-   correction, or completion when doing so helps the person understand that work
-   is progressing. No stage is required to speak, and internal implementation
-   steps are not milestones merely because they occurred. Every speech-capable
-   stage must consult the Interaction Ledger and communicate only the still-needed
-   semantic progress delta; equivalent delivered or already-pending speech is not
-   repeated. Social Attention, clarification/confirmation, task progress
-   communication, and final result delivery remain distinct responsibilities even
-   when they happen close together.
+23. **Goal progress communication is a shared responsibility with one cognitive owner per milestone.**
+   Once a nontrivial Goal is sufficiently understood and still requires downstream
+   work before a substantive answer or effect, Goal Interpretation should normally
+   give one tiny polite prospective notification so the person knows Chromie got
+   the Goal and is taking it forward. Missing result evidence limits what that
+   notification may claim; it is not itself a reason for silence. A separate Fast
+   Response is omitted when the substantive answer is immediate, an equivalent
+   notification is already delivered or pending, the user requested silence, or
+   another line would only repeat or add empty chatter. Later cognitive or
+   execution stages may surface a new trustworthy user-relevant milestone,
+   limitation, wait state, failure, correction, or completion when doing so helps
+   the person understand meaningful progress. Internal implementation steps are
+   not milestones merely because they occurred. Every speech-capable stage must
+   consult the Interaction Ledger and communicate only the still-needed semantic
+   progress delta; equivalent delivered or already-pending speech is not repeated.
+   The stage that owns a progress judgment owns whether and what to say: production
+   must not insert a second LLM merely to re-decide or repair that ordinary
+   communication choice. Deterministic code may reject malformed typed fields,
+   unsupported authority, or evidence violations. If the semantic communication
+   choice is systematically wrong, fix and qualify the source prompt/model rather
+   than hiding the defect behind another model. Social Attention,
+   clarification/confirmation, task progress communication, and final result
+   delivery remain distinct responsibilities even when they happen close together.
 
 ## Non-goals
 

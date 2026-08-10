@@ -12,11 +12,18 @@ remains available in Git history.
 - All speech-capable cognitive stages now receive one shared progress-communication
   principle: communicate only a new, trustworthy, user-relevant milestone and use
   Interaction Context to avoid repeated acknowledgements or status narration.
-- Kept progress speech optional and low-noise; internal workflow steps are not
-  milestones by themselves, while clear nontrivial Goals may still receive a polite
-  immediate acknowledgement before longer work continues.
-- Kept Fast speech review on the Fast Goal Interpreter model so the quality gate no
-  longer places a deep-model latency barrier in the immediate-response path.
+- Made the initial Fast Response normally responsive rather than silence-biased:
+  once Goal Interpretation has understood a nontrivial Goal that still needs
+  downstream work, it should give one tiny polite prospective notification unless
+  the substantive answer is immediate, an equivalent notification already exists,
+  the user requested silence, or another line would only repeat or add empty chatter.
+- Removed the production Fast-speech reviewer entirely. Goal Interpretation is the
+  sole semantic owner of its Fast Response; Host/runtime code validates only typed,
+  evidence, cancellation, and transport invariants. Semantic mistakes are fixed at
+  the source prompt/model boundary and measured by regression/benchmark scenarios.
+- Removed the redundant tool-only Fast Response gate and the pre-commit memory mute;
+  all eligible downstream-work routes use the same source-authored prospective
+  notification contract, while memory wording still cannot claim a completed commit.
 
 ### Interaction-delta cognition contract
 
@@ -26,16 +33,10 @@ remains available in Git history.
 - Made the shared Interaction Ledger / still-needed-delta rule explicit across
   Goal Interpretation, Goal Association, Fast and Deep Planning, Tool Result
   Interpretation, and Response Composition.
-- Made Fast speech and Fast silence symmetric proposals at Goal Interpretation:
-  the source prompt now treats Fast speech as optional human-interaction progress
-  and explicitly weighs acknowledgement value against filler, paraphrase,
-  repetition, and verbosity. One semantic-delta review judges either candidate
-  against Interaction Context, emits a bounded reason for speech or silence, and
-  may author a missing acknowledgement only when it materially helps. Cognitive
-  Runtime projects that reviewed decision to downstream cognitive prompts without
-  treating it as playback evidence. Removed the separate Fast-speech repair-model
-  call and the host rule that treated any prior speech as sufficient evidence that
-  silence was admissible.
+- Kept the Interaction Ledger as the only cross-stage continuity authority for
+  Goal progress speech. Later stages infer the still-needed communication delta from
+  actual delivered/pending speech and Goal/runtime evidence; the obsolete
+  `fast_interaction_decision` reviewer projection was removed.
 - Replaced scenario-answer instructions in coordinated-action review with
   general semantic entailment and Capability-contract principles; concrete
   distinctions remain benchmark/regression responsibilities.
@@ -65,13 +66,13 @@ remains available in Git history.
   fields to explicit session/ephemeral memory, a logged mechanical recovery may
   only remove authority; durable, profile, forget, and clear contradictions
   remain fail-closed.
-- Restored independently reviewed tool acknowledgements under the exact
-  `acknowledge_and_check`/`checking_only` claim contract while retaining memory
-  commit gating. Playback start remains the delivery boundary and de-duplication
-  uses event identity and structured act state rather than text comparison. The
-  Interaction-delta contract above supersedes the temporary pure-safe-read mute:
-  later stages reuse an equivalent Fast act, or may author only a genuinely new
-  prospective conversational delta before grounded result/failure speech.
+- Restored source-authored tool acknowledgements under the exact
+  `acknowledge_and_check`/`checking_only` claim contract. Playback start remains
+  the delivery boundary and de-duplication uses event identity and structured act
+  state rather than text comparison. The Interaction-delta contract above
+  supersedes the temporary pure-safe-read mute: later stages reuse an equivalent
+  Fast act, or may author only a genuinely new prospective conversational delta
+  before grounded result/failure speech.
 - Added the independently controlled, typed, versioned
   `chromie.interaction_session_capture` Data Loop policy. Each SID snapshots its
   policy at start, reuses existing input/trace/Episode evidence providers, and

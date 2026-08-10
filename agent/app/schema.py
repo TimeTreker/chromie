@@ -48,7 +48,7 @@ _EMPTY_BRACKETS_RE = re.compile(r"\(\s*\)|\[\s*\]|\{\s*\}")
 
 
 class FastSpeech(BaseModel):
-    """Core-authored process acknowledgement preserved across services."""
+    """Source-authored first Goal Progress Communication notification."""
 
     text: str = ""
     purpose: str | None = None

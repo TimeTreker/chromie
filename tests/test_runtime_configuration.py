@@ -87,12 +87,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
-        self.assertEqual(
-            values[
-                "AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED"
-            ],
-            "1",
-        )
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
@@ -199,7 +193,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             ],
             "1",
         )
-        self.assertEqual(values["ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED"], "1")
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
         self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")

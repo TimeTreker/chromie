@@ -1307,24 +1307,23 @@ Before effectful execution, a response plan may contain:
 
 Prospective planning output cannot contain a final completion claim.
 
-The Host may schedule a complete, independently schema-valid `fast_speech` or
-`ResponseStage` only after Host validation authorizes it against the applicable
-turn/Goal correlation, commitment or evidence state, claim guards, and
-cancellation generation; it need not wait for unrelated later response fields.
-Raw model-token deltas, partial JSON, private reasoning, and incomplete
-sentences are not response contracts. For eligible planning and embodied work,
-the Core model owns the exact dynamic wording and an independent review checks
-its ordinary meaning against the owner-approved style context. Dynamic pre-Goal
-speech must carry `claim_state=none` with empty capability and Goal claim IDs,
-but those typed fields are not sufficient evidence about sentence meaning. A
-tool route may use only the independently reviewed
-`acknowledge_and_check`/`checking_only` act before result evidence. Memory speech
-still waits for a commit; a generic Host cache may present a low-commitment
-fallback. The Host does not classify ordinary wording by keywords. An immediate acknowledgement may
-claim only hearing or evaluation, a proposal or confirmation requires a
-validated plan, starting speech requires committed execution, progress requires
-correlated runtime evidence, and final speech requires reconciled terminal
-evidence.
+The Host may schedule a complete, schema-valid source-authored `fast_speech` or
+`ResponseStage` only after mechanical validation authorizes it against the
+applicable turn/Goal correlation, commitment or evidence state, claim guards,
+and cancellation generation; it need not wait for unrelated later response
+fields. Raw model-token deltas, partial JSON, private reasoning, and incomplete
+sentences are not response contracts. Goal Interpretation owns the exact dynamic
+Fast Response wording and the semantic decision to speak or remain silent. No
+second production LLM re-decides or repairs that ordinary communication choice.
+Dynamic pre-Goal speech must carry `claim_state=none` with empty capability and
+Goal claim IDs. Tool speech uses the typed `acknowledge_and_check`/
+`checking_only` contract before result evidence; a memory acknowledgement is
+likewise purely prospective and cannot claim that the commit already happened.
+The Host does not classify ordinary wording by keywords. An immediate
+acknowledgement may claim only understanding/evaluation and prospective intent;
+a proposal or confirmation requires a validated plan, starting speech requires
+committed execution, progress requires correlated runtime evidence, and final
+speech requires reconciled terminal evidence.
 
 Response stages reuse earlier current-turn speech by exact speech-event ID and
 structured act fields, not text comparison. The playback event preserves turn,
@@ -1401,10 +1400,16 @@ promoting the Ledger into long-term memory.
 
 Goal Progress Communication is the shared user-facing communication responsibility
 that spans the lifetime of one Goal. The familiar Fast Response is its earliest
-possible milestone: after Goal Interpretation has sufficiently understood a
-nontrivial Goal that still requires downstream work, Chromie may briefly tell the
-person that the Goal was understood and is being taken forward. That act is not
-Social Attention and is not clarification or confirmation of an unclear Goal.
+common milestone: after Goal Interpretation has sufficiently understood a
+nontrivial Goal that still requires downstream work before a substantive answer or
+effect, Chromie should normally give one tiny polite prospective notification so
+the person knows the Goal was understood and is being taken forward. Missing
+result evidence limits what that notification may claim; it is not itself a
+reason for silence. A separate Fast Response is omitted when a substantive answer
+is immediate, an equivalent notification is already delivered or pending, the
+user requested silence, or another line would only repeat or add empty chatter.
+That act is not Social Attention and is not clarification or confirmation of an
+unclear Goal.
 
 The same responsibility continues after the initial acknowledgement. A planner,
 trusted result interpreter, response composer, or later cognitive stage may propose
@@ -1415,14 +1420,16 @@ user-facing speech field preserve the milestone in authoritative Goal/runtime st
 so a later speech-capable stage can communicate it. The architecture does not add a
 parallel speech pipeline for every module merely to expose implementation progress.
 
-Progress speech is optional. The Core reasons about whether the new milestone is
-worth interrupting the person for. It should not narrate internal modules, schemas,
-provider plumbing, planning mechanics, or every execution step. An immediate final
-answer can make an acknowledgement unnecessary; a small milestone can be omitted
-when it adds no user value. Conversely, a clear request is not a reason for silence:
-clarity can make a truthful acknowledgement possible while substantial work
-continues. The objective is responsive, polite, low-noise interaction rather than
-minimum word count or maximum status reporting.
+After the initial Fast Response, later progress speech remains selective. The
+cognitive stage that owns a new milestone reasons about whether it is worth telling
+the person; it should not narrate internal modules, schemas, provider plumbing,
+planning mechanics, or every execution step. The objective is responsive, polite,
+low-noise interaction rather than minimum word count or maximum status reporting.
+Each milestone has one cognitive communication owner. The runtime does not call a
+second LLM to re-decide or repair an ordinary speech-versus-silence judgment.
+Mechanical schema, authority, evidence, cancellation, and delivery checks remain
+deterministic; semantic mistakes are fixed at the source prompt/model boundary and
+measured in regression and benchmark scenarios.
 
 Every stage uses Goal-scoped Interaction Context before proposing speech. Only
 audible playback counts as already told to the user; scheduled speech is merely

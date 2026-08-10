@@ -141,8 +141,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
     def __init__(
         self,
         script: list[dict[str, Any]],
-        *,
-        pending_work_fast_speech_repair_enabled: bool = False,
     ) -> None:
         super().__init__(
             ollama_url="http://scenario.invalid",
@@ -152,9 +150,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
             review_timeout_ms=1000,
             confidence_threshold=0.55,
             slow_review_recovery_enabled=True,
-            pending_work_fast_speech_repair_enabled=(
-                pending_work_fast_speech_repair_enabled
-            ),
             num_predict=160,
         )
         self.script = [dict(item) for item in script]
@@ -1020,12 +1015,7 @@ def _scenario_goal_interpreter_from_stub(
 ) -> _GoalInterpretationLlm | _ScriptedGoalInterpreter:
     script = _goal_interpretation_script_from_stub(scenario_key, stub)
     if script is not None:
-        return _ScriptedGoalInterpreter(
-            script,
-            pending_work_fast_speech_repair_enabled=bool(
-                stub.get("pending_work_fast_speech_repair_enabled", False)
-            ),
-        )
+        return _ScriptedGoalInterpreter(script)
     raw_decision = stub.get("llm_decision")
     if raw_decision is None:
         return _GoalInterpretationLlm(fallback_decision)

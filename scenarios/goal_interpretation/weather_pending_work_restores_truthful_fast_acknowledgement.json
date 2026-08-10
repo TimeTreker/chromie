@@ -3,7 +3,7 @@
   "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A slow weather lookup whose quick interpretation omits Fast speech is resolved by the same semantic-delta review used for authored speech, producing one truthful acknowledgement before result evidence exists.",
+  "description": "A slow weather lookup is acknowledged directly by the source Goal Interpreter once the Goal is understood; no second LLM reviewer repairs or re-decides the Fast Response.",
   "tags": [
     "reported-live-voice",
     "weather",
@@ -17,7 +17,6 @@
   },
   "stub": {
     "interpretation_mode": "hybrid",
-    "pending_work_fast_speech_repair_enabled": true,
     "catalog": {
       "catalog_version": 81,
       "capabilities": [
@@ -53,19 +52,16 @@
               "date": "today",
               "units": "metric"
             }
-          }
-        }
-      },
-      {
-        "stage": "fast_speech_semantic_review",
-        "decision": {
+          },
           "fast_speech": {
-            "text": "好呀，我帮你查一下北京今天有没有下雨。",
+            "text": "好呀，我看看北京今天有没有下雨。",
             "purpose": "acknowledge_and_check",
             "commitment": "checking_only",
+            "claim_state": "none",
+            "claimed_capability_ids": [],
+            "claimed_goal_ids": [],
             "must_not_claim_completion": true
-          },
-          "reason_summary": "A brief acknowledgement adds useful interaction progress while the lookup is pending."
+          }
         }
       }
     ]
@@ -74,19 +70,14 @@
     "route": "tool",
     "intent": "capability:chromie.weather.lookup",
     "source": "llm",
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "fast_speech_semantic_review"
+      "quick_intent"
     ],
     "fast_speech_present": true,
     "fast_speech_purpose": "acknowledge_and_check",
     "fast_speech_commitment": "checking_only",
     "fast_speech_must_not_claim_completion": true,
-    "metadata_json_contains": [
-      "fast_speech_semantic_review",
-      "model_reviewed"
-    ],
     "task_types_include": [
       "task.use_tool"
     ]

@@ -587,10 +587,6 @@ class GoalInterpreterSettings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    pending_work_fast_speech_repair_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 
 AgentServiceSettings = Settings

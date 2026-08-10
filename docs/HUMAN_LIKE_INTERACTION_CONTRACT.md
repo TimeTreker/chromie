@@ -214,25 +214,25 @@ permits a bypass nor requires escalation, and it never authorizes an effect.
 
 Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
-contracts and must never reach TTS. The Host may schedule a complete,
-independently schema-valid `fast_speech` or `ResponseStage` only after Host
-validation authorizes it against the applicable turn/Goal correlation,
-commitment or evidence state, claim guards, and cancellation generation. It
-need not wait for unrelated later response fields. The stages have distinct
-truth requirements. For eligible planning or embodied work, the Core model owns
-the exact dynamic fast-speech wording under the owner-approved mind and style
-context, and an independent semantic/style review must preserve or truthfully
-repair it. The typed `claim_state`, `claimed_capability_ids`, and
-`claimed_goal_ids` are necessary claim controls; before Goals and Plans exist
-they must be `none`, empty, and empty. They are not proof that the ordinary
-sentence stayed prospective. A tool route may therefore speak only an
-independently reviewed `acknowledge_and_check` act with `checking_only`
-commitment before evidence exists; the later result, failure, or limitation is
-a distinct act. Memory speech remains suppressed until a commit exists. The
-Host validates typed fields, turn correlation, internal-token safety, and
-lifecycle state without inferring meaning from a phrase blacklist. The
-pre-generated generic cache is a transport-safe fallback when dynamic speech is
-not admissible or cannot be scheduled; it never claims evidence or an effect.
+contracts and must never reach TTS. The Host may schedule a complete, schema-valid source-authored `fast_speech` or
+`ResponseStage` only after mechanical validation authorizes it against the
+applicable turn/Goal correlation, commitment or evidence state, claim guards,
+and cancellation generation. It need not wait for unrelated later response
+fields. The stages have distinct truth requirements. Goal Interpretation owns
+the exact dynamic Fast Response wording and whether that first progress
+notification is useful. There is no second production LLM that re-decides or
+repairs this ordinary communication choice. The typed `claim_state`,
+`claimed_capability_ids`, and `claimed_goal_ids` remain necessary mechanical
+claim controls; before Goals and Plans exist they must be `none`, empty, and
+empty. Tool speech may therefore use only the typed
+`acknowledge_and_check`/`checking_only` prospective act before evidence exists;
+a memory acknowledgement may be prospective too, but cannot claim that a memory
+commit already happened. The later result, failure, limitation, or committed
+memory outcome is a distinct act. The Host validates typed fields, turn
+correlation, internal-token safety, and lifecycle state without inferring
+meaning from a phrase blacklist. The pre-generated generic cache is a
+transport-safe fallback when dynamic speech is not admissible or cannot be
+scheduled; it never claims evidence or an effect.
 
 Current-turn de-duplication uses the typed speech-event identity and its turn,
 structured purpose, stage, route, commitment, source Goal IDs, Plan provenance,
@@ -385,29 +385,23 @@ never a candidate spoken response.
 
 ## Tool behavior
 
-The Cognitive Gateway admits a turn but does not author semantic speech. For
-eligible planning or embodied work, Goal Interpretation may propose one typed,
-non-terminal `fast_speech` process acknowledgement or silence. Fast speech is the
-first possible **Goal Progress Communication** milestone: once a nontrivial Goal is
-sufficiently understood and will continue through downstream work, a brief
-prospective acknowledgement may tell the person that Chromie got the Goal and is
-taking it forward. It is not Social Attention and it is not task
-clarification/confirmation. Fast speech remains optional when a substantive answer
-is immediate, an equivalent acknowledgement is already delivered or pending, or
-another line would be filler, repetition, or verbosity. A clear request by itself
-is not a reason for silence; the objective is responsive, polite, low-noise human
-interaction rather than minimum word count. A single bounded semantic-delta review
-owns both speech and silence proposals and may author, revise, or suppress the
-act without changing the chosen route, bindings, or safety policy. It compares
-the current pending responsibility with recent Interaction Context by meaning:
-an equivalent delivered or pending acknowledgement can suppress repetition,
-but unrelated prior speech cannot. The reviewer also emits a short bounded
-`reason_summary`; Cognitive Runtime projects that reviewed speech-or-silence
-judgment to later cognitive stages as `fast_interaction_decision`. This explains
-why an early acknowledgement was selected or omitted, but never proves playback:
-actual heard/pending status remains exclusively owned by Interaction Context.
-Route-specific safety may still forbid claims that lack the required commit or
-evidence, but no normal tool/effect route is muted merely because it is executable.
+The Cognitive Gateway admits a turn but does not author semantic speech. Goal
+Interpretation owns the first possible **Goal Progress Communication** milestone.
+Once a nontrivial Goal is sufficiently understood and still requires downstream
+work before a substantive answer or effect, it should normally author one typed,
+non-terminal `fast_speech` notification so the person knows Chromie got the Goal
+and is taking it forward. This is a polite progress notification, not Social
+Attention and not task clarification/confirmation. Missing result evidence limits
+what the wording may claim; it is not itself a reason for silence. A separate Fast
+Response is omitted when the substantive answer is immediate, an equivalent
+notification is already delivered or pending, the user asked for silence, or
+another utterance would only repeat or add empty chatter. The source Goal
+Interpreter owns that semantic choice. No second production LLM reviews, repairs,
+or re-decides it. Host/runtime code validates only the mechanical FastSpeech,
+correlation, evidence, cancellation, and transport boundaries. If the source model
+makes a poor semantic choice, the remedy is to fix and qualify that source
+prompt/model, not to hide the defect behind another LLM. Interaction Context remains
+the sole authority for whether any speech was actually heard or is still pending.
 
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same Goal Progress Communication rule. The initial acknowledgement is only the
@@ -416,10 +410,8 @@ progress delta, it may propose a concise update; when nothing meaningfully chang
 it remains silent. Internal workflow boundaries and every low-level execution step
 are not user-facing milestones merely because they occurred. Interaction Context
 prevents the same acknowledgement or progress message from being paraphrased and
-repeated by successive stages.
-
-Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
-the same delta rule. An executable Plan may carry prospective `response_text`;
+repeated by successive stages. An executable Plan may carry prospective
+`response_text`;
 that text is conversational intent, never an executable step and never evidence
 that work started or completed. For a pure safe read, a new prospective
 acknowledgement may be scheduled when it adds a still-needed act, while an

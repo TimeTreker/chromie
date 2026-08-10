@@ -1150,7 +1150,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "重庆今天天气怎么样？",
             )
         )
-        assistant.fast_first_tool_response_enabled = True
         self.assertEqual(
             assistant._fast_first_response_text(
                 RouteDecision(
@@ -1275,7 +1274,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    def test_tool_fast_first_response_requires_enablement_and_typed_contract(self) -> None:
+    def test_tool_fast_first_response_uses_general_enablement_and_typed_contract(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
         assistant.core_generated_fast_speech_enabled = True
@@ -1294,15 +1293,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        assistant.fast_first_tool_response_enabled = False
-        self.assertIsNone(
-            assistant._fast_first_response_text(
-                decision,
-                "今天北京天气怎么样？",
-            )
-        )
-
-        assistant.fast_first_tool_response_enabled = True
         self.assertEqual(
             assistant._fast_first_response_text(
                 decision,
@@ -1311,10 +1301,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "好的，我查一下北京今天的天气。",
         )
 
+        assistant.fast_first_response_enabled = False
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                decision,
+                "今天北京天气怎么样？",
+            )
+        )
+
     def test_dynamic_fast_speech_is_default_off_and_requires_full_contract(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
-        assistant.fast_first_tool_response_enabled = True
         decision = RouteDecision(
             route="robot_action",
             intent="capability:soridormi.walk_forward",
@@ -1381,8 +1378,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    def test_memory_fast_speech_fails_closed_until_host_commit(self) -> None:
-        self.assertIsNone(
+    def test_memory_fast_speech_accepts_typed_precommit_acknowledgement(self) -> None:
+        self.assertEqual(
             VoiceAssistant._validated_fast_speech_payload_text(
                 {
                     "text": "Okay, I will remember it.",
@@ -1394,7 +1391,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     "must_not_claim_completion": True,
                 },
                 route="memory",
-            )
+            ),
+            "Okay, I will remember it.",
         )
 
     def test_tool_fast_speech_accepts_typed_pre_result_acknowledgement(self) -> None:

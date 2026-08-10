@@ -843,16 +843,6 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_PENDING_WORK_FAST_SPEECH_REPAIR_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
       "key": "AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED",
       "owners": [
         ".env.common",
@@ -3437,15 +3427,6 @@
     {
       "boolean": true,
       "category": "profile_constant",
-      "key": "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
       "key": "ORCH_FAST_PLANNER_MODE",
       "owners": [
         ".env.common",
@@ -4845,12 +4826,12 @@
     "category_counts": {
       "acceptance_override": 57,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 146,
+      "profile_constant": 145,
       "public_choice": 9,
-      "service_internal": 244
+      "service_internal": 243
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 456
+    "total_keys": 454
   }
 }

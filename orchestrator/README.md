@@ -226,27 +226,23 @@ This generates runtime configuration, activates the selected Conda environment,
 checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
-The Orchestrator has a fast-first presentation path for slow work. Once Goal
-Interpretation confidently selects eligible planning or embodied pending work,
-the Core may propose either one typed, non-terminal `fast_speech`
-acknowledgement or silence. Fast speech is optional and source-authored: Goal
-Interpretation is prompted to choose it only when one short prospective act adds
-meaningful human-interaction value before the next visible progress, and to keep
-silent when an extra prelude would be filler, paraphrase, repetition, or needless
-verbosity. The same bounded semantic-delta review judges both proposals against
-the current turn and recent Interaction Context: it may keep or rewrite one
-still-needed acknowledgement, or preserve silence when that is the better current
-interaction choice. The Host does not infer semantic equivalence from route names,
-wording, or the mere presence of earlier speech. Missing Fast speech therefore
-does not bypass review and does not require a separate repair-model call. The
-reviewer supplies a bounded `reason_summary`; Cognitive Runtime exposes that as
-`fast_interaction_decision` to downstream cognitive prompts while Interaction
-Context remains the sole authority for whether any speech was actually heard or
-is still pending. Tool routes may use the exact
-independently reviewed `acknowledge_and_check`/`checking_only` contract before
-result evidence; this acknowledges understanding and evaluation only. Memory
-speech still waits for a committed update. Results and failures remain separate
-evidence-bound acts.
+The Orchestrator has a fast-first presentation path for Goal Progress
+Communication. Once Goal Interpretation has sufficiently understood a nontrivial
+Goal that still requires downstream work before a substantive answer or effect,
+the source Goal Interpreter should normally propose one typed, non-terminal
+`fast_speech` notification so the person knows Chromie got the Goal and is taking
+it forward. Missing result evidence limits what that notification may claim; it
+is not itself a reason for silence. A separate Fast Response is omitted when the
+substantive answer is immediate, an equivalent notification is already delivered
+or pending, the user requested silence, or another utterance would only repeat or
+add empty chatter. Goal Interpretation is the sole semantic owner of that first
+notification: there is no second production LLM that re-decides or repairs the
+speech-versus-silence choice. The Host validates the structured FastSpeech,
+correlation, evidence, cancellation, and transport boundaries only; it does not
+infer semantic equivalence from route names or wording. Tool routes use the typed
+`acknowledge_and_check`/`checking_only` prospective contract before result evidence;
+memory routes may likewise carry only a prospective acknowledgement and never a
+commit claim. Results and failures remain separate evidence-bound acts.
 
 At startup the Orchestrator may also prime a small speaker-specific
 English/Chinese acknowledgement cache through the configured TTS service and
