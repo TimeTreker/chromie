@@ -2634,7 +2634,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Identity and personality shape voice only", repair_rendered)
         self.assertIn("Do not use a universal or canned acknowledgement", repair_rendered)
-        self.assertIn("return fast_speech=null", repair_rendered)
+        self.assertIn("fast_speech must not be null", repair_rendered)
         self.assertIn("claim_state=none", repair_rendered)
         self.assertIn("Review meaning, not keywords", review_rendered)
         self.assertIn("still-needed acknowledgement", review_rendered)
@@ -2687,6 +2687,10 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             rendered,
         )
         self.assertIn("rewrite them prospectively", rendered)
+        self.assertEqual(
+            payload["format"]["properties"]["fast_speech"]["type"],
+            "object",
+        )
         self.assertEqual(payload["model"], "test-model")
 
     async def test_fast_speech_review_receives_advisory_ability_semantics(self) -> None:
@@ -2833,7 +2837,22 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 }
 
         decision = await RobotInterpreter().route(
-            RouteRequest(text="往前走。", language="zh-CN")
+            RouteRequest(
+                text="往前走。",
+                language="zh-CN",
+                context={
+                    "interaction_context": {
+                        "already_spoken": [
+                            {
+                                "event_type": "speech_playback_started",
+                                "speech_act": "acknowledge",
+                            }
+                        ],
+                        "pending_speech": [],
+                        "events": [],
+                    }
+                },
+            )
         )
 
         self.assertIsNone(decision.fast_speech)
@@ -3025,7 +3044,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stage_models["fast_speech_repair"], "quick-model")
         self.assertEqual(
             stage_models["fast_speech_semantic_review"],
-            "quick-model",
+            "quality-model",
         )
 
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
@@ -3072,18 +3091,14 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exact model-authored bindings", rendered)
         self.assertIn("must not semantically claim", rendered)
         self.assertIn("Goal Association and planning have not happened yet", rendered)
-        self.assertIn("return fast_speech=null", rendered)
-        self.assertIn("no still-needed speech delta", rendered)
+        self.assertIn("contains no audible or pending speech", rendered)
+        self.assertIn("fast_speech must not be null", rendered)
         self.assertIn("never phrase matching", rendered)
         self.assertIn("purpose=acknowledge_and_check", rendered)
         self.assertIn("commitment=checking_only", rendered)
         speech_schema = payload["format"]["properties"]["fast_speech"]
-        speech_choice = next(
-            branch for branch in speech_schema["anyOf"] if branch.get("type") == "object"
-        )
-        self.assertTrue(
-            any(branch.get("type") == "null" for branch in speech_schema["anyOf"])
-        )
+        self.assertEqual(speech_schema["type"], "object")
+        speech_choice = speech_schema
         self.assertEqual(
             speech_choice["properties"]["purpose"]["enum"],
             ["acknowledge_and_check"],
@@ -3098,6 +3113,63 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["model"], "quick-model")
         self.assertIn("今天重庆天气怎么样", rendered)
         self.assertIn("weather_query", rendered)
+
+    def test_fast_speech_repair_allows_null_with_typed_speech_evidence(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Check the weather.",
+            context={
+                "interaction_context": {
+                    "already_spoken": [
+                        {
+                            "event_type": "speech_playback_started",
+                            "speech_act": "acknowledge_and_check",
+                        }
+                    ],
+                    "pending_speech": [],
+                    "events": [],
+                }
+            },
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            confidence=0.95,
+        )
+
+        payload = interpreter.build_fast_speech_repair_payload(request, decision)
+        rendered = "\n".join(
+            str(message.get("content") or "") for message in payload["messages"]
+        )
+        speech_schema = payload["format"]["properties"]["fast_speech"]
+
+        self.assertTrue(
+            any(branch.get("type") == "null" for branch in speech_schema["anyOf"])
+        )
+        self.assertIn("return fast_speech=null", rendered)
+
+        review_payload = interpreter.build_fast_speech_review_payload(
+            request,
+            decision,
+            FastSpeech(
+                text="I will check that.",
+                purpose="acknowledge_and_check",
+                commitment="checking_only",
+                claim_state="none",
+                claimed_capability_ids=[],
+                claimed_goal_ids=[],
+                must_not_claim_completion=True,
+            ),
+        )
+        review_schema = review_payload["format"]["properties"]["fast_speech"]
+        self.assertTrue(
+            any(branch.get("type") == "null" for branch in review_schema["anyOf"])
+        )
 
     async def test_social_framing_chat_is_rechecked_on_review_model(self) -> None:
         class FramingInterpreter(OllamaGoalInterpreter):
