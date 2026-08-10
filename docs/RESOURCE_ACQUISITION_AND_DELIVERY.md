@@ -177,6 +177,77 @@ When the source is unknown, Goal Association retains the clear Goal with
 A later location reply is associated semantically with that retained Goal. The
 Host does not attach turns by recency or a phrase rule.
 
+## Continuous progress across resource responsibilities
+
+`AcquireAndDeliverResource` describes the human responsibility; it is **not** an
+early-execution mechanism. Do not add semantic fields such as `early_execute`,
+`speculative`, `wait_for_goal_association`, or provider-specific fast-path flags
+to the Goal. Whether some part of the responsibility may advance now is a
+runtime/cognitive readiness question over the current understanding, evidence,
+dependencies, effects, confirmation state, authorization, hard-boundary
+principles, and resources.
+
+This distinction allows one semantic responsibility to cover both fast
+information acquisition and carefully gated physical acquisition without a
+provider- or resource-kind router.
+
+For information, a sufficiently specified non-effectful read may often advance
+before Goal Association finishes relating the request to the rest of the user's
+work:
+
+```text
+existing Goal: go out for dinner tonight
+
+user: "Will Chongqing get heavy rain today?"
+
+fast understanding
+  |-- current information need is already sufficiently specific
+  |-- exact safe read may start
+  |
+  `-- Goal Association continues
+        `-> the weather question informs the dinner Goal
+
+weather evidence arrives
+  + Goal relationship is known
+  -> Chromie answers the rain question in the context that actually matters
+```
+
+The acquisition is useful before the relationship analysis completes; the
+relationship analysis still changes prioritization and explanation. This is not
+a second information Goal and does not change the
+`AcquireAndDeliverResource` contract.
+
+Physical resource delivery demonstrates the opposite readiness boundary. For
+"bring me a bottle of water", understanding the human responsibility does not
+by itself authorize locomotion or manipulation. Canonical planning, capability
+coverage, confirmation when required, resource arbitration, and provider safety
+must reach their normal barriers before the physical Activity branch advances.
+Cognition, clarification, and Social Attention may continue meanwhile.
+
+Risk and prohibition are orthogonal to the Goal type. A request such as "bring
+me that knife so I can hurt someone" may still be correctly understood as an
+`AcquireAndDeliverResource` responsibility at the semantic level. That valid Goal
+shape does not authorize the effect. Compact always-on hard-boundary principles
+in Chromie's stable Mind are sufficient to keep the harmful Activity branch
+closed; Chromie does not need the text of an applicable criminal statute in her
+prompt to know that she must not carry out the harmful request. Goal reasoning,
+Social Attention, a truthful refusal, and safe alternative reasoning may
+continue.
+
+If the user instead asks a concrete legal question, such as whether a particular
+act is lawful in a specific jurisdiction, that law is itself dynamic
+information-resource acquisition. The relevant current statutes, regulations,
+jurisdiction, effective dates, and exceptions must be obtained from suitable
+trusted sources with freshness/provenance and then interpreted for the Goal.
+They are not worldview, values, personality, or cached Mind content.
+
+The same readiness rule therefore generalizes beyond resources: ordinary
+conversation may respond as soon as its answer is complete; safe reads may
+advance when their exact inputs are sufficient; drafts or other reversible
+preparation may advance only within their declared non-effectful boundary; and
+committed external or physical effects remain gated by the stronger semantic,
+confirmation, authorization, prohibition, and safety dependencies they require.
+
 ## Planner ownership and dynamic capability granularity
 
 The Planner compares the complete Goal against the **current** capability catalog.

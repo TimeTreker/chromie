@@ -139,6 +139,80 @@ and the original goals intact. It cannot return to input classification, widen
 the goal, bypass a new material confirmation, or repeat a physical action
 without fresh authorization. Physical TaskGraph work remains sequential.
 
+### 3.1 Continuous progress and the critical path
+
+The state machine above records authoritative semantic, authorization, and
+evidence milestones. It is **not** a requirement that every model call,
+read-only acquisition, response preparation step, or Social-Attention proposal
+wait for the previous box to finish in wall-clock time.
+
+For each prospective piece of progress, Chromie evaluates four independent
+questions:
+
+1. is the current model-authored meaning sufficient for this exact progress;
+2. are the required inputs, evidence, schemas, and dependencies already
+   available;
+3. do effect, safety, prohibition, confirmation, authorization, and resource
+   boundaries allow this progress now; and
+4. can later cognition refine Goal relationships without making this already
+   allowed progress unsafe or falsely treating it as completion?
+
+When the answers are sufficient, that part may advance while unrelated cognition
+continues. This is the general runtime rule behind responsive conversation,
+bounded information acquisition, Social Attention, and later parallel work. It
+must not be implemented as a weather phrase rule, route shortcut, or second
+semantic authority.
+
+A fully specified non-effectful read is the clearest case. Once the Core has
+sufficiently understood an exact bounded read and trusted code verifies that the
+registered operation is read-only, schema-valid, confirmation-free, and safe to
+perform, the read may start while Goal Association continues to determine
+continuity and relationships with existing Goals. The returned observation is
+retained with exact turn, capability/version, arguments, schema identity,
+timestamps, and provenance. It is not Goal completion evidence merely because
+it arrived early. If later canonical planning requires the exact same operation,
+deterministic correlation may reuse the observation; if the identities differ,
+the Host must not coerce them into equivalence and the canonical request proceeds
+normally.
+
+Effectful work is different. Physical motion, object manipulation, writes,
+message sending, media effects, and other committed side effects remain behind
+the applicable canonical planning, confirmation, authorization, resource, and
+provider-safety barriers. Sufficient understanding may allow cognition,
+clarification, safe preparation, refusal, or another harmless branch to advance,
+but it is not execution authorization.
+
+The same principle applies to optional presentation work. Response composition,
+semantic polishing, Social Attention, or presentation repair must not become a
+barrier to an otherwise-ready non-effectful acquisition merely because those
+activities happen in the same interaction. Runtime qualification should measure
+at least the time to the first meaningful reaction and the time to the first
+useful result separately; reducing one must not hide a long unnecessary critical
+path in the other.
+
+Example:
+
+```text
+existing Goal: go out for dinner tonight
+
+user: "Will it rain heavily in Chongqing today?"
+
+admit + fast understanding
+  |-- sufficiently specified safe weather read ----------> provider
+  |                                                        |
+  |                                                        `-> trusted observation
+  |
+  `-- Goal Association ----------------------------------> relates the weather
+                                                           question to the
+                                                           existing dinner Goal
+
+trusted observation + canonical Goal relationships
+  -> evidence-qualified answer focused on whether rain affects the user's plan
+```
+
+The weather lookup does not need to wait for the relationship analysis; the
+relationship analysis still improves what the result means to the user.
+
 ## 4. Gateway-to-Core contract
 
 The Gateway emits a versioned `UserTurnEnvelope`. It is the only canonical
@@ -214,6 +288,72 @@ unless it produces a valid plan; it is not semantic escalation. A confidence
 number alone neither permits a bypass nor requires escalation, and it never
 authorizes an effect.
 
+### 5.1 One Mind: stable cached prefix plus bounded live projections
+
+All cognitive stages belong to one Chromie Mind; separate model calls do not
+create separate personalities or semantic authorities. Prompt/context projection
+is therefore both a latency boundary and an identity-consistency boundary.
+
+The Mind has a low-churn **stable layer** and high-churn **live projections**.
+The stable layer contains owner-controlled state that normally changes only by a
+deliberate configuration/content revision:
+
+- Chromie's identity and self-concept;
+- personality and interaction/expression style;
+- worldview and values; and
+- concise hard-boundary principles covering safety, authorization,
+  evidence-truth, semantic authority, and strict prohibitions.
+
+Where supported by Ollama/model serving, this stable layer should be arranged as
+a reusable prompt prefix so prefix/KV caching can avoid repeatedly evaluating the
+same Mind text. Cacheability is an execution optimization, not a new semantic
+authority: changing the owner-controlled Mind invalidates the relevant cached
+prefix. Identity/style remains relevant across cognition. Worldview and values
+are also stable and cacheable, but a bounded role should reason over only the
+portion it needs rather than receive a large active instruction burden merely
+because the text is stable.
+
+The live layer is projected by responsibility:
+
+- Gateway Attention receives ingress/attention evidence and only the bounded
+  interaction context required to decide admission; it does not need the full
+  Goal graph or capability catalog.
+- Goal Interpretation receives the admitted turn, bounded recent dialogue,
+  active/recent Goal and Task progress, discourse focus, and enough capability
+  semantics to recognize what kind of progress is being requested.
+- Goal Association receives the richer Goal/Task/discourse view needed to decide
+  continuity, reference, modification, relationship, or genuinely new work.
+- Fast Planner receives the resolved work plus only relevant exact capability
+  candidates, schemas, dependencies, resource/confirmation facts, and current
+  evidence. It is fast because the problem and live projection are bounded, not
+  merely because a smaller model happens to be configured.
+- Tool Result Interpretation receives the user's question, relevant Goal
+  context, trusted observations, already-delivered interaction delta, and the
+  compact stable Mind rather than unrelated live state.
+- Social Attention receives current interaction events, scene/target evidence,
+  recent expressive history, primary activity state, eligible exact social
+  capabilities, and the compact stable Mind.
+- Deep Planner is the deliberate rich-context path. When escalation is semantic
+  rather than merely technical, it may receive broader Goal relationships,
+  relevant long-term memory, environment, capability state, trustworthy
+  evidence, alternatives, long-horizon context, and the explicit reason deeper
+  reasoning was required. Its stable Mind prefix remains the same owner-controlled
+  identity, worldview, values, style, and principles; Deep receives more *live*
+  context, not a different person.
+
+Dynamic domain knowledge is not part of that stable layer. "Do not intentionally
+harm a person or perform clearly prohibited conduct" may be a concise persistent
+principle; answering whether a specific act is legal in a particular jurisdiction
+requires current legal information to be acquired through the information
+capability path with source and freshness evidence. The same rule applies to
+weather, news, prices, schedules, current policies, and other externally changing
+facts.
+
+This projection rule applies to prompt design as well as data structures. The
+stable Mind should be cache-friendly rather than re-tokenized as turn data, while
+large history, catalog, evidence, memory, and world-state payloads remain dynamic
+and are supplied only when the receiving cognition actually needs them.
+
 ## 6. Delegation model
 
 Chromie uses manager-owned delegation:
@@ -230,7 +370,9 @@ Core
 
 Specialists may be implemented as Agents, tools, memory providers, or
 Soridormi skills. Their implementation category does not change the contract.
-Every request is bound to:
+
+Effectful requests and any request used directly as canonical Goal-completion
+evidence remain bound to:
 
 - the admitted turn;
 - canonical plan ID and fingerprint;
@@ -241,6 +383,16 @@ Every request is bound to:
 - the full committed SHA-256 identity of a versioned, non-empty declared output
   schema and bounded observation limits;
 - timeout, cancellation, confirmation, and idempotency policy.
+
+A bounded read-only acquisition that is allowed to start before canonical Goal
+resolution is the narrow exception to the plan-first correlation shape, not to
+evidence integrity. It must still retain the admitted turn identity, exact
+capability and version, exact normalized arguments, committed output-schema
+identity, provider/result provenance, cancellation/idempotency policy, and
+timestamps. It may satisfy later canonical work only after deterministic exact
+correlation establishes that the later Plan requested the same operation.
+Otherwise it remains unused turn-scoped evidence and cannot complete a Goal or
+silently replace the canonical request.
 
 Independent non-physical work may use bounded concurrency only when capability
 and resource contracts allow it. Physical work remains sequential. A specialist

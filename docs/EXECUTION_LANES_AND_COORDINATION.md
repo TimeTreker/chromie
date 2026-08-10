@@ -44,6 +44,66 @@ Social Attention proposes socially appropriate behavior; it does not directly
 operate the body. Speaking delivers model-authored communication; it is not a
 separate conversational agent.
 
+## Continuous Social Attention
+
+Social Attention is a concurrent interaction lane, not an ornament attached only
+to a final spoken response. It may be reconsidered when meaningful interaction
+state changes, including:
+
+- a user starts or finishes addressing Chromie;
+- fast understanding becomes sufficient to acknowledge or begin safe progress;
+- Activity or information acquisition starts, waits, changes, completes, or
+  fails;
+- new scene/target evidence becomes available;
+- interruption or cancellation changes the interaction; and
+- speaking starts, continues, or completes.
+
+These triggers provide *state*, not hardcoded gestures. The Social-Attention
+cognition still decides whether expression is useful and may choose
+`decision=none`. It consumes a bounded social projection of the one Core-owned
+interaction together with Chromie's stable Mind. It therefore does not need to
+wait for a complete Goal graph when the available scene and interaction evidence
+already support a harmless expression. Conversely, target-specific gaze or
+other claims that require scene evidence remain unavailable until that evidence
+exists.
+
+Response Composer may coordinate body expression with authored speech when one
+joint decision is useful, but it is not the exclusive owner or only trigger of
+Social Attention. A separate Social-Attention model path, when used, remains an
+auxiliary proposal mechanism rather than a second semantic planner.
+
+When the runtime already knows the reviewed live set of eligible social
+Capabilities, the model-facing contract should make invented identifiers
+unrepresentable: `capability_id` is constrained to the exact supplied candidate
+IDs, while trusted code still validates arguments, target evidence, resources,
+safety, and provider availability. The model decides *whether* and *which*
+eligible expression is appropriate; it does not reconstruct machine identifiers.
+
+Optional Social Attention must fail soft with respect to unrelated primary work.
+A slow, invalid, unavailable, or rejected social proposal must not delay an
+otherwise-ready safe read or cancel a valid primary Activity Plan. Coordination
+creates a dependency only when the intended behavior actually requires one.
+
+Example interaction:
+
+```text
+user speaks
+  -> Social Attention may orient/listen
+
+fast understanding becomes sufficient
+  -> optional acknowledgement expression
+  -> safe information acquisition may start independently
+
+provider result arrives
+  -> Social Attention may re-engage
+
+Chromie answers
+  -> speech and optional expression may be coordinated
+```
+
+No stage above requires a gesture, and none gives Social Attention authority over
+the user's Goal.
+
 ## Soridormi embodied compilation contract
 
 Soridormi is a peer Capability Provider beneath Chromie's Activity lane. It

@@ -262,7 +262,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    committed, completed, failed, cancelled, or observed. Cognitive layers decide
    meaning, communication, prioritization, and ordinary behavior from those
    facts. Low-level mechanisms must not quietly become owners of social or
-   semantic judgment, and cognition must not invent runtime facts.
+   semantic judgment, and cognition must not invent runtime facts. A response,
+   interpretation, or presentation failure must not rewrite trusted outcome truth:
+   completed provider evidence does not become user-goal misunderstanding,
+   capability unavailability, or execution failure merely because a later
+   model-authored presentation failed validation. Any fallback must preserve the
+   strongest state actually established by trusted evidence.
 19. **Separate policy from mechanism.** Policy states what should happen and why;
    mechanisms provide the reusable means and trustworthy state needed to carry
    it out. Do not scatter one behavioral policy across special-case checks, and
@@ -339,6 +344,70 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    provenance remains downstream fail-closed: a value labelled `user_supplied`
    must be traceable to an authoritative typed Goal binding rather than model
    memory or an invented contextual guess.
+
+25. **Progress is gated by local readiness, not global cognitive completion.**
+   Chromie does not wait for every cognitive stage to finish before every useful
+   part of an interaction may advance. For each prospective piece of progress,
+   the owning cognitive/runtime boundary asks whether the current meaning,
+   required evidence and inputs, dependencies, and risk/authority state are
+   sufficient for *that progress*. If they are, it may advance while unrelated
+   Goal Association, deeper reasoning, response preparation, or other cognition
+   continues. If they are not, only that branch waits. The interaction critical
+   path therefore contains true semantic, evidence, safety, authorization, and
+   resource dependencies rather than a mandatory serialization of module names.
+   Effectful work still requires its normal canonical planning, confirmation,
+   authorization, and safety barriers. Bounded non-effectful reads may advance
+   earlier when their exact request is already sufficiently understood and the
+   trusted runtime can prove that executing the read has no side effect or
+   confirmation obligation. Early read results are observations, not Goal
+   completion, until canonical reconciliation proves they satisfy the eventual
+   Goal and Plan.
+26. **Stable Mind is cacheable; live context is projected.** Chromie's identity,
+   self-concept, personality, interaction style, worldview, values, and compact
+   hard-boundary principles are owner-controlled, low-churn Mind state. They
+   should be expressed as a stable reusable prompt prefix where the model/runtime
+   supports prefix or KV reuse, rather than rebuilt as dynamic turn payload on
+   every call. Identity, personality, and style remain available throughout
+   cognition so listening, understanding, planning, Social Attention, evidence
+   interpretation, and response remain the behavior of one continuous character.
+   Worldview and values belong to the same stable Mind because they normally
+   change only by deliberate owner revision, although a bounded role need not
+   actively reason over every part of them on every turn. Current dialogue,
+   Goals, Tasks, scene state, capability state, evidence, and relevant memory are
+   dynamic projections layered after that stable Mind and supplied only to roles
+   that need them.
+27. **Dynamic world knowledge is acquired, not baked into the Mind.** Weather,
+   news, prices, schedules, current policies, specific laws and regulations,
+   jurisdictional requirements, and similar facts can change independently of
+   Chromie's identity or values. They therefore do not belong in the stable Mind
+   or its cacheable prefix. When a Goal depends on them, Chromie acquires them
+   through the appropriate trusted information path with freshness, source,
+   scope, and evidence provenance, then reasons from that observation. A concise
+   stable principle such as refusing clearly unlawful or severely harmful conduct
+   may remain part of the hard-boundary Mind, but the text of a statute,
+   regulation, local exception, or current legal interpretation is dynamic
+   information and must be obtained when needed rather than assumed from cached
+   prompt content. Trusted mechanisms still enforce effects, permissions,
+   confirmation, schemas, and evidence independently of the model.
+28. **Understanding, acceptance, capability, and authorization are separate.**
+   Chromie may correctly understand a Goal that she cannot or must not execute.
+   A prohibited, unsafe, harmful, unavailable, or unconfirmed effect closes the
+   affected Activity branch; it does not freeze Goal reasoning, safe information
+   gathering, Social Attention, clarification, refusal, or safe alternative
+   reasoning. Basic effect and prohibition boundaries must be available without
+   requiring a full Deep-Planner round trip. Complex conflicts, uncertainty,
+   alternatives, or broader value reasoning may escalate to Deep cognition, but
+   escalation cannot weaken an already applicable safety or authorization
+   boundary.
+29. **Social Attention is continuous interaction behavior, not a response
+   decoration.** Social Attention may react to listening, attention changes,
+   sufficient understanding, work starting, waiting, new evidence, failure,
+   completion, interruption, and speaking. It remains an auxiliary proposal lane:
+   it does not create Goals, decide user meaning, authorize effects, or become a
+   second conversation manager. Speech composition may coordinate an expression
+   with a response, but response composition is not the exclusive time or place
+   at which Social Attention may occur. Optional Social Attention must not become
+   an unnecessary execution dependency for otherwise-ready work.
 
 ## Non-goals
 
