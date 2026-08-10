@@ -720,6 +720,8 @@ def chromie_manifests(
                     },
                     "resource_contract": {
                         "provider_role": "acquire_information",
+                        "plan_requires": [],
+                        "plan_provides": ["resource_acquired"],
                         "completion_evidence": "trusted_tool_result",
                         "final_delivery_owner": "chromie_response_layer",
                     },
@@ -890,6 +892,8 @@ def chromie_manifests(
                     },
                     "resource_contract": {
                         "provider_role": "acquire_information",
+                        "plan_requires": [],
+                        "plan_provides": ["resource_acquired"],
                         "completion_evidence": "grounded_retrieval_evidence",
                         "final_delivery_owner": "chromie_response_layer",
                     },

@@ -163,39 +163,85 @@ When the source is unknown, Goal Association retains the clear Goal with
 A later location reply is associated semantically with that retained Goal. The
 Host does not attach turns by recency or a phrase rule.
 
-## Planner ownership
+## Planner ownership and dynamic capability granularity
 
-The Planner compares the complete Goal against exact available capability
-semantics.
+The Planner compares the complete Goal against the **current** capability catalog.
+`AcquireAndDeliverResource` remains one Goal whether its execution plan has one
+capability step or several. Capability atomicity is relative to the planner that
+consumes the catalog, not a permanent property of the user Goal.
 
-It must never use a partial primitive as proof of the complete outcome:
+The decomposition rule is:
 
-```text
-walk_forward completed        ≠ object delivered
-web search started            ≠ grounded answer delivered
-grip command completed        ≠ object acquired and handed over
-one candidate retrieved       ≠ recommendation evaluated for the user
+1. Prefer one exact capability when its declared resource contract covers the
+   complete required outcome. Chromie treats that capability as one atomic plan leaf.
+2. If no single capability covers the Goal, compose multiple **advertised**
+   capabilities when their declared `plan_requires` / `plan_provides` resource-state
+   contracts form a valid ordered chain whose union covers the Goal.
+3. Never invent provider-internal navigation, perception, grasp, search, retry, or
+   handover stages that are not exposed as capabilities. Those remain inside the
+   selected provider capability.
+4. Never accept a partial capability or partial chain as proof of complete Goal
+   satisfaction.
+
+For physical handover, plan-level completion requires the resource state to establish
+both `resource_acquired` and `resource_delivered`. For information resources, the
+provider plan must establish acquisition of trusted information evidence; the
+resource contract may declare `final_delivery_owner=chromie_response_layer`, in
+which case Tool Result Interpretation and Response Composition own the final human
+delivery.
+
+This makes the boundary evolve naturally. If Soridormi currently advertises only
+`acquire_resource` and `deliver_resource`, Deep Planning may compose them. If a later
+Soridormi version can reliably guarantee the complete workflow and advertises
+`acquire_and_deliver_resource`, Chromie may use that one capability instead. No Goal
+schema, phrase rule, or provider-specific route needs to change.
+
+A provider capability that contributes to a resource Goal declares a provider-neutral
+plan contract such as:
+
+```json
+{
+  "semantic_scope": {
+    "responsibility_type": "acquire_and_deliver_resource",
+    "resource_kinds": ["physical_object"]
+  },
+  "resource_contract": {
+    "plan_requires": [],
+    "plan_provides": ["resource_acquired"],
+    "completion_requires": ["resource_acquired"]
+  }
+}
 ```
 
-The Planner may choose:
+A later delivery capability may declare:
 
-- `soridormi.acquire_and_deliver_resource` when Soridormi advertises
-  `responsibility_type=acquire_and_deliver_resource`,
-  `resource_kinds=[physical_object]`, and `delivery_modes=[physical_handover]`;
-- `chromie.weather.lookup` for its exact structured weather scope;
-- `chromie.external_information.retrieve` for grounded places, restaurants,
-  recommendations, news, how-to research, and general external information;
-- another future exact provider capability whose declared scope covers the
-  complete responsibility.
+```json
+{
+  "semantic_scope": {
+    "responsibility_type": "acquire_and_deliver_resource",
+    "resource_kinds": ["physical_object"],
+    "delivery_modes": ["physical_handover"]
+  },
+  "resource_contract": {
+    "plan_requires": ["resource_acquired"],
+    "plan_provides": ["resource_delivered"],
+    "completion_requires": ["resource_delivered"]
+  }
+}
+```
 
-These examples are capability contracts, not Host routing rules.
+The state labels are capability-contract facts, not new Goals. They let deterministic
+validation prove that the selected capability chain is coherent without making the
+Host a semantic planner.
 
-## Soridormi named-skill contract
+## Soridormi capability contracts
 
-Soridormi should advertise one provider-scoped implementation of the shared
-resource responsibility rather than inventing a second top-level semantic
-concept or one skill per object type. The capability ID is provider-specific;
-the matching contract is the semantic scope:
+Soridormi may advertise capabilities at whatever semantic granularity its current
+body/runtime can **truthfully guarantee**. It may expose a complete composite, smaller
+resource capabilities, or both. Higher-level capabilities are optimizations and
+stronger provider promises; they are not hardcoded mappings from the Goal type.
+
+A complete provider-scoped capability may advertise:
 
 ```json
 {
@@ -249,25 +295,25 @@ the matching contract is the semantic scope:
     "required": ["resource", "source", "recipient"],
     "additionalProperties": false
   },
-  "resource_claims": [
-    "locomotion",
-    "right_gripper",
-    "carried_object"
-  ],
   "metadata": {
     "semantic_scope": {
       "responsibility_type": "acquire_and_deliver_resource",
       "resource_kinds": ["physical_object"],
-      "acquisition": "provider_owned",
-      "delivery_modes": ["physical_handover"],
+      "delivery_modes": ["physical_handover"]
     },
     "resource_contract": {
       "result_field": "resource_outcome",
+      "plan_requires": [],
+      "plan_provides": [
+        "resource_acquired",
+        "resource_delivered"
+      ],
       "completion_requires": [
         "resource_acquired",
         "resource_delivered"
       ],
       "provider_owns": [
+        "source_resolution",
         "navigation",
         "perception",
         "grasping",
@@ -281,35 +327,33 @@ the matching contract is the semantic scope:
 }
 ```
 
-Soridormi may initially implement navigation, grasp, carrying, and handover with
-scripted or idealized behavior. That is a provider implementation detail. The
-provider must still return a coherent world-state result and may claim
-completion only when the complete contract is satisfied.
+Soridormi may internally implement that capability with rules, a behavior tree, a
+local planner, learned policies, deterministic controllers, or another hierarchy.
+Those mechanisms do not become a second Chromie semantic planner because they are
+bounded by the already-selected capability contract.
 
-Successful provider evidence may include:
+Successful composite-provider evidence may include:
 
 ```json
 {
   "completed": true,
   "skill_id": "acquire_and_deliver_resource",
-  "summary": "The requested bottle was acquired and delivered.",
   "resource_outcome": {
     "responsibility_type": "acquire_and_deliver_resource",
     "resource_kind": "physical_object",
     "resource_description": "a bottle of water",
     "resource_acquired": true,
     "resource_delivered": true,
-    "recipient_description": "requester",
-    "evidence_summary": "Object attachment and delivery state were verified by Soridormi."
+    "recipient_description": "requester"
   }
 }
 ```
 
-Chromie's adapter retains the bounded `resource_outcome` as provider evidence.
-For a capability whose semantic scope declares
-`acquire_and_deliver_resource`, `completed=true` is rejected unless both
-`resource_acquired=true` and `resource_delivered=true` are present. The response
-layer does not expose provider mode in ordinary speech.
+Chromie's adapter validates only the `completion_requires` declared by the exact
+capability that produced a result. Goal completion is stricter: the complete Plan and
+subsequent response/evidence path must still establish every state required by the
+Goal. A successful `acquire_resource` result therefore proves acquisition only; it
+does not by itself close a physical delivery Goal.
 
 ## External-information provider contract
 
@@ -346,24 +390,25 @@ naturally. A more exact provider capability remains preferable when its scope
 matches, such as the structured weather contract.
 
 
-## Semantic planning versus provider-local planning
+## Stable authority, dynamic decomposition boundary
 
-There is one semantic planning authority. Chromie decides which user-visible
-responsibilities exist, which exact capability can satisfy each responsibility, and
-the ordering/dependencies between independent responsibilities. A selected provider
-may then plan *inside* that bounded capability contract.
+There is one user-semantic planning authority, but there is no permanently fixed
+line saying which physical subproblem must be planned in Chromie versus Soridormi.
+The live capability catalog negotiates that line.
 
-For example, after Chromie selects `soridormi.acquire_and_deliver_resource`,
-Soridormi may internally resolve a source, navigate, perceive, grasp, carry, recover,
-and hand over the object. Those provider-local stages are not new Chromie Goals and
-do not reinterpret the user's intent. Likewise, a weather provider may acquire and
-normalize forecast evidence while Chromie still owns evidence interpretation and
-conversational delivery. Shared abstraction does not imply a shared provider.
+Chromie owns the Goal and plans **across advertised capabilities**. A provider owns
+planning **inside each selected capability**. If the provider exposes a high-level
+capability, its internal decomposition is private. If it exposes smaller capabilities
+instead, those capabilities become separate leaves that Chromie's Planner may compose.
+A provider may expose both granularities simultaneously.
 
-A useful boundary test is: if a step can be independently requested, changed,
-cancelled, or judged by the user, it belongs in Chromie's semantic plan. If it exists
-only because a selected capability needs it to satisfy its own contract, it belongs
-inside the provider.
+This is analogous to a central SoC and an ECU/domain controller: the central planner
+chooses subsystem capabilities and coordinates them with other domains, while the
+subsystem may have sophisticated local planning and control. Improving the subsystem
+can move the capability boundary upward without transferring user-semantic authority.
+
+The durable rule is therefore: **semantic authority is stable; capability atomicity
+is dynamic**.
 
 ## Completion and failure
 

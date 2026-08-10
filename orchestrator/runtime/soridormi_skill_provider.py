@@ -596,6 +596,20 @@ class SoridormiNamedSkillAdapter:
         if semantic_scope.get("responsibility_type") != "acquire_and_deliver_resource":
             return None
 
+        resource_contract = metadata.get("resource_contract")
+        resource_contract = (
+            resource_contract if isinstance(resource_contract, dict) else {}
+        )
+        completion_requires = [
+            str(value).strip()
+            for value in resource_contract.get("completion_requires", [])
+            if str(value).strip()
+        ]
+        # Legacy complete resource providers predate per-capability completion
+        # declarations. Preserve their stricter acquisition+delivery requirement.
+        if not completion_requires:
+            completion_requires = ["resource_acquired", "resource_delivered"]
+
         resource_outcome = output.get("resource_outcome")
         if not isinstance(resource_outcome, dict):
             return SkillResult(
@@ -607,13 +621,15 @@ class SoridormiNamedSkillAdapter:
                 output=output,
                 reason_code="resource_outcome_missing",
                 message=(
-                    "Provider reported completion without acquisition-and-delivery evidence"
+                    "Provider reported completion without required resource evidence"
                 ),
             )
-        if (
-            resource_outcome.get("resource_acquired") is not True
-            or resource_outcome.get("resource_delivered") is not True
-        ):
+        missing = [
+            field
+            for field in completion_requires
+            if resource_outcome.get(field) is not True
+        ]
+        if missing:
             return SkillResult(
                 request_id=request.request_id,
                 skill_id=request.skill_id,
@@ -621,9 +637,10 @@ class SoridormiNamedSkillAdapter:
                 status="failed",
                 provider_id=self.provider_id,
                 output=output,
-                reason_code="resource_delivery_incomplete",
+                reason_code="resource_completion_incomplete",
                 message=(
-                    "Provider did not prove both resource acquisition and delivery"
+                    "Provider did not prove required resource completion fields: "
+                    + ",".join(missing)
                 ),
             )
         return None

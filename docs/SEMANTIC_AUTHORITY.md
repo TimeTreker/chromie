@@ -38,6 +38,16 @@ output preparation does not create another semantic owner: a response composer
 cannot reinterpret Goals or authorize effects, and an execution specialist
 cannot become the conversation authority.
 
+Single semantic authority does not freeze capability granularity. A provider may
+change which bounded capabilities it advertises as its implementation improves.
+Chromie plans only across the capabilities visible in the current catalog: one
+provider capability may cover a complete Goal today, while the same Goal may require
+a composition of several advertised capabilities on another body or provider
+version. A provider may plan arbitrarily deeply inside an already-selected
+capability, but it cannot reinterpret the user Goal or plan across capabilities it
+does not own. The live capability contract, not a permanent architectural layer or
+capability name, is the decomposition boundary.
+
 ## Current compatibility boundary
 
 The service currently named Goal Interpreter has not yet been reduced to the narrow

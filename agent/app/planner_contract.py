@@ -980,7 +980,13 @@ class ResourceResponsibilityCapabilityGroundingError(ValueError):
 class ResourceResponsibilityCapabilityUnavailableError(
     ResourceResponsibilityCapabilityGroundingError
 ):
-    """No supplied Capability declares the typed resource contract."""
+    """No supplied Capability set declares enough typed resource coverage."""
+
+
+class ResourceResponsibilityRequiresCompositionError(
+    ResourceResponsibilityCapabilityGroundingError
+):
+    """The Goal is coverable only by composing multiple advertised capabilities."""
 
 
 def validate_resource_responsibility_capability_grounding(
@@ -989,16 +995,20 @@ def validate_resource_responsibility_capability_grounding(
     authoritative_goals: list[dict[str, Any]],
     capabilities: list[dict[str, Any]],
 ) -> None:
-    """Require provider-declared semantics for executable resource Goals.
+    """Validate resource Goals against the current plan-level capability boundary.
 
-    Goal Association owns the typed resource responsibility and the planner
-    owns Capability selection. This validator makes neither semantic choice: it
-    only rejects an executable selection when the selected provider contract
-    does not exactly declare the already-selected responsibility type,
-    resource kind, delivery mode, and result-evidence contract. Generic motion
-    can therefore never be promoted into acquisition or delivery by a model
-    rationale alone. Non-executing terminal outcomes remain valid fail-closed
-    representations and require no Capability.
+    Goal Association owns the provider-neutral responsibility. The Planner owns
+    selection and composition across the *advertised* catalog. Providers own any
+    decomposition hidden inside one selected capability. This validator makes no
+    semantic choices; it mechanically verifies that selected capability contracts
+    form an ordered resource-state chain and that their combined promises cover
+    the already-authored Goal.
+
+    ``resource_contract.plan_requires`` and ``plan_provides`` are public
+    composition facts. ``completion_requires`` remains provider-result evidence
+    for the exact capability. Legacy one-step full providers that predate
+    ``plan_provides`` remain accepted when their existing scope/contract already
+    declares the complete delivery responsibility.
     """
 
     capability_by_id = {
@@ -1007,6 +1017,101 @@ def validate_resource_responsibility_capability_grounding(
         if isinstance(item, dict)
         and " ".join(str(item.get("capability_id") or "").strip().split())
     }
+
+    def normalized_values(value: Any) -> set[str]:
+        values = value if isinstance(value, list) else []
+        return {
+            " ".join(str(item or "").strip().split())
+            for item in values
+            if " ".join(str(item or "").strip().split())
+        }
+
+    def capability_contract(candidate: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        hints = candidate.get("hints")
+        metadata = candidate.get("metadata")
+        hints = hints if isinstance(hints, dict) else {}
+        metadata = metadata if isinstance(metadata, dict) else {}
+        scope = hints.get("semantic_scope")
+        if not isinstance(scope, dict) or not scope:
+            scope = metadata.get("semantic_scope")
+        contract = hints.get("resource_contract")
+        if not isinstance(contract, dict) or not contract:
+            contract = metadata.get("resource_contract")
+        return (scope if isinstance(scope, dict) else {}, contract if isinstance(contract, dict) else {})
+
+    def contract_projection(
+        candidate: dict[str, Any],
+        *,
+        expected_type: str,
+        expected_kind: str,
+        expected_delivery: str,
+        allow_legacy_full: bool,
+    ) -> tuple[list[str], set[str], set[str], set[str], str]:
+        scope, contract = capability_contract(candidate)
+        errors: list[str] = []
+        if not contract:
+            errors.append("missing resource_contract")
+        if scope.get("responsibility_type") != expected_type:
+            errors.append(
+                "semantic_scope.responsibility_type does not match "
+                f"{expected_type!r}"
+            )
+        kinds = normalized_values(scope.get("resource_kinds"))
+        if expected_kind not in kinds:
+            errors.append(
+                "semantic_scope.resource_kinds does not include "
+                f"{expected_kind!r}"
+            )
+        raw_delivery_modes = scope.get("delivery_modes")
+        delivery_modes = {
+            " ".join(str(value or "").strip().split())
+            for value in (
+                raw_delivery_modes
+                if isinstance(raw_delivery_modes, list)
+                else [scope.get("delivery")]
+            )
+            if " ".join(str(value or "").strip().split())
+        }
+        requires = normalized_values(contract.get("plan_requires"))
+        provides = normalized_values(contract.get("plan_provides"))
+        completion_requires = normalized_values(contract.get("completion_requires"))
+        if not provides and completion_requires:
+            # Existing complete providers already express the states their own
+            # successful result must prove. Those states are also valid public
+            # plan coverage when no explicit plan_provides exists.
+            provides = set(completion_requires)
+        final_delivery_owner = " ".join(
+            str(contract.get("final_delivery_owner") or "").strip().split()
+        )
+        if (
+            not provides
+            and allow_legacy_full
+            and contract
+            and expected_delivery in delivery_modes
+        ):
+            # Backward compatibility for one-step providers from before the
+            # composition contract existed. Do not apply this inference to a
+            # multi-step plan because it would make every partial step look full.
+            provides = {"resource_acquired"}
+            if expected_kind == "physical_object":
+                provides.add("resource_delivered")
+        if "resource_delivered" in provides and expected_delivery not in delivery_modes:
+            errors.append(
+                "capability providing resource_delivered must declare "
+                f"delivery mode {expected_delivery!r}"
+            )
+        if (
+            final_delivery_owner == "chromie_response_layer"
+            and expected_delivery not in delivery_modes
+        ):
+            errors.append(
+                "response-layer delivery capability must declare "
+                f"delivery mode {expected_delivery!r}"
+            )
+        if not provides and final_delivery_owner != "chromie_response_layer":
+            errors.append("resource_contract.plan_provides is empty")
+        return errors, requires, provides, delivery_modes, final_delivery_owner
+
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
@@ -1018,20 +1123,7 @@ def validate_resource_responsibility_capability_grounding(
         owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
         if not owned_steps:
             continue
-        if len(owned_steps) != 1:
-            raise ValueError(
-                "resource responsibility execute outcome requires exactly one "
-                f"provider-owned Capability step: {goal_id}"
-            )
 
-        step = owned_steps[0]
-        capability = capability_by_id.get(step.capability_id)
-        if capability is None:
-            raise ValueError(
-                "resource responsibility step uses a Capability absent from the "
-                f"authoritative catalog: goal_id={goal_id}, "
-                f"capability_id={step.capability_id}"
-            )
         resource = responsibility.get("resource")
         resource = resource if isinstance(resource, dict) else {}
         expected_type = " ".join(
@@ -1041,89 +1133,186 @@ def validate_resource_responsibility_capability_grounding(
         expected_delivery = " ".join(
             str(responsibility.get("delivery_mode") or "").strip().split()
         )
+        required_terminal_states = {"resource_acquired"}
+        if expected_kind == "physical_object":
+            required_terminal_states.add("resource_delivered")
 
-        def contract_errors(candidate: dict[str, Any]) -> list[str]:
-            candidate_hints = candidate.get("hints")
-            candidate_metadata = candidate.get("metadata")
-            candidate_hints = (
-                candidate_hints if isinstance(candidate_hints, dict) else {}
-            )
-            candidate_metadata = (
-                candidate_metadata if isinstance(candidate_metadata, dict) else {}
-            )
-            candidate_scope = candidate_hints.get("semantic_scope")
-            if not isinstance(candidate_scope, dict) or not candidate_scope:
-                candidate_scope = candidate_metadata.get("semantic_scope")
-            candidate_contract = candidate_hints.get("resource_contract")
-            if not isinstance(candidate_contract, dict) or not candidate_contract:
-                candidate_contract = candidate_metadata.get("resource_contract")
-            candidate_scope = (
-                candidate_scope if isinstance(candidate_scope, dict) else {}
-            )
-            candidate_contract = (
-                candidate_contract if isinstance(candidate_contract, dict) else {}
-            )
-            candidate_raw_kinds = candidate_scope.get("resource_kinds")
-            candidate_kinds = {
-                " ".join(str(value or "").strip().split())
-                for value in (
-                    candidate_raw_kinds
-                    if isinstance(candidate_raw_kinds, list)
-                    else []
-                )
-                if " ".join(str(value or "").strip().split())
-            }
-            candidate_errors: list[str] = []
-            if not candidate_contract:
-                candidate_errors.append("missing resource_contract")
-            if candidate_scope.get("responsibility_type") != expected_type:
-                candidate_errors.append(
-                    "semantic_scope.responsibility_type does not match "
-                    f"{expected_type!r}"
-                )
-            if expected_kind not in candidate_kinds:
-                candidate_errors.append(
-                    "semantic_scope.resource_kinds does not include "
-                    f"{expected_kind!r}"
-                )
-            raw_delivery_modes = candidate_scope.get("delivery_modes")
-            candidate_delivery_modes = {
-                " ".join(str(value or "").strip().split())
-                for value in (
-                    raw_delivery_modes
-                    if isinstance(raw_delivery_modes, list)
-                    else [candidate_scope.get("delivery")]
-                )
-                if " ".join(str(value or "").strip().split())
-            }
-            if expected_delivery not in candidate_delivery_modes:
-                candidate_errors.append(
-                    "semantic_scope.delivery_modes does not include "
-                    f"{expected_delivery!r}"
-                )
-            return candidate_errors
+        def catalog_coverage(
+            initial_state: set[str],
+        ) -> tuple[set[str], bool, list[str], list[str]]:
+            """Return reachable resource state from currently advertised contracts."""
 
-        errors = contract_errors(capability)
-        if errors:
-            matching_capability_ids = sorted(
-                capability_id
-                for capability_id, candidate in capability_by_id.items()
-                if not contract_errors(candidate)
+            reachable = set(initial_state)
+            response_delivery = False
+            projections: list[tuple[str, set[str], set[str], str]] = []
+            complete_capability_ids: list[str] = []
+            for capability_id, candidate in capability_by_id.items():
+                errors, requires, provides, _modes, final_delivery_owner = (
+                    contract_projection(
+                        candidate,
+                        expected_type=expected_type,
+                        expected_kind=expected_kind,
+                        expected_delivery=expected_delivery,
+                        allow_legacy_full=True,
+                    )
+                )
+                if errors:
+                    continue
+                projections.append(
+                    (capability_id, requires, provides, final_delivery_owner)
+                )
+                individually_complete = (
+                    not requires
+                    and required_terminal_states <= provides
+                    and (
+                        expected_kind == "physical_object"
+                        or "resource_delivered" in provides
+                        or final_delivery_owner == "chromie_response_layer"
+                    )
+                )
+                if individually_complete:
+                    complete_capability_ids.append(capability_id)
+
+            used: list[str] = []
+            remaining = list(projections)
+            while remaining:
+                progressed = False
+                next_remaining: list[tuple[str, set[str], set[str], str]] = []
+                for capability_id, requires, provides, final_delivery_owner in remaining:
+                    if not requires <= reachable:
+                        next_remaining.append(
+                            (capability_id, requires, provides, final_delivery_owner)
+                        )
+                        continue
+                    reachable.update(provides)
+                    response_delivery = response_delivery or (
+                        final_delivery_owner == "chromie_response_layer"
+                    )
+                    used.append(capability_id)
+                    progressed = True
+                if not progressed:
+                    break
+                remaining = next_remaining
+            return (
+                reachable,
+                response_delivery,
+                sorted(set(used)),
+                sorted(set(complete_capability_ids)),
             )
-            message = (
-                "resource responsibility Capability contract mismatch: "
-                f"goal_id={goal_id}, capability_id={step.capability_id}: "
-                + "; ".join(errors)
+
+        def coverage_complete(state: set[str], response_delivery: bool) -> bool:
+            if not required_terminal_states <= state:
+                return False
+            if expected_kind == "physical_object":
+                return True
+            return "resource_delivered" in state or response_delivery
+
+        resource_state: set[str] = set()
+        response_layer_delivery = False
+        selected_ids: list[str] = []
+
+        for step in owned_steps:
+            capability = capability_by_id.get(step.capability_id)
+            if capability is None:
+                raise ValueError(
+                    "resource responsibility step uses a Capability absent from the "
+                    f"authoritative catalog: goal_id={goal_id}, "
+                    f"capability_id={step.capability_id}"
+                )
+            errors, requires, provides, _delivery_modes, final_delivery_owner = (
+                contract_projection(
+                    capability,
+                    expected_type=expected_type,
+                    expected_kind=expected_kind,
+                    expected_delivery=expected_delivery,
+                    allow_legacy_full=len(owned_steps) == 1,
+                )
             )
-            if not matching_capability_ids:
+            if errors:
+                reachable, response_delivery, composition_ids, complete_ids = (
+                    catalog_coverage(set())
+                )
+                message = (
+                    "resource responsibility Capability contract mismatch: "
+                    f"goal_id={goal_id}, capability_id={step.capability_id}: "
+                    + "; ".join(errors)
+                )
+                if complete_ids:
+                    raise ResourceResponsibilityCapabilityGroundingError(
+                        message
+                        + "; complete_capability_ids="
+                        + ",".join(complete_ids)
+                    )
+                if coverage_complete(reachable, response_delivery):
+                    raise ResourceResponsibilityRequiresCompositionError(
+                        message
+                        + "; composable_capability_ids="
+                        + ",".join(composition_ids)
+                    )
                 raise ResourceResponsibilityCapabilityUnavailableError(
-                    message + "; no supplied Capability declares the required contract"
+                    message
+                    + "; no supplied Capability set declares the required contract"
                 )
+            missing_preconditions = sorted(requires - resource_state)
+            if missing_preconditions:
+                raise ResourceResponsibilityCapabilityGroundingError(
+                    "resource responsibility capability chain has unsatisfied "
+                    f"plan_requires for goal_id={goal_id}, "
+                    f"capability_id={step.capability_id}: "
+                    + ",".join(missing_preconditions)
+                )
+            if requires and step.timing == "parallel":
+                raise ResourceResponsibilityCapabilityGroundingError(
+                    "resource responsibility capability with plan_requires must be "
+                    f"sequential: goal_id={goal_id}, capability_id={step.capability_id}"
+                )
+            resource_state.update(provides)
+            response_layer_delivery = response_layer_delivery or (
+                final_delivery_owner == "chromie_response_layer"
+            )
+            selected_ids.append(step.capability_id)
+
+        missing_terminal_states = sorted(required_terminal_states - resource_state)
+        delivery_missing = (
+            expected_kind != "physical_object"
+            and "resource_delivered" not in resource_state
+            and not response_layer_delivery
+        )
+        if not missing_terminal_states and not delivery_missing:
+            continue
+
+        reachable, response_delivery, composition_ids, complete_ids = catalog_coverage(
+            resource_state
+        )
+
+        details = [*missing_terminal_states]
+        if delivery_missing:
+            details.append("user_delivery")
+        message = (
+            "resource responsibility plan does not cover the complete Goal: "
+            f"goal_id={goal_id}, selected_capability_ids={','.join(selected_ids)}, "
+            f"missing={','.join(details)}"
+        )
+        if complete_ids:
             raise ResourceResponsibilityCapabilityGroundingError(
                 message
-                + "; matching_capability_ids="
-                + ",".join(matching_capability_ids)
+                + "; complete_capability_ids="
+                + ",".join(complete_ids)
             )
+        if coverage_complete(reachable, response_delivery):
+            additional_ids = [
+                capability_id
+                for capability_id in composition_ids
+                if capability_id not in selected_ids
+            ]
+            raise ResourceResponsibilityRequiresCompositionError(
+                message
+                + "; additional_capability_ids="
+                + ",".join(additional_ids)
+            )
+        raise ResourceResponsibilityCapabilityUnavailableError(
+            message + "; no supplied Capability set declares the missing resource coverage"
+        )
 
 
 def coordinated_action_goal_ids(

@@ -10,6 +10,7 @@ from agent.app.planner_contract import (
     PlannerModelOutput,
     ResourceResponsibilityCapabilityGroundingError,
     ResourceResponsibilityCapabilityUnavailableError,
+    ResourceResponsibilityRequiresCompositionError,
     canonical_goal_grounding,
     validate_resource_responsibility_capability_grounding,
 )
@@ -30,7 +31,9 @@ class _NoopOllama:
 
 class ResourceAcquisitionContractTests(unittest.TestCase):
     @staticmethod
-    def _planner_output(capability_id: str) -> PlannerModelOutput:
+    def _planner_output_for_capabilities(
+        capability_ids: list[str],
+    ) -> PlannerModelOutput:
         goal_id = "goal-resource"
         satisfaction = {
             "score": 1.0,
@@ -38,8 +41,24 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             "satisfied_goal_ids": [goal_id],
             "unmet_goal_ids": [],
             "unmet_requirements": [],
-            "rationale": "The declared Capability covers the resource Goal.",
+            "rationale": "The declared Capability set covers the resource Goal.",
         }
+        step_ids = (
+            ["fetch"]
+            if len(capability_ids) == 1
+            else [f"resource-{index}" for index in range(1, len(capability_ids) + 1)]
+        )
+        steps = [
+            {
+                "step_id": step_id,
+                "capability_id": capability_id,
+                "args": {},
+                "timing": "sequential",
+                "source_goal_ids": [goal_id],
+                "reason_summary": "Execute one advertised resource capability.",
+            }
+            for step_id, capability_id in zip(step_ids, capability_ids, strict=True)
+        ]
         return PlannerModelOutput.model_validate(
             {
                 "disposition": "execute",
@@ -47,16 +66,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "confidence": 1.0,
                 "goal_summary": "Fetch and deliver the red mug.",
                 "response_text": "",
-                "steps": [
-                    {
-                        "step_id": "fetch",
-                        "capability_id": capability_id,
-                        "args": {},
-                        "timing": "sequential",
-                        "source_goal_ids": [goal_id],
-                        "reason_summary": "Execute the resource responsibility.",
-                    }
-                ],
+                "steps": steps,
                 "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [],
@@ -66,9 +76,9 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "coverage": "complete",
                         "response_text": "",
                         "unresolved": [],
-                        "step_ids": ["fetch"],
+                        "step_ids": step_ids,
                         "satisfaction": satisfaction,
-                        "rationale": "The exact provider Capability is selected.",
+                        "rationale": "The advertised Capability set is selected.",
                     }
                 },
                 "goal_satisfaction": satisfaction,
@@ -76,6 +86,37 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "user_confirmation_required": False,
             }
         )
+
+    @classmethod
+    def _planner_output(cls, capability_id: str) -> PlannerModelOutput:
+        return cls._planner_output_for_capabilities([capability_id])
+
+    @staticmethod
+    def _resource_capability(
+        capability_id: str,
+        *,
+        requires: list[str],
+        provides: list[str],
+        delivery_modes: list[str] | None = None,
+    ) -> dict:
+        scope = {
+            "responsibility_type": "acquire_and_deliver_resource",
+            "resource_kinds": ["physical_object"],
+        }
+        if delivery_modes:
+            scope["delivery_modes"] = delivery_modes
+        return {
+            "capability_id": capability_id,
+            "hints": {
+                "semantic_scope": scope,
+                "resource_contract": {
+                    "plan_requires": requires,
+                    "plan_provides": provides,
+                    "completion_requires": provides,
+                    "result_field": "resource_outcome",
+                },
+            },
+        }
 
     @staticmethod
     def _resource_goal() -> dict:
@@ -143,6 +184,10 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 self.assertIn("information", scope["resource_kinds"])
                 self.assertIn("spoken_explanation", scope["delivery_modes"])
                 self.assertTrue(hints["resource_contract"])
+                self.assertEqual(
+                    hints["resource_contract"]["plan_provides"],
+                    ["resource_acquired"],
+                )
                 self.assertEqual(
                     hints["resource_contract"]["final_delivery_owner"],
                     "chromie_response_layer",
@@ -230,7 +275,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             ResourceResponsibilityCapabilityUnavailableError,
         )
         self.assertIn(
-            "matching_capability_ids=soridormi.acquire_and_deliver_resource",
+            "complete_capability_ids=soridormi.acquire_and_deliver_resource",
             str(caught.exception),
         )
 
@@ -260,6 +305,128 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     }
                 ],
             )
+
+
+    def test_granular_capabilities_can_compose_complete_resource_goal(self) -> None:
+        acquire = self._resource_capability(
+            "soridormi.acquire_resource",
+            requires=[],
+            provides=["resource_acquired"],
+        )
+        deliver = self._resource_capability(
+            "soridormi.deliver_resource",
+            requires=["resource_acquired"],
+            provides=["resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+
+        validate_resource_responsibility_capability_grounding(
+            self._planner_output_for_capabilities(
+                ["soridormi.acquire_resource", "soridormi.deliver_resource"]
+            ),
+            authoritative_goals=[self._resource_goal()],
+            capabilities=[acquire, deliver],
+        )
+
+    def test_granular_capability_order_must_follow_provider_contract(self) -> None:
+        acquire = self._resource_capability(
+            "soridormi.acquire_resource",
+            requires=[],
+            provides=["resource_acquired"],
+        )
+        deliver = self._resource_capability(
+            "soridormi.deliver_resource",
+            requires=["resource_acquired"],
+            provides=["resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+
+        with self.assertRaisesRegex(
+            ResourceResponsibilityCapabilityGroundingError,
+            "unsatisfied plan_requires",
+        ):
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output_for_capabilities(
+                    ["soridormi.deliver_resource", "soridormi.acquire_resource"]
+                ),
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[acquire, deliver],
+            )
+
+    def test_partial_resource_plan_signals_composition_when_catalog_can_finish(self) -> None:
+        acquire = self._resource_capability(
+            "soridormi.acquire_resource",
+            requires=[],
+            provides=["resource_acquired"],
+        )
+        deliver = self._resource_capability(
+            "soridormi.deliver_resource",
+            requires=["resource_acquired"],
+            provides=["resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+
+        with self.assertRaises(ResourceResponsibilityRequiresCompositionError) as caught:
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output("soridormi.acquire_resource"),
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[acquire, deliver],
+            )
+        self.assertIn(
+            "additional_capability_ids=soridormi.deliver_resource",
+            str(caught.exception),
+        )
+
+    def test_wrong_nonresource_selection_detects_composable_catalog(self) -> None:
+        acquire = self._resource_capability(
+            "soridormi.acquire_resource",
+            requires=[],
+            provides=["resource_acquired"],
+        )
+        deliver = self._resource_capability(
+            "soridormi.deliver_resource",
+            requires=["resource_acquired"],
+            provides=["resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+        walk = {
+            "capability_id": "soridormi.walk_forward",
+            "hints": {"semantic_scope": {}, "resource_contract": {}},
+        }
+
+        with self.assertRaises(ResourceResponsibilityRequiresCompositionError) as caught:
+            validate_resource_responsibility_capability_grounding(
+                self._planner_output("soridormi.walk_forward"),
+                authoritative_goals=[self._resource_goal()],
+                capabilities=[walk, acquire, deliver],
+            )
+        self.assertIn("soridormi.acquire_resource", str(caught.exception))
+        self.assertIn("soridormi.deliver_resource", str(caught.exception))
+
+    def test_complete_capability_remains_atomic_when_granular_skills_also_exist(self) -> None:
+        acquire = self._resource_capability(
+            "soridormi.acquire_resource",
+            requires=[],
+            provides=["resource_acquired"],
+        )
+        deliver = self._resource_capability(
+            "soridormi.deliver_resource",
+            requires=["resource_acquired"],
+            provides=["resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+        complete = self._resource_capability(
+            "soridormi.acquire_and_deliver_resource",
+            requires=[],
+            provides=["resource_acquired", "resource_delivered"],
+            delivery_modes=["physical_handover"],
+        )
+
+        validate_resource_responsibility_capability_grounding(
+            self._planner_output("soridormi.acquire_and_deliver_resource"),
+            authoritative_goals=[self._resource_goal()],
+            capabilities=[acquire, deliver, complete],
+        )
 
     def test_planner_grounding_preserves_new_resource_responsibility(self) -> None:
         resource_goal = self._resource_goal()

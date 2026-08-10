@@ -80,6 +80,58 @@ class FullCatalog:
         return self.items
 
 
+class GranularResourceCatalog(FullCatalog):
+    def __init__(self):
+        super().__init__()
+        self.items.extend(
+            [
+                CatalogCapability(
+                    capability_id="soridormi.acquire_resource",
+                    agent_id="capability_agent",
+                    description="Acquire a physical resource.",
+                    route="robot_action",
+                    available=True,
+                    interaction_executable=True,
+                    prompt_tier="common",
+                    input_schema={"type": "object", "properties": {}},
+                    hints={
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                        },
+                        "resource_contract": {
+                            "plan_requires": [],
+                            "plan_provides": ["resource_acquired"],
+                            "completion_requires": ["resource_acquired"],
+                        },
+                    },
+                ),
+                CatalogCapability(
+                    capability_id="soridormi.deliver_resource",
+                    agent_id="capability_agent",
+                    description="Deliver an acquired physical resource.",
+                    route="robot_action",
+                    available=True,
+                    interaction_executable=True,
+                    prompt_tier="common",
+                    input_schema={"type": "object", "properties": {}},
+                    hints={
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                            "delivery_modes": ["physical_handover"],
+                        },
+                        "resource_contract": {
+                            "plan_requires": ["resource_acquired"],
+                            "plan_provides": ["resource_delivered"],
+                            "completion_requires": ["resource_delivered"],
+                        },
+                    },
+                ),
+            ]
+        )
+
+
 def request(text="往前走15秒，然后眨眼。", *, goal_ids=None):
     goal_ids = list(goal_ids or ["goal-action"])
     return AgentRunRequest(
@@ -254,6 +306,106 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertTrue(plan.metadata["resource_contract_unavailable"])
         self.assertNotIn("failure_class", plan.metadata)
+
+    def test_deep_planner_composes_advertised_granular_resource_capabilities(self):
+        goal_id = "goal-resource"
+        reason = "Fetch and hand over the red mug."
+        satisfaction = {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+            "unmet_goal_ids": [],
+            "unmet_requirements": [],
+            "rationale": "The advertised resource chain covers acquisition and delivery.",
+        }
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": reason,
+            "response_text": "",
+            "steps": [
+                {
+                    "step_id": "acquire",
+                    "capability_id": "soridormi.acquire_resource",
+                    "args": {},
+                    "timing": "sequential",
+                    "source_goal_ids": [goal_id],
+                    "reason_summary": "Acquire the requested resource.",
+                },
+                {
+                    "step_id": "deliver",
+                    "capability_id": "soridormi.deliver_resource",
+                    "args": {},
+                    "timing": "sequential",
+                    "source_goal_ids": [goal_id],
+                    "reason_summary": "Deliver the acquired resource.",
+                },
+            ],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {
+                goal_id: {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": ["acquire", "deliver"],
+                    "satisfaction": satisfaction,
+                    "rationale": "Both advertised capability contracts are required.",
+                }
+            },
+            "goal_satisfaction": satisfaction,
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        run_request = request(reason, goal_ids=[goal_id])
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": reason,
+                    "source_text": reason,
+                    "resource_responsibility": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "red mug",
+                        },
+                        "source": {"status": "unknown"},
+                        "recipient": {"description": "requester"},
+                        "delivery_mode": "physical_handover",
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                }
+            ],
+        }
+
+        coverage_review = {
+            "decision": "accept",
+            "confidence": 1.0,
+            "uncovered_requirements": [],
+            "reason": (
+                "The advertised acquire and delivery steps jointly cover the "
+                "resource responsibility."
+            ),
+        }
+        plan = asyncio.run(
+            DeepPlannerResolver(
+                SequencedOllama([raw, coverage_review]),
+                GranularResourceCatalog(),
+            ).resolve(run_request.model_copy(update={"context": context}))
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(
+            [step.capability_id for step in plan.steps],
+            ["soridormi.acquire_resource", "soridormi.deliver_resource"],
+        )
+        self.assertNotEqual(plan.metadata.get("execution_allowed"), False)
 
     def test_prior_validator_capability_contract_precedes_catalog_truncation(self):
         run_request = request("Walk briefly.")

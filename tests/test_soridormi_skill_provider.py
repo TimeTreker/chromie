@@ -754,7 +754,52 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNotNone(incomplete)
         assert incomplete is not None
-        self.assertEqual(incomplete.reason_code, "resource_delivery_incomplete")
+        self.assertEqual(incomplete.reason_code, "resource_completion_incomplete")
+
+    def test_granular_resource_capability_uses_its_own_completion_contract(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "acquire_resource",
+                    "description": "Acquire a physical object and retain it.",
+                    "available": True,
+                    "parameters_schema": {"type": "object"},
+                    "metadata": {
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                        },
+                        "resource_contract": {
+                            "result_field": "resource_outcome",
+                            "plan_requires": [],
+                            "plan_provides": ["resource_acquired"],
+                            "completion_requires": ["resource_acquired"],
+                        },
+                    },
+                }
+            ]
+        )
+        provider = SoridormiMcpSkillProvider(_RecordingInvoker())
+        request = SkillRequest(
+            request_id="resource-acquire",
+            skill_id="soridormi.acquire_resource",
+        )
+        definition = registry.get(request.skill_id)
+
+        failure = provider._resource_completion_failure(
+            request,
+            definition,
+            {
+                "completed": True,
+                "skill_id": "acquire_resource",
+                "resource_outcome": {
+                    "resource_acquired": True,
+                    "resource_delivered": False,
+                },
+            },
+        )
+        self.assertIsNone(failure)
 
     async def test_fetch_and_deliver_preserves_scope_and_complete_resource_evidence(self) -> None:
         registry = SkillRegistry()

@@ -74,6 +74,61 @@ class FakeCatalog:
         return self.items
 
 
+class GranularResourceCatalog(FakeCatalog):
+    def __init__(self):
+        super().__init__()
+        self.items.extend(
+            [
+                CatalogCapability(
+                    capability_id="soridormi.acquire_resource",
+                    agent_id="capability_agent",
+                    description="Acquire a physical resource.",
+                    input_schema={"type": "object", "properties": {}},
+                    route="robot_action",
+                    available=True,
+                    interaction_executable=True,
+                    prompt_tier="common",
+                    hints={
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                        },
+                        "resource_contract": {
+                            "plan_requires": [],
+                            "plan_provides": ["resource_acquired"],
+                            "completion_requires": ["resource_acquired"],
+                        },
+                    },
+                ),
+                CatalogCapability(
+                    capability_id="soridormi.deliver_resource",
+                    agent_id="capability_agent",
+                    description="Deliver an acquired physical resource.",
+                    input_schema={"type": "object", "properties": {}},
+                    route="robot_action",
+                    available=True,
+                    interaction_executable=True,
+                    prompt_tier="common",
+                    hints={
+                        "semantic_scope": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kinds": ["physical_object"],
+                            "delivery_modes": ["physical_handover"],
+                        },
+                        "resource_contract": {
+                            "plan_requires": ["resource_acquired"],
+                            "plan_provides": ["resource_delivered"],
+                            "completion_requires": ["resource_delivered"],
+                        },
+                    },
+                ),
+            ]
+        )
+
+    async def prompt_entries(self, **kwargs):
+        return self.items
+
+
 def request(text: str, route="robot_action", *, goal_ids=None):
     goal_ids = list(goal_ids or [])
     new_goals = [
@@ -936,6 +991,66 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
         self.assertTrue(plan.metadata["resource_contract_unavailable"])
         self.assertNotIn("failure_class", plan.metadata)
+
+    def test_granular_resource_catalog_escalates_to_deep_composition(self):
+        goal_id = "goal-resource"
+        reason = "Fetch and hand over the red mug."
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary=reason,
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    [goal_id],
+                    reason,
+                )
+            ],
+            goal_outcomes={goal_id: execute_outcome(goal_id, ["walk"], reason)},
+            goal_satisfaction=exact_satisfaction([goal_id], reason),
+        )
+        run_request = request(reason, goal_ids=[goal_id])
+        context = dict(run_request.context)
+        context["goal_association_resolution"] = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": reason,
+                    "source_text": reason,
+                    "resource_responsibility": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "red mug",
+                        },
+                        "source": {"status": "unknown"},
+                        "recipient": {"description": "requester"},
+                        "delivery_mode": "physical_handover",
+                    },
+                    "metadata": {"responsibility_kind": "executable_action"},
+                }
+            ],
+        }
+
+        ollama = FakeOllama(raw)
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, GranularResourceCatalog()).resolve(
+                run_request.model_copy(update={"context": context})
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(
+            plan.escalation_reason,
+            "resource_responsibility_composition_required",
+        )
+        self.assertEqual(plan.steps, [])
+        self.assertTrue(plan.metadata["resource_composition_required"])
+        self.assertFalse(plan.metadata["execution_allowed"])
 
     def test_schema_invalid_capability_args_get_bounded_model_repair(self):
         invalid = {

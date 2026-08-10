@@ -4,15 +4,20 @@ This document defines the stable purpose and boundaries of Chromie. It should
 change rarely. Current implementation and evidence belong in
 [STATUS.md](STATUS.md); delivery order belongs in [ROADMAP.md](../ROADMAP.md).
 
-### One resource responsibility, provider-scoped implementations
+### One resource responsibility, dynamically bounded capabilities
 
 `AcquireAndDeliverResource` is one provider-neutral human responsibility.
 `physical_object` and `information` are resource kinds, not sibling top-level
-capability concepts. Chromie owns semantic decomposition, capability selection, and
-cross-capability ordering. Providers own only the implementation plan inside the
-selected bounded capability. Capability matching is driven by declared semantic
-scope (`responsibility_type`, supported `resource_kinds`, and `delivery_modes`), not
-by capability-name conventions or Host routing rules.
+capability concepts. The semantic-authority boundary is stable: Chromie owns the
+user Goal, cross-provider capability selection, ordering, and dependencies. The
+execution-decomposition boundary is dynamic: each provider advertises the semantic
+granularity it can currently guarantee, and Chromie plans over that live catalog.
+A complete provider capability is one atomic planning unit to Chromie; when no one
+capability covers the Goal, Chromie may compose multiple advertised capabilities
+whose declared resource-state contracts collectively cover it. Provider-internal
+substeps remain private unless the provider explicitly exposes them as capabilities.
+Capability upgrades therefore move the decomposition boundary without changing the
+Goal model, Host routing, or semantic authority.
 
 
 ## Mission
@@ -72,7 +77,7 @@ A successful Chromie release lets an operator:
 
 ### Soridormi owns
 
-- embodied planning and execution;
+- provider-local embodied planning and execution inside advertised capability contracts;
 - simulator and physical providers;
 - robot resource exclusivity across processes;
 - motion monitoring, stop, emergency stop, and recovery;
