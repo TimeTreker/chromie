@@ -455,6 +455,26 @@ missing-ability metadata, and zero actions. Any non-empty action list requires
 `route=robot_action`. This makes invalid repair states unrepresentable to constrained
 generation instead of relying on a later repair to discover them.
 
+### Evidence-qualified completion and one-act delivery
+
+Provider transport success and provider-reported completion do not prove user-Goal completion.
+When a selected Capability declares an output schema, the reconciler accepts completion only
+from an observation that passes the committed/current schema and trust checks. Schema-invalid
+output remains failure evidence even if the provider process returned `completed`; user-facing
+speech must not promote it to success.
+
+The same state discipline applies before execution. If a newer accepted turn fails or terminates without a canonical Goal commit, its text remains
+recent dialogue evidence. A later follow-up should reason from that newer conversational subject rather than
+mechanically preferring an older canonical Goal. The failed turn does not receive an invented
+Goal ID and cannot authorize effects.
+
+Within one turn, a typed Goal Progress Communication act is delivered once. Interaction Ledger
+event identity, act/purpose, Goal scope, and playback state determine reuse. If an acknowledgement
+is already scheduled or heard, a later response stage either references that exact event or
+expresses a genuinely new semantic act such as a correction, warning, clarification, or new
+evidence. Equivalent acknowledgement text is not regenerated merely because another cognitive
+stage was reached.
+
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same Goal Progress Communication rule. The initial acknowledgement is only the
 first milestone. When a later stage owns a new, trustworthy and user-relevant

@@ -468,6 +468,64 @@ class ResponseComposerResolverTests(unittest.TestCase):
             ],
         )
 
+    def test_effectful_pre_execution_rejects_replaying_same_typed_acknowledgement(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-water"],
+            steps=[
+                {
+                    "step_id": "bring-water",
+                    "skill_id": "soridormi.acquire_and_deliver_resource",
+                    "args": {},
+                    "source_goal_ids": ["goal-water"],
+                }
+            ],
+        )
+        context = {
+            "delivered_turn_speech": [
+                {
+                    "status": "playback_started",
+                    "stage": "fast_first",
+                    "purpose": "acknowledge",
+                    "text": "好的！我马上帮你拿水！",
+                    "speech_event_id": "speech-water-fast",
+                    "source_goal_ids": ["goal-water"],
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "must be referenced with reuse_current_turn_speech=true",
+        ):
+            ResponseComposerResolver._validate_pending_response_contract(
+                ResponsePlan(
+                    pre_action=ResponseStage(
+                        text="好，我去拿水。",
+                        speech_act="acknowledge",
+                        commitment_state="evaluating",
+                        must_not_claim_completion=True,
+                        covers_goal_ids=["goal-water"],
+                    )
+                ),
+                plan=canonical,
+                context=context,
+            )
+
+        ResponseComposerResolver._validate_pending_response_contract(
+            ResponsePlan(
+                pre_action=ResponseStage(
+                    text="等等，我得换个办法。",
+                    speech_act="correction",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=["goal-water"],
+                )
+            ),
+            plan=canonical,
+            context=context,
+        )
+
     def test_clarification_decoder_schema_matches_runtime_coordination_contract(self):
         canonical = CanonicalPlan(
             plan_id="clarify-without-goal",

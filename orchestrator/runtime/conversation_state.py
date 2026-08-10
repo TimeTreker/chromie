@@ -3307,6 +3307,25 @@ class ConversationStateManager:
             return turn
         return None
 
+    def user_turn_snapshot(self, sid: str | None) -> dict[str, Any]:
+        """Return one bounded accepted user-turn record by SID.
+
+        This is transport evidence only.  It is used by observability/failure
+        paths that may not have received a normal response ``experience_context``;
+        it never creates or changes Goal semantics.
+        """
+
+        normalized_sid = str(sid or "").strip()
+        if not normalized_sid:
+            return {}
+        for turn in reversed(self._turns):
+            if (
+                turn.get("role") == "user"
+                and str(turn.get("sid") or "").strip() == normalized_sid
+            ):
+                return copy.deepcopy(dict(turn))
+        return {}
+
     def record_accepted_user_turn(
         self,
         sid: str | None,

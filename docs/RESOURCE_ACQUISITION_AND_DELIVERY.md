@@ -154,6 +154,20 @@ explanation remain one information-resource responsibility. Weather therefore ha
 `resource.kind=information`, while the Planner still selects the exact
 `chromie.weather.lookup` Capability rather than a generic hidden router.
 
+A query-scope binding is not source evidence. A place, date, person, product, or other
+entity that tells a provider *what to search for* remains an ordinary Goal binding; it does not
+make `source.status=known`. `known` requires an actual user/discourse-supplied information source.
+Otherwise Goal Association uses `unknown` or `provider_resolved` according to the intended
+contract. This prevents a location such as a neighborhood or city from being misrepresented as
+the source that supplied the requested information.
+
+The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
+Goal Association must not duplicate one information request into one capability Goal that
+retrieves evidence and another capability Goal whose only purpose is to answer from that same
+evidence. Response/Tool Result Interpretation owns the natural delivery after acquisition. If a model promotes an evidence-dependent answer into another provider-required Goal with no
+independent bindings/resource contract, semantic review re-segments from the authoritative user
+turn rather than allowing duplicate provider calls.
+
 Separate Goals are still required for independently requested outcomes. For
 example, “bring the book and tell me a joke” contains one physical resource Goal
 and one spoken-response Goal.

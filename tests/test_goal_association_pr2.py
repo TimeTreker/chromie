@@ -471,6 +471,171 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "schema_constrained_model_revision",
         )
 
+    def test_information_query_location_cannot_be_used_as_known_source(self):
+        invalid = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Find good restaurants near Chongqing Longxing Paradise Walk.",
+                    "output_mode": "capability_work",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "重庆龙兴天街",
+                            "confidence": 1.0,
+                        }
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "nearby good restaurants",
+                        "source_status": "known",
+                        "source_binding_names": ["location"],
+                        "delivery_mode": "spoken_explanation",
+                    },
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.95,
+            "reason_summary": "Need current local restaurant information.",
+        }
+        corrected = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Find good restaurants near Chongqing Longxing Paradise Walk.",
+                    "output_mode": "capability_work",
+                    "bindings": invalid["new_goals"][0]["bindings"],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "nearby good restaurants",
+                        "source_status": "provider_resolved",
+                        "source_description": "current external place information",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.95,
+            "reason_summary": "The location scopes the query; the provider resolves the source.",
+        }
+        ollama = ScriptedOllama([invalid, corrected])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "帮我找重庆龙兴天街附近好吃的餐厅。",
+                    route="tool",
+                    intent="capability:chromie.external_information.retrieve",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertIsNotNone(responsibility)
+        assert responsibility is not None
+        self.assertEqual(responsibility.source.status, "provider_resolved")
+        self.assertEqual(
+            result.new_goals[0].object["bindings"]["location"]["value"],
+            "重庆龙兴天街",
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "query-scope location bindings as source evidence",
+            ollama.prompts[1][0],
+        )
+
+    def test_resource_lookup_and_derived_answer_are_resegmented_as_one_goal(self):
+        bindings = [
+            {
+                "name": "location",
+                "entity_type": "city",
+                "value": "上海",
+                "confidence": 1.0,
+            },
+            {
+                "name": "date_scope",
+                "entity_type": "temporal_scope",
+                "value": "明天",
+                "confidence": 1.0,
+            },
+        ]
+        responsibility = {
+            "resource_kind": "information",
+            "resource_description": "weather forecast for Shanghai tomorrow",
+            "source_status": "unknown",
+            "delivery_mode": "spoken_explanation",
+        }
+        duplicated = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Check the weather forecast for Shanghai for tomorrow to determine if heavy rain is expected.",
+                    "output_mode": "capability_work",
+                    "bindings": bindings,
+                    "resource_responsibility": responsibility,
+                },
+                {
+                    "description": "Answer whether it will rain heavily in Shanghai tomorrow based on the retrieved weather information.",
+                    "output_mode": "capability_work",
+                    "bindings": [],
+                },
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "The model incorrectly split evidence acquisition from result delivery.",
+        }
+        reviewed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Check tomorrow's Shanghai forecast and answer whether heavy rain is expected.",
+                    "output_mode": "capability_work",
+                    "bindings": bindings,
+                    "resource_responsibility": responsibility,
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "The information resource Goal owns evidence acquisition and its derived answer.",
+        }
+        ollama = ScriptedOllama([duplicated, reviewed])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "诶，明天上海会下大雨吗？",
+                    route="tool",
+                    intent="capability:chromie.weather.lookup",
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "resource_result_delivery_split_review",
+            result.metadata["semantic_review"]["triggers"],
+        )
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "goal_association.semantic_resegmentation",
+        )
+        self.assertIn(
+            "delivery owned by that resource Goal",
+            ollama.prompts[1][0],
+        )
+        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
+
     def test_tool_route_spoken_only_output_gets_fresh_responsibility_review(self):
         spoken_only = {
             "decision": "create_goals",

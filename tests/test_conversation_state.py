@@ -1574,5 +1574,41 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertFalse(any("task completed" in text for text in outcome_texts))
 
 
+
+
+class AcceptedDialogueSemanticStatusTests(unittest.TestCase):
+    def test_failed_precommit_turn_remains_dialogue_evidence_without_goal_creation(self) -> None:
+        manager = ConversationStateManager(enabled=True)
+        manager.record_accepted_user_turn(
+            "sid-failed",
+            "帮我找附近好吃的地方。",
+            metadata={"source": "cognitive_gateway_admitted_dialogue"},
+        )
+
+        manager.record_user_turn(
+            "sid-failed",
+            "帮我找附近好吃的地方。",
+            route="safe_fallback",
+            intent="goal_association_failure",
+            metadata={
+                "semantic_task_resolution_authoritative": True,
+                "semantic_status": "failed",
+                "semantic_failure_stage": "goal_association",
+                "semantic_failure_class": "contract_failure",
+                "canonical_goal_committed": False,
+            },
+        )
+        turn = manager.user_turn_snapshot("sid-failed")
+        self.assertEqual(turn["text"], "帮我找附近好吃的地方。")
+        self.assertEqual(turn["metadata"]["semantic_status"], "failed")
+        self.assertEqual(
+            turn["metadata"]["semantic_failure_stage"],
+            "goal_association",
+        )
+        self.assertFalse(turn["metadata"]["canonical_goal_committed"])
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(manager.active_task_snapshots(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

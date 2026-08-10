@@ -93,6 +93,7 @@ SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
                 "resource_acquired": {"type": "boolean"},
                 "resource_delivered": {"type": "boolean"},
                 "recipient_description": {"type": "string"},
+                "mocked_simulation": {"type": "boolean"},
                 "evidence_summary": {"type": "string"},
             },
             "required": [

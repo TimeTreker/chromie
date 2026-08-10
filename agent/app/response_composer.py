@@ -927,6 +927,48 @@ class ResponseComposerResolver:
         ]
 
     @classmethod
+    def _existing_event_for_pending_speech_act(
+        cls,
+        stage: ResponseStage,
+        context: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Return an exact current-turn act identity already scheduled/heard.
+
+        This is deliberately not text similarity.  The model-authored
+        ``speech_act`` and the Interaction Ledger event purpose are the typed
+        conversational responsibility identity.  A genuinely new supplement,
+        correction, warning, or confirmation must carry its own act identity;
+        an acknowledgement with the same identity must reference the existing
+        event instead of requesting duplicate audio.
+        """
+
+        speech_act = " ".join(stage.speech_act.strip().casefold().split())
+        if not speech_act:
+            return None
+        stage_goal_ids = set(stage.covers_goal_ids)
+        for event in reversed(cls._reusable_turn_speech(context)):
+            event_id = cls._speech_event_id(event)
+            purpose = " ".join(
+                str(event.get("purpose") or event.get("speech_act") or "")
+                .strip()
+                .casefold()
+                .split()
+            )
+            if not event_id or purpose != speech_act:
+                continue
+            event_goal_ids = {
+                normalized
+                for item in event.get("source_goal_ids") or []
+                if (normalized := " ".join(str(item or "").strip().split()))
+            }
+            if event_goal_ids and stage_goal_ids and not event_goal_ids.intersection(
+                stage_goal_ids
+            ):
+                continue
+            return event
+        return None
+
+    @classmethod
     def _pending_scheduled_turn_speech(
         cls,
         context: dict[str, Any] | None,
@@ -1234,6 +1276,17 @@ class ResponseComposerResolver:
                 f"{plan.disposition} pre-execution response requires immediate or pre_action speech"
             )
         for stage in pending_stages:
+            if not stage.reuse_current_turn_speech:
+                existing = cls._existing_event_for_pending_speech_act(
+                    stage,
+                    context,
+                )
+                if existing is not None:
+                    raise ValueError(
+                        "pending response repeats a current-turn speech act that "
+                        "must be referenced with reuse_current_turn_speech=true: "
+                        + cls._speech_event_id(existing)
+                    )
             if stage.speech_act.strip().casefold() == "none":
                 raise ValueError(
                     f"{plan.disposition} pre-execution response cannot use "

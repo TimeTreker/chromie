@@ -3021,11 +3021,42 @@ class VoiceAssistant:
         capture_reference = self.sessions.interaction_session_capture_reference(
             session_id
         )
+        metadata = dict(response.metadata)
+        experience_context = dict(metadata.get("experience_context") or {})
+        if conversation_state is not None and not str(
+            experience_context.get("user_text") or ""
+        ).strip():
+            turn_snapshot = conversation_state.user_turn_snapshot(session_id)
+            if turn_snapshot:
+                experience_context["user_text"] = str(
+                    turn_snapshot.get("text") or ""
+                )
+                if not str(experience_context.get("route") or "").strip():
+                    experience_context["route"] = str(
+                        turn_snapshot.get("route") or "unknown"
+                    )
+                if not str(experience_context.get("intent") or "").strip():
+                    experience_context["intent"] = str(
+                        turn_snapshot.get("intent") or "unknown"
+                    )
+                experience_context.setdefault(
+                    "route_source",
+                    str(
+                        (turn_snapshot.get("metadata") or {}).get("source")
+                        if isinstance(turn_snapshot.get("metadata"), dict)
+                        else ""
+                    )
+                    or "conversation_state",
+                )
+                experience_context.setdefault(
+                    "conversation_id",
+                    str(turn_snapshot.get("conversation_id") or ""),
+                )
         if capture_reference is not None:
-            metadata = dict(response.metadata)
-            experience_context = dict(metadata.get("experience_context") or {})
             experience_context["interaction_session_evidence"] = capture_reference
+        if experience_context:
             metadata["experience_context"] = experience_context
+        if metadata != response.metadata:
             response = response.model_copy(update={"metadata": metadata})
         self.sessions.update_trace_correlations(
             session_id,
@@ -4270,6 +4301,19 @@ class VoiceAssistant:
                         "source": "goal_driven_cognitive_runtime",
                         "semantic_task_resolution_authoritative": True,
                         "cognitive_runtime_resolution": summary,
+                        "semantic_status": "failed",
+                        "semantic_failure_stage": str(
+                            resolution.metadata.get("failure_stage")
+                            or "cognitive_runtime"
+                        ),
+                        "semantic_failure_class": str(
+                            resolution.metadata.get("failure_class")
+                            or resolution.status
+                        ),
+                        "canonical_goal_committed": (
+                            resolution.metadata.get("goal_state_commit_stage")
+                            == "goal_association"
+                        ),
                     },
                     turn_envelope,
                 ),
@@ -4371,6 +4415,20 @@ class VoiceAssistant:
                         "source": "goal_driven_cognitive_runtime",
                         "semantic_task_resolution_authoritative": True,
                         "cognitive_runtime_resolution": summary,
+                        "semantic_status": "failed",
+                        "semantic_failure_stage": str(
+                            resolution.metadata.get("failure_stage")
+                            or "cognitive_runtime"
+                        ),
+                        "semantic_failure_class": str(
+                            resolution.metadata.get("failure_class")
+                            or resolution.fallback_reason
+                            or resolution.status
+                        ),
+                        "canonical_goal_committed": (
+                            resolution.metadata.get("goal_state_commit_stage")
+                            == "goal_association"
+                        ),
                     },
                     turn_envelope,
                 ),
@@ -4615,6 +4673,14 @@ class VoiceAssistant:
                     "confidence": decision.confidence,
                     "semantic_task_resolution_authoritative": True,
                     "cognitive_runtime_resolution": summary,
+                    **(
+                        {
+                            "semantic_status": "terminal_without_canonical_goal",
+                            "canonical_goal_committed": False,
+                        }
+                        if resolution.metadata.get("terminal_goal_interpretation") is True
+                        else {}
+                    ),
                 },
                 turn_envelope,
             ),
@@ -5339,7 +5405,6 @@ class VoiceAssistant:
                 turn_envelope,
             ),
         )
-
         core_start_ms = now_ms()
         self.session_log(
             session_id,
@@ -5419,7 +5484,14 @@ class VoiceAssistant:
                 route="safe_fallback",
                 intent="cognitive_core_exception",
                 metadata=self._metadata_with_turn_envelope(
-                    {"source": "cognitive_core_exception", "error": str(exc)},
+                    {
+                        "source": "cognitive_core_exception",
+                        "error": str(exc),
+                        "semantic_status": "failed",
+                        "semantic_failure_stage": "goal_interpretation",
+                        "semantic_failure_class": type(exc).__name__,
+                        "canonical_goal_committed": False,
+                    },
                     turn_envelope,
                 ),
             )

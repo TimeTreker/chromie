@@ -35,6 +35,22 @@ Capability implies no provider attempt and no observed result; an empty result i
 only after a qualified Capability actually ran and trusted evidence proves an empty
 result set. This truth boundary is evidence-owned, not phrase-owned.
 
+### Completion and continuity are evidence-qualified
+
+A provider-reported `completed` status is not sufficient to complete a Goal. When a
+Capability has a declared output schema, completion evidence must pass that schema and
+its trust boundary before the reconciler may mark the bound Goal complete. A schema-invalid
+observation is failed evidence, not degraded success. Provider and consumer schemas must
+therefore evolve together.
+
+Accepted dialogue also survives semantic-path failure. A user turn that fails before canonical
+Goal commit remains bounded conversation evidence for a later follow-up, but it never becomes a
+provisional Goal. A newer turn is not itself a semantic cancellation of older committed work.
+
+Goal Progress Communication is event-identity based. Once a typed conversational act is
+scheduled or heard for the current turn, a later stage reuses that exact event or produces a
+genuinely different speech act; it does not paraphrase the same acknowledgement as new audio.
+
 
 ## Mission
 

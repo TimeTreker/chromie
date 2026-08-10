@@ -84,6 +84,14 @@ def _tool_definition(
 
 
 class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    def test_soridormi_resource_outcome_schema_accepts_simulation_marker(self) -> None:
+        resource = SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA["properties"]["resource_outcome"]
+        self.assertIn("mocked_simulation", resource["properties"])
+        self.assertEqual(
+            resource["properties"]["mocked_simulation"],
+            {"type": "boolean"},
+        )
+
     async def test_runtime_rejects_execution_id_collision_after_model_copy(
         self,
     ) -> None:

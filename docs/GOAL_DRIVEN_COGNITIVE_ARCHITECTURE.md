@@ -667,6 +667,11 @@ The Host never manufactures a provisional Goal from the early dialogue record.
 If a prior association is unavailable or fails, the later model may still reason
 from accepted dialogue, but it must not pretend that an uncommitted Goal exists.
 
+A failed or superseded-before-commit turn is annotated as such on its accepted dialogue
+record. This is causal/transport evidence for later semantic reasoning, not a Host judgment about
+what the failed turn meant. Consequently, a newer failed turn can remain the current conversational
+subject even while an older Goal is the newest canonical Goal.
+
 ### 6.3 Ambiguity handling
 
 When more than one active goal plausibly matches, Chromie asks a natural
@@ -1489,9 +1494,11 @@ Every stage uses Goal-scoped Interaction Context before proposing speech. Only
 audible playback counts as already told to the user; scheduled speech is merely
 pending. Planned or committed work is not an achieved milestone, and a completion
 claim still requires trusted terminal evidence. Equivalent delivered or pending
-progress acts are reused or omitted rather than paraphrased at successive stages.
-A new notification is justified by a new semantic progress delta, not by a module
-boundary.
+progress acts are reused or omitted rather than paraphrased at successive stages. For current-turn
+speech, the runtime can enforce this mechanically from the typed speech act and Interaction Ledger
+event identity: a later stage that wants the same act must reference the existing event instead of
+requesting new audio. A genuinely new supplement carries a different semantic act. A new
+notification is justified by a new semantic progress delta, not by a module boundary.
 
 ### 15.2 Post-execution response
 

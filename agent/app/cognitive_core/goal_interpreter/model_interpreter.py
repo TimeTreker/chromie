@@ -1140,6 +1140,20 @@ def _compact_recent_dialogue(
                 projected["route"] = route
             if intent:
                 projected["intent"] = intent
+            semantic_status = " ".join(
+                str(metadata.get("semantic_status") or "").strip().split()
+            )
+            if semantic_status:
+                projected["semantic_status"] = semantic_status
+            failure_stage = " ".join(
+                str(metadata.get("semantic_failure_stage") or "").strip().split()
+            )
+            if failure_stage:
+                projected["semantic_failure_stage"] = failure_stage
+            if "canonical_goal_committed" in metadata:
+                projected["canonical_goal_committed"] = bool(
+                    metadata.get("canonical_goal_committed")
+                )
         else:
             source = " ".join(str(metadata.get("source") or "").strip().split())
             if source:
@@ -1389,7 +1403,7 @@ class OllamaGoalInterpreter:
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use bounded recent accepted dialogue, active/recent Goals, Tasks/progress, discourse, and Interaction Context; resolve continuity by meaning, not lexical shortcuts or recency, and emit only the still-needed delta. Fast speech is the first Goal Progress Communication milestone: for understood nontrivial downstream work, normally give one tiny polite prospective acknowledgement. Missing results limit claims, not responsiveness; an external truth check may say it is being checked but must not assert the proposition before evidence. Omit for an immediate answer, equivalent notification delivered/pending, requested silence, or empty repetition. Heard speech and trusted terminal effects count as done; scheduled/planned work does not. Preserve exact corrected bindings; clarify only real ambiguity.\n"
+            "Use bounded recent accepted dialogue, active/recent Goals, Tasks/progress, discourse, and Interaction Context; resolve continuity by meaning, not lexical shortcuts or recency, and emit only the still-needed delta. Keep newer failed/goal-less dialogue salient. Fast speech is the first Goal Progress Communication milestone: for understood nontrivial downstream work, normally give one tiny polite prospective acknowledgement. Missing results limit claims, not responsiveness; an external truth check may say it is being checked but must not assert the proposition before evidence. Omit for an immediate answer, equivalent notification delivered/pending, requested silence, or empty repetition. Heard speech and trusted terminal effects count as done; scheduled/planned work does not. Preserve exact corrected bindings; clarify only real ambiguity.\n"
             "Capability Affordance Proposal:\n"
             "Treat the Common Ability Catalog as a compact body/tool affordance interface: candidate proposals, not authoritative grounding and not a phrase table. capability_inquiry is only about Chromie's abilities. Availability questions stay chat; supported execution requests use robot_action. Bind exact capabilities only for clear execution methods. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify. Missing or ambiguous methods preserve an open goal for CapabilityAgent. For current external facts, choose an available trusted lookup capability by meaning and context; do not map a topic keyword to a tool. Exact match: route=tool and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or emit low-level motor/control fields.\n\n"
             "Cost Function:\n"

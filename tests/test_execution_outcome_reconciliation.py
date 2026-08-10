@@ -298,6 +298,80 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
         )
         self.assertEqual(len(execution_outcome_fingerprint(bundle)), 64)
 
+    def test_provider_completed_with_schema_invalid_observation_fails_closed(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        result = SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            status="completed",
+            provider_id="weather.provider",
+            output={"summary": "Rain.", "unexpected": True},
+        )
+
+        bundle = build_execution_outcome_bundle(
+            turn_id="turn-schema-invalid",
+            plan=plan,
+            interaction_id="interaction-schema-invalid",
+            requests=[request],
+            results=[result],
+            output_schemas={
+                "chromie.weather.lookup": output_schema("summary")
+            },
+        )
+
+        self.assertEqual(bundle.aggregate_status, "failed")
+        self.assertEqual(bundle.goal_outcomes[0].status, "failed")
+        evidence = bundle.evidence[0]
+        self.assertEqual(evidence.status, "failed")
+        self.assertEqual(evidence.reason_code, "completion_observation_not_trusted")
+        self.assertIsNotNone(evidence.observation)
+        assert evidence.observation is not None
+        self.assertEqual(evidence.observation.status, "schema_invalid")
+        self.assertFalse(evidence.observation.schema_validated)
+        self.assertTrue(evidence.metadata["reported_provider_completion"])
+        self.assertEqual(
+            evidence.metadata["completion_observation_status"],
+            "schema_invalid",
+        )
+
+    def test_completed_evidence_contract_rejects_explicit_schema_invalid_observation(self) -> None:
+        plan = single_plan()
+        request = request_for_step(plan, "lookup")
+        valid = build_execution_outcome_bundle(
+            turn_id="turn-contract-schema-invalid",
+            plan=plan,
+            interaction_id="interaction-contract-schema-invalid",
+            requests=[request],
+            results=[
+                SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    status="completed",
+                    output={"summary": "Clear."},
+                )
+            ],
+            output_schemas={
+                "chromie.weather.lookup": output_schema("summary")
+            },
+        ).model_dump(mode="json")
+        evidence = valid["evidence"][0]
+        output_sha256 = evidence["observation"]["output_sha256"]
+        evidence["observation"] = {
+            "status": "schema_invalid",
+            "schema_validated": False,
+            "data": {},
+            "output_sha256": output_sha256,
+            "output_size_bytes": 0,
+            "validation_errors": ["provider output failed schema validation"],
+        }
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "completed execution evidence cannot rely",
+        ):
+            ExecutionOutcomeBundle.model_validate(valid)
+
     def test_one_success_and_one_failure_remain_mixed_per_goal(self) -> None:
         plan = two_goal_plan()
         requests = [

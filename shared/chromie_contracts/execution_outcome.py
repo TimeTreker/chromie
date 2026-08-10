@@ -186,6 +186,15 @@ class ExecutionEvidence(CapabilityIdentityModel):
             raise ValueError("missing result evidence must have status=not_run")
         if self.status == "completed" and self.missing_result:
             raise ValueError("missing result evidence cannot report completion")
+        if (
+            self.status == "completed"
+            and self.observation is not None
+            and self.observation.status == "schema_invalid"
+        ):
+            raise ValueError(
+                "completed execution evidence cannot rely on an untrusted "
+                "or schema-invalid provider observation"
+            )
         if self.started_at and self.finished_at and self.finished_at < self.started_at:
             raise ValueError("finished_at must not precede started_at")
         return self

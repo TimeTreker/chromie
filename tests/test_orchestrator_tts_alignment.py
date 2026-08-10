@@ -81,6 +81,61 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delivered[0]["status"], "playback_started")
         self.assertEqual(delivered[0]["text"], "好呀，我帮你看看。")
 
+    async def test_failure_experience_recovers_user_text_from_accepted_dialogue(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.conversation_state = ConversationStateManager(enabled=True)
+        assistant.conversation_state.record_accepted_user_turn(
+            "sid-failure",
+            "帮我找重庆龙兴天街附近好吃的地方。",
+            metadata={"source": "cognitive_gateway_admitted_dialogue"},
+        )
+        captured: list[InteractionResponse] = []
+
+        class Recorder:
+            def record_interaction(self, *, response, **kwargs):
+                del kwargs
+                captured.append(response)
+                return None
+
+        assistant.experience = Recorder()
+        assistant.episode_recorder = Recorder()
+        assistant.mind = types.SimpleNamespace(profile=default_mind_profile())
+        assistant.sessions = types.SimpleNamespace(
+            interaction_session_capture_reference=lambda sid: None,
+            update_trace_correlations=lambda *args, **kwargs: None,
+            attach_episode_evidence=lambda *args, **kwargs: None,
+        )
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        response = InteractionResponse(
+            status="error",
+            speech=[],
+            skills=[],
+            metadata={"source": "test_failure"},
+        )
+
+        assistant._record_experience(
+            response=response,
+            execution=None,
+            session_id="sid-failure",
+            errors=["semantic failure"],
+        )
+
+        self.assertEqual(len(captured), 2)
+        for recorded in captured:
+            context = recorded.metadata["experience_context"]
+            self.assertEqual(
+                context["user_text"],
+                "帮我找重庆龙兴天街附近好吃的地方。",
+            )
+            self.assertEqual(context["route_source"], "cognitive_gateway_admitted_dialogue")
+            self.assertEqual(
+                context["conversation_id"],
+                assistant.conversation_state.conversation_id,
+            )
+
     def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_language = "zh-CN"

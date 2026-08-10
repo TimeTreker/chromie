@@ -612,6 +612,51 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
 
+    def test_recent_failed_turn_status_is_projected_for_followup_salience(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="s-follow",
+            text="那你能找到啥呢？",
+            language="zh-CN",
+            context={
+                "history": [
+                    {
+                        "role": "user",
+                        "sid": "s-restaurants",
+                        "text": "我在重庆龙兴天街，帮我找附近好吃的地方。",
+                        "metadata": {
+                            "semantic_status": "failed",
+                            "semantic_failure_stage": "goal_association",
+                            "canonical_goal_committed": False,
+                        },
+                    }
+                ],
+                "recent_goal_snapshots": [
+                    {
+                        "goal_id": "goal-older-weather",
+                        "status": "done",
+                        "goal": {
+                            "goal_id": "goal-older-weather",
+                            "description": "Check Shanghai weather.",
+                            "object": {},
+                        },
+                    }
+                ],
+            },
+        )
+
+        prompt = interpreter.build_user_prompt(request)
+
+        self.assertIn('"semantic_status":"failed"', prompt)
+        self.assertIn('"canonical_goal_committed":false', prompt)
+        self.assertIn("重庆龙兴天街", prompt)
+        self.assertIn("Keep newer failed/goal-less dialogue salient", prompt)
+
     def test_user_and_repair_prompts_include_recent_terminal_goal_projection(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",

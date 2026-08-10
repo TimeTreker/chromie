@@ -258,12 +258,13 @@ class ExecutionOutcomeReconciler:
 
             status, normalization_reason = self._result_status(result.status)
             reason_code = result.reason_code or normalization_reason
+            output_schema = schemas.get(
+                request.request_id,
+                schemas.get(step.skill_id),
+            )
             observation = self.build_model_observation(
                 result.output,
-                output_schema=schemas.get(
-                    request.request_id,
-                    schemas.get(step.skill_id),
-                ),
+                output_schema=output_schema,
                 remaining_total_bytes=max(
                     0,
                     self.max_total_observation_bytes
@@ -272,6 +273,14 @@ class ExecutionOutcomeReconciler:
             )
             if observation.status == "available":
                 observation_bytes_used += observation.output_size_bytes
+            if (
+                status == "completed"
+                and isinstance(output_schema, dict)
+                and bool(output_schema)
+                and observation.status in {"schema_unavailable", "schema_invalid"}
+            ):
+                status = "failed"
+                reason_code = "completion_observation_not_trusted"
 
             started_at = result.started_at
             finished_at = result.finished_at
@@ -325,6 +334,10 @@ class ExecutionOutcomeReconciler:
                         "correlation": "plan_step_request_and_skill_result",
                         "request_args": dict(request.args),
                         "provider_execution": dict(result.metadata),
+                        "reported_provider_completion": (
+                            str(result.status).strip().casefold() == "completed"
+                        ),
+                        "completion_observation_status": observation.status,
                         "safety_class": str(
                             request.metadata.get("safety_class") or ""
                         ),

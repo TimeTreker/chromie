@@ -147,6 +147,19 @@ _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
         "recommendation_route_spoken_responsibility_review",
         "tool_route_spoken_responsibility_review",
         "invalid_typed_execution_contract",
+        "resource_result_delivery_split_review",
+    }
+)
+
+_INFORMATION_QUERY_SCOPE_ENTITY_TYPES = frozenset(
+    {
+        "address",
+        "city",
+        "country",
+        "county",
+        "location",
+        "place",
+        "region",
     }
 )
 
@@ -1646,6 +1659,23 @@ class GoalAssociationResolver:
             goal.resource_responsibility is not None
             for goal in model_output.new_goals
         )
+        has_unscoped_capability_sibling = any(
+            goal.responsibility_kind == "capability_dependent"
+            and goal.resource_responsibility is None
+            and not goal.bindings
+            for goal in model_output.new_goals
+        )
+        if (
+            len(model_output.new_goals) > 1
+            and has_resource_work
+            and has_unscoped_capability_sibling
+        ):
+            # This is only a typed semantic-review trigger. A second provider
+            # Goal with no own bindings/resource contract can be legitimate, but
+            # it is also the exact shape produced when evidence-dependent answer
+            # delivery is incorrectly promoted into another Capability Goal.
+            # Re-segment from the authoritative turn; the Host never merges it.
+            triggers.append("resource_result_delivery_split_review")
         has_ordinary_spoken = any(
             goal.responsibility_kind == "spoken_response"
             and goal.output_mode == "speech"
@@ -2059,7 +2089,7 @@ class GoalAssociationResolver:
             f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-            "Recent conversation is accepted dialogue evidence for ellipsis, pronouns, corrections, and other follow-up meaning. Bounded Goal and Task state is stronger evidence of already-validated semantic continuity when it exists. If an earlier admitted turn has not yet produced canonical Goal state, dialogue may still resolve the current reference, but never invent a Goal ID or pretend uncommitted work is canonical.\n\n"
+            "Recent conversation is accepted dialogue evidence for ellipsis, pronouns, corrections, and other follow-up meaning. Bounded Goal and Task state is stronger evidence of already-validated semantic continuity when it exists. A newer accepted turn whose metadata says semantic_status=failed or terminal_without_canonical_goal remains valid recent conversational evidence even though it has no canonical Goal; do not skip it solely because an older Goal is canonical. If an earlier admitted turn has not yet produced canonical Goal state, dialogue may still resolve the current reference, but never invent a Goal ID or pretend uncommitted work is canonical.\n\n"
             "Tool-result contents are intentionally absent at this boundary. Resolve references and Goal bindings from user semantics, scoped referents, candidate Goals, and dialogue only. A later Planner may explicitly retrieve an exact verified memory record after bindings are fixed. "
             "For a scheduled, running, or recoverable safe-read Goal, associate a semantic follow-up with that exact Goal when appropriate; do not answer from another task's result. "
             "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
@@ -2139,7 +2169,7 @@ class GoalAssociationResolver:
             f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-            "Use recent conversation as accepted dialogue evidence for follow-up meaning, while bounded Goal and Task state remains the authority for already-validated semantic work. Never invent a Goal ID merely because dialogue implies an earlier turn is still being processed.\n\n"
+            "Use recent conversation as accepted dialogue evidence for follow-up meaning, while bounded Goal and Task state remains the authority for already-validated semantic work. A newer failed or terminal-without-canonical-Goal dialogue turn remains relevant context and must not be skipped solely because an older Goal has canonical state. Never invent a Goal ID merely because dialogue implies an earlier turn is still being processed.\n\n"
             "Previous model output JSON:\n"
             f"{self._bounded_json(raw, 5000)}\n\n"
             "Exact validation errors JSON:\n"
@@ -2271,6 +2301,17 @@ class GoalAssociationResolver:
             if "mixed_capability_and_spoken_responsibilities" in triggers
             else ""
         )
+        resource_delivery_guidance = (
+            "A resource-backed Goal and another provider-required Goal with no own "
+            "bindings/resource contract coexist. Re-segment from the authoritative "
+            "turn and decide whether the latter has an independent evidence/effect "
+            "outcome. If it merely interprets, reports, recommends, or answers from "
+            "the resource Goal's result, it is delivery owned by that resource Goal, "
+            "not another Capability Goal. Preserve it only when it has a genuinely "
+            "independent outcome.\n\n"
+            if "resource_result_delivery_split_review" in triggers
+            else ""
+        )
         review_input = (
             "No previous Goal DTO is supplied for this review. Reconstruct the "
             "segmentation independently from the authoritative user turn so an "
@@ -2291,6 +2332,7 @@ class GoalAssociationResolver:
             "dialogue context. Do not use phrase matching, binding equality, "
             "numeric suffixes, lexical overlap, or another deterministic shortcut.\n\n"
             + mixed_responsibility_guidance
+            + resource_delivery_guidance
             + "Classify each candidate's output_mode by the semantic work and evidence "
             "that complete the human outcome, not by grammar, verb choice, command "
             "framing, or the surrounding route. Embodied effects use body_action; "
@@ -2385,7 +2427,7 @@ class GoalAssociationResolver:
             f"{self._bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-            "Use accepted dialogue for unresolved follow-up meaning and use bounded Goal/Task state for validated continuity. Do not fabricate missing canonical state.\n\n"
+            "Use accepted dialogue for unresolved follow-up meaning and use bounded Goal/Task state for validated continuity. A newer accepted turn that failed or ended without a canonical Goal remains valid dialogue evidence; do not substitute an older canonical Goal merely because it has stronger lifecycle state. Do not fabricate missing canonical state.\n\n"
             + review_input
             + "Tool-result contents are intentionally absent. Do not use remembered "
             "capability results to decide Goal structure or claim completion.\n\n"
@@ -2931,6 +2973,24 @@ class GoalAssociationResolver:
                         "resource source references unknown Goal bindings: "
                         f"{unknown_source_bindings}"
                     )
+                if (
+                    resource_item.resource_kind == "information"
+                    and resource_item.source_status == "known"
+                ):
+                    query_scope_source_bindings = sorted(
+                        name
+                        for name in resource_item.source_binding_names
+                        if str(
+                            binding_map[name].get("entity_type") or ""
+                        ).casefold()
+                        in _INFORMATION_QUERY_SCOPE_ENTITY_TYPES
+                    )
+                    if query_scope_source_bindings:
+                        raise ValueError(
+                            "information resource source cannot use query-scope "
+                            "location bindings as source evidence: "
+                            f"{query_scope_source_bindings}"
+                        )
                 source_bindings = {
                     name: binding_map[name]
                     for name in resource_item.source_binding_names
