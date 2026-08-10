@@ -245,6 +245,19 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    semantic inference, measure and attribute that model failure instead of
    automatically hiding it behind another example-specific instruction.
 
+23. **Goal progress communication is a shared cognitive responsibility.** Once a
+   nontrivial Goal is understood, the first useful acknowledgement is only the
+   earliest possible progress milestone. Later cognitive or execution stages may
+   surface a new user-relevant milestone, limitation, wait state, failure,
+   correction, or completion when doing so helps the person understand that work
+   is progressing. No stage is required to speak, and internal implementation
+   steps are not milestones merely because they occurred. Every speech-capable
+   stage must consult the Interaction Ledger and communicate only the still-needed
+   semantic progress delta; equivalent delivered or already-pending speech is not
+   repeated. Social Attention, clarification/confirmation, task progress
+   communication, and final result delivery remain distinct responsibilities even
+   when they happen close together.
+
 ## Non-goals
 
 Chromie is not:

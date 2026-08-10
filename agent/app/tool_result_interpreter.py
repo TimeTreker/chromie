@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .goal_progress_communication import goal_progress_communication_prompt
 import copy
 import json
 import logging
@@ -316,6 +317,7 @@ class ToolResultInterpreter:
             f"Chromie personality JSON: {self._bounded(personality, 4200)}\n"
             f"{skill_section}"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
+            f"{goal_progress_communication_prompt('Tool Result Interpreter')}\n"
             f"Goal-scoped Interaction Context JSON: {self._bounded(interaction_context, 8000)}\n"
             f"Fast interaction decision JSON (why an early acknowledgement or silence was selected; delivery is still determined only by Interaction Context): {self._bounded(request.context.get('fast_interaction_decision') or {}, 1400)}\n"
             f"Conversation hints JSON: {self._bounded(conversation_hints, 2600)}\n\n"

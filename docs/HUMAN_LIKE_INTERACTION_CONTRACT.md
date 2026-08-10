@@ -387,12 +387,16 @@ never a candidate spoken response.
 
 The Cognitive Gateway admits a turn but does not author semantic speech. For
 eligible planning or embodied work, Goal Interpretation may propose one typed,
-non-terminal `fast_speech` process acknowledgement or silence. Fast speech is
-interaction progress, not a mandatory status line: the source Goal Interpretation
-prompt must weigh whether one brief prospective acknowledgement materially helps
-the person through an otherwise noticeable gap against the costs of filler,
-paraphrase, repetition, and verbosity. Silence is therefore a valid intentional
-choice even when work remains pending. A single bounded semantic-delta review
+non-terminal `fast_speech` process acknowledgement or silence. Fast speech is the
+first possible **Goal Progress Communication** milestone: once a nontrivial Goal is
+sufficiently understood and will continue through downstream work, a brief
+prospective acknowledgement may tell the person that Chromie got the Goal and is
+taking it forward. It is not Social Attention and it is not task
+clarification/confirmation. Fast speech remains optional when a substantive answer
+is immediate, an equivalent acknowledgement is already delivered or pending, or
+another line would be filler, repetition, or verbosity. A clear request by itself
+is not a reason for silence; the objective is responsive, polite, low-noise human
+interaction rather than minimum word count. A single bounded semantic-delta review
 owns both speech and silence proposals and may author, revise, or suppress the
 act without changing the chosen route, bindings, or safety policy. It compares
 the current pending responsibility with recent Interaction Context by meaning:
@@ -404,6 +408,15 @@ why an early acknowledgement was selected or omitted, but never proves playback:
 actual heard/pending status remains exclusively owned by Interaction Context.
 Route-specific safety may still forbid claims that lack the required commit or
 evidence, but no normal tool/effect route is muted merely because it is executable.
+
+Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
+the same Goal Progress Communication rule. The initial acknowledgement is only the
+first milestone. When a later stage owns a new, trustworthy and user-relevant
+progress delta, it may propose a concise update; when nothing meaningfully changed,
+it remains silent. Internal workflow boundaries and every low-level execution step
+are not user-facing milestones merely because they occurred. Interaction Context
+prevents the same acknowledgement or progress message from being paraphrased and
+repeated by successive stages.
 
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same delta rule. An executable Plan may carry prospective `response_text`;

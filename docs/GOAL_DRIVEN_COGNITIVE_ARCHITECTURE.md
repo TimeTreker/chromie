@@ -1397,6 +1397,41 @@ across process restart. A future persistence requirement must preserve the same
 owner, replay, evidence, and bounded-projection contracts rather than silently
 promoting the Ledger into long-term memory.
 
+### 15.1.2 Goal Progress Communication
+
+Goal Progress Communication is the shared user-facing communication responsibility
+that spans the lifetime of one Goal. The familiar Fast Response is its earliest
+possible milestone: after Goal Interpretation has sufficiently understood a
+nontrivial Goal that still requires downstream work, Chromie may briefly tell the
+person that the Goal was understood and is being taken forward. That act is not
+Social Attention and is not clarification or confirmation of an unclear Goal.
+
+The same responsibility continues after the initial acknowledgement. A planner,
+trusted result interpreter, response composer, or later cognitive stage may propose
+concise speech when it owns a genuinely new and trustworthy user-relevant delta,
+such as a material plan limitation, a meaningful wait state, an important achieved
+milestone, a failure or retry state, a correction, or completion. Stages without a
+user-facing speech field preserve the milestone in authoritative Goal/runtime state
+so a later speech-capable stage can communicate it. The architecture does not add a
+parallel speech pipeline for every module merely to expose implementation progress.
+
+Progress speech is optional. The Core reasons about whether the new milestone is
+worth interrupting the person for. It should not narrate internal modules, schemas,
+provider plumbing, planning mechanics, or every execution step. An immediate final
+answer can make an acknowledgement unnecessary; a small milestone can be omitted
+when it adds no user value. Conversely, a clear request is not a reason for silence:
+clarity can make a truthful acknowledgement possible while substantial work
+continues. The objective is responsive, polite, low-noise interaction rather than
+minimum word count or maximum status reporting.
+
+Every stage uses Goal-scoped Interaction Context before proposing speech. Only
+audible playback counts as already told to the user; scheduled speech is merely
+pending. Planned or committed work is not an achieved milestone, and a completion
+claim still requires trusted terminal evidence. Equivalent delivered or pending
+progress acts are reused or omitted rather than paraphrased at successive stages.
+A new notification is justified by a new semantic progress delta, not by a module
+boundary.
+
 ### 15.2 Post-execution response
 
 After execution, the host's deterministic closure reconciles every executable

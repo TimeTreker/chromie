@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .goal_progress_communication import goal_progress_communication_prompt
 import copy
 import hashlib
 import json
@@ -2047,6 +2048,7 @@ class GoalAssociationResolver:
             + skill_section
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
+            f"{goal_progress_communication_prompt('Goal Association')}\n\n"
             "Goal-scoped Interaction Context JSON (append-only facts about what Chromie already associated, planned, said, committed, completed, or failed; owner and event_type preserve evidence strength). Use it to identify the still-needed Goal/continuity delta. Generated or scheduled speech is not heard speech, and planned or committed work is not completed work. Do not reopen, repeat, or recreate an already fulfilled responsibility unless the current turn explicitly repeats it or new failure, correction, changed state, evidence, or clarification requires a new delta:\n"
             f"{self._bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
             "Fast interaction decision JSON (reviewed reason for choosing one early acknowledgement or silence; this never proves playback, which remains owned by Interaction Context):\n"
@@ -2126,6 +2128,7 @@ class GoalAssociationResolver:
             "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 7000)}\n\n"
+            f"{goal_progress_communication_prompt('Goal Association')}\n\n"
             "Goal-scoped Interaction Context JSON:\n"
             f"{self._bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"
@@ -2368,6 +2371,7 @@ class GoalAssociationResolver:
             f"with {output_fields}. The exact schema is enforced out-of-band.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
+            f"{goal_progress_communication_prompt('Goal Association')}\n\n"
             "Goal-scoped Interaction Context JSON:\n"
             f"{self._bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
             "Scoped discourse referents JSON:\n"

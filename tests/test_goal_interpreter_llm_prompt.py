@@ -376,7 +376,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("not final goal meaning", prompt)
         self.assertIn("Return calibrated confidence", prompt)
         self.assertIn("fast_speech", prompt)
-        self.assertIn("still-needed conversational acknowledgement", prompt)
+        self.assertIn("first Goal Progress Communication milestone", prompt)
         self.assertIn("Common ability IDs", prompt)
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
@@ -2491,11 +2491,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         system_prompt = interpreter.load_system_prompt()
         user_prompt = interpreter.build_user_prompt(request)
 
-        self.assertIn("Fast speech is optional interaction progress", system_prompt)
-        self.assertIn("prefer intentional silence over filler", system_prompt)
-        self.assertIn("Fast speech is optional interaction progress", user_prompt)
-        self.assertIn("prefer intentional silence over filler", user_prompt)
-        self.assertIn("Fast speech is optional interaction progress", user_prompt)
+        self.assertIn("Goal Progress Communication", system_prompt)
+        self.assertIn("Omit it for an immediate answer", system_prompt)
+        self.assertIn("Goal Progress Communication", user_prompt)
+        self.assertIn("Omit it when an answer is immediate", user_prompt)
+        self.assertIn("Goal Progress Communication", user_prompt)
 
     async def test_tool_route_missing_fast_speech_is_semantic_delta_reviewed(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
@@ -2631,7 +2631,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("both candidate speech and candidate silence as proposals", review_rendered)
         self.assertIn("mere presence of any earlier speech is never enough", review_rendered)
-        self.assertIn("Fast speech is optional", review_rendered)
+        self.assertIn("Fast speech is still optional", review_rendered)
         self.assertIn("Uncommitted or unexecuted work must remain prospective", review_rendered)
         self.assertEqual(decision.metadata["fast_speech_review"]["candidate_kind"], "silence")
 
@@ -3007,7 +3007,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         stage_models = dict(interpreter.calls)
         self.assertEqual(
             stage_models["fast_speech_semantic_review"],
-            "quality-model",
+            "quick-model",
         )
         self.assertEqual([stage for stage, _ in interpreter.calls], ["quick_intent", "fast_speech_semantic_review"])
 
@@ -3055,12 +3055,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         speech_schema = payload["format"]["properties"]["fast_speech"]
         self.assertTrue(any(branch.get("type") == "null" for branch in speech_schema["anyOf"]))
         self.assertIn("reason_summary", payload["format"]["required"])
-        self.assertIn("Fast speech is optional", rendered)
+        self.assertIn("Fast speech is still optional", rendered)
         self.assertIn("filler", rendered)
         speech_choice = next(branch for branch in speech_schema["anyOf"] if branch.get("type") == "object")
         self.assertEqual(speech_choice["properties"]["purpose"]["enum"], ["thinking"])
         self.assertEqual(speech_choice["properties"]["commitment"]["enum"], ["prelude_only"])
-        self.assertEqual(payload["model"], "quality-model")
+        self.assertEqual(payload["model"], "quick-model")
 
     async def test_unrelated_prior_speech_does_not_structurally_suppress_new_delta(self) -> None:
         class PlanningInterpreter(OllamaGoalInterpreter):
@@ -3265,7 +3265,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("provider canonicalization", rendered)
         self.assertIn("intent=clarify_uncertain_request", rendered)
         self.assertIn(
-            "When the user supplies an exact replacement binding",
+            "Preserve exact corrected bindings",
             interpreter.build_user_prompt(request),
         )
 

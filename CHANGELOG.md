@@ -5,6 +5,19 @@ remains available in Git history.
 
 ## Unreleased
 
+### Goal Progress Communication
+
+- Defined Fast Response as the first milestone of a shared Goal Progress
+  Communication responsibility rather than task confirmation or Social Attention.
+- All speech-capable cognitive stages now receive one shared progress-communication
+  principle: communicate only a new, trustworthy, user-relevant milestone and use
+  Interaction Context to avoid repeated acknowledgements or status narration.
+- Kept progress speech optional and low-noise; internal workflow steps are not
+  milestones by themselves, while clear nontrivial Goals may still receive a polite
+  immediate acknowledgement before longer work continues.
+- Kept Fast speech review on the Fast Goal Interpreter model so the quality gate no
+  longer places a deep-model latency barrier in the immediate-response path.
+
 ### Interaction-delta cognition contract
 
 - Restored planner-authored prospective `response_text` for executable Plans;

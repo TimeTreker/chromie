@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .goal_progress_communication import goal_progress_communication_prompt
 import copy
 import hashlib
 import json
@@ -1151,6 +1152,7 @@ class DeepPlannerResolver:
             f"Executable capability catalog JSON:\n{self._bounded(prompt_capabilities, 12000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{self._bounded(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
             f"Active and recoverable task bindings JSON:\n{self._bounded(context.get('active_task_snapshots') or [], 6000)}\n\n"
+            f"{goal_progress_communication_prompt('Deep Planner')}\n\n"
             f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 8000)}\n\n"
             f"Fast interaction decision JSON (why Goal Interpretation selected an early acknowledgement or silence; actual playback remains Interaction Context evidence):\n{self._bounded(context.get('fast_interaction_decision') or {}, 1400)}\n\n"
             "Use Interaction Context to reason from what Chromie actually delivered, what trusted evidence says completed or failed, what remains pending, and what is new; produce only the still-needed conversational and effectful delta. Preserve owner and event_type evidence strength: generated or scheduled speech is not proof the user heard it, a proposal or committed request is not completion, and execution completion must retain execution_closure evidence references. Use the Fast interaction decision as conversational context, not an instruction to speak: intentional silence may remain silent, while missing or undelivered communication may still leave a meaningful delta. Add response_text only when it materially improves the current interaction; avoid filler and repetition. Repeat an act only when the current meaning justifies it, such as an explicit repeat, retry, correction, changed state, new evidence, or clarification. The current canonical Goals and validation feedback remain authoritative. "

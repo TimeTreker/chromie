@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .goal_progress_communication import goal_progress_communication_prompt
 import hashlib
 import json
 import logging
@@ -2696,6 +2697,7 @@ class ResponseComposerResolver:
             f"Language hint: {request.language or 'auto'}\n\n"
             f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.prompt_projection(), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
+            f"{goal_progress_communication_prompt('Response Composer')}\n\n"
             f"Goal-scoped Interaction Context JSON:\n{self._bounded(context.get('interaction_context') or {}, 8000)}\n\n"
             f"Fast interaction decision JSON (why an early acknowledgement or silence was selected; this decision never proves that speech was heard):\n{self._bounded(context.get('fast_interaction_decision') or {}, 1400)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
