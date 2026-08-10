@@ -1054,6 +1054,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "goal_ids_do_not_match_goal_association",
+                response_text=plan.response_text,
                 metadata={
                     "expected_goal_ids": expected_goal_ids_for_turn,
                     "actual_goal_ids": list(plan.goal_ids),
@@ -1069,6 +1070,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "tool_route_requires_executable_step",
+                response_text=plan.response_text,
                 metadata={
                     "proposed_disposition": plan.disposition,
                     **counts,
@@ -1095,6 +1097,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "coverage_not_complete",
+                response_text=plan.response_text,
                 unresolved=plan.unresolved,
                 metadata={
                     "proposed_coverage": plan.coverage,
@@ -1107,6 +1110,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "goal_satisfaction_not_exact",
+                response_text=plan.response_text,
                 unresolved=plan.unresolved,
                 metadata={
                     "proposed_goal_satisfaction": (
@@ -1127,6 +1131,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "per_goal_satisfaction_not_exact",
+                response_text=plan.response_text,
                 unresolved=incomplete_outcomes,
                 metadata={**counts},
             )
@@ -1137,6 +1142,7 @@ class FastPlannerResolver:
                     plan.plan_id,
                     request,
                     "step_not_in_executable_common_catalog",
+                    response_text=plan.response_text,
                     unresolved=[step.capability_id],
                     metadata={**counts},
                 )
@@ -1149,6 +1155,7 @@ class FastPlannerResolver:
                 plan.plan_id,
                 request,
                 "parallel_execution_contract_unavailable",
+                response_text=plan.response_text,
                 unresolved=[str(item["type"]) for item in parallel_errors],
                 metadata={
                     "parallel_contract_errors": parallel_errors,
@@ -1178,6 +1185,7 @@ class FastPlannerResolver:
         request: AgentRunRequest,
         reason: str,
         *,
+        response_text: str = "",
         unresolved: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
         error: Exception | None = None,
@@ -1201,6 +1209,12 @@ class FastPlannerResolver:
                 }
             )
         context = request.context if isinstance(request.context, dict) else {}
+        retained_progress = " ".join(str(response_text or "").strip().split())
+        if retained_progress:
+            detail["retained_progress_response_text"] = {
+                "status": "undelivered_advisory",
+                "reason": reason,
+            }
         return CanonicalPlan(
             plan_id=plan_id,
             planner_tier="fast",
@@ -1209,6 +1223,7 @@ class FastPlannerResolver:
             confidence=0.0,
             goal_ids=expected_goal_ids(context),
             goal_summary=request.text,
+            response_text=retained_progress,
             steps=[],
             escalation_reason=reason,
             unresolved=list(unresolved or []),

@@ -253,7 +253,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    notification may claim; it is not itself a reason for silence. A separate Fast
    Response is omitted when the substantive answer is immediate, an equivalent
    notification is already delivered or pending, the user requested silence, or
-   another line would only repeat or add empty chatter. Later cognitive or
+   another line would only repeat or add empty chatter. At the model-facing Goal
+   Interpretation boundary, the **decision is mandatory even though speech is
+   optional**: `fast_speech` must be either one brief notification or explicit
+   `null`; omission is not a silence decision. The model chooses only that semantic
+   text-or-silence decision. Host code materializes deterministic claim-envelope
+   fields and validates evidence/authority without becoming a second semantic
+   owner. Later cognitive or
    execution stages may surface a new trustworthy user-relevant milestone,
    limitation, wait state, failure, correction, or completion when doing so helps
    the person understand meaningful progress. Internal implementation steps are

@@ -1212,13 +1212,39 @@ class OllamaGoalInterpreter:
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. For understood nontrivial downstream work, normally include one brief fast_speech notification. It is not confirmation and cannot claim execution or unavailable results; missing results do not justify silence. Omit it for an immediate substantive answer, equivalent delivered/pending notification, explicit user silence, or empty repetition. Lifecycle pairs: tool=acknowledge_and_check/checking_only; robot_action=acknowledge/prelude_only; deep_thought=thinking/prelude_only; memory=acknowledge/prelude_only. Before Goals exist use claim_state=none and empty claim IDs; never claim result, motion, memory commit, or completion. fast_speech/speak_first use human-like social warmth, not a program, programme, or backend. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech. fast_speech is one short natural notification or null; never omit the decision. For understood nontrivial downstream work, normally notify the person promptly; missing results limit claims, not responsiveness. Use null for an immediate answer, an equivalent delivered/pending notification, requested silence, or empty repetition. Host derives the typed claim envelope; the text cannot claim execution or results. fast_speech uses human-like social warmth, not a program, programme, or backend. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
     def _route_response_schema() -> dict[str, Any]:
         schema = RouteDecision.model_json_schema()
         properties = schema.get("properties", {})
+        # The model must explicitly decide whether a first progress notification
+        # exists. Speech itself remains optional; silence is represented by JSON
+        # null rather than by omitting the responsibility. Keep the model-facing
+        # choice semantic and small: the Host materializes the deterministic
+        # claim envelope after decoding.
+        properties["fast_speech"] = {
+            "anyOf": [
+                {"type": "string", "minLength": 1, "maxLength": 120},
+                {"type": "null"},
+            ],
+            "description": (
+                "Required Goal Progress Communication decision: one brief natural "
+                "prospective notification, or null for intentional silence."
+            ),
+        }
+        schema["required"] = list(
+            dict.fromkeys(
+                [
+                    *(schema.get("required") or []),
+                    "route",
+                    "intent",
+                    "confidence",
+                    "fast_speech",
+                ]
+            )
+        )
         source = properties.get("source")
         if isinstance(source, dict):
             source.clear()
@@ -1353,10 +1379,10 @@ class OllamaGoalInterpreter:
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
                         "- Choose deep_thought for complex reasoning, debugging, design, implementation planning, or multi-step task-session work.\n\n"
                         "Output Contract:\n"
-                        "- Return compact JSON only. Required keys are route, intent, and confidence; metadata and fast_speech are allowed when they change downstream routing or immediate user acknowledgement.\n"
+                        "- Return compact JSON only. Required keys are route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null; the decision itself may not be omitted.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- fast_speech, when present, must be a short prospective Goal-progress notification only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
+                        "- A non-null fast_speech is a short prospective Goal-progress notification only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Never choose interrupt or ignore.\n"
                         "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
                     ),
@@ -1472,10 +1498,10 @@ class OllamaGoalInterpreter:
                         "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
                         "- Use task context and recent action history for follow-ups, but never as standalone authorization.\n\n"
                         "Output Contract:\n"
-                        "- Return compact JSON only with required keys route, intent, and confidence. metadata and fast_speech are allowed for tool lookups.\n"
+                        "- Return compact JSON only with required keys route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- fast_speech must be a short prospective Goal-progress notification only; never claim tool results, physical completion, or memory commit.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
+                        "- A non-null fast_speech must be a short prospective Goal-progress notification only; never claim tool results, physical completion, or memory commit.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"
                         "- Confidence is semantic routing confidence; use at least 0.72 when the request clearly maps to a common ability."
@@ -1635,7 +1661,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only with keys route, intent, and confidence.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from the common ability catalog.\n"
                         "- Never return placeholder intents such as capability or capability:<exact capability_id>.\n"
                         "- Confidence is semantic routing confidence."
@@ -1709,7 +1735,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return one compact RouteDecision JSON object.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- If the emergency interpretation was correct, return route=interrupt and intent=stop_current_output.\n"
                         "- If it was a misunderstanding, return the corrected non-interrupt route with confidence >= 0.72 when clear.\n"
                         "- For a correction, speak_first may contain one brief apology/correction sentence, but must not claim a physical action or tool side effect has executed."

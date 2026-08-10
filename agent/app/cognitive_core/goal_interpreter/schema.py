@@ -33,6 +33,14 @@ Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 
+_SOURCE_FAST_SPEECH_ROUTE_CONTRACTS: dict[str, tuple[str, str]] = {
+    "tool": ("acknowledge_and_check", "checking_only"),
+    "robot_action": ("acknowledge", "prelude_only"),
+    "deep_thought": ("thinking", "prelude_only"),
+    "memory": ("acknowledge", "prelude_only"),
+}
+
+
 logger = logging.getLogger("chromie.agent.goal_interpreter.schema")
 
 
@@ -172,8 +180,19 @@ class RouteDecision(BaseModel):
 
     @model_validator(mode="after")
     def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
-        if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
-            self.speak_first = self.fast_speech.text.strip()
+        if self.fast_speech and self.fast_speech.text.strip():
+            # Goal Interpretation owns the semantic choice to speak or stay
+            # silent. The route-specific claim envelope is a deterministic
+            # system invariant, so do not make the LLM redundantly author it.
+            contract = _SOURCE_FAST_SPEECH_ROUTE_CONTRACTS.get(self.route)
+            if contract is not None:
+                purpose, commitment = contract
+                if self.fast_speech.purpose is None:
+                    self.fast_speech.purpose = purpose
+                if self.fast_speech.commitment is None:
+                    self.fast_speech.commitment = commitment
+            if not self.speak_first:
+                self.speak_first = self.fast_speech.text.strip()
         return self
 
 

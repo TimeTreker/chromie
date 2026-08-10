@@ -396,8 +396,12 @@ what the wording may claim; it is not itself a reason for silence. A separate Fa
 Response is omitted when the substantive answer is immediate, an equivalent
 notification is already delivered or pending, the user asked for silence, or
 another utterance would only repeat or add empty chatter. The source Goal
-Interpreter owns that semantic choice. No second production LLM reviews, repairs,
-or re-decides it. Host/runtime code validates only the mechanical FastSpeech,
+Interpreter owns that semantic choice, and its model-facing output must state the
+choice explicitly: `fast_speech` is notification text or JSON `null`, never omitted.
+Speech is optional; making the decision is not. The Host deterministically derives
+the typed claim envelope from the selected route instead of asking the model to
+copy system invariants. No second production LLM reviews, repairs, or re-decides
+it. Host/runtime code validates only the mechanical FastSpeech,
 correlation, evidence, cancellation, and transport boundaries. If the source model
 makes a poor semantic choice, the remedy is to fix and qualify that source
 prompt/model, not to hide the defect behind another LLM. Interaction Context remains
@@ -413,7 +417,11 @@ prevents the same acknowledgement or progress message from being paraphrased and
 repeated by successive stages. An executable Plan may carry prospective
 `response_text`;
 that text is conversational intent, never an executable step and never evidence
-that work started or completed. For a pure safe read, a new prospective
+that work started or completed. If a valid Fast Plan must escalate for a separate
+planning defect, the source-authored progress candidate may survive only as an
+undelivered advisory to Deep Planning; retention makes no truth claim and it must
+never be treated as already spoken.
+For a pure safe read, a new prospective
 acknowledgement may be scheduled when it adds a still-needed act, while an
 already delivered or pending equivalent is reused or omitted. The read itself
 need not wait for optional acknowledgement playback. After execution, Tool

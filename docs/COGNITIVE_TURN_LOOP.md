@@ -346,8 +346,11 @@ Outcome reconciliation is a Core stage after execution. It:
 
 Streaming changes scheduling, not authority. Raw model-token deltas, partial
 JSON, private reasoning, and incomplete sentences are not speech contracts and
-must never reach TTS. The Host may schedule a complete, independently
-schema-valid `fast_speech` or `ResponseStage` only after Host validation
+must never reach TTS. Goal Interpretation's model-facing Fast Response decision is
+required-but-nullable: `fast_speech` must be a short string or explicit JSON `null`.
+The Host derives deterministic typed claim-envelope fields after decoding; it does
+not infer silence from an omitted decision. The Host may schedule a complete,
+independently schema-valid `fast_speech` or `ResponseStage` only after Host validation
 authorizes it against the applicable correlation, commitment/evidence state,
 claim guards, and cancellation generation. It need not wait for unrelated later
 response fields.
@@ -407,7 +410,11 @@ planning output alone is insufficient.
 
 Pre-execution speech is never execution evidence and never closes an effectful
 goal. Fast or Deep Planning may carry a prospective `response_text` alongside
-executable steps when that text represents a still-needed conversational delta;
+executable steps when that text represents a still-needed conversational delta.
+When a structurally valid Fast Plan escalates for a separate validation defect, the
+source-authored candidate may be retained only as an undelivered advisory to Deep
+Planning; retention makes no truth claim, is never delivery evidence, and must be
+reconsidered against the Interaction Ledger and current Plan authority;
 `chromie.speak` still does not become a task-plan leaf. Response Composer uses
 the Plan and Interaction Context to realize, supplement, reuse, or omit that
 speech according to what is actually new. A non-effectful conversational turn

@@ -24,6 +24,17 @@ remains available in Git history.
 - Removed the redundant tool-only Fast Response gate and the pre-commit memory mute;
   all eligible downstream-work routes use the same source-authored prospective
   notification contract, while memory wording still cannot claim a completed commit.
+- Made the model-facing Fast Response decision required-but-nullable: Goal
+  Interpretation must return either one short `fast_speech` notification or explicit
+  `null`; it can no longer silently omit the responsibility. The Host now derives the
+  deterministic route-specific claim envelope instead of asking the fast model to
+  copy those invariants.
+- Removed the prompt contradiction between structured Goal Progress Communication
+  and the old blanket ban on "progress text"; only free-form progress narration
+  outside the structured speech field is forbidden.
+- Preserve a Fast Planner progress candidate across unrelated escalation only as an
+  `undelivered_advisory` for Deep Planning. It never counts as heard speech and must
+  still be reconciled with Interaction Context and current evidence.
 
 ### Interaction-delta cognition contract
 

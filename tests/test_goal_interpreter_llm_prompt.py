@@ -162,7 +162,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
         self.assertIn("Return one compact JSON object", prompt)
-        self.assertIn("Required keys: route, intent, confidence", prompt)
+        self.assertIn("Required: route, intent, confidence, fast_speech", prompt)
         self.assertIn("direct_to_tts", prompt)
         self.assertIn("full_mind", prompt)
         self.assertIn("human-like", prompt)
@@ -170,7 +170,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Never output placeholder intents", prompt)
         self.assertIn("Do not", prompt)
         self.assertIn("chain-of-thought", prompt)
-        self.assertIn("progress text", prompt)
+        self.assertIn("free-form progress narration", prompt)
         self.assertLess(len(prompt), 5200)
 
 
@@ -410,7 +410,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Speech-only conversation", prompt)
         self.assertIn("Never return interrupt or ignore", prompt)
         self.assertIn("separate focused addressedness stage", prompt)
-        self.assertIn("Required keys: route, intent, confidence", prompt)
+        self.assertIn("Required keys: route, intent, confidence, fast_speech", prompt)
         self.assertIn("routes[]", prompt)
         self.assertIn("Allowed lanes", contract_prompt)
         self.assertIn("Allowed context_profile", contract_prompt)
@@ -418,9 +418,9 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("non-executable ability proposals", prompt)
         self.assertIn("\"confidence\":0.0", prompt)
         self.assertIn("chain-of-thought", contract_prompt)
-        self.assertIn("progress text", contract_prompt)
+        self.assertIn("free-form progress narration", contract_prompt)
         self.assertIn("placeholder intents", contract_prompt)
-        self.assertIn("speak_first", prompt)
+        self.assertIn("fast_speech", prompt)
         self.assertIn("human-like social warmth", prompt)
         self.assertIn("not a program, programme", prompt)
         self.assertIn("Return one compact JSON object", prompt)
@@ -699,7 +699,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("working memory, task context, and recent action history", system)
         self.assertIn("multi-step task-session work", system)
         self.assertIn("chain-of-thought", system)
-        self.assertIn("progress text", system)
+        self.assertIn("free-form progress narration", system)
         self.assertIn("Common ability catalog JSON", user)
         self.assertIn("soridormi.shake_no", user)
         self.assertIn("capability:<exact capability_id>", system)
@@ -747,7 +747,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("speak_first may contain one brief apology/correction sentence", system)
         self.assertIn("must not claim a physical action or tool side effect has executed", system)
         self.assertIn("chain-of-thought", system)
-        self.assertIn("progress text", system)
+        self.assertIn("free-form progress narration", system)
         self.assertIn("confidence >= 0.72", system)
         self.assertIn("Stop by the table means what?", user)
         self.assertIn("soridormi.walk_forward", user)
@@ -2496,8 +2496,23 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("polite", rendered)
             self.assertIn("normally", rendered)
             self.assertIn("Missing result", rendered)
-        self.assertIn("substantive answer is immediate", system_prompt)
+        self.assertIn("immediate answer", system_prompt)
         self.assertIn("equivalent notification", user_prompt)
+
+    def test_model_facing_schema_requires_explicit_fast_speech_decision(self) -> None:
+        schema = OllamaGoalInterpreter._route_response_schema()
+        self.assertIn("fast_speech", schema["required"])
+        self.assertIn("route", schema["required"])
+        self.assertIn("intent", schema["required"])
+        self.assertIn("confidence", schema["required"])
+        fast_speech = schema["properties"]["fast_speech"]
+        self.assertEqual(
+            fast_speech["anyOf"],
+            [
+                {"type": "string", "minLength": 1, "maxLength": 120},
+                {"type": "null"},
+            ],
+        )
 
     async def test_primary_tool_fast_speech_is_preserved_without_second_llm_call(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
@@ -2516,10 +2531,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     "message": {
                         "content": (
                             '{"route":"tool","intent":"weather_query","confidence":0.95,'
-                            '"fast_speech":{"text":"好呀，我看看重庆今天的天气。",'
-                            '"purpose":"acknowledge_and_check","commitment":"checking_only",'
-                            '"claim_state":"none","claimed_capability_ids":[],'
-                            '"claimed_goal_ids":[],"must_not_claim_completion":true},'
+                            '"fast_speech":"好呀，我看看重庆今天的天气。",'
                             '"metadata":{"tool_name":"weather",'
                             '"weather_query":{"location":"重庆","date":"today","units":"metric"}}}'
                         )
@@ -2571,7 +2583,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     "message": {
                         "content": (
                             '{"route":"deep_thought","intent":"plan_weekend",'
-                            '"confidence":0.95}'
+                            '"confidence":0.95,"fast_speech":null}'
                         )
                     }
                 }

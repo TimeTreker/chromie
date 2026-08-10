@@ -7,8 +7,10 @@ GOAL_PROGRESS_COMMUNICATION_PRINCIPLE = (
     "substantive answer or effect, it should normally emit one tiny polite prospective "
     "notification so the person knows the Goal was understood and is being taken forward. "
     "Missing result evidence limits what that notification may claim; it is not itself a "
-    "reason for silence. Omit that separate Fast Response when the substantive answer is "
-    "immediate, an equivalent notification is already delivered or pending, the user asked "
+    "reason for silence. At Goal Interpretation the model-facing decision is explicit: "
+    "return one notification or intentional silence; do not omit the decision. Omit that "
+    "separate Fast Response when the substantive answer is immediate, an equivalent "
+    "notification is already delivered or pending, the user asked "
     "for silence, or another line would only repeat or add empty chatter. Later cognitive "
     "stages may communicate a meaningful new milestone, limitation, wait state, failure, "
     "correction, or completion only when it is trustworthy and useful to the person. Use "
@@ -16,7 +18,9 @@ GOAL_PROGRESS_COMMUNICATION_PRINCIPLE = (
     "that the user already heard or that is already pending, and do not mistake generated "
     "or planned work for delivered speech or completed effects. Internal modules, schemas, "
     "planning mechanics, provider plumbing, and ordinary low-level steps are not milestones "
-    "merely because they occurred. Social Attention and clarification/confirmation are "
+    "merely because they occurred. A progress candidate retained across replanning remains "
+    "undelivered until playback evidence says otherwise. Social Attention and "
+    "clarification/confirmation are "
     "separate responsibilities."
 )
 

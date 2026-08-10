@@ -2154,6 +2154,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             disposition="execute",
             coverage="complete",
             goal_summary="Walk forward.",
+            response_text="好，我知道啦，我先看看怎么安排。",
             steps=[
                 {
                     **execute_step(
@@ -2201,6 +2202,11 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "parallel_execution_contract_unavailable")
+        self.assertEqual(plan.response_text, "好，我知道啦，我先看看怎么安排。")
+        self.assertEqual(
+            plan.metadata["retained_progress_response_text"]["status"],
+            "undelivered_advisory",
+        )
         self.assertEqual(
             plan.metadata["parallel_contract_errors"][0]["type"],
             "parallel_capability_not_declared_safe",

@@ -1313,9 +1313,14 @@ applicable turn/Goal correlation, commitment or evidence state, claim guards,
 and cancellation generation; it need not wait for unrelated later response
 fields. Raw model-token deltas, partial JSON, private reasoning, and incomplete
 sentences are not response contracts. Goal Interpretation owns the exact dynamic
-Fast Response wording and the semantic decision to speak or remain silent. No
-second production LLM re-decides or repairs that ordinary communication choice.
-Dynamic pre-Goal speech must carry `claim_state=none` with empty capability and
+Fast Response wording and the semantic decision to speak or remain silent. Its
+model-facing structured output must make that decision explicitly: `fast_speech`
+is one brief natural string or JSON `null`, never an omitted field. This makes the
+communication decision required without making speech mandatory. The Host derives
+route-specific purpose/commitment and other deterministic claim-envelope facts;
+the model does not redundantly copy those system invariants. No second production
+LLM re-decides or repairs that ordinary communication choice. Dynamic pre-Goal
+speech must carry `claim_state=none` with empty capability and
 Goal claim IDs. Tool speech uses the typed `acknowledge_and_check`/
 `checking_only` contract before result evidence; a memory acknowledgement is
 likewise purely prospective and cannot claim that the commit already happened.
@@ -1409,7 +1414,9 @@ reason for silence. A separate Fast Response is omitted when a substantive answe
 is immediate, an equivalent notification is already delivered or pending, the
 user requested silence, or another line would only repeat or add empty chatter.
 That act is not Social Attention and is not clarification or confirmation of an
-unclear Goal.
+unclear Goal. At this boundary optional speech does not mean an optional decision:
+the source model must return either notification text or explicit `null`. A missing
+field is a contract defect, not evidence that silence was intended.
 
 The same responsibility continues after the initial acknowledgement. A planner,
 trusted result interpreter, response composer, or later cognitive stage may propose
@@ -1429,7 +1436,12 @@ Each milestone has one cognitive communication owner. The runtime does not call 
 second LLM to re-decide or repair an ordinary speech-versus-silence judgment.
 Mechanical schema, authority, evidence, cancellation, and delivery checks remain
 deterministic; semantic mistakes are fixed at the source prompt/model boundary and
-measured in regression and benchmark scenarios.
+measured in regression and benchmark scenarios. If a structurally valid Fast Plan
+is escalated for an unrelated planning/coverage defect, its source-authored progress
+`response_text` may be retained only as an **undelivered advisory** for Deep
+Planning. Retention makes no truth or playback claim and does not satisfy the
+communication act; Deep Planning still reasons from Interaction Context and
+current evidence before using any such candidate.
 
 Every stage uses Goal-scoped Interaction Context before proposing speech. Only
 audible playback counts as already told to the user; scheduled speech is merely
