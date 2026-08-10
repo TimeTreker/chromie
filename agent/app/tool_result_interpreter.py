@@ -305,7 +305,7 @@ class ToolResultInterpreter:
         conversation_hints = {
             key: value
             for key, value in request.context.items()
-            if key not in {"agent_skill_disclosure", "interaction_context"}
+            if key not in {"agent_skill_disclosure", "interaction_context", "fast_interaction_decision"}
         }
         interaction_context = request.context.get("interaction_context") or {}
         return (
@@ -317,8 +317,9 @@ class ToolResultInterpreter:
             f"{skill_section}"
             f"Trusted evidence JSON: {self._bounded(evidence_payload, 14000)}\n"
             f"Goal-scoped Interaction Context JSON: {self._bounded(interaction_context, 8000)}\n"
+            f"Fast interaction decision JSON (why an early acknowledgement or silence was selected; delivery is still determined only by Interaction Context): {self._bounded(request.context.get('fast_interaction_decision') or {}, 1400)}\n"
             f"Conversation hints JSON: {self._bounded(conversation_hints, 2600)}\n\n"
-            "First understand the exact question the user asked and the still-needed conversational delta. Interaction Context tells you what Chromie already said, what was only scheduled, what provider work was committed, and what trusted terminal evidence now completed or failed. Generated or scheduled speech is not proof that it was heard, and committed work is not completion. Do not replay an acknowledgement, promise, or already delivered result when no new information, correction, retry or failure explanation, changed state, or clarification makes repetition useful. "
+            "First understand the exact question the user asked and the still-needed conversational delta. Interaction Context tells you what Chromie already said, what was only scheduled, what provider work was committed, and what trusted terminal evidence now completed or failed. The Fast interaction decision explains why an earlier acknowledgement or silence was selected; do not prepend a compensating acknowledgement merely because Fast speech was absent. Generated or scheduled speech is not proof that it was heard, and committed work is not completion. Do not replay an acknowledgement, promise, or already delivered result when no new information, correction, retry or failure explanation, changed state, or clarification makes repetition useful. "
             "Choose answer_mode=direct "
             "for a narrow question, summary for a normal overview, and detailed only when the "
             "user explicitly asks for detail. For a yes/no, qualitative, comparative, comfort, "

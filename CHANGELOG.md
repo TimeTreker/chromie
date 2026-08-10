@@ -13,6 +13,16 @@ remains available in Git history.
 - Made the shared Interaction Ledger / still-needed-delta rule explicit across
   Goal Interpretation, Goal Association, Fast and Deep Planning, Tool Result
   Interpretation, and Response Composition.
+- Made Fast speech and Fast silence symmetric proposals at Goal Interpretation:
+  the source prompt now treats Fast speech as optional human-interaction progress
+  and explicitly weighs acknowledgement value against filler, paraphrase,
+  repetition, and verbosity. One semantic-delta review judges either candidate
+  against Interaction Context, emits a bounded reason for speech or silence, and
+  may author a missing acknowledgement only when it materially helps. Cognitive
+  Runtime projects that reviewed decision to downstream cognitive prompts without
+  treating it as playback evidence. Removed the separate Fast-speech repair-model
+  call and the host rule that treated any prior speech as sufficient evidence that
+  silence was admissible.
 - Replaced scenario-answer instructions in coordinated-action review with
   general semantic entailment and Capability-contract principles; concrete
   distinctions remain benchmark/regression responsibilities.

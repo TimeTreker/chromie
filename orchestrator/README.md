@@ -228,14 +228,25 @@ duplicate processes, and starts the module from the repository root.
 
 The Orchestrator has a fast-first presentation path for slow work. Once Goal
 Interpretation confidently selects eligible planning or embodied pending work,
-the Core must author one typed, non-terminal `fast_speech` acknowledgement from
-the current turn and approved mind/style context. The Host validates and queues
-that reviewed dynamic sentence before slow Goal Association, planning, and
-execution. One bounded Core repair may fill the field when the first output
-omits it. Tool routes may use the exact independently reviewed
-`acknowledge_and_check`/`checking_only` contract before result evidence; this
-acknowledges understanding and evaluation only. Memory speech still waits for a
-committed update. Results and failures remain separate evidence-bound acts.
+the Core may propose either one typed, non-terminal `fast_speech`
+acknowledgement or silence. Fast speech is optional and source-authored: Goal
+Interpretation is prompted to choose it only when one short prospective act adds
+meaningful human-interaction value before the next visible progress, and to keep
+silent when an extra prelude would be filler, paraphrase, repetition, or needless
+verbosity. The same bounded semantic-delta review judges both proposals against
+the current turn and recent Interaction Context: it may keep or rewrite one
+still-needed acknowledgement, or preserve silence when that is the better current
+interaction choice. The Host does not infer semantic equivalence from route names,
+wording, or the mere presence of earlier speech. Missing Fast speech therefore
+does not bypass review and does not require a separate repair-model call. The
+reviewer supplies a bounded `reason_summary`; Cognitive Runtime exposes that as
+`fast_interaction_decision` to downstream cognitive prompts while Interaction
+Context remains the sole authority for whether any speech was actually heard or
+is still pending. Tool routes may use the exact
+independently reviewed `acknowledge_and_check`/`checking_only` contract before
+result evidence; this acknowledges understanding and evaluation only. Memory
+speech still waits for a committed update. Results and failures remain separate
+evidence-bound acts.
 
 At startup the Orchestrator may also prime a small speaker-specific
 English/Chinese acknowledgement cache through the configured TTS service and

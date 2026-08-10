@@ -386,14 +386,24 @@ never a candidate spoken response.
 ## Tool behavior
 
 The Cognitive Gateway admits a turn but does not author semantic speech. For
-eligible planning or embodied work, Goal Interpretation may emit one typed,
-non-terminal `fast_speech` process acknowledgement; one bounded Core repair may
-add or suppress it without changing the chosen route, bindings, or safety
-policy. It must inspect recent Interaction Context and leave the act absent when
-an equivalent acknowledgement is already delivered or pending and nothing new
-needs saying. Route-specific safety may still forbid claims that lack the
-required commit or evidence, but no normal tool/effect route is muted merely
-because it is executable.
+eligible planning or embodied work, Goal Interpretation may propose one typed,
+non-terminal `fast_speech` process acknowledgement or silence. Fast speech is
+interaction progress, not a mandatory status line: the source Goal Interpretation
+prompt must weigh whether one brief prospective acknowledgement materially helps
+the person through an otherwise noticeable gap against the costs of filler,
+paraphrase, repetition, and verbosity. Silence is therefore a valid intentional
+choice even when work remains pending. A single bounded semantic-delta review
+owns both speech and silence proposals and may author, revise, or suppress the
+act without changing the chosen route, bindings, or safety policy. It compares
+the current pending responsibility with recent Interaction Context by meaning:
+an equivalent delivered or pending acknowledgement can suppress repetition,
+but unrelated prior speech cannot. The reviewer also emits a short bounded
+`reason_summary`; Cognitive Runtime projects that reviewed speech-or-silence
+judgment to later cognitive stages as `fast_interaction_decision`. This explains
+why an early acknowledgement was selected or omitted, but never proves playback:
+actual heard/pending status remains exclusively owned by Interaction Context.
+Route-specific safety may still forbid claims that lack the required commit or
+evidence, but no normal tool/effect route is muted merely because it is executable.
 
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same delta rule. An executable Plan may carry prospective `response_text`;

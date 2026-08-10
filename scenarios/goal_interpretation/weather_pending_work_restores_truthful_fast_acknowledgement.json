@@ -3,7 +3,7 @@
   "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A slow weather lookup repairs and independently reviews one typed acknowledgement that claims only understanding and evaluation before result evidence exists.",
+  "description": "A slow weather lookup whose quick interpretation omits Fast speech is resolved by the same semantic-delta review used for authored speech, producing one truthful acknowledgement before result evidence exists.",
   "tags": [
     "reported-live-voice",
     "weather",
@@ -57,17 +57,6 @@
         }
       },
       {
-        "stage": "fast_speech_repair",
-        "decision": {
-          "fast_speech": {
-            "text": "好呀，我帮你查一下北京今天有没有下雨。",
-            "purpose": "acknowledge_and_check",
-            "commitment": "checking_only",
-            "must_not_claim_completion": true
-          }
-        }
-      },
-      {
         "stage": "fast_speech_semantic_review",
         "decision": {
           "fast_speech": {
@@ -75,7 +64,8 @@
             "purpose": "acknowledge_and_check",
             "commitment": "checking_only",
             "must_not_claim_completion": true
-          }
+          },
+          "reason_summary": "A brief acknowledgement adds useful interaction progress while the lookup is pending."
         }
       }
     ]
@@ -84,10 +74,9 @@
     "route": "tool",
     "intent": "capability:chromie.weather.lookup",
     "source": "llm",
-    "llm_calls": 3,
+    "llm_calls": 2,
     "llm_stages": [
       "quick_intent",
-      "fast_speech_repair",
       "fast_speech_semantic_review"
     ],
     "fast_speech_present": true,

@@ -102,7 +102,8 @@
                 "purpose": "acknowledge_and_check",
                 "commitment": "checking_only",
                 "must_not_claim_completion": true
-              }
+              },
+              "reason_summary": "A brief acknowledgement adds useful interaction progress while the weather lookup is pending."
             }
           }
         ]

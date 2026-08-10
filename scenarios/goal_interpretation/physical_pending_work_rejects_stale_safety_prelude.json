@@ -3,7 +3,7 @@
   "id": "physical_pending_work_rejects_stale_safety_prelude",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A physical request whose first Core interpretation omits fast speech rejects the retired safety_prelude/needs_confirmation repair contract and remains silent before authoritative Goals and Plans exist.",
+  "description": "A physical request whose quick interpretation omits Fast speech sends silence through semantic-delta review; the reviewer may preserve silence before authoritative Goals and Plans exist.",
   "tags": [
     "pending-work",
     "claim-free",
@@ -48,14 +48,10 @@
         }
       },
       {
-        "stage": "fast_speech_repair",
+        "stage": "fast_speech_semantic_review",
         "decision": {
-          "fast_speech": {
-            "text": "我先确认一下能不能安全地往前走。",
-            "purpose": "safety_prelude",
-            "commitment": "needs_confirmation",
-            "must_not_claim_completion": true
-          }
+          "fast_speech": null,
+          "reason_summary": "Silence is the better interaction choice before authoritative planning because another prelude would add no useful conversational delta."
         }
       }
     ]
@@ -67,7 +63,7 @@
     "llm_calls": 2,
     "llm_stages": [
       "quick_intent",
-      "fast_speech_repair"
+      "fast_speech_semantic_review"
     ],
     "fast_speech_present": false,
     "task_types_include": [

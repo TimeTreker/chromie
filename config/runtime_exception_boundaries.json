@@ -351,20 +351,6 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._repair_missing_fast_speech",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Attempt bounded model-authored repair for required pending-work speech and retain explicit missing-speech diagnostics without authorizing result or completion claims.",
-      "review_status": "reviewed",
-      "body_sha256": "1e2bfe246d0bbb48ed6589778f02e9197df2f02eb84062b8d1dea24ff37aebd1",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter._repair_semantic_route",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -416,21 +402,6 @@
       "failure_signals": [
         "diagnostic",
         "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_pending_fast_speech",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Suppress unreviewed or invalid pending-work speech so dynamic wording cannot invent unsupported facts, abilities, or side tasks; preserve only a reviewed replacement that satisfies the pre-plan claim contract.",
-      "review_status": "reviewed",
-      "body_sha256": "c00d032e8a8c2ddf7bff1b827a24f9b1e86b94b8e7c67d5e555ceaea70d73f7c",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
       ]
     },
     {

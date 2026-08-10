@@ -2475,7 +2475,29 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(InterpretationUnavailableError, 'placeholder capability intent'):
             await interpreter.route(RouteRequest(text="Hello, how are you."))
 
-    async def test_tool_route_missing_fast_speech_is_repaired_and_reviewed(self) -> None:
+    def test_primary_prompt_treats_fast_speech_as_optional_human_interaction_delta(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="帮我看看这个问题。",
+            language="zh-CN",
+            context={"interaction_context": {"already_spoken": [], "pending_speech": []}},
+        )
+
+        system_prompt = interpreter.load_system_prompt()
+        user_prompt = interpreter.build_user_prompt(request)
+
+        self.assertIn("Fast speech is optional interaction progress", system_prompt)
+        self.assertIn("prefer intentional silence over filler", system_prompt)
+        self.assertIn("Fast speech is optional interaction progress", user_prompt)
+        self.assertIn("prefer intentional silence over filler", user_prompt)
+        self.assertIn("Fast speech is optional interaction progress", user_prompt)
+
+    async def test_tool_route_missing_fast_speech_is_semantic_delta_reviewed(self) -> None:
         class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2487,16 +2509,9 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.stages: list[str] = []
 
-            async def _chat(self, payload: dict) -> dict:
-                system = str(payload["messages"][0].get("content") or "")
-                if "independent fast-speech semantic and style reviewer" in system:
-                    stage = "fast_speech_semantic_review"
-                elif "fast-speech repairer" in system:
-                    stage = "fast_speech_repair"
-                else:
-                    stage = "primary_interpreter"
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
                 self.stages.append(stage)
-                if stage in {"fast_speech_repair", "fast_speech_semantic_review"}:
+                if stage == "fast_speech_semantic_review":
                     return {
                         "message": {
                             "content": (
@@ -2506,7 +2521,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                                 '"claim_state":"none",'
                                 '"claimed_capability_ids":[],'
                                 '"claimed_goal_ids":[],'
-                                '"must_not_claim_completion":true}}'
+                                '"must_not_claim_completion":true},"reason_summary":"A brief acknowledgement adds useful interaction progress."}'
                             )
                         }
                     }
@@ -2548,16 +2563,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(decision.fast_speech.must_not_claim_completion)
         self.assertTrue(decision.metadata["fast_speech_review"]["model_reviewed"])
         self.assertTrue(decision.metadata["fast_speech_review"]["speech_selected"])
+        self.assertEqual(decision.metadata["fast_speech_review"]["candidate_kind"], "silence")
         self.assertEqual(
             interpreter.stages,
-            [
-                "primary_interpreter",
-                "fast_speech_repair",
-                "fast_speech_semantic_review",
-            ],
+            ["quick_intent", "fast_speech_semantic_review"],
         )
 
-    async def test_robot_action_fast_speech_repair_stays_generic_before_planning(self) -> None:
+    async def test_robot_action_missing_fast_speech_uses_same_semantic_delta_review(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2567,12 +2579,11 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     confidence_threshold=0.55,
                     pending_work_fast_speech_repair_enabled=True,
                 )
-                self.payloads: list[dict] = []
+                self.payloads: list[tuple[str, dict]] = []
 
-            async def _chat(self, payload: dict) -> dict:
-                self.payloads.append(payload)
-                system = str(payload["messages"][0].get("content") or "")
-                if "independent fast-speech semantic and style reviewer" in system:
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.payloads.append((stage, payload))
+                if stage == "fast_speech_semantic_review":
                     return {
                         "message": {
                             "content": (
@@ -2582,21 +2593,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                                 '"claim_state":"none",'
                                 '"claimed_capability_ids":[],'
                                 '"claimed_goal_ids":[],'
-                                '"must_not_claim_completion":true}}'
-                            )
-                        }
-                    }
-                if "fast-speech repairer" in system:
-                    return {
-                        "message": {
-                            "content": (
-                                '{"fast_speech":{"text":"我这就去确认路径安全，然后帮你拿水。",'
-                                '"purpose":"acknowledge",'
-                                '"commitment":"prelude_only",'
-                                '"claim_state":"none",'
-                                '"claimed_capability_ids":[],'
-                                '"claimed_goal_ids":[],'
-                                '"must_not_claim_completion":true}}'
+                                '"must_not_claim_completion":true},"reason_summary":"A brief acknowledgement adds useful interaction progress."}'
                             )
                         }
                     }
@@ -2624,24 +2621,19 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.fast_speech.text, "嗯，我想想怎么帮你。")
         self.assertEqual(decision.fast_speech.purpose, "acknowledge")
         self.assertEqual(decision.fast_speech.commitment, "prelude_only")
-        repair_rendered = "\n".join(
-            str(message.get("content") or "")
-            for message in interpreter.payloads[1]["messages"]
+        self.assertEqual(
+            [stage for stage, _ in interpreter.payloads],
+            ["quick_intent", "fast_speech_semantic_review"],
         )
         review_rendered = "\n".join(
             str(message.get("content") or "")
-            for message in interpreter.payloads[2]["messages"]
+            for message in interpreter.payloads[1][1]["messages"]
         )
-        self.assertIn("Identity and personality shape voice only", repair_rendered)
-        self.assertIn("Do not use a universal or canned acknowledgement", repair_rendered)
-        self.assertIn("fast_speech must not be null", repair_rendered)
-        self.assertIn("claim_state=none", repair_rendered)
-        self.assertIn("Review meaning, not keywords", review_rendered)
-        self.assertIn("still-needed acknowledgement", review_rendered)
-        self.assertIn("the body action definitely has not started", review_rendered)
-        self.assertIn("ordinary sentence meaning", review_rendered)
-        self.assertIn("rewrite it prospectively", review_rendered)
-        self.assertEqual(len(interpreter.payloads), 3)
+        self.assertIn("both candidate speech and candidate silence as proposals", review_rendered)
+        self.assertIn("mere presence of any earlier speech is never enough", review_rendered)
+        self.assertIn("Fast speech is optional", review_rendered)
+        self.assertIn("Uncommitted or unexecuted work must remain prospective", review_rendered)
+        self.assertEqual(decision.metadata["fast_speech_review"]["candidate_kind"], "silence")
 
     async def test_memory_fast_speech_review_keeps_commit_prospective(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -2677,20 +2669,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             str(message.get("content") or "") for message in payload["messages"]
         )
 
-        self.assertIn("memory update has not been committed", rendered)
-        self.assertIn(
-            "explicitly prospective or intentional grammatical construction",
-            rendered,
-        )
-        self.assertIn(
-            "already remembered, noted, recorded, stored, saved, or updated",
-            rendered,
-        )
-        self.assertIn("rewrite them prospectively", rendered)
-        self.assertEqual(
-            payload["format"]["properties"]["fast_speech"]["type"],
-            "object",
-        )
+        self.assertIn("authoritative Goals, Plans, provider results, effect commits", rendered)
+        self.assertIn("state transition or external fact", rendered)
+        self.assertIn("ordinary sentence meaning and grammatical aspect", rendered)
+        self.assertIn("Uncommitted or unexecuted work must remain prospective", rendered)
+        speech_schema = payload["format"]["properties"]["fast_speech"]
+        self.assertTrue(any(branch.get("type") == "null" for branch in speech_schema["anyOf"]))
         self.assertEqual(payload["model"], "test-model")
 
     async def test_fast_speech_review_receives_advisory_ability_semantics(self) -> None:
@@ -2738,7 +2722,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIn("advisory pre-association hypothesis", rendered)
-        self.assertIn("do not promise that outcome or a method", rendered)
+        self.assertIn("never broaden a capability beyond its declared semantics", rendered)
         self.assertIn("soridormi.walk_forward", rendered)
         self.assertIn("Walk forward for a bounded duration", rendered)
 
@@ -2797,7 +2781,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("authoritative result response required", decision.reason or "")
 
-    async def test_fast_speech_review_failure_suppresses_dynamic_candidate(self) -> None:
+    async def test_semantic_delta_review_can_keep_silence_when_act_is_already_covered(self) -> None:
         class RobotInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
@@ -2807,25 +2791,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     confidence_threshold=0.55,
                     pending_work_fast_speech_repair_enabled=True,
                 )
+                self.stages: list[str] = []
 
-            async def _chat(self, payload: dict) -> dict:
-                system = str(payload["messages"][0].get("content") or "")
-                if "independent fast-speech semantic and style reviewer" in system:
-                    return {"message": {"content": '{"fast_speech":null}'}}
-                if "fast-speech repairer" in system:
-                    return {
-                        "message": {
-                            "content": (
-                                '{"fast_speech":{"text":"嗯。",'
-                                '"purpose":"acknowledge",'
-                                '"commitment":"prelude_only",'
-                                '"claim_state":"none",'
-                                '"claimed_capability_ids":[],'
-                                '"claimed_goal_ids":[],'
-                                '"must_not_claim_completion":true}}'
-                            )
-                        }
-                    }
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.stages.append(stage)
+                if stage == "fast_speech_semantic_review":
+                    return {"message": {"content": '{"fast_speech":null,"reason_summary":"The equivalent acknowledgement is already covered."}'}}
                 return {
                     "message": {
                         "content": (
@@ -2836,7 +2807,8 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        decision = await RobotInterpreter().route(
+        interpreter = RobotInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="往前走。",
                 language="zh-CN",
@@ -2846,6 +2818,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                             {
                                 "event_type": "speech_playback_started",
                                 "speech_act": "acknowledge",
+                                "text": "好呀，我准备一下。",
                             }
                         ],
                         "pending_speech": [],
@@ -2856,11 +2829,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsNone(decision.fast_speech)
+        self.assertEqual(interpreter.stages, ["quick_intent", "fast_speech_semantic_review"])
         self.assertFalse(decision.metadata["fast_speech_review"]["speech_selected"])
         self.assertTrue(decision.metadata["fast_speech_review"]["model_reviewed"])
+        self.assertEqual(decision.metadata["fast_speech_review"]["candidate_kind"], "silence")
         self.assertEqual(
-            decision.metadata["fast_speech_review"]["reason"],
-            "no_still_needed_delta",
+            decision.metadata["fast_speech_review"]["reason_summary"],
+            "The equivalent acknowledgement is already covered.",
         )
 
     async def test_tool_route_missing_fast_speech_does_not_add_interpreter_latency_by_default(self) -> None:
@@ -2931,7 +2906,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                                 '"claim_state":"none",'
                                 '"claimed_capability_ids":[],'
                                 '"claimed_goal_ids":[],'
-                                '"must_not_claim_completion":true}}'
+                                '"must_not_claim_completion":true},"reason_summary":"A brief acknowledgement adds useful interaction progress."}'
                             )
                         }
                     }
@@ -2980,17 +2955,6 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
             async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
                 self.calls.append((stage, str(payload.get("model") or "")))
-                if stage == "fast_speech_repair":
-                    return {
-                        "message": {
-                            "content": (
-                                '{"fast_speech":{"text":"好呀，我先准备一下。",'
-                                '"purpose":"acknowledge","commitment":"prelude_only",'
-                                '"claim_state":"none","claimed_capability_ids":[],'
-                                '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
-                            )
-                        }
-                    }
                 if stage == "fast_speech_semantic_review":
                     return {
                         "message": {
@@ -2998,7 +2962,7 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                                 '{"fast_speech":{"text":"好呀，我先准备一下。",'
                                 '"purpose":"acknowledge","commitment":"prelude_only",'
                                 '"claim_state":"none","claimed_capability_ids":[],'
-                                '"claimed_goal_ids":[],"must_not_claim_completion":true}}'
+                                '"claimed_goal_ids":[],"must_not_claim_completion":true},"reason_summary":"A brief acknowledgement adds useful interaction progress."}'
                             )
                         }
                     }
@@ -3041,13 +3005,13 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(decision.fast_speech)
         self.assertNotIn("intent_review", [stage for stage, _ in interpreter.calls])
         stage_models = dict(interpreter.calls)
-        self.assertEqual(stage_models["fast_speech_repair"], "quick-model")
         self.assertEqual(
             stage_models["fast_speech_semantic_review"],
             "quality-model",
         )
+        self.assertEqual([stage for stage, _ in interpreter.calls], ["quick_intent", "fast_speech_semantic_review"])
 
-    def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
+    def test_fast_speech_semantic_delta_payload_reviews_speech_or_silence(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
@@ -3056,79 +3020,15 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             confidence_threshold=0.55,
         )
         request = RouteRequest(
-            text="今天重庆天气怎么样？",
+            text="帮我想一下周末怎么安排。",
             language="zh-CN",
-            context={
-                "common_ability_catalog": [
-                    {
-                        "capability_id": "chromie.weather.lookup",
-                        "route": "tool",
-                        "effects": ["external_read", "weather_lookup"],
-                        "description": "Retrieve current weather or forecast for a city.",
-                    }
-                ]
-            },
-        )
-        decision = RouteDecision(
-            route="tool",
-            intent="weather_query",
-            confidence=0.95,
-            metadata={
-                "tool_name": "weather",
-                "weather_query": {"location": "重庆", "date": "today", "units": "metric"},
-            },
-        )
-
-        payload = interpreter.build_fast_speech_repair_payload(request, decision)
-        rendered = "\n".join(str(message.get("content") or "") for message in payload["messages"])
-
-        self.assertIn("fast-speech repairer", rendered)
-        self.assertIn("six-year-old child", rendered)
-        self.assertIn("not customer service", rendered)
-        self.assertIn("robot status system", rendered)
-        self.assertIn("Do not announce her age or role", rendered)
-        self.assertIn("Do not change route", rendered)
-        self.assertIn("exact model-authored bindings", rendered)
-        self.assertIn("must not semantically claim", rendered)
-        self.assertIn("Goal Association and planning have not happened yet", rendered)
-        self.assertIn("contains no audible or pending speech", rendered)
-        self.assertIn("fast_speech must not be null", rendered)
-        self.assertIn("never phrase matching", rendered)
-        self.assertIn("purpose=acknowledge_and_check", rendered)
-        self.assertIn("commitment=checking_only", rendered)
-        speech_schema = payload["format"]["properties"]["fast_speech"]
-        self.assertEqual(speech_schema["type"], "object")
-        speech_choice = speech_schema
-        self.assertEqual(
-            speech_choice["properties"]["purpose"]["enum"],
-            ["acknowledge_and_check"],
-        )
-        self.assertEqual(
-            speech_choice["properties"]["claim_state"]["const"], "none"
-        )
-        self.assertEqual(
-            speech_choice["properties"]["claimed_capability_ids"]["maxItems"],
-            0,
-        )
-        self.assertEqual(payload["model"], "quick-model")
-        self.assertIn("今天重庆天气怎么样", rendered)
-        self.assertIn("weather_query", rendered)
-
-    def test_fast_speech_repair_allows_null_with_typed_speech_evidence(self) -> None:
-        interpreter = OllamaGoalInterpreter(
-            ollama_url="http://example.invalid",
-            model="quick-model",
-            timeout_ms=800,
-            confidence_threshold=0.55,
-        )
-        request = RouteRequest(
-            text="Check the weather.",
             context={
                 "interaction_context": {
                     "already_spoken": [
                         {
                             "event_type": "speech_playback_started",
-                            "speech_act": "acknowledge_and_check",
+                            "speech_act": "greeting",
+                            "text": "早呀。",
                         }
                     ],
                     "pending_speech": [],
@@ -3137,39 +3037,93 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         decision = RouteDecision(
-            route="tool",
-            intent="capability:chromie.weather.lookup",
+            route="deep_thought",
+            intent="plan_weekend",
             confidence=0.95,
         )
 
-        payload = interpreter.build_fast_speech_repair_payload(request, decision)
-        rendered = "\n".join(
-            str(message.get("content") or "") for message in payload["messages"]
-        )
+        payload = interpreter.build_fast_speech_review_payload(request, decision, None)
+        rendered = "\n".join(str(message.get("content") or "") for message in payload["messages"])
+
+        self.assertIn("semantic-delta and style reviewer", rendered)
+        self.assertIn("both candidate speech and candidate silence as proposals", rendered)
+        self.assertIn("mere presence of any earlier speech is never enough", rendered)
+        self.assertIn("suppress only when its meaning is already covered", rendered)
+        self.assertIn("never broaden a capability beyond its declared semantics", rendered)
+        self.assertIn("ordinary sentence meaning and grammatical aspect", rendered)
+        self.assertIn("null is a silence proposal, not a verdict", rendered)
         speech_schema = payload["format"]["properties"]["fast_speech"]
+        self.assertTrue(any(branch.get("type") == "null" for branch in speech_schema["anyOf"]))
+        self.assertIn("reason_summary", payload["format"]["required"])
+        self.assertIn("Fast speech is optional", rendered)
+        self.assertIn("filler", rendered)
+        speech_choice = next(branch for branch in speech_schema["anyOf"] if branch.get("type") == "object")
+        self.assertEqual(speech_choice["properties"]["purpose"]["enum"], ["thinking"])
+        self.assertEqual(speech_choice["properties"]["commitment"]["enum"], ["prelude_only"])
+        self.assertEqual(payload["model"], "quality-model")
 
-        self.assertTrue(
-            any(branch.get("type") == "null" for branch in speech_schema["anyOf"])
-        )
-        self.assertIn("return fast_speech=null", rendered)
+    async def test_unrelated_prior_speech_does_not_structurally_suppress_new_delta(self) -> None:
+        class PlanningInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="quality-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    pending_work_fast_speech_repair_enabled=True,
+                )
+                self.stages: list[str] = []
 
-        review_payload = interpreter.build_fast_speech_review_payload(
-            request,
-            decision,
-            FastSpeech(
-                text="I will check that.",
-                purpose="acknowledge_and_check",
-                commitment="checking_only",
-                claim_state="none",
-                claimed_capability_ids=[],
-                claimed_goal_ids=[],
-                must_not_claim_completion=True,
-            ),
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.stages.append(stage)
+                if stage == "fast_speech_semantic_review":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"我想想周末怎么安排。",'
+                                '"purpose":"thinking","commitment":"prelude_only",'
+                                '"claim_state":"none","claimed_capability_ids":[],'
+                                '"claimed_goal_ids":[],"must_not_claim_completion":true},"reason_summary":"A brief acknowledgement adds useful interaction progress."}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"deep_thought","intent":"plan_weekend",'
+                            '"confidence":0.95}'
+                        )
+                    }
+                }
+
+        interpreter = PlanningInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="帮我想一下周末怎么安排。",
+                language="zh-CN",
+                context={
+                    "interaction_context": {
+                        "already_spoken": [
+                            {
+                                "event_type": "speech_playback_started",
+                                "speech_act": "greeting",
+                                "text": "早呀。",
+                            }
+                        ],
+                        "pending_speech": [],
+                        "events": [],
+                    }
+                },
+            )
         )
-        review_schema = review_payload["format"]["properties"]["fast_speech"]
-        self.assertTrue(
-            any(branch.get("type") == "null" for branch in review_schema["anyOf"])
-        )
+
+        self.assertIsNotNone(decision.fast_speech)
+        assert decision.fast_speech is not None
+        self.assertEqual(decision.fast_speech.text, "我想想周末怎么安排。")
+        self.assertEqual(interpreter.stages, ["quick_intent", "fast_speech_semantic_review"])
+        self.assertEqual(decision.metadata["fast_speech_review"]["candidate_kind"], "silence")
+        self.assertTrue(decision.metadata["fast_speech_review"]["speech_selected"])
 
     async def test_social_framing_chat_is_rechecked_on_review_model(self) -> None:
         class FramingInterpreter(OllamaGoalInterpreter):
