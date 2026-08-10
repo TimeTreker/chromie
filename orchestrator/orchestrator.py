@@ -679,6 +679,7 @@ class VoiceAssistant:
             # continue.  Effectful execution still remains behind the trusted
             # canonical-plan/runtime boundary.
             goal_state_apply=self._apply_cognitive_goal_association_stage,
+            context_refresh=self.build_context,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
         )
@@ -5322,6 +5323,22 @@ class VoiceAssistant:
                 state["llm_done"] = True
             self.maybe_session_done(session_id)
             return
+
+        # Admission is already trusted dialogue evidence even though Goal
+        # Association has not run yet. Publish only the user utterance here so a
+        # concurrent follow-up can resolve ellipsis/reference against it. Canonical
+        # Goal and Task state remains model-owned and is committed later.
+        self.conversation_state.record_accepted_user_turn(
+            session_id,
+            user_text,
+            metadata=self._metadata_with_turn_envelope(
+                {
+                    "source": "cognitive_gateway_admitted_dialogue",
+                    "admission": turn_envelope.admission,
+                },
+                turn_envelope,
+            ),
+        )
 
         core_start_ms = now_ms()
         self.session_log(

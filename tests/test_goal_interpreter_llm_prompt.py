@@ -295,8 +295,15 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
                     "profile_id": "chromie_default_mind",
                     "identity": {
                         "name": "Chromie",
-                        "age_description": "6 years old in robot identity terms",
+                        "age_description": "6 years old",
+                        "family_role": "the family's secretary",
                         "pronouns": ["she", "her"],
+                    },
+                    "personality_expression": {
+                        "owner_approved": True,
+                        "spoken_style": "Short, natural, age-appropriate family conversation.",
+                        "tool_use_style": "Say what you are checking in ordinary words.",
+                        "maturity_boundary": "Be a smart six-year-old family secretary, never customer service.",
                     },
                     "core_principles": [
                         {
@@ -355,6 +362,11 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
         self.assertIn("Global Context Group", prompt)
         self.assertIn("Fast Goal Interpretation Context", prompt)
+        self.assertIn("6 years old", prompt)
+        self.assertIn("the family's secretary", prompt)
+        self.assertIn("spoken_style", prompt)
+        self.assertIn("tool_use_style", prompt)
+        self.assertIn("maturity_boundary", prompt)
         self.assertIn("full owner-approved mind profile", prompt)
         self.assertIn("context_profile", prompt)
         self.assertIn("fast_minimal", prompt)
@@ -394,7 +406,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
         self.assertIn("chromie_default_mind", prompt)
         self.assertIn("Chromie", prompt)
-        self.assertIn("6 years old in robot identity terms", prompt)
+        self.assertIn("6 years old", prompt)
         self.assertNotIn("Protect humans first.", prompt)
         self.assertNotIn("Become a useful companion robot.", prompt)
         self.assertNotIn("soridormi.walk_velocity", prompt)
@@ -421,8 +433,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("free-form progress narration", contract_prompt)
         self.assertIn("placeholder intents", contract_prompt)
         self.assertIn("fast_speech", prompt)
-        self.assertIn("human-like social warmth", prompt)
-        self.assertIn("not a program, programme", prompt)
+        self.assertIn("owner-approved fast voice profile", prompt)
+        self.assertIn("not customer-service", prompt)
         self.assertIn("Return one compact JSON object", prompt)
         self.assertLess(len(prompt), 5200)
 
@@ -547,7 +559,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertFalse(proposal["effectful"])
         self.assertNotIn("social.blink_eyes", annotated.actions)
 
-    def test_user_prompt_uses_extracted_memory_not_raw_history(self) -> None:
+    def test_user_prompt_uses_bounded_recent_dialogue_and_extracted_memory(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -594,7 +606,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         prompt = interpreter.build_user_prompt(request)
 
         self.assertIn("Current task: design extracted prompt memory", prompt)
-        self.assertNotIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
+        self.assertIn("Recent Accepted Dialogue JSON", prompt)
+        self.assertIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_CONVERSATION_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
         self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
@@ -2495,9 +2508,12 @@ class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Goal Progress Communication", rendered)
             self.assertIn("polite", rendered)
             self.assertIn("normally", rendered)
-            self.assertIn("Missing result", rendered)
+            self.assertIn("limit claims, not responsiveness", rendered)
         self.assertIn("immediate answer", system_prompt)
         self.assertIn("equivalent notification", user_prompt)
+        self.assertIn("customer-service", user_prompt)
+        self.assertIn("external truth check", user_prompt)
+        self.assertIn("before evidence", user_prompt)
 
     def test_model_facing_schema_requires_explicit_fast_speech_decision(self) -> None:
         schema = OllamaGoalInterpreter._route_response_schema()

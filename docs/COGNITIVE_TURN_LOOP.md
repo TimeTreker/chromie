@@ -378,15 +378,24 @@ results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
 provider-backed Speaking outcomes. No entry edits or upgrades another owner's
 evidence.
 
-Before Goal Association, recent session events form volatile Interaction
-Context for Goal Interpretation and Goal Association. After canonical Goal IDs
-exist, Runtime projects only events bound to those Goals plus explicitly unbound
-Fast speech from the same turn. Fast Planner, Deep Planner, Tool Result
-Interpreter, Response Composer, and other later cognitive stages receive the
-bounded Goal-scoped projection to decide the still-needed delta. Scheduled
-speech remains distinct from audible speech, committed work remains distinct
-from terminal evidence, and a speech event can never become execution or
-completion evidence.
+Before Goal Association, two bounded continuity surfaces are available. First,
+Gateway-admitted user turns are published immediately as accepted dialogue
+history; this preserves references across overlapping turns without creating a
+Goal or Task. Second, recent session events form volatile Interaction Context for
+Goal Interpretation and Goal Association. Goal Interpretation receives that
+dialogue together with compact active/recent Goal and Task/progress projections.
+Goal Association receives the richer bounded Goal/Task/discourse view. Within one
+conversation, Goal Association is serialized at its semantic-state boundary; a
+later association refreshes continuity after the association already occupying that
+boundary commits. Refreshed dialogue is causally cut at the current admitted turn,
+so later speech can inform a follow-up but can never flow backward into an earlier turn.
+After canonical Goal IDs exist, Runtime projects only Interaction Ledger events
+bound to those Goals plus explicitly unbound Fast speech from the same turn. Fast
+Planner, Deep Planner, Tool Result Interpreter, Response Composer, and other later
+cognitive stages receive the bounded Goal-scoped projection to decide the
+still-needed delta. Scheduled speech remains distinct from audible speech,
+committed work remains distinct from terminal evidence, and a speech event can
+never become execution or completion evidence.
 
 The maintained result-scheduling contract distinguishes result evidence from
 speech scheduling. Dedicated safety/control evidence may deterministically

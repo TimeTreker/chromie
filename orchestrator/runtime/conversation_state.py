@@ -3290,6 +3290,69 @@ class ConversationStateManager:
     def clear(self, *, reason: str = "manual_clear") -> None:
         self.start_new_conversation(reason=reason)
 
+    def _matching_user_turn(
+        self,
+        *,
+        sid: str | None,
+        text: str,
+    ) -> dict[str, Any] | None:
+        normalized_sid = str(sid or "").strip()
+        for turn in reversed(self._turns):
+            if turn.get("role") != "user":
+                continue
+            if normalized_sid and str(turn.get("sid") or "").strip() != normalized_sid:
+                continue
+            if str(turn.get("text") or "") != text:
+                continue
+            return turn
+        return None
+
+    def record_accepted_user_turn(
+        self,
+        sid: str | None,
+        text: str | None,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Publish admitted dialogue immediately without inventing semantic state.
+
+        This is conversational evidence only. It deliberately does not create or
+        mutate a Goal/Task, extract semantic memory, or claim that Goal Association
+        has completed. A later ``record_user_turn`` enriches this same SID after
+        the model-owned semantic path resolves.
+        """
+
+        if not self.enabled:
+            return
+        compact = self._compact_text(text)
+        if not compact:
+            return
+        existing = self._matching_user_turn(sid=sid, text=compact)
+        accepted_metadata = {
+            "accepted_dialogue_evidence": True,
+            **dict(metadata or {}),
+        }
+        if existing is not None:
+            current_metadata = existing.get("metadata")
+            if not isinstance(current_metadata, dict):
+                current_metadata = {}
+            existing["metadata"] = {**current_metadata, **accepted_metadata}
+            self.last_activity_ms = _now_ms()
+            return
+        self._turns.append(
+            {
+                "role": "user",
+                "sid": sid,
+                "text": compact,
+                "route": None,
+                "intent": None,
+                "ts_ms": _now_ms(),
+                "conversation_id": self.conversation_id,
+                "metadata": accepted_metadata,
+            }
+        )
+        self.last_activity_ms = _now_ms()
+
     def record_user_turn(
         self,
         sid: str | None,
@@ -3319,18 +3382,27 @@ class ConversationStateManager:
                 source=str(turn_metadata.get("source") or "goal_interpreter"),
             )
             turn_metadata["semantic_task_operation_results"] = operation_results
-        self._turns.append(
-            {
-                "role": "user",
-                "sid": sid,
-                "text": compact,
-                "route": route,
-                "intent": intent,
-                "ts_ms": _now_ms(),
-                "conversation_id": self.conversation_id,
-                "metadata": turn_metadata,
-            }
-        )
+        existing = self._matching_user_turn(sid=sid, text=compact)
+        if existing is None:
+            self._turns.append(
+                {
+                    "role": "user",
+                    "sid": sid,
+                    "text": compact,
+                    "route": route,
+                    "intent": intent,
+                    "ts_ms": _now_ms(),
+                    "conversation_id": self.conversation_id,
+                    "metadata": turn_metadata,
+                }
+            )
+        else:
+            existing_metadata = existing.get("metadata")
+            if not isinstance(existing_metadata, dict):
+                existing_metadata = {}
+            existing["route"] = route
+            existing["intent"] = intent
+            existing["metadata"] = {**existing_metadata, **turn_metadata}
         if not semantic_operations and not semantic_resolution_authoritative:
             self._record_task_context_from_user_turn(
                 sid=sid,

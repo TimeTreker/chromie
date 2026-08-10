@@ -30,6 +30,7 @@ class _ConversationState:
     def __init__(self, conversation_id: str) -> None:
         self.conversation_id = conversation_id
         self.user_turns: list[dict[str, Any]] = []
+        self.accepted_turns: list[dict[str, Any]] = []
 
     def prepare_for_user_text(
         self,
@@ -41,6 +42,17 @@ class _ConversationState:
             "conversation_id": self.conversation_id,
             "started_new": False,
         }
+
+    def record_accepted_user_turn(
+        self,
+        sid: str,
+        user_text: str,
+        *,
+        metadata: dict[str, Any],
+    ) -> None:
+        self.accepted_turns.append(
+            {"sid": sid, "text": user_text, "metadata": metadata}
+        )
 
     def record_user_turn(
         self,
@@ -108,6 +120,9 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
             ) -> CoreInterpretationResult:
                 del args
                 envelope = kwargs["turn_envelope"]
+                self_outer = assistant.conversation_state
+                assert self_outer.accepted_turns
+                assert self_outer.accepted_turns[-1]["sid"] == envelope.session_id
                 return CoreInterpretationResult.from_route_decision(
                     envelope=envelope,
                     decision=SharedRouteDecision.model_validate(

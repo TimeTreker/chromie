@@ -352,6 +352,80 @@ def walk_definition() -> SkillDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
+    def test_goal_association_refreshes_committed_continuity_and_excludes_current_dialogue(self):
+        live_context = {
+            "conversation_id": "conversation-weather",
+            "history": [
+                {"role": "user", "sid": "turn-1", "text": "上海今晚是不是有大暴雨？"},
+                {"role": "user", "sid": "turn-2", "text": "那你帮我查一下是不是有吗？"},
+            ],
+            "active_goal_snapshots": [
+                {
+                    "goal_id": "goal-shanghai-weather",
+                    "status": "planning",
+                    "goal": {
+                        "description": "Check Shanghai weather tonight.",
+                        "object": {
+                            "bindings": {
+                                "location": {"entity_type": "location", "value": "上海"}
+                            }
+                        },
+                    },
+                }
+            ],
+            "active_task_snapshots": [
+                {
+                    "task_id": "task-shanghai-weather",
+                    "status": "planning",
+                    "semantic_goal": {
+                        "goal_id": "goal-shanghai-weather",
+                        "description": "Check Shanghai weather tonight.",
+                    },
+                }
+            ],
+        }
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=object(),
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            context_refresh=lambda sid: live_context,
+        )
+
+        refreshed, history = coordinator._refresh_continuity_context(
+            context={
+                "conversation_id": "conversation-weather",
+                "history": [],
+                "active_goal_snapshots": [],
+                "turn_id": "turn-2",
+            },
+            sid="turn-2",
+        )
+
+        self.assertEqual([item["sid"] for item in history], ["turn-1"])
+        self.assertEqual(
+            refreshed["active_goal_snapshots"][0]["goal"]["object"]["bindings"]["location"]["value"],
+            "上海",
+        )
+        self.assertEqual(refreshed["active_task_snapshots"][0]["status"], "planning")
+        first_turn_context, first_turn_history = coordinator._refresh_continuity_context(
+            context={
+                "conversation_id": "conversation-weather",
+                "history": [],
+                "turn_id": "turn-1",
+            },
+            sid="turn-1",
+        )
+        self.assertEqual(first_turn_history, [])
+        self.assertEqual(first_turn_context["history"], [])
+        self.assertIs(
+            coordinator._goal_association_lock(
+                context=refreshed, sid="turn-1"
+            ),
+            coordinator._goal_association_lock(
+                context=refreshed, sid="turn-2"
+            ),
+        )
+
     def run_resolution(
         self,
         coordinator,

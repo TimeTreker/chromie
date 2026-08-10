@@ -1981,6 +1981,102 @@ def validate_goal_binding_argument_grounding(
                     )
 
 
+def validate_user_supplied_parameter_provenance(
+    output: PlannerModelOutput,
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> None:
+    """Require non-numeric ``user_supplied`` values to exist in typed Goals.
+
+    A Planner may map a Goal binding to a differently named Capability argument,
+    but it cannot manufacture a material string/entity value and label it as user
+    supplied. Numeric provenance retains its older dedicated validator because it
+    also accounts for explicit numeric literals during the binding migration.
+    """
+
+    if output.disposition not in {"execute", "mixed"}:
+        return
+
+    bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        if goal_id:
+            bindings_by_goal[goal_id] = _goal_binding_map(goal)
+
+    for resolution in output.parameter_resolutions:
+        if resolution.strategy != "user_supplied":
+            continue
+        value = resolution.value
+        if (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float, Decimal))
+        ) or (
+            isinstance(value, str)
+            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is not None
+        ):
+            # The dedicated numeric provenance validator also supports legacy
+            # Goals whose numeric binding migration is still in progress.
+            continue
+
+        source_goal_ids = [
+            goal_id
+            for goal_id in resolution.source_goal_ids
+            if goal_id in bindings_by_goal
+        ]
+        if not source_goal_ids:
+            raise ValueError(
+                "non-numeric user_supplied parameter resolution requires "
+                f"authoritative source_goal_ids: {resolution.step_id}."
+                f"{resolution.parameter}"
+            )
+
+        cited_bindings: dict[str, list[dict[str, Any]]] = {}
+        for goal_id in source_goal_ids:
+            for name, binding in bindings_by_goal[goal_id].items():
+                cited_bindings.setdefault(name, []).append(binding)
+
+        if isinstance(value, dict) and resolution.parameter == "material_args":
+            unmatched = []
+            for name, actual in value.items():
+                candidates = cited_bindings.get(str(name), [])
+                if not candidates or not any(
+                    _material_values_equal(
+                        actual,
+                        binding["value"],
+                        list_compatible=(binding["entity_type"] in _LIST_ENTITY_TYPES),
+                    )
+                    for binding in candidates
+                ):
+                    unmatched.append(str(name))
+            if not unmatched:
+                continue
+        else:
+            preferred = cited_bindings.get(resolution.parameter, [])
+            candidates = preferred or [
+                binding
+                for bindings in cited_bindings.values()
+                for binding in bindings
+            ]
+            if any(
+                _material_values_equal(
+                    value,
+                    binding["value"],
+                    list_compatible=(binding["entity_type"] in _LIST_ENTITY_TYPES),
+                )
+                for binding in candidates
+            ):
+                continue
+
+        raise ValueError(
+            "user_supplied parameter resolution is not present in authoritative "
+            f"typed Goal bindings: {resolution.step_id}."
+            f"{resolution.parameter}={value!r}"
+        )
+
+
+
 def validate_external_response_evidence_boundary(
     output: PlannerModelOutput,
     *,

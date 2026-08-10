@@ -407,6 +407,26 @@ makes a poor semantic choice, the remedy is to fix and qualify that source
 prompt/model, not to hide the defect behind another LLM. Interaction Context remains
 the sole authority for whether any speech was actually heard or is still pending.
 
+Fast Response wording uses a bounded owner-approved **fast voice projection**:
+Chromie's name, child age/role identity where relevant to expression, and the
+positive `spoken_style`, `maturity_boundary`, and `tool_use_style` guidance needed
+to sound like the same person as later responses. The fast path does not need the
+entire worldview or long-term mind profile. A prospective lookup acknowledgement
+must sound like ordinary family conversation rather than customer-service or
+workflow-status prose. It may say what Chromie understood or is going to check,
+but a proposition whose truth still requires external evidence must not be stated
+as an already-known result. This is a general evidence/voice rule, not a list of
+forbidden phrases.
+
+Recent accepted dialogue is also part of human-like continuity. Once the Gateway
+admits a user turn, that turn is immediately visible to later turns as bounded
+conversation evidence even if its Goal Association is still running. This early
+record is not a provisional Goal and cannot authorize effects. Goal Association
+later publishes canonical Goal/Task/discourse state, and association/commit work within
+one conversation is serialized at that semantic-state boundary. A fast follow-up can
+therefore use the earlier utterance immediately and, once available, the earlier
+validated Goal instead of guessing a missing entity from model memory.
+
 Fast Planner, Deep Planner, Tool Result Interpreter, and Response Composer obey
 the same Goal Progress Communication rule. The initial acknowledgement is only the
 first milestone. When a later stage owns a new, trustworthy and user-relevant

@@ -914,6 +914,46 @@ def _compact_active_task_snapshots(
     return compact
 
 
+def _compact_active_goal_snapshots(
+    context: dict[str, Any],
+    *,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    raw = context.get("active_goal_snapshots")
+    if not isinstance(raw, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in raw[-max(1, limit) :]:
+        if not isinstance(item, dict):
+            continue
+        goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+        goal_id = str(item.get("goal_id") or goal.get("goal_id") or "").strip()
+        if not goal_id:
+            continue
+        compact.append(
+            {
+                "goal_id": goal_id,
+                "status": str(item.get("status") or ""),
+                "goal": {
+                    "description": str(goal.get("description") or "")[:240],
+                    "object": (
+                        goal.get("object")
+                        if isinstance(goal.get("object"), dict)
+                        else {}
+                    ),
+                    "constraints": (
+                        goal.get("constraints")
+                        if isinstance(goal.get("constraints"), dict)
+                        else {}
+                    ),
+                },
+                "commitment_state": item.get("commitment_state"),
+                "last_user_update": str(item.get("last_user_update") or "")[:220],
+            }
+        )
+    return compact
+
+
 def _compact_recent_goal_snapshots(
     context: dict[str, Any],
     *,
@@ -994,6 +1034,61 @@ def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, An
     return prompt_context
 
 
+def _compact_recent_dialogue(
+    context: dict[str, Any],
+    *,
+    limit: int = 6,
+) -> list[dict[str, Any]]:
+    """Project bounded accepted dialogue without reintroducing full session state.
+
+    Goal Interpretation needs nearby conversational evidence for follow-ups such
+    as pronouns, ellipsis, corrections, and "that one" references.  The full
+    conversation object remains excluded from the fast prompt; this projection
+    keeps only user/assistant surface text plus small provenance fields.
+    """
+
+    raw = context.get("history")
+    if not isinstance(raw, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in raw[-max(1, int(limit)) :]:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        if role not in {"user", "assistant"}:
+            continue
+        # Suppressed ambient input is retained by the Host for auditability but
+        # is not conversational evidence for semantic continuity.
+        if role == "user" and str(item.get("route") or "").strip() == "ignore":
+            continue
+        text = " ".join(str(item.get("text") or "").strip().split())
+        if not text:
+            continue
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        projected = {
+            "role": role,
+            "text": text[:260],
+        }
+        sid = " ".join(str(item.get("sid") or "").strip().split())
+        if sid:
+            projected["sid"] = sid
+        if role == "user":
+            route = " ".join(str(item.get("route") or "").strip().split())
+            intent = " ".join(str(item.get("intent") or "").strip().split())
+            if route:
+                projected["route"] = route
+            if intent:
+                projected["intent"] = intent
+        else:
+            source = " ".join(str(metadata.get("source") or "").strip().split())
+            if source:
+                projected["source"] = source
+        compact.append(projected)
+    return compact
+
+
 def _goal_interpretation_fast_context_section(mind: Any) -> str:
     """Minimal context for the fast Goal Interpreter.
 
@@ -1002,34 +1097,53 @@ def _goal_interpretation_fast_context_section(mind: Any) -> str:
     Deepthinking and capability prompts still receive richer mind context.
     """
 
-    identity = {}
+    identity: dict[str, Any] = {}
+    voice: dict[str, Any] = {}
     if isinstance(mind, dict):
+        raw_identity = mind.get("identity")
+        if isinstance(raw_identity, dict):
+            identity.update(
+                {
+                    key: raw_identity.get(key)
+                    for key in (
+                        "entity_id",
+                        "name",
+                        "kind",
+                        "age_description",
+                        "family_role",
+                    )
+                    if raw_identity.get(key) not in (None, "", [], {})
+                }
+            )
         self_model = mind.get("self_model")
         speaker = self_model.get("speaker_entity") if isinstance(self_model, dict) else None
         if isinstance(speaker, dict):
-            identity = {
-                "profile_id": mind.get("profile_id"),
-                "version": mind.get("version"),
-                "entity_id": speaker.get("entity_id"),
-                "name": speaker.get("name"),
-                "kind": speaker.get("kind"),
+            for key in ("entity_id", "name", "kind"):
+                if speaker.get(key) not in (None, "", [], {}):
+                    identity[key] = speaker.get(key)
+        identity["profile_id"] = mind.get("profile_id")
+        identity["version"] = mind.get("version")
+        personality = mind.get("personality_expression")
+        if isinstance(personality, dict) and personality.get("owner_approved") is True:
+            voice = {
+                key: personality.get(key)
+                for key in (
+                    "spoken_style",
+                    "tool_use_style",
+                    "maturity_boundary",
+                )
+                if personality.get(key) not in (None, "", [], {})
             }
-        elif isinstance(mind.get("identity"), dict):
-            raw_identity = mind["identity"]
-            identity = {
-                "profile_id": mind.get("profile_id"),
-                "version": mind.get("version"),
-                "entity_id": raw_identity.get("entity_id"),
-                "name": raw_identity.get("name"),
-                "kind": raw_identity.get("kind"),
-                "age_description": raw_identity.get("age_description"),
-                "identity_answer_guidance": raw_identity.get("identity_answer_guidance"),
-            }
+    profile = {
+        "identity": identity or {"entity_id": "chromie", "name": "Chromie"},
+        "voice": voice,
+    }
     return (
         "Fast Goal Interpretation Context:\n"
-        f"{_bounded_json(identity or {'entity_id': 'chromie', 'name': 'Chromie'}, max_chars=180)}\n"
+        f"{_bounded_json(profile, max_chars=1150)}\n"
+        "This voice governs fast_speech. "
         "The full owner-approved mind profile, worldview, lifeview, valueview, "
-        "long-term goals, and core principles are downstream only. "
+        "long-term goals, and core principles remain downstream. "
         "Pick context_profile: fast_minimal, session_compact, capability_safety, full_mind."
     )
 
@@ -1177,9 +1291,17 @@ class OllamaGoalInterpreter:
             request.context.get("interaction_context") or {},
             max_chars=3200,
         )
+        recent_dialogue_json = _bounded_json_array(
+            _compact_recent_dialogue(request.context),
+            max_chars=1800,
+        )
         active_tasks_json = _bounded_json_array(
             _compact_active_task_snapshots(request.context),
             max_chars=1800,
+        )
+        active_goals_json = _bounded_json_array(
+            _compact_active_goal_snapshots(request.context),
+            max_chars=1500,
         )
         recent_goals_json = _bounded_json_array(
             _compact_recent_goal_snapshots(request.context),
@@ -1197,7 +1319,9 @@ class OllamaGoalInterpreter:
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
             f"Recent Interaction Context JSON:{interaction_context_json}\n"
-            f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
+            f"Recent Accepted Dialogue JSON:{recent_dialogue_json}\n"
+            f"Active Goal Snapshot JSON:{active_goals_json}\n"
+            f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
             "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter ran. Decide from meaning, bounded context. Terminal references do not reopen Goals. Memory writes use route=memory; supplied-memory recall uses route=chat. This is bounded cognitive evidence, not final goal meaning. Return calibrated confidence; do not answer, execute, or authorize side effects.\n\n"
@@ -1206,13 +1330,13 @@ class OllamaGoalInterpreter:
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use Goals and Interaction Context by meaning; emit only the still-needed delta. Heard speech and trusted terminal effects count as done; scheduled speech and planned/committed work do not. Fast speech is the first Goal Progress Communication milestone and a polite notification: once a nontrivial Goal is understood and still needs downstream work, normally give one tiny prospective acknowledgement. Missing results limit claims, not responsiveness. Omit it for an immediate substantive answer, an equivalent notification delivered/pending, explicit user silence, or empty repetition. It is not Social Attention or clarification/confirmation. Repeat only for new meaning such as failure/retry, correction, changed state, evidence, clarification, or explicit repetition. Preserve exact corrected bindings; clarify only real ambiguity; one responsibility is one route item.\n"
+            "Use bounded recent accepted dialogue, active/recent Goals, Tasks/progress, discourse, and Interaction Context; resolve continuity by meaning, not lexical shortcuts or recency, and emit only the still-needed delta. Fast speech is the first Goal Progress Communication milestone: for understood nontrivial downstream work, normally give one tiny polite prospective acknowledgement. Missing results limit claims, not responsiveness; an external truth check may say it is being checked but must not assert the proposition before evidence. Omit for an immediate answer, equivalent notification delivered/pending, requested silence, or empty repetition. Heard speech and trusted terminal effects count as done; scheduled/planned work does not. Preserve exact corrected bindings; clarify only real ambiguity.\n"
             "Capability Affordance Proposal:\n"
             "Treat the Common Ability Catalog as a compact body/tool affordance interface: candidate proposals, not authoritative grounding and not a phrase table. capability_inquiry is only about Chromie's abilities. Availability questions stay chat; supported execution requests use robot_action. Bind exact capabilities only for clear execution methods. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify. Missing or ambiguous methods preserve an open goal for CapabilityAgent. For current external facts, choose an available trusted lookup capability by meaning and context; do not map a topic keyword to a tool. Exact match: route=tool and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or emit low-level motor/control fields.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech. fast_speech is one short natural notification or null; never omit the decision. For understood nontrivial downstream work, normally notify the person promptly; missing results limit claims, not responsiveness. Use null for an immediate answer, an equivalent delivered/pending notification, requested silence, or empty repetition. Host derives the typed claim envelope; the text cannot claim execution or results. fast_speech uses human-like social warmth, not a program, programme, or backend. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech. fast_speech is one short natural notification or null; never omit the decision. Follow the bounded owner-approved fast voice profile: sound like the same child/family person as later speech, not customer-service, workflow-status, or technical-operator prose. The notification may say what Chromie understood or will check, but cannot assert an unobserved result, execution, or completion. Use null for an immediate answer, an equivalent delivered/pending notification, requested silence, or empty repetition. Host derives the typed claim envelope. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
@@ -1348,6 +1472,9 @@ class OllamaGoalInterpreter:
         )
         mind = request.context.get("mind", {})
         session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
+        recent_dialogue = _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1400)
+        active_goals = _bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1000)
+        active_tasks = _bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1200)
         return {
             "model": self.review_model or self.model,
             "stream": False,
@@ -1360,9 +1487,13 @@ class OllamaGoalInterpreter:
                     "content": (
                         "Global Context Group:\n"
                         f"{_goal_interpretation_global_context_section(mind)}\n\n"
+                        f"{_goal_interpretation_fast_context_section(mind)}\n\n"
                         "Session Context Group:\n"
                         f"- Language hint: {request.language or 'auto'}\n"
-                        f"- Bounded session context JSON: {session_context}\n\n"
+                        f"- Bounded session context JSON: {session_context}\n"
+                        f"- Recent accepted dialogue JSON: {recent_dialogue}\n"
+                        f"- Active Goal JSON: {active_goals}\n"
+                        f"- Active Task/progress JSON: {active_tasks}\n\n"
                         "Current Job:\n"
                         "- You are now acting as Chromie's semantic route reviewer.\n"
                         "- Use semantic generalization from meaning, session context, and supplied common ability descriptions.\n"
@@ -1381,7 +1512,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only. Required keys are route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null; the decision itself may not be omitted.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- A non-null fast_speech is a short prospective Goal-progress notification only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
+                        "- A non-null fast_speech is a short prospective Goal-progress notification only. Follow the supplied fast identity/voice projection: ordinary child/family speech, not customer-service or workflow-status prose. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. It must not claim completion, physical execution, memory commit, or a tool result.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Never choose interrupt or ignore.\n"
                         "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
@@ -1474,6 +1605,9 @@ class OllamaGoalInterpreter:
         )
         mind = request.context.get("mind", {})
         session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
+        recent_dialogue = _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1400)
+        active_goals = _bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1000)
+        active_tasks = _bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1200)
         return {
             "model": self.model,
             "stream": False,
@@ -1486,9 +1620,13 @@ class OllamaGoalInterpreter:
                     "content": (
                         "Global Context Group:\n"
                         f"{_goal_interpretation_global_context_section(mind)}\n\n"
+                        f"{_goal_interpretation_fast_context_section(mind)}\n\n"
                         "Session Context Group:\n"
                         f"- Language hint: {request.language or 'auto'}\n"
-                        f"- Bounded session context JSON: {session_context}\n\n"
+                        f"- Bounded session context JSON: {session_context}\n"
+                        f"- Recent accepted dialogue JSON: {recent_dialogue}\n"
+                        f"- Active Goal JSON: {active_goals}\n"
+                        f"- Active Task/progress JSON: {active_tasks}\n\n"
                         "Current Job:\n"
                         "- Repair a realtime robot route after the deterministic emergency/noise filter already passed.\n"
                         "- The fast goal interpreter incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and common abilities.\n"
@@ -1500,7 +1638,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only with required keys route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- A non-null fast_speech must be a short prospective Goal-progress notification only; never claim tool results, physical completion, or memory commit.\n"
+                        "- A non-null fast_speech must follow the supplied fast identity/voice projection and sound like ordinary child/family speech, not customer-service or workflow-status prose. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. Never claim tool results, physical completion, or memory commit.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"

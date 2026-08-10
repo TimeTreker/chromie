@@ -17,6 +17,37 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class ConversationStateTests(unittest.TestCase):
+    def test_admitted_dialogue_is_visible_before_semantic_state_without_duplication(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="dialogue")
+
+        manager.record_accepted_user_turn(
+            "s1",
+            "上海今晚是不是有大暴雨？",
+            metadata={"source": "cognitive_gateway_admitted_dialogue"},
+        )
+
+        history = manager.get_history()
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["text"], "上海今晚是不是有大暴雨？")
+        self.assertIsNone(history[0]["route"])
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(manager.active_task_snapshots(), [])
+
+        manager.record_user_turn(
+            "s1",
+            "上海今晚是不是有大暴雨？",
+            route="tool",
+            intent="capability:chromie.weather.lookup",
+            metadata={"source": "goal_driven_cognitive_runtime"},
+        )
+
+        history = manager.get_history()
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["route"], "tool")
+        self.assertEqual(history[0]["intent"], "capability:chromie.weather.lookup")
+        self.assertTrue(history[0]["metadata"]["accepted_dialogue_evidence"])
+        self.assertEqual(history[0]["metadata"]["source"], "goal_driven_cognitive_runtime")
+
     def test_natural_language_reset_is_not_classified_by_host(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
         manager.record_user_turn("s1", "check the weather", route="tool", intent="weather_query")

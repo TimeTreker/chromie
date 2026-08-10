@@ -290,6 +290,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    than hiding the defect behind another model. Social Attention,
    clarification/confirmation, task progress communication, and final result
    delivery remain distinct responsibilities even when they happen close together.
+24. **Publish dialogue early; publish semantic state only after validation.**
+   Goal Interpretation and Goal Association require a bounded view of the recent
+   accepted conversation together with active/recent Goals, task/progress state,
+   discourse focus, and Interaction Context. A user turn becomes conversation
+   evidence as soon as the Cognitive Gateway admits it, so a fast follow-up can
+   still refer to that utterance while the earlier Goal is being interpreted.
+   Admission does **not** create a provisional canonical Goal, Task, binding, or
+   execution authority. Canonical Goal/Task state becomes visible only after the
+   model-owned Goal Association result passes validation. Goal Association commits
+   within one conversation are serialized at that semantic-state boundary; the
+   next association refreshes the bounded continuity snapshot before deciding `continue`, `reference`, `modify`,
+   replacement, or new work. Continuity is causally bounded: a turn never reads
+   dialogue admitted after itself. This keeps conversational continuity responsive
+   without letting the Host infer semantics from recency or wording. Planner
+   provenance remains downstream fail-closed: a value labelled `user_supplied`
+   must be traceable to an authoritative typed Goal binding rather than model
+   memory or an invented contextual guess.
 
 ## Non-goals
 

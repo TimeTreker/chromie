@@ -8,6 +8,7 @@ from agent.app.planner_contract import (
     normalize_schema_default_parameter_provenance,
     validate_explicit_numeric_parameter_grounding,
     validate_goal_binding_argument_grounding,
+    validate_user_supplied_parameter_provenance,
 )
 
 
@@ -459,6 +460,68 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 resolution_value="temperature, rain, air conditioning need"
             ),
             authoritative_goals=[_weather_goal()],
+        )
+
+    def test_string_user_supplied_resolution_requires_typed_goal_binding(self):
+        raw = _weather_output().model_dump(mode="python")
+        raw["steps"][0]["args"]["location"] = "重庆"
+        raw["parameter_resolutions"].append(
+            {
+                "step_id": "weather",
+                "parameter": "location",
+                "strategy": "user_supplied",
+                "value": "重庆",
+                "confidence": 1.0,
+                "blocking": False,
+                "rationale": "Claimed as user supplied.",
+                "source_goal_ids": ["goal-weather"],
+            }
+        )
+        output = PlannerModelOutput.model_validate(raw)
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "not present in authoritative typed Goal bindings",
+        ):
+            validate_user_supplied_parameter_provenance(
+                output,
+                authoritative_goals=[_weather_goal()],
+            )
+
+    def test_string_user_supplied_resolution_cannot_replace_typed_location(self):
+        goal = _weather_goal()
+        goal["object"]["bindings"]["location"] = {
+            "entity_type": "location",
+            "value": "上海",
+        }
+        raw = _weather_output().model_dump(mode="python")
+        raw["steps"][0]["args"]["location"] = "重庆"
+        raw["parameter_resolutions"].append(
+            {
+                "step_id": "weather",
+                "parameter": "location",
+                "strategy": "user_supplied",
+                "value": "重庆",
+                "confidence": 1.0,
+                "blocking": False,
+                "rationale": "Claimed as user supplied.",
+                "source_goal_ids": ["goal-weather"],
+            }
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "not present in authoritative typed Goal bindings",
+        ):
+            validate_user_supplied_parameter_provenance(
+                PlannerModelOutput.model_validate(raw),
+                authoritative_goals=[goal],
+            )
+
+        raw["steps"][0]["args"]["location"] = "上海"
+        raw["parameter_resolutions"][-1]["value"] = "上海"
+        validate_user_supplied_parameter_provenance(
+            PlannerModelOutput.model_validate(raw),
+            authoritative_goals=[goal],
         )
 
     def test_scalar_string_is_not_split_without_list_shape_evidence(self):

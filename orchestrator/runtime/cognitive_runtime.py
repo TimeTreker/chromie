@@ -1867,7 +1867,7 @@ class GoalDrivenRuntimeCoordinator:
         adapter: CanonicalPlanRuntimeAdapter,
         policy: CognitiveRuntimePolicy,
         goal_state_apply: Callable[..., list[dict[str, Any]]] | None = None,
-        context_refresh: Callable[[], dict[str, Any]] | None = None,
+        context_refresh: Callable[[str | None], dict[str, Any]] | None = None,
         delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
         interaction_ledger: Any | None = None,
         workflow_stage_sink: Callable[..., None] | None = None,
@@ -1877,6 +1877,7 @@ class GoalDrivenRuntimeCoordinator:
         self.policy = policy
         self.goal_state_apply = goal_state_apply
         self.context_refresh = context_refresh
+        self._goal_association_locks: dict[str, asyncio.Lock] = {}
         self.delivered_turn_speech_provider = delivered_turn_speech_provider
         self.workflow_stage_sink = workflow_stage_sink
         self.interaction_ledger = interaction_ledger or getattr(
@@ -1884,6 +1885,99 @@ class GoalDrivenRuntimeCoordinator:
             "interaction_ledger",
             None,
         )
+
+    _CONTINUITY_REFRESH_KEYS = frozenset(
+        {
+            "conversation",
+            "session_memory",
+            "memory_summary",
+            "extracted_memory",
+            "history",
+            "pending_tasks",
+            "active_pending_tasks",
+            "task_contexts",
+            "active_task_contexts",
+            "active_task_snapshots",
+            "active_goal_snapshots",
+            "recent_goal_snapshots",
+            "current_task_context",
+            "discourse_referents",
+            "discourse_focus",
+            "verified_tool_memory_index",
+            "recent_tool_evidence",
+            "interaction_engagement",
+        }
+    )
+
+    @staticmethod
+    def _goal_association_lock_key(
+        context: dict[str, Any],
+        sid: str,
+    ) -> str:
+        return " ".join(
+            str(context.get("conversation_id") or sid or "local_default")
+            .strip()
+            .split()
+        ) or "local_default"
+
+    def _goal_association_lock(
+        self,
+        *,
+        context: dict[str, Any],
+        sid: str,
+    ) -> asyncio.Lock:
+        key = self._goal_association_lock_key(context, sid)
+        lock = self._goal_association_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._goal_association_locks[key] = lock
+        return lock
+
+    def _refresh_continuity_context(
+        self,
+        *,
+        context: dict[str, Any],
+        sid: str,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        if self.context_refresh is None:
+            refreshed = dict(context)
+        else:
+            live = self.context_refresh(sid)
+            refreshed = dict(context)
+            for key in self._CONTINUITY_REFRESH_KEYS:
+                if key in live:
+                    refreshed[key] = live[key]
+
+        # The admitted current turn may already be published as conversation
+        # evidence. Goal Association receives it separately as authoritative
+        # request.text, so history must contain only prior dialogue.
+        raw_history = refreshed.get("history")
+        if isinstance(raw_history, list):
+            normalized_sid = str(sid or "").strip()
+            current_index = next(
+                (
+                    index
+                    for index, item in enumerate(raw_history)
+                    if isinstance(item, dict)
+                    and str(item.get("sid") or "").strip() == normalized_sid
+                ),
+                None,
+            )
+            causal_history = (
+                raw_history[:current_index]
+                if current_index is not None
+                else raw_history
+            )
+            history = [
+                dict(item)
+                for item in causal_history
+                if isinstance(item, dict)
+                and str(item.get("sid") or "").strip() != normalized_sid
+            ]
+        else:
+            history = []
+        refreshed["history"] = history
+        return refreshed, history
 
     @staticmethod
     def _workflow_output_status(output: Any) -> str:
@@ -2478,135 +2572,144 @@ class GoalDrivenRuntimeCoordinator:
             )
 
         try:
-            stage = time.perf_counter()
-            association = await self._observe_workflow_stage(
+            association_lock = self._goal_association_lock(
+                context=context,
                 sid=sid,
-                stage="goal_association",
-                input_payload={
-                    "user_text": text,
-                    "route_decision": route_decision,
-                    "active_goal_snapshots": context.get("active_goal_snapshots", []),
-                    "history_turn_count": len(history),
-                },
-                operation=self.agent_client.resolve_goal_association(
-                    session,
-                    text=text,
-                    route_decision=route_decision,
-                    sid=sid,
-                    context=context,
-                    history=history,
-                    timeout_ms=self.policy.goal_association_timeout_ms,
-                ),
             )
-            timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
-            association_status = str((association.metadata or {}).get("status") or "resolved")
-            planning_context = dict(context)
-            planning_context["goal_association_resolution"] = association.prompt_projection()
-
-            if association_status not in {"resolved", "needs_clarification"}:
-                raise CognitiveStageFailure(
-                    "goal_association",
-                    self._stage_failure_metadata(
-                        "goal_association",
-                        association.metadata,
-                        default_failure_class=association_status or "stage_failure",
+            async with association_lock:
+                context, history = self._refresh_continuity_context(
+                    context=context,
+                    sid=sid,
+                )
+                stage = time.perf_counter()
+                association = await self._observe_workflow_stage(
+                    sid=sid,
+                    stage="goal_association",
+                    input_payload={
+                        "user_text": text,
+                        "route_decision": route_decision,
+                        "active_goal_snapshots": context.get("active_goal_snapshots", []),
+                        "history_turn_count": len(history),
+                    },
+                    operation=self.agent_client.resolve_goal_association(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=context,
+                        history=history,
+                        timeout_ms=self.policy.goal_association_timeout_ms,
                     ),
                 )
+                timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
+                association_status = str((association.metadata or {}).get("status") or "resolved")
+                planning_context = dict(context)
+                planning_context["goal_association_resolution"] = association.prompt_projection()
 
-            # Goal Association is the model-owned semantic interpretation of the
-            # user's responsibility.  Publish that validated semantic state as
-            # soon as the stage completes so a concurrent follow-up can reason
-            # over the in-flight Goal while planning/composition continue.  The
-            # host is only transporting and versioning the model result here; it
-            # does not infer continuity, entities, or bindings itself.
-            #
-            # Named cancellation remains deferred to the trusted runtime closure
-            # because execution-bound cancellation requires provider receipts.
-            has_named_goal_cancellation = any(
-                item.relationship == "cancel" for item in association.associations
-            )
-            if (
-                self.policy.mode == "apply"
-                and self.goal_state_apply is not None
-                and association_status == "resolved"
-                and not association.clarification
-            ):
-                if has_named_goal_cancellation:
-                    goal_state_commit_stage = "deferred_named_goal_cancellation"
-                else:
-                    commit_started_ms = time.perf_counter() * 1000.0
-                    try:
-                        goal_state_results = self.goal_state_apply(
-                            association,
-                            sid=sid,
-                            user_text=text,
-                            route=route_decision.route,
-                            intent=route_decision.intent,
-                            source=("goal_driven_cognitive_runtime_goal_association"),
-                        )
-                    except Exception as exc:
+                if association_status not in {"resolved", "needs_clarification"}:
+                    raise CognitiveStageFailure(
+                        "goal_association",
+                        self._stage_failure_metadata(
+                            "goal_association",
+                            association.metadata,
+                            default_failure_class=association_status or "stage_failure",
+                        ),
+                    )
+
+                # Goal Association is the model-owned semantic interpretation of the
+                # user's responsibility.  Publish that validated semantic state as
+                # soon as the stage completes so a concurrent follow-up can reason
+                # over the in-flight Goal while planning/composition continue.  The
+                # host is only transporting and versioning the model result here; it
+                # does not infer continuity, entities, or bindings itself.
+                #
+                # Named cancellation remains deferred to the trusted runtime closure
+                # because execution-bound cancellation requires provider receipts.
+                has_named_goal_cancellation = any(
+                    item.relationship == "cancel" for item in association.associations
+                )
+                if (
+                    self.policy.mode == "apply"
+                    and self.goal_state_apply is not None
+                    and association_status == "resolved"
+                    and not association.clarification
+                ):
+                    if has_named_goal_cancellation:
+                        goal_state_commit_stage = "deferred_named_goal_cancellation"
+                    else:
+                        commit_started_ms = time.perf_counter() * 1000.0
+                        try:
+                            goal_state_results = self.goal_state_apply(
+                                association,
+                                sid=sid,
+                                user_text=text,
+                                route=route_decision.route,
+                                intent=route_decision.intent,
+                                source=("goal_driven_cognitive_runtime_goal_association"),
+                            )
+                        except Exception as exc:
+                            self._record_workflow_stage(
+                                sid=sid,
+                                stage="goal_state_commit",
+                                started_monotonic_ms=commit_started_ms,
+                                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                                status="failed",
+                                input_payload={"goal_association": association},
+                                output_payload=None,
+                                errors=[
+                                    {
+                                        "error_type": type(exc).__name__,
+                                        "error": str(exc),
+                                    }
+                                ],
+                                attempt=1,
+                            )
+                            raise CognitiveStageFailure(
+                                "goal_association_commit",
+                                {
+                                    "failure_class": type(exc).__name__,
+                                    "failure_domain": "semantic_state",
+                                    "architecture_attribution": "host_runtime",
+                                    "retryable": False,
+                                    "error_type": type(exc).__name__,
+                                    "error": str(exc)[:300],
+                                },
+                            ) from exc
                         self._record_workflow_stage(
                             sid=sid,
                             stage="goal_state_commit",
                             started_monotonic_ms=commit_started_ms,
                             finished_monotonic_ms=time.perf_counter() * 1000.0,
-                            status="failed",
+                            status="accepted",
                             input_payload={"goal_association": association},
-                            output_payload=None,
-                            errors=[
-                                {
-                                    "error_type": type(exc).__name__,
-                                    "error": str(exc),
-                                }
-                            ],
+                            output_payload={"goal_state_results": goal_state_results},
+                            errors=[],
                             attempt=1,
                         )
-                        raise CognitiveStageFailure(
-                            "goal_association_commit",
-                            {
-                                "failure_class": type(exc).__name__,
-                                "failure_domain": "semantic_state",
-                                "architecture_attribution": "host_runtime",
-                                "retryable": False,
-                                "error_type": type(exc).__name__,
-                                "error": str(exc)[:300],
-                            },
-                        ) from exc
-                    self._record_workflow_stage(
-                        sid=sid,
-                        stage="goal_state_commit",
-                        started_monotonic_ms=commit_started_ms,
-                        finished_monotonic_ms=time.perf_counter() * 1000.0,
-                        status="accepted",
-                        input_payload={"goal_association": association},
-                        output_payload={"goal_state_results": goal_state_results},
-                        errors=[],
-                        attempt=1,
-                    )
-                    rejected = [
-                        item
-                        for item in goal_state_results
-                        if item.get("applied") is False
-                        and item.get("reason")
-                        not in {
-                            "operation_already_applied",
-                        }
-                    ]
-                    if rejected:
-                        raise CognitiveStageFailure(
-                            "goal_association_commit",
-                            {
-                                "failure_class": "goal_state_application_rejected",
-                                "failure_domain": "semantic_state",
-                                "architecture_attribution": "host_runtime",
-                                "retryable": False,
-                                "error": json.dumps(
-                                    rejected,
-                                    ensure_ascii=False,
-                                )[:300],
-                            },
-                        )
-                    goal_state_commit_stage = "goal_association"
+                        rejected = [
+                            item
+                            for item in goal_state_results
+                            if item.get("applied") is False
+                            and item.get("reason")
+                            not in {
+                                "operation_already_applied",
+                            }
+                        ]
+                        if rejected:
+                            raise CognitiveStageFailure(
+                                "goal_association_commit",
+                                {
+                                    "failure_class": "goal_state_application_rejected",
+                                    "failure_domain": "semantic_state",
+                                    "architecture_attribution": "host_runtime",
+                                    "retryable": False,
+                                    "error": json.dumps(
+                                        rejected,
+                                        ensure_ascii=False,
+                                    )[:300],
+                                },
+                            )
+                        goal_state_commit_stage = "goal_association"
 
             association_goal_ids = self._association_goal_ids(association)
             if self.policy.mode == "apply" and self.interaction_ledger is not None:

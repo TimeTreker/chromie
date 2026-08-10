@@ -623,16 +623,49 @@ Goal being answered.
 
 Goal association should consider a bounded projection of:
 
+- recent Gateway-admitted dialogue turns, even when an earlier turn has not yet
+  finished Goal Association;
 - active goals;
 - goals waiting for user input;
 - goals awaiting confirmation;
 - recently completed or cancelled goals when reference is plausible.
+
+It also receives the bounded task/progress projection for those Goals. Dialogue
+history answers *what was just said*; Goal snapshots answer *what semantic work
+has already been validated*; task/progress snapshots answer *what is currently
+planning, waiting, committed, running, recoverable, or terminal*. These are
+different evidence classes and must not be collapsed into one recency heuristic.
 
 It must not load unlimited history.
 
 Candidate retrieval may narrow the context, but retrieval scores, recency,
 entity overlap, and keyword matches are advisory only. They cannot decide the
 relationship.
+
+### 6.2.1 Accepted dialogue versus canonical Goal state
+
+Conversation continuity has two publication boundaries.
+
+1. After Cognitive Gateway admission, the exact normalized user turn is appended
+   immediately to bounded conversation history as **accepted dialogue evidence**.
+   This record carries no Goal ID, semantic binding, Task commitment, or execution
+   authority.
+2. After Goal Association validates, its model-owned Goal/association result is
+   committed to canonical Goal/Task/discourse state. That semantic state may then
+   guide later turns and planning.
+
+Goal Interpretation therefore sees recent accepted dialogue plus whatever
+canonical Goal/Task state already exists. Goal Association uses the same dialogue
+evidence but is the only stage that decides how the current turn relates to the
+bounded Goal set. Within one conversation, Goal Association is serialized at this
+semantic-state boundary: a later association refreshes continuity after any association
+already occupying that boundary commits, then reasons over the newest validated Goal
+and Task state. Fast acknowledgement and Gateway admission remain outside that
+serialization, so conversational responsiveness does not require semantic races.
+
+The Host never manufactures a provisional Goal from the early dialogue record.
+If a prior association is unavailable or fails, the later model may still reason
+from accepted dialogue, but it must not pretend that an uncommitted Goal exists.
 
 ### 6.3 Ambiguity handling
 

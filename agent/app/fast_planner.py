@@ -43,6 +43,7 @@ from .planner_contract import (
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
+    validate_user_supplied_parameter_provenance,
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
@@ -303,6 +304,10 @@ class FastPlannerResolver:
                     authoritative_goals=authoritative_goals,
                 )
                 validate_goal_binding_argument_grounding(
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
+                )
+                validate_user_supplied_parameter_provenance(
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
                 )
