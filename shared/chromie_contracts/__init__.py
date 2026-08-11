@@ -190,6 +190,7 @@ from .resource import (
 )
 from .semantic_task import (
     CommitmentState,
+    ResponsibilityStatus,
     InformationGap,
     PlanningResult,
     ResponsePlan,
@@ -364,6 +365,7 @@ __all__ = [
     "GoalVersionRef",
     "stable_goal_operation_id",
     "CommitmentState",
+    "ResponsibilityStatus",
     "InformationGap",
     "PlanningResult",
     "ResponsePlan",

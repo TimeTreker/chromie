@@ -726,7 +726,13 @@ class ConversationStateTests(unittest.TestCase):
                 task_store_path=store_path,
             )
 
-            self.assertIsNone(restored_after_done.snapshot()["current_task_context"])
+            restored_done_context = restored_after_done.snapshot()["current_task_context"]
+            self.assertIsNotNone(restored_done_context)
+            self.assertEqual(restored_done_context["status"], "recoverable")
+            self.assertEqual(
+                restored_after_done.active_goal_snapshots()[0]["responsibility_status"],
+                "open",
+            )
 
     def test_completed_skill_request_closes_active_task_and_can_be_pruned(self) -> None:
         manager = ConversationStateManager(completed_task_retention_sec=0)
@@ -842,7 +848,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
 
         manager.record_agent_result("sid-execute", response)
         self.assertEqual(
-            [item["status"] for item in manager.active_goal_snapshots()],
+            [item["work_status"] for item in manager.active_goal_snapshots()],
             ["scheduled", "scheduled"],
         )
 
@@ -854,7 +860,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["goal_id"] for item in manager.active_goal_snapshots()],
-            ["goal-blink"],
+            ["goal-walk", "goal-blink"],
         )
 
         self.assertTrue(
@@ -863,43 +869,17 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 status="completed",
             )
         )
-        self.assertEqual(manager.active_goal_snapshots(), [])
         self.assertEqual(
-            [item["goal_id"] for item in manager.recent_goal_snapshots()],
-            ["goal-walk", "goal-blink"],
+            [item["responsibility_status"] for item in manager.active_goal_snapshots()],
+            ["open", "open"],
         )
+        self.assertEqual(manager.recent_goal_snapshots(), [])
         self.assertEqual(
             [
                 item["goal_id"]
                 for item in manager.goal_association_candidate_snapshots()
             ],
             ["goal-walk", "goal-blink"],
-        )
-        continuity = manager.apply_goal_association_resolution(
-            {
-                "turn_id": "turn-reference-completed",
-                "associations": [
-                    {
-                        "association_id": "assoc-reference-completed",
-                        "relationship": "reference",
-                        "target_goal_ids": ["goal-walk"],
-                        "confidence": 0.99,
-                        "reason_summary": "The user referred to the completed walk Goal.",
-                    }
-                ],
-                "confidence": 0.99,
-            },
-            sid="sid-reference-completed",
-            user_text="Was that completed?",
-            route="chat",
-            intent="status_followup",
-        )
-        self.assertTrue(continuity[0]["applied"])
-        self.assertEqual(continuity[0]["state_change"], "continuity_marker")
-        self.assertEqual(manager.active_goal_snapshots(), [])
-        self.assertEqual(
-            manager.recent_goal_snapshots()[0]["status"],
-            "done",
         )
 
     def test_respond_goal_waits_for_scoped_speech_runtime_result(self) -> None:
@@ -935,7 +915,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
         self.assertEqual(active[0]["goal_id"], "goal-answer")
-        self.assertEqual(active[0]["status"], "scheduled")
+        self.assertEqual(active[0]["work_status"], "scheduled")
         self.assertTrue(
             manager.update_pending_task_status_for_request_id(
                 request_id="speech-answer",
@@ -972,7 +952,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
         self.assertEqual(active[0]["goal_id"], "goal-native-answer")
-        self.assertEqual(active[0]["status"], "scheduled")
+        self.assertEqual(active[0]["work_status"], "scheduled")
         self.assertTrue(
             manager.update_pending_task_status_for_request_id(
                 request_id="speech-native-answer",
@@ -1015,8 +995,8 @@ class GoalScopedLifecycleTests(unittest.TestCase):
 
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
-        self.assertEqual(active[0]["status"], "waiting_for_user")
-        self.assertEqual(active[0]["commitment_state"], "waiting_for_user")
+        self.assertEqual(active[0]["work_status"], "waiting_for_user")
+        self.assertEqual(active[0]["responsibility_status"], "open")
         self.assertFalse(
             manager.update_pending_task_status_for_request_id(
                 request_id="speech-question",
@@ -1024,7 +1004,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            manager.active_goal_snapshots()[0]["status"],
+            manager.active_goal_snapshots()[0]["work_status"],
             "waiting_for_user",
         )
 
@@ -1076,11 +1056,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                         status=runtime_status,
                     )
                 )
-                self.assertEqual(manager.active_goal_snapshots(), [])
-                self.assertEqual(
-                    manager.snapshot()["task_contexts"][0]["status"],
-                    goal_status,
-                )
+                active = manager.active_goal_snapshots()
+                self.assertEqual(len(active), 1)
+                self.assertEqual(active[0]["responsibility_status"], "open")
+                self.assertEqual(active[0]["work_status"], goal_status)
 
     def test_multi_goal_confirmation_denial_and_expiry_close_every_goal(self) -> None:
         expected = {
@@ -1128,7 +1107,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                     ["goal-walk", "goal-blink"],
                 )
                 self.assertEqual(
-                    [item["status"] for item in manager.active_goal_snapshots()],
+                    [item["work_status"] for item in manager.active_goal_snapshots()],
                     ["awaiting_confirmation", "awaiting_confirmation"],
                 )
                 self.assertFalse(
@@ -1143,12 +1122,13 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                         decision=decision,
                     )
                 )
-                self.assertEqual(manager.active_goal_snapshots(), [])
+                active = manager.active_goal_snapshots()
                 self.assertEqual(
-                    [
-                        item["status"]
-                        for item in manager.snapshot()["task_contexts"]
-                    ],
+                    [item["responsibility_status"] for item in active],
+                    ["open", "open"],
+                )
+                self.assertEqual(
+                    [item["work_status"] for item in active],
                     [final_status, final_status],
                 )
 
@@ -1191,7 +1171,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            [item["status"] for item in manager.active_goal_snapshots()],
+            [item["work_status"] for item in manager.active_goal_snapshots()],
             ["planning", "planning"],
         )
 
@@ -1202,7 +1182,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [item["status"] for item in manager.active_goal_snapshots()],
+            [item["work_status"] for item in manager.active_goal_snapshots()],
             ["scheduled", "scheduled"],
         )
         active_task_types = [
@@ -1217,7 +1197,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["goal_id"] for item in manager.active_goal_snapshots()],
-            ["goal-blink"],
+            ["goal-walk", "goal-blink"],
         )
         self.assertTrue(
             manager.update_pending_task_status_for_request_id(
@@ -1225,7 +1205,10 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 status="completed",
             )
         )
-        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(
+            [item["responsibility_status"] for item in manager.active_goal_snapshots()],
+            ["open", "open"],
+        )
 
     def test_execution_outcome_bundle_preserves_exact_mixed_goal_evidence(self) -> None:
         manager = ConversationStateManager(base_conversation_id="outcome-bundle")
@@ -1341,6 +1324,25 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(contexts["goal-walk"]["status"], "done")
         self.assertEqual(contexts["goal-blink"]["status"], "failed")
         self.assertEqual(
+            contexts["goal-walk"]["semantic_goal"]["responsibility_status"],
+            "open",
+        )
+        self.assertEqual(
+            contexts["goal-blink"]["semantic_goal"]["responsibility_status"],
+            "open",
+        )
+        reconciled = manager.reconcile_execution_outcome_responsibilities(
+            bundle, sid="sid-outcome"
+        )
+        self.assertEqual(
+            [item["responsibility_status"] for item in reconciled],
+            ["satisfied", "open"],
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-blink"],
+        )
+        self.assertEqual(
             contexts["goal-blink"]["evidence_summary"]["execution_outcome"][
                 "status"
             ],
@@ -1349,6 +1351,113 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(
             contexts["goal-walk"]["metadata"]["execution_outcome_status"],
             "completed",
+        )
+
+    def test_later_correction_reopens_satisfied_responsibility_without_rewriting_outcome(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="reopen-after-correction")
+        self._create_goals(manager, "goal-cup")
+        response = InteractionResponse(
+            interaction_id="interaction-cup",
+            skills=[
+                {
+                    "request_id": "request-cup",
+                    "skill_id": "soridormi.pick_up",
+                    "metadata": {
+                        "source_goal_ids": ["goal-cup"],
+                        "canonical_plan_id": "plan-lifecycle",
+                        "canonical_plan_fingerprint": "c" * 64,
+                    },
+                }
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "turn_id": "turn-cup",
+                "canonical_plan_id": "plan-lifecycle",
+                "canonical_plan_fingerprint": "c" * 64,
+                "canonical_plan": self._canonical_plan(
+                    "execute",
+                    [
+                        {
+                            "goal_id": "goal-cup",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["step-cup"],
+                        }
+                    ],
+                ),
+            },
+        )
+        manager.record_agent_result("sid-cup", response)
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-cup",
+            turn_id="turn-cup",
+            interaction_id="interaction-cup",
+            canonical_plan_id="plan-lifecycle",
+            canonical_plan_fingerprint="c" * 64,
+            canonical_goal_ids=["goal-cup"],
+            aggregate_status="completed",
+            evidence=[
+                {
+                    "evidence_id": "evidence-cup",
+                    "request_id": "request-cup",
+                    "step_id": "step-cup",
+                    "skill_id": "soridormi.pick_up",
+                    "source_goal_ids": ["goal-cup"],
+                    "status": "completed",
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-cup",
+                    "status": "completed",
+                    "step_ids": ["step-cup"],
+                    "evidence_ids": ["evidence-cup"],
+                    "completed_step_ids": ["step-cup"],
+                }
+            ],
+        )
+        manager.record_execution_outcome_bundle(bundle, sid="sid-cup")
+        manager.reconcile_execution_outcome_responsibilities(bundle, sid="sid-cup")
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertEqual(
+            manager.recent_goal_snapshots()[0]["responsibility_status"],
+            "satisfied",
+        )
+
+        correction = manager.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-correction",
+                "associations": [
+                    {
+                        "association_id": "assoc-correction",
+                        "relationship": "modify",
+                        "target_goal_ids": ["goal-cup"],
+                        "goal_update": {
+                            "description": "Pick up the blue cup, not the red cup."
+                        },
+                        "requires_replan": True,
+                        "confidence": 0.99,
+                        "reason_summary": "The user corrected the intended cup.",
+                    }
+                ],
+                "confidence": 0.99,
+                "reason_summary": "The same responsibility was misunderstood.",
+            },
+            sid="sid-correction",
+            user_text="No, I meant the blue cup.",
+            route="robot_action",
+            intent="correction",
+            atomic=True,
+        )
+        self.assertTrue(all(item.get("applied") is True for item in correction))
+        active = manager.active_goal_snapshots()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["goal_id"], "goal-cup")
+        self.assertEqual(active[0]["responsibility_status"], "open")
+        context = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(
+            context["evidence_summary"]["execution_outcome"]["outcome_id"],
+            "outcome-cup",
         )
 
     def test_interrupted_safe_read_stays_recoverable_with_bound_arguments(self) -> None:
@@ -1444,7 +1553,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             sid="sid-weather",
         )
 
-        self.assertEqual(applied[0]["lifecycle_status"], "recoverable")
+        self.assertEqual(applied[0]["work_status"], "recoverable")
         snapshots = manager.active_task_snapshots()
         self.assertEqual(len(snapshots), 1)
         self.assertEqual(snapshots[0]["status"], "recoverable")

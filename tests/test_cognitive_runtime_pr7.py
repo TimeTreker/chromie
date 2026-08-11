@@ -972,7 +972,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         state.record_agent_result("sid-respond-delivery", response)
         self.assertEqual(
-            state.active_goal_snapshots()[0]["status"],
+            state.active_goal_snapshots()[0]["work_status"],
             "scheduled",
         )
 
@@ -2493,7 +2493,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 [item["goal_id"] for item in snapshots],
                 ["goal-weather"],
             )
-            self.assertEqual(snapshots[0]["status"], "planning")
+            self.assertEqual(snapshots[0]["work_status"], "planning")
             client.release_planner.set()
             return await task
 

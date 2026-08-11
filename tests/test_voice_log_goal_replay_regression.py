@@ -9,6 +9,7 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -84,20 +85,32 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
         state.record_agent_result(
             "sid-motion",
             InteractionResponse(
+                interaction_id="interaction-motion",
                 skills=[
                     {
                         "request_id": "request-walk",
                         "skill_id": "soridormi.walk_forward",
-                        "metadata": {"source_goal_ids": ["goal-walk"]},
+                        "metadata": {
+                            "source_goal_ids": ["goal-walk"],
+                            "canonical_plan_id": "plan-motion",
+                            "canonical_plan_fingerprint": "m" * 64,
+                        },
                     },
                     {
                         "request_id": "request-blink",
                         "skill_id": "soridormi.blink_eyes",
-                        "metadata": {"source_goal_ids": ["goal-blink"]},
+                        "metadata": {
+                            "source_goal_ids": ["goal-blink"],
+                            "canonical_plan_id": "plan-motion",
+                            "canonical_plan_fingerprint": "m" * 64,
+                        },
                     },
                 ],
                 metadata={
                     "planning_result": "composed_plan",
+                    "turn_id": "turn-motion",
+                    "canonical_plan_id": "plan-motion",
+                    "canonical_plan_fingerprint": "m" * 64,
                     "canonical_plan": {
                         "plan_id": "plan-motion",
                         "planner_tier": "fast",
@@ -136,14 +149,69 @@ class VoiceLogGoalReplayRegressionTests(unittest.TestCase):
                 status="completed",
             )
         )
+        # Request completion is Work truth only.  Close the responsibilities
+        # only after exact execution evidence has crossed the explicit
+        # Responsibility reconciliation boundary.
+        self.assertEqual(
+            {item["responsibility_status"] for item in state.active_goal_snapshots()},
+            {"open"},
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-motion",
+            turn_id="turn-motion",
+            interaction_id="interaction-motion",
+            canonical_plan_id="plan-motion",
+            canonical_plan_fingerprint="m" * 64,
+            canonical_goal_ids=["goal-walk", "goal-blink"],
+            aggregate_status="completed",
+            evidence=[
+                {
+                    "evidence_id": "evidence-walk",
+                    "request_id": "request-walk",
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                    "status": "completed",
+                },
+                {
+                    "evidence_id": "evidence-blink",
+                    "request_id": "request-blink",
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "source_goal_ids": ["goal-blink"],
+                    "status": "completed",
+                },
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "step_ids": ["walk"],
+                    "evidence_ids": ["evidence-walk"],
+                    "completed_step_ids": ["walk"],
+                },
+                {
+                    "goal_id": "goal-blink",
+                    "status": "completed",
+                    "step_ids": ["blink"],
+                    "evidence_ids": ["evidence-blink"],
+                    "completed_step_ids": ["blink"],
+                },
+            ],
+        )
+        state.record_execution_outcome_bundle(bundle, sid="sid-motion")
+        state.reconcile_execution_outcome_responsibilities(bundle, sid="sid-motion")
+
         self.assertEqual(state.active_goal_snapshots(), [])
         terminal_by_goal = {
-            str((item.get("semantic_goal") or {}).get("goal_id")): item.get("status")
+            str((item.get("semantic_goal") or {}).get("goal_id")): (
+                item.get("semantic_goal") or {}
+            ).get("responsibility_status")
             for item in state.snapshot()["task_contexts"]
         }
         self.assertEqual(
             terminal_by_goal,
-            {"goal-walk": "done", "goal-blink": "done"},
+            {"goal-walk": "satisfied", "goal-blink": "satisfied"},
         )
 
         association = GoalAssociationResolution.model_validate(

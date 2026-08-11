@@ -750,7 +750,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(launched[0][0].speech[0].text, natural_prompt)
         self.assertEqual(
             [
-                item["status"]
+                item["work_status"]
                 for item in assistant.conversation_state.active_goal_snapshots()
             ],
             ["awaiting_confirmation", "awaiting_confirmation"],
@@ -759,8 +759,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await assistant._handle_confirmation_reply("no", "sid-confirm")
         )
         self.assertEqual(
-            assistant.conversation_state.active_goal_snapshots(),
-            [],
+            [
+                item["responsibility_status"]
+                for item in assistant.conversation_state.active_goal_snapshots()
+            ],
+            ["open", "open"],
         )
         self.assertEqual(
             [
@@ -883,7 +886,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             [
-                item["status"]
+                item["work_status"]
                 for item in assistant.conversation_state.active_goal_snapshots()
             ],
             ["scheduled", "scheduled"],

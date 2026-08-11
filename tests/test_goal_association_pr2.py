@@ -223,14 +223,23 @@ def request(
     )
 
 
-def active_goal(goal_id: str, description: str, *, bindings=None, status="open"):
+def active_goal(
+    goal_id: str,
+    description: str,
+    *,
+    bindings=None,
+    work_status="open",
+    responsibility_status="open",
+):
     return {
         "goal_id": goal_id,
         "goal_version": 1,
-        "status": status,
+        "responsibility_status": responsibility_status,
+        "work_status": work_status,
         "goal": {
             "goal_id": goal_id,
             "version": 1,
+            "responsibility_status": responsibility_status,
             "description": description,
             "source_text": description,
             "beneficiary": "user",
@@ -240,7 +249,6 @@ def active_goal(goal_id: str, description: str, *, bindings=None, status="open")
             "metadata": {},
         },
         "open_information_gaps": [],
-        "commitment_state": "none",
         "last_user_update": description,
         "metadata": {},
     }
@@ -1557,7 +1565,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                                     "confidence": 1.0,
                                 }
                             },
-                            status="done",
+                            work_status="done",
+                            responsibility_status="satisfied",
                         )
                     ],
                     history=[
@@ -3086,7 +3095,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         completed = active_goal(
             "goal-weather",
             "判断重庆一会儿是否会下大雨。",
-            status="done",
+            work_status="done",
+                            responsibility_status="satisfied",
         )
 
         result = asyncio.run(
@@ -3132,9 +3142,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "reason_summary": "Continuity with the recent completed lookup.",
             }
         )
-        completed = active_goal("goal-weather", "Check today's weather in Beijing")
-        completed["status"] = "done"
-        completed["commitment_state"] = "completed"
+        completed = active_goal(
+            "goal-weather",
+            "Check today's weather in Beijing",
+            work_status="done",
+                            responsibility_status="satisfied",
+        )
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -3154,7 +3167,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.new_goals, [])
         prompt = ollama.prompts[0][0]
         self.assertIn("retained recent terminal Goal", prompt)
-        self.assertIn('"status":"done"', prompt)
+        self.assertIn('"responsibility_status":"satisfied"', prompt)
 
     def test_schema_forbids_reference_objects_without_supplied_referents(self):
         schema = GoalAssociationResolver._response_schema(
@@ -3533,7 +3546,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         active_goal(
                             "goal-weather",
                             "Check whether today's weather in Beijing is hot.",
-                            status="done",
+                            work_status="done",
+                            responsibility_status="satisfied",
                         )
                     ],
                     language="en-US",

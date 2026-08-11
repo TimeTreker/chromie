@@ -7396,9 +7396,16 @@ class VoiceAssistant:
                     exc,
                 )
         goal_state_results: list[dict[str, Any]] = []
+        responsibility_results: list[dict[str, Any]] = []
         try:
             goal_state_results = (
                 self.conversation_state.record_execution_outcome_bundle(
+                    bundle,
+                    sid=session_id,
+                )
+            )
+            responsibility_results = (
+                self.conversation_state.reconcile_execution_outcome_responsibilities(
                     bundle,
                     sid=session_id,
                 )
@@ -7447,6 +7454,9 @@ class VoiceAssistant:
 
         response.metadata["execution_outcome_goal_state_results"] = (
             goal_state_results
+        )
+        response.metadata["responsibility_reconciliation_results"] = (
+            responsibility_results
         )
         self.session_log(
             session_id,

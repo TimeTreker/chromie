@@ -322,13 +322,55 @@ class ConversationStateManager:
             return value
         return str(value)
 
+
+    @staticmethod
+    def _goal_responsibility_status(context: dict[str, Any]) -> str:
+        raw = context.get("semantic_goal")
+        if isinstance(raw, dict):
+            return str(raw.get("responsibility_status") or "open").strip().lower() or "open"
+        return "open"
+
+    @staticmethod
+    def _set_goal_responsibility_status(
+        context: dict[str, Any],
+        status: str,
+        *,
+        source: str,
+        evidence_refs: list[str] | None = None,
+    ) -> None:
+        goal = ConversationStateManager._semantic_goal_from_context(context)
+        revised = goal.model_copy(
+            update={
+                "responsibility_status": status,
+                "version": goal.version + 1,
+            }
+        )
+        context["semantic_goal"] = revised.model_dump(mode="json", exclude_none=True)
+        context["goal_version"] = revised.version
+        metadata = context.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        history = metadata.get("responsibility_reconciliation_history")
+        if not isinstance(history, list):
+            history = []
+        history.append({
+            "status": status,
+            "source": source,
+            "evidence_refs": list(evidence_refs or []),
+            "ts_ms": _now_ms(),
+        })
+        context["metadata"] = {
+            **metadata,
+            "responsibility_status": status,
+            "responsibility_reconciliation_history": history[-16:],
+        }
+
     def _durable_task_contexts(self) -> list[dict[str, Any]]:
         if self.max_pending_tasks <= 0:
             return []
         durable: list[dict[str, Any]] = []
         for context in self._task_contexts:
-            status = str(context.get("status") or "open").lower()
-            if status in _DONE_TASK_STATUSES:
+            if self._goal_responsibility_status(context) != "open":
                 continue
             policy = str(context.get("persistence_policy") or "persist_if_unfinished").lower()
             if policy in {"ephemeral", "memory_only", "do_not_persist", "none"}:
@@ -427,7 +469,7 @@ class ConversationStateManager:
             if not isinstance(item, dict):
                 continue
             original_status = str(item.get("status") or "open")
-            if original_status.lower() in _DONE_TASK_STATUSES:
+            if self._goal_responsibility_status(item) != "open":
                 continue
             context = dict(item)
             context["conversation_id"] = self.conversation_id
@@ -478,8 +520,7 @@ class ConversationStateManager:
     def _active_task_contexts(self) -> list[dict[str, Any]]:
         contexts: list[dict[str, Any]] = []
         for context in self._task_contexts:
-            status = str(context.get("status") or "open").lower()
-            if status not in _DONE_TASK_STATUSES:
+            if self._goal_responsibility_status(context) == "open":
                 contexts.append(context)
         return contexts
 
@@ -708,10 +749,17 @@ class ConversationStateManager:
     def active_goal_snapshots(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         """Return a bounded goal-first projection without changing task runtime behavior."""
 
-        task_snapshots = self.active_task_snapshots(limit=limit)
+        active = self._active_task_contexts()
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
         return [
-            ActiveGoalSnapshot.from_task_snapshot(item).model_dump(mode="json", exclude_none=True)
-            for item in task_snapshots
+            ActiveGoalSnapshot.from_task_snapshot(
+                self._task_snapshot(item)
+            ).model_dump(mode="json", exclude_none=True)
+            for item in active[-limit:]
         ]
 
     def recent_goal_snapshots(self, *, limit: int | None = None) -> list[dict[str, Any]]:
@@ -725,8 +773,7 @@ class ConversationStateManager:
         now = _now_ms()
         retained: list[dict[str, Any]] = []
         for context in self._task_contexts:
-            status = str(context.get("status") or "open").strip().lower()
-            if status not in _DONE_TASK_STATUSES:
+            if self._goal_responsibility_status(context) == "open":
                 continue
             updated_ms = context.get("updated_ms") or now
             try:
@@ -950,9 +997,16 @@ class ConversationStateManager:
             metadata.update(update_metadata)
 
         version = goal.version + 1
+        responsibility_status = (
+            "open"
+            if goal.responsibility_status == "satisfied"
+            and operation.operation in {"modify", "clarification_answer", "correct"}
+            else goal.responsibility_status
+        )
         return SemanticGoal(
             goal_id=goal.goal_id,
             version=version,
+            responsibility_status=responsibility_status,
             description=str(update.get("description") or goal.description),
             source_text=str(update.get("source_text") or user_text or goal.source_text),
             beneficiary=(
@@ -996,14 +1050,31 @@ class ConversationStateManager:
             )
             return result
 
-        status = str(context.get("status") or "open").lower()
-        if status in _DONE_TASK_STATUSES and operation.operation not in {"query_status"}:
-            result["reason"] = f"task_status_{status}_is_not_modifiable"
+        responsibility_status = self._goal_responsibility_status(context)
+        if (
+            responsibility_status in {"cancelled", "refused", "superseded"}
+            and operation.operation not in {"query_status"}
+        ):
+            result["reason"] = (
+                f"responsibility_status_{responsibility_status}_is_not_modifiable"
+            )
+            return result
+        if (
+            responsibility_status == "satisfied"
+            and operation.operation
+            not in {"query_status", "modify", "clarification_answer", "correct"}
+        ):
+            result["reason"] = "satisfied_responsibility_requires_correction_to_reopen"
             return result
 
         if operation.operation in {"cancel", "reject"}:
             context["status"] = "cancelled" if operation.operation == "cancel" else "refused"
             context["commitment_state"] = "cancelled" if operation.operation == "cancel" else "failed"
+            self._set_goal_responsibility_status(
+                context,
+                "cancelled" if operation.operation == "cancel" else "refused",
+                source=f"semantic_operation:{operation.operation}",
+            )
         elif operation.operation == "pause":
             context["status"] = "paused"
         elif operation.operation == "resume":
@@ -1018,6 +1089,11 @@ class ConversationStateManager:
             goal = self._semantic_goal_from_context(context)
             revised = self._merge_semantic_goal(goal, operation, user_text=user_text)
             context["semantic_goal"] = revised.model_dump(mode="json", exclude_none=True)
+            if revised.responsibility_status == "open":
+                metadata = context.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                context["metadata"] = {**metadata, "responsibility_status": "open"}
             context["goal"] = self._compact_text(revised.description, limit=220)
             context["goal_version"] = revised.version
             context["constraints"] = dict(revised.constraints)
@@ -2711,6 +2787,11 @@ class ConversationStateManager:
         }
         if relation == "close_task":
             context["status"] = str(patch.get("status") or "done")
+            self._set_goal_responsibility_status(
+                context,
+                "satisfied",
+                source="model_authored_close_task",
+            )
         self._persist_task_contexts_if_enabled()
 
     def _prune_completed_tasks(self, now_ms: float | None = None) -> None:
@@ -3579,6 +3660,12 @@ class ConversationStateManager:
                 context["status"] = "refused"
                 context["commitment_state"] = "failed"
                 context["plan_status"] = disposition
+                if disposition == "refused":
+                    self._set_goal_responsibility_status(
+                        context,
+                        "refused",
+                        source="canonical_plan_refusal",
+                    )
                 item_changed = True
             if item_changed:
                 context["updated_ms"] = now
@@ -4031,6 +4118,19 @@ class ConversationStateManager:
                     "request_statuses": dict(statuses),
                     "remaining_request_ids": list(remaining),
                 }
+                planned_skills = context["metadata"].get("planned_skills")
+                speaking_only = bool(planned_skills) and all(
+                    isinstance(item, dict)
+                    and str(item.get("capability_id") or "") == "chromie.speak"
+                    for item in planned_skills
+                ) if isinstance(planned_skills, list) else False
+                if task_status == "done" and speaking_only:
+                    self._set_goal_responsibility_status(
+                        context,
+                        "satisfied",
+                        source="speaking_delivery_reconciliation",
+                        evidence_refs=[request_id],
+                    )
 
             self._memory_store.add_many(
                 self._memory_extractor.extract_task_outcome(
@@ -4051,13 +4151,11 @@ class ConversationStateManager:
         *,
         sid: str | None,
     ) -> list[dict[str, Any]]:
-        """Atomically attach exact execution evidence to every affected goal.
+        """Atomically attach exact execution evidence to bound Work records.
 
-        The existing task lifecycle uses a smaller legacy status vocabulary.
-        Keep that projection for compatibility, but retain the exact
-        ``GoalExecutionOutcome.status`` in each task context's evidence and
-        metadata so partial and not-run results are never flattened in the
-        authoritative cognitive record.
+        ExecutionOutcome is immutable historical truth about what execution did.
+        This method updates Work/runtime projections and evidence only; it never
+        decides whether the semantic Responsibility is satisfied.
         """
 
         if not self.enabled:
@@ -4241,7 +4339,7 @@ class ConversationStateManager:
                     {
                         "goal_id": outcome.goal_id,
                         "status": outcome.status,
-                        "lifecycle_status": lifecycle_status,
+                        "work_status": lifecycle_status,
                         "outcome_id": validated.outcome_id,
                         "applied": True,
                         "pending_records_updated": matched_pending,
@@ -4253,6 +4351,77 @@ class ConversationStateManager:
             self._task_contexts = contexts_backup
             raise
         self.last_activity_ms = timestamp_ms
+        return results
+
+    def reconcile_execution_outcome_responsibilities(
+        self,
+        bundle: ExecutionOutcomeBundle,
+        *,
+        sid: str | None,
+    ) -> list[dict[str, Any]]:
+        """Reconcile current Responsibility truth from trusted execution evidence.
+
+        A completed execution is evidence, not Goal truth by itself. This explicit
+        boundary performs the current satisfaction judgment after the immutable
+        outcome has already been recorded. Non-completed Work leaves the Goal open
+        so later evidence, replanning, or provider changes may still advance it.
+        """
+
+        if not self.enabled:
+            return []
+        validated = ExecutionOutcomeBundle.model_validate(bundle)
+        results: list[dict[str, Any]] = []
+        changed = False
+        for outcome in validated.goal_outcomes:
+            context = self._task_context_by_goal_id(outcome.goal_id)
+            if context is None:
+                raise ValueError(
+                    "responsibility reconciliation references unknown Goal: "
+                    f"{outcome.goal_id}"
+                )
+            evidence_summary = context.get("evidence_summary")
+            if not isinstance(evidence_summary, dict):
+                raise ValueError(
+                    "responsibility reconciliation requires recorded execution evidence"
+                )
+            recorded = evidence_summary.get("execution_outcome")
+            if not isinstance(recorded, dict) or recorded.get("outcome_id") != validated.outcome_id:
+                raise ValueError(
+                    "responsibility reconciliation requires the exact recorded outcome"
+                )
+
+            previous = self._goal_responsibility_status(context)
+            if previous in {"cancelled", "refused", "superseded"}:
+                results.append({
+                    "goal_id": outcome.goal_id,
+                    "previous_status": previous,
+                    "responsibility_status": previous,
+                    "changed": False,
+                    "reason": "semantic_terminal_state_preserved",
+                })
+                continue
+
+            current = "satisfied" if outcome.status == "completed" else "open"
+            if current != previous:
+                self._set_goal_responsibility_status(
+                    context,
+                    current,
+                    source="execution_outcome_reconciliation",
+                    evidence_refs=[validated.outcome_id, *outcome.evidence_ids],
+                )
+                context["updated_ms"] = _now_ms()
+                changed = True
+            results.append({
+                "goal_id": outcome.goal_id,
+                "previous_status": previous,
+                "responsibility_status": current,
+                "changed": current != previous,
+                "execution_status": outcome.status,
+            })
+
+        if changed:
+            self._persist_task_contexts_if_enabled()
+            self.last_activity_ms = _now_ms()
         return results
 
     def _record_planning_metadata(

@@ -992,7 +992,12 @@ def _compact_active_goal_snapshots(
         compact.append(
             {
                 "goal_id": goal_id,
-                "status": str(item.get("status") or ""),
+                "responsibility_status": str(
+                    item.get("responsibility_status")
+                    or goal.get("responsibility_status")
+                    or "open"
+                ),
+                "work_status": str(item.get("work_status") or ""),
                 "goal": {
                     "description": str(goal.get("description") or "")[:240],
                     "object": (
@@ -1006,7 +1011,6 @@ def _compact_active_goal_snapshots(
                         else {}
                     ),
                 },
-                "commitment_state": item.get("commitment_state"),
                 "last_user_update": str(item.get("last_user_update") or "")[:220],
             }
         )

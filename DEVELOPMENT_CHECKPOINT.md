@@ -91,12 +91,11 @@ Key invariants now settled for detail work:
 
 ## Verification state
 
-`docs/STATUS.md` owns current implementation and evidence claims. The General
-Progress change retains source regressions for native conversation, exact
-capability progress, Goal binding, safe-read readiness, effectful negative
-boundaries, peer Social Attention, and truthful outcome presentation. It does not
-by itself establish live-model latency, physical audio, simulator, or physical
-robot qualification.
+`docs/STATUS.md` owns current implementation and evidence claims. General
+Progress plus the first Goal/Work truth-separation slice now cover ready progress,
+canonical Responsibility lifecycle, explicit execution-to-Goal reconciliation,
+and correction-driven reopening. They do not by themselves establish live-model
+latency, physical audio, simulator, or physical robot qualification.
 
 Before claiming the working tree is clean, run the canonical gate in a
 dependency-complete environment:
@@ -123,11 +122,10 @@ evidence.
 
 ## Near-term implementation order from the compressed baseline
 
-1. separate Goal Responsibility lifecycle from Task/Plan/request/execution
-   lifecycle, remove duplicated commitment/work truth from Goal projections, and
-   make Goal satisfaction/reopening an explicit reconciliation decision rather
-   than a projection of provider/request status;
-2. define the minimum bounded Situation projection and its grounding/rebuild
+1. **implemented:** Goal Responsibility lifecycle is separated from
+   Task/Plan/request/execution lifecycle; Goal satisfaction/reopening now crosses
+   explicit reconciliation rather than provider/request status projection;
+2. **next:** define the minimum bounded Situation projection and its grounding/rebuild
    rules without creating a durable Belief/world-state database;
 3. tighten Goal materialization, same-Responsibility refinement, replacement,
    reopening, cancellation, and downstream semantic-compatibility behavior;

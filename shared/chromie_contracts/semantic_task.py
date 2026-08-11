@@ -22,6 +22,14 @@ TaskOperationName = Literal[
     "replace",
 ]
 
+ResponsibilityStatus = Literal[
+    "open",
+    "satisfied",
+    "cancelled",
+    "refused",
+    "superseded",
+]
+
 TaskLifecycleStatus = Literal[
     "open",
     "planning",
@@ -81,6 +89,7 @@ class SemanticGoal(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     goal_id: str | None = None
     version: int = Field(default=1, ge=1)
+    responsibility_status: ResponsibilityStatus = "open"
     description: str = Field(min_length=1)
     source_text: str = Field(min_length=1)
     beneficiary: str | None = None

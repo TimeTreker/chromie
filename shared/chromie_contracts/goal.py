@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
-from .semantic_task import InformationGap, SemanticGoal, TaskContextSnapshot
+from .semantic_task import InformationGap, ResponsibilityStatus, SemanticGoal, TaskContextSnapshot
 from .discourse import DiscourseReferentUpdate, ResolvedDiscourseReference
 
 
@@ -25,25 +25,6 @@ GoalRelationship = Literal[
     "split",
     "reference",
     "new",
-]
-
-GoalLifecycleStatus = Literal[
-    "open",
-    "planning",
-    "needs_context",
-    "waiting_for_user",
-    "awaiting_confirmation",
-    "committed",
-    "scheduled",
-    "running",
-    "paused",
-    "recoverable",
-    "done",
-    "failed",
-    "refused",
-    "timed_out",
-    "cancelled",
-    "superseded",
 ]
 
 
@@ -160,16 +141,16 @@ class ActiveGoalSnapshot(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     goal_id: str = Field(min_length=1)
     goal_version: int = Field(default=1, ge=1)
-    status: GoalLifecycleStatus = "open"
+    responsibility_status: ResponsibilityStatus = "open"
+    work_status: str = "open"
     goal: SemanticGoal
     open_information_gaps: list[InformationGap] = Field(default_factory=list)
-    commitment_state: str = "none"
     last_user_update: str = ""
     updated_ms: int | None = Field(default=None, ge=0)
     source_task_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("goal_id", "commitment_state", "last_user_update", "source_task_id", mode="before")
+    @field_validator("goal_id", "work_status", "last_user_update", "source_task_id", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         if value is None:
@@ -199,10 +180,10 @@ class ActiveGoalSnapshot(BaseModel):
         return cls(
             goal_id=goal_id,
             goal_version=task.goal_version,
-            status=task.status,
+            responsibility_status=goal.responsibility_status,
+            work_status=task.status,
             goal=goal,
             open_information_gaps=task.open_information_gaps,
-            commitment_state=task.commitment_state,
             last_user_update=task.last_user_update,
             updated_ms=normalized_updated_ms,
             source_task_id=task.task_id,

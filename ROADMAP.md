@@ -39,17 +39,14 @@ represent.
 The next work is **detail validation and incremental implementation against this
 baseline**, not another broad concept-expansion phase:
 
-1. **Map the settled baseline onto current contracts and delete duplication.**
-   Identify exactly what `SemanticGoal`, General Progress, Interaction
-   Ledger/Context, CanonicalPlan, `ExecutionOutcomeBundle`, Memory, and
-   provider/runtime contracts already own. Do not add `Responsibility`, `Work`,
-   `Commitment`, `Attention`, or similar parallel mutable truth merely for naming
-   convenience. The first known cleanup target is the current Goal/Task lifecycle
-   overlap: planning, waiting, confirmation, scheduling, execution failure,
-   timeout, and recovery belong to Work/runtime state, while Goal owns whether
-   the Responsibility is still open, satisfied, refused/unavailable, cancelled,
-   or superseded. `ExecutionOutcomeBundle` remains historical execution truth and
-   must feed—not replace—Goal satisfaction reconciliation.
+1. **Goal/Work truth separation is implemented.** `SemanticGoal` now owns the
+   small Responsibility lifecycle while `ActiveGoalSnapshot.work_status` exposes
+   the independently owned Work/runtime projection. `ExecutionOutcomeBundle` is
+   recorded as historical execution truth before a separate Responsibility
+   reconciliation step; non-completed Work leaves the Goal open, and later
+   correction may reopen a satisfied Goal without rewriting history. Preserve
+   this separation and delete any remaining duplicate commitment/work truth when
+   encountered.
 2. **Define the minimal live Situation representation/projection.** Keep it
    bounded, revisable, non-authoritative, and mostly reconstructable; reuse source
    evidence and existing owners instead of copying Goal/Plan/provider/runtime
@@ -84,12 +81,12 @@ with fewer truth owners and processes, not preserving an obsolete pipeline or
 adding a manager because a useful explanatory term exists.
 ## Current priorities
 
-1. Implement the next Continuous Mind invariant from the compressed baseline
-   without adding a standalone cognition manager, generic priority engine,
-   dependency graph, Belief database, or behavior-specific fast path. Start by
-   proving how the needed behavior maps to existing owners and the minimal live
-   Situation projection, then add only the smallest missing contract if
-   information would otherwise be lost.
+1. Implement the next Continuous Mind invariant from the compressed baseline:
+   the minimum live Situation projection. Do not add a standalone cognition
+   manager, generic priority engine, dependency graph, Belief database, or
+   behavior-specific fast path. Reuse Evidence, Goal, Work, Memory, and provider
+   truth; add only the smallest missing live interpretation contract if meaning
+   would otherwise be lost.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue
