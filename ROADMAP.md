@@ -13,65 +13,83 @@ Provider and Host boundaries remain the only authorities for effects.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
-## Immediate architecture line — Continuous Mind synthesis
+## Immediate architecture line — Continuous Mind implementation from the compressed baseline
 
-The General Progress substrate in the current change is the first implementation
-slice of readiness-driven cognition: Fast Understanding may surface complete
-native conversation or exact capability work while Goal Association continues,
-and trusted readiness determines what may progress now. **It is not the end-state
-Mind architecture.**
+The General Progress substrate remains the first implemented slice of
+readiness-driven cognition. The complete problem-space discussion has now been
+compressed into the architecture baseline in
+[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#414-continuous-mind-synthesis--compressed-architecture-baseline).
+The project should not reopen the ontology by creating one class/manager per
+human cognitive term.
 
-The next work begins immediately after this substrate lands and takes precedence
-over adding new cognitive feature modules:
+The settled target is intentionally small:
 
-1. **Discuss and compress the complete problem space** in
-   [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
-   Decide the smallest core state model that can explain Belief, Self/User/Common
-   Ground, unfinished Responsibility, Intention/Progress/Commitment,
-   Attention/Working Set, Memory/Experience, and Reflection/Metacognition. These
-   names are candidate concepts, not pre-approved DTOs.
-2. **Map existing contracts before creating new ones.** Reuse or consolidate
-   `SemanticGoal`, General Progress, Interaction Ledger/Context, CanonicalPlan,
-   `ExecutionOutcomeBundle`, memory, Capability/provider state, and existing
-   authority/evidence surfaces. Add a first-class concept only when an independent
-   lifecycle or authority cannot be represented cleanly.
-3. **Settle responsibility semantics.** Define when Fast cognition may complete a
-   transient responsibility without persistent Goal state, when unfinished work
-   becomes Goal/prospective memory, how concern/obligation/promise differ, and how
-   time/dependency events reactivate slow cognition.
-4. **Settle reality and revision semantics.** Define bounded Observation/Belief
-   update, self/user/common-ground state, uncertainty/contradiction/provenance,
-   expected outcomes, and how later cognition corrects or supersedes unfinished
-   progress. Prefer evidence acquisition over longer inference when uncertainty is
-   externally resolvable.
-5. **Settle intention and commitment semantics.** Decide how Goal, Intention,
-   Plan, Progress, and Commitment differ; preserve stronger authorization for
-   irreversible effects; allow incremental next-commitment planning when future
-   steps depend on observations.
-6. **Settle attention and slow-cognition reactivation.** Define salience, working
-   set, interruption/suspend/resume, compute contention, and event/time/idle-driven
-   reactivation without building a brittle numeric priority engine.
-7. **Settle Reflection, Memory, and Learning promotion.** Reflection remains
-   selective slow cognition rather than a per-turn barrier. Define self-correction,
-   pattern reflection, memory retention/forgetting, calibration, habit/provider
-   learning, and owner-reviewed promotion boundaries.
-8. **Then implement in dependency order**, with retained general-ability scenarios
-   at each slice. Multi-user privacy/consent, durable restart continuity, broader
-   autonomy, and learning promotion widen only after the underlying state and
-   authority model is explicit.
+- durable Mind state: Stable Mind, Goal as unfinished Responsibility, and Memory;
+- live Mind state: bounded, revisable, mostly reconstructable Situation; and
+- existing grounding/action substrate: Evidence/Interaction Ledger,
+  Progress/CanonicalPlan/request/execution/outcome artifacts, and
+  Capability/provider truth.
 
-Architecture review is allowed to remove or replace pre-release compatibility or
-workflow structures when they obstruct this model. `Use less to solve more` means
-ending with fewer, clearer concepts—not preserving an obsolete pipeline because
-it already exists.
+`Work`, Intention, Commitment, Attention, Readiness, Salience, Concern,
+Reflection, Learning, Recovery, Common Ground, Affordance, and similar terms are
+currently explanatory/process/derived/policy concepts unless a concrete future
+case proves an independent lifecycle or authority that existing owners cannot
+represent.
 
+The next work is **detail validation and incremental implementation against this
+baseline**, not another broad concept-expansion phase:
+
+1. **Map the settled baseline onto current contracts and delete duplication.**
+   Identify exactly what `SemanticGoal`, General Progress, Interaction
+   Ledger/Context, CanonicalPlan, `ExecutionOutcomeBundle`, Memory, and
+   provider/runtime contracts already own. Do not add `Responsibility`, `Work`,
+   `Commitment`, `Attention`, or similar parallel mutable truth merely for naming
+   convenience. The first known cleanup target is the current Goal/Task lifecycle
+   overlap: planning, waiting, confirmation, scheduling, execution failure,
+   timeout, and recovery belong to Work/runtime state, while Goal owns whether
+   the Responsibility is still open, satisfied, refused/unavailable, cancelled,
+   or superseded. `ExecutionOutcomeBundle` remains historical execution truth and
+   must feed—not replace—Goal satisfaction reconciliation.
+2. **Define the minimal live Situation representation/projection.** Keep it
+   bounded, revisable, non-authoritative, and mostly reconstructable; reuse source
+   evidence and existing owners instead of copying Goal/Plan/provider/runtime
+   facts into a God object.
+3. **Tighten Goal materialization and revision semantics.** Persist only an
+   unfinished owned outcome that needs continuity; preserve Goal identity across
+   refinement of the same Responsibility; create a new Goal only for a genuinely
+   independent/replacement Responsibility; keep decomposition in Work/Plan by
+   default.
+4. **Implement evidence-driven revision/reactivation.** New relevant Evidence may
+   revise Situation, make open Goals actionable, invalidate Work assumptions,
+   close/reopen responsibility, or justify fast/slow cognition. Prefer semantic
+   compatibility checks over a generic dependency/invalidation graph or version
+   mismatch rule.
+5. **Preserve truth semantics and repair forward.** Historical Evidence/outcomes/
+   delivered speech are append-only facts; current Goal/Plan/Memory meaning may be
+   provenance-preserving revised; Situation remains soft; Stable Mind and
+   provider/authorization/safety authority cannot be rewritten by ordinary
+   cognition.
+6. **Keep Memory/Reflection/learning selective.** Promote only reusable meaning;
+   keep provider procedural learning provider-owned; reconstruct/revalidate
+   volatile Situation after restart rather than persisting a complete world
+   model.
+7. **Widen only after the core invariants hold.** Durable scoped consent/privacy,
+   multi-user identity, broader autonomy, competence calibration, and richer
+   resumable cognition remain later detail work unless a current implementation
+   slice requires them.
+
+Architecture review may remove or replace pre-release compatibility/workflow
+structures when they obstruct this model. `Use less to solve more` means ending
+with fewer truth owners and processes, not preserving an obsolete pipeline or
+adding a manager because a useful explanatory term exists.
 ## Current priorities
 
-1. Complete the Continuous Mind architecture synthesis above before adding
-   another standalone cognition manager, review layer, or behavior-specific fast
-   path. The General Progress substrate is retained while Belief/Responsibility/
-   Intention/Attention/Memory/Reflection semantics are compressed and mapped to
-   existing contracts.
+1. Implement the next Continuous Mind invariant from the compressed baseline
+   without adding a standalone cognition manager, generic priority engine,
+   dependency graph, Belief database, or behavior-specific fast path. Start by
+   proving how the needed behavior maps to existing owners and the minimal live
+   Situation projection, then add only the smallest missing contract if
+   information would otherwise be lost.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue

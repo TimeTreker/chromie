@@ -457,12 +457,11 @@ may advance now. Goal Association later supplies explicit canonical Goal binding
 when the responsibility persists or needs reconciliation. The Host does not infer
 Goal ownership from route names, text similarity, or capability resemblance.
 
-### 4.11 Candidate Continuous Mind state model — immediate architecture work
+### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
-The next architecture line must compress the complete human-like cognition
-problem space into the smallest useful set of first-class state concepts. The
-following are **candidate conceptual roles, not a decision to add one DTO,
-manager, database, or model call per item**:
+The following vocabulary is retained as the broad problem-space inventory that
+led to the compressed baseline in Section 4.14. These are **candidate conceptual
+roles, not a decision to add one DTO, manager, database, or model call per item**:
 
 1. **Observation/Event** — something newly perceived or reported by the user,
    body, provider, environment, clock, or runtime.
@@ -492,13 +491,14 @@ free-running cognitive subsystem. Stable identity/personality/worldview/values
 remain the cache-friendly Mind background; current law, weather, news, prices,
 policies, and other changing facts remain dynamically acquired information.
 
-### 4.12 Complete Continuous Mind problem space
+### 4.12 Complete Continuous Mind problem space — retained design inventory
 
-The following problem space is the **immediate design agenda**. It is deliberately
-listed before implementation so the project does not solve one visible example
-with another special-case mechanism. Each item must be mapped to an existing
-contract where possible, and only concepts with a genuinely independent state,
-lifecycle, or authority boundary should become new first-class structures.
+The following problem space is the **retained design inventory** used for the
+architecture synthesis. It remains a pressure-test checklist so future work does
+not solve one visible example with another special-case mechanism. Each item must
+still be mapped to an existing contract where possible, and only concepts with a
+genuinely independent state, lifecycle, or authority boundary may become new
+first-class structures.
 
 #### A. Reality, knowledge, and epistemics
 
@@ -681,10 +681,11 @@ Direction:
 - observations may update beliefs but cannot rewrite Mind authority; and
 - "learning" and "changing who Chromie is" remain separate promotion boundaries.
 
-### 4.13 Compression rule before implementation
+### 4.13 Compression rule used for synthesis and future additions
 
-The list above is a problem space, not an implementation inventory. Before each
-new architectural slice:
+The list above is a problem space, not an implementation inventory. The rule
+that produced the compressed baseline in Section 4.14 remains mandatory before
+each new architectural slice:
 
 1. map the phenomenon onto existing Goal, Progress, Interaction Ledger,
    ExecutionOutcome, Memory, Capability, and provider contracts;
@@ -696,8 +697,420 @@ new architectural slice:
 5. retain scenarios that distinguish the general ability from the initiating
    example.
 
-The target is a small Continuous Mind state model—approximately a handful of
-core concepts—not one class, prompt, manager, or LLM role per cognitive term.
+The result of applying this rule is the small truth-owner model in Section
+4.14—not one class, prompt, manager, or LLM role per cognitive term.
+
+### 4.14 Continuous Mind synthesis — compressed architecture baseline
+
+The architecture discussion over the complete problem space in Sections 4.11–4.13
+has now produced a compressed baseline. This section records the current
+architecture conclusion; it does **not** claim that every detail below is already
+implemented. `STATUS.md` remains the authority for implementation and retained
+evidence.
+
+The result is intentionally smaller than the problem-space vocabulary. Terms such
+as Belief, Concern, Intention, Commitment, Attention, Reflection, Homeostasis,
+Common Ground, Experience, Learning, Recovery, and Autonomy remain useful for
+reasoning about behavior, but they do not each earn a DTO, manager, database,
+prompt role, or LLM call.
+
+A concept becomes first-class only when removing it would collapse two states
+that require different future behavior and that distinction cannot already be
+owned by an existing contract. Semantic importance alone is not sufficient.
+Likewise, a concept may be architecturally first-class without requiring a new
+class or service.
+
+#### 4.14.1 Small truth-owner model
+
+The current target separates **Mind state** from the grounding/action substrate
+that keeps the Mind honest.
+
+Durable Mind state:
+
+1. **Stable Mind** — owner-controlled identity, personality, worldview, values,
+   interaction/expression style, and compact hard-boundary principles.
+2. **Goal** — the canonical representation of an unfinished Responsibility that
+   must retain semantic continuity.
+3. **Memory** — selectively retained meaning that may matter again after it is no
+   longer part of the current live context.
+
+Live Mind state:
+
+4. **Situation** — Chromie's bounded, revisable, currently relevant
+   interpretation of reality. Situation is soft cognitive state: semantically
+   first-class, runtime-live, mostly reconstructable, and not historical or
+   external authority.
+
+Existing grounding/action substrate:
+
+5. **Evidence / Interaction Ledger** — what was actually observed, reported,
+   delivered, requested, or otherwise authoritatively recorded by its source.
+6. **Progress / CanonicalPlan / request / execution / outcome artifacts** — the
+   existing contracts that represent what may advance, what course was selected,
+   what effect was requested, and what actually happened. `Work` is useful
+   architecture vocabulary for this family; it is not a new required contract.
+7. **Capability/provider contracts and runtime state** — provider-owned truth
+   about executable ability, schemas, current availability, and provider-side
+   safety/control boundaries.
+
+This is a truth-ownership model, not a seven-manager architecture. Before adding
+anything new, implementation must attempt to express the behavior through these
+owners and remove redundant state rather than mirror the same truth twice.
+
+#### 4.14.2 Situation is soft, bounded, and mostly reconstructable
+
+Situation answers one question that Evidence, Goal, Plan, and Memory do not:
+
+> What does Chromie currently think is relevantly true, given the available
+> grounding and current responsibilities?
+
+Situation must not become a second database for facts already owned elsewhere.
+Provider availability remains provider/runtime truth; execution results remain
+`ExecutionOutcome` truth; Goal meaning remains Goal truth; durable learned meaning
+remains Memory. Situation may contain the **current cognitive implication** of
+those facts when that implication is needed for behavior.
+
+Examples of Situation-like meaning include an unresolved or likely referent, a
+current interpretation that a route is blocked for the active responsibility, a
+judgment that an old observation is too stale for the present question, or the
+current common-ground implication that the user probably has not received a
+needed answer. Copying `goal.status`, `execution.success`, or a provider's
+capability availability into a competing mutable Situation truth is prohibited.
+
+Situation should be aggressively bounded to what current or near-future cognition
+needs. Memory, history, the full capability catalog, and unrelated world facts are
+retrieved or projected only when relevant. Role-specific prompt projections may
+select different bounded views of the same live Situation; the architecture does
+not require one giant global `SituationManager` or a complete world/Belief graph.
+
+Losing Situation should cause re-interpretation cost, not semantic catastrophe.
+After restart, Chromie should restore durable Mind state and required historical
+artifacts, refresh provider/runtime truth and current observations, then
+reconstruct Situation. Volatile body, scene, user-location, freshness, and
+provider-availability assumptions must be revalidated rather than blindly
+restored as current truth.
+
+When a provisional interpretation becomes too important to lose, the question is
+*why*. Promote only the meaning that needs continuity into the existing owner
+whose semantics require it:
+
+- an unfinished owed outcome -> Goal;
+- a selected course or resumable cognitive/work product -> Plan/Progress or
+  another existing continuation artifact;
+- an authorized or dispatched effect -> trusted request/execution artifact;
+- reusable future meaning -> Memory; and
+- a delivered user-facing claim -> Speaking/Interaction evidence.
+
+Otherwise the interpretation may remain in Situation and expire when irrelevant.
+This "promotion escape hatch" keeps Situation soft rather than turning it into a
+durable Belief database.
+
+#### 4.14.3 Goal is unfinished Responsibility, not an execution ticket
+
+`Responsibility` is architecture vocabulary; `Goal` is its canonical persistent
+representation. Do not create a parallel Responsibility object whose truth must
+be synchronized with Goal.
+
+A Goal materializes only when Chromie owns an outcome that remains unfinished
+after currently available progress and therefore needs stable semantic continuity
+across future cognition, evidence, dependency, interruption, authorization, or
+time. Understanding a request does not automatically create a Goal; acceptance
+does not automatically create a Goal; and effectful work is not required to wait
+for a Goal merely so the Goal can act as a work permit.
+
+A complete native conversational responsibility may be understood, spoken
+through the trusted Speaking path, and completed without durable Goal state. A
+safe exact information read may begin while Goal Association continues; if an
+owed outcome remains while the provider result is pending, that unfinished
+responsibility is then represented/bound as Goal state. Effectful work still
+requires the applicable planning, confirmation, authorization, resource, and
+provider-safety boundaries regardless of how early its meaning is understood.
+
+Goal identity follows **responsibility continuity**. The current meaning of the
+same responsibility may be refined as referents, constraints, or intent become
+clearer without creating a new Goal for every clarification. A genuinely new or
+replacement responsibility receives a new Goal; the old Goal is cancelled or
+superseded as appropriate. Current Goal meaning may therefore be canonical and
+revisable at the same time: `canonical` means one current semantic owner, not
+`immutable forever`.
+
+Goal completion is also a reconciliation judgment, not an immutable historical
+event. Later evidence may show that a previously closed Goal was never actually
+satisfied and justify reopening/revising it. The underlying execution outcome or
+past completion claim remains historical evidence and is never rewritten.
+
+The canonical Goal lifecycle must therefore stay responsibility-level and small.
+`planning`, `needs_context`, `waiting_for_user`, `awaiting_confirmation`,
+`scheduled`, `running`, `recoverable`, provider `failed`, and request `timed_out`
+are Work/runtime conditions, not Goal lifecycle states. They may explain why an
+open Goal cannot progress, but they must not become competing answers to whether
+the Responsibility is still owed. Likewise, a trusted `ExecutionOutcome` owns
+what execution actually did; it may supply evidence to Goal reconciliation but
+must not directly redefine the Responsibility as satisfied or abandoned.
+
+#### 4.14.4 Decomposition belongs to Work unless responsibility becomes independent
+
+Goals are a set of unfinished responsibilities, not a mandatory parent/child
+workflow tree. `Task`, `SubGoal`, `Concern`, and intermediate planning steps do
+not automatically become Mind-level responsibility objects.
+
+Plan decomposition is normal and may change as provider granularity changes.
+Today a provider may expose `walk`, `look`, `grasp`, and `fill`; tomorrow it may
+expose one qualified `bring_water` capability. The Goal remains the same while
+Work decomposition changes.
+
+Promote a work item into another Goal only when an independently owned
+responsibility has actually emerged. A useful semantic test is whether Chromie
+would still owe that outcome if the originating Goal disappeared. Mere duration,
+waiting, delegation, or planner decomposition is insufficient.
+
+Likewise, most "dependencies" are conditions on current reality rather than
+Goal-to-Goal edges. A package arrival, user clarification, time threshold,
+provider result, permission, resource availability, or changed environment
+should normally enter as Evidence/Situation and make progress newly possible.
+Responsibilities usually depend on outcomes/world conditions, not another Goal
+object's lifecycle. Do not introduce a generic Goal dependency graph until a
+behaviorally necessary relation cannot be represented by Goal constraints,
+Situation, evidence, and existing Work bindings.
+
+Work and Evidence may advance more than one Goal. A read-only weather request may
+both complete an information responsibility and advance an existing outdoor-plan
+responsibility. Shared Work must therefore be bindable to the responsibilities it
+actually advances; cancelling one Goal does not automatically cancel useful Work
+still serving another open Goal.
+
+#### 4.14.5 Commitment is expressed by artifact boundaries
+
+Do not add a global `CommitmentState` or numeric commitment level. Commitment is
+cross-cutting semantics expressed by the authoritative artifact that another
+actor, future cognition, or external reality is now allowed or required to rely
+on:
+
+```text
+Situation interpretation
+    -> Goal responsibility commitment
+    -> Plan/current-work commitment
+    -> authorized/dispatched effect commitment
+    -> observed execution/outcome history
+    -> delivered communicative commitment
+```
+
+These are different kinds of commitment with different owners; collapsing them
+into one mutable number loses information and creates another truth that must be
+reconciled.
+
+Meaning should remain provisional in Situation until continuity or external
+reliance requires promotion. Once meaning has crossed into external action or
+speech, correction happens forward through cancellation, compensation, new Work,
+or corrective communication rather than by pretending the old commitment never
+occurred.
+
+#### 4.14.6 Truth and revision semantics
+
+Core artifacts have different truth semantics:
+
+- **Historical fact** — Evidence, trusted execution/outcome records, and delivered
+  speech record what occurred. Later cognition may append new evidence or a
+  correction but must not silently rewrite them.
+- **Current canonical meaning** — Goal, current Plan/Work choice, and durable
+  Memory each have one current semantic owner and may be revised with retained
+  provenance when better evidence or intent requires it.
+- **Soft interpretation** — Situation is cheap to revise, expire, or reconstruct.
+- **Normative/external authority** — Stable Mind, provider contracts, explicit
+  authorization/consent, privacy authority, and trusted safety boundaries can be
+  consumed by ordinary cognition but cannot be rewritten merely because a model
+  infers something different.
+
+The general revision invariant is:
+
+> **Revise the present; preserve the past.**
+
+Equivalently, current meaning is revisable while committed history is monotonic.
+When upstream meaning changes, downstream Work is not blindly invalidated by a
+version mismatch. Re-evaluate whether existing Work remains semantically
+compatible with the current Goal and Situation; retain compatible Work and
+revise, supersede, cancel, or replan only the part that no longer advances the
+current responsibility.
+
+`Goal changed -> invalidate every plan` is therefore too coarse. A deadline
+relaxation may leave all Work valid, while a small referent correction may make a
+specific manipulation step invalid. Existing Goal/Plan/Progress/request/result
+bindings should be reused before introducing a general semantic dependency or
+invalidation graph.
+
+Execution success and Goal satisfaction remain distinct. A provider may
+successfully perform the wrong action; the execution record remains successful
+while reconciliation leaves/reopens the responsibility as unfinished. Likewise,
+a presentation/interpreter failure cannot rewrite trusted execution truth.
+
+#### 4.14.7 Grounding must not be polluted by intention
+
+Reality enters cognition through Evidence and authority-owned current state, not
+through Chromie's own desired outcome or selected Plan. In particular:
+
+```text
+Goal != Evidence
+Plan != Evidence
+model inference != Evidence
+Memory != fresh Evidence
+```
+
+A Goal that names `cup_17` does not prove that `cup_17` is the correct physical
+referent. A Plan that chooses route A does not prove route A remains open. Memory
+may provide priors and relevant history, but current high-commitment action may
+require fresh grounding. Committed intent must not feed back as evidence and
+create a self-confirming world model.
+
+Source trust and authority are proposition/domain scoped rather than one global
+numeric ranking. The user may be authoritative about an explicit current
+preference; a provider is authoritative about its capability contract/runtime
+state; trusted execution owns what request completed; perception supplies scene
+evidence; Situation owns only Chromie's current interpretation. Avoid a universal
+confidence score or giant conflict resolver unless concrete requirements prove it
+necessary.
+
+When uncertainty can be resolved cheaply by reality, prefer acquiring evidence
+through perception, a provider/tool read, or clarification over spending longer
+LLM inference guessing. Deeper commitment requires stronger evidence,
+authorization, and provenance.
+
+#### 4.14.8 Event-driven cognition without a Mind-level scheduler
+
+Continuous Mind does not mean continuous LLM inference. Raw sensor frames and
+runtime churn should be filtered near their source into meaningful observations.
+Even a meaningful observation should wake cognition only when its state delta is
+relevant to an open responsibility, current interaction, current Work,
+authority/safety boundary, or another material concern.
+
+`Attention`, `Salience`, `Readiness`, `Affordance`, and `Working Set` therefore do
+not currently justify independent persistent Mind state:
+
+- salience is a relation between what changed and what currently matters;
+- readiness is a derived decision over current meaning, evidence, dependencies,
+  risk, authority, and capability state;
+- affordance is derived from provider capability plus current Situation and
+  constraints;
+- working set is a bounded projection of relevant Situation, Goals, Work, Memory,
+  and interaction evidence; and
+- compute preemption/scheduling belongs to runtime, while valuable resumable
+  cognition belongs in existing Work/continuation artifacts.
+
+A relevant state change may produce no cognition, a deterministic/local reaction,
+fast cognition, slow cognition, or overlapping fast progress plus slower
+reasoning. Fast and Slow cognition are different cognitive timescales/resources,
+not mandatory sequential stages.
+
+Open responsibilities wait passively until reality makes new progress possible.
+Provider results, user clarification, timer events, scene/body changes, memory
+retrieval, or other relevant Evidence may reactivate cognition. Do not implement
+a background `while true: think()` loop or a giant numeric priority engine.
+
+#### 4.14.9 Memory, learning, and recovery
+
+Evidence history is not Memory. Evidence answers what happened; Memory is the
+selective retention of meaning worth making available to future cognition.
+Situation answers what matters now; Memory answers what may matter again later.
+The default should be not to promote ordinary transient facts into durable
+Memory.
+
+`Experience` does not currently require a separate first-class store. Repeated or
+important outcomes may produce an experience candidate; selective Reflection may
+turn a supported reusable interpretation into Memory. Provider-internal
+procedural learning remains provider-owned, and ordinary cognition cannot promote
+experience directly into Stable Mind identity/values or invent a new provider
+capability.
+
+Learning is therefore a promotion process with explicit authority boundaries,
+not a `LearningState`. Forgetting/decay is retention policy, not another cognitive
+subsystem. Reflection is selective slow cognition that may propose revisions to
+Situation, Goal, Plan/Work, or Memory; it cannot rewrite historical Evidence,
+trusted outcome records, prior speech, provider authority, or Stable Mind.
+
+Across restart, durable unfinished Goals, Memory, Stable Mind, and the minimum
+trusted Work/Evidence required for continuity may survive according to their
+owners' durability rules. Volatile Situation and provider/environment state are
+revalidated/reconstructed. `Recovery` and `Identity Continuity` emerge from those
+persistence/revalidation boundaries rather than requiring another Mind-state
+object.
+
+#### 4.14.10 Mutation authority
+
+Cognitive roles are distinguished not only by model/prompt but by which semantic
+owner they may establish or revise:
+
+- Fast Understanding and perception/result interpretation may propose/update
+  revisable Situation meaning but do not rewrite Evidence;
+- Goal Association owns canonical responsibility continuity and Goal refinement,
+  replacement, cancellation, reopening, and binding decisions;
+- Planner roles own chosen Work/Plan semantics but do not casually rewrite Goal
+  meaning or execution history;
+- trusted validation/runtime owns authorization, request correlation, execution,
+  and outcome records but does not reinterpret user meaning;
+- Reflection may challenge current Situation/Goal/Plan/Memory within those
+  owners' rules but cannot become a second authority for Evidence, provider
+  contracts, effects, or Stable Mind; and
+- external text enters as data/Evidence and cannot acquire authority over Stable
+  Mind, safety, privacy, or capability contracts through prompt content.
+
+Implementation should encode these ownership boundaries using existing contracts
+where possible rather than creating a universal `AuthorityManager`.
+
+#### 4.14.11 Continuous Mind constitution
+
+The synthesis above reduces to a small set of invariants:
+
+1. **Reality enters through Evidence, not through intention.**
+2. **Situation is revisable interpretation, not historical authority.**
+3. **Persist an unfinished owned responsibility as Goal only when continuity is
+   needed.**
+4. **Progress whenever meaning, dependencies, readiness, authorization, and
+   safety are sufficient; Goal or Planner is not a universal barrier.**
+5. **Planning is Work formation when direct progress is insufficient, not a
+   mandatory stage.**
+6. **Promote meaning only when another canonical artifact needs continuity,
+   authority, or durable reuse.**
+7. **Current canonical meaning may be revised with provenance; committed history
+   is never silently rewritten.**
+8. **After upstream meaning changes, revalidate downstream semantic compatibility
+   and preserve compatible Work.**
+9. **Once an error has crossed into external action or speech, repair forward.**
+10. **Memory provides reusable past meaning; it does not replace fresh grounding.**
+11. **Stable Mind and external/trusted authority boundaries cannot be rewritten by
+    ordinary cognition.**
+12. **When reality can cheaply resolve material uncertainty, acquire evidence
+    instead of thinking harder.**
+
+The architectural shape is therefore not a new `ContinuousMind` manager. It is
+the continuous evidence-driven evolution of a few truth owners:
+
+```text
+                    Stable Mind
+                         |
+                         | constrains
+                         v
+Evidence ----------> Situation <---------- Memory
+   ^                     |
+   |                     | understand / revise
+   |                     v
+   |              ready Progress OR Goal
+   |                     |
+   |               Work / Plan if needed
+   |                     |
+   |              trusted externalization
+   |                     v
+   +------------------ Reality
+```
+
+Capability/provider truth constrains which Work is actually possible. New
+Evidence continuously revises Situation and may make open responsibilities ready,
+invalidates assumptions, close/reopen Goals, or make selective deeper cognition
+worthwhile.
+
+This synthesis is now the architecture baseline for the next implementation
+slices. Remaining detail questions—minimal Situation representation/projection,
+exact Goal revision provenance, resumable cognitive artifacts, durable scoped
+consent/privacy, and multi-user identity—must be solved against these invariants
+without reopening the whole ontology or pre-creating one manager per concept.
 
 ## 5. Continuous cognitive loop
 
@@ -744,9 +1157,12 @@ are cognition events, not merely terminal inputs to a speech formatter.
 
 The implemented General Progress substrate covers immediate native conversation,
 exact capability candidates, explicit Goal binding, trusted early safe-read
-readiness, and peer Social Attention. Sections 4.11–4.13 deliberately describe
-the broader **next** Continuous Mind problem space; those candidate concepts must
-be discussed and compressed before they are implemented as new persistent state.
+readiness, and peer Social Attention. Sections 4.11–4.13 retain the broader
+problem-space inventory and the compression discipline that produced Section
+4.14. They are no longer an instruction to pre-create the candidate concepts as
+persistent state; future implementation starts from the compressed baseline and
+adds a new owner only when a concrete lifecycle or authority gap proves it
+necessary.
 
 ### 5.1 Model-facing Goal Association boundary
 

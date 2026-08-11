@@ -19,40 +19,75 @@ for the applicable planning, confirmation, authorization, resource, and provider
 safety boundaries. Social Attention is a peer event lane and does not own Goals
 or completion.
 
-## Immediate checkpoint — discuss architecture before adding modules
+## Architecture checkpoint — Continuous Mind synthesis compressed
 
-The **next development work is to finish the Continuous Mind architecture
-synthesis**, then implement it incrementally. Do not add a `BeliefManager`,
-`ReflectionManager`, generic priority engine, background-thought loop, or other
-new cognitive framework merely because the corresponding human phenomenon is in
-the problem-space list.
+The broad architecture discussion is now sufficiently complete to move from
+ontology expansion to detail validation and incremental implementation. Do not
+add a `BeliefManager`, `SituationManager`, `ReflectionManager`, generic priority
+engine, dependency graph, background-thought loop, or another cognitive framework
+merely because the corresponding human phenomenon has a useful name.
 
-The authoritative problem space, questions, directions, and compression rule are
-in
-[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
-The delivery order is in [Roadmap](ROADMAP.md#immediate-architecture-line--continuous-mind-synthesis).
+The authoritative complete problem space remains in
+[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#412-complete-continuous-mind-problem-space--retained-design-inventory).
+The compressed conclusion is
+[Continuous Mind synthesis](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#414-continuous-mind-synthesis--compressed-architecture-baseline),
+and the implementation order is in
+[Roadmap](ROADMAP.md#immediate-architecture-line--continuous-mind-implementation-from-the-compressed-baseline).
 
-Immediate discussion order:
+Current architecture baseline:
 
-1. compress the candidate state model: Observation/Belief, unfinished
-   Responsibility, Intention/Progress/Commitment, Attention/Working Set,
-   Memory/Experience, Reflection/Metacognition, with authority as a cross-cutting
-   boundary;
-2. decide which concepts are already represented by Goal, Interaction Ledger,
-   CanonicalPlan, ExecutionOutcome, Memory, Capability/provider state, and
-   General Progress, and which truly need a new first-class lifecycle;
-3. settle Goal as unfinished responsibility versus immediately completed
-   transient progress, including concerns, promises, time/dependencies, and slow
-   cognition reactivation;
-4. settle observation-driven belief/revision, uncertainty, common ground,
-   intention/commitment, incremental planning, attention/preemption, and selective
-   Reflection; and
-5. only then implement slices in dependency order and delete superseded pipeline
-   or compatibility concepts instead of layering adapters around them.
+```text
+Durable Mind
+  Stable Mind
+  Goal       = canonical unfinished Responsibility
+  Memory
 
-The design rule is: **design the whole Mind, implement the next invariant, and
-keep the final concept count small.** Weather, chat, walking, or any individual
-scenario is evidence for a general ability, never the architecture target.
+Live Mind
+  Situation  = bounded, revisable, mostly reconstructable soft state
+
+Grounding/action substrate
+  Evidence/Ledger; Progress/Plan/Request/Execution/Outcome; Capability/provider truth
+```
+
+`Responsibility` and `Work` are architecture vocabulary, not approved parallel
+runtime objects: Goal owns the former; existing Progress/Plan/Execution artifacts
+express the latter. Intention, Commitment, Readiness, Attention, Salience,
+Concern, Reflection, Learning, Recovery, Common Ground, Affordance, and similar
+terms remain derived/process/policy/projection concepts unless a concrete case
+proves information loss without a new owner.
+
+The design rule remains: **design the whole Mind, implement the next invariant,
+and keep the permanent concept count small.** Individual scenarios are evidence
+for a general ability, never the architecture target.
+
+Key invariants now settled for detail work:
+
+- Reality enters through Evidence; Goal/Plan/model inference cannot manufacture
+  grounding.
+- Situation is current soft interpretation, not a copied world database or
+  historical authority.
+- A Goal materializes only for an owned outcome that remains unfinished and
+  needs semantic continuity; immediately completed ready progress need not create
+  durable Goal state.
+- Goal identity follows Responsibility continuity; refinement may revise current
+  Goal meaning with provenance, while a genuinely different Responsibility gets
+  a new Goal.
+- Decomposition belongs to Work/Plan unless an independent Responsibility truly
+  emerges; dependencies are usually Situation/world conditions rather than a
+  Goal graph.
+- Current canonical meaning may be revised; historical Evidence, execution
+  outcomes, and delivered speech are never silently rewritten. Repair forward.
+- Goal lifecycle is responsibility-level, not workflow-level: planning, waiting,
+  confirmation, scheduling, running, retry/recovery, provider failure, and timeout
+  belong to Work/runtime artifacts. Execution success/failure is evidence for
+  reconciliation and cannot by itself decide whether the Responsibility is
+  satisfied or abandoned.
+- Existing Work survives an upstream revision when it remains semantically
+  compatible; do not invalidate everything merely because a version changed.
+- Open Goals wait for relevant events rather than a polling thought loop. A state
+  change may require none, local, fast, slow, or overlapping cognition.
+- Memory is selective reusable past meaning; Reflection/learning are bounded
+  processes and cannot rewrite provider authority or Stable Mind.
 
 ## Verification state
 
@@ -86,19 +121,31 @@ Do not report Ruff, Mypy, GPU, microphone, speaker, MuJoCo, physical-provider,
 or live-model results unless those exact gates actually ran and retained their
 evidence.
 
-## Near-term implementation order after architecture decisions
+## Near-term implementation order from the compressed baseline
 
-1. responsibility/Goal materialization and lifecycle semantics;
-2. bounded Observation/Belief update plus evidence-driven reactivation;
-3. Intention/Progress/Commitment and revision/incremental-planning semantics;
-4. Attention/Working Set, time/dependency wake-up, and cognitive preemption;
-5. selective Reflection, memory consolidation/forgetting, and learning promotion;
-6. multi-user privacy/consent, durable recovery, competence/calibration, and
-   bounded autonomy after the earlier authority model is stable.
+1. separate Goal Responsibility lifecycle from Task/Plan/request/execution
+   lifecycle, remove duplicated commitment/work truth from Goal projections, and
+   make Goal satisfaction/reopening an explicit reconciliation decision rather
+   than a projection of provider/request status;
+2. define the minimum bounded Situation projection and its grounding/rebuild
+   rules without creating a durable Belief/world-state database;
+3. tighten Goal materialization, same-Responsibility refinement, replacement,
+   reopening, cancellation, and downstream semantic-compatibility behavior;
+4. make relevant Evidence/state deltas reactivate ready Progress or cognition
+   without a central polling/priority scheduler;
+5. preserve revision provenance and forward-repair semantics across Goal, Plan,
+   execution outcome, speech, and Memory using existing Ledger/evidence owners;
+6. add selective Memory consolidation/forgetting and Reflection/learning
+   promotion only where current contracts cannot already express the invariant;
+7. defer multi-user privacy/scoped durable consent, broader recovery/autonomy,
+   competence calibration, and richer continuation semantics until a concrete
+   slice requires their missing authority/lifecycle.
 
 Every slice must first identify the reusable cognitive invariant, map or remove
-existing concepts, retain general scenarios, and avoid a new permanent abstraction
-when an existing owner can represent the state correctly.
+existing concepts, retain general scenarios, and avoid a new permanent
+abstraction when an existing owner can represent the state correctly. If a new
+concept is proposed, the review must name the two behaviorally different states
+that would otherwise become indistinguishable.
 
 ## Canonical owners
 

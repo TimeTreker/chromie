@@ -226,20 +226,56 @@ trusted observation + canonical Goal relationships
 The weather lookup does not need to wait for the relationship analysis; the
 relationship analysis still improves what the result means to the user.
 
-### 3.2 General Progress is a substrate, not the complete Mind model
+### 3.2 General Progress inside the Continuous Mind baseline
 
 The implemented readiness paths establish one general invariant: a piece of
 progress may advance when its own meaning, dependencies, risk, and authority are
-sufficient, without waiting for unrelated cognition. They do **not** decide the
-full long-term state model for Belief, unfinished Responsibility, Intention,
-Attention, Memory, Reflection, autonomy, or learning.
+sufficient, without waiting for unrelated cognition. The broader Continuous Mind
+synthesis is now recorded in
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#414-continuous-mind-synthesis--compressed-architecture-baseline).
+It deliberately does not introduce one runtime manager or persistent DTO for
+each cognitive term.
 
-Those questions are the project's immediate architecture line and are owned by
-[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
-Before adding new runtime managers or persistent DTOs, map each cognitive
-phenomenon onto existing Goal, General Progress, Interaction Ledger, Plan,
-ExecutionOutcome, Memory, and provider contracts and promote only the smallest
-missing lifecycle/authority concept.
+The target Mind state is small: Stable Mind, unfinished Responsibility represented
+canonically by Goal, selective Memory, and a bounded live Situation. Situation is
+soft, revisable, mostly reconstructable cognitive state rather than another
+authoritative fact store. Evidence/Interaction Ledger, existing Progress/Plan/
+request/execution/outcome artifacts, and provider capability/runtime truth remain
+the grounding/action substrate around that Mind state.
+
+The executable turn state machine in this document records committed milestones;
+it must not be mistaken for a wall-clock cognition pipeline. Meaningful new
+Evidence may revise Situation, make an open Goal actionable, invalidate a Work
+assumption, complete/reopen a responsibility, or justify deeper cognition. The
+reaction may be none, deterministic/local, fast, slow, or overlapping fast
+progress plus slower reasoning. Open Goals wait for relevant state change rather
+than being polled by a background thought loop.
+
+When Situation or Goal meaning changes, existing downstream Work is reconsidered
+for semantic compatibility rather than blindly invalidated by version mismatch.
+Compatible Work survives; incompatible Work is revised, superseded, cancelled,
+or replanned. Historical Evidence, trusted execution/outcome records, and already
+delivered speech are never rewritten; correction proceeds forward.
+
+The same separation applies to lifecycle. `planning`, `waiting_for_user`,
+confirmation, `scheduled`, `running`, retry/recovery, provider failure, and
+timeout are Work/runtime conditions. They are not the target Goal lifecycle
+truth. An `ExecutionOutcome` records what happened in execution; a Goal closes or
+reopens only through Responsibility reconciliation against its current meaning
+and trusted evidence.
+
+Some later sections still describe the currently implemented Task/Goal lifecycle
+projection using workflow labels such as `waiting`, `recoverable`, `failed`, or
+`timed_out`. Those descriptions remain implementation evidence, not the final
+ontology. The first cleanup slice in the Roadmap separates that runtime Work
+state from canonical Responsibility state; `STATUS.md` remains authoritative for
+what has actually landed.
+
+Before adding new runtime state, first map the behavior onto Goal, General
+Progress, Interaction Ledger/Context, CanonicalPlan, ExecutionOutcome, Memory,
+Capability/provider state, and bounded live Situation projections. A new
+first-class concept still requires an independently necessary lifecycle or
+authority that those owners cannot express without information loss.
 
 ## 4. Gateway-to-Core contract
 
