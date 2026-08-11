@@ -603,6 +603,18 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 ]
             },
         )
+        association_situation = client.association_contexts[0]["situation"]
+        fast_situation = client.fast_contexts[0]["situation"]
+        compose_situation = client.compose_contexts[0]["situation"]
+        self.assertEqual(association_situation["revision"], 1)
+        self.assertEqual(association_situation["focus_goal_ids"], [])
+        self.assertEqual(fast_situation["revision"], 2)
+        self.assertEqual(fast_situation["focus_goal_ids"], ["goal-1"])
+        self.assertEqual(compose_situation, fast_situation)
+        self.assertNotEqual(
+            association_situation["digest"],
+            fast_situation["digest"],
+        )
     def test_runtime_trace_can_emit_one_runtime_event_package(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

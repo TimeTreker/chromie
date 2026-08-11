@@ -7,7 +7,7 @@ import json
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 try:
     from chromie_contracts.interaction import (
@@ -26,6 +26,11 @@ try:
     from chromie_contracts.goal import GoalAssociationResolution
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.goal import GoalAssociationResolution
+
+try:
+    from chromie_contracts.situation import SituationProjection
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.situation import SituationProjection
 
 try:
     from chromie_contracts.plan import (
@@ -2075,6 +2080,19 @@ def validate_user_supplied_parameter_provenance(
             f"{resolution.parameter}={value!r}"
         )
 
+
+
+def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any]:
+    """Return only a validated bounded Situation projection for model prompts."""
+
+    current = context if isinstance(context, dict) else {}
+    raw = current.get("situation")
+    if not isinstance(raw, dict):
+        return {}
+    try:
+        return SituationProjection.model_validate(raw).prompt_projection()
+    except ValidationError:
+        return {}
 
 
 def validate_external_response_evidence_boundary(

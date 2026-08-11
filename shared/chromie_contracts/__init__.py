@@ -80,6 +80,12 @@ from .interaction_ledger import (
     InteractionEventType,
     InteractionLedgerEvent,
 )
+from .situation import (
+    SituationConditionRef,
+    SituationEvidenceKind,
+    SituationEvidenceRef,
+    SituationProjection,
+)
 from .semantic_authority import (
     SEMANTIC_AUTHORITY_CONTEXT_KEY,
     SemanticAuthorityClaim,
@@ -284,6 +290,10 @@ __all__ = [
     "InteractionEventOwner",
     "InteractionEventType",
     "InteractionLedgerEvent",
+    "SituationConditionRef",
+    "SituationEvidenceKind",
+    "SituationEvidenceRef",
+    "SituationProjection",
     "SEMANTIC_AUTHORITY_CONTEXT_KEY",
     "SemanticAuthorityClaim",
     "SemanticAuthorityOwner",

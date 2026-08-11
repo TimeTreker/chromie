@@ -1107,8 +1107,9 @@ invalidates assumptions, close/reopen Goals, or make selective deeper cognition
 worthwhile.
 
 This synthesis is now the architecture baseline for the next implementation
-slices. Remaining detail questions—minimal Situation representation/projection,
-exact Goal revision provenance, resumable cognitive artifacts, durable scoped
+slices. The minimum Situation projection is now implemented as bounded live
+reference state. Remaining detail questions—exact Goal revision provenance,
+resumable cognitive artifacts, durable scoped
 consent/privacy, and multi-user identity—must be solved against these invariants
 without reopening the whole ontology or pre-creating one manager per concept.
 

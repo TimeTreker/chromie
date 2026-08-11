@@ -56,6 +56,7 @@ try:
         ResourceSource,
     )
     from chromie_contracts.semantic_task import SemanticGoal
+    from chromie_contracts.situation import SituationProjection
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.discourse import (
         DiscourseReferent,
@@ -78,6 +79,7 @@ except ImportError:  # pragma: no cover
         ResourceSource,
     )
     from shared.chromie_contracts.semantic_task import SemanticGoal
+    from shared.chromie_contracts.situation import SituationProjection
 
 logger = logging.getLogger("chromie.agent.goal_association")
 
@@ -2034,6 +2036,18 @@ class GoalAssociationResolver:
         return out
 
     @staticmethod
+    def _situation_projection(request: AgentRunRequest) -> dict[str, Any]:
+        context = request.context if isinstance(request.context, dict) else {}
+        raw = context.get("situation")
+        if not isinstance(raw, dict):
+            return {}
+        try:
+            return SituationProjection.model_validate(raw).prompt_projection()
+        except ValidationError as exc:
+            logger.debug("Ignoring malformed Situation projection error=%s", exc)
+            return {}
+
+    @staticmethod
     def _turn_id(request: AgentRunRequest) -> str:
         seed = f"{request.sid or 'turn'}|{request.text}"
         return f"turn_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:20]}"
@@ -2204,6 +2218,8 @@ class GoalAssociationResolver:
             "For a location named directly in that user turn, copy the complete location binding value verbatim as one contiguous span. Never translate, transliterate, shorten, or expand it. Do not ask the user for provider canonicalization or extra administrative granularity merely because multiple real-world places might share the supplied value; bind it exactly and let the downstream Capability resolve it or report provider ambiguity. Only an indirect reference resolved from a supplied referent may use the referent's canonical value.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 7000)}\n\n"
+            "Bounded live Situation projection JSON (soft/revisable relevance only):\n"
+            f"{self._bounded_json(self._situation_projection(request), 3600)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
             f"{goal_progress_communication_prompt('Goal Association')}\n\n"
@@ -2462,6 +2478,8 @@ class GoalAssociationResolver:
             f"with {output_fields}. The exact schema is enforced out-of-band.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
+            "Bounded live Situation projection JSON (soft/revisable relevance only; IDs reference authoritative Goal/Evidence/discourse owners and never override them):\n"
+            f"{self._bounded_json(self._situation_projection(request), 3600)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
             f"{goal_progress_communication_prompt('Goal Association')}\n\n"

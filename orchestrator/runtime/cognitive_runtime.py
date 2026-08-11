@@ -61,6 +61,8 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 from orchestrator.runtime.evidence_identity import runtime_identity_reference
 
+from orchestrator.runtime.situation import build_situation_projection
+
 logger = logging.getLogger(__name__)
 
 CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
@@ -3436,6 +3438,17 @@ class GoalDrivenRuntimeCoordinator:
                     context=context,
                     sid=sid,
                 )
+                situation = build_situation_projection(
+                    context=context,
+                    turn_id=turn_id,
+                    lane=str(getattr(route_decision, "route", "") or "unknown"),
+                    intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                    progress_candidate_ids=[
+                        item.candidate_id for item in progress_candidates
+                    ],
+                    revision=1,
+                )
+                context = {**context, "situation": situation.prompt_projection()}
                 stage = time.perf_counter()
                 association = await self._observe_workflow_stage(
                     sid=sid,
@@ -3444,6 +3457,7 @@ class GoalDrivenRuntimeCoordinator:
                         "user_text": text,
                         "route_decision": route_decision,
                         "active_goal_snapshots": context.get("active_goal_snapshots", []),
+                        "situation_digest": situation.digest,
                         "history_turn_count": len(history),
                     },
                     operation=self.agent_client.resolve_goal_association(
@@ -3601,6 +3615,16 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             association_goal_ids = self._association_goal_ids(association)
+            planning_situation = build_situation_projection(
+                context=context,
+                turn_id=turn_id,
+                lane=str(getattr(route_decision, "route", "") or "unknown"),
+                intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                progress_candidate_ids=[item.candidate_id for item in progress_candidates],
+                focus_goal_ids=association_goal_ids or situation.focus_goal_ids,
+                revision=situation.revision + 1,
+            )
+            planning_context["situation"] = planning_situation.prompt_projection()
             if self.policy.mode == "apply" and self.interaction_ledger is not None:
                 self.interaction_ledger.record_goal_association(
                     session_id=sid,

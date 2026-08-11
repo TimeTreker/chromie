@@ -47,10 +47,12 @@ baseline**, not another broad concept-expansion phase:
    correction may reopen a satisfied Goal without rewriting history. Preserve
    this separation and delete any remaining duplicate commitment/work truth when
    encountered.
-2. **Define the minimal live Situation representation/projection.** Keep it
-   bounded, revisable, non-authoritative, and mostly reconstructable; reuse source
-   evidence and existing owners instead of copying Goal/Plan/provider/runtime
-   facts into a God object.
+2. **The minimal live Situation projection is implemented.** A frozen bounded
+   projection now carries only current relevance/interpretation references: turn
+   lane/intent, focused Goal IDs, discourse focus, unresolved condition refs,
+   ready progress IDs, and evidence refs. It is rebuilt in-process, revisioned
+   between Goal Association and planning, prompt-validated, and never owns or
+   copies the referenced Goal/Evidence/provider truth.
 3. **Tighten Goal materialization and revision semantics.** Persist only an
    unfinished owned outcome that needs continuity; preserve Goal identity across
    refinement of the same Responsibility; create a new Goal only for a genuinely
@@ -82,11 +84,10 @@ adding a manager because a useful explanatory term exists.
 ## Current priorities
 
 1. Implement the next Continuous Mind invariant from the compressed baseline:
-   the minimum live Situation projection. Do not add a standalone cognition
-   manager, generic priority engine, dependency graph, Belief database, or
-   behavior-specific fast path. Reuse Evidence, Goal, Work, Memory, and provider
-   truth; add only the smallest missing live interpretation contract if meaning
-   would otherwise be lost.
+   tighten Goal materialization, same-Responsibility refinement/replacement, and
+   downstream semantic-compatibility behavior. Preserve the landed minimum
+   Situation projection; do not grow it into a manager, Belief database, world
+   graph, or duplicate truth store.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue

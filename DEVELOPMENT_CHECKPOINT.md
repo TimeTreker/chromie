@@ -125,9 +125,10 @@ evidence.
 1. **implemented:** Goal Responsibility lifecycle is separated from
    Task/Plan/request/execution lifecycle; Goal satisfaction/reopening now crosses
    explicit reconciliation rather than provider/request status projection;
-2. **next:** define the minimum bounded Situation projection and its grounding/rebuild
-   rules without creating a durable Belief/world-state database;
-3. tighten Goal materialization, same-Responsibility refinement, replacement,
+2. **implemented:** the minimum bounded Situation projection is reconstructed from
+   current authoritative references, revisioned across cognition, and never persisted
+   as a Belief/world-state database;
+3. **next:** tighten Goal materialization, same-Responsibility refinement, replacement,
    reopening, cancellation, and downstream semantic-compatibility behavior;
 4. make relevant Evidence/state deltas reactivate ready Progress or cognition
    without a central polling/priority scheduler;

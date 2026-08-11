@@ -47,6 +47,7 @@ from .planner_contract import (
     planner_response_goal_ids,
     planner_contract_diagnostics,
     review_coordinated_action_plan_coverage,
+    situation_prompt_projection,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -1147,6 +1148,7 @@ class DeepPlannerResolver:
             f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 1800)}\n\n"
             f"Goal association advisory JSON:\n{self._bounded(association, 3200)}\n\n"
             f"Active goals JSON:\n{self._bounded(goals, 3200)}\n\n"
+            f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{self._bounded(situation_prompt_projection(context), 3600)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"{skill_section}"
