@@ -3480,6 +3480,19 @@ class ConversationStateManager:
             return {}
         plan = metadata.get("canonical_plan")
         if not isinstance(plan, dict):
+            if (
+                metadata.get("planning_result") == "direct_response"
+                and metadata.get("planless_direct_response") is True
+            ):
+                goal_ids = metadata.get("goal_ids")
+                if isinstance(goal_ids, str):
+                    goal_ids = [goal_ids]
+                if isinstance(goal_ids, list):
+                    return {
+                        goal_id: {"goal_id": goal_id, "disposition": "respond"}
+                        for value in goal_ids
+                        if (goal_id := " ".join(str(value or "").strip().split()))
+                    }
             return {}
         raw_outcomes = plan.get("goal_outcomes")
         outcomes: dict[str, dict[str, Any]] = {}

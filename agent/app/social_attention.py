@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import time
@@ -13,10 +14,10 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_contracts.interaction import SkillRequest
-    from chromie_contracts.social_attention import SocialAttentionPlan
+    from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import SkillRequest
-    from shared.chromie_contracts.social_attention import SocialAttentionPlan
+    from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 
 logger = logging.getLogger("chromie.agent.social_attention")
 
@@ -35,7 +36,9 @@ class SocialAttentionPlanner:
     def __init__(self, services: Any) -> None:
         self.services = services
 
-    async def plan(self, request: AgentRunRequest) -> SocialAttentionPlan | None:
+    async def plan(
+        self, request: AgentRunRequest | SocialAttentionRequest
+    ) -> SocialAttentionPlan | None:
         client = self.services.social_attention_ollama
         candidates = request.context.get("social_attention_candidates")
         if client is None or not isinstance(candidates, list) or not candidates:
@@ -69,7 +72,7 @@ class SocialAttentionPlanner:
                     "num_ctx": int(self.services.social_attention_num_ctx),
                     "num_predict": int(self.services.social_attention_num_predict),
                 },
-                response_format="json",
+                response_format=self._response_schema(candidates),
             )
         except Exception as exc:
             planner_ms = (time.perf_counter() - started) * 1000.0
@@ -161,14 +164,63 @@ class SocialAttentionPlanner:
         )
         return plan
 
-    def _prompt(self, request: AgentRunRequest, candidates: list[dict[str, Any]]) -> str:
+    @staticmethod
+    def _response_schema(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        """Constrain body identity to the exact reviewed live candidate set."""
+
+        schema = copy.deepcopy(SocialAttentionPlan.model_json_schema())
+        candidate_ids = list(
+            dict.fromkeys(
+                str(item.get("capability_id") or "").strip()
+                for item in candidates
+                if isinstance(item, dict)
+                and str(item.get("capability_id") or "").strip()
+            )
+        )
+        behavior_schema = schema.get("$defs", {}).get("SocialAttentionBehavior")
+        if isinstance(behavior_schema, dict):
+            properties = behavior_schema.get("properties")
+            if isinstance(properties, dict):
+                capability_id = properties.get("capability_id")
+                if isinstance(capability_id, dict):
+                    capability_id["type"] = "string"
+                    capability_id["enum"] = candidate_ids
+            required = behavior_schema.setdefault("required", [])
+            if "capability_id" not in required:
+                required.append("capability_id")
+        required = schema.setdefault("required", [])
+        if "decision" not in required:
+            required.append("decision")
+        return schema
+
+    def _prompt(
+        self,
+        request: AgentRunRequest | SocialAttentionRequest,
+        candidates: list[dict[str, Any]],
+    ) -> str:
+        if isinstance(request, SocialAttentionRequest):
+            language = request.language
+            event = request.event
+            intent = request.intent
+            route = ""
+            priority = "normal"
+            actions: list[str] = []
+        else:
+            language = request.language or request.route_decision.language
+            event = str(request.context.get("social_attention_event") or "speaking")
+            intent = request.route_decision.intent
+            route = request.route_decision.route
+            priority = request.route_decision.priority
+            actions = list(request.route_decision.actions or [])
         payload = {
+            "event": event,
             "user_utterance": request.text,
-            "language": request.language or request.route_decision.language,
-            "route": request.route_decision.route,
-            "intent": request.route_decision.intent,
-            "priority": request.route_decision.priority,
-            "goal_interpretation_actions": list(request.route_decision.actions or []),
+            "language": language,
+            "route": route,
+            "intent": intent,
+            "priority": priority,
+            "goal_interpretation_actions": actions,
+            "interaction_state": request.context.get("social_attention_interaction_state") or {},
             "recent_history": list(request.history[-4:]),
             "attention_target_evidence": request.context.get("social_attention_target_evidence")
             or {"available": False},
@@ -176,7 +228,8 @@ class SocialAttentionPlanner:
             "max_behaviors": int(self.services.social_attention_max_behaviors),
         }
         return (
-            "Plan optional social attention for the current spoken interaction.\n"
+            "Plan optional Social Attention for the supplied interaction event.\n"
+            "The event is a state transition such as understanding becoming ready, work starting, waiting, evidence arriving, or speaking; it is not a user Goal.\n"
             "Attention is the goal; blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
             "Choose decision=none when speech alone is natural, when a gesture would be repetitive, distracting, "
             "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "

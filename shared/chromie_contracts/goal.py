@@ -237,6 +237,37 @@ def stable_goal_operation_id(
     return f"goalop_{digest}"
 
 
+class GoalProgressBinding(BaseModel):
+    """Goal Association binding from one Core progress candidate to canonical Goals."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str = Field(min_length=1)
+    goal_ids: list[str] = Field(min_length=1)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    reason_summary: str = ""
+
+    @field_validator("candidate_id", "reason_summary", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("goal_ids", mode="before")
+    @classmethod
+    def normalize_goal_ids(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("goal_ids must be a list")
+        return list(dict.fromkeys(
+            normalized
+            for item in value
+            if (normalized := " ".join(str(item or "").strip().split()))
+        ))
+
+
 class GoalAssociationResolution(BaseModel):
     """Advisory result for continuity-before-creation on one user turn."""
 
@@ -248,6 +279,7 @@ class GoalAssociationResolution(BaseModel):
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
     resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
+    progress_bindings: list[GoalProgressBinding] = Field(default_factory=list)
     clarification: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
@@ -278,11 +310,23 @@ class GoalAssociationResolution(BaseModel):
             raise ValueError("new_goals goal_id values must be unique")
         if existing_targets.intersection(new_ids):
             raise ValueError("new_goals must not reuse target existing goal IDs")
+        binding_ids = [item.candidate_id for item in self.progress_bindings]
+        if len(binding_ids) != len(set(binding_ids)):
+            raise ValueError("progress_bindings candidate_id values must be unique")
+        canonical_ids = existing_targets | set(new_ids)
+        for binding in self.progress_bindings:
+            unknown = set(binding.goal_ids) - canonical_ids
+            if unknown:
+                raise ValueError(
+                    "progress binding references non-canonical Goal IDs: "
+                    + ", ".join(sorted(unknown))
+                )
         if self.clarification and (
             self.new_goals
             or self.associations
             or self.referent_updates
             or self.resolved_references
+            or self.progress_bindings
         ):
             raise ValueError(
                 "clarification result must not also propose goal or discourse changes"
@@ -356,6 +400,10 @@ class GoalAssociationResolution(BaseModel):
             "resolved_references": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in self.resolved_references
+            ],
+            "progress_bindings": [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in self.progress_bindings
             ],
             "clarification": self.clarification,
             "confidence": self.confidence,

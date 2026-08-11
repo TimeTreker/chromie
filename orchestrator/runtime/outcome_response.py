@@ -55,8 +55,8 @@ _ENGLISH_ORDINALS = (
 _EXPLICIT_OBSERVATION_FIELDS = ("user_summary",)
 
 _INTERPRETATION_UNAVAILABLE_TEXT = {
-    "zh": "我刚才没看明白。",
-    "en": "I could not make sense of that just now.",
+    "zh": "结果已经拿到了，不过我刚才没整理好怎么说。",
+    "en": "I got the result, but I could not phrase the details properly just now.",
 }
 
 _MAX_OBSERVATION_TEXT = 240

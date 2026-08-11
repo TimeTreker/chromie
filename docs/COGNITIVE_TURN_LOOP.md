@@ -163,6 +163,19 @@ bounded information acquisition, Social Attention, and later parallel work. It
 must not be implemented as a weather phrase rule, route shortcut, or second
 semantic authority.
 
+A complete native conversational response is another locally ready form of
+progress. When Fast Understanding can already answer from the current Mind and
+bounded conversation context without external acquisition, unresolved reference,
+provider evidence, effect, or deeper reasoning, it may author one substantive
+`native_response` and start it through the existing Speaking runtime while Goal
+Association continues. This is distinct from `fast_speech`: `fast_speech` only
+communicates progress, whereas `native_response` may satisfy a conversational
+Goal. The early Speaking result remains turn-scoped until Goal Association
+explicitly binds that exact progress candidate to a canonical `spoken_response`
+Goal; canonical delivery may then reuse the exact speech/result instead of
+speaking it again. The Host may validate and bind that model-authored act but may
+not rewrite it or infer its Goal from text similarity.
+
 A fully specified non-effectful read is the clearest case. Once the Core has
 sufficiently understood an exact bounded read and trusted code verifies that the
 registered operation is read-only, schema-valid, confirmation-free, and safe to
@@ -213,6 +226,21 @@ trusted observation + canonical Goal relationships
 The weather lookup does not need to wait for the relationship analysis; the
 relationship analysis still improves what the result means to the user.
 
+### 3.2 General Progress is a substrate, not the complete Mind model
+
+The implemented readiness paths establish one general invariant: a piece of
+progress may advance when its own meaning, dependencies, risk, and authority are
+sufficient, without waiting for unrelated cognition. They do **not** decide the
+full long-term state model for Belief, unfinished Responsibility, Intention,
+Attention, Memory, Reflection, autonomy, or learning.
+
+Those questions are the project's immediate architecture line and are owned by
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
+Before adding new runtime managers or persistent DTOs, map each cognitive
+phenomenon onto existing Goal, General Progress, Interaction Ledger, Plan,
+ExecutionOutcome, Memory, and provider contracts and promote only the smallest
+missing lifecycle/authority concept.
+
 ## 4. Gateway-to-Core contract
 
 The Gateway emits a versioned `UserTurnEnvelope`. It is the only canonical
@@ -249,13 +277,16 @@ ordinary Core cognition.
 
 ## 5. Goal understanding and planning
 
-The Core first associates the admitted turn with active goals. It then creates
-only genuinely independent new goals. A complete non-effectful
-`spoken_response` Goal that needs no external read, tool, memory mutation, or
-embodied effect may move directly from `GOALS_RESOLVED` to
-`READY_TO_RESPOND`; it does not invoke Fast or Deep Planner merely to transport
-speech. This is a model-authored semantic result validated against the typed
-Goal, never a Host greeting phrase table.
+The Core associates the admitted turn with active goals and creates only
+genuinely independent new goals. A complete non-effectful `spoken_response`
+responsibility that needs no external read, memory retrieval/mutation, unresolved
+reference, or embodied effect may already have started as a Fast-Understanding
+`native_response`; Goal Association then explicitly binds that candidate to the
+canonical Goal and the Host may adopt/reuse the exact Speaking act. If no such
+ready candidate exists, a resolved `spoken_response` Goal may still move directly
+from `GOALS_RESOLVED` to `READY_TO_RESPOND`. Neither path invokes Fast or Deep
+Planner merely to transport speech. Both are model-authored semantic results,
+never a Host greeting phrase table or `route == chat` shortcut.
 
 When capability work or broader planning is required, the planning path is:
 

@@ -4,91 +4,73 @@ Status: current resume point
 
 ## Direction
 
-Continue the **Goal-driven single semantic authority** architecture. The
-Cognitive Gateway owns ingress, deterministic protective reflexes, and attention
-admission. The Goal-driven Cognitive Core owns ordinary semantic interpretation,
-goal association, planning, response composition, and outcome reconciliation.
-Effects remain authorized only by trusted Host and provider boundaries.
+Continue the **Goal-driven single semantic authority** architecture as a
+readiness-driven Continuous Mind rather than a mandatory cognition pipeline.
+The Cognitive Gateway owns ingress and deterministic protective reflexes; the
+Cognitive Core owns meaning and responsibility; trusted Host/provider boundaries
+remain the only authorities for effects and evidence.
 
-## Current checkpoint
+The current General Progress implementation is a substrate, not the finished
+Mind model. Fast Understanding can surface a complete `native_response` or exact
+`capability` progress candidate; ready native conversation and trusted safe-read
+work may advance while Goal Association continues, and Goal Association later
+provides explicit canonical responsibility binding. Effectful work still waits
+for the applicable planning, confirmation, authorization, resource, and provider
+safety boundaries. Social Attention is a peer event lane and does not own Goals
+or completion.
 
-Issues [#17](https://github.com/TimeTreker/chromie/issues/17) and
-[#18](https://github.com/TimeTreker/chromie/issues/18) are merged on `main` in
-PR [#19](https://github.com/TimeTreker/chromie/pull/19). `LayeredPrompt` promotes
-exact stable fragments before volatile turn state and `OllamaClient` records
-only reuse candidates and provider timings, never inferred cache hits.
+## Immediate checkpoint — discuss architecture before adding modules
 
-Issue [#20](https://github.com/TimeTreker/chromie/issues/20) is merged through
-PR [#21](https://github.com/TimeTreker/chromie/pull/21) as `ac1944d`. Its
-reproduced failure was
-a mixed chain: qwen3.5:4b ignores the semantic-review JSON schema on Ollama
-`/api/chat` while honoring the same schema through `/api/generate`; the runtime
-previously treated that expected model/transport incompatibility as permission
-to preserve an ungrounded chat decision; route-narrowed capability context
-could omit an exact recovery ability; and planner validation could accept a
-typed effectful Goal as satisfied with zero executable steps. The merged source
-provides one same-model, same-schema transport compatibility retry,
-preserves a candidate-first lossless supplied catalog for review, and rejects
-unresolved effectful zero-step outcomes before canonical planning. Focused
-regressions pass 191/191, the applicable Level A classes pass 13/13, and the
-canonical gate passes; `docs/STATUS.md` owns the exact evidence limits.
+The **next development work is to finish the Continuous Mind architecture
+synthesis**, then implement it incrementally. Do not add a `BeliefManager`,
+`ReflectionManager`, generic priority engine, background-thought loop, or other
+new cognitive framework merely because the corresponding human phenomenon is in
+the problem-space list.
 
-Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the active
-source line. Core-authored speech retains turn, Goal, canonical Plan, role,
-claim, and completion-restriction provenance through playback. The bounded
-append-only Interaction Ledger transports immutable owner-authored Goal/Plan,
-speech, committed capability, Social Attention, and trusted execution events;
-its Goal-scoped Interaction Context is supplied as volatile input to Goal
-Association, Fast Planner, Deep Planner, and Response Composer. It never
-replaces or upgrades playback, `TaskProposalLedger`, Goal state, Social
-Attention results, or `ExecutionOutcomeBundle` evidence. Current retention is
-in-memory only and makes no process-restart continuity claim.
+The authoritative problem space, questions, directions, and compression rule are
+in
+[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
+The delivery order is in [Roadmap](ROADMAP.md#immediate-architecture-line--continuous-mind-synthesis).
 
-The Issue #22 branch passes 383 focused tests, the three relevant Level A
-classes 25/25, and the canonical gate with 102 benchmark tests, 2,168
-maintained tests, and 20 legacy Agent tests. Its remaining delivery step is
-review and merge; no live model, speaker, simulator, restart, or physical-robot
-claim is attached to this source result.
+Immediate discussion order:
 
-The earlier post-merge audit and paired closure are retained in
-`docs/STATUS.md`, their implementation/evidence authority. In summary, clean
-Chromie `a36444b` and Soridormi `fa8080d2` retained exact compound MuJoCo
-execution, deterministic provider-start cancellation, Goal reconciliation, and
-safe idle. The source and generated-speech gates also closed their recorded
-revision scopes.
+1. compress the candidate state model: Observation/Belief, unfinished
+   Responsibility, Intention/Progress/Commitment, Attention/Working Set,
+   Memory/Experience, Reflection/Metacognition, with authority as a cross-cutting
+   boundary;
+2. decide which concepts are already represented by Goal, Interaction Ledger,
+   CanonicalPlan, ExecutionOutcome, Memory, Capability/provider state, and
+   General Progress, and which truly need a new first-class lifecycle;
+3. settle Goal as unfinished responsibility versus immediately completed
+   transient progress, including concerns, promises, time/dependencies, and slow
+   cognition reactivation;
+4. settle observation-driven belief/revision, uncertainty, common ground,
+   intention/commitment, incremental planning, attention/preemption, and selective
+   Reflection; and
+5. only then implement slices in dependency order and delete superseded pipeline
+   or compatibility concepts instead of layering adapters around them.
 
-The narrow physical voice-device track is now target validated for one
-supervised English speech-only turn. Clean host revision `f8d5eae` retained
-`.chromie/acceptance/voice/20260809T122818Z`: the EDIFIER H230P microphone was
-recognized exactly by ASR, Gateway/Core produced one chat response with zero
-executable capabilities, audible playback completed, all six machine checks
-passed, the operator verdict was `pass`, and the strict
-`current-revision-live-voice` profile reported zero errors. This closes that
-microphone -> ASR -> cognition -> TTS -> speaker chain only. Broader semantic
-review, physical-device barge-in/echo and latency qualification, physical robot
-evidence, real vocal/media providers, and release qualification remain open;
-do not reinterpret one accepted physical turn or the retained simulator and
-generated-audio evidence as those broader claims. `docs/STATUS.md` owns the
-exact evidence identity and limits.
+The design rule is: **design the whole Mind, implement the next invariant, and
+keep the final concept count small.** Weather, chat, walking, or any individual
+scenario is evidence for a general ability, never the architecture target.
 
-The maintained source contracts and compatibility state are owned by
-`docs/STATUS.md`; `/interaction` and `/run` remain emergency-only compatibility
-surfaces and must not become ordinary semantic fallback.
+## Verification state
 
-The current working tree also removes Host/Agent natural-language rule tables
-from ordinary behavior. Action-request/action-claim regexes, confirmation and
-conversation-reset phrase lists, lexical capability scoring, schema-enum word
-aliases, speech-marker rewrites, and related phrase-based response checks are
-gone. Goal Association and the Cognitive Core now own those meanings through
-typed output; exact schema/ID checks remain mechanical. Only the deterministic protective
-reflex matches language for stop, cancel, emergency, silence, and unusable input. This source
-change has no current-revision live-model, microphone, speaker, simulator, or
-physical-robot evidence; `docs/STATUS.md` owns the final automated evidence and
-limits.
+`docs/STATUS.md` owns current implementation and evidence claims. The General
+Progress change retains source regressions for native conversation, exact
+capability progress, Goal binding, safe-read readiness, effectful negative
+boundaries, peer Social Attention, and truthful outcome presentation. It does not
+by itself establish live-model latency, physical audio, simulator, or physical
+robot qualification.
 
-## Resume commands
+Before claiming the working tree is clean, run the canonical gate in a
+dependency-complete environment:
 
-From the repository root:
+```bash
+./scripts/run_tests.sh
+```
+
+Useful focused ownership/structure checks are:
 
 ```bash
 python scripts/check_repository_policies.py
@@ -98,63 +80,34 @@ python scripts/check_runtime_structure.py
 python scripts/check_docs.py
 python scripts/semantic_authority_audit.py --check
 ./scripts/benchmark_check.sh
-python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-In a dependency-complete environment, use the canonical gate instead:
+Do not report Ruff, Mypy, GPU, microphone, speaker, MuJoCo, physical-provider,
+or live-model results unless those exact gates actually ran and retained their
+evidence.
 
-```bash
-./scripts/run_tests.sh
-```
+## Near-term implementation order after architecture decisions
 
-For a running Agent service:
+1. responsibility/Goal materialization and lifecycle semantics;
+2. bounded Observation/Belief update plus evidence-driven reactivation;
+3. Intention/Progress/Commitment and revision/incremental-planning semantics;
+4. Attention/Working Set, time/dependency wake-up, and cognitive preemption;
+5. selective Reflection, memory consolidation/forgetting, and learning promotion;
+6. multi-user privacy/consent, durable recovery, competence/calibration, and
+   bounded autonomy after the earlier authority model is stable.
 
-```bash
-python scripts/control_plane_smoke.py --base-url http://127.0.0.1:8092
-```
-
-For the maintained GPU profile and service lifecycle, use:
-
-```bash
-bash scripts/gpu_smoke_test.sh
-```
-
-Do not report GPU, microphone, speaker, MuJoCo, or physical-provider validation
-unless the command actually ran against that target and retained its evidence.
-
-## Next engineering work
-
-Complete, publish, and review Issue #22 without widening its evidence-owner
-scope. Then qualify the configured RTX 4090 Laptop `gemma4:e4b` model-role
-change and retain a
-same-model warm/cold prefix measurement;
-separate prompt evaluation from model load and never call a repeated digest a
-provider cache hit.
-
-The merged Issues retain clean, revision-bound source and highest-safe automated
-evidence for the walk/sing/blink defect, reversible barge-in, the exact
-`chromie.vocal.perform` contract, and peer media Activity. The evidence paths,
-counts, limits, and remaining physical/provider gaps are owned by
-[Current Status](docs/STATUS.md) and [Acceptance](docs/ACCEPTANCE.md). Generated
-speech and MuJoCo body results do not prove a physical microphone, speaker,
-robot, real vocal provider, or real media provider. The separate supervised
-bundle recorded above is the authority for its one narrow physical
-microphone-to-speaker claim.
-
-The paired Soridormi reproducibility patch is merged as `fa8080d2`; Chromie's
-capability manifest and compatibility authority are bound to that revision.
-Chromie PRs #12 and #13 are merged with green Python 3.11/3.12 checks; exact
-compound and cancellation replay is retained against clean merged `a36444b`.
-Preserve it while advancing explicit target tracks. Keep backend names out of
-Goals, add no neutral media alias, and never relabel source, generated TTS, or
-simulator evidence as real-provider, physical-audio, or hardware proof.
+Every slice must first identify the reusable cognitive invariant, map or remove
+existing concepts, retain general scenarios, and avoid a new permanent abstraction
+when an existing owner can represent the state correctly.
 
 ## Canonical owners
 
-- stable boundaries: [Project Charter](docs/PROJECT_CHARTER.md)
+- stable boundaries and principles: [Project Charter](docs/PROJECT_CHARTER.md)
+- cognitive constitution and complete problem space:
+  [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- executable turn/evidence lifecycle: [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md)
 - delivery order: [Roadmap](ROADMAP.md)
 - implementation and evidence: [Current Status](docs/STATUS.md)
 - target workflow: [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md)
 - interfaces: [API Reference](docs/API_REFERENCE.md)
 - operation: [Runbook](CHROMIE_RUNBOOK.md)
-- notable changes: [Changelog](CHANGELOG.md)

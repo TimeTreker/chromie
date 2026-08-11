@@ -100,6 +100,9 @@ def local_agent_tool_definitions(
                     "safety_class": tool.safety_class,
                     "semantic_authority": "goal_driven_cognitive_core",
                     "execution_boundary": "trusted_local_tool",
+                    "side_effect_free": bool(tool.execution.side_effect_free),
+                    "semantic_scope": dict(tool.llm_hints.get("semantic_scope") or {}),
+                    "resource_contract": dict(tool.llm_hints.get("resource_contract") or {}),
                 },
             )
         )

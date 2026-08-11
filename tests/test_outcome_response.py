@@ -342,7 +342,7 @@ class OutcomeResponseTests(unittest.TestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "I could not make sense of that just now.",
+            "I got the result, but I could not phrase the details properly just now.",
         )
         self.assertNotIn("Runtime", response.speech[0].text)
 
@@ -365,7 +365,7 @@ class OutcomeResponseTests(unittest.TestCase):
 
         response = compose_outcome_response(bundle, plan, "zh-CN")
 
-        self.assertEqual(response.speech[0].text, "我刚才没看明白。")
+        self.assertEqual(response.speech[0].text, "结果已经拿到了，不过我刚才没整理好怎么说。")
         self.assertNotIn("36", response.speech[0].text)
         self.assertNotIn("观测结果", response.speech[0].text)
         self.assertEqual(response.metadata["source"], "deterministic_outcome_fallback")
@@ -392,7 +392,7 @@ class OutcomeResponseTests(unittest.TestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "I could not make sense of that just now.",
+            "I got the result, but I could not phrase the details properly just now.",
         )
         self.assertNotIn("goal-weather", response.speech[0].text)
         self.assertNotIn("plan-post-execution", response.speech[0].text)

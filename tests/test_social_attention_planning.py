@@ -28,7 +28,10 @@ class _AttentionOllama:
         self.prompts: list[str] = []
 
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs["response_format"] == "json"
+        schema = kwargs["response_format"]
+        assert isinstance(schema, dict)
+        behavior = schema["$defs"]["SocialAttentionBehavior"]
+        assert "enum" in behavior["properties"]["capability_id"]
         self.prompts.append(prompt)
         if self.delay_s:
             await asyncio.sleep(self.delay_s)

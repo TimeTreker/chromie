@@ -13,9 +13,66 @@ Provider and Host boundaries remain the only authorities for effects.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
+## Immediate architecture line — Continuous Mind synthesis
+
+The General Progress substrate in the current change is the first implementation
+slice of readiness-driven cognition: Fast Understanding may surface complete
+native conversation or exact capability work while Goal Association continues,
+and trusted readiness determines what may progress now. **It is not the end-state
+Mind architecture.**
+
+The next work begins immediately after this substrate lands and takes precedence
+over adding new cognitive feature modules:
+
+1. **Discuss and compress the complete problem space** in
+   [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#411-candidate-continuous-mind-state-model--immediate-architecture-work).
+   Decide the smallest core state model that can explain Belief, Self/User/Common
+   Ground, unfinished Responsibility, Intention/Progress/Commitment,
+   Attention/Working Set, Memory/Experience, and Reflection/Metacognition. These
+   names are candidate concepts, not pre-approved DTOs.
+2. **Map existing contracts before creating new ones.** Reuse or consolidate
+   `SemanticGoal`, General Progress, Interaction Ledger/Context, CanonicalPlan,
+   `ExecutionOutcomeBundle`, memory, Capability/provider state, and existing
+   authority/evidence surfaces. Add a first-class concept only when an independent
+   lifecycle or authority cannot be represented cleanly.
+3. **Settle responsibility semantics.** Define when Fast cognition may complete a
+   transient responsibility without persistent Goal state, when unfinished work
+   becomes Goal/prospective memory, how concern/obligation/promise differ, and how
+   time/dependency events reactivate slow cognition.
+4. **Settle reality and revision semantics.** Define bounded Observation/Belief
+   update, self/user/common-ground state, uncertainty/contradiction/provenance,
+   expected outcomes, and how later cognition corrects or supersedes unfinished
+   progress. Prefer evidence acquisition over longer inference when uncertainty is
+   externally resolvable.
+5. **Settle intention and commitment semantics.** Decide how Goal, Intention,
+   Plan, Progress, and Commitment differ; preserve stronger authorization for
+   irreversible effects; allow incremental next-commitment planning when future
+   steps depend on observations.
+6. **Settle attention and slow-cognition reactivation.** Define salience, working
+   set, interruption/suspend/resume, compute contention, and event/time/idle-driven
+   reactivation without building a brittle numeric priority engine.
+7. **Settle Reflection, Memory, and Learning promotion.** Reflection remains
+   selective slow cognition rather than a per-turn barrier. Define self-correction,
+   pattern reflection, memory retention/forgetting, calibration, habit/provider
+   learning, and owner-reviewed promotion boundaries.
+8. **Then implement in dependency order**, with retained general-ability scenarios
+   at each slice. Multi-user privacy/consent, durable restart continuity, broader
+   autonomy, and learning promotion widen only after the underlying state and
+   authority model is explicit.
+
+Architecture review is allowed to remove or replace pre-release compatibility or
+workflow structures when they obstruct this model. `Use less to solve more` means
+ending with fewer, clearer concepts—not preserving an obsolete pipeline because
+it already exists.
+
 ## Current priorities
 
-1. Preserve the merged source contracts from Issues
+1. Complete the Continuous Mind architecture synthesis above before adding
+   another standalone cognition manager, review layer, or behavior-specific fast
+   path. The General Progress substrate is retained while Belief/Responsibility/
+   Intention/Attention/Memory/Reflection semantics are compressed and mapped to
+   existing contracts.
+2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue
    [#20](https://github.com/TimeTreker/chromie/issues/20), then complete the
@@ -24,7 +81,7 @@ organized by capability, risk, and retained evidence.
    replacement model profile. Same-model timing evidence must remain separate
    from cross-model reload measurement; no prompt-prefix result may claim
    cross-model KV reuse or model-reload savings.
-2. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
+3. Preserve the closed 2026-08-07 post-merge audit contracts. Clean merged
    Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
    ordered MuJoCo execution, provider-start deterministic cancellation, and
    safe-idle recovery. The dependency-complete source gate and rebuilt clean
@@ -32,27 +89,27 @@ organized by capability, risk, and retained evidence.
    independent semantic reviewer remains an explicit non-release gap. Hard
    semantic, delivery-evidence, safety, provider, or provenance failures remain
    non-averageable blockers.
-3. Keep every admitted non-operational turn on one Goal-driven semantic path.
+4. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
-4. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
+5. Preserve the source-qualified `chromie.vocal.perform` contract and its clean
    default-provider distinction evidence; real modes remain a separate target
    evidence track.
-5. Preserve Issue #7's source-qualified peer media-playback contract and its
+6. Preserve Issue #7's source-qualified peer media-playback contract and its
    clean default-provider distinction evidence. Real operations remain a
    separate target-evidence track; singing remains Speaking, existing-audio
    playback remains Activity, and ordinary TTS is neither kind of evidence.
-6. Preserve exact provider-prefixed capability identity from model proposal
+7. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
    replacement stays behind that exact capability identity; do not introduce a
    neutral late-binding alias merely to relocate implementation.
-7. Close source-bound and target-bound evidence separately. A passing source
+8. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
    behavior.
-8. Reduce compatibility surfaces only after the maintained path has equivalent
+9. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.
-9. Keep documentation, benchmarks, static analysis, configuration ownership,
+10. Keep documentation, benchmarks, static analysis, configuration ownership,
    and unit behavior in the canonical pull-request gate.
 
 ## Completed foundations

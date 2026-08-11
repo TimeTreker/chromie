@@ -70,6 +70,7 @@ Core endpoints:
 - `POST /goal-association`
 - `POST /fast-plan`
 - `POST /deep-plan`
+- `POST /social-attention/plan`
 - `POST /compose-response-plan`
 - `POST /task-continuity`
 
@@ -163,26 +164,30 @@ See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
 
 ## Model-driven social attention
 
-Social Attention is a behavior domain rather than a fixed gesture list. In the
-goal-driven path, Response Composer coordinates the actual response language and
-an optional auxiliary body-expression plan under one model-authored social
-purpose. It may adapt language style or pacing, select zero or more exact
-catalog capabilities tagged `social_attention`, combine both, or choose `none`.
-The native compatibility planner remains body-only and runs independently of the
-primary response.
+Social Attention is a behavior domain and a peer proposal lane, not a fixed
+gesture list or a Response Composer decoration. The maintained Goal-driven Host
+starts event-scoped `/social-attention/plan` work independently from Goal
+Association, ready capability work, and response preparation. The planner may
+select zero or more exact catalog capabilities tagged `social_attention` or
+choose `none`; it does not own Goal meaning, speech meaning, or authorization.
+The Response Composer retains optional Social-Attention fields only for explicit
+compatibility/coordinated-composition callers, and the maintained peer lane
+disables that duplicate ownership in normal Goal-driven composition.
 
 Candidate discovery uses catalog behavior-domain metadata supplemented by
 `capabilities/behavior_domains.json`; `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is
-only an optional operator override. Deterministic code does not map utterances to
-gestures. It validates exact skill IDs, argument schemas, target evidence,
-availability, resource compatibility, confirmation policy, and latency.
+only an optional operator override. The response schema constrains behavior
+`capability_id` to the exact live candidate set. Trusted code still validates
+argument schemas, target evidence, availability, resource compatibility,
+confirmation policy, and provider concurrency before the same Trusted Capability
+Runtime executes any auxiliary behavior.
 
-Auxiliary skills carry `metadata.auxiliary_social_attention=true` and
-`metadata.interaction_role=auxiliary_expression`. They are excluded from user
-task proposals and are dropped rather than delaying or conflicting with speech,
-emergency handling, or the primary task. A concrete user request such as "blink
-twice" remains a normal, non-droppable CanonicalPlan goal even though its
-observable behavior belongs to the same domain. The maintained policy is `on`;
+Auxiliary skills carry `metadata.auxiliary_social_attention=true` and have no
+Goal-completion authority. They are dropped rather than delaying or conflicting
+with speech, emergency handling, or the primary task. A concrete user request
+such as "blink twice" remains a normal, non-droppable CanonicalPlan Goal even
+though its observable behavior belongs to the same domain. The maintained policy
+is `on`;
 `report_only` retains advisory plans without body requests and `off` suppresses
 auxiliary planning. Target evidence is semantic only. Chromie does not accept installation calibration,
 body coordinates, joint targets, or controller parameters in Social Attention

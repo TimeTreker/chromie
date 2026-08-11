@@ -46,6 +46,7 @@ try:
         ActiveGoalSnapshot,
         GoalAssociation,
         GoalAssociationResolution,
+        GoalProgressBinding,
         stable_goal_operation_id,
     )
     from chromie_contracts.resource import (
@@ -67,6 +68,7 @@ except ImportError:  # pragma: no cover
         ActiveGoalSnapshot,
         GoalAssociation,
         GoalAssociationResolution,
+        GoalProgressBinding,
         stable_goal_operation_id,
     )
     from shared.chromie_contracts.resource import (
@@ -239,6 +241,7 @@ class GoalAssociationModelAssociation(BaseModel):
     updated_description: str = ""
     resolved_gap_ids: list[str] = Field(default_factory=list)
     requires_replan: bool = False
+    progress_candidate_ids: list[str] = Field(default_factory=list, max_length=8)
 
     @field_validator("reason_summary", "updated_description", mode="before")
     @classmethod
@@ -247,7 +250,7 @@ class GoalAssociationModelAssociation(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("target_goal_ids", "resolved_gap_ids", mode="before")
+    @field_validator("target_goal_ids", "resolved_gap_ids", "progress_candidate_ids", mode="before")
     @classmethod
     def normalize_ids(cls, value: Any) -> list[str]:
         if value is None:
@@ -513,6 +516,8 @@ class GoalAssociationModelGoal(BaseModel):
         default_factory=list,
         max_length=12,
     )
+    progress_candidate_ids: list[str] = Field(default_factory=list, max_length=8)
+    related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
 
     @field_validator("description", mode="before")
@@ -521,6 +526,19 @@ class GoalAssociationModelGoal(BaseModel):
         if isinstance(value, str):
             return " ".join(value.strip().split())
         return value
+
+    @field_validator("progress_candidate_ids", "related_goal_ids", mode="before")
+    @classmethod
+    def normalize_progress_candidate_ids(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return list(dict.fromkeys(
+            normalized
+            for item in value
+            if (normalized := " ".join(str(item or "").strip().split()))
+        ))
 
     @model_validator(mode="before")
     @classmethod
@@ -937,6 +955,7 @@ class GoalAssociationResolver:
             output_type,
             candidate_goals,
             discourse_referents,
+            progress_candidates=(request.context.get("progress_candidates") or []),
             clarification_only=False,
         )
         generation_options = {
@@ -1783,6 +1802,7 @@ class GoalAssociationResolver:
         candidate_goals: list[dict[str, Any]],
         discourse_referents: list[dict[str, Any]],
         *,
+        progress_candidates: list[dict[str, Any]] | None = None,
         clarification_only: bool = False,
     ) -> dict[str, Any]:
         schema = copy.deepcopy(output_type.model_json_schema())
@@ -1795,6 +1815,12 @@ class GoalAssociationResolver:
             " ".join(str(item.get("referent_id") or "").strip().split())
             for item in discourse_referents
             if " ".join(str(item.get("referent_id") or "").strip().split())
+        ]
+        progress_candidate_ids = [
+            " ".join(str(item.get("candidate_id") or "").strip().split())
+            for item in (progress_candidates or [])
+            if isinstance(item, dict)
+            and " ".join(str(item.get("candidate_id") or "").strip().split())
         ]
         properties = schema.get("properties", {})
         new_goals = properties.get("new_goals")
@@ -1809,6 +1835,24 @@ class GoalAssociationResolver:
             if isinstance(node, dict):
                 node_properties = node.get("properties")
                 if isinstance(node_properties, dict):
+                    candidate_field = node_properties.get("progress_candidate_ids")
+                    if isinstance(candidate_field, dict):
+                        items = candidate_field.get("items")
+                        if isinstance(items, dict):
+                            if progress_candidate_ids:
+                                items["type"] = "string"
+                                items["enum"] = progress_candidate_ids
+                            else:
+                                candidate_field["maxItems"] = 0
+                    related_field = node_properties.get("related_goal_ids")
+                    if isinstance(related_field, dict):
+                        items = related_field.get("items")
+                        if isinstance(items, dict):
+                            if active_ids:
+                                items["type"] = "string"
+                                items["enum"] = active_ids
+                            else:
+                                related_field["maxItems"] = 0
                     if (
                         "responsibility_kind" in node_properties
                         and "output_mode" in node_properties
@@ -2028,7 +2072,7 @@ class GoalAssociationResolver:
         else:
             state_instructions = (
                 "Resolve continuity before creation using semantic reasoning. "
-                "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and the applicable updated_description, resolved_gap_ids, and requires_replan fields. "
+                "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields, plus progress_candidate_ids only when supplied current-turn progress candidates support that exact Goal. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
                 "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify or replace only when the user meaning actually changes and include updated_description or resolved_gap_ids. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
@@ -2037,7 +2081,7 @@ class GoalAssociationResolver:
             )
             output_instructions = (
                 "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
-                "Use decision=associate for continuity, decision=create_goals for independent work, or decision=clarify only for genuine ambiguity. "
+                "Use decision=associate for continuity, decision=create_goals for independent work, or decision=clarify only for genuine ambiguity. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
                 "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
             )
         return (
@@ -2070,7 +2114,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description, output_mode, optional media_operation, bindings, and optional resource_responsibility only. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, output_mode, optional media_operation, bindings, optional resource_responsibility, progress_candidate_ids only when a supplied current-turn progress candidate directly supports that Goal, and related_goal_ids only when one or more supplied retained Goals are genuinely relevant context for this new responsibility. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -2078,6 +2122,8 @@ class GoalAssociationResolver:
             + skill_section
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
+            "Current-turn progress candidates JSON (Core-authored bounded progress already understood before Goal Association. kind=capability is exact capability-shaped work; kind=native_response is a complete conversational answer already authored from current Mind/context. Copy candidate_id into only the canonical Goal(s) that exact progress directly satisfies or supports. Do not create, modify, or infer capabilities or rewrite response text here; an empty list means no early progress exists):\n"
+            f"{self._bounded_json(context.get('progress_candidates') or [], 3600)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
             f"{goal_progress_communication_prompt('Goal Association')}\n\n"
@@ -3011,6 +3057,14 @@ class GoalAssociationResolver:
                     delivery_mode=resource_item.delivery_mode,
                 )
 
+            unknown_related_goal_ids = sorted(
+                set(item.related_goal_ids) - active_goal_ids
+            )
+            if unknown_related_goal_ids:
+                raise ValueError(
+                    "new Goal references unknown related Goal IDs: "
+                    + ", ".join(unknown_related_goal_ids)
+                )
             new_goals.append(
                 SemanticGoal(
                     goal_id=goal_id,
@@ -3020,6 +3074,7 @@ class GoalAssociationResolver:
                     constraints={},
                     success_criteria=[item.description],
                     resource_responsibility=resource_responsibility,
+                    related_goal_ids=item.related_goal_ids,
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,
@@ -3036,10 +3091,59 @@ class GoalAssociationResolver:
                 )
             )
 
+        supplied_progress = {
+            str(item.get("candidate_id") or "").strip(): item
+            for item in (request.context.get("progress_candidates") or [])
+            if isinstance(item, dict) and str(item.get("candidate_id") or "").strip()
+        }
+        supplied_progress_ids = set(supplied_progress)
+        progress_bindings: list[GoalProgressBinding] = []
+        seen_progress_ids: set[str] = set()
+        for item in model_associations:
+            for candidate_id in item.progress_candidate_ids:
+                if candidate_id not in supplied_progress_ids:
+                    raise ValueError(f"unknown progress_candidate_id={candidate_id!r}")
+                if candidate_id in seen_progress_ids:
+                    raise ValueError(f"progress candidate bound more than once={candidate_id!r}")
+                seen_progress_ids.add(candidate_id)
+                progress_bindings.append(GoalProgressBinding(
+                    candidate_id=candidate_id,
+                    goal_ids=list(item.target_goal_ids),
+                    confidence=item.confidence,
+                    reason_summary=item.reason_summary,
+                ))
+        for goal_id, item in zip(generated_goal_ids, model_output.new_goals, strict=True):
+            for candidate_id in item.progress_candidate_ids:
+                if candidate_id not in supplied_progress_ids:
+                    raise ValueError(f"unknown progress_candidate_id={candidate_id!r}")
+                progress_kind = str(
+                    supplied_progress[candidate_id].get("kind") or ""
+                ).strip()
+                if item.output_mode == "speech" and progress_kind != "native_response":
+                    raise ValueError(
+                        "spoken_response Goal progress must be native_response: "
+                        f"{candidate_id!r}"
+                    )
+                if item.output_mode != "speech" and progress_kind == "native_response":
+                    raise ValueError(
+                        "native_response progress may bind only a speech Goal: "
+                        f"{candidate_id!r}"
+                    )
+                if candidate_id in seen_progress_ids:
+                    raise ValueError(f"progress candidate bound more than once={candidate_id!r}")
+                seen_progress_ids.add(candidate_id)
+                progress_bindings.append(GoalProgressBinding(
+                    candidate_id=candidate_id,
+                    goal_ids=[goal_id],
+                    confidence=model_output.confidence,
+                    reason_summary=f"Current-turn progress supports Goal {goal_id}",
+                ))
+
         return GoalAssociationResolution(
             turn_id=turn_id,
             associations=associations,
             new_goals=new_goals,
+            progress_bindings=progress_bindings,
             referent_updates=referent_updates,
             resolved_references=resolved_references,
             clarification=model_output.clarification,

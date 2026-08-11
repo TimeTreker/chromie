@@ -101,16 +101,25 @@ needs a stable semantic object above routes and skills: the user goal.
 
 ## 3. Constitutional principles
 
-### 3.1 Goal first
+### 3.1 Outcome and unfinished responsibility first
 
-The primary cognitive object is the user’s desired outcome, not a route,
-intent, capability, or skill.
+The primary semantic object is the user-visible outcome, not a route, intent,
+capability, or skill. A persistent Goal represents an outcome Chromie still
+owes, is waiting on, or must continue reasoning about; it is prospective memory
+for unfinished responsibility, not a mandatory ticket that every immediate
+interaction act must acquire before useful progress can begin.
 
-An executable capability is one possible means of satisfying a goal. A
-Agent Skill is a reusable method that may help an Agent decide how to use
-one or more capabilities. The same goal may be satisfied through different
-capabilities, Agent Skills, composed plans, observation, clarification, or
-an alternative plan depending on context.
+Fast cognition may complete a fully understood, low-risk responsibility directly
+through a validated `native_response` or another locally ready progress act while
+Goal Association continues. Work that is not yet complete, needs dependencies,
+requires deeper reasoning, or must survive the current instant is retained as or
+associated with canonical Goal state.
+
+An executable capability is one possible means of satisfying a responsibility.
+An Agent Skill is a reusable method that may help an Agent decide how to use one
+or more capabilities. The same outcome may be satisfied through different
+capabilities, Agent Skills, composed or incremental plans, observation,
+clarification, or an alternative intention depending on context.
 
 ### 3.2 Continuity before creation
 
@@ -160,29 +169,45 @@ selection remains model-authored and typed. Agent Skill content cannot
 register capabilities, grant permissions, bypass confirmation, or execute
 scripts. See [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
-### 3.5 Single-direction cognition
+### 3.5 One semantic authority, multiple cognitive timescales
 
-The normal cognitive path is monotonic, with a direct response branch for a
-complete non-effectful spoken-response Goal:
+Chromie has one semantic Mind, but useful cognition does not have to serialize
+into one wall-clock pipeline. Fast understanding, Goal continuity, ready
+progress, Social Attention, observation handling, and deeper reasoning may
+advance at different timescales from the same authoritative interaction state.
 
 ```text
-associate → segment → direct grounded response
-                    ↘ fast plan → deep plan if needed → validate → commit → execute
+                     fast understanding
+                        /         \
+              ready progress    unfinished responsibility
+                    |                    |
+             speak/read/prepare         Goal
+                    |                    |
+                    +------ observations+----> slower cognition as needed
 ```
 
-The Deep Planner never sends a goal back to the Fast Planner for another
-semantic decomposition pass.
+A later, broader cognition may revise, cancel, redirect, or supersede work that
+has not crossed an irreversible commitment boundary. The more consequential or
+irreversible the effect, the stronger the semantic, evidence, authorization,
+and safety prerequisites before progress may advance.
 
-Both planners may use the same capabilities and shared planning primitives.
-They differ in context breadth, latency budget, and planning depth—not in skill
-ownership.
+Fast and Deep Planner remain useful planning roles, but they are not two stages
+that every responsibility must traverse. Deep Planner never sends a goal back to
+Fast Planner for another semantic decomposition pass. The tiers differ in
+context breadth, latency budget, horizon, and planning depth—not in capability
+ownership or semantic authority.
 
-### 3.6 Planning before execution
+### 3.6 Planning when needed; authorization before effect
 
-No model may directly execute, authorize, or commit a side effect.
+No model may directly execute, authorize, or commit a side effect. Effectful or
+otherwise commitment-bearing work must cross the applicable canonical
+planning/intention, deterministic validation, confirmation, authorization, and
+provider-safety boundaries.
 
-Every plan, regardless of planner tier, must enter the same deterministic
-validation and commitment boundary.
+Planning is not a mandatory barrier for progress whose responsibility is already
+complete in current Mind/context or whose trusted capability contract permits a
+non-effectful read to advance before canonical Goal closure. Such early progress
+never gains Goal-completion or effect authority merely because it started.
 
 ### 3.7 Evidence before claim
 
@@ -244,16 +269,18 @@ physical TaskGraph execution remains sequential.
 A blink selected to express attention is not automatically part of the user’s
 goal. An explicit user request to blink is.
 
-Likewise, response transport is not a user-task step. A direct conversational
-Goal is represented by a `respond` outcome, and a transport capability such as
-`chromie.speak` may remain available to legacy/native interaction surfaces but
-is not a Fast or Deep Planner leaf. This transport boundary does **not** make
-planners mute: Fast and Deep Planning may author `response_text`, including on
-an executable Plan, when there is a new prospective conversational delta to
-communicate. That text never authorizes, executes, or proves the effect. Response
-Composer realizes and coordinates user-facing speech from the immutable Plan and
-Interaction Context; it must preserve new semantic intent while avoiding an act
-Chromie already delivered or already has pending for the same responsibility.
+Likewise, response transport is not a user-task step. `Converse` is a native
+cognitive ability to complete a conversational responsibility from current Mind
+and context; `chromie.speak` is only the trusted Speaking transport/evidence
+boundary. A complete Fast-Understanding `native_response` may begin through that
+Speaking runtime before Goal Association completes, then be explicitly bound to
+a canonical `spoken_response` Goal if persistent Goal state is needed.
+
+Fast and Deep Planning may still identify a later conversational delta when
+planning or new evidence makes one necessary, but Planner text never authorizes,
+executes, or proves an effect. Response composition coordinates only the
+still-needed user-facing delta and must not repeat a substantive act already
+delivered or pending for the same responsibility.
 
 ### 3.11 Truth over guessing
 
@@ -282,10 +309,17 @@ A user turn is evidence. It is not itself a goal.
 
 ### 4.2 Semantic goal
 
-A versioned representation of a desired outcome.
+A versioned persistent representation of a desired outcome that remains
+unfinished, deferred, waiting, or otherwise relevant beyond an immediately
+completed progress act.
 
 A goal should preserve natural meaning rather than forcing every request into a
-fixed taxonomy.
+fixed taxonomy. An admitted turn may produce no persistent Goal when a complete
+low-risk conversational responsibility is immediately satisfied; the delivered
+act and evidence still remain part of interaction history. Conversely, a
+well-understood responsibility that cannot yet be completed should survive as
+Goal state rather than force synchronous deep thinking before the interaction
+can move on.
 
 Suggested shape:
 
@@ -407,74 +441,312 @@ A retained interaction outcome used for evaluation, scenario mining, and
 owner-reviewed improvement. Experience never silently changes safety policy or
 core principles.
 
-## 5. End-to-end cognitive pipeline
+### 4.10 General progress candidate
+
+`CognitiveProgressCandidate` is an implemented Fast-Understanding proposal for
+work that is already semantically concrete enough to be considered for progress.
+It is deliberately more general than a tool/read request. Current forms include:
+
+- `native_response`: a complete substantive conversational act that current
+  Mind/context can already support; and
+- `capability`: an exact capability plus material arguments that Fast
+  Understanding has already resolved.
+
+A candidate is meaning, not authorization. Trusted readiness policy decides what
+may advance now. Goal Association later supplies explicit canonical Goal binding
+when the responsibility persists or needs reconciliation. The Host does not infer
+Goal ownership from route names, text similarity, or capability resemblance.
+
+### 4.11 Candidate Continuous Mind state model — immediate architecture work
+
+The next architecture line must compress the complete human-like cognition
+problem space into the smallest useful set of first-class state concepts. The
+following are **candidate conceptual roles, not a decision to add one DTO,
+manager, database, or model call per item**:
+
+1. **Observation/Event** — something newly perceived or reported by the user,
+   body, provider, environment, clock, or runtime.
+2. **Belief State** — what Chromie currently takes to be true about world, self,
+   user, and common ground, including source, freshness, uncertainty, conflict,
+   and evidence provenance.
+3. **Responsibility State** — concerns, Goals, obligations/promises, dependencies,
+   timing, and lifecycle for outcomes that remain open.
+4. **Intention / Progress / Commitment** — the current direction for advancing a
+   responsibility, what has already progressed, how ready the next progress is,
+   and how far an idea has crossed from thought into promise, authorized action,
+   observed outcome, or user-facing claim.
+5. **Attention / Working Set** — what currently deserves scarce cognitive and
+   execution resources, including salience, urgency, interruption, suspension,
+   resume, and compute contention.
+6. **Memory / Experience** — short-lived working context, retained episodes,
+   stable user preferences/relationships, semantic knowledge, and reviewed
+   experience candidates, with explicit retention and forgetting boundaries.
+7. **Reflection / Metacognition** — on-demand reconsideration of surprising,
+   failed, contradictory, important, or repeated outcomes; self-correction,
+   calibration, deciding whether more thinking is useful, and proposing reviewed
+   learning without self-authorizing policy/personality changes.
+
+Safety, consent/permission, semantic authority, evidence truth, privacy, and
+provider authorization are cross-cutting trusted boundaries rather than another
+free-running cognitive subsystem. Stable identity/personality/worldview/values
+remain the cache-friendly Mind background; current law, weather, news, prices,
+policies, and other changing facts remain dynamically acquired information.
+
+### 4.12 Complete Continuous Mind problem space
+
+The following problem space is the **immediate design agenda**. It is deliberately
+listed before implementation so the project does not solve one visible example
+with another special-case mechanism. Each item must be mapped to an existing
+contract where possible, and only concepts with a genuinely independent state,
+lifecycle, or authority boundary should become new first-class structures.
+
+#### A. Reality, knowledge, and epistemics
+
+Questions:
+
+- How do continuous perception, partial ASR, provider results, body telemetry,
+  time, and environmental changes become bounded `Observation` events?
+- What does Chromie currently believe about the world, herself, a user, and
+  shared/common ground?
+- How are source, provenance, freshness, uncertainty type, contradiction, and
+  confidence/calibration represented without reducing cognition to one numeric
+  threshold?
+- How are expectation, prediction error, causality, and counterfactual reasoning
+  represented so Reflection does not confuse correlation with cause?
+- How do Capability plus current Belief/Self State expose affordances without
+  turning deterministic Host code into a semantic planner?
+
+Direction:
+
+- observations update bounded belief/context rather than entering prompts as raw
+  authority; external text is data, never instruction;
+- uncertainty that can be resolved by evidence should normally trigger
+  observation, information acquisition, or clarification instead of more empty
+  inference; and
+- contradictory or stale beliefs remain explicitly unresolved until evidence or
+  cognition resolves them.
+
+#### B. Self, competence, and homeostasis
+
+Questions:
+
+- What is Chromie's current self state: speaking, moving, holding something,
+  resource constrained, low battery, degraded sensor, or cognitively busy?
+- How does she know the difference between possessing a Capability and being
+  competent/reliable with it in the current conditions?
+- Which self-preservation signals create a concern, a Goal, a deterministic
+  safety action, or only an observation?
+
+Direction:
+
+- self state is current evidence, not personality;
+- competence is evidence-qualified expectation, not a Capability ID synonym; and
+- homeostatic concerns may create cognition but never bypass effect authority.
+
+#### C. Responsibilities, concerns, obligations, and time
+
+Questions:
+
+- When does a transient understood act need no persistent Goal, and when must an
+  unfinished responsibility be materialized?
+- How are a concern, user-requested Goal, promise/obligation, preference/drive,
+  and self-generated Goal distinguished so Goal state does not explode?
+- How do waiting, deferred, superseded, cancelled, completed, stale, deadline,
+  condition, and dependency semantics reactivate slow cognition?
+- Can Chromie autonomously notice a concern or propose a Goal without thereby
+  gaining permission to act externally?
+
+Direction:
+
+- Goal is prospective memory for unfinished responsibility;
+- a concern is lighter than a Goal and may simply request attention;
+- a promise is a stronger commitment than an internal intention; and
+- time/condition changes are cognition events, not polling rules hidden in a
+  planner.
+
+#### D. Intention, planning, progress, revision, and commitment
+
+Questions:
+
+- What is the distinction between desired outcome (Goal), current chosen
+  direction (Intention), concrete Plan, progress already made, and commitment
+  depth?
+- When is full planning useful versus taking only the next meaningful,
+  evidence-producing commitment and replanning incrementally?
+- How can later cognition revise, redirect, cancel, or supersede unfinished Fast
+  progress while irreversible/effectful work requires stronger commitment gates?
+- How are delegation and multi-provider/multi-agent coordination represented
+  without transferring user-semantic responsibility?
+
+Direction:
+
+- `Progress` is the cross-cutting abstraction; current forms already include
+  native conversation and exact capability work;
+- commitment is a dimension, not another mandatory module: thought < intention <
+  promise/plan < authorized request < started action < observed outcome <
+  user-facing claim; and
+- planning should be incremental when future steps depend on observations not yet
+  available.
+
+#### E. Attention, salience, metacognition, and compute
+
+Questions:
+
+- Which open Goals, concerns, observations, users, or environmental changes enter
+  the current cognitive working set?
+- How do novelty, urgency, risk, user attention, dependency readiness, deadlines,
+  and importance influence focus without becoming a brittle integer-priority rule
+  engine?
+- How does slow cognition suspend and resume when a new high-salience turn
+  arrives?
+- When should Chromie stop thinking, think deeper, acquire evidence, or defer
+  work?
+- How should local GPU/model contention allow fast cognition to remain responsive
+  while slower cognition is active?
+
+Direction:
+
+- salience filters continuous observations before expensive cognition;
+- open responsibilities reactivate from meaningful events, dependencies, time,
+  or bounded idle opportunity rather than only synchronous Fast-Planner
+  escalation; and
+- metacognition should reduce useless review/repair loops instead of adding a
+  mandatory review LLM after every stage.
+
+#### F. Conversation, users, common ground, consent, and social behavior
+
+Questions:
+
+- What does Chromie believe the user knows, wants, is attending to, and has
+  already heard? What is shared/common ground versus private belief?
+- How do multiple users, ownership, privacy, sensitivity, consent, age/role, and
+  authority scopes affect memory, disclosure, confirmation, and actions?
+- When should Chromie explain a refusal, changed intention, correction, or
+  high-impact decision without exposing private chain-of-thought?
+- How do Speaking and continuous Social Attention represent real interaction
+  progress even when the substantive Goal remains open?
+
+Direction:
+
+- user models and common ground are epistemic state, not permission;
+- permission/consent are explicit cross-cutting authority facts;
+- `Converse` is native cognition, while `chromie.speak` remains transport/evidence;
+  and
+- Social Attention reacts to interaction-state changes but never becomes a second
+  Goal or semantic planner.
+
+#### G. Outcome reconciliation, reflection, memory, and learning
+
+Questions:
+
+- Which ordinary outcomes simply close a responsibility, and which unexpected,
+  contradictory, important, or repeated outcomes justify Reflection?
+- How does Chromie distinguish current self-correction from pattern-level
+  reflection and longer-term experience consolidation?
+- Which events become working memory, episodic memory, stable preferences,
+  relationship knowledge, semantic knowledge, or reviewed experience—and what
+  should decay or be forgotten?
+- How can repeated success become habit/procedural competence or a provider
+  capability without allowing the Mind to self-authorize new effectful skills?
+- Who may promote experience into memory, prompt/Skill guidance, provider
+  learning, policy, worldview, values, or identity?
+
+Direction:
+
+- reconciliation is normal; Reflection is selective slow cognition and never a
+  mandatory user-facing latency barrier;
+- Reflection may create correction, replan, calibration change, or an experience
+  candidate, but durable promotion remains reviewed and owner/authority bound; and
+- learning must respect Chromie/Soridormi ownership: conversational experience
+  does not silently become motor policy, and provider-local physical learning does
+  not become Chromie semantic authority.
+
+#### H. Reliability, recovery, security, and continuity
+
+Questions:
+
+- Which Goals, promises, beliefs, memories, and identity state survive process or
+  robot restart, and which volatile perception/body facts must be revalidated?
+- How do provider failure, model timeout, interrupted cognition, partial action,
+  crash recovery, and resumed work preserve truthful commitment state?
+- How are source trust, prompt injection from acquired information, and provider
+  degradation contained?
+- Which stable Mind elements may change through owner revision, and which may be
+  influenced only through reviewed learning rather than arbitrary conversation?
+
+Direction:
+
+- recovery restores durable responsibility/identity only with explicit freshness
+  and reconciliation;
+- observations may update beliefs but cannot rewrite Mind authority; and
+- "learning" and "changing who Chromie is" remain separate promotion boundaries.
+
+### 4.13 Compression rule before implementation
+
+The list above is a problem space, not an implementation inventory. Before each
+new architectural slice:
+
+1. map the phenomenon onto existing Goal, Progress, Interaction Ledger,
+   ExecutionOutcome, Memory, Capability, and provider contracts;
+2. identify the independent lifecycle/authority that existing structures cannot
+   represent cleanly;
+3. promote the smallest missing concept only when that boundary is real;
+4. remove or consolidate an obsolete concept when the new model supersedes it;
+   and
+5. retain scenarios that distinguish the general ability from the initiating
+   example.
+
+The target is a small Continuous Mind state model—approximately a handful of
+core concepts—not one class, prompt, manager, or LLM role per cognitive term.
+
+## 5. Continuous cognitive loop
+
+The maintained architecture is a state-driven loop with multiple cognitive
+timescales, not a mandatory module pipeline:
 
 ```text
-User Turn
+Admitted Observation / User Turn
   ↓
-Cognitive Gateway
-  ├─ preserve and normalize input
-  ├─ deterministic protective reflex: stop / cancel / emergency / audio validity
-  └─ bounded attention and turn admission
-  ↓
-Bounded active-goal projection
-  ↓
-Goal Association
-  ├─ existing goal relationship
-  ├─ ambiguity requiring natural clarification
-  └─ no existing relationship
-  ↓
-Goal Segmentation
-  ├─ update existing goals
-  └─ create independent new goals
-  ↓
-Complete non-effectful spoken-response Goal
-  └─ direct grounded response composition, with no Fast or Deep Planner
-  or
-  ↓
-Model-authored Agent Skill selection and bounded projection loading
-  ├─ zero, one, or several owner-approved methods
-  └─ no Skill content receives execution authority
-  ↓
-Fast Planner per goal
-  ├─ complete coverage → Canonical Plan
-  └─ partial / uncertain / complex → Deep Planner
-                                      ↓
-                                Canonical Plan
-  ↓
-Deterministic Validator
-  ├─ valid exact plan → commit or confirm
-  ├─ valid material alternative → confirm
-  ├─ information gap → wait for source
-  ├─ unavailable / refused → explain
-  └─ structured rejection → bounded replan by originating tier
-  ↓
-Pre-execution Response Plan + optional Social Attention Plan
-  ↓
-Trusted Capability Runtime / Tools / Memory / Soridormi
-  ↓
-ExecutionOutcomeBundle
-  ↓
-Per-goal Outcome Reconciliation
-  ├─ close completed, failed, refused, timed-out, or cancelled goals
-  ├─ preserve partial and not-run outcomes
-  └─ request one bounded replan only when policy and authorization permit
-  ↓
-Evidence-bound Final Response
-  ↓
-Experience and Scenario Mining
+Fast Understanding
+  ├─ complete native conversational progress ───────────────→ Speaking
+  ├─ exact capability progress candidate ──────────────────→ readiness gate
+  │                                                           ├─ ready safe progress → trusted runtime
+  │                                                           └─ not ready → Goal/planning path
+  └─ unfinished / uncertain responsibility ────────────────→ Goal cognition
+
+In parallel from the same interaction state:
+  Goal Association / continuity / relationship reasoning
+  Social Attention proposal lane
+  existing ready work and observations
+
+Goal/slow cognition as needed:
+  Goal state → intention/planning → deterministic validation/authorization
+             → trusted execution → observation/evidence
+
+Every new observation:
+  → reconcile current responsibility/progress
+  → close, correct, replan, clarify, reactivate, or continue
+  → optionally trigger bounded Reflection when surprise/importance warrants it
 ```
 
-The Gateway-to-Core handoff is an auditable turn envelope, not a completed
-semantic interpretation. A protective reflex may act immediately, before model
-inference, while preserving its input and outcome for cognitive state. Admitted
-turns reach Goal Association with the original user meaning intact.
+The loop preserves one semantic authority even when work overlaps in time. A
+Fast candidate does not authorize itself; a started read or spoken response does
+not complete a Goal until the applicable canonical binding/evidence proves what
+responsibility it satisfied; an effectful Intention still crosses trusted
+planning and authorization.
 
-In the current deployment, Core-owned fast Goal Interpretation may supply a
-bounded advisory route/effect projection after Gateway admission. That projection
-may constrain configured lanes and the maximum source-effect envelope, but it
-does not replace Goal Association, become a canonical Plan, or create a second
-authority after Core acquisition.
+Goal Association is therefore a continuity and responsibility-relation boundary,
+not a global start barrier. Planner is an intention-forming mechanism used when
+the responsibility is not already complete or cannot safely advance from current
+understanding. Response Composer is a still-needed-delta coordinator, not the
+only place conversation or Social Attention may originate. Provider observations
+are cognition events, not merely terminal inputs to a speech formatter.
+
+The implemented General Progress substrate covers immediate native conversation,
+exact capability candidates, explicit Goal binding, trusted early safe-read
+readiness, and peer Social Attention. Sections 4.11–4.13 deliberately describe
+the broader **next** Continuous Mind problem space; those candidate concepts must
+be discussed and compressed before they are implemented as new persistent state.
 
 ### 5.1 Model-facing Goal Association boundary
 
@@ -1583,61 +1855,90 @@ required fixture structure, evidence boundaries, and review process.
 
 ## 17. Design invariants
 
-The following are merge-blocking invariants:
+The following are merge-blocking invariants for the current and next Continuous
+Mind architecture:
 
-1. Goal association occurs before new-goal creation.
-2. A planner must preserve the complete user goal.
-3. Partial coverage never becomes implicit execution.
-4. Fast planning may complete or escalate; it does not partially commit.
-5. Deep planning never routes semantic decomposition back to fast planning.
-6. Both planner tiers output the same canonical plan contract.
-7. Planners never execute or authorize side effects.
-8. Validators never invent semantic meaning or user-facing answers.
-9. Alternative plans that materially change the goal require confirmation.
-10. Goal and plan versions remain explicit and auditable.
-11. Stale confirmations and grants cannot execute.
-12. Social attention is auxiliary unless explicitly requested.
-13. Capability claims are grounded in current registry/provider evidence.
-14. Execution claims require trusted evidence.
-15. Missing information remains attached to the original goal.
-16. Ambiguity is clarified naturally, without exposing internal IDs.
-17. A failed optional subsystem cannot corrupt the primary task.
-18. Runtime never silently fills semantic parameters through action-specific
-    rules.
+1. One Cognitive Core owns ordinary semantic meaning even when cognition runs at
+   multiple timescales. Parallel progress does not create a second semantic
+   authority.
+2. A persistent Goal represents unfinished responsibility; an immediately
+   completed low-risk act need not wait for persistent Goal materialization
+   before useful progress begins.
+3. Goal Association owns continuity and explicit progress-to-Goal binding; Host
+   code does not infer ownership from route labels, recency, text similarity, or
+   capability resemblance.
+4. A typed progress candidate is meaning, not authorization or completion.
+5. Planning is required when an intention needs decomposition, alternatives,
+   dependencies, or stronger commitment; it is not a mandatory transport stage
+   for complete native conversation or trusted ready non-effectful acquisition.
+6. Effectful work never bypasses deterministic validation, confirmation when
+   required, authorization, resource policy, or provider safety.
+7. Partial coverage never becomes implicit execution, and no material alternative
+   silently replaces the user's responsibility.
+8. Later cognition may revise, redirect, cancel, or supersede progress that has
+   not crossed an irreversible commitment boundary; already observed reality is
+   preserved as evidence rather than rewritten.
+9. Observation/evidence may reactivate cognition and update current state, but
+   external data cannot rewrite Mind authority or instructions.
+10. Claims about execution, observation, memory, or completion require trusted
+    evidence; presentation failure cannot rewrite a trusted outcome into user
+    misunderstanding or capability failure.
+11. Social Attention and Speaking are genuine interaction progress but do not
+    independently own user Goals or effect authorization.
+12. Fast and Deep planning share canonical execution contracts when planning is
+    needed; Deep does not route semantic decomposition back to Fast.
+13. Uncertainty is resolved by the cheapest trustworthy means appropriate to the
+    responsibility—observation, information acquisition, clarification, waiting,
+    or deeper reasoning—not by a confidence threshold alone.
+14. Reflection is selective slow cognition, not a required synchronous stage of
+    every interaction; it cannot self-authorize policy, identity, values, or
+    effectful learned behavior.
+15. Stable Mind identity/personality/worldview/values and hard-boundary principles
+    remain distinct from dynamic externally acquired facts.
+16. New cognitive concepts must justify an independent lifecycle or authority and
+    should replace/consolidate obsolete concepts rather than only increase the
+    permanent architecture surface.
 
-The implemented grounded-response latency boundary additionally requires that
-a complete non-effectful spoken-response Goal not invoke a planner merely to
-transport speech, that every Deep invocation record a reason requiring the wider
-semantic boundary, and that concurrent output preparation neither create a
-second semantic authority nor permit raw model fragments to reach TTS. Current
-latency measurements remain target-evidence claims, not architecture assumptions.
+The implemented General Progress substrate is intentionally narrower than the
+full problem space in Sections 4.11–4.13. Those sections define immediate design
+work, not implementation claims.
 
 ## 18. Prohibited anti-patterns
 
 The following patterns violate this architecture:
 
 - regex or phrase-table planning for normal language;
-- hidden keyword-to-skill mapping;
-- Host-selected Agent Skills for ordinary language;
-- automatic execution or registration from an Agent Skill package;
-- an Agent Skill that owns hidden Goal, memory, or provider state;
-- one new task per utterance;
-- using recency alone to associate a turn with a goal;
-- Goal Interpreter-selected first skill treated as the complete goal;
-- partial action leakage from an invalid compound plan;
-- Deep Planner calling Fast Planner for semantic decomposition;
+- hidden keyword-to-skill mapping or `route == chat/tool` as a semantic readiness
+  rule;
+- a mandatory `Gateway → Goal Association → Planner → Composer → Execute`
+  wall-clock pipeline when no true dependency requires it;
+- one new persistent Goal per utterance or per implementation step;
+- treating Goal as an execution ticket rather than unfinished responsibility;
+- Host-inferred progress ownership from recency, text similarity, or capability
+  resemblance;
+- Fast Understanding output being treated as authorization for an effect;
+- partial action leakage from an invalid compound responsibility;
 - model output directly authorizing execution;
-- deterministic code choosing conversational meaning;
-- generic “missing parameters” responses with no structured gap;
-- automatic execution of a material alternative;
-- fixed gesture after every response;
-- social gestures recorded as user-requested tasks;
-- string concatenation presented as semantic response composition;
+- deterministic code choosing ordinary conversational meaning;
+- a numerical confidence threshold acting as the sole readiness, truth, or
+  authorization decision;
+- thinking longer when a blocking uncertainty can be resolved by available
+  evidence, observation, or clarification;
+- an unlimited background-thought or Reflection loop;
+- a Reflection/review LLM after every normal action regardless of surprise, risk,
+  or learning value;
+- creating one manager/class/model role for every term in the Continuous Mind
+  problem-space list;
+- self-generated concern automatically becoming external execution authority;
+- automatic promotion of experience into policy, personality, values, motor
+  skills, or provider capabilities without the owning review/authority boundary;
+- fixed gesture after every response or Social Attention made dependent on
+  speech;
+- social gestures recorded as user-requested tasks when they were auxiliary;
 - speech claiming results before evidence;
-- prompt branches such as “if the user says X, answer Y” used as the primary
-  cognitive mechanism;
-- implementation-component identity replacing Chromie’s speaking identity;
-- unlimited active-goal or conversation context.
+- external/provider text treated as instruction authority;
+- implementation-component identity replacing Chromie's speaking identity; and
+- unlimited active-goal, belief, observation, or conversation context.
 
 ## 19. Implementation record
 
@@ -1873,78 +2174,109 @@ Evolution rules:
 
 ## 21. Observability
 
-The cognitive pipeline should record, without exposing private model reasoning:
+The cognitive loop should record, without exposing private model reasoning:
 
-- normalized input identity, protective-reflex result, and admission decision;
-- digest-bound Core interpretation advisories and source-effect envelope, when present;
-- goal-association result and confidence;
-- candidate goal IDs considered;
-- goal segmentation count;
-- fast coverage result;
-- escalation reason;
-- planner tier and duration;
-- capability candidates supplied;
-- canonical plan version;
-- information gaps and resolution sources;
-- validation rejection codes;
-- confirmation binding;
-- committed steps;
-- execution evidence;
-- response claims;
-- optional attention status.
+- normalized observation/input identity, protective-reflex result, and admission;
+- Fast-Understanding progress candidates and their typed kind;
+- readiness decisions and the trusted facts that allowed or blocked progress;
+- explicit progress-to-Goal bindings and Goal relationship/lifecycle changes;
+- native Speaking, capability, and Social-Attention progress start/terminal state;
+- planner invocation only when planning was actually needed, including escalation
+  reason and duration;
+- canonical plan/commitment identity when one exists;
+- information gaps, uncertainty source, and resolution method;
+- validation/authorization rejection codes and confirmation binding;
+- observations/evidence and the responsibilities they reconcile;
+- corrections, cancellation/supersession, and bounded reactivation events; and
+- Reflection/experience-promotion events if later implemented, with the trigger
+  that justified them.
 
-Current traces distinguish direct/Fast/Deep path classification and reason,
-first-valid-speech commitment, TTS request, provider stream/PCM milestones,
-actual playback start, completion, model evaluation, and contract repair. Exact
-warm/cold and shared-resource latency remains target evidence and must be
-reported from retained runs.
+Current traces may still preserve direct/Fast/Deep compatibility classifications,
+but observability must report the readiness-driven reality rather than imply that
+all roles ran serially. Exact warm/cold, compute contention, shared-resource
+latency, cognitive reactivation, and future Reflection cost remain target-evidence
+claims and must come from retained runs.
 
-Logs should show decisions and contracts, not hidden chain-of-thought.
+Logs show state transitions, decisions, authority, and evidence—not hidden
+chain-of-thought.
 
 ## 22. Non-goals
 
-This RFC does not claim:
+This architecture does not claim:
 
-- general autonomous operation;
-- unrestricted self-modifying prompts or policy;
-- unbounded long-term memory;
-- production physical-robot readiness;
-- human-level perception;
-- automatic approval of learned behavior;
-- removal of deterministic safety controls;
-- that every user turn requires deep planning;
-- that a numerical satisfaction score alone can authorize execution.
+- human-equivalent consciousness or a literal neuroscience model;
+- general autonomous operation or unattended physical-robot authority;
+- unrestricted self-generated external Goals or self-modifying prompts/policy;
+- one persistent DTO, manager, database, or model call for every cognitive
+  phenomenon named in the problem space;
+- an always-running background LLM or mandatory Reflection after every turn;
+- unbounded long-term memory or permanent retention of every observation;
+- automatic approval of learned behavior, habits, values, identity changes, or
+  provider skills;
+- removal of deterministic safety, consent, permission, authorization, or
+  evidence controls;
+- that every responsibility needs a Goal, Planner, Deep reasoning, or Response
+  Composer;
+- that a numerical confidence/satisfaction score alone can authorize progress; or
+- production physical-robot readiness.
 
 ## 23. Review checklist
 
-Every cognition-related pull request should answer:
+Every cognition-related change should answer:
 
-1. Is this ingress/reflex/attention work for the Cognitive Gateway, or semantic
-   goal/planning work for the Cognitive Core?
-2. What user goal or relationship is preserved?
-3. Does the change associate before creating new goals?
-4. Can a compound goal be narrowed or partially executed?
-5. Which planner tier owns the semantic decision?
-6. Does the Deep Planner ever call the Fast Planner?
-7. Is the output a canonical plan?
-8. What does deterministic validation enforce?
-9. Are alternatives and confirmations version-bound?
-10. Are claims grounded in evidence?
-11. Is social behavior separated from user-task semantics?
-12. Which retained scenario failed before the change?
-13. What evidence supports the resulting claim?
+1. What general cognitive responsibility or invariant is being improved, beyond
+   the initiating example?
+2. Is the input an Observation, existing state update, new/continued unfinished
+   Responsibility, progress candidate, or trusted effect-control event?
+3. Can the responsibility be completed immediately, or what makes persistent Goal
+   state necessary?
+4. If progress may start now, which typed meaning, dependency, risk, permission,
+   and evidence facts make it ready?
+5. If progress cannot start, should Chromie wait, acquire evidence, clarify, plan,
+   defer, or use slower cognition?
+6. Does Goal Association explicitly preserve continuity and bind progress without
+   Host semantic guessing?
+7. If planning is used, is it forming the smallest useful intention/commitment,
+   and can later observation revise unfinished work safely?
+8. What is the commitment depth, and which trusted boundary authorizes the next
+   step?
+9. What observation/evidence is expected, and what happens if reality contradicts
+   that expectation?
+10. Does the change affect attention/working set, user/common ground, privacy,
+    consent, memory, or restart continuity?
+11. Is Reflection truly warranted, or would another review call only add latency?
+12. Is a proposed new concept already representable by Goal, General Progress,
+    Interaction Ledger, Plan, ExecutionOutcome, Memory, Capability/provider state,
+    or existing authority?
+13. What obsolete concept/path can be removed or consolidated if a new one is
+    introduced?
+14. Which retained general-ability scenario fails before the change, and what
+    evidence supports the resulting source/target claim?
 
 ## 24. Definition of architectural success
 
 Chromie satisfies this architecture when:
 
-- users can continue, modify, correct, or cancel goals naturally across turns;
-- one turn can create multiple independent goals without losing continuity;
-- simple goals remain fast;
-- complex goals escalate without semantic loss;
-- both planner tiers produce the same validated plan format;
-- no partial or unconfirmed degraded plan executes;
-- parameter questions are specific and context-preserving;
-- social behavior feels attentive but remains optional and grounded;
-- speech, execution, and evidence remain consistent;
-- every material behavior is protected by retained scenarios.
+- simple, fully understood responsibilities can progress at human-useful latency
+  without waiting for unrelated cognition;
+- unfinished responsibilities survive as coherent Goal/prospective-memory state
+  and reactivate from meaningful observations, dependencies, time, or user input;
+- the same turn may contain progress at different maturity levels without
+  collapsing them into one synchronous workflow;
+- later cognition can correct or supersede unfinished progress while irreversible
+  commitments remain strongly gated;
+- observation, current belief/context, Goal, intention/progress, commitment, and
+  evidence are not silently conflated;
+- uncertainty is resolved through trustworthy evidence acquisition when possible
+  rather than hallucination or unnecessary deeper inference;
+- attention and compute remain responsive while slow cognition continues;
+- Speaking and Social Attention feel continuous without becoming separate semantic
+  authorities;
+- Reflection improves correction/calibration/experience selectively without
+  becoming a latency tax or self-modification loophole;
+- multi-user privacy, consent, promises, recovery, and learning promotion remain
+  authority-bound as those capabilities are introduced;
+- the final architecture uses a small number of clear state concepts that explain
+  the complete problem space rather than one subsystem per cognitive term; and
+- every material behavior and architectural widening is protected by retained
+  general scenarios and evidence proportional to its claim.

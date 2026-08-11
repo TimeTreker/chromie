@@ -356,12 +356,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    path therefore contains true semantic, evidence, safety, authorization, and
    resource dependencies rather than a mandatory serialization of module names.
    Effectful work still requires its normal canonical planning, confirmation,
-   authorization, and safety barriers. Bounded non-effectful reads may advance
-   earlier when their exact request is already sufficiently understood and the
-   trusted runtime can prove that executing the read has no side effect or
-   confirmation obligation. Early read results are observations, not Goal
-   completion, until canonical reconciliation proves they satisfy the eventual
-   Goal and Plan.
+   authorization, and safety barriers. A complete native conversational answer
+   may enter the existing Speaking lane as soon as current Mind/context is
+   sufficient, while Goal Association continues; that substantive answer is not
+   `fast_speech`, which remains a progress-notification act. Bounded non-effectful
+   reads may likewise advance earlier when their exact request is sufficiently
+   understood and the trusted runtime can prove that executing the read has no
+   side effect or confirmation obligation. Early speech/read results carry no
+   Goal-completion authority until explicit canonical Goal binding and trusted
+   reconciliation establish the responsibility they satisfy.
 26. **Stable Mind is cacheable; live context is projected.** Chromie's identity,
    self-concept, personality, interaction style, worldview, values, and compact
    hard-boundary principles are owner-controlled, low-churn Mind state. They

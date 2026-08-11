@@ -205,6 +205,184 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                 }
             )
 
+
+    def test_core_interpretation_materializes_exact_progress_candidates_across_routes(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Look up the reference status, then move forward.",
+            session_id="turn-progress",
+            conversation_id="conversation-progress",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(capture, {})
+        envelope = gateway.admit_attention(
+            capture,
+            snapshot,
+            AttentionReviewResult(
+                turn_id=capture.turn_id,
+                session_id=capture.session_id,
+                context_digest=snapshot.digest,
+                disposition="admit",
+                speech_act="request",
+                confidence=0.99,
+                source="test",
+                reason="direct request",
+            ),
+        )
+        decision = RouteDecision.model_validate(
+            {
+                "route": "robot_action",
+                "intent": "compound_request",
+                "confidence": 0.98,
+                "language": "en-US",
+                "source": "llm",
+                "routes": [
+                    {
+                        "route": "tool",
+                        "intent": "chromie.reference.lookup",
+                        "capability_id": "chromie.reference.lookup",
+                        "args": {"query": "current status"},
+                        "confidence": 0.98,
+                    },
+                    {
+                        "route": "tool",
+                        "intent": "chromie.reference.lookup",
+                        "capability_id": "chromie.reference.lookup",
+                        "args": {"query": "current status"},
+                        "confidence": 0.98,
+                    },
+                    {
+                        "route": "robot_action",
+                        "intent": "soridormi.walk_forward",
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"distance_m": 1.0},
+                        "confidence": 0.96,
+                    },
+                ],
+            }
+        )
+
+        interpretation = CoreInterpretationResult.from_route_decision(
+            envelope=envelope,
+            decision=decision,
+        )
+
+        self.assertEqual(len(interpretation.progress_candidates), 2)
+        by_capability = {item.capability_id: item for item in interpretation.progress_candidates}
+        self.assertEqual(
+            by_capability["chromie.reference.lookup"].args,
+            {"query": "current status"},
+        )
+        self.assertEqual(
+            by_capability["soridormi.walk_forward"].args,
+            {"distance_m": 1.0},
+        )
+        self.assertTrue(
+            all(item.kind == "capability" for item in interpretation.progress_candidates)
+        )
+        self.assertTrue(
+            all(item.candidate_id.startswith("progress_") for item in interpretation.progress_candidates)
+        )
+
+    def test_core_interpretation_materializes_native_conversation_progress(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "What is your name?",
+            session_id="turn-native",
+            conversation_id="conversation-native",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(capture, {})
+        envelope = gateway.admit_attention(
+            capture,
+            snapshot,
+            AttentionReviewResult(
+                turn_id=capture.turn_id,
+                session_id=capture.session_id,
+                context_digest=snapshot.digest,
+                disposition="admit",
+                speech_act="question",
+                confidence=0.99,
+                source="test",
+                reason="direct question",
+            ),
+        )
+        decision = RouteDecision(
+            route="chat",
+            intent="identity_question",
+            confidence=0.97,
+            language="en-US",
+            source="llm",
+        )
+
+        interpretation = CoreInterpretationResult.from_route_decision(
+            envelope=envelope,
+            decision=decision,
+            progress_proposals=[
+                {
+                    "kind": "native_response",
+                    "response_text": "I'm Chromie!",
+                    "speech_act": "answer",
+                    "intent": "identity_question",
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        self.assertEqual(len(interpretation.progress_candidates), 1)
+        candidate = interpretation.progress_candidates[0]
+        self.assertEqual(candidate.kind, "native_response")
+        self.assertEqual(candidate.response_text, "I'm Chromie!")
+        self.assertEqual(candidate.speech_act, "answer")
+        self.assertFalse(candidate.capability_id)
+        self.assertEqual(candidate.args, {})
+
+    def test_native_response_progress_requires_conversational_scope(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Move forward.",
+            session_id="turn-native-reject",
+            conversation_id="conversation-native-reject",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(capture, {})
+        envelope = gateway.admit_attention(
+            capture,
+            snapshot,
+            AttentionReviewResult(
+                turn_id=capture.turn_id,
+                session_id=capture.session_id,
+                context_digest=snapshot.digest,
+                disposition="admit",
+                speech_act="request",
+                confidence=0.99,
+                source="test",
+                reason="direct request",
+            ),
+        )
+        decision = RouteDecision(
+            route="robot_action",
+            intent="move",
+            confidence=0.97,
+            language="en-US",
+            source="llm",
+        )
+
+        interpretation = CoreInterpretationResult.from_route_decision(
+            envelope=envelope,
+            decision=decision,
+            progress_proposals=[
+                {
+                    "kind": "native_response",
+                    "response_text": "Sure, I moved.",
+                    "speech_act": "answer",
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        self.assertEqual(interpretation.progress_candidates, [])
+
     def test_core_request_requires_an_admitted_envelope(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)
         capture = gateway.capture(

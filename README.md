@@ -13,9 +13,17 @@ experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
-> semantic authority: Goal Association -> Fast/terminal Deep Planning ->
-> prospective Response Composition -> trusted execution -> deterministic
-> per-goal outcome reconciliation -> speech-only final response. A frozen
+> semantic authority with readiness-driven continuous progress. After admitted
+> Fast Understanding, complete native conversational answers, exact capability
+> work candidates, and peer Social Attention may advance independently while Goal
+> Association continues. Native answers enter the existing Speaking runtime;
+> trusted safe reads may start provider work early. Goal Association later binds
+> those candidates to canonical Goals. Fully bound native conversation can close
+> without Planner/Response-Composer model calls, and fully bound information reads
+> may adopt a canonical Plan without a Fast-Planner call; other work falls through
+> to Fast/terminal Deep Planning. Response Composition runs only when a new
+> presentation decision is still needed, then trusted execution and
+> deterministic per-goal reconciliation own completion truth. A frozen
 > `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
 > The contracts and host path are automatically verified and default to
 > authoritative chat plus registered safe read-only tools in the common safe
@@ -66,12 +74,17 @@ Host Orchestrator
   microphone -> VAD -> ASR -> Cognitive Gateway
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
-        -> Goal Association -> model-authored Agent Skill selection and bounded projection disclosure
-        -> Fast Planner -> terminal Deep Planner when needed
-        -> prospective Response Composer -> strict InteractionResponse
-        -> Social-Attention Proposal / Speaking / Activity coordination lanes
+        -> Fast Understanding
+           |-> complete native response -> Speaking --- .
+           |-> exact capability progress candidate ----|
+           |      `-> readiness-qualified safe read ---|
+           |-> peer Social-Attention proposal lane ----|
+           `-> Goal Association -----------------------+-> canonical Goal state
+                                                        |
+        -> exact ready-progress adoption OR Fast Planner -> terminal Deep Planner when needed
+        -> Response Composer only when a new presentation decision is still needed
         -> Trusted Capability Runtime (legacy code name: Skill Runtime)
-        -> named capability -> Soridormi MCP
+        -> named capability -> Soridormi / peer providers
         -> structured results and traces
         -> exact plan/request/result join -> per-goal outcome reconciliation
         -> speech-only final response -> TTS -> speaker

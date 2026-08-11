@@ -199,6 +199,7 @@ def request(
     recent_goals=None,
     route="chat",
     intent="conversation",
+    progress_candidates=None,
 ):
     return AgentRunRequest(
         sid="sid-pr2",
@@ -217,6 +218,7 @@ def request(
             "discourse_referents": discourse_referents or [],
             "discourse_focus": discourse_focus or [],
             "recent_tool_evidence": recent_tool_evidence or [],
+            "progress_candidates": progress_candidates or [],
         },
     )
 
@@ -3210,7 +3212,15 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(
             set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {"description", "output_mode", "media_operation", "bindings", "resource_responsibility"},
+            {
+                "description",
+                "output_mode",
+                "media_operation",
+                "bindings",
+                "resource_responsibility",
+                "progress_candidate_ids",
+                "related_goal_ids",
+            },
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
         self.assertEqual(
@@ -3239,6 +3249,191 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "reference",
             ],
         )
+
+
+    def test_progress_candidate_ids_are_decoder_constrained_and_materialized(self):
+        candidate = {
+            "candidate_id": "progress-weather-today",
+            "kind": "capability",
+            "capability_id": "chromie.weather.lookup",
+            "args": {"location": "Chongqing", "date": "today"},
+            "intent": "chromie.weather.lookup",
+            "confidence": 0.99,
+        }
+        payload = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "Check today's Chongqing weather and answer whether heavy rain is expected.",
+                    "output_mode": "capability_work",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "place",
+                            "value": "Chongqing",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "date",
+                            "entity_type": "temporal_scope",
+                            "value": "today",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "today's Chongqing weather",
+                        "source_status": "provider_resolved",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                    "progress_candidate_ids": ["progress-weather-today"],
+                    "related_goal_ids": ["goal-dinner"],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.98,
+            "reason_summary": "The current read directly supports the new weather Goal and informs dinner planning.",
+        }
+        ollama = FakeOllama(payload)
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Will it rain heavily in Chongqing today?",
+                    language="en-US",
+                    route="tool",
+                    intent="chromie.weather.lookup",
+                    active_goals=[active_goal("goal-dinner", "Go out for dinner tonight")],
+                    progress_candidates=[candidate],
+                )
+            )
+        )
+
+        schema = ollama.prompts[0][1]["response_format"]
+        goal_properties = schema["$defs"]["GoalAssociationModelGoal"]["properties"]
+        self.assertEqual(
+            goal_properties["progress_candidate_ids"]["items"]["enum"],
+            ["progress-weather-today"],
+        )
+        self.assertEqual(
+            goal_properties["related_goal_ids"]["items"]["enum"],
+            ["goal-dinner"],
+        )
+        self.assertEqual(len(result.new_goals), 1)
+        goal = result.new_goals[0]
+        self.assertEqual(goal.related_goal_ids, ["goal-dinner"])
+        self.assertEqual(len(result.progress_bindings), 1)
+        self.assertEqual(result.progress_bindings[0].candidate_id, "progress-weather-today")
+        self.assertEqual(result.progress_bindings[0].goal_ids, [goal.goal_id])
+
+    def test_native_response_progress_binds_only_to_spoken_goal(self):
+        candidate = {
+            "candidate_id": "progress-native-answer",
+            "kind": "native_response",
+            "response_text": "I'm Chromie!",
+            "speech_act": "answer",
+            "intent": "identity_question",
+            "confidence": 0.99,
+        }
+        payload = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Answer the user's identity question.",
+                    "responsibility_kind": "spoken_response",
+                    "execution_lane": "speaking",
+                    "output_mode": "speech",
+                    "provider_required": False,
+                    "media_operation": "none",
+                    "bindings": [],
+                    "progress_candidate_ids": ["progress-native-answer"],
+                    "related_goal_ids": [],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.99,
+            "reason_summary": "The ready native response directly satisfies the new spoken Goal.",
+        }
+        ollama = FakeOllama(payload)
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "What is your name?",
+                    language="en-US",
+                    route="chat",
+                    intent="identity_question",
+                    progress_candidates=[candidate],
+                )
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(len(result.progress_bindings), 1)
+        self.assertEqual(result.progress_bindings[0].candidate_id, "progress-native-answer")
+        self.assertEqual(
+            result.progress_bindings[0].goal_ids,
+            [result.new_goals[0].goal_id],
+        )
+
+    def test_unknown_progress_candidate_is_rejected(self):
+        payload = {
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
+                {
+                    "description": "Check today's Chongqing weather.",
+                    "output_mode": "capability_work",
+                    "bindings": [],
+                    "resource_responsibility": {
+                        "resource_kind": "information",
+                        "resource_description": "today's Chongqing weather",
+                        "source_status": "provider_resolved",
+                        "delivery_mode": "spoken_explanation",
+                    },
+                    "progress_candidate_ids": ["invented-progress"],
+                    "related_goal_ids": [],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 0.9,
+            "reason_summary": "invalid candidate reference",
+        }
+        ollama = ScriptedOllama(
+            [
+                payload,
+                {
+                    "decision": "clarify",
+                    "associations": [],
+                    "new_goals": [],
+                    "referent_updates": [],
+                    "resolved_references": [],
+                    "clarification": "I need to verify what information to retrieve.",
+                    "confidence": 0.6,
+                    "reason_summary": "The progress reference was invalid.",
+                },
+            ]
+        )
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Check the weather.",
+                    language="en-US",
+                    route="tool",
+                    intent="chromie.weather.lookup",
+                    progress_candidates=[],
+                )
+            )
+        )
+        self.assertFalse(result.progress_bindings)
+        self.assertTrue(result.clarification)
 
     def test_invalid_enum_uses_one_schema_constrained_model_repair(self):
         ollama = ScriptedOllama(

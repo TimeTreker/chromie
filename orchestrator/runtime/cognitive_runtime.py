@@ -12,10 +12,13 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal, Protocol
 
 from agent.app.capabilities.validator import validate_args_for_schema
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from orchestrator.schemas.route import RouteDecision as CompatibilityRouteDecision
-from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveProgressCandidate,
+    CoreInterpretationResult,
+)
 from shared.chromie_contracts.execution_outcome import (
     ExecutionOutcomeBundle,
     execution_outcome_fingerprint,
@@ -30,7 +33,12 @@ from shared.chromie_contracts.interaction import (
     output_schema_sha256,
     validate_output_schema_declaration,
 )
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    CanonicalPlanStep,
+    ExecuteGoalPlanOutcome,
+    GoalSatisfactionAssessment,
+)
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
     DirectResponseComposition,
@@ -38,7 +46,12 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
     goal_association_fingerprint,
 )
-from shared.chromie_contracts.social_attention import normalize_social_attention_mode
+from shared.chromie_contracts.semantic_task import ResponsePlan
+from shared.chromie_contracts.social_attention import (
+    SocialAttentionPlan,
+    SocialAttentionRequest,
+    normalize_social_attention_mode,
+)
 from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
     GatewayContextSnapshot,
@@ -121,6 +134,10 @@ class CognitiveAgentClient(Protocol):
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
+
+    async def resolve_social_attention(
+        self, session: Any, **kwargs: Any
+    ) -> SocialAttentionPlan: ...
 
     async def compose_response_plan(
         self, session: Any, **kwargs: Any
@@ -525,6 +542,25 @@ class CanonicalPlanRuntimeAdapter:
             return "tool"
         return "unsupported"
 
+    def is_pure_safe_read_plan(self, plan: CanonicalPlan) -> bool:
+        if plan.disposition != "execute" or not plan.steps:
+            return False
+        try:
+            definitions = [
+                self.interaction_runtime.skill_definition(step.skill_id)
+                for step in plan.steps
+            ]
+        except ValueError:
+            return False
+        return all(
+            definition.available
+            and not definition.requires_confirmation
+            and str((definition.metadata or {}).get("safety_class") or "")
+            == "safe_read"
+            and (definition.metadata or {}).get("side_effect_free") is True
+            for definition in definitions
+        )
+
     async def validation_errors(self, plan: CanonicalPlan) -> list[dict[str, Any]]:
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
@@ -773,6 +809,295 @@ class CanonicalPlanRuntimeAdapter:
                 return True
         return False
 
+    async def execute_social_attention_event(
+        self,
+        *,
+        plan: SocialAttentionPlan,
+        session_id: str,
+        turn_id: str,
+        event: str,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Validate and execute one peer-lane Social-Attention proposal.
+
+        This path has no Goal-completion authority and never waits on or rewrites
+        the primary response.  It reuses the same Trusted Capability Runtime as
+        ordinary Activity work.
+        """
+
+        if self.social_attention_mode != "on" or plan.decision != "express":
+            return {
+                "status": "not_executed",
+                "decision": plan.decision,
+                "event": event,
+                "materialized_count": 0,
+            }
+        runtime_context = dict(context or {})
+        target_error = self._attention_target_error(plan, runtime_context)
+        if target_error:
+            return {
+                "status": "rejected",
+                "decision": plan.decision,
+                "event": event,
+                "materialized_count": 0,
+                "reasons": [target_error],
+            }
+
+        requests: list[SkillRequest] = []
+        reasons: list[str] = []
+        seen: set[str] = set()
+        for index, behavior in enumerate(plan.behaviors):
+            try:
+                await self.interaction_runtime.ensure_skill_definitions([behavior.skill_id])
+                definition = self.interaction_runtime.skill_definition(behavior.skill_id)
+                metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
+                domains = {
+                    str(item).strip().lower()
+                    for item in metadata.get("behavior_domains", [])
+                    if str(item).strip()
+                }
+                if "social_attention" not in domains:
+                    reasons.append(f"not_social_attention:{behavior.skill_id}")
+                    continue
+                if behavior.skill_id in seen:
+                    reasons.append(f"duplicate_social_skill:{behavior.skill_id}")
+                    continue
+                if not definition.available:
+                    reasons.append(f"unavailable:{behavior.skill_id}")
+                    continue
+                if definition.requires_confirmation:
+                    reasons.append(f"confirmation_required:{behavior.skill_id}")
+                    continue
+                if behavior.timing != "parallel":
+                    reasons.append(f"auxiliary_must_be_parallel:{behavior.skill_id}")
+                    continue
+                if not definition.can_run_parallel:
+                    reasons.append(f"parallel_not_supported:{behavior.skill_id}")
+                    continue
+                if (
+                    behavior.skill_id.startswith("soridormi.")
+                    and metadata.get("parallel_metadata_declared") is not True
+                ):
+                    reasons.append(f"parallel_metadata_missing:{behavior.skill_id}")
+                    continue
+                schema_errors = validate_args_for_schema(behavior.args, definition.input_schema)
+                if schema_errors:
+                    reasons.append(f"invalid_args:{behavior.skill_id}")
+                    continue
+                target_args_error = self._attention_target_args_error(
+                    behavior.args,
+                    definition.input_schema,
+                    runtime_context,
+                )
+                if target_args_error:
+                    reasons.append(
+                        f"target_error:{behavior.skill_id}:{target_args_error}"
+                    )
+                    continue
+                schema_digest = output_schema_sha256(definition.output_schema)
+                digest = hashlib.sha256(
+                    f"{turn_id}|{event}|{index}|{behavior.skill_id}".encode("utf-8")
+                ).hexdigest()[:20]
+                request = SkillRequest(
+                    request_id=f"social_{digest}",
+                    skill_id=behavior.skill_id,
+                    skill_version=definition.version,
+                    args=dict(behavior.args),
+                    timing="parallel",
+                    timeout_ms=definition.timeout_ms,
+                    cancellable=definition.interruptible,
+                    requires_confirmation=False,
+                    idempotency_key=f"{turn_id}:social:{event}:{index}",
+                    committed_output_schema_sha256=schema_digest,
+                    metadata={
+                        "source": "social_attention_plan",
+                        "auxiliary_social_attention": True,
+                        "behavior_domain": "social_attention",
+                        "interaction_role": "auxiliary_expression",
+                        "social_attention_event": event,
+                        "social_attention_purpose": plan.purpose,
+                        "social_function": behavior.social_function,
+                        "target": plan.target.model_dump(mode="json", exclude_none=True),
+                        "reason": behavior.reason,
+                        "social_attention_policy_mode": self.social_attention_mode,
+                        "execution_lane": "social_attention",
+                        "source_goal_ids": [],
+                        "turn_id": turn_id,
+                    },
+                )
+                requests.append(request)
+                self._record_auxiliary_behavior_request(request, session_id=session_id)
+                seen.add(behavior.skill_id)
+            except (TypeError, ValueError, ValidationError, RuntimeError) as exc:
+                reasons.append(f"invalid:{behavior.skill_id}:{type(exc).__name__}")
+
+        if not requests:
+            return {
+                "status": "rejected" if reasons else "not_executed",
+                "decision": plan.decision,
+                "event": event,
+                "materialized_count": 0,
+                "reasons": reasons,
+            }
+        interaction_id = f"social_{turn_id}_{hashlib.sha256(event.encode('utf-8')).hexdigest()[:10]}"
+        response_metadata: dict[str, Any] = {
+            "source": "continuous_social_attention",
+            "auxiliary_social_attention": True,
+            "turn_id": turn_id,
+            "session_id": session_id,
+            "social_attention_event": event,
+        }
+        envelope = runtime_context.get("user_turn_envelope")
+        if isinstance(envelope, dict):
+            response_metadata["user_turn_envelope"] = dict(envelope)
+        response = InteractionResponse(
+            interaction_id=interaction_id,
+            status="ok",
+            skills=requests,
+            metadata=response_metadata,
+        )
+        execution = await self.interaction_runtime.execute(
+            response,
+            session_id=session_id,
+        )
+        return {
+            "status": execution.status,
+            "decision": plan.decision,
+            "event": event,
+            "materialized_count": len(requests),
+            "request_ids": [item.request_id for item in requests],
+            "reasons": reasons,
+        }
+
+    def build_adopted_native_response(
+        self,
+        *,
+        association: GoalAssociationResolution,
+        candidates: dict[str, CognitiveProgressCandidate],
+        session_id: str,
+        language: str,
+        context: dict[str, Any] | None = None,
+    ) -> InteractionResponse | None:
+        """Compile GA-bound native conversation into canonical Speaking work.
+
+        Goal Association owns the binding; the Host only verifies complete,
+        non-overlapping spoken-Goal coverage and preserves the Core-authored text.
+        No response text is invented or rewritten here.
+        """
+
+        if association.clarification or association.associations or not association.new_goals:
+            return None
+        goal_ids = [
+            str(goal.goal_id or "").strip()
+            for goal in association.new_goals
+            if str(goal.goal_id or "").strip()
+        ]
+        if len(goal_ids) != len(association.new_goals) or not goal_ids:
+            return None
+        if any(
+            str((goal.metadata or {}).get("responsibility_kind") or "")
+            != "spoken_response"
+            or bool((goal.metadata or {}).get("provider_required"))
+            for goal in association.new_goals
+        ):
+            return None
+
+        goal_order = {goal_id: index for index, goal_id in enumerate(goal_ids)}
+        rows: list[tuple[int, CognitiveProgressCandidate, list[str]]] = []
+        covered: set[str] = set()
+        for binding in association.progress_bindings:
+            candidate = candidates.get(binding.candidate_id)
+            if candidate is None or candidate.kind != "native_response":
+                return None
+            bound_goal_ids = [goal_id for goal_id in binding.goal_ids if goal_id in goal_order]
+            if len(bound_goal_ids) != len(binding.goal_ids) or not bound_goal_ids:
+                return None
+            if covered.intersection(bound_goal_ids):
+                return None
+            covered.update(bound_goal_ids)
+            rows.append(
+                (
+                    min(goal_order[goal_id] for goal_id in bound_goal_ids),
+                    candidate,
+                    bound_goal_ids,
+                )
+            )
+        if covered != set(goal_ids) or not rows:
+            return None
+
+        fingerprint = goal_association_fingerprint(association)
+        runtime_context = context if isinstance(context, dict) else {}
+        envelope = runtime_context.get("user_turn_envelope")
+        turn_id = (
+            str(envelope.get("turn_id") or session_id)
+            if isinstance(envelope, dict)
+            else session_id
+        )
+        speech: list[InteractionSpeech] = []
+        for _, candidate, bound_goal_ids in sorted(rows, key=lambda item: item[0]):
+            speech_digest = hashlib.sha256(
+                f"{fingerprint}|native|{candidate.candidate_id}".encode("utf-8")
+            ).hexdigest()[:20]
+            speech.append(
+                InteractionSpeech(
+                    id=f"speech_native_{speech_digest}",
+                    text=candidate.response_text,
+                    timing="immediate",
+                    style="brief",
+                    metadata={
+                        "source": "core_native_response_readiness",
+                        "turn_id": turn_id,
+                        "phase": "final",
+                        "speech_act": candidate.speech_act,
+                        "commitment_state": "completed",
+                        "must_not_claim_completion": False,
+                        "covers_goal_ids": list(bound_goal_ids),
+                        "source_goal_ids": list(bound_goal_ids),
+                        "goal_association_fingerprint": fingerprint,
+                        "claims": [],
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                        "planless_direct_response": True,
+                        "native_response_readiness_adoption": True,
+                        "progress_candidate_id": candidate.candidate_id,
+                        "execution_lane": "speaking",
+                        "delivery_role": "response",
+                    },
+                )
+            )
+
+        metadata: dict[str, Any] = {
+            "source": "goal_driven_cognitive_runtime",
+            "cognitive_runtime_apply": True,
+            "language": language,
+            "planless_direct_response": True,
+            "native_response_readiness_adoption": True,
+            "goal_association": association.model_dump(mode="json", exclude_none=True),
+            "goal_association_fingerprint": fingerprint,
+            "execution_lanes": {
+                "social_attention": "peer_proposal_lane",
+                "speaking": "response_delivery",
+                "activity": "idle",
+            },
+            "lane_coordination_groups": [],
+            "planning_result": "direct_response",
+            "capability_decision": "respond",
+            "goal_ids": goal_ids,
+            "planner_tier": "none",
+            "native_response_progress_ids": [
+                candidate.candidate_id for _, candidate, _ in sorted(rows, key=lambda item: item[0])
+            ],
+            "operational_speech_authority": "core_native_response_readiness",
+        }
+        if isinstance(runtime_context.get("user_turn_envelope"), dict):
+            metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
+        return InteractionResponse(
+            interaction_id=f"cognitive_{session_id}",
+            status="ok",
+            speech=speech,
+            metadata=metadata,
+        )
+
     async def build_direct_response(
         self,
         *,
@@ -954,6 +1279,57 @@ class CanonicalPlanRuntimeAdapter:
             metadata=metadata,
         )
         return response
+
+    async def build_execution_only_response(
+        self,
+        *,
+        plan: CanonicalPlan,
+        session_id: str,
+        language: str,
+        context: dict[str, Any] | None = None,
+    ) -> InteractionResponse:
+        """Materialize a pure safe-read Plan without a presentation-model barrier."""
+
+        fingerprint = canonical_plan_fingerprint(plan)
+        composition = CoordinatedResponsePlan(
+            composition_id=f"execution_only_{fingerprint[:20]}",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=fingerprint,
+            canonical_plan=plan,
+            response_plan=ResponsePlan(),
+            social_attention_plan=SocialAttentionPlan(
+                decision="none",
+                reason=(
+                    "Safe read started independently; Social Attention remains an "
+                    "optional peer lane rather than a presentation dependency."
+                ),
+                metadata={
+                    "auxiliary_social_attention": True,
+                    "execution_permitted": False,
+                },
+            ),
+            lane_coordination=[],
+            confidence=1.0,
+            rationale="Pure safe-read execution does not require pre-evidence response composition.",
+            metadata={
+                "authority": "advisory",
+                "resolver": "readiness_execution",
+                "task_plan_immutable": True,
+                "safe_read_speech_optional": True,
+                "social_attention_policy": {
+                    "mode": "off",
+                    "execution_enabled": False,
+                    "embodiment_independent": True,
+                },
+            },
+        )
+        return await self.build_response(
+            plan=plan,
+            composition=composition,
+            session_id=session_id,
+            language=language,
+            context=context,
+        )
 
     async def build_response(
         self,
@@ -1851,7 +2227,7 @@ class CanonicalPlanRuntimeAdapter:
 
 
 class GoalDrivenRuntimeCoordinator:
-    """Single-direction goal association → fast/deep plan → composition pipeline."""
+    """Advance one Core-owned interaction as independent work becomes ready."""
 
     TRACE_MODULE = TraceModule(
         name="orchestrator.cognitive_runtime",
@@ -1885,6 +2261,86 @@ class GoalDrivenRuntimeCoordinator:
             "interaction_ledger",
             None,
         )
+        self._auxiliary_tasks: set[asyncio.Task[Any]] = set()
+        self._social_attention_pending: dict[
+            tuple[str, str], dict[str, Any]
+        ] = {}
+        self._social_attention_workers: dict[
+            tuple[str, str], asyncio.Task[Any]
+        ] = {}
+
+    def _track_auxiliary_task(self, task: asyncio.Task[Any]) -> None:
+        """Keep peer-lane work alive without making it a turn-response barrier."""
+
+        self._auxiliary_tasks.add(task)
+
+        def _done(completed: asyncio.Task[Any]) -> None:
+            self._auxiliary_tasks.discard(completed)
+            if completed.cancelled():
+                return
+            exc = completed.exception()
+            if exc is not None:  # pragma: no cover - peer-lane bug visibility guard
+                logger.warning(
+                    "auxiliary cognitive task failed task=%s error_type=%s error=%s",
+                    completed.get_name(),
+                    type(exc).__name__,
+                    exc,
+                )
+
+        task.add_done_callback(_done)
+
+    def _queue_social_attention_event(
+        self,
+        session: Any,
+        *,
+        event: str,
+        text: str,
+        sid: str,
+        turn_id: str,
+        language: str,
+        intent: str,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+    ) -> None:
+        """Coalesce peer-lane social state without blocking primary cognition."""
+
+        if self.policy.mode != "apply" or self.adapter.social_attention_mode == "off":
+            return
+        key = (sid, turn_id)
+        # Only the latest not-yet-processed state matters while one social model
+        # decision is already in flight. This keeps the lane continuous without
+        # turning every runtime event into another latency/compute tax.
+        self._social_attention_pending[key] = {
+            "session": session,
+            "event": event,
+            "text": text,
+            "sid": sid,
+            "turn_id": turn_id,
+            "language": language,
+            "intent": intent,
+            "context": dict(context),
+            "history": [dict(item) for item in history if isinstance(item, dict)],
+        }
+        existing = self._social_attention_workers.get(key)
+        if existing is not None and not existing.done():
+            return
+        worker = asyncio.create_task(
+            self._drain_social_attention_events(key),
+            name=f"social-attention:{sid}:{turn_id}",
+        )
+        self._social_attention_workers[key] = worker
+        self._track_auxiliary_task(worker)
+
+    async def _drain_social_attention_events(self, key: tuple[str, str]) -> None:
+        try:
+            while True:
+                payload = self._social_attention_pending.pop(key, None)
+                if payload is None:
+                    return
+                await self._run_social_attention_event(**payload)
+        finally:
+            self._social_attention_workers.pop(key, None)
+            self._social_attention_pending.pop(key, None)
 
     _CONTINUITY_REFRESH_KEYS = frozenset(
         {
@@ -2174,6 +2630,352 @@ class GoalDrivenRuntimeCoordinator:
         )
 
     @staticmethod
+    def _progress_candidates_from_context(
+        context: dict[str, Any],
+    ) -> dict[str, CognitiveProgressCandidate]:
+        candidates: dict[str, CognitiveProgressCandidate] = {}
+        for item in context.get("progress_candidates") or []:
+            try:
+                candidate = CognitiveProgressCandidate.model_validate(item)
+            except ValidationError:
+                continue
+            candidates[candidate.candidate_id] = candidate
+        return candidates
+
+    async def _start_ready_progress(
+        self,
+        *,
+        candidates: dict[str, CognitiveProgressCandidate],
+        sid: str,
+        turn_id: str,
+        language: str,
+    ) -> dict[str, Any]:
+        """Start independently-ready Core progress without changing its meaning."""
+
+        runtime = self.adapter.interaction_runtime
+
+        async def start(candidate: CognitiveProgressCandidate) -> Any:
+            if candidate.kind == "native_response":
+                return await runtime.start_ready_native_response(
+                    candidate,
+                    session_id=sid,
+                    turn_id=turn_id,
+                    language=language,
+                )
+            return await runtime.start_ready_capability_read(
+                candidate,
+                session_id=sid,
+                turn_id=turn_id,
+                language=language,
+            )
+
+        starts = {
+            candidate_id: asyncio.create_task(start(candidate))
+            for candidate_id, candidate in candidates.items()
+        }
+        handles: dict[str, Any] = {}
+        if not starts:
+            return handles
+        outcomes = await asyncio.gather(*starts.values(), return_exceptions=True)
+        for candidate_id, outcome in zip(starts, outcomes, strict=True):
+            if isinstance(outcome, BaseException):
+                logger.warning(
+                    "ready progress start failed candidate_id=%s error_type=%s error=%s",
+                    candidate_id,
+                    type(outcome).__name__,
+                    outcome,
+                )
+                continue
+            if outcome is not None:
+                handles[candidate_id] = outcome
+        return handles
+
+    async def _cancel_ready_progress(self, handles: dict[str, Any]) -> None:
+        if not handles:
+            return
+        runtime = self.adapter.interaction_runtime
+
+        async def cancel(candidate_id: str, handle: Any) -> None:
+            candidate = getattr(handle, "candidate", None)
+            if isinstance(candidate, CognitiveProgressCandidate) and candidate.kind == "native_response":
+                await runtime.cancel_ready_native_response(handle)
+            else:
+                await runtime.cancel_ready_capability_read(handle)
+
+        await asyncio.gather(
+            *(cancel(candidate_id, handle) for candidate_id, handle in list(handles.items())),
+            return_exceptions=True,
+        )
+        handles.clear()
+
+    async def _adopt_ready_plan(
+        self,
+        *,
+        association: GoalAssociationResolution,
+        candidates: dict[str, CognitiveProgressCandidate],
+        handles: dict[str, Any],
+        text: str,
+        sid: str,
+    ) -> CanonicalPlan | None:
+        """Compile already model-authored safe reads when GA proves complete coverage.
+
+        This method never selects a capability.  It only adopts exact Core
+        candidates explicitly bound by Goal Association and revalidates them
+        against the trusted live catalog.
+        """
+
+        if association.associations or not association.new_goals:
+            return None
+        goal_by_id = {goal.goal_id: goal for goal in association.new_goals if goal.goal_id}
+        if not goal_by_id or set(goal_by_id) != set(self._association_goal_ids(association)):
+            return None
+        if any(
+            str((goal.metadata or {}).get("output_mode") or "") != "capability_work"
+            or goal.resource_responsibility is None
+            or goal.resource_responsibility.resource.kind != "information"
+            for goal in goal_by_id.values()
+        ):
+            return None
+
+        covered_goals = {
+            goal_id
+            for binding in association.progress_bindings
+            for goal_id in binding.goal_ids
+        }
+        if covered_goals != set(goal_by_id):
+            return None
+        if not association.progress_bindings:
+            return None
+
+        step_rows: list[tuple[CognitiveProgressCandidate, Any, list[str]]] = []
+        for binding in association.progress_bindings:
+            candidate = candidates.get(binding.candidate_id)
+            handle = handles.get(binding.candidate_id)
+            if candidate is None or handle is None:
+                return None
+            try:
+                definition = self.adapter.interaction_runtime.skill_definition(
+                    candidate.capability_id
+                )
+            except ValueError:
+                return None
+            metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
+            scope = metadata.get("semantic_scope")
+            if not isinstance(scope, dict):
+                return None
+            if scope.get("responsibility_type") != "acquire_and_deliver_resource":
+                return None
+            resource_kinds = {str(item) for item in scope.get("resource_kinds") or []}
+            if "information" not in resource_kinds:
+                return None
+            if (
+                str(metadata.get("safety_class") or "") != "safe_read"
+                or metadata.get("side_effect_free") is not True
+                or definition.requires_confirmation
+                or not definition.available
+            ):
+                return None
+            if validate_args_for_schema(candidate.args, definition.input_schema):
+                return None
+            if any(goal_id not in goal_by_id for goal_id in binding.goal_ids):
+                return None
+            step_rows.append((candidate, definition, list(binding.goal_ids)))
+
+        can_parallel = len(step_rows) > 1 and all(
+            bool(definition.can_run_parallel) for _, definition, _ in step_rows
+        )
+        steps: list[CanonicalPlanStep] = []
+        step_ids_by_goal: dict[str, list[str]] = {goal_id: [] for goal_id in goal_by_id}
+        for index, (candidate, definition, goal_ids) in enumerate(step_rows):
+            step_id = f"ready_step_{candidate.candidate_id.removeprefix('progress_')}"
+            steps.append(
+                CanonicalPlanStep(
+                    step_id=step_id,
+                    capability_id=candidate.capability_id,
+                    args=dict(candidate.args),
+                    timing="parallel" if can_parallel else "sequential",
+                    source_goal_ids=goal_ids,
+                    reason_summary="Adopt exact Core progress candidate bound by Goal Association.",
+                    metadata={
+                        "progress_candidate_id": candidate.candidate_id,
+                        "model_authored_before_goal_association": True,
+                        "definition_version": definition.version,
+                    },
+                )
+            )
+            for goal_id in goal_ids:
+                step_ids_by_goal[goal_id].append(step_id)
+
+        if any(not step_ids for step_ids in step_ids_by_goal.values()):
+            return None
+        goal_ids = list(goal_by_id)
+        satisfaction = GoalSatisfactionAssessment(
+            score=1.0,
+            status="exact",
+            satisfied_goal_ids=goal_ids,
+            unmet_goal_ids=[],
+            unmet_requirements=[],
+            rationale="Every canonical Goal is covered by explicitly bound readiness work.",
+        )
+        plan_seed = json.dumps(
+            [
+                {
+                    "candidate_id": candidate.candidate_id,
+                    "goal_ids": goal_ids_for_candidate,
+                }
+                for candidate, _, goal_ids_for_candidate in step_rows
+            ],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return CanonicalPlan(
+            plan_id=f"plan_ready_{hashlib.sha256((sid + plan_seed).encode('utf-8')).hexdigest()[:20]}",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=min(
+                [association.confidence, *[item.confidence for item in association.progress_bindings]]
+            ),
+            goal_ids=goal_ids,
+            goal_summary=text,
+            steps=steps,
+            goal_outcomes=[
+                ExecuteGoalPlanOutcome(
+                    goal_id=goal_id,
+                    disposition="execute",
+                    coverage="complete",
+                    step_ids=step_ids_by_goal[goal_id],
+                    satisfaction=satisfaction,
+                    rationale="Covered by exact Core progress candidate(s).",
+                    metadata={"resolver": "readiness_adoption"},
+                )
+                for goal_id in goal_ids
+            ],
+            goal_satisfaction=satisfaction,
+            metadata={
+                "resolver": "readiness_adoption",
+                "status": "resolved",
+                "authority": "advisory",
+                "path_classification": "terminal",
+                "planner_llm_invoked": False,
+            },
+        )
+
+    async def _bind_ready_results(
+        self,
+        *,
+        association: GoalAssociationResolution,
+        handles: dict[str, Any],
+        interaction: InteractionResponse,
+    ) -> int:
+        bindings = {item.candidate_id: item for item in association.progress_bindings}
+        bound = 0
+        for candidate_id, handle in list(handles.items()):
+            binding = bindings.get(candidate_id)
+            if binding is None:
+                continue
+            expected_goals = set(binding.goal_ids)
+            canonical_request = next(
+                (
+                    request
+                    for request in interaction.skills
+                    if set(request.metadata.get("source_goal_ids") or []) == expected_goals
+                    and request.skill_id == handle.request.skill_id
+                    and request.args == handle.request.args
+                ),
+                None,
+            )
+            if canonical_request is None:
+                continue
+            if await self.adapter.interaction_runtime.bind_ready_capability_read(
+                handle,
+                canonical_interaction_id=interaction.interaction_id,
+                canonical_request=canonical_request,
+            ):
+                handles.pop(candidate_id, None)
+                bound += 1
+        return bound
+
+    async def _run_social_attention_event(
+        self,
+        session: Any,
+        *,
+        event: str,
+        text: str,
+        sid: str,
+        turn_id: str,
+        language: str,
+        intent: str,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        resolver = getattr(self.agent_client, "resolve_social_attention", None)
+        if not callable(resolver) or self.adapter.social_attention_mode == "off":
+            return {"status": "not_available", "event": event}
+        social_context = dict(context)
+        social_context.pop("social_attention_owned_by_peer_lane", None)
+        social_context["social_attention_event"] = event
+        social_context["social_attention_interaction_state"] = {
+            "event": event,
+            "progress_candidates": list(social_context.get("progress_candidates") or []),
+            "primary_work_known": bool(social_context.get("progress_candidates")),
+        }
+        recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
+        social_context["recent_auxiliary_behavior_evidence"] = (
+            recent(sid) if callable(recent) else []
+        )
+        request = SocialAttentionRequest(
+            session_id=sid,
+            turn_id=turn_id,
+            event=event,
+            text=text,
+            language=language,
+            intent=intent or "unknown",
+            context=social_context,
+            history=[dict(item) for item in history[-6:] if isinstance(item, dict)],
+        )
+        planner_outcome = (
+            await asyncio.gather(
+                resolver(session, request=request),
+                return_exceptions=True,
+            )
+        )[0]
+        if isinstance(planner_outcome, asyncio.CancelledError):
+            raise planner_outcome
+        if isinstance(planner_outcome, BaseException):
+            return {
+                "status": "planner_failed",
+                "event": event,
+                "error_type": type(planner_outcome).__name__,
+                "error": str(planner_outcome)[:240],
+            }
+        plan = planner_outcome
+        execution_outcome = (
+            await asyncio.gather(
+                self.adapter.execute_social_attention_event(
+                    plan=plan,
+                    session_id=sid,
+                    turn_id=turn_id,
+                    event=event,
+                    context=social_context,
+                ),
+                return_exceptions=True,
+            )
+        )[0]
+        if isinstance(execution_outcome, asyncio.CancelledError):
+            raise execution_outcome
+        if isinstance(execution_outcome, BaseException):
+            return {
+                "status": "execution_failed",
+                "event": event,
+                "decision": plan.decision,
+                "error_type": type(execution_outcome).__name__,
+                "error": str(execution_outcome)[:240],
+            }
+        return execution_outcome
+
+    @staticmethod
     def _is_terminal_missing_ability_decision(route_decision: Any) -> bool:
         return bool(
             str(getattr(route_decision, "route", "") or "").strip() == "clarify"
@@ -2320,6 +3122,10 @@ class GoalDrivenRuntimeCoordinator:
                     exclude={"compatibility_projection"},
                 ),
                 "core_interpretation_projection_digest": (core_interpretation.projection_digest),
+                "progress_candidates": [
+                    item.model_dump(mode="json", exclude_none=True)
+                    for item in core_interpretation.progress_candidates
+                ],
             }
         if route_decision is None:
             raise ValueError(
@@ -2485,7 +3291,16 @@ class GoalDrivenRuntimeCoordinator:
         stage_diagnostics: list[dict[str, Any]] = []
         fast_planner_path = ""
         deep_planner_invocation_reasons: list[str] = []
-        lane: CognitiveLane = "unsupported"
+        source_lane = str(getattr(route_decision, "route", "") or "")
+        lane: CognitiveLane = (
+            source_lane
+            if source_lane in {"chat", "robot_action", "tool", "memory"}
+            else "unsupported"
+        )
+        progress_candidates = self._progress_candidates_from_context(context)
+        ready_handles: dict[str, Any] = {}
+        ready_start_task: asyncio.Task[dict[str, Any]] | None = None
+        ready_bound_count = 0
 
         def path_metadata() -> dict[str, Any]:
             first_deep_reason = (
@@ -2501,7 +3316,9 @@ class GoalDrivenRuntimeCoordinator:
                     in {
                         "terminal",
                         "direct_spoken_response",
+                        "native_response_readiness_adoption",
                         "terminal_missing_ability",
+                        "readiness_adoption",
                     }
                     and not deep_planner_invocation_reasons
                 ),
@@ -2518,6 +3335,8 @@ class GoalDrivenRuntimeCoordinator:
                     len(fast_plan.steps) if fast_plan is not None else 0
                 ),
                 "goal_state_commit_stage": goal_state_commit_stage,
+                "progress_candidate_count": len(progress_candidates),
+                "ready_result_bound_count": ready_bound_count,
             }
 
         if self._is_terminal_missing_ability_decision(route_decision):
@@ -2583,6 +3402,31 @@ class GoalDrivenRuntimeCoordinator:
             )
 
         try:
+            turn_id = self._context_turn_id(context, sid)
+            if (
+                self.policy.mode == "apply"
+                and self.policy.lane_enabled(lane)
+                and progress_candidates
+            ):
+                ready_start_task = asyncio.create_task(
+                    self._start_ready_progress(
+                        candidates=progress_candidates,
+                        sid=sid,
+                        turn_id=turn_id,
+                        language=language,
+                    )
+                )
+            self._queue_social_attention_event(
+                session,
+                event="understanding_ready",
+                text=text,
+                sid=sid,
+                turn_id=turn_id,
+                language=language,
+                intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                context=context,
+                history=history,
+            )
             association_lock = self._goal_association_lock(
                 context=context,
                 sid=sid,
@@ -2722,6 +3566,40 @@ class GoalDrivenRuntimeCoordinator:
                             )
                         goal_state_commit_stage = "goal_association"
 
+            self._queue_social_attention_event(
+                session,
+                event="goal_associated",
+                text=text,
+                sid=sid,
+                turn_id=turn_id,
+                language=language,
+                intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                context={
+                    **context,
+                    "goal_association": association.prompt_projection(),
+                },
+                history=history,
+            )
+            if ready_start_task is not None:
+                ready_handles = await ready_start_task
+                ready_start_task = None
+            if ready_handles:
+                self._queue_social_attention_event(
+                    session,
+                    event="work_started",
+                    text=text,
+                    sid=sid,
+                    turn_id=turn_id,
+                    language=language,
+                    intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                    context={
+                        **context,
+                        "goal_association": association.prompt_projection(),
+                        "ready_progress_ids": sorted(ready_handles),
+                    },
+                    history=history,
+                )
+
             association_goal_ids = self._association_goal_ids(association)
             if self.policy.mode == "apply" and self.interaction_ledger is not None:
                 self.interaction_ledger.record_goal_association(
@@ -2782,9 +3660,112 @@ class GoalDrivenRuntimeCoordinator:
                     )
 
                 if self._is_direct_spoken_association(association):
-                    fast_planner_path = "direct_spoken_response"
                     lane = "chat"
+                    adoption_stage = time.perf_counter()
+                    adopted_native = self.adapter.build_adopted_native_response(
+                        association=association,
+                        candidates=progress_candidates,
+                        session_id=sid,
+                        language=language,
+                        context=planning_context,
+                    )
+                    timings["native_response_adoption"] = (
+                        time.perf_counter() - adoption_stage
+                    ) * 1000.0
+                    if adopted_native is not None:
+                        fast_planner_path = "native_response_readiness_adoption"
+                        timings["fast_planner"] = 0.0
+                        timings["response_composer"] = 0.0
+                        if self.policy.mode == "apply":
+                            if not self.policy.lane_enabled(lane):
+                                return self._finish(
+                                    mode="apply",
+                                    status="error",
+                                    lane=lane,
+                                    association=association,
+                                    fast_plan=None,
+                                    terminal_plan=None,
+                                    composition=None,
+                                    timings=timings,
+                                    started=started,
+                                    fallback_reason=(
+                                        "native_response_lane_not_enabled_for_apply"
+                                    ),
+                                    metadata={
+                                        "failure_stage": "authority_boundary",
+                                        "failure_class": (
+                                            "native_response_lane_mismatch"
+                                        ),
+                                        "failure_domain": "cognitive_runtime",
+                                        "retryable": False,
+                                        **path_metadata(),
+                                    },
+                                )
+                            runtime = self.adapter.interaction_runtime
+                            for speech_item in adopted_native.speech:
+                                candidate_id = str(
+                                    speech_item.metadata.get("progress_candidate_id")
+                                    or ""
+                                ).strip()
+                                handle = ready_handles.get(candidate_id)
+                                if handle is None:
+                                    continue
+                                if await runtime.bind_ready_native_response(
+                                    handle,
+                                    canonical_interaction_id=(
+                                        adopted_native.interaction_id
+                                    ),
+                                    canonical_speech=speech_item,
+                                ):
+                                    ready_bound_count += 1
+                                    ready_handles.pop(candidate_id, None)
+                            if goal_state_commit_stage == "goal_association":
+                                adopted_native.metadata["goal_state_results"] = (
+                                    goal_state_results
+                                )
+                            return self._finish(
+                                mode="apply",
+                                status="applied",
+                                lane=lane,
+                                association=association,
+                                fast_plan=None,
+                                terminal_plan=None,
+                                composition=None,
+                                interaction=adopted_native,
+                                goal_state_results=goal_state_results,
+                                timings=timings,
+                                started=started,
+                                metadata={
+                                    "runtime_replan_count": 0,
+                                    "planless_direct_response": True,
+                                    "native_response_readiness_adoption": True,
+                                    "stage_diagnostics": stage_diagnostics,
+                                    **path_metadata(),
+                                },
+                            )
+                        return self._finish(
+                            mode="report_only",
+                            status="report_only",
+                            lane=lane,
+                            association=association,
+                            fast_plan=None,
+                            terminal_plan=None,
+                            composition=None,
+                            interaction=adopted_native,
+                            timings=timings,
+                            started=started,
+                            metadata={
+                                "runtime_replan_count": 0,
+                                "planless_direct_response": True,
+                                "native_response_readiness_adoption": True,
+                                "stage_diagnostics": stage_diagnostics,
+                                **path_metadata(),
+                            },
+                        )
+
+                    fast_planner_path = "direct_spoken_response"
                     composition_context = dict(planning_context)
+                    composition_context["social_attention_owned_by_peer_lane"] = True
                     composition_context["direct_goal_association_resolution"] = (
                         association.prompt_projection()
                     )
@@ -2916,36 +3897,49 @@ class GoalDrivenRuntimeCoordinator:
                         },
                     )
 
-                stage = time.perf_counter()
-                fast_plan = await self._observe_workflow_stage(
+                adopted_plan = await self._adopt_ready_plan(
+                    association=association,
+                    candidates=progress_candidates,
+                    handles=ready_handles,
+                    text=text,
                     sid=sid,
-                    stage="fast_planner",
-                    input_payload={
-                        "user_text": text,
-                        "route_decision": route_decision,
-                        "goal_association": association,
-                        "interaction_context": planning_context.get(
-                            "interaction_context", {}
-                        ),
-                    },
-                    operation=self.agent_client.resolve_fast_plan(
-                        session,
-                        text=text,
-                        route_decision=route_decision,
+                )
+                if adopted_plan is not None:
+                    fast_plan = adopted_plan
+                    terminal_plan = adopted_plan
+                    fast_planner_path = "readiness_adoption"
+                    timings["fast_planner"] = 0.0
+                else:
+                    stage = time.perf_counter()
+                    fast_plan = await self._observe_workflow_stage(
                         sid=sid,
-                        context=planning_context,
-                        history=history,
-                        timeout_ms=self.policy.fast_planner_timeout_ms,
-                    ),
-                )
-                timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
-                fast_failure = self._optional_stage_failure_metadata(
-                    "fast_planner", fast_plan.metadata
-                )
-                if fast_failure is not None:
-                    stage_diagnostics.append(fast_failure)
-                terminal_plan = fast_plan
-                fast_planner_path = self._fast_plan_path(fast_plan)
+                        stage="fast_planner",
+                        input_payload={
+                            "user_text": text,
+                            "route_decision": route_decision,
+                            "goal_association": association,
+                            "interaction_context": planning_context.get(
+                                "interaction_context", {}
+                            ),
+                        },
+                        operation=self.agent_client.resolve_fast_plan(
+                            session,
+                            text=text,
+                            route_decision=route_decision,
+                            sid=sid,
+                            context=planning_context,
+                            history=history,
+                            timeout_ms=self.policy.fast_planner_timeout_ms,
+                        ),
+                    )
+                    timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
+                    fast_failure = self._optional_stage_failure_metadata(
+                        "fast_planner", fast_plan.metadata
+                    )
+                    if fast_failure is not None:
+                        stage_diagnostics.append(fast_failure)
+                    terminal_plan = fast_plan
+                    fast_planner_path = self._fast_plan_path(fast_plan)
                 if fast_plan.disposition == "escalate":
                     deep_reason = (
                         "fast_contract_failure"
@@ -3150,7 +4144,119 @@ class GoalDrivenRuntimeCoordinator:
                 goal_ids=terminal_plan.goal_ids,
             )
 
+            if self.adapter.is_pure_safe_read_plan(terminal_plan):
+                lane = "tool"
+                if self.policy.mode == "apply":
+                    if not self.policy.lane_enabled(lane):
+                        return self._finish(
+                            mode="apply",
+                            status="error",
+                            lane=lane,
+                            association=association,
+                            fast_plan=fast_plan,
+                            terminal_plan=terminal_plan,
+                            composition=None,
+                            timings=timings,
+                            started=started,
+                            fallback_reason="safe_read_lane_not_enabled_for_apply",
+                            metadata={
+                                "failure_stage": "authority_boundary",
+                                "failure_class": "safe_read_lane_mismatch",
+                                "failure_domain": "cognitive_runtime",
+                                "retryable": False,
+                                **path_metadata(),
+                            },
+                        )
+                    stage = time.perf_counter()
+                    interaction = await self._observe_workflow_stage(
+                        sid=sid,
+                        stage="runtime_adapter",
+                        input_payload={
+                            "canonical_plan": terminal_plan,
+                            "execution_only_safe_read": True,
+                        },
+                        operation=self.adapter.build_execution_only_response(
+                            plan=terminal_plan,
+                            session_id=sid,
+                            language=language,
+                            context=planning_context,
+                        ),
+                    )
+                    timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
+                    timings["response_composer"] = 0.0
+                    ready_bound_count = await self._bind_ready_results(
+                        association=association,
+                        handles=ready_handles,
+                        interaction=interaction,
+                    )
+                    if ready_bound_count:
+                        self._queue_social_attention_event(
+                            session,
+                            event="evidence_arrived",
+                            text=text,
+                            sid=sid,
+                            turn_id=turn_id,
+                            language=language,
+                            intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                            context={
+                                **planning_context,
+                                "ready_result_bound_count": ready_bound_count,
+                            },
+                            history=history,
+                        )
+                    interaction.metadata["goal_association"] = association.model_dump(
+                        mode="json", exclude_none=True
+                    )
+                    if goal_state_commit_stage == "goal_association":
+                        interaction.metadata["goal_state_results"] = goal_state_results
+                    interaction.metadata["continuous_cognition"] = {
+                        "execution_started_before_goal_association_completed": bool(
+                            progress_candidates
+                        ),
+                        "planner_llm_avoided": fast_planner_path == "readiness_adoption",
+                        "response_composer_llm_avoided": True,
+                        "ready_result_bound_count": ready_bound_count,
+                    }
+                    return self._finish(
+                        mode="apply",
+                        status="applied",
+                        lane=lane,
+                        association=association,
+                        fast_plan=fast_plan,
+                        terminal_plan=terminal_plan,
+                        composition=None,
+                        interaction=interaction,
+                        goal_state_results=goal_state_results,
+                        timings=timings,
+                        started=started,
+                        metadata={
+                            "runtime_replan_count": replan_count,
+                            "execution_only_safe_read": True,
+                            "stage_diagnostics": stage_diagnostics,
+                            **path_metadata(),
+                        },
+                    )
+                timings["response_composer"] = 0.0
+                return self._finish(
+                    mode="report_only",
+                    status="report_only",
+                    lane=lane,
+                    association=association,
+                    fast_plan=fast_plan,
+                    terminal_plan=terminal_plan,
+                    composition=None,
+                    timings=timings,
+                    started=started,
+                    metadata={
+                        "runtime_replan_count": replan_count,
+                        "execution_only_safe_read": True,
+                        "stage_diagnostics": stage_diagnostics,
+                        **path_metadata(),
+                    },
+                )
+
             composition_context = dict(planning_context)
+            composition_context["social_attention_owned_by_peer_lane"] = True
             composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
             composition_context["execution_capabilities"] = [
                 {
@@ -3274,6 +4380,26 @@ class GoalDrivenRuntimeCoordinator:
                     ),
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
+                ready_bound_count = await self._bind_ready_results(
+                    association=association,
+                    handles=ready_handles,
+                    interaction=interaction,
+                )
+                if ready_bound_count:
+                    self._queue_social_attention_event(
+                        session,
+                        event="evidence_arrived",
+                        text=text,
+                        sid=sid,
+                        turn_id=turn_id,
+                        language=language,
+                        intent=str(getattr(route_decision, "intent", "") or "unknown"),
+                        context={
+                            **composition_context,
+                            "ready_result_bound_count": ready_bound_count,
+                        },
+                        history=history,
+                    )
                 if goal_state_commit_stage == "goal_association":
                     interaction.metadata["goal_association"] = association.model_dump(
                         mode="json", exclude_none=True
@@ -3366,6 +4492,20 @@ class GoalDrivenRuntimeCoordinator:
                     **path_metadata(),
                 },
             )
+        finally:
+            if ready_start_task is not None:
+                pending_outcome = (
+                    await asyncio.gather(ready_start_task, return_exceptions=True)
+                )[0]
+                if isinstance(pending_outcome, dict):
+                    ready_handles.update(pending_outcome)
+                elif isinstance(pending_outcome, BaseException):
+                    logger.warning(
+                        "ready progress cleanup observed failure error_type=%s error=%s",
+                        type(pending_outcome).__name__,
+                        pending_outcome,
+                    )
+            await self._cancel_ready_progress(ready_handles)
 
     @staticmethod
     def _optional_stage_failure_metadata(

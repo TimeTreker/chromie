@@ -91,6 +91,7 @@ class SemanticGoal(BaseModel):
         default=None,
         exclude_if=lambda value: value is None,
     )
+    related_goal_ids: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator(
@@ -107,6 +108,27 @@ class SemanticGoal(BaseModel):
         if isinstance(value, str):
             return " ".join(value.strip().split())
         return value
+
+    @field_validator("related_goal_ids", mode="before")
+    @classmethod
+    def normalize_related_goal_ids(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("related_goal_ids must be a list or string")
+        return list(dict.fromkeys(
+            normalized
+            for item in value
+            if (normalized := " ".join(str(item or "").strip().split()))
+        ))
+
+    @model_validator(mode="after")
+    def validate_related_goals(self) -> "SemanticGoal":
+        if self.goal_id and self.goal_id in self.related_goal_ids:
+            raise ValueError("related_goal_ids must not contain the Goal itself")
+        return self
 
     @field_validator("success_criteria", mode="before")
     @classmethod

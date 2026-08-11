@@ -2622,6 +2622,15 @@ def canonical_plan_response_schema(
     }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_skills
 
+    if requires_execution and not response_goal_set:
+        planner_response_text = properties.get("response_text")
+        if isinstance(planner_response_text, dict):
+            planner_response_text["maxLength"] = 0
+            planner_response_text["description"] = (
+                "Execution-only planning does not author speech; communication is "
+                "owned by the response layer."
+            )
+
     # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
     # emits a complete map.  Fast Planner uses one flat decoder-compatible shape:
     # either an empty map for semantic escalation or a complete terminal map.
@@ -2847,12 +2856,10 @@ def canonical_plan_response_schema(
                         ]
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
-                        response_text_field["maxLength"] = 800
+                        response_text_field["maxLength"] = 0
                         response_text_field["description"] = (
-                            "Optional prospective conversational delta. Use Interaction "
-                            "Context to avoid repeating an already delivered or pending "
-                            "act; never use this field to satisfy the tool Goal or claim "
-                            "its result before evidence."
+                            "Execution Goals do not author speech; communication is "
+                            "owned by the response layer."
                         )
                     branches = specialized.get("oneOf")
                     if isinstance(branches, list):
@@ -3144,15 +3151,18 @@ def fast_multi_goal_response_schema(
     # otherwise simple plans consume most of the decoder budget.  Keep the
     # semantic judgments model-authored while bounding their representation.
     bound_text(properties, "goal_summary", 240)
-    bound_text(properties, "response_text", 800)
+    bound_text(
+        properties,
+        "response_text",
+        0 if requires_execution and not response_goal_set else 800,
+    )
     if requires_execution:
         response_text_field = properties.get("response_text")
         if isinstance(response_text_field, dict):
             response_text_field["description"] = (
-                "Optional prospective conversational delta for executable work. "
-                "Use Interaction Context to avoid repeating already delivered or "
-                "pending speech; never use it to satisfy the tool Goal or predict "
-                "the result before evidence."
+                "Planner speech is empty for execution-only work; a separate "
+                "response owner handles communication. Mixed plans may carry only "
+                "the direct-response Goal delta."
             )
     bound_text(properties, "escalation_reason", 240)
     top_unresolved = properties.get("unresolved")
@@ -3233,7 +3243,11 @@ def fast_multi_goal_response_schema(
             if field_name not in outcome_required:
                 outcome_required.append(field_name)
         outcome_properties = outcome_schema.get("properties", {})
-        bound_text(outcome_properties, "response_text", 800)
+        bound_text(
+            outcome_properties,
+            "response_text",
+            0 if requires_execution and not response_goal_set else 800,
+        )
         bound_text(outcome_properties, "rationale", 200)
         outcome_unresolved = outcome_properties.get("unresolved")
         if isinstance(outcome_unresolved, dict):
@@ -3460,10 +3474,10 @@ def fast_multi_goal_response_schema(
                     disposition_field["enum"] = ["execute", "clarify", "escalate"]
                 response_text_field = specialized_outcome_properties.get("response_text")
                 if isinstance(response_text_field, dict):
-                    response_text_field["maxLength"] = 800
+                    response_text_field["maxLength"] = 0
                     response_text_field["description"] = (
-                        "Optional prospective conversational delta; it does not "
-                        "complete the tool Goal and must not predict tool evidence."
+                        "Execution Goals do not author speech; communication is "
+                        "owned by the response layer."
                     )
                 branches = specialized_outcome.get("oneOf")
                 if isinstance(branches, list):

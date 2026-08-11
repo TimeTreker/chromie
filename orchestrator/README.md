@@ -17,9 +17,9 @@ For authoritative architecture, status, and configuration, see:
 
 - ASR converts complete PCM utterances to final text.
 - Goal Interpretation produces deterministic or model-assisted `RouteDecision` objects.
-- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
-  Response Composition, plus compatibility `AgentResult`/`InteractionResponse`
-  surfaces.
+- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, peer
+  Social-Attention proposals, and Response Composition, plus compatibility
+  `AgentResult`/`InteractionResponse` surfaces.
 - TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
   complete request through the provider `end` event before ordered playback and
   interruption handling.
@@ -71,12 +71,18 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Goal Association resolves scoped references and typed Goal bindings
-  -> Fast Planner -> terminal Deep Planner when required
-      -> exact verified-memory retrieval or fresh external read
-  -> prospective Response Composer -> host-built strict InteractionResponse
+  -> Fast Understanding
+       |-> complete native response -> existing Speaking runtime may start
+       |-> exact capability candidate -> trusted safe read may start when ready
+       |-> peer Social-Attention event lane may progress independently
+       `-> Goal Association resolves scoped references, Goal relations, and exact candidate bindings
+  -> fully bound native conversation: deterministic canonical speech adoption
+     fully bound information work: adopt canonical Plan without Fast Planner
+     otherwise: Fast Planner -> terminal Deep Planner when required
+  -> reuse already-started Speaking / execution-only ready read when sufficient
+     otherwise: Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Trusted Capability Runtime
-      -> Soridormi provider -> MCP -> simulator/robot
+      -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-goal outcome commit
   -> validated speech-only final response -> TTS -> playback
 ```

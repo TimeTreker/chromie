@@ -35,6 +35,41 @@ def normalize_social_attention_mode(
     return "off"
 
 
+SocialAttentionEvent = Literal[
+    "understanding_ready",
+    "goal_associated",
+    "work_started",
+    "waiting",
+    "evidence_arrived",
+    "speaking",
+]
+
+
+class SocialAttentionRequest(BaseModel):
+    """One event-scoped projection for the independent Social-Attention lane.
+
+    The request carries interaction state, not user-goal authority.  It deliberately
+    has no planner disposition, capability authorization, or response text contract.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    session_id: str = Field(min_length=1, max_length=160)
+    turn_id: str = Field(min_length=1, max_length=160)
+    event: SocialAttentionEvent
+    text: str = ""
+    language: str = Field(default="auto", min_length=1, max_length=64)
+    intent: str = Field(default="unknown", min_length=1, max_length=200)
+    context: dict[str, Any] = Field(default_factory=dict)
+    history: list[dict[str, Any]] = Field(default_factory=list, max_length=12)
+
+    @field_validator("session_id", "turn_id", "text", "language", "intent", mode="before")
+    @classmethod
+    def normalize_request_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+
 SocialAttentionDecision = Literal["none", "express"]
 SocialAttentionTargetSource = Literal[
     "live_perception",

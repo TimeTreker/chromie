@@ -96,8 +96,13 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "apply preconditions pass"
             ),
             "planner_path": (
-                "Goal Association -> Fast Planner -> terminal Deep Planner when "
-                "required -> Response Composer -> trusted runtime adapter"
+                "Core readiness may start complete native Speaking, exact trusted "
+                "safe reads, and peer Social Attention while Goal Association continues; "
+                "Goal Association explicitly binds progress to canonical Goals; completely "
+                "bound native conversation may adopt canonical speech without Planner or "
+                "Response Composer, completely bound safe reads may adopt a canonical Plan "
+                "without Fast Planner, otherwise Fast/Deep Planning applies; Response "
+                "Composer runs only when a new presentation decision still requires it"
             ),
             "fallback": "fail_closed_after_authority_acquisition",
         },
@@ -120,7 +125,10 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "orchestrator.handle_routed_text/report_only",
             "owner": "goal_driven_runtime",
             "role": "observer",
-            "planner_path": "same goal-driven stages, evidence only",
+            "planner_path": (
+                "same Goal semantics and planner fallback, but no readiness execution "
+                "or other effect authorization; evidence only"
+            ),
             "fallback": "legacy_agent_pipeline_remains_the_only_authority",
         },
         {

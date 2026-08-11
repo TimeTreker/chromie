@@ -39,6 +39,7 @@ try:
         CoreInterpretationUnavailable,
     )
     from chromie_contracts.route import RouteDecision as SharedRouteDecision
+    from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
@@ -62,6 +63,7 @@ except ImportError:  # pragma: no cover
         CoreInterpretationUnavailable,
     )
     from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
+    from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
@@ -675,12 +677,17 @@ async def interpret_cognitive_turn(
             status_code=503,
             content=unavailable.model_dump(mode="json"),
         )
+    progress_proposals = [
+        item.model_dump(mode="json", exclude_none=True)
+        for item in decision.progress
+    ]
     projection = SharedRouteDecision.model_validate(
-        decision.model_dump(mode="json")
+        decision.model_dump(mode="json", exclude={"progress"})
     )
     return CoreInterpretationResult.from_route_decision(
         envelope=envelope,
         decision=projection,
+        progress_proposals=progress_proposals,
     )
 
 @app.post("/fast-plan")
@@ -711,6 +718,20 @@ async def resolve_deep_plan(request: AgentRunRequest):
             prepared.context
         ),
     )
+
+
+@app.post("/social-attention/plan", response_model=SocialAttentionPlan)
+async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttentionPlan:
+    """Plan one independent, event-scoped auxiliary Social-Attention proposal."""
+    await interaction_runtime.prepare_social_attention_context(request)
+    plan = await interaction_runtime.social_attention_planner.plan(request)
+    if plan is None:
+        return SocialAttentionPlan(
+            decision="none",
+            reason="No eligible Social-Attention proposal was available for this event.",
+            metadata={"resolver": "social_attention", "event": request.event},
+        )
+    return plan
 
 
 @app.post("/compose-response-plan")

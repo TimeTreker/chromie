@@ -4,19 +4,25 @@ import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry
+from agent.app.capabilities.validator import validate_args_for_schema
 from agent.app.tool_invocation import (
     AsyncToolInvoker,
     McpStreamableHttpInvoker,
     ToolInvocationContext,
 )
+from shared.chromie_contracts.core_interpretation import CognitiveProgressCandidate
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     SkillRequest,
     SkillResult,
+    SkillTrace,
+    output_schema_sha256,
 )
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
@@ -89,6 +95,26 @@ def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
     except ValueError:
         return default
     return max(minimum, value)
+
+
+@dataclass
+class ReadyCapabilityExecution:
+    """One turn-local trusted read started before canonical Goal planning closes."""
+
+    candidate: CognitiveProgressCandidate
+    interaction_id: str
+    request: SkillRequest
+    task: asyncio.Task[SkillRuntimeResult]
+
+
+@dataclass
+class ReadyNativeResponseExecution:
+    """One Core-authored native response already entering the Speaking lane."""
+
+    candidate: CognitiveProgressCandidate
+    interaction_id: str
+    speech: InteractionSpeech
+    task: asyncio.Task[SkillRuntimeResult]
 
 
 class InteractionRuntimeCoordinator:
@@ -191,6 +217,7 @@ class InteractionRuntimeCoordinator:
         )
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
+        self._preexecuted: dict[tuple[str, str], tuple[SkillResult, SkillTrace | None]] = {}
 
     async def ensure_skill_definitions(self, skill_ids: Iterable[str]) -> None:
         """Refresh provider-backed definitions needed for a canonical plan.
@@ -208,6 +235,350 @@ class InteractionRuntimeCoordinator:
 
     def skill_definition(self, skill_id: str):
         return self.registry.get(skill_id)
+
+    async def start_ready_capability_read(
+        self,
+        candidate: CognitiveProgressCandidate,
+        *,
+        session_id: str,
+        turn_id: str,
+        language: str,
+    ) -> ReadyCapabilityExecution | None:
+        """Start one Core-authored exact read only when trusted readiness is proven.
+
+        The candidate is semantic input, never authorization.  This boundary
+        accepts only registered, available, confirmation-free, side-effect-free
+        safe reads with valid arguments and declared output evidence.
+        """
+
+        if candidate.kind != "capability":
+            return None
+        try:
+            await self.ensure_skill_definitions([candidate.capability_id])
+            definition = self.skill_definition(candidate.capability_id)
+        except (ValueError, RuntimeError):
+            return None
+        metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
+        if (
+            not definition.available
+            or definition.requires_confirmation
+            or definition.requires_safety_monitor
+            or str(metadata.get("safety_class") or "") != "safe_read"
+            or metadata.get("side_effect_free") is not True
+        ):
+            return None
+        if validate_args_for_schema(candidate.args, definition.input_schema):
+            return None
+        try:
+            schema_digest = output_schema_sha256(definition.output_schema)
+        except (TypeError, ValueError):
+            return None
+
+        request = SkillRequest(
+            request_id=f"ready_{candidate.candidate_id}",
+            skill_id=candidate.capability_id,
+            skill_version=definition.version,
+            args=dict(candidate.args),
+            timing="parallel",
+            timeout_ms=definition.timeout_ms,
+            cancellable=definition.interruptible,
+            requires_confirmation=False,
+            idempotency_key=f"{turn_id}:{candidate.candidate_id}",
+            committed_output_schema_sha256=schema_digest,
+            metadata={
+                "source": "core_readiness_candidate",
+                "progress_candidate_id": candidate.candidate_id,
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "safety_class": "safe_read",
+                "effectful": False,
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+            },
+        )
+        interaction_id = f"ready_{turn_id}_{candidate.candidate_id}"
+        response = InteractionResponse(
+            interaction_id=interaction_id,
+            status="ok",
+            skills=[request],
+            metadata={
+                "source": "core_readiness_candidate",
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+            },
+        )
+        # SkillRuntime is the trusted execution boundary; this provisional call
+        # intentionally bypasses canonical Interaction Ledger commitment because
+        # Goal Association has not yet attached the work to a canonical Goal.
+        task = asyncio.create_task(self.runtime.execute(response))
+        return ReadyCapabilityExecution(candidate, interaction_id, request, task)
+
+    async def start_ready_native_response(
+        self,
+        candidate: CognitiveProgressCandidate,
+        *,
+        session_id: str,
+        turn_id: str,
+        language: str,
+    ) -> ReadyNativeResponseExecution | None:
+        """Start one complete native conversational answer through chromie.speak.
+
+        The Core owns the semantic judgment that current Mind/context is already
+        sufficient.  Trusted runtime still owns delivery mechanics and evidence.
+        The response is deliberately Goal-unbound until Goal Association later
+        binds the candidate to canonical conversational Goals.
+        """
+
+        if candidate.kind != "native_response":
+            return None
+        text = " ".join(candidate.response_text.strip().split())
+        if not text:
+            return None
+        speech = InteractionSpeech(
+            id=f"ready_speech_{candidate.candidate_id}",
+            text=text,
+            timing="immediate",
+            style="brief",
+            priority="normal",
+            interruptible=True,
+            metadata={
+                "source": "core_native_response_readiness",
+                "phase": "native_response",
+                "speech_act": candidate.speech_act,
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "progress_candidate_id": candidate.candidate_id,
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+                "execution_lane": "speaking",
+                "delivery_role": "response",
+                "wait_for_playback_start": True,
+                "playback_start_required_for_delivery": True,
+            },
+        )
+        interaction_id = f"ready_native_{turn_id}_{candidate.candidate_id}"
+        response = InteractionResponse(
+            interaction_id=interaction_id,
+            status="ok",
+            speech=[speech],
+            metadata={
+                "source": "core_native_response_readiness",
+                "turn_id": turn_id,
+                "session_id": session_id,
+                "language": language,
+                "progress_candidate_id": candidate.candidate_id,
+                "canonical_goal_binding_pending": True,
+                "goal_completion_authority": False,
+            },
+        )
+        task = asyncio.create_task(self.runtime.execute(response))
+        return ReadyNativeResponseExecution(candidate, interaction_id, speech, task)
+
+    async def cancel_ready_native_response(
+        self, handle: ReadyNativeResponseExecution
+    ) -> None:
+        if handle.task.done():
+            return
+        handle.task.cancel()
+        await asyncio.gather(handle.task, return_exceptions=True)
+
+    async def bind_ready_native_response(
+        self,
+        handle: ReadyNativeResponseExecution,
+        *,
+        canonical_interaction_id: str,
+        canonical_speech: InteractionSpeech,
+    ) -> bool:
+        """Rebind one delivered/pending native response to canonical speech once."""
+
+        if (
+            handle.candidate.kind != "native_response"
+            or canonical_speech.text != handle.speech.text
+        ):
+            await self.cancel_ready_native_response(handle)
+            return False
+        execution_outcome = (
+            await asyncio.gather(handle.task, return_exceptions=True)
+        )[0]
+        if isinstance(execution_outcome, BaseException):
+            return False
+        result = next(
+            (
+                item
+                for item in execution_outcome.results
+                if item.request_id == handle.speech.id
+                and item.skill_id == "chromie.speak"
+            ),
+            None,
+        )
+        if result is None:
+            return False
+        trace = next(
+            (
+                item
+                for item in execution_outcome.traces
+                if item.request_id == handle.speech.id
+            ),
+            None,
+        )
+        rebound_result = result.model_copy(
+            deep=True,
+            update={
+                "request_id": canonical_speech.id,
+                "capability_id": "chromie.speak",
+                "metadata": {
+                    **dict(result.metadata or {}),
+                    "readiness_candidate_reused": True,
+                    "progress_candidate_id": handle.candidate.candidate_id,
+                },
+            },
+        )
+        rebound_trace = (
+            trace.model_copy(
+                deep=True,
+                update={
+                    "interaction_id": canonical_interaction_id,
+                    "request_id": canonical_speech.id,
+                    "capability_id": "chromie.speak",
+                },
+            )
+            if trace is not None
+            else None
+        )
+        self._preexecuted[(canonical_interaction_id, canonical_speech.id)] = (
+            rebound_result,
+            rebound_trace,
+        )
+        return True
+
+    async def cancel_ready_capability_read(
+        self, handle: ReadyCapabilityExecution
+    ) -> None:
+        if handle.task.done():
+            return
+        handle.task.cancel()
+        await asyncio.gather(handle.task, return_exceptions=True)
+
+    @staticmethod
+    def _ready_matches_request(
+        handle: ReadyCapabilityExecution,
+        request: SkillRequest,
+    ) -> bool:
+        return bool(
+            request.skill_id == handle.request.skill_id
+            and request.skill_version == handle.request.skill_version
+            and request.args == handle.request.args
+            and request.committed_output_schema_sha256
+            == handle.request.committed_output_schema_sha256
+        )
+
+    async def bind_ready_capability_read(
+        self,
+        handle: ReadyCapabilityExecution,
+        *,
+        canonical_interaction_id: str,
+        canonical_request: SkillRequest,
+    ) -> bool:
+        """Bind one finished early read to an exact canonical request one time."""
+
+        if not self._ready_matches_request(handle, canonical_request):
+            await self.cancel_ready_capability_read(handle)
+            return False
+        execution_outcome = (
+            await asyncio.gather(handle.task, return_exceptions=True)
+        )[0]
+        if isinstance(execution_outcome, BaseException):
+            return False
+        execution = execution_outcome
+        result = next(
+            (item for item in execution.results if item.request_id == handle.request.request_id),
+            None,
+        )
+        if result is None:
+            return False
+        trace = next(
+            (item for item in execution.traces if item.request_id == handle.request.request_id),
+            None,
+        )
+        rebound_result = result.model_copy(
+            deep=True,
+            update={
+                "request_id": canonical_request.request_id,
+                "capability_id": canonical_request.capability_id,
+                "skill_version": canonical_request.skill_version,
+                "metadata": {
+                    **dict(result.metadata or {}),
+                    "readiness_candidate_reused": True,
+                    "progress_candidate_id": handle.candidate.candidate_id,
+                },
+            },
+        )
+        rebound_trace = (
+            trace.model_copy(
+                deep=True,
+                update={
+                    "interaction_id": canonical_interaction_id,
+                    "request_id": canonical_request.request_id,
+                    "capability_id": canonical_request.capability_id,
+                },
+            )
+            if trace is not None
+            else None
+        )
+        self._preexecuted[(canonical_interaction_id, canonical_request.request_id)] = (
+            rebound_result,
+            rebound_trace,
+        )
+        return True
+
+    def _consume_preexecuted(
+        self, response: InteractionResponse
+    ) -> tuple[InteractionResponse, list[SkillResult], list[SkillTrace]]:
+        consumed_results: list[SkillResult] = []
+        consumed_traces: list[SkillTrace] = []
+        remaining_skills: list[SkillRequest] = []
+        remaining_speech: list[InteractionSpeech] = []
+
+        def consume(request_id: str) -> bool:
+            seeded = self._preexecuted.pop(
+                (response.interaction_id, request_id),
+                None,
+            )
+            if seeded is None:
+                return False
+            result, trace = seeded
+            consumed_results.append(result)
+            if trace is not None:
+                consumed_traces.append(trace)
+            return True
+
+        for request in response.skills:
+            if not consume(request.request_id):
+                remaining_skills.append(request)
+        for speech in response.speech:
+            if not consume(speech.id):
+                remaining_speech.append(speech)
+        if (
+            len(remaining_skills) == len(response.skills)
+            and len(remaining_speech) == len(response.speech)
+        ):
+            return response, consumed_results, consumed_traces
+        return (
+            response.model_copy(
+                deep=True,
+                update={
+                    "skills": remaining_skills,
+                    "speech": remaining_speech,
+                },
+            ),
+            consumed_results,
+            consumed_traces,
+        )
 
     async def execute(
         self,
@@ -354,12 +725,36 @@ class InteractionRuntimeCoordinator:
             if gated_requests and after_skills_speech
             else prepared
         )
-        execution = await self.runtime.execute(
-            primary,
-            authorization=RuntimeAuthorization(
-                confirmed_request_ids=authorized_request_ids,
-            ),
+        primary, preexecuted_results, preexecuted_traces = self._consume_preexecuted(
+            primary
         )
+        if primary.skills or primary.speech:
+            execution = await self.runtime.execute(
+                primary,
+                authorization=RuntimeAuthorization(
+                    confirmed_request_ids=authorized_request_ids,
+                ),
+            )
+        else:
+            execution = SkillRuntimeResult(
+                interaction_id=prepared.interaction_id,
+                status="completed",
+            )
+        if preexecuted_results:
+            merged_results = [*preexecuted_results, *execution.results]
+            merged_traces = [*preexecuted_traces, *execution.traces]
+            execution = execution.model_copy(
+                update={
+                    "results": merged_results,
+                    "traces": merged_traces,
+                    "status": (
+                        "completed"
+                        if merged_results
+                        and all(item.status == "completed" for item in merged_results)
+                        else execution.status
+                    ),
+                }
+            )
         if not gated_requests:
             return execution
 

@@ -101,7 +101,12 @@ class _AgreementOllama:
 
 class _SocialAttentionOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs["response_format"] == "json"
+        schema = kwargs["response_format"]
+        assert isinstance(schema, dict)
+        behavior = schema["$defs"]["SocialAttentionBehavior"]
+        assert behavior["properties"]["capability_id"]["enum"] == [
+            "soridormi.express_attention"
+        ]
         assert "eligible_social_capabilities" in prompt
         return {
             "decision": "express",
@@ -114,7 +119,7 @@ class _SocialAttentionOllama:
             },
             "behaviors": [
                 {
-                    "skill_id": "soridormi.express_attention",
+                    "capability_id": "soridormi.express_attention",
                     "args": {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
                     "timing": "parallel",
                     "reason": "A subtle attention cue supports the spoken reply.",
@@ -127,7 +132,11 @@ class _SocialAttentionOllama:
 
 class _SocialAttentionNoneOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs["response_format"] == "json"
+        schema = kwargs["response_format"]
+        assert isinstance(schema, dict)
+        assert schema["$defs"]["SocialAttentionBehavior"]["properties"]["capability_id"]["enum"] == [
+            "soridormi.express_attention"
+        ]
         return {
             "decision": "none",
             "target": {"target_ref": "none", "source": "none", "confidence": 0.0, "metadata": {}},

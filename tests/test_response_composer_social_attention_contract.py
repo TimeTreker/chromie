@@ -126,6 +126,10 @@ class ResponseComposerSocialAttentionContractTests(
             "decision",
             schema["$defs"]["SocialAttentionPlan"]["required"],
         )
+        self.assertEqual(
+            schema["$defs"]["SocialAttentionBehavior"]["properties"]["capability_id"]["enum"],
+            ["soridormi.blink_eyes"],
+        )
 
     def test_schema_keeps_explicit_null_for_policy_off(self) -> None:
         schema = ResponseComposerResolver._response_schema(

@@ -535,13 +535,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
             with self.subTest(role=role):
                 self.assertRegex(
                     launcher,
-                    rf"{re.escape(role)}\s+\| \$\{{{variable}\}}",
+                    rf"{re.escape(role)}\s+\| \$\{{{variable}\}}\s+\|",
                 )
-        self.assertIn("Role                               | Model", launcher)
         self.assertIn(
-            "-----------------------------------+--------------------------------",
+            "Role                               | Model                            | Maintained runtime use",
             launcher,
         )
+        self.assertIn("independent peer event lane", launcher)
+        self.assertIn("skipped by pure ready reads", launcher)
         summary_index = launcher.index("Effective cognitive model roles:")
         self.assertGreater(
             summary_index,

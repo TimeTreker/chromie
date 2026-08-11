@@ -28,6 +28,7 @@ from .agent_skill import (
 )
 from .route import MemoryUpdateProposal, RouteDecision, RouteItem, RouteRequest
 from .core_interpretation import (
+    CognitiveProgressCandidate,
     CoreInterpretationResult,
     CoreInterpretationUnavailable,
 )
@@ -155,6 +156,7 @@ from .social_attention import (
     SocialAttentionSpeechExpression,
     SocialAttentionTarget,
     normalize_social_attention_mode,
+    SocialAttentionRequest,
 )
 from .discourse import (
     DiscourseReferenceSource,
@@ -171,6 +173,7 @@ from .goal import (
     ActiveGoalSnapshot,
     GoalAssociation,
     GoalAssociationResolution,
+    GoalProgressBinding,
     GoalRelationship,
     GoalSet,
     GoalVersionRef,
@@ -340,6 +343,7 @@ __all__ = [
     "SocialAttentionBehavior",
     "SocialAttentionMode",
     "SocialAttentionPlan",
+    "SocialAttentionRequest",
     "SocialAttentionSpeechExpression",
     "SocialAttentionTarget",
     "normalize_social_attention_mode",

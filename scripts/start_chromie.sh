@@ -488,19 +488,19 @@ fi
 
 cat <<EOF_MODEL_ROLES
 [chromie] Effective cognitive model roles:
-Role                               | Model
------------------------------------+--------------------------------
-Cognitive Gateway attention        | ${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL}
-Fast intent (Goal Interpreter)     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL}
-Goal Interpreter review            | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL}
-Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
-Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL}
-Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL}
-Response Composer                  | ${EFFECTIVE_RESPONSE_COMPOSER_MODEL}
-Tool Result Interpreter            | ${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL}
-Task Continuity                    | ${EFFECTIVE_TASK_CONTINUITY_MODEL}
-Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
-Response Review                    | ${EFFECTIVE_RESPONSE_REVIEW_MODEL}
+Role                               | Model                            | Maintained runtime use
+-----------------------------------+----------------------------------+----------------------------------------------
+Cognitive Gateway attention        | ${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL} | ingress attention review
+Fast intent (Goal Interpreter)     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL} | fast understanding / readiness candidates
+Goal Interpreter review            | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL} | bounded semantic review/repair when required
+Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL} | Goal continuity and candidate binding
+Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL} | fallback when readiness does not fully cover Goals
+Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | semantic escalation / bounded replan only
+Response Composer                  | ${EFFECTIVE_RESPONSE_COMPOSER_MODEL} | response-required paths; skipped by pure ready reads
+Tool Result Interpreter            | ${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL} | post-evidence grounded delivery
+Task Continuity                    | ${EFFECTIVE_TASK_CONTINUITY_MODEL} | compatibility/auxiliary surface
+Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL} | independent peer event lane
+Response Review                    | ${EFFECTIVE_RESPONSE_REVIEW_MODEL} | optional semantic response review
 EOF_MODEL_ROLES
 
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE

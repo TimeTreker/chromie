@@ -944,6 +944,43 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(manager.active_goal_snapshots(), [])
 
+    def test_planless_native_response_goal_waits_for_scoped_speaking_evidence(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="native-respond-lifecycle")
+        self._create_goals(manager, "goal-native-answer")
+        response = InteractionResponse(
+            speech=[
+                {
+                    "id": "speech-native-answer",
+                    "text": "I'm Chromie!",
+                    "metadata": {
+                        "covers_goal_ids": ["goal-native-answer"],
+                        "source_goal_ids": ["goal-native-answer"],
+                        "progress_candidate_id": "progress-native-answer",
+                    },
+                }
+            ],
+            metadata={
+                "planning_result": "direct_response",
+                "planless_direct_response": True,
+                "native_response_readiness_adoption": True,
+                "goal_ids": ["goal-native-answer"],
+            },
+        )
+
+        manager.record_agent_result("sid-native-answer", response)
+
+        active = manager.active_goal_snapshots()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["goal_id"], "goal-native-answer")
+        self.assertEqual(active[0]["status"], "scheduled")
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="speech-native-answer",
+                status="completed",
+            )
+        )
+        self.assertEqual(manager.active_goal_snapshots(), [])
+
     def test_clarify_goal_remains_active_after_clarification_speech(self) -> None:
         manager = ConversationStateManager(base_conversation_id="clarify-lifecycle")
         self._create_goals(manager, "goal-clarify")

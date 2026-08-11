@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 try:
     from chromie_contracts.interaction import OptionalCapabilityIdentityModel
@@ -143,6 +143,52 @@ class RouteItem(OptionalCapabilityIdentityModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class FastProgressProposal(BaseModel):
+    """Model-facing progress already understood by Fast Goal Interpretation.
+
+    The proposal is semantic evidence only.  Host/runtime decides whether the
+    proposed progress is locally ready, and Goal Association later binds it to
+    canonical Goals.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["capability", "native_response"]
+    capability_id: str = Field(default="", max_length=200)
+    args: dict[str, Any] = Field(default_factory=dict)
+    response_text: str = Field(default="", max_length=600)
+    speech_act: str = Field(default="inform", min_length=1, max_length=120)
+    intent: str = Field(default="unknown", min_length=1, max_length=200)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator(
+        "capability_id",
+        "response_text",
+        "speech_act",
+        "intent",
+        mode="before",
+    )
+    @classmethod
+    def normalize_progress_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @model_validator(mode="after")
+    def validate_progress_shape(self) -> "FastProgressProposal":
+        if self.kind == "capability":
+            if not self.capability_id:
+                raise ValueError("capability progress requires capability_id")
+            if self.response_text:
+                raise ValueError("capability progress must not carry response_text")
+            return self
+        if self.capability_id or self.args:
+            raise ValueError("native_response progress must not carry capability work")
+        if not self.response_text:
+            raise ValueError("native_response progress requires response_text")
+        return self
+
+
 class RouteDecision(BaseModel):
     """Structured decision consumed by host orchestrator."""
 
@@ -158,6 +204,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     fast_speech: FastSpeech | None = None
+    progress: list[FastProgressProposal] = Field(default_factory=list, max_length=8)
     memory_update: MemoryUpdateProposal | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)

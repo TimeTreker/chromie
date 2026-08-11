@@ -1397,19 +1397,19 @@ class OllamaGoalInterpreter:
             f"Active Task/Progress Snapshot JSON:{active_tasks_json}\n\n"
             f"{recent_goals_section}"
             "Current Job:\n"
-            "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter ran. Decide from meaning, bounded context. Terminal references do not reopen Goals. Memory writes use route=memory; supplied-memory recall uses route=chat. This is bounded cognitive evidence, not final goal meaning. Return calibrated confidence; do not answer, execute, or authorize side effects.\n\n"
+            "fast goal-interpretation and lane proposer with readiness candidates. The deterministic emergency/noise filter ran. Decide from meaning, bounded context. This is bounded cognitive evidence, not final goal meaning. Return calibrated confidence; never execute or authorize side effects. Terminal references do not reopen Goals. Memory write=memory; recall=chat. If current Mind/context fully answers ordinary conversation, put it only in progress as kind=native_response; otherwise do not answer.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
-            "Use bounded recent accepted dialogue, active/recent Goals, Tasks/progress, discourse, and Interaction Context; resolve continuity by meaning, not lexical shortcuts or recency, and emit only the still-needed delta. Keep newer failed/goal-less dialogue salient. Fast speech is the first Goal Progress Communication milestone: for understood nontrivial downstream work, normally give one tiny polite prospective acknowledgement. Missing results limit claims, not responsiveness; an external truth check may say it is being checked but must not assert the proposition before evidence. Omit for an immediate answer, equivalent notification delivered/pending, requested silence, or empty repetition. Heard speech and trusted terminal effects count as done; scheduled/planned work does not. Preserve exact corrected bindings; clarify only real ambiguity.\n"
+            "Use bounded dialogue, active/recent Goals, task progress, discourse, and Interaction Context; resolve by meaning, not lexical shortcuts, and emit the still-needed delta. Keep newer failed/goal-less dialogue salient. fast_speech is the first Goal Progress Communication milestone: normally one tiny polite acknowledgement; missing results limit claims, not responsiveness. An external truth check may acknowledge checking but never assert its result before evidence. Omit for an immediate answer, equivalent notification delivered/pending, silence, or repetition. Heard speech/trusted terminal effects are done; scheduled/planned work is not. Preserve exact corrected bindings; clarify real ambiguity.\n"
             "Capability Affordance Proposal:\n"
-            "Treat the Common Ability Catalog as a compact body/tool affordance interface: candidate proposals, not authoritative grounding and not a phrase table. capability_inquiry is only about Chromie's abilities. Availability questions stay chat; supported execution requests use robot_action. Bind exact capabilities only for clear execution methods. One parameterized capability may leave args to CapabilityAgent; compound explicit capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify. Missing or ambiguous methods preserve an open goal for CapabilityAgent. For current external facts, choose an available trusted lookup capability by meaning and context; do not map a topic keyword to a tool. Exact match: route=tool and intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or emit low-level motor/control fields.\n\n"
+            "Treat the Common Ability Catalog as a compact body/tool affordance interface: proposals, not authoritative grounding and not a phrase table. capability_inquiry=abilities; availability=chat; execution=robot_action. Bind exact methods. One parameterized capability may leave args to CapabilityAgent; compound capabilities may use actions[]. Isolated letters and low-information ASR fragments clarify; missing/ambiguous methods keep an open goal for CapabilityAgent. Clear supplied capability+material args may enter progress as kind=capability with exact ID+args; this is not authorization, runtime decides readiness from the live contract. If current Mind/context fully answers conversation, progress may use kind=native_response with complete answer+speech_act; never while external/private/runtime evidence, memory retrieval, unresolved references, effects, or deeper reasoning remain. Current external facts use trusted lookup by meaning/context: route=tool, intent=capability:<exact capability_id>. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never invent args, claim completion, or emit low-level controls.\n\n"
             "Cost Function:\n"
-            "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
+            "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech. fast_speech is one short natural notification or null; never omit the decision. Follow the bounded owner-approved fast voice profile: sound like the same child/family person as later speech, not customer-service, workflow-status, or technical-operator prose. The notification may say what Chromie understood or will check, but cannot assert an unobserved result, execution, or completion. Use null for an immediate answer, an equivalent delivered/pending notification, requested silence, or empty repetition. Host derives the typed claim envelope. memory writes use route=memory; supplied-memory recall uses chat. memory_update defaults session/ephemeral; durable profile needs explicit current-turn consent. routes[] split responsibilities; actions[] are only explicit capabilities with exact IDs and typed args (\"confidence\":0.0 marks unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. progress=[] or kind=capability exact supplied ID+args / kind=native_response complete conversational answer. fast_speech is one short progress notification or null; null for native immediate answer, equivalent delivered/pending speech, silence, or repetition. Follow the owner-approved fast voice profile: same child/family person, not customer-service/workflow/technical prose. Never claim unobserved result, execution, or completion. Host derives the typed claim envelope. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs and typed args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
@@ -1421,6 +1421,13 @@ class OllamaGoalInterpreter:
         # null rather than by omitting the responsibility. Keep the model-facing
         # choice semantic and small: the Host materializes the deterministic
         # claim envelope after decoding.
+        progress = properties.get("progress")
+        if isinstance(progress, dict):
+            progress["description"] = (
+                "Required bounded readiness proposals. Use [] when no part is already "
+                "safe/complete enough to progress from current cognition. native_response "
+                "is a substantive conversational answer, never a progress acknowledgement."
+            )
         properties["fast_speech"] = {
             "anyOf": [
                 {"type": "string", "minLength": 1, "maxLength": 120},
@@ -1439,6 +1446,7 @@ class OllamaGoalInterpreter:
                     "intent",
                     "confidence",
                     "fast_speech",
+                    "progress",
                 ]
             )
         )

@@ -11,6 +11,7 @@ from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
+from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -365,6 +366,41 @@ class AgentClient:
                 result = ToolResultInterpretation.model_validate_json(body)
             span.set_attribute("result_status", result.status)
             span.set_attribute("selected_fact_count", len(result.selected_facts))
+            return result
+
+    async def resolve_social_attention(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: SocialAttentionRequest,
+        timeout_ms: int | None = None,
+    ) -> SocialAttentionPlan:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_social_attention",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/social-attention/plan",
+                "timeout_ms": effective_timeout_ms,
+                "event": request.event,
+            },
+        ) as span:
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/social-attention/plan",
+                json=request.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent social-attention endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = SocialAttentionPlan.model_validate_json(body)
+            span.set_attribute("decision", result.decision)
+            span.set_attribute("behavior_count", len(result.behaviors))
             return result
 
     async def resolve_goal_association(

@@ -324,16 +324,18 @@ class InteractionRuntime(_AgentPipeline):
         mode = self.services.effective_social_attention_mode()
         # Policy is host-owned runtime context, not a model preference. Clear any
         # caller-supplied/stale candidates before rebuilding the eligible view.
+        peer_owned = request.context.get("social_attention_owned_by_peer_lane") is True
         request.context["social_attention_policy"] = {
-            "mode": mode,
-            "planning_enabled": mode != "off",
-            "execution_enabled": mode == "on",
+            "mode": "off" if peer_owned else mode,
+            "planning_enabled": mode != "off" and not peer_owned,
+            "execution_enabled": mode == "on" and not peer_owned,
             "embodiment_independent": True,
+            "owner": "peer_lane" if peer_owned else "local_request",
         }
         request.context.pop("social_attention_candidates", None)
         request.context.pop("social_attention_candidate_source", None)
         request.context.pop("social_attention_target_evidence", None)
-        if mode == "off":
+        if mode == "off" or peer_owned:
             return
         catalog = self.services.capability_catalog
         if catalog is None:
@@ -446,11 +448,8 @@ class InteractionRuntime(_AgentPipeline):
                 self._social_attention_target_evidence(request)
             )
 
-    async def prepare_response_composition_context(
-        self,
-        request: AgentRunRequest,
-    ) -> None:
-        """Attach bounded owner policy, evidence, and candidate context."""
+    async def prepare_social_attention_context(self, request: Any) -> None:
+        """Attach the bounded stable/social projection for one Social-Attention event."""
 
         mind = request.context.get("mind")
         style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
@@ -470,6 +469,14 @@ class InteractionRuntime(_AgentPipeline):
             request.context["recent_auxiliary_behavior_evidence"] = []
 
         await self._ensure_social_attention_candidates(request)
+
+    async def prepare_response_composition_context(
+        self,
+        request: AgentRunRequest,
+    ) -> None:
+        """Attach bounded owner policy, evidence, and candidate context."""
+
+        await self.prepare_social_attention_context(request)
 
     def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
         for key in ("social_attention_target", "active_user_target", "perceived_user_target"):
