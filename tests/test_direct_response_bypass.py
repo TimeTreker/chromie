@@ -199,7 +199,7 @@ class DirectResponseComposerTests(unittest.TestCase):
                     "decision": "express",
                     "behaviors": [],
                     "reason": "A warm response is appropriate.",
-                    "metadata": {"speech_expression": "mode=adapt"},
+                    "metadata": {"decorative_intent": "warm"},
                 },
                 "confidence": 0.96,
                 "rationale": "The spoken answer completes the direct goal.",

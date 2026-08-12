@@ -425,15 +425,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    alternatives, or broader value reasoning may escalate to Deep cognition, but
    escalation cannot weaken an already applicable safety or authorization
    boundary.
-29. **Social Attention is continuous interaction behavior, not a response
-   decoration.** Social Attention may react to listening, attention changes,
-   sufficient understanding, work starting, waiting, new evidence, failure,
-   completion, interruption, and speaking. It remains an auxiliary proposal lane:
-   it does not create Goals, decide user meaning, authorize effects, or become a
-   second conversation manager. Speech composition may coordinate an expression
-   with a response, but response composition is not the exclusive time or place
-   at which Social Attention may occur. Optional Social Attention must not become
-   an unnecessary execution dependency for otherwise-ready work.
+29. **Social Attention is background social decoration, not a Goal or execution
+   lane.** While Chromie is already engaged in a socially meaningful state such
+   as listening, Vocal output, Activity, turn-taking, or interaction-bound
+   waiting, Social Attention may add small contextual embodied cues such as gaze,
+   blink, nod, a small wave, or slight posture/orientation. Decoration is
+   optional, interruptible, non-disruptive, subordinate, and fail-soft: it must
+   not author or alter response meaning, create or satisfy a Goal, delay or fail
+   primary work, weaken confirmation/safety, or appear in Vocal/Activity lane
+   coordination. Accepted body decoration executes through Activity with an
+   explicit auxiliary role and no Goal-completion authority. The same physical
+   Capability is ordinary Activity when explicitly requested by the user. A
+   social event important enough to change what Chromie should do must escalate
+   through normal Cognitive Core / Goal reasoning rather than through the
+   decoration plan. Social Attention is not a generic idle-animation loop;
+   unanchored baseline embodiment belongs to a separate concern.
 
 ### One personal voice; resources constrain coexistence
 

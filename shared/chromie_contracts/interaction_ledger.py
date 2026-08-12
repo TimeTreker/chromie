@@ -14,7 +14,7 @@ InteractionEventOwner = Literal[
     "trusted_capability_runtime",
     "execution_closure",
 ]
-InteractionEventLane = Literal[
+InteractionEventDomain = Literal[
     "cognition",
     "vocal",
     "activity",
@@ -42,13 +42,13 @@ InteractionEventType = Literal[
     "activity_timed_out",
     "activity_refused",
     "activity_not_run",
-    "social_action_committed",
-    "social_action_completed",
-    "social_action_failed",
-    "social_action_cancelled",
-    "social_action_timed_out",
-    "social_action_refused",
-    "social_action_not_run",
+    "social_decoration_committed",
+    "social_decoration_completed",
+    "social_decoration_failed",
+    "social_decoration_cancelled",
+    "social_decoration_timed_out",
+    "social_decoration_refused",
+    "social_decoration_not_run",
 ]
 
 
@@ -94,7 +94,7 @@ class InteractionLedgerEvent(BaseModel):
     turn_id: str = Field(default="", max_length=200)
     interaction_id: str = Field(default="", max_length=200)
     owner: InteractionEventOwner
-    lane: InteractionEventLane
+    domain: InteractionEventDomain
     event_type: InteractionEventType
     state: str = Field(min_length=1, max_length=80)
     goal_ids: list[str] = Field(default_factory=list, max_length=16)
@@ -139,7 +139,7 @@ class InteractionLedgerEvent(BaseModel):
     @model_validator(mode="after")
     def validate_owner_boundary(self) -> "InteractionLedgerEvent":
         if self.event_type.startswith("speech_"):
-            if self.owner != "playback_delivery" or self.lane != "vocal":
+            if self.owner != "playback_delivery" or self.domain != "vocal":
                 raise ValueError(
                     "speech events must be owned by playback_delivery in the "
                     "Vocal lane"
@@ -150,7 +150,7 @@ class InteractionLedgerEvent(BaseModel):
                 if self.event_type == "vocal_action_committed"
                 else "execution_closure"
             )
-            if self.owner != expected_owner or self.lane != "vocal":
+            if self.owner != expected_owner or self.domain != "vocal":
                 raise ValueError(
                     "provider-backed Vocal events must retain their trusted "
                     "runtime owner"
@@ -161,22 +161,22 @@ class InteractionLedgerEvent(BaseModel):
                 if self.event_type == "activity_committed"
                 else "execution_closure"
             )
-            if self.owner != expected_owner or self.lane != "activity":
+            if self.owner != expected_owner or self.domain != "activity":
                 raise ValueError(
                     "activity events must retain their trusted runtime owner"
                 )
-        elif self.event_type.startswith("social_action_"):
+        elif self.event_type.startswith("social_decoration_"):
             if (
                 self.owner != "trusted_capability_runtime"
-                or self.lane != "social_attention"
+                or self.domain != "social_attention"
             ):
                 raise ValueError(
-                    "social action events must be owned by the trusted "
+                    "social decoration events must be owned by the trusted "
                     "capability runtime"
                 )
         elif (
             self.owner != "cognitive_runtime"
-            or self.lane != "cognition"
+            or self.domain != "cognition"
         ):
             raise ValueError(
                 "goal and plan events must be owned by cognitive_runtime"
@@ -214,7 +214,7 @@ class InteractionContextProjection(BaseModel):
     pending_speech: list[dict[str, Any]] = Field(default_factory=list)
     activity: list[dict[str, Any]] = Field(default_factory=list)
     vocal_actions: list[dict[str, Any]] = Field(default_factory=list)
-    social_actions: list[dict[str, Any]] = Field(default_factory=list)
+    social_decorations: list[dict[str, Any]] = Field(default_factory=list)
     goal_history: list[dict[str, Any]] = Field(default_factory=list)
     unresolved: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -229,7 +229,7 @@ class InteractionContextProjection(BaseModel):
         "pending_speech",
         "activity",
         "vocal_actions",
-        "social_actions",
+        "social_decorations",
         "goal_history",
         "unresolved",
     )
@@ -243,7 +243,7 @@ class InteractionContextProjection(BaseModel):
 
 __all__ = [
     "InteractionContextProjection",
-    "InteractionEventLane",
+    "InteractionEventDomain",
     "InteractionEventOwner",
     "InteractionEventType",
     "InteractionLedgerEvent",

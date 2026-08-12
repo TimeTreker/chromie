@@ -156,37 +156,6 @@ def collect_observations(
             }
         )
 
-    cognitive = summary.get("cognitive_runtime")
-    if not isinstance(cognitive, dict):
-        cognitive = {}
-    composition = cognitive.get("response_composition")
-    if not isinstance(composition, dict):
-        composition = {}
-    coordinated = composition.get("composition")
-    if not isinstance(coordinated, dict):
-        coordinated = {}
-    attention = coordinated.get("social_attention_plan")
-    if not isinstance(attention, dict):
-        attention = {}
-    speech_expression = attention.get("speech_expression")
-    if isinstance(speech_expression, dict) and speech_expression.get("mode") == "adapt":
-        observations.append(
-            {
-                "sequence": max(
-                    (int(item.get("sequence", -1)) for item in observations),
-                    default=-1,
-                ) + 1,
-                "type": "social_attention.speech_expression",
-                "domain": "social_attention",
-                "status": "completed" if response.get("speech") else "planned",
-                "interaction_role": "auxiliary_expression",
-                "args": {
-                    "purpose": attention.get("purpose"),
-                    "style": speech_expression.get("style"),
-                    "pacing": speech_expression.get("pacing"),
-                },
-            }
-        )
     observations.sort(
         key=lambda item: (
             int(item.get("sequence", 0)),

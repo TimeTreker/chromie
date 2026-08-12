@@ -46,9 +46,9 @@ SocialAttentionEvent = Literal[
 
 
 class SocialAttentionRequest(BaseModel):
-    """One event-scoped projection for the independent Social-Attention lane.
+    """One event-scoped projection for background Social Attention.
 
-    The request carries interaction state, not user-goal authority.  It deliberately
+    The request carries an interaction anchor, not user-goal authority. It deliberately
     has no planner disposition, capability authorization, or response text contract.
     """
 
@@ -88,21 +88,10 @@ SocialAttentionPurpose = Literal[
     "neutral_presence",
     "other",
 ]
-SocialAttentionSpeechMode = Literal["none", "adapt"]
-SocialAttentionSpeechStyle = Literal[
-    "neutral",
-    "brief",
-    "warm",
-    "calm",
-    "encouraging",
-    "empathetic",
-    "playful",
-]
-SocialAttentionSpeechPacing = Literal["normal", "slower", "faster"]
 
 
 class SocialAttentionTarget(BaseModel):
-    """Evidence-backed target for social-attention expression."""
+    """Evidence-backed target for social-attention decoration."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -129,56 +118,20 @@ class SocialAttentionTarget(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class SocialAttentionSpeechExpression(BaseModel):
-    """Model-authored language-expression guidance coordinated with ResponsePlan.
-
-    This object does not contain a second response or override task semantics.
-    The Response Composer authors the actual ResponsePlan text and uses this
-    guidance to choose tone and pacing for the current scene.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    mode: SocialAttentionSpeechMode = "none"
-    style: SocialAttentionSpeechStyle = "neutral"
-    pacing: SocialAttentionSpeechPacing = "normal"
-    reason: str | None = None
-
-    @field_validator("reason")
-    @classmethod
-    def normalize_reason(cls, value: str | None) -> str | None:
-        normalized = " ".join((value or "").strip().split())
-        return normalized or None
-
-    @model_validator(mode="after")
-    def validate_mode(self) -> "SocialAttentionSpeechExpression":
-        if self.mode == "none" and (
-            self.style != "neutral" or self.pacing != "normal" or self.reason
-        ):
-            raise ValueError(
-                "speech_expression mode=none must use neutral style, normal pacing, and no reason"
-            )
-        return self
-
-
 class SocialAttentionBehavior(CapabilityIdentityModel):
-    """One model-authored body expression selected from the live catalog."""
+    """One optional decorative body expression selected from the live catalog."""
 
     args: dict[str, Any] = Field(default_factory=dict)
     timing: SocialAttentionSkillTiming = "parallel"
     social_function: str | None = None
     reason: str | None = None
-    coordination_id: str | None = Field(
-        default=None,
-        exclude_if=lambda value: value is None,
-    )
 
     @field_validator("args")
     @classmethod
     def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
-    @field_validator("social_function", "reason", "coordination_id")
+    @field_validator("social_function", "reason")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         normalized = " ".join((value or "").strip().split())
@@ -186,14 +139,13 @@ class SocialAttentionBehavior(CapabilityIdentityModel):
 
 
 class SocialAttentionPlan(BaseModel):
-    """Advisory model-authored social-attention expression plan.
+    """Advisory model-authored Social Attention decoration plan.
 
-    Social attention is a high-level behavior domain, not a fixed skill. The
-    model may adapt language expression, select one or more context-appropriate
-    body behaviors from the supplied catalog, select both, or choose stillness.
-    This contract is only for auxiliary expression; explicit user-requested
-    actions remain authoritative CanonicalPlan goals and cannot be replaced by
-    this optional plan.
+    Social Attention is background cognition that may add small, non-disruptive
+    body expressions around an anchored interaction. It does not author or alter
+    response text, create a Goal, own completion, or become an execution lane.
+    Explicit user-requested actions remain authoritative CanonicalPlan goals and
+    cannot be replaced by this optional decoration plan.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -203,9 +155,6 @@ class SocialAttentionPlan(BaseModel):
     purpose: SocialAttentionPurpose = "neutral_presence"
     decision: SocialAttentionDecision = "none"
     target: SocialAttentionTarget = Field(default_factory=SocialAttentionTarget)
-    speech_expression: SocialAttentionSpeechExpression = Field(
-        default_factory=SocialAttentionSpeechExpression
-    )
     behaviors: list[SocialAttentionBehavior] = Field(default_factory=list, max_length=3)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str | None = None
@@ -224,13 +173,8 @@ class SocialAttentionPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_decision_shape(self) -> "SocialAttentionPlan":
-        has_speech_expression = self.speech_expression.mode == "adapt"
-        if self.decision == "none" and (self.behaviors or has_speech_expression):
-            raise ValueError(
-                "decision=none must not contain body behaviors or adapted speech expression"
-            )
-        if self.decision == "express" and not (self.behaviors or has_speech_expression):
-            raise ValueError(
-                "decision=express requires at least one body behavior or adapted speech expression"
-            )
+        if self.decision == "none" and self.behaviors:
+            raise ValueError("decision=none must not contain decorative body behaviors")
+        if self.decision == "express" and not self.behaviors:
+            raise ValueError("decision=express requires at least one decorative body behavior")
         return self

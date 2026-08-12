@@ -16,9 +16,9 @@ logger = logging.getLogger("chromie-orchestrator")
 class RuntimeReadyGreetingPolicy:
     """Bounded startup-orientation policy.
 
-    ``enabled`` remains the compatibility lifecycle switch.  Non-verbal
-    orientation and startup speech are independent choices: maintained profiles
-    prefer one subtle untargeted orientation and no speech.
+    Non-verbal startup orientation and optional startup speech are independent
+    lifecycle choices. Startup orientation is baseline Activity/liveliness, not
+    Social Attention, because no social interaction anchor exists yet.
     """
 
     enabled: bool
@@ -34,20 +34,18 @@ async def execute_default_runtime_ready_orientation(
     interaction_runtime: Any,
     *,
     enable_soridormi_skills: bool,
-    social_attention_mode: str,
 ) -> dict[str, Any]:
-    """Execute one quiet, untargeted, capability-grounded wake orientation.
+    """Execute one quiet, untargeted, capability-grounded startup orientation.
 
-    Startup has no user turn and no perception evidence. Only the maintained
-    neutral Social Attention capabilities below may be attempted, with
-    provider-declared schemas and no target. Failure remains silent and
-    fail-open; it never produces body-failure speech or an observation claim.
+    Startup has no user turn and no social interaction anchor, so this is
+    baseline lifecycle Activity rather than Social Attention. Only subtle,
+    untargeted expression/orientation capabilities may be attempted. Failure
+    remains silent and fail-open; it never produces body-failure speech or an
+    observation claim.
     """
 
     if not enable_soridormi_skills:
         return {"status": "skipped", "reason": "soridormi_skills_disabled"}
-    if social_attention_mode != "on":
-        return {"status": "skipped", "reason": "social_attention_not_on"}
 
     candidates = (
         (
@@ -72,8 +70,10 @@ async def execute_default_runtime_ready_orientation(
             if definition.requires_confirmation:
                 reasons.append(f"{capability_id}:requires_confirmation")
                 continue
-            if "social_attention" not in behavior_domains:
-                reasons.append(f"{capability_id}:not_social_attention")
+            if not behavior_domains.intersection(
+                {"facial_expression", "posture_expression", "orientation"}
+            ):
+                reasons.append(f"{capability_id}:not_startup_orientation")
                 continue
 
             response = InteractionResponse(
@@ -86,7 +86,8 @@ async def execute_default_runtime_ready_orientation(
                         metadata={
                             "source": "runtime_ready_orientation",
                             "startup_orientation": True,
-                            "auxiliary_social_attention": True,
+                            "execution_lane": "activity",
+                            "execution_role": "startup_orientation",
                             "untargeted": True,
                         },
                     )

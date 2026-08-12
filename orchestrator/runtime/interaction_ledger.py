@@ -13,7 +13,7 @@ from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.interaction import SkillRequest, SkillResult
 from shared.chromie_contracts.interaction_ledger import (
     InteractionContextProjection,
-    InteractionEventLane,
+    InteractionEventDomain,
     InteractionEventOwner,
     InteractionEventType,
     InteractionLedgerEvent,
@@ -41,12 +41,12 @@ _VOCAL_ACTION_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
     "not_run": "vocal_action_not_run",
 }
 _SOCIAL_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
-    "completed": "social_action_completed",
-    "failed": "social_action_failed",
-    "cancelled": "social_action_cancelled",
-    "timed_out": "social_action_timed_out",
-    "refused": "social_action_refused",
-    "not_run": "social_action_not_run",
+    "completed": "social_decoration_completed",
+    "failed": "social_decoration_failed",
+    "cancelled": "social_decoration_cancelled",
+    "timed_out": "social_decoration_timed_out",
+    "refused": "social_decoration_refused",
+    "not_run": "social_decoration_not_run",
 }
 
 
@@ -107,7 +107,7 @@ class InteractionLedger:
         *,
         session_id: str,
         owner: InteractionEventOwner,
-        lane: InteractionEventLane,
+        domain: InteractionEventDomain,
         event_type: InteractionEventType,
         state: str,
         subject_id: str,
@@ -132,7 +132,7 @@ class InteractionLedger:
             raise ValueError("interaction ledger event requires event_id")
         candidate = {
             "owner": owner,
-            "lane": lane,
+            "domain": domain,
             "event_type": event_type,
             "state": _normalized_text(state),
             "subject_id": _normalized_text(subject_id),
@@ -225,7 +225,7 @@ class InteractionLedger:
         return self.append(
             session_id=session_id,
             owner="playback_delivery",
-            lane="vocal",
+            domain="vocal",
             event_type=event_type,
             state=status,
             subject_id=speech_event_id,
@@ -279,7 +279,7 @@ class InteractionLedger:
         return self.append(
             session_id=session_id,
             owner="cognitive_runtime",
-            lane="cognition",
+            domain="cognition",
             event_type="goal_associated",
             state="resolved",
             subject_id=subject_id,
@@ -307,7 +307,7 @@ class InteractionLedger:
         return self.append(
             session_id=session_id,
             owner="cognitive_runtime",
-            lane="cognition",
+            domain="cognition",
             event_type="plan_resolved",
             state=plan.disposition,
             subject_id=plan.plan_id,
@@ -346,13 +346,13 @@ class InteractionLedger:
                 metadata.get("execution_lane") == "vocal" and not social
             )
             event_type: InteractionEventType = (
-                "social_action_committed"
+                "social_decoration_committed"
                 if social
                 else "vocal_action_committed"
                 if vocal
                 else "activity_committed"
             )
-            lane: InteractionEventLane = (
+            domain: InteractionEventDomain = (
                 "social_attention"
                 if social
                 else "vocal"
@@ -367,7 +367,7 @@ class InteractionLedger:
                 self.append(
                     session_id=session_id,
                     owner="trusted_capability_runtime",
-                    lane=lane,
+                    domain=domain,
                     event_type=event_type,
                     state="committed",
                     subject_id=request.request_id,
@@ -428,7 +428,7 @@ class InteractionLedger:
                 if vocal
                 else _ACTIVITY_EVENT_BY_STATUS[outcome.status]
             )
-            lane: InteractionEventLane = (
+            domain: InteractionEventDomain = (
                 "vocal" if vocal else "activity"
             )
             evidence_refs = [
@@ -440,7 +440,7 @@ class InteractionLedger:
                 self.append(
                     session_id=session_id,
                     owner="execution_closure",
-                    lane=lane,
+                    domain=domain,
                     event_type=event_type,
                     state=outcome.status,
                     subject_id=f"{validated.outcome_id}:{outcome.goal_id}",
@@ -500,7 +500,7 @@ class InteractionLedger:
             normalized_status = _normalized_text(result.status)
             event_type = _SOCIAL_EVENT_BY_STATUS.get(
                 normalized_status,
-                "social_action_failed",
+                "social_decoration_failed",
             )
             metadata = request.metadata
             evidence_refs = [request.request_id]
@@ -510,7 +510,7 @@ class InteractionLedger:
                 self.append(
                     session_id=session_id,
                     owner="trusted_capability_runtime",
-                    lane="social_attention",
+                    domain="social_attention",
                     event_type=event_type,
                     state=normalized_status or "failed",
                     subject_id=request.request_id,
@@ -592,22 +592,22 @@ class InteractionLedger:
         activity = [
             item
             for item in projected_events
-            if item["lane"] == "activity"
+            if item["domain"] == "activity"
         ]
         vocal_actions = [
             item
             for item in projected_events
             if item["event_type"].startswith("vocal_action_")
         ]
-        social_actions = [
+        social_decorations = [
             item
             for item in projected_events
-            if item["lane"] == "social_attention"
+            if item["domain"] == "social_attention"
         ]
         goal_history = [
             item
             for item in projected_events
-            if item["lane"] == "cognition"
+            if item["domain"] == "cognition"
         ]
         unresolved: list[dict[str, Any]] = []
         terminal_evidence_refs = {
@@ -633,8 +633,8 @@ class InteractionLedger:
             elif item["event_type"] == "vocal_action_committed":
                 if item["subject_id"] not in terminal_evidence_refs:
                     waiting_for = "vocal_action_terminal_result"
-            elif item["event_type"] == "social_action_committed":
-                waiting_for = "social_action_terminal_result"
+            elif item["event_type"] == "social_decoration_committed":
+                waiting_for = "social_decoration_terminal_result"
             if waiting_for:
                 unresolved.append(
                     {
@@ -653,7 +653,7 @@ class InteractionLedger:
             pending_speech=pending_speech,
             activity=activity,
             vocal_actions=vocal_actions,
-            social_actions=social_actions,
+            social_decorations=social_decorations,
             goal_history=goal_history,
             unresolved=unresolved,
         )
@@ -666,7 +666,7 @@ class InteractionLedger:
             "turn_id": event.turn_id,
             "interaction_id": event.interaction_id,
             "owner": event.owner,
-            "lane": event.lane,
+            "domain": event.domain,
             "event_type": event.event_type,
             "state": event.state,
             "goal_ids": list(event.goal_ids),

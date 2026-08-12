@@ -196,11 +196,9 @@ class ResponseComposerSocialAttentionContractTests(
                 "behaviors": [
                     {
                         "capability_id": "soridormi.blink_eyes",
-                        "coordination_id": "attention-blink",
                         "reason": "Optional acknowledgement.",
                     }
                 ],
-                "speech_expression": {"mode": "adapt", "style": "warm"},
             }
         )
         ollama = _SequenceOllama([output])
@@ -215,7 +213,6 @@ class ResponseComposerSocialAttentionContractTests(
         assert attention is not None
         self.assertEqual(attention.decision, "none")
         self.assertEqual(attention.behaviors, [])
-        self.assertEqual(attention.speech_expression.mode, "none")
         self.assertTrue(
             attention.metadata["canonicalized_conflicting_none_expression"]
         )

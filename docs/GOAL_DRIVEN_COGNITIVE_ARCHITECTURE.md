@@ -24,16 +24,22 @@ work, not implementation claims created by this documentation update. Current
 behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
 
 
-## One Core and three execution lanes
+## One Core, two execution lanes, and background Social Attention
 
-The Goal-Driven Cognitive Core remains the single semantic authority while the
-maintained runtime coordinates three concurrent lanes: Social-Attention
-proposals, Vocal execution, and Activity execution. These lanes do not own
-independent Goals or personalities. Response Composer may author explicit
-best-effort lane coordination around parallel Canonical Plan steps; provider
-metadata and the Trusted Capability Runtime remain authoritative for actual
-overlap. Soridormi is a peer Capability Provider below Activity and owns its
-subtle-expression, locomotion/whole-body, and physical safety arbitration. See
+The Goal-Driven Cognitive Core remains the single semantic authority. The
+maintained runtime has two execution lanes: **Vocal** and **Activity**. Social
+Attention is not a third lane. It is background social cognition that may add
+small optional embodied decoration around an already-anchored interaction.
+Accepted decoration executes through Activity with explicit auxiliary metadata
+and no Goal-completion authority.
+
+Response Composer may author explicit best-effort lane coordination only between
+Vocal and Activity around parallel Canonical Plan work. Social Attention never
+appears in `LaneCoordinationGroup`, never authors response text, and never owns a
+user Responsibility. Provider metadata and the Trusted Capability Runtime remain
+authoritative for physical overlap. Soridormi is a peer Capability Provider
+below Activity and owns subtle-expression/body concurrency and physical safety
+arbitration. See
 [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
 
 ## 1. Purpose
@@ -251,23 +257,29 @@ alternative plans, and natural language.
 Deterministic code enforces contracts and safety. It must not replace semantic
 reasoning with action-specific rules.
 
-### 3.10 Interaction is independent from task execution
+### 3.10 Primary responsibility and social decoration are different semantics
 
-Speech, social attention, and user-task execution are separate plans that may be
-coordinated but must not be conflated.
+Vocal and Activity carry primary executable responsibility. Social Attention may
+decorate an interaction, but it is not a third responsibility or execution
+channel.
 
 Every admitted turn still has one Core-owned semantic and conversational
 authority. Speech composition and user-task execution may be prepared or
 scheduled independently, including through bounded parallel model calls, only
-from the applicable immutable authoritative state: the same turn, plus Goal
+from applicable immutable authoritative state: the same turn, plus Goal
 versions, a Canonical Plan, and evidence when each exists. A response composer
 cannot reinterpret the Goal or authorize an effect, and an execution specialist
-cannot become the conversation authority. Every emitted request remains
-correlated to its owning turn and, when they exist, Goal and Plan identities;
-physical TaskGraph execution remains sequential.
+cannot become conversation authority. Every primary request remains correlated
+to its owning turn and, when they exist, Goal and Plan identities.
 
-A blink selected to express attention is not automatically part of the user’s
-goal. An explicit user request to blink is.
+Background Social Attention may additionally propose small body decoration for
+the same interaction. That decoration must not alter the primary response text,
+create a Goal, delay the primary path, or acquire completion authority. An
+accepted decoration is materialized as auxiliary Activity.
+
+A blink chosen because Chromie is socially engaged is optional decoration. An
+explicit user request to blink is primary Activity responsibility even when both
+ultimately use the same named Capability.
 
 Likewise, response transport is not a user-task step. `Converse` is a native
 cognitive ability to complete a conversational responsibility from current Mind
@@ -1135,7 +1147,7 @@ Fast Understanding
 
 In parallel from the same interaction state:
   Goal Association / continuity / relationship reasoning
-  Social Attention proposal lane
+  background Social Attention decoration cognition
   existing ready work and observations
 
 Goal/slow cognition as needed:
@@ -1157,13 +1169,14 @@ planning and authorization.
 Goal Association is therefore a continuity and responsibility-relation boundary,
 not a global start barrier. Planner is an intention-forming mechanism used when
 the responsibility is not already complete or cannot safely advance from current
-understanding. Response Composer is a still-needed-delta coordinator, not the
-only place conversation or Social Attention may originate. Provider observations
-are cognition events, not merely terminal inputs to a speech formatter.
+understanding. Response Composer is a still-needed-delta coordinator, not the only place
+background Social Attention may reconsider optional decoration. Social Attention
+still never owns response wording. Provider observations are cognition events,
+not merely terminal inputs to a speech formatter.
 
 The implemented General Progress substrate covers immediate native conversation,
 exact capability candidates, explicit Goal binding, trusted early safe-read
-readiness, and peer Social Attention. Sections 4.11–4.13 retain the broader
+readiness, and background Social Attention decoration. Sections 4.11–4.13 retain the broader
 problem-space inventory and the compression discipline that produced Section
 4.14. They are no longer an instruction to pre-create the candidate concepts as
 persistent state; future implementation starts from the compressed baseline and
@@ -1899,39 +1912,44 @@ not a deterministic utterance-to-gesture mapping. It is a model-authored
 interaction objective that may be expressed through language, body behavior,
 both, or deliberate stillness.
 
-The coordinated shapes are:
+The related shapes are:
 
 ```text
-Canonical User Task Plan
-Response Plan
-Auxiliary Social Attention Plan
+Canonical User Task Plan          -> primary responsibility
+Response Plan                     -> Vocal/user-facing meaning
+SocialAttentionPlan               -> optional body decoration only
 ```
 
-### 12.2 Explicit goals and auxiliary expression
+### 12.2 Explicit Activity and auxiliary social decoration
 
 A concrete user request such as "blink twice" or "look at me" remains an
-explicit CanonicalPlan goal. It is non-droppable and cannot be replaced with a
-more convenient gesture.
+explicit CanonicalPlan Activity responsibility. It is non-droppable and cannot
+be replaced with a more convenient gesture.
 
-Autonomous interaction expression uses
-`interaction_role=auxiliary_expression`. It may support acknowledgement,
-listening, engagement, empathy, turn taking, deference, neutral presence, or
-another model-stated purpose. It cannot satisfy, replace, authorize, or claim
-completion of a user goal.
+`SocialAttentionPlan` is different. It exists only for optional decoration
+around an anchored interaction. Its `interaction_role=auxiliary_expression`
+means auxiliary embodied expression; it does not represent another speech
+channel. Decoration may support acknowledgement, listening, engagement, empathy,
+turn taking, deference, or neutral presence, but cannot satisfy, replace,
+authorize, delay, or claim completion of a user Goal.
 
 ### 12.3 Model authority
 
-Response Composer sees the immutable terminal plan, actual response stages,
-turn context, target evidence, and catalog candidates tagged with the
-`social_attention` behavior domain. The model owns:
+The Social Attention model receives bounded interaction state, target evidence,
+owner-approved Social Interaction Style, recent decoration evidence, and exact
+catalog candidates tagged with the `social_attention` behavior domain. It owns:
 
-- whether expression is useful;
+- whether small embodied decoration is useful now;
 - the social purpose;
-- speech style and pacing adaptation;
-- exact candidate skill IDs, arguments, timing, social function, and target;
-- the choice to use body expression, language adaptation, both, or neither.
+- exact eligible body Capability IDs, arguments, timing, social function, and
+  target; and
+- the choice between a body decoration and `decision=none`.
 
-The host does not map purposes or user phrases to actions. It validates catalog
+It does **not** own speech text, speech style, response semantics, Goal meaning,
+provider identity, or motor implementation. Response Composer / applicable
+cognitive owners retain language authority independently of Social Attention.
+
+The Host does not map purposes or user phrases to gestures. It validates catalog
 membership, schemas, target evidence, resource conflicts, confirmation and
 safety policy, low-level-field exclusion, auxiliary limits, and execution
 evidence.
@@ -1939,18 +1957,23 @@ evidence.
 ### 12.4 Capability taxonomy is not planning
 
 Capabilities may declare multiple behavior domains. Gaze, blink, nod, head
-orientation, posture, and bow are current Social Attention candidates, but the
-same underlying motion can serve perception, navigation, or another domain in a
-different plan. `capabilities/behavior_domains.json` supplies semantic taxonomy;
-simulator or hardware provider metadata never participates in candidate
-discovery or social policy.
+orientation, posture, and other qualified subtle body behaviors can be Social
+Attention candidates, but the same Capability can be primary Activity when it
+is explicitly requested. The owning semantic reason, not the actuator, decides
+whether work is primary or decorative.
 
-Soridormi backends preserve the same named-skill and semantic-argument
-contracts. Backend selection, controller adaptation, calibration, motion
-limits, collision safety, stop, and recovery are provider responsibilities and
-are not represented in Chromie's Social Attention policy.
+`capabilities/behavior_domains.json` supplies semantic taxonomy; simulator or
+hardware provider metadata never participates in candidate discovery or social
+policy. Soridormi backends preserve named-skill and semantic-argument contracts.
+Backend selection, controller adaptation, calibration, motion limits, collision
+safety, stop, and recovery remain provider responsibilities.
 
-### 12.5 Target evidence and conflict policy
+### 12.5 Interaction anchor, target evidence, and conflict policy
+
+Social Attention requires an interaction anchor. Listening, Vocal output,
+ongoing Activity, turn-taking, interaction-bound waiting, or another
+socially-relevant event can provide that anchor. Pure unanchored idle animation
+is a separate embodiment/liveliness concern.
 
 Target priority is:
 
@@ -1961,12 +1984,20 @@ Target priority is:
 Chromie never accepts installation calibration or body coordinates as target
 evidence. Soridormi resolves the semantic target for its active embodiment.
 
-Invalid, sequential, or conflicting auxiliary body behaviors are dropped. A
-speech-only adaptation may remain when body behavior is rejected. Auxiliary
-expression never delays speech, emergency handling, or primary task execution.
-The Response Composer receives the owner-approved Social Interaction Style and
-bounded recent accepted-request evidence for cooldown and repetition restraint;
-that evidence never proves provider completion.
+Invalid, sequential, unavailable, repetitive, unnecessary, or conflicting
+auxiliary body decoration is dropped. There is no Social-Attention speech
+fallback: dropping decoration leaves ResponsePlan/Vocal output unchanged.
+Decoration never delays speech, emergency handling, or primary task execution.
+The Social Interaction Style controls frequency/restraint, and recent accepted
+or terminal decoration evidence supports cooldown without becoming Goal
+completion evidence.
+
+Accepted decoration executes through Activity with
+`auxiliary_social_attention=true` and `execution_role=social_decoration`.
+`LaneCoordinationGroup` remains Vocal/Activity only; Social Attention decoration
+does not carry `coordination_id`. Same-provider body overlap is compiled and
+validated from the actual runtime batch and provider concurrency/safety
+contracts.
 
 See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 
@@ -2102,10 +2133,10 @@ Planner, Deep Planner, Tool Result Interpretation, Response Composer, and any
 later cognitive stage that can otherwise repeat a Goal-scoped conversational or
 effectful responsibility. Runtime owners append the qualified facts. This
 architecture document is the authoritative owner of the term because the
-contract spans Vocal, Activity, Social Attention, and cognition; no
-component-only document can own that cross-lane boundary.
+contract spans Vocal, Activity, Social Attention decoration, and cognition; no
+component-only document can own that cross-domain boundary.
 
-Every entry is immutable, replay-safe, typed by owner, lane, event type, state,
+Every entry is immutable, replay-safe, typed by owner, event domain, event type, state,
 Goal IDs, turn, Plan provenance, subject, time, and evidence references. Existing
 owners append only facts they are qualified to observe:
 
@@ -2113,7 +2144,7 @@ owners append only facts they are qualified to observe:
 |---|---|---|
 | Cognitive Runtime | Goal association and validated Plan resolution | That a planned effect started or completed |
 | Playback Delivery | speech scheduled, playback started, or not delivered | Activity execution or completion |
-| Trusted Capability Runtime | Activity, provider-backed Vocal, or Social Attention request committed; Social Attention terminal result | Completion of an unrelated Goal |
+| Trusted Capability Runtime | Activity, provider-backed Vocal, or Social Attention decoration request committed; decoration terminal result | Completion of an unrelated Goal |
 | Execution closure | Goal-scoped Activity or provider-backed Vocal terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
 
 The Ledger neither edits nor replaces playback evidence,
@@ -2130,8 +2161,9 @@ does not claim that Goal state was updated.
 journal, not another store. Runtime selects a bounded chronology for the
 relevant Goal IDs and includes same-turn unbound Fast speech without inventing
 Goal ownership. It exposes already audible speech, pending speech, Activity and
-provider-backed Vocal work, Social Attention actions, Goal/Plan history, and
-unresolved waits. Before canonical Goal IDs exist, Goal Interpretation and Goal
+provider-backed Vocal work, Social Attention decorations, Goal/Plan history, and
+unresolved waits. Ledger `domain=social_attention` is an observation domain, not
+an execution lane; accepted decoration physically executes through Activity. Before canonical Goal IDs exist, Goal Interpretation and Goal
 Association receive bounded recent session context; after association, later
 cognition receives the Goal-scoped projection.
 

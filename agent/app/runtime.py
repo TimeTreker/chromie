@@ -324,13 +324,13 @@ class InteractionRuntime(_AgentPipeline):
         mode = self.services.effective_social_attention_mode()
         # Policy is host-owned runtime context, not a model preference. Clear any
         # caller-supplied/stale candidates before rebuilding the eligible view.
-        peer_owned = request.context.get("social_attention_owned_by_peer_lane") is True
+        peer_owned = request.context.get("social_attention_owned_by_background_loop") is True
         request.context["social_attention_policy"] = {
             "mode": "off" if peer_owned else mode,
             "planning_enabled": mode != "off" and not peer_owned,
             "execution_enabled": mode == "on" and not peer_owned,
             "embodiment_independent": True,
-            "owner": "peer_lane" if peer_owned else "local_request",
+            "owner": "background_loop" if peer_owned else "local_request",
         }
         request.context.pop("social_attention_candidates", None)
         request.context.pop("social_attention_candidate_source", None)

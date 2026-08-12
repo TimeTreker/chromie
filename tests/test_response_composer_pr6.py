@@ -235,7 +235,6 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "social_attention_plan": {
                 "decision": "express",
                 "behaviors": [],
-                "speech_expression": {"mode": "none"},
                 "confidence": 0.8,
             },
             "lane_coordination": [],
@@ -2041,7 +2040,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.social_attention_plan.metadata["auxiliary_social_attention"]  # type: ignore[union-attr]
         )
 
-    def test_speech_only_social_attention_is_preserved_and_model_coordinated(self):
+    def test_response_text_can_be_empathetic_without_social_attention_owning_speech(self):
         canonical = plan(goals=["goal-chat"])
         raw = {
             "response_plan": {
@@ -2056,13 +2055,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 "behavior_domain": "social_attention",
                 "interaction_role": "auxiliary_expression",
                 "purpose": "empathy",
-                "decision": "express",
-                "speech_expression": {
-                    "mode": "adapt",
-                    "style": "empathetic",
-                    "pacing": "slower",
-                    "reason": "Match the user's emotional state without adding body motion.",
-                },
+                "decision": "none",
                 "behaviors": [],
                 "confidence": 0.91,
             },
@@ -2076,12 +2069,13 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         composition = result.composition
         self.assertIsNotNone(composition)
+        self.assertEqual(
+            composition.response_plan.final.text,
+            "我理解这让你有些难受，我们慢慢来。",
+        )
         attention = composition.social_attention_plan
-        self.assertEqual(attention.decision, "express")
-        self.assertEqual(attention.purpose, "empathy")
+        self.assertEqual(attention.decision, "none")
         self.assertEqual(attention.behaviors, [])
-        self.assertEqual(attention.speech_expression.mode, "adapt")
-        self.assertEqual(attention.speech_expression.style, "empathetic")
         self.assertEqual(attention.metadata["behavior_domain"], "social_attention")
         self.assertEqual(attention.metadata["interaction_role"], "auxiliary_expression")
 
@@ -2256,7 +2250,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
         )
         prompt = ollama.prompts[0][0]
         self.assertIn("CanonicalPlan is immutable", prompt)
-        self.assertIn("never a user goal or task step", prompt)
+        self.assertIn("never a user Goal, task step, completion owner, or execution lane", prompt)
         self.assertIn("Delivered evidence-bound dialogue JSON", prompt)
         self.assertIn("北京现在约28℃", prompt)
         self.assertIn("Preserve every measurement and condition", prompt)

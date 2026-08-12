@@ -73,7 +73,7 @@ running.
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`, including bounded same-tier revision. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted `CognitiveOpportunity`; it may propose replan, clarification, correction, or bounded task/session Memory but has no execution or history-rewrite authority. |
 | `POST` | `/social-attention/plan` | Produce one event-scoped auxiliary `SocialAttentionPlan` from the reviewed live social-capability set; it has no Goal, speech, or execution authority. |
-| `POST` | `/compose-response-plan` | Bind goal-scoped speech to an immutable terminal plan; optional Social Attention remains available only for explicit compatibility/coordinated-composition callers. |
+| `POST` | `/compose-response-plan` | Bind goal-scoped speech to an immutable terminal plan; optional Social Attention remains an advisory body-decoration surface and never becomes an execution lane. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 | `POST` | `/tool-result/interpret` | Select exact grounded facts from complete tool evidence and synthesize a concise spoken answer. |
 
@@ -141,7 +141,7 @@ caller-supplied disclosure context is removed before trusted injection.
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/social-attention/plan` | Return an event-scoped auxiliary Social-Attention proposal with behavior IDs decoder-constrained to the reviewed live candidate set. |
-| `POST` | `/compose-response-plan` | Compose goal-scoped speech around an immutable terminal `CanonicalPlan`; optional Social Attention is a compatibility/coordinated-composition surface rather than the maintained Goal-driven owner. |
+| `POST` | `/compose-response-plan` | Compose goal-scoped speech around an immutable terminal `CanonicalPlan`; optional Social Attention is an advisory body-decoration surface; background ownership remains separate from response wording. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
 
@@ -182,7 +182,7 @@ Capability authorization and execution.
 
 `POST /social-attention/plan` accepts a `SocialAttentionRequest` describing one interaction-state event such as understanding becoming ready, work starting, evidence arriving, or speaking. It returns an auxiliary `SocialAttentionPlan`. The decoder constrains every behavior `capability_id` to the reviewed live candidate set. The endpoint only proposes; the Host independently validates target evidence, schemas, confirmation, resources, provider concurrency, and availability before the Trusted Capability Runtime may execute a behavior. The proposal owns no Goal state, speech meaning, or completion evidence.
 
-`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional compatibility/coordinated `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The Host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. In the maintained Goal-driven runtime, Social Attention is owned by the peer event lane and this composition call receives that ownership state so it does not make a duplicate social decision. A fully bound `native_response` may reuse its already-started Vocal delivery evidence without calling Response Composer, while pure fully bound safe reads may use execution-only response materialization instead of waiting for pre-evidence composition.
+`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional advisory body-only `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The Host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. In the maintained Goal-driven runtime, Social Attention is background social-decoration cognition rather than an execution lane; this composition call receives background-loop ownership state so it does not make a duplicate social decision. Any accepted body decoration executes through Activity and never owns Goal completion. A fully bound `native_response` may reuse its already-started Vocal delivery evidence without calling Response Composer, while pure fully bound safe reads may use execution-only response materialization instead of waiting for pre-evidence composition.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (legacy code name: Skill Runtime) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
@@ -248,12 +248,13 @@ metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
 `legacy-fallback`) for operator diagnostics. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the runtime may attach an
 advisory model-authored `social_attention_plan`. The plan identifies the
 `social_attention` behavior domain, the `auxiliary_expression` role, a social
-purpose, optional speech style/pacing adaptation, and zero or more model-selected
-catalog behaviors. Response Composer coordinates the actual response text with
-this plan; the native compatibility planner remains body-only. Applied skills
-carry `metadata.source=social_attention_plan`,
-`metadata.auxiliary_social_attention=true`, and purpose/function metadata; they
-are excluded from user task proposals. Runtime validation checks exact catalog
+purpose, and optional small body behaviors selected from the reviewed catalog.
+It cannot author or adapt response text. Applied decoration requests carry
+`metadata.source=social_attention_plan`,
+`metadata.auxiliary_social_attention=true`,
+`metadata.execution_lane=activity`, and
+`metadata.execution_role=social_decoration`; they are excluded from user task
+proposals and Goal completion. Runtime validation checks exact catalog
 membership, schemas, target evidence, resource conflicts, confirmation policy,
 and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
 coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary

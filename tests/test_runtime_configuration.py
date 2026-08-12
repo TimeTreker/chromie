@@ -541,7 +541,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Role                               | Model                            | Maintained runtime use",
             launcher,
         )
-        self.assertIn("independent peer event lane", launcher)
+        self.assertIn("background social-decoration loop", launcher)
         self.assertIn("skipped by pure ready reads", launcher)
         summary_index = launcher.index("Effective cognitive model roles:")
         self.assertGreater(

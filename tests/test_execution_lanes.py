@@ -163,7 +163,6 @@ class ExecutionLaneContractTests(unittest.TestCase):
                         args={},
                         timing="parallel",
                         social_function="engagement",
-                        coordination_id="together-1",
                     )
                 ],
                 metadata={"auxiliary_social_attention": True},
@@ -171,7 +170,7 @@ class ExecutionLaneContractTests(unittest.TestCase):
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="together-1",
-                    lanes=["vocal", "activity", "social_attention"],
+                    lanes=["vocal", "activity"],
                     activity_step_ids=["walk"],
                     reason_summary="The user requested overlapping behavior.",
                 )
@@ -193,17 +192,24 @@ class ExecutionLaneContractTests(unittest.TestCase):
                 activity_step_ids=["walk"],
             )
 
-    def test_three_lane_contract_accepts_explicit_parallel_members(self) -> None:
+    def test_two_execution_lane_contract_accepts_explicit_parallel_members(self) -> None:
         composition = self._composition(self._plan())
 
         self.assertEqual(
             composition.lane_coordination[0].lanes,
-            ["vocal", "activity", "social_attention"],
+            ["vocal", "activity"],
         )
 
-    def test_three_lane_contract_rejects_serial_activity_step(self) -> None:
+    def test_two_execution_lane_contract_rejects_serial_activity_step(self) -> None:
         with self.assertRaisesRegex(ValueError, "timing=parallel"):
             self._composition(self._plan(timing="sequential"))
+
+    def test_social_attention_is_not_an_execution_lane(self) -> None:
+        with self.assertRaises(ValueError):
+            LaneCoordinationGroup(
+                coordination_id="not-a-lane",
+                lanes=["vocal", "social_attention"],
+            )
 
     def test_confirmation_speech_cannot_overlap_activity(self) -> None:
         plan = self._plan()
@@ -268,7 +274,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             blink,
         )
 
-    async def test_adapter_materializes_three_distinct_lane_members(self) -> None:
+    async def test_adapter_materializes_two_execution_lanes_plus_social_decoration(self) -> None:
         response, _, _ = await self._response()
 
         self.assertEqual(response.speech[0].timing, "parallel")
@@ -287,12 +293,13 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             by_id["soridormi.blink_eyes"].metadata["execution_lane"],
-            "social_attention",
+            "activity",
         )
         self.assertEqual(
-            by_id["soridormi.blink_eyes"].metadata["coordination_id"],
-            "together-1",
+            by_id["soridormi.blink_eyes"].metadata["execution_role"],
+            "social_decoration",
         )
+        self.assertNotIn("coordination_id", by_id["soridormi.blink_eyes"].metadata)
         self.assertEqual(len(response.metadata["lane_coordination_groups"]), 1)
 
     async def test_adapter_rejects_cross_lane_activity_without_provider_metadata(self) -> None:

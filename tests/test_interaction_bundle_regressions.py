@@ -138,7 +138,6 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         reconciled, kept, reasons = ResponseComposerResolver._reconcile_lane_coordination(
             response_plan=output.response_plan,
             lane_coordination=output.lane_coordination,
-            social_attention_plan=output.social_attention_plan,
             plan=plan,
         )
         self.assertEqual(kept, [])
@@ -146,41 +145,33 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         assert reconciled.immediate is not None
         self.assertEqual(reconciled.immediate.text, "Let me check that first.")
 
-    def test_invalid_optional_social_group_is_pruned_not_turn_fatal(self) -> None:
+    def test_social_attention_is_pruned_from_execution_lane_coordination(self) -> None:
         plan = self._mixed_plan()
-        response_plan = ResponsePlan(
-            immediate=ResponseStage(
-                text="我准备好啦。",
-                speech_act="affirmative",
-                commitment_state="none",
-                must_not_claim_completion=True,
-                covers_goal_ids=["goal-move", "goal-song"],
-            )
-        )
-        group = ResponseComposerModelOutput.model_validate(
-            {
-                "response_plan": response_plan.model_dump(mode="json"),
-                "social_attention_plan": {"decision": "none"},
-                "lane_coordination": [
-                    {
-                        "coordination_id": "coord-social-only",
-                        "lanes": ["vocal", "social_attention"],
-                    }
-                ],
-            }
-        ).lane_coordination
+        raw = {
+            "response_plan": {
+                "immediate": {
+                    "text": "我准备好啦。",
+                    "speech_act": "affirmative",
+                    "commitment_state": "none",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-move", "goal-song"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "lane_coordination": [
+                {
+                    "coordination_id": "coord-social-only",
+                    "lanes": ["vocal", "social_attention"],
+                }
+            ],
+        }
 
-        reconciled, kept, reasons = ResponseComposerResolver._reconcile_lane_coordination(
-            response_plan=response_plan,
-            lane_coordination=group,
-            social_attention_plan=SocialAttentionPlan(decision="none"),
+        normalized = ResponseComposerResolver._canonicalize_lane_coordination_payload(
+            raw,
             plan=plan,
         )
 
-        self.assertEqual(kept, [])
-        self.assertTrue(reasons)
-        assert reconciled.immediate is not None
-        self.assertIsNone(reconciled.immediate.coordination_id)
+        self.assertEqual(normalized["lane_coordination"], [])
 
     def test_activity_ids_without_activity_lane_are_removed_before_dto_validation(
         self,
@@ -214,9 +205,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
         )
         output = ResponseComposerModelOutput.model_validate(normalized)
 
-        self.assertEqual(len(output.lane_coordination), 1)
-        self.assertEqual(output.lane_coordination[0].activity_step_ids, [])
-        self.assertNotIn("activity", output.lane_coordination[0].lanes)
+        self.assertEqual(output.lane_coordination, [])
 
     def test_malformed_social_express_is_not_silently_downgraded(self) -> None:
         with self.assertRaises(ValidationError):
@@ -238,34 +227,29 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                 }
             )
 
-    def test_social_speech_adaptation_is_a_real_expression_member(self) -> None:
-        output = ResponseComposerModelOutput.model_validate(
-            {
-                "response_plan": {
-                    "final": {
-                        "text": "好呀。",
-                        "speech_act": "acknowledge",
-                        "commitment_state": "completed",
-                        "must_not_claim_completion": False,
-                        "covers_goal_ids": ["goal-chat"],
-                    }
-                },
-                "social_attention_plan": {
-                    "decision": "express",
-                    "purpose": "engagement",
-                    "speech_expression": {
-                        "mode": "adapt",
-                        "style": "warm",
-                        "pacing": "normal",
-                        "reason": "Stay gently engaged without a target-dependent gesture.",
+    def test_social_attention_cannot_author_speech_adaptation(self) -> None:
+        with self.assertRaises(ValidationError):
+            ResponseComposerModelOutput.model_validate(
+                {
+                    "response_plan": {
+                        "final": {
+                            "text": "好呀。",
+                            "speech_act": "acknowledge",
+                            "commitment_state": "completed",
+                            "must_not_claim_completion": False,
+                            "covers_goal_ids": ["goal-chat"],
+                        }
                     },
-                },
-            }
-        )
-
-        assert output.social_attention_plan is not None
-        self.assertEqual(output.social_attention_plan.decision, "express")
-        self.assertEqual(output.social_attention_plan.speech_expression.mode, "adapt")
+                    "social_attention_plan": {
+                        "decision": "express",
+                        "purpose": "engagement",
+                        "speech_expression": {
+                            "mode": "adapt",
+                            "style": "warm",
+                        },
+                    },
+                }
+            )
 
     def test_failed_composition_reports_zero_provider_requests(self) -> None:
         resolution = CognitiveRuntimeResolution(

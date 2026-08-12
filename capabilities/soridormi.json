@@ -4203,13 +4203,13 @@
     "chromie_concurrency_model": {
       "cognitive_core": "single_authoritative_mind",
       "lanes": [
-        "social_attention_proposal",
-        "speaking_execution",
+        "vocal_execution",
         "activity_execution"
       ],
       "runtime_coordinator": "chromie",
       "speech_owner": "chromie",
-      "body_provider": "soridormi"
+      "body_provider": "soridormi",
+      "social_attention": "background_social_decoration"
     },
     "soridormi_concurrency_model": {
       "primary_locomotion_members": "zero_or_one",
@@ -4219,10 +4219,10 @@
     },
     "rules": [
       "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
-      "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
-      "The Vocal Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
+      "Background Social Attention may propose only optional small body decoration; it does not author speech, own Goals, become an execution lane, or operate actuators.",
+      "Vocal and Activity are the two peer execution lanes beneath one Cognitive Core; accepted Social Attention decoration executes through Activity.",
       "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
-      "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
+      "Speech or singing is never a Soridormi Activity member; Chromie coordinates Vocal/Activity overlap through coordination_id, while same-provider body overlap is compiled from the actual parallel Activity batch.",
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
       "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",

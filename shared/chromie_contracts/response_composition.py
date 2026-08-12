@@ -182,24 +182,6 @@ class CoordinatedResponsePlan(BaseModel):
                 raise ValueError("confirmation and waiting speech cannot overlap effect execution")
             coordinated_speech_ids.add(coordination_id)
 
-        coordinated_social_ids: set[str] = set()
-        if self.social_attention_plan is not None:
-            for behavior in self.social_attention_plan.behaviors:
-                coordination_id = str(behavior.coordination_id or "").strip()
-                if not coordination_id:
-                    continue
-                coordination_group = coordination_by_id.get(coordination_id)
-                if coordination_group is None:
-                    raise ValueError(
-                        "social behavior references unknown lane coordination: " + coordination_id
-                    )
-                if "social_attention" not in coordination_group.lanes:
-                    raise ValueError(
-                        "social behavior coordination requires the social_attention lane: "
-                        + coordination_id
-                    )
-                coordinated_social_ids.add(coordination_id)
-
         for group in self.lane_coordination:
             lane_set = set(group.lanes)
             if (
@@ -218,14 +200,6 @@ class CoordinatedResponsePlan(BaseModel):
                 raise ValueError(
                     "one personal voice cannot run ordinary speech and provider Vocal work "
                     "in the same parallel coordination group: " + group.coordination_id
-                )
-            if (
-                "social_attention" in lane_set
-                and group.coordination_id not in coordinated_social_ids
-            ):
-                raise ValueError(
-                    "social_attention lane coordination requires one coordinated behavior: "
-                    + group.coordination_id
                 )
 
         if plan.disposition == "execute":

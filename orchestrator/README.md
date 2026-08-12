@@ -74,7 +74,7 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> Fast Understanding
        |-> complete native response -> existing Vocal runtime may start
        |-> exact capability candidate -> trusted safe read may start when ready
-       |-> peer Social-Attention event lane may progress independently
+       |-> background Social Attention may prepare optional body decoration
        `-> Goal Association resolves scoped references, Goal relations, and exact candidate bindings
   -> fully bound native conversation: deterministic canonical speech adoption
      fully bound information work: adopt canonical Plan without Fast Planner

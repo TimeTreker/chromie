@@ -582,7 +582,6 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "purpose": "acknowledge",
                 "decision": "express",
                 "target": {"target_ref": "none", "source": "none"},
-                "speech_expression": {"mode": "none"},
                 "behaviors": [
                     {
                         "skill_id": "soridormi.blink_eyes",
@@ -615,38 +614,30 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SocialAttentionDomainContractTests(unittest.TestCase):
-    def test_speech_only_social_attention_expression_is_valid(self) -> None:
-        plan = SocialAttentionPlan.model_validate(
-            {
-                "behavior_domain": "social_attention",
-                "interaction_role": "auxiliary_expression",
-                "purpose": "empathy",
-                "decision": "express",
-                "speech_expression": {
-                    "mode": "adapt",
-                    "style": "empathetic",
-                    "pacing": "slower",
-                    "reason": "The user sounds upset.",
-                },
-                "behaviors": [],
-                "confidence": 0.9,
-            }
-        )
-
-        self.assertEqual(plan.purpose, "empathy")
-        self.assertEqual(plan.speech_expression.style, "empathetic")
-        self.assertEqual(plan.behaviors, [])
-
-    def test_none_decision_rejects_hidden_expression(self) -> None:
+    def test_social_attention_rejects_speech_expression(self) -> None:
         with self.assertRaises(ValueError):
             SocialAttentionPlan.model_validate(
                 {
-                    "decision": "none",
+                    "behavior_domain": "social_attention",
+                    "interaction_role": "auxiliary_expression",
+                    "purpose": "empathy",
+                    "decision": "express",
                     "speech_expression": {
                         "mode": "adapt",
-                        "style": "warm",
-                        "pacing": "normal",
+                        "style": "empathetic",
                     },
+                    "behaviors": [],
+                    "confidence": 0.9,
+                }
+            )
+
+    def test_express_requires_decorative_body_behavior(self) -> None:
+        with self.assertRaises(ValueError):
+            SocialAttentionPlan.model_validate(
+                {
+                    "decision": "express",
+                    "purpose": "engagement",
+                    "behaviors": [],
                 }
             )
 

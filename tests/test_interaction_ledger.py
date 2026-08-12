@@ -161,7 +161,7 @@ class InteractionLedgerTests(unittest.TestCase):
                 sequence=1,
                 session_id="sid",
                 owner="execution_closure",
-                lane="activity",
+                domain="activity",
                 event_type="activity_completed",
                 state="completed",
                 subject_id="goal-walk",
@@ -205,8 +205,8 @@ class InteractionLedgerTests(unittest.TestCase):
         context = ledger.context("sid", goal_ids=["goal-greet"])
         self.assertEqual(context.unresolved, [])
         self.assertEqual(
-            context.social_actions[-1]["event_type"],
-            "social_action_completed",
+            context.social_decorations[-1]["event_type"],
+            "social_decoration_completed",
         )
 
     def test_replay_is_idempotent_but_cannot_change_an_event(self) -> None:
@@ -214,7 +214,7 @@ class InteractionLedgerTests(unittest.TestCase):
         kwargs = {
             "session_id": "sid",
             "owner": "playback_delivery",
-            "lane": "vocal",
+            "domain": "vocal",
             "event_type": "speech_scheduled",
             "state": "scheduled",
             "subject_id": "speech-1",
@@ -232,7 +232,7 @@ class InteractionLedgerTests(unittest.TestCase):
         returned = ledger.append(
             session_id="sid",
             owner="cognitive_runtime",
-            lane="cognition",
+            domain="cognition",
             event_type="goal_associated",
             state="resolved",
             subject_id="association-1",
@@ -252,7 +252,7 @@ class InteractionLedgerTests(unittest.TestCase):
         original = {
             "session_id": "sid",
             "owner": "cognitive_runtime",
-            "lane": "cognition",
+            "domain": "cognition",
             "event_type": "goal_associated",
             "state": "resolved",
             "subject_id": "association-0",
@@ -264,7 +264,7 @@ class InteractionLedgerTests(unittest.TestCase):
             ledger.append(
                 session_id="sid",
                 owner="cognitive_runtime",
-                lane="cognition",
+                domain="cognition",
                 event_type="goal_associated",
                 state="resolved",
                 subject_id=f"association-{index}",

@@ -2,20 +2,100 @@
 
 ## Decision
 
-Social Attention is a high-level interaction behavior domain, not one fixed
-skill, not a phrase-to-action routing rule, and not a deployment-backend policy.
-During interaction, the model may coordinate context-appropriate language
-expression, gaze, blink, nod, head orientation, posture, another
-catalog-supplied behavior, or no expression.
+Social Attention is Chromie's background social-decoration cognition.
 
-Chromie decides whether a social expression is appropriate, what social purpose
-it serves, and how strong it should be. Soridormi decides how the currently
-attached body realizes the selected named skill.
+It does **not** decide the primary thing Chromie is trying to accomplish. It
+may add small, optional, non-disruptive embodied cues around an interaction that
+is already happening so that the same primary behavior feels socially present
+rather than mechanically isolated.
 
-The deterministic host never maps phrases such as "pay attention" or "I am
-sad" to a fixed gesture. It supplies bounded interaction context, the
-owner-approved mind profile, and the eligible semantic capability catalog, then
-validates the model-authored plan.
+A greeting illustrates the boundary:
+
+```text
+Primary responsibility
+  greet Alice
+    |
+    +-- Vocal: "Hello!"
+    |
+    `-- optional Social Attention decoration
+          +-- look toward Alice
+          +-- natural blink
+          +-- small nod / wave
+          `-- slight posture or body orientation
+```
+
+The greeting remains the greeting. Social Attention does not rewrite the text,
+create another Goal for the blink, or make the greeting incomplete when an
+optional decoration cannot run.
+
+In this document, **decoration** means semantic subordination, not meaningless
+random animation. A decoration is socially contextual, attached to a real
+interaction state, and lower priority than the responsibility it accompanies.
+
+## Core invariants
+
+Social Attention obeys all of the following:
+
+1. **Not a Goal.** It does not create a user-facing Goal or Responsibility.
+2. **Not an execution lane.** Chromie's maintained execution lanes are Vocal
+   and Activity. Accepted Social Attention body requests execute through
+   Activity.
+3. **Not a speech owner.** It never authors, rewrites, paraphrases, or changes
+   the semantic content of ResponsePlan/Vocal output.
+4. **Anchored.** A decoration must accompany a meaningful social interaction
+   state such as listening, speaking, ongoing Activity, turn-taking, waiting in
+   an active interaction, or another evidence-backed social event. It does not
+   manufacture standalone work merely so that Chromie can move.
+5. **Small and non-disruptive.** Typical candidates are gaze, blink, a small
+   nod, a small wave, a smile when supported by embodiment, or slight posture /
+   body orientation. The live capability catalog remains authoritative.
+6. **Optional and fail-soft.** Invalid, slow, unavailable, conflicting, or
+   unnecessary decoration is dropped. It must not delay, replace, cancel, or
+   fail the primary behavior.
+7. **Interruptible and subordinate.** Emergency handling, explicit user
+   actions, confirmation, Vocal delivery, and primary Activity always have
+   priority.
+8. **No completion authority.** Decoration evidence can say that a decoration
+   ran; it cannot satisfy or prove completion of the primary Goal.
+
+A socially important event that genuinely changes what Chromie should do next
+is no longer merely decoration. It must be elevated through normal Cognitive
+Core / Goal reasoning rather than smuggled into `SocialAttentionPlan`.
+
+## Same motion, different semantic role
+
+The semantic role comes from **why the motion exists**, not from the actuator or
+Capability ID.
+
+```text
+User: "Blink twice."
+  -> Activity responsibility
+  -> required CanonicalPlan work
+  -> completion-relevant evidence
+
+Chromie greets someone and naturally blinks
+  -> Social Attention decoration
+  -> optional Activity execution
+  -> no Goal completion authority
+```
+
+Both paths may eventually use the same qualified `soridormi.blink_eyes`
+Capability. The first is requested work; the second is auxiliary social
+appearance. Trusted metadata and reconciliation must preserve that distinction.
+
+## Interaction anchor versus idle embodiment
+
+Social Attention is not a generic idle-animation system.
+
+A blink while Chromie is actively listening can be Social Attention because it
+belongs to a live social interaction. A purely autonomous blink while no social
+interaction exists may still be desirable for embodiment realism, but that is a
+separate baseline embodiment/liveliness concern and must not be represented as a
+fake Social Attention Goal or event.
+
+This prevents Social Attention from degrading into random gesture generation.
+The model should be reasoning about a social situation, not decorating elapsed
+time.
 
 ## Embodiment-independent boundary
 
@@ -30,8 +110,12 @@ The boundary is:
 ```text
 Chromie
   understands the interaction
-  chooses an optional semantic social behavior
-  submits the named skill and semantic arguments
+  decides whether a small social decoration is useful
+  selects an eligible semantic body Capability
+        |
+        v
+Trusted Capability Runtime
+  validates schema, availability, policy, resources, and priority
         |
         v
 Soridormi
@@ -45,104 +129,68 @@ traces, commissioning configuration, and Soridormi safety logic. They must not
 appear as a Social Attention decision dimension, candidate-selection rule,
 model prompt preference, or personality mode inside Chromie.
 
-A capable simulator should preserve the same named-skill semantics, observable
-behavior, and execution-result contract expected from a commissioned physical
-provider. Moving from simulation to hardware should therefore change the
-Soridormi backend, controller, calibration, and safety envelope, not Chromie's
-social reasoning or plan shape.
+Moving from simulation to hardware should change the Soridormi backend,
+controller, calibration, and safety envelope, not Chromie's Social Attention
+meaning or plan shape.
 
-## Social interaction style belongs to the mind
+## Social interaction style belongs to the Mind
 
-How frequently Chromie uses Social Attention should come from the
-owner-approved mind profile and the current interaction, not from the execution
-environment.
+How frequently Chromie adds social decoration comes from the owner-approved
+Mind profile and current interaction, not from the execution environment.
 
-The accepted target model is an owner-approved social interaction style with
-continuous tendencies such as:
+The shared Social Interaction Style carries tendencies such as:
 
 - `courtesy`: willingness to acknowledge, attend, thank, apologize, and defer;
 - `expressiveness`: overall strength and frequency of visible social cues;
-- `initiative`: willingness to add an unrequested but useful auxiliary cue;
+- `initiative`: willingness to add an unrequested but useful small cue;
 - `restraint`: preference for stillness when a cue would be repetitive,
-  distracting, or artificial;
+  distracting, artificial, or unnecessary;
 - cooldown and repetition limits that keep behavior natural.
 
-Named presets are available as profile-authoring and ordinary deployment conveniences through `ORCH_SOCIAL_INTERACTION_STYLE_PRESET`:
+Named presets remain profile-authoring conveniences through
+`ORCH_SOCIAL_INTERACTION_STYLE_PRESET`:
 
-| Style | Typical behavior |
+| Style | Typical decoration behavior |
 |---|---|
-| `courteous` | More acknowledgement, gaze, light nods, and context-sensitive expression, while respecting cooldown and urgency. |
-| `neutral` | Social cues at important conversational moments, but not on every turn. |
-| `reserved` | Rare auxiliary body expression; stillness is normally preferred. |
+| `courteous` | More context-appropriate gaze, light nods, and acknowledgement cues while respecting urgency and cooldown. |
+| `neutral` | Small cues at meaningful conversational moments, not every turn. |
+| `reserved` | Rare auxiliary body decoration; stillness is usually preferred. |
 
-These are personality tendencies, not deterministic gesture tables. Even a
-courteous profile may choose `none`, and an urgent stop or safety turn must
-suppress decorative expression.
+These are tendencies, not gesture tables. Even a courteous profile may choose
+`none`, and emergency or safety work suppresses decoration.
 
-The shared `MindProfile.social_interaction_style` contract carries the selected preset plus bounded courtesy, expressiveness, initiative, restraint, cooldown, and repetition guidance. It remains owner-approved/operator-selected configuration rather than experience-auto-mutable behavior. A full reviewed profile may use `preset=custom`; ordinary deployments may select `courteous`, `neutral`, or `reserved`.
+The style influences whether and how strongly Chromie decorates the interaction.
+It does **not** give Social Attention ownership of response wording. Vocal style,
+word choice, personality expression, and conversational semantics remain with
+the applicable cognitive/response owner.
 
-## Two interaction roles
+## Model-owned decoration plan
 
-### Explicit user goal
+`SocialAttentionPlan` is advisory and body-only. The model decides:
 
-When the user requests a concrete action, for example "blink twice" or "look at
-me for two seconds", that action remains a normal CanonicalPlan goal. It is not
-optional and cannot be replaced with a different social gesture.
+- whether a decoration is useful for the current anchored interaction;
+- its social purpose, such as listening, acknowledgement, engagement, empathy,
+  turn-taking, deference, or neutral presence;
+- zero or more exact body Capability IDs from the supplied candidates when
+  `decision=none`, or at least one when `decision=express`;
+- capability arguments, social function, target selection, and bounded semantic
+  intensity parameters supplied by the public schema.
 
-The behavior may still be classified in the `social_attention` domain for
-observation and analysis, but its interaction role is
-`explicit_user_goal`.
+It does **not** decide speech text, speech style fields, user Goal meaning,
+provider identity, or motor implementation.
 
-### Auxiliary expression
-
-When the model adds language style or body expression to support the
-interaction, the role is `auxiliary_expression`. It is advisory, lower priority
-than the user task, and may be dropped on target uncertainty, resource conflict,
-confirmation requirements, invalid parameters, latency pressure, emergency
-priority, or repetition/cooldown policy.
-
-Auxiliary expression can never satisfy, replace, delay, or claim completion of a
-user goal.
-
-## Model-owned plan
-
-The model authors:
-
-- the social purpose, such as listening, empathy, acknowledgement, engagement,
-  turn taking, deference, or neutral presence;
-- whether expression is useful for this turn;
-- language style and pacing adaptation;
-- zero or more exact capability IDs from the supplied candidates;
-- capability arguments, timing, social function, target selection, and
-  schema-valid semantic intensity parameters such as amplitude or duration.
-
-The model should consider the owner-approved interaction style together with:
-
-- the current speech act and relationship context;
-- user affect and engagement evidence;
-- conversation phase and turn-taking state;
-- primary task urgency and resource needs;
-- recent auxiliary behaviors, cooldown, and repetition;
-- currently available semantic capabilities and target evidence.
-
-A plan may use body expression, speech adaptation, both, or neither. The
-Response Composer owns coordination of the actual response text and auxiliary
-body plan so they express one coherent purpose. The standalone native
-compatibility planner remains body-only and sets speech adaptation to `none`.
-
-Current-compatible example shape:
+Example:
 
 ```json
 {
   "behavior_domain": "social_attention",
   "interaction_role": "auxiliary_expression",
-  "purpose": "acknowledgement",
+  "purpose": "acknowledge",
   "decision": "express",
-  "speech_expression": {
-    "mode": "adapt",
-    "style": "warm",
-    "pacing": "normal",
-    "reason": "Acknowledge the greeting naturally."
+  "target": {
+    "target_ref": "person:alice",
+    "source": "conversation_context",
+    "confidence": 0.9
   },
   "behaviors": [
     {
@@ -155,56 +203,90 @@ Current-compatible example shape:
 }
 ```
 
+`interaction_role=auxiliary_expression` means auxiliary embodied expression in
+this contract. It does not imply a second speech-expression channel.
+
 ## Capability discovery
 
-Capabilities declare one or more behavior domains. The checked-in
-`capabilities/behavior_domains.json` supplements the semantic taxonomy for
-current Soridormi named skills. Candidate discovery selects available,
-interaction-executable catalog entries tagged `social_attention` without using
-simulator or hardware provider metadata.
+Capabilities may declare one or more behavior domains. The checked-in
+`capabilities/behavior_domains.json` supplements semantic taxonomy for current
+Soridormi named skills. Candidate discovery selects available,
+interaction-executable entries tagged `social_attention` without using
+simulator or hardware-provider metadata.
 
 `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is an optional operator allow-list or
 extension, not the primary fixed candidate list. Its default is empty.
 
-A capability may belong to multiple domains. A head turn can express social
-attention, perception, navigation, or safety depending on the model-authored
-purpose and owning task. Capability taxonomy does not decide the plan.
+A Capability may belong to multiple domains. A head turn can be an explicit
+Activity responsibility, a perception behavior, or optional Social Attention
+decoration depending on the owning intent. Capability taxonomy does not decide
+that semantic role.
 
-Candidate discovery may use semantic capability identity, availability,
-interaction executability, schema, resource, and confirmation metadata. It must
-not filter candidates because a provider is labelled `sim`, `hardware`, or any
-other deployment backend.
+The model-facing projection removes provider backend identity and excludes
+low-level calibration/control fields. Target evidence contains only semantic
+identity and relative direction. Soridormi converts those semantics into
+embodiment-specific controller values.
 
-The model-facing projection also removes provider backend identity and excludes
-capabilities whose public schema exposes calibrated yaw/pitch or installation
-calibration fields. Target evidence contains only semantic identity and relative
-direction. Soridormi converts those semantics into embodiment-specific joint or
-controller values.
+## Host and runtime authority
 
-## Host authority
-
-The host may:
+The Host / Trusted Capability Runtime may:
 
 - validate exact catalog membership and argument schemas;
 - verify target evidence;
-- enforce confirmation and safety policy;
+- enforce confirmation, safety, and availability policy;
 - reject low-level motor fields;
-- detect resource conflicts with the primary plan;
+- detect resource and embodied-concurrency conflicts with primary Activity;
 - cap auxiliary behavior count;
-- apply emergency and latency suppression;
-- require auxiliary body requests to remain parallel and conflict-free;
-- drop invalid auxiliary expression;
-- record accepted-request evidence separately from execution and user outcomes.
+- apply emergency, latency, cooldown, and repetition suppression;
+- require Social Attention body requests to remain parallel and conflict-free;
+- drop invalid optional decoration;
+- record accepted-request and terminal decoration evidence separately from Goal
+  completion.
 
-The host may not:
+The Host must not:
 
-- inspect user phrases to select a social skill;
+- inspect user phrases and map them to a fixed social gesture;
 - replace an explicit requested action;
-- generate a gesture sequence from a social purpose;
-- invent a conversational answer or emotional interpretation;
-- let auxiliary expression delay speech, emergency handling, or the user task;
-- select, suppress, or authorize Social Attention because the active body is a
-  simulator or a physical robot.
+- generate a gesture sequence from a social-purpose string;
+- invent response text or emotional interpretation for Social Attention;
+- let decoration delay Vocal, emergency handling, or primary Activity;
+- select, suppress, or authorize decoration because the active body is a
+  simulator versus physical robot.
+
+Materialized Social Attention body requests carry:
+
+```text
+execution_lane = activity
+execution_role = social_decoration
+auxiliary_social_attention = true
+```
+
+That metadata is the trusted distinction between optional decoration and a
+primary Activity responsibility.
+
+## Relationship to execution coordination
+
+Chromie has two maintained execution lanes:
+
+```text
+Vocal
+Activity
+```
+
+`LaneCoordinationGroup` coordinates only those two lanes. Social Attention never
+appears in `lanes`, and a `SocialAttentionBehavior` never carries a
+`coordination_id`.
+
+When decoration is accepted, it becomes optional Activity work. If it overlaps
+other body Activity, the Trusted Capability Runtime and provider concurrency
+contract decide whether those exact body members may coexist. Compatible
+same-provider Soridormi members are compiled as one provider-local physical
+batch. This is body execution arbitration, not a third cognitive or execution
+lane.
+
+The Interaction Ledger may still retain a `social_attention` **event domain** so
+later cognition can distinguish decoration evidence from primary Activity
+evidence. That event-domain label is deliberately not an execution-lane label.
 
 ## Soridormi authority
 
@@ -218,73 +300,40 @@ Soridormi owns:
 - collision, balance, stop, emergency-stop, recovery, and safe-idle behavior;
 - provider health and execution evidence.
 
-A physical provider may clamp or reject an otherwise valid semantic request
-when the body cannot execute it safely. That is a provider execution result, not
-an alternate Chromie cognition mode.
+A provider may clamp or reject an otherwise valid semantic decoration when the
+body cannot execute it safely. That is a provider execution result, not an
+alternate Chromie cognition mode.
 
 ## Runtime policy
 
 | Mode | Meaning |
 |---|---|
 | `off` | Owner-selected or diagnostic suppression; do not plan auxiliary Social Attention. |
-| `report_only` | Compose and retain advisory evidence, but do not materialize auxiliary body requests. |
-| `on` | Compose and, after normal validation, materialize optional auxiliary Social Attention. |
+| `report_only` | Retain the advisory decoration decision/evidence, but do not materialize body requests. |
+| `on` | After normal validation, materialize optional body decoration through Activity. |
 
-The maintained default is `on`. A legacy simulator-scoped environment value is
-normalized to `on` at the configuration boundary because body-backend selection
-belongs to Soridormi/provider. Unknown explicit values fail closed to `off`.
-Contextual model selection may always produce `decision=none`.
+The maintained default is `on`. Contextual model selection may always produce
+`decision=none`.
 
-## Implemented closure
+## Testing and acceptance
 
-The implementation now:
+Tests should prove the semantic boundary rather than one fixed gesture:
 
-1. exposes only `off`, `report_only`, and `on` in the public contract;
-2. supplies owner-approved Social Interaction Style and bounded recent accepted
-   auxiliary-request evidence to Response Composer;
-3. discovers and validates candidates without inspecting provider backend mode;
-4. accepts only semantic target identity and relative direction as target evidence;
-5. requires auxiliary body requests to use `timing=parallel`, need no user
-   confirmation, and avoid primary resource conflicts;
-6. preserves explicit user actions as CanonicalPlan goals and never treats
-   auxiliary requests as completion evidence;
-7. keeps named-skill IDs and semantic argument schemas stable across Soridormi
-   backends; and
-8. leaves controller adaptation, calibration, motion limits, collision safety,
-   stop, recovery, safe idle, and execution evidence below the Chromie boundary.
+- `SocialAttentionPlan` cannot author speech-expression fields;
+- Social Attention is absent from `ChromieExecutionLane`;
+- `LaneCoordinationGroup` accepts Vocal/Activity only;
+- materialized decoration uses Activity plus
+  `auxiliary_social_attention=true`;
+- decoration cannot satisfy primary Goal completion;
+- explicit "blink twice" remains required Activity while an incidental blink is
+  optional decoration;
+- a decoration conflict/failure does not fail unrelated primary work;
+- backend metadata changes do not change Chromie's social decision semantics;
+- target-specific decoration requires evidence for that target;
+- repeated or unnecessary decoration may validly resolve to `decision=none`;
+- same-provider body overlap is accepted or rejected by declared provider
+  concurrency and safety, not by Capability-name heuristics.
 
-Automated contract and file-backed parity coverage is included. Retained live
-provider-backed qualification remains separate evidence work.
-
-## Testing
-
-Black-box tests classify both explicit and auxiliary actions in the stable
-`social_attention` observation domain while preserving their different
-interaction roles. The same named-skill and semantic-argument scenario must
-remain invariant when provider backend metadata changes. Abstract requests such
-as "show that you are listening" should be judged for contextual appropriateness
-without requiring one specific skill. Concrete requests such as "blink twice"
-require the exact observable count and remain primary goals.
-
-Backend-invariance tests should run the same semantic catalog and interaction
-context with different provider deployment metadata and require the same
-Chromie plan. Soridormi-specific tests then verify that each backend realizes or
-safely rejects the semantic request according to its own controller and safety
-contract.
-
-## Relationship to Chromie's execution lanes
-
-Social Attention is Chromie's proposal lane, not Soridormi's expression
-controller. It decides whether a bounded social behavior would be appropriate;
-Response Composer may coordinate that proposal with Vocal and parallel
-Activity. The Activity lane materializes the accepted exact capability request,
-and Soridormi decides whether the attached body can safely execute it.
-
-For overlap with a primary activity, both the Social Attention capability and
-every primary capability must carry Soridormi's explicit nested `concurrency`
-contract. Blink may be an `independent_output`, bounded gaze a
-`body_command_overlay`, and a large gesture `standalone_body_motion`; all remain
-subtle-expression semantics but have different physical coupling. Chromie does
-not infer those declarations from names or phrases. Compatible members are sent
-through one Soridormi embodied compilation rather than independent motor calls.
-See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md).
+See [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md) for
+the execution boundary and [Project Charter](PROJECT_CHARTER.md) for the
+constitutional rule.

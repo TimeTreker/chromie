@@ -75,7 +75,7 @@ from .execution_outcome import (
 )
 from .interaction_ledger import (
     InteractionContextProjection,
-    InteractionEventLane,
+    InteractionEventDomain,
     InteractionEventOwner,
     InteractionEventType,
     InteractionLedgerEvent,
@@ -169,7 +169,6 @@ from .social_attention import (
     SocialAttentionBehavior,
     SocialAttentionMode,
     SocialAttentionPlan,
-    SocialAttentionSpeechExpression,
     SocialAttentionTarget,
     normalize_social_attention_mode,
     SocialAttentionRequest,
@@ -296,7 +295,7 @@ __all__ = [
     "aggregate_execution_status",
     "execution_outcome_fingerprint",
     "InteractionContextProjection",
-    "InteractionEventLane",
+    "InteractionEventDomain",
     "InteractionEventOwner",
     "InteractionEventType",
     "InteractionLedgerEvent",
@@ -373,7 +372,6 @@ __all__ = [
     "SocialAttentionMode",
     "SocialAttentionPlan",
     "SocialAttentionRequest",
-    "SocialAttentionSpeechExpression",
     "SocialAttentionTarget",
     "normalize_social_attention_mode",
     "DiscourseReferenceSource",

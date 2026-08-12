@@ -593,7 +593,7 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
     asyncio.run(scenario())
 
 
-def test_social_attention_planning_is_peer_lane_and_does_not_wait_for_goal_association():
+def test_social_attention_background_loop_does_not_wait_for_goal_association():
     async def scenario():
         candidate = CognitiveProgressCandidate(
             candidate_id="progress-reference-social",

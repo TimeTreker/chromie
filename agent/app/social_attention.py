@@ -23,13 +23,13 @@ logger = logging.getLogger("chromie.agent.social_attention")
 
 
 class SocialAttentionPlanner:
-    """Model-driven auxiliary body-expression planning.
+    """Model-driven auxiliary body-decoration planning.
 
-    Social attention is a high-level behavior domain. The model decides whether
-    a body expression would improve the current interaction and selects exact
-    catalog skills for the scene. In the goal-driven path, Response Composer
-    coordinates language expression and body expression together. This native
-    compatibility path plans body expression only; deterministic code validates
+    Social Attention is background social cognition. The model decides whether
+    a small body decoration would make the anchored interaction more socially
+    natural without changing its Goal, response text, or completion, and selects exact
+    catalog skills for the scene. Response wording remains owned by the normal
+    cognitive/Response Composer path; this planner is body-only. Deterministic code validates
     schemas, evidence, safety, and resource conflicts without choosing actions.
     """
 
@@ -61,10 +61,11 @@ class SocialAttentionPlanner:
             raw = await client.generate(
                 prompt,
                 system=(
-                    "You are Chromie's auxiliary social-attention body planner. Treat social "
-                    "attention as a high-level interaction purpose, then choose scene-appropriate "
-                    "body expressions from the supplied catalog. Do not use phrase-to-skill rules, "
-                    "do not author speech in this compatibility path, and return JSON only."
+                    "You are Chromie's background Social Attention planner. Choose only small, "
+                    "scene-appropriate body decorations for the supplied interaction anchor from "
+                    "the supplied catalog. Decorations must remain optional, non-disruptive, and "
+                    "subordinate to the primary behavior. Do not use phrase-to-skill rules, do not "
+                    "author or alter speech, and return JSON only."
                 ),
                 options={
                     "temperature": 0.2,
@@ -236,7 +237,7 @@ class SocialAttentionPlanner:
             "one is available.\n"
             "Use only supplied semantic target evidence. Never invent a perceived person, target location, "
             "body calibration, joint target, or controller parameter.\n"
-            "Do not create or change the user's primary task. Do not add speech, tool calls, memory writes, or raw "
+            "Do not create or change the user's primary task or response text. Do not add speech, tool calls, memory writes, or raw "
             "joint/motor controls. Select only exact capability_id values from eligible_social_capabilities and provide "
             "schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
             "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. "

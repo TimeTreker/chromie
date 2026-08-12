@@ -5,7 +5,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ChromieExecutionLane = Literal[
-    "social_attention",
     "vocal",
     "activity",
 ]
@@ -39,9 +38,10 @@ def _normalize_unique_text_list(value: Any) -> list[str]:
 
 
 class LaneCoordinationGroup(BaseModel):
-    """One bounded cross-lane overlap authored by the Cognitive Core.
+    """One bounded Vocal/Activity overlap authored by the Cognitive Core.
 
-    The group coordinates execution channels; it does not create another mind,
+    Social Attention is not an execution lane and never appears here. The group
+    coordinates execution channels; it does not create another mind,
     select a provider, authorize an effect, or weaken provider safety.  This
     first maintained contract deliberately supports best-effort overlap only.
     Synchronized start barriers and atomic cross-provider failure semantics must
@@ -52,7 +52,7 @@ class LaneCoordinationGroup(BaseModel):
 
     coordination_id: str = Field(min_length=1)
     relation: LaneCoordinationRelation = "parallel"
-    lanes: list[ChromieExecutionLane] = Field(min_length=2, max_length=3)
+    lanes: list[ChromieExecutionLane] = Field(min_length=2, max_length=2)
     vocal_step_ids: list[str] = Field(default_factory=list)
     activity_step_ids: list[str] = Field(default_factory=list)
     start_policy: LaneCoordinationStartPolicy = "best_effort_parallel"

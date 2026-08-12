@@ -48,20 +48,7 @@ class OutcomeObservationTests(unittest.TestCase):
                     {"request_id": "speech-1", "status": "completed"},
                 ]
             },
-            "cognitive_runtime": {
-                "response_composition": {
-                    "composition": {
-                        "social_attention_plan": {
-                            "purpose": "listening",
-                            "speech_expression": {
-                                "mode": "adapt",
-                                "style": "warm",
-                                "pacing": "slower",
-                            },
-                        }
-                    }
-                }
-            },
+            "cognitive_runtime": {},
         }
 
     def test_normalizes_capabilities_into_user_observable_events(self) -> None:
@@ -76,9 +63,6 @@ class OutcomeObservationTests(unittest.TestCase):
         self.assertEqual(observations[1]["type"], "social_attention.gaze")
         self.assertEqual(observations[1]["interaction_role"], "auxiliary_expression")
         self.assertTrue(any(item["type"] == "speech.output" for item in observations))
-        self.assertTrue(
-            any(item["type"] == "social_attention.speech_expression" for item in observations)
-        )
 
     def test_expected_observations_are_skill_id_independent(self) -> None:
         observations = collect_observations(self._summary())

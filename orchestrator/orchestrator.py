@@ -9815,12 +9815,8 @@ class VoiceAssistant:
         async def schedule_text(text: str) -> dict[str, Any]:
             return await self.schedule_tts_text(text, session_id=None)
 
-        cognition_settings = getattr(
-            getattr(self, "host_settings", None), "cognition", None
-        )
         orientation_enabled = bool(
             getattr(self, "enable_soridormi_skills", False)
-            and getattr(cognition_settings, "social_attention_mode", "off") == "on"
         )
 
         async def execute_orientation() -> dict[str, Any]:
@@ -9828,9 +9824,6 @@ class VoiceAssistant:
                 self.interaction_runtime,
                 enable_soridormi_skills=getattr(
                     self, "enable_soridormi_skills", False
-                ),
-                social_attention_mode=getattr(
-                    cognition_settings, "social_attention_mode", "off"
                 ),
             )
 

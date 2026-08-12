@@ -194,12 +194,13 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                         },
                         "social_attention_plan": {
                             "decision": "express",
-                            "speech_expression": {
-                                "mode": "adapt",
-                                "style": "warm",
-                                "pacing": "normal",
-                                "reason": "Be friendly.",
-                            },
+                            "behaviors": [
+                                {
+                                    "capability_id": "soridormi.blink_eyes",
+                                    "args": {"count": 1},
+                                    "timing": "parallel",
+                                }
+                            ],
                         },
                     }
                 )

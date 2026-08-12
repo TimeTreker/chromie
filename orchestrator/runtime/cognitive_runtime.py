@@ -825,7 +825,7 @@ class CanonicalPlanRuntimeAdapter:
         event: str,
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Validate and execute one peer-lane Social-Attention proposal.
+        """Validate and execute one background Social-Attention decoration proposal.
 
         This path has no Goal-completion authority and never waits on or rewrites
         the primary response.  It reuses the same Trusted Capability Runtime as
@@ -927,7 +927,8 @@ class CanonicalPlanRuntimeAdapter:
                         "target": plan.target.model_dump(mode="json", exclude_none=True),
                         "reason": behavior.reason,
                         "social_attention_policy_mode": self.social_attention_mode,
-                        "execution_lane": "social_attention",
+                        "execution_lane": "activity",
+                        "execution_role": "social_decoration",
                         "source_goal_ids": [],
                         "turn_id": turn_id,
                     },
@@ -1092,10 +1093,10 @@ class CanonicalPlanRuntimeAdapter:
             "goal_association": association.model_dump(mode="json", exclude_none=True),
             "goal_association_fingerprint": fingerprint,
             "execution_lanes": {
-                "social_attention": "peer_proposal_lane",
                 "vocal": "response_delivery",
                 "activity": "idle",
             },
+            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [],
             "planning_result": "direct_response",
             "capability_decision": "respond",
@@ -1252,7 +1253,8 @@ class CanonicalPlanRuntimeAdapter:
                                     ),
                                     "reason": behavior.reason,
                                     "social_attention_policy_mode": policy_mode,
-                                    "execution_lane": "social_attention",
+                                    "execution_lane": "activity",
+                                    "execution_role": "social_decoration",
                                     "source_goal_ids": list(goal_ids),
                                 },
                             )
@@ -1273,10 +1275,12 @@ class CanonicalPlanRuntimeAdapter:
             "goal_association_fingerprint": fingerprint,
             "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
-                "social_attention": "proposal_and_auxiliary_execution",
                 "vocal": "response_delivery",
-                "activity": "idle",
+                "activity": (
+                    "auxiliary_social_decoration" if skills else "idle"
+                ),
             },
+            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [],
             "planning_result": "direct_response",
             "capability_decision": "respond",
@@ -1317,8 +1321,8 @@ class CanonicalPlanRuntimeAdapter:
             social_attention_plan=SocialAttentionPlan(
                 decision="none",
                 reason=(
-                    "Safe read started independently; Social Attention remains an "
-                    "optional peer lane rather than a presentation dependency."
+                    "Safe read started independently; Social Attention remains optional "
+                    "background decoration rather than a presentation dependency."
                 ),
                 metadata={
                     "auxiliary_social_attention": True,
@@ -1826,9 +1830,6 @@ class CanonicalPlanRuntimeAdapter:
                         "lane_start_policy": coordination.start_policy,
                         "lane_failure_policy": coordination.failure_policy,
                         "parallel_with_activity": "activity" in coordination.lanes,
-                        "parallel_with_social_attention": (
-                            "social_attention" in coordination.lanes
-                        ),
                         "playback_start_required_for_effects": False,
                     }
                 )
@@ -1920,7 +1921,6 @@ class CanonicalPlanRuntimeAdapter:
                     "parallel_with_activity": (
                         execution_lane != "activity" and "activity" in coordination.lanes
                     ),
-                    "parallel_with_social_attention": ("social_attention" in coordination.lanes),
                 }
                 if coordination is not None
                 else {}
@@ -2050,20 +2050,6 @@ class CanonicalPlanRuntimeAdapter:
                         ):
                             omitted_attention.append(f"resource_conflict:{behavior.skill_id}")
                             continue
-                        coordination_id = str(behavior.coordination_id or "").strip()
-                        coordination = lane_coordination_by_id.get(coordination_id)
-                        coordination_metadata = (
-                            {
-                                "coordination_id": coordination.coordination_id,
-                                "lane_coordination_relation": coordination.relation,
-                                "lane_start_policy": coordination.start_policy,
-                                "lane_failure_policy": coordination.failure_policy,
-                                "parallel_with_vocal": ("vocal" in coordination.lanes),
-                                "parallel_with_activity": ("activity" in coordination.lanes),
-                            }
-                            if coordination is not None
-                            else {}
-                        )
                         digest = hashlib.sha256(
                             f"{fingerprint}|social|{index}|{behavior.skill_id}".encode("utf-8")
                         ).hexdigest()[:20]
@@ -2086,9 +2072,6 @@ class CanonicalPlanRuntimeAdapter:
                                     "behavior_domain": attention.behavior_domain,
                                     "interaction_role": attention.interaction_role,
                                     "social_attention_purpose": attention.purpose,
-                                    "speech_expression": attention.speech_expression.model_dump(
-                                        mode="json", exclude_none=True
-                                    ),
                                     "social_function": behavior.social_function,
                                     "canonical_plan_id": plan.plan_id,
                                     "canonical_plan_fingerprint": fingerprint,
@@ -2098,8 +2081,8 @@ class CanonicalPlanRuntimeAdapter:
                                     ),
                                     "reason": behavior.reason,
                                     "social_attention_policy_mode": policy_mode,
-                                    "execution_lane": "social_attention",
-                                    **coordination_metadata,
+                                    "execution_lane": "activity",
+                                    "execution_role": "social_decoration",
                                 },
                             )
                         )
@@ -2148,7 +2131,6 @@ class CanonicalPlanRuntimeAdapter:
             "canonical_plan_fingerprint": fingerprint,
             "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
-                "social_attention": "proposal_and_auxiliary_execution",
                 "vocal": (
                     "response_delivery_and_provider_work"
                     if any(
@@ -2163,9 +2145,14 @@ class CanonicalPlanRuntimeAdapter:
                         and request.metadata.get("auxiliary_social_attention") is not True
                         for request in skills
                     )
-                    else "idle"
+                    else (
+                        "auxiliary_social_decoration"
+                        if materialized_social_capability_ids
+                        else "idle"
+                    )
                 ),
             },
+            "social_attention_role": "background_decoration",
             "lane_coordination_groups": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in composition.lane_coordination
@@ -2287,7 +2274,7 @@ class GoalDrivenRuntimeCoordinator:
         ] = {}
 
     def _track_auxiliary_task(self, task: asyncio.Task[Any]) -> None:
-        """Keep peer-lane work alive without making it a turn-response barrier."""
+        """Keep background social decoration alive without making it a turn-response barrier."""
 
         self._auxiliary_tasks.add(task)
 
@@ -2296,7 +2283,7 @@ class GoalDrivenRuntimeCoordinator:
             if completed.cancelled():
                 return
             exc = completed.exception()
-            if exc is not None:  # pragma: no cover - peer-lane bug visibility guard
+            if exc is not None:  # pragma: no cover - background-loop bug visibility guard
                 logger.warning(
                     "auxiliary cognitive task failed task=%s error_type=%s error=%s",
                     completed.get_name(),
@@ -2319,13 +2306,13 @@ class GoalDrivenRuntimeCoordinator:
         context: dict[str, Any],
         history: list[dict[str, Any]],
     ) -> None:
-        """Coalesce peer-lane social state without blocking primary cognition."""
+        """Coalesce background social-decoration state without blocking primary cognition."""
 
         if self.policy.mode != "apply" or self.adapter.social_attention_mode == "off":
             return
         key = (sid, turn_id)
         # Only the latest not-yet-processed state matters while one social model
-        # decision is already in flight. This keeps the lane continuous without
+        # decision is already in flight. This keeps Social Attention continuous without
         # turning every runtime event into another latency/compute tax.
         self._social_attention_pending[key] = {
             "session": session,
@@ -2979,7 +2966,7 @@ class GoalDrivenRuntimeCoordinator:
         if not callable(resolver) or self.adapter.social_attention_mode == "off":
             return {"status": "not_available", "event": event}
         social_context = dict(context)
-        social_context.pop("social_attention_owned_by_peer_lane", None)
+        social_context.pop("social_attention_owned_by_background_loop", None)
         social_context["social_attention_event"] = event
         social_context["social_attention_interaction_state"] = {
             "event": event,
@@ -3882,7 +3869,7 @@ class GoalDrivenRuntimeCoordinator:
 
                     fast_planner_path = "direct_vocal_output"
                     composition_context = dict(planning_context)
-                    composition_context["social_attention_owned_by_peer_lane"] = True
+                    composition_context["social_attention_owned_by_background_loop"] = True
                     composition_context["direct_goal_association_resolution"] = (
                         association.prompt_projection()
                     )
@@ -4373,7 +4360,7 @@ class GoalDrivenRuntimeCoordinator:
                 )
 
             composition_context = dict(planning_context)
-            composition_context["social_attention_owned_by_peer_lane"] = True
+            composition_context["social_attention_owned_by_background_loop"] = True
             composition_context["canonical_plan_resolution"] = terminal_plan.prompt_projection()
             composition_context["execution_capabilities"] = [
                 {

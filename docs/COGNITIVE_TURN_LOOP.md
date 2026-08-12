@@ -494,7 +494,7 @@ conservatively records each affected committed request as `cancelled` with an
 unknown-start diagnostic rather than asserting it never ran. An unknown or
 uncommitted runtime result fails exact reconciliation; only a result for an
 explicitly committed auxiliary social-attention request may be excluded.
-Pre-action speech and auxiliary social attention do not satisfy an effectful
+Pre-action speech and auxiliary Social Attention decoration do not satisfy an effectful
 user goal. Provider postcondition evidence such as `safe_idle=true` may support
 a safety claim, but does not by itself prove every requested goal completed.
 

@@ -65,7 +65,6 @@ _RESULT_AUTHORITY_METADATA_KEYS = (
     "lane_start_policy",
     "lane_failure_policy",
     "parallel_with_activity",
-    "parallel_with_social_attention",
 )
 
 
@@ -1347,7 +1346,6 @@ class SkillRuntime:
                 "lane_start_policy",
                 "lane_failure_policy",
                 "parallel_with_activity",
-                "parallel_with_social_attention",
             )
             if key in speech_metadata
         }
@@ -1404,14 +1402,11 @@ class SkillRuntime:
     ) -> tuple[str, str] | None:
         if definition.metadata.get("provider_local_activity_compilation") is not True:
             return None
-        coordination_id = str(request.metadata.get("coordination_id") or "").strip()
-        args_metadata = request.args.get("metadata")
-        if not coordination_id and isinstance(args_metadata, dict):
-            coordination_id = str(args_metadata.get("coordination_id") or "").strip()
-        return (
-            definition.provider_id,
-            coordination_id or "__parallel_body_batch__",
-        )
+        # Provider-local embodied compilation follows the actual runtime parallel
+        # batch, not Chromie's cross-lane coordination vocabulary. This lets
+        # auxiliary Social Attention remain an Activity decoration while the body
+        # provider still receives all simultaneous body members in one compile.
+        return (definition.provider_id, "__parallel_body_batch__")
 
     async def _run_parallel(
         self,

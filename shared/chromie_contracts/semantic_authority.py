@@ -97,7 +97,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             ),
             "planner_path": (
                 "Core readiness may start complete native Vocal, exact trusted "
-                "safe reads, and peer Social Attention while Goal Association continues; "
+                "safe reads, while background Social Attention may prepare optional body decoration as Goal Association continues; "
                 "Goal Association explicitly binds progress to canonical Goals; completely "
                 "bound native conversation may adopt canonical speech without Planner or "
                 "Response Composer, completely bound safe reads may adopt a canonical Plan "

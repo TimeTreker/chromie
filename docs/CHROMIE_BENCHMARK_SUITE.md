@@ -697,8 +697,8 @@ The matrix must demonstrate that:
 - `none` remains valid in every ordinary style;
 - explicit user requests and primary tasks dominate personality expression;
 - recent evidence suppresses mechanical repetition;
-- Social Attention does not delay speech, tools, emergency handling, or primary
-  execution;
+- Social Attention decoration does not delay speech, tools, emergency handling, or primary
+  execution and never changes response text;
 - provider rejection remains truthful and does not trigger Host substitution.
 
 ## 9. Existing scenario classification and migration

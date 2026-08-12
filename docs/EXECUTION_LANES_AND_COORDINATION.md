@@ -2,12 +2,10 @@
 
 ## Status
 
-Chromie has one Goal-Driven Cognitive Core and three concurrent coordination
-lanes:
+Chromie has one Goal-Driven Cognitive Core and two execution lanes:
 
 ```text
 Chromie Cognitive Core
-├── Social-Attention Proposal Lane
 ├── Vocal Execution Lane
 └── Activity Execution Lane
       └── Capability Providers
@@ -17,12 +15,22 @@ Chromie Cognitive Core
           ├── Weather
           ├── Memory
           └── future providers
+
+Background Social Attention
+  └── may add optional embodied decoration around an anchored interaction
+      └── accepted body decoration executes through Activity
 ```
 
-The shared contracts and maintained runtime now support explicit best-effort
-coordination across those lanes. This is not a second brain, a second planner,
-or a provider-selection shortcut. Goal meaning, Goal Association, planning, and
-response meaning remain owned by the one Cognitive Core.
+The shared contracts and maintained runtime support explicit best-effort
+coordination between Vocal and Activity. Social Attention is deliberately not a
+third lane. It is background social cognition that may propose small auxiliary
+body decoration such as gaze, blink, nod, a small wave, or slight posture /
+orientation when the live catalog and interaction make that appropriate.
+
+This is not a second brain, a second planner, or a provider-selection shortcut.
+Goal meaning, Goal Association, planning, and response meaning remain owned by
+the one Cognitive Core. Social Attention cannot author response text, create a
+Goal, own completion, or enter lane coordination.
 
 The current implementation provides best-effort parallel start through the
 Trusted Capability Runtime. It does not yet claim a synchronized cross-provider
@@ -34,75 +42,72 @@ evidence. Those require a later runtime contract and provider support.
 | Layer | Owns | Must not own |
 |---|---|---|
 | Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
-| Social-Attention Proposal Lane | bounded social proposals such as attention, natural blink, gaze, acknowledgement, or restraint | independent speech meaning, Goal creation, motor authorization |
+| Background Social Attention | whether an anchored interaction benefits from small optional embodied decoration; social purpose and eligible body candidate | user Goal creation, response wording, completion, execution-lane membership, motor authorization |
 | Vocal Execution Lane | authored speech, TTS/vocal playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality, semantic planning, or existing-media lifecycle ownership |
-| Activity Execution Lane | exact provider calls, task execution, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
-| Soridormi | embodied feasibility, body-lane arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
+| Activity Execution Lane | exact provider calls, primary task execution, optional Social Attention body decoration, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
+| Soridormi | embodied feasibility, body arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
-The Activity lane executes work for Goals; it does not own those Goals.
-Social Attention proposes socially appropriate behavior; it does not directly
-operate the body. Vocal delivers Chromie-authored personal voice output; it is not a
-separate conversational agent.
+The Activity lane executes work; it does not own Goals. Optional Social
+Attention decoration also executes through Activity, but carries
+`auxiliary_social_attention=true` and `execution_role=social_decoration` so it
+cannot be mistaken for primary completion work. Vocal delivers Chromie-authored
+personal voice output; it is not a separate conversational agent.
 
-## Continuous Social Attention
+## Background Social Attention
 
-Social Attention is a concurrent interaction lane, not an ornament attached only
-to a final spoken response. It may be reconsidered when meaningful interaction
-state changes, including:
+Social Attention is continuous background social cognition, not an execution
+lane and not a standalone action generator. It may reconsider whether a small
+decoration is useful when meaningful interaction state changes, including:
 
 - a user starts or finishes addressing Chromie;
-- fast understanding becomes sufficient to acknowledge or begin safe progress;
+- fast understanding becomes sufficient for the ongoing interaction;
 - Activity or information acquisition starts, waits, changes, completes, or
   fails;
 - new scene/target evidence becomes available;
 - interruption or cancellation changes the interaction; and
 - Vocal output starts, continues, or completes.
 
-These triggers provide *state*, not hardcoded gestures. The Social-Attention
-cognition still decides whether expression is useful and may choose
-`decision=none`. It consumes a bounded social projection of the one Core-owned
-interaction together with Chromie's stable Mind. It therefore does not need to
-wait for a complete Goal graph when the available scene and interaction evidence
-already support a harmless expression. Conversely, target-specific gaze or
-other claims that require scene evidence remain unavailable until that evidence
-exists.
+These events provide an **interaction anchor**, not a reason to move by default.
+The Social-Attention model may choose `decision=none`. A decoration is useful
+only when it supports the live social situation and remains small,
+non-disruptive, interruptible, optional, and subordinate to the primary
+responsibility.
 
-Response Composer may coordinate body expression with authored speech when one
-joint decision is useful, but it is not the exclusive owner or only trigger of
-Social Attention. A separate Social-Attention model path, when used, remains an
-auxiliary proposal mechanism rather than a second semantic planner.
+Social Attention must not become a generic idle-animation loop. A blink while
+actively listening may be Social Attention; an autonomous idle blink with no
+social interaction belongs to baseline embodiment/liveliness if that separate
+behavior is ever implemented.
 
-When the runtime already knows the reviewed live set of eligible social
-Capabilities, the model-facing contract should make invented identifiers
-unrepresentable: `capability_id` is constrained to the exact supplied candidate
-IDs, while trusted code still validates arguments, target evidence, resources,
-safety, and provider availability. The model decides *whether* and *which*
-eligible expression is appropriate; it does not reconstruct machine identifiers.
+Response Composer may include an advisory SocialAttentionPlan when a joint
+presentation decision is useful, but it is not the exclusive trigger. A
+separate background Social-Attention model path may use the same bounded
+contract. Neither path owns response text: wording, speech acts, and Vocal style
+remain with the applicable cognitive/response owner.
 
-Optional Social Attention must fail soft with respect to unrelated primary work.
-A slow, invalid, unavailable, or rejected social proposal must not delay an
-otherwise-ready safe read or cancel a valid primary Activity Plan. Coordination
-creates a dependency only when the intended behavior actually requires one.
+When the runtime knows the reviewed live set of eligible Social Attention body
+Capabilities, the model-facing contract constrains `capability_id` to those
+candidates. Trusted code still validates arguments, target evidence, resources,
+safety, provider availability, and provider concurrency. The model decides
+whether a decoration is socially appropriate; it does not reconstruct machine
+identifiers or body-controller policy.
 
-Example interaction:
+Optional decoration fails soft with respect to unrelated primary work. A slow,
+invalid, unavailable, conflicting, or rejected Social Attention proposal must
+not delay ready Vocal or Activity work and must not change Goal truth.
+
+Example:
 
 ```text
-user speaks
-  -> Social Attention may orient/listen
-
-fast understanding becomes sufficient
-  -> optional acknowledgement expression
-  -> safe information acquisition may start independently
-
-provider result arrives
-  -> Social Attention may re-engage
-
-Chromie answers
-  -> speech and optional expression may be coordinated
+Goal: greet Alice
+  -> Vocal says "Hello!"
+  -> Social Attention may optionally propose look/blink/small wave
+       -> accepted decoration executes as auxiliary Activity
+       -> decoration failure does not make the greeting Goal false
 ```
 
-No stage above requires a gesture, and none gives Social Attention authority over
-the user's Goal.
+If the user explicitly asks "blink twice", that blink is instead primary
+Activity responsibility. The physical Capability may be the same; the semantic
+role and completion authority are not.
 
 ## Soridormi embodied compilation contract
 
@@ -167,22 +172,23 @@ media execution.
 ## Lane-coordination contract
 
 `LaneCoordinationGroup` records model-authored execution overlap after the
-Canonical Plan already exists. It does not create capabilities or authorize an
-effect.
+Canonical Plan already exists. It coordinates only the two execution lanes:
+Vocal and Activity. It does not create capabilities, authorize an effect, or
+represent Social Attention.
 
 ```json
 {
   "coordination_id": "performance_1",
   "relation": "parallel",
-  "lanes": ["vocal", "activity", "social_attention"],
+  "lanes": ["vocal", "activity"],
   "activity_step_ids": ["step_walk"],
   "start_policy": "best_effort_parallel",
   "failure_policy": "independent",
-  "reason_summary": "Walk while speaking and blinking."
+  "reason_summary": "Walk while speaking."
 }
 ```
 
-The participating response stage copies the same identifier:
+The participating response stage may copy the same identifier:
 
 ```json
 {
@@ -190,27 +196,32 @@ The participating response stage copies the same identifier:
   "speech_act": "inform",
   "commitment_state": "in_progress",
   "must_not_claim_completion": true,
-  "covers_goal_ids": ["goal_performance"],
+  "covers_goal_ids": ["goal_walk"],
   "coordination_id": "performance_1",
   "delivery_role": "activity_companion"
 }
 ```
 
-An auxiliary social proposal may join the same group:
+A Social Attention decoration does **not** join that coordination group and does
+not carry `coordination_id`:
 
 ```json
 {
   "capability_id": "soridormi.blink_eyes",
-  "args": {"count": 2},
+  "args": {"count": 1},
   "timing": "parallel",
-  "social_function": "engagement",
-  "coordination_id": "performance_1"
+  "social_function": "engagement"
 }
 ```
 
-The referenced Canonical Plan activity steps must already use
-`timing=parallel`. The Response Composer cannot convert a sequential activity
-step into a parallel one.
+If accepted, the Host materializes that body decoration as auxiliary Activity.
+Actual overlap with primary body Activity is then decided mechanically from the
+runtime batch and provider concurrency/safety declarations. Cross-lane
+coordination IDs are not reused as embodied-provider grouping semantics.
+
+The referenced Canonical Plan Activity steps must already use
+`timing=parallel`. Response Composer cannot convert a sequential primary step
+into a parallel one.
 
 ## Playback and confirmation rules
 
@@ -257,10 +268,11 @@ Host may reuse an exact source-authored, mechanically validated current-turn
 or unavailable Goal mechanically, or change the immutable Capability Plan.
 
 Optional Social Attention is likewise not execution authority. A model output
-that selects `decision=express` but contains neither a valid body behavior nor
-`speech_expression.mode=adapt` is normalized to an explicit `decision=none`
-before nested DTO validation. The empty auxiliary expression is dropped while
-the immutable mixed or Activity Plan remains available to Runtime.
+with `decision=express` requires at least one valid decorative body behavior;
+otherwise the advisory plan is rejected or normalized to `decision=none` at the
+applicable bounded boundary. Social Attention cannot fall back to changing
+speech text. Dropping optional decoration leaves the immutable Vocal/Activity
+work unchanged.
 
 Eligible `tool`, `robot_action`, and `deep_thought` fast acknowledgements receive
 an independent semantic review before playback. Persona may shape wording but
@@ -274,17 +286,18 @@ suppressed, unavailable, or invalid dynamic acknowledgement.
 
 The maintained runtime:
 
-1. validates all coordination references and lane membership;
-2. requires referenced activity steps to be parallel Canonical Plan steps;
+1. validates Vocal/Activity coordination references and lane membership;
+2. requires referenced primary Activity steps to be parallel Canonical Plan steps;
 3. keeps ordinary pre-action speech behind the playback-start barrier;
-4. runs Vocal and peer-provider Activity work as a best-effort parallel
-   batch;
-5. groups compatible same-provider Soridormi body members into one deterministic
-   embodied compilation and execution;
-6. requires explicit provider concurrency metadata for Social Attention overlap;
-7. maps Soridormi aggregate member evidence back to the original request IDs and
-   Goal-owning steps;
-8. records lane membership and coordination IDs in interaction evidence; and
+4. runs Vocal and Activity work as a best-effort parallel batch;
+5. materializes accepted Social Attention body decoration as auxiliary Activity
+   with no Goal-completion authority;
+6. groups compatible same-provider Soridormi body members from the actual
+   parallel runtime batch into one deterministic embodied compilation and
+   execution, independent of cross-lane coordination IDs;
+7. requires provider concurrency metadata and safety validation for body overlap;
+8. maps Soridormi aggregate member evidence back to original request identities
+   while preserving primary-versus-decoration semantics; and
 9. reconciles each Goal only from its own capability-specific outcome evidence.
 
 Cross-provider Vocal/body start remains best-effort. Inside Soridormi, body

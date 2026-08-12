@@ -72,7 +72,7 @@ behavior spans several boundaries:
 - parameter resolution;
 - validation and confirmation;
 - provider execution;
-- speech and social attention;
+- speech and optional Social Attention body decoration;
 - task and goal continuity.
 
 A retained scenario preserves the complete interaction contract across these

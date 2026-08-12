@@ -368,8 +368,10 @@ content itself.
 
 Startup readiness is not a compulsory spoken greeting. The maintained default is
 one quiet, untargeted, capability-grounded orientation followed by attentive
-listening. It may use only a provider-declared Social Attention capability that
-is currently available, requires no confirmation, and accepts the exact bounded
+listening. Because startup has no social interaction anchor, this orientation is
+baseline lifecycle Activity/liveliness rather than Social Attention. It may use
+only a provider-declared subtle expression/orientation Capability that is
+currently available, requires no confirmation, and accepts the exact bounded
 arguments supplied by the Host startup policy. It does not target a person,
 claim to inspect the room, or infer nearby people, weather, meals, feelings, or
 other environmental facts.
@@ -592,30 +594,46 @@ typed value matches the claimed argument and occurs in the claimed Goal; it
 must not infer the mapping or demand a redundant copied-text citation whose
 format can block an otherwise correct plan.
 
-## Social attention during speech
+## Social decoration during interaction
 
-Chromie may coordinate speech with subtle nonverbal attention, but attention is
-the goal and no particular gesture is mandatory. Blinking, gaze, a small nod,
-or remaining still are possible model-selected expressions, not fixed responses
-attached to every utterance.
+Chromie may accompany speech, listening, or ongoing Activity with subtle
+nonverbal Social Attention decoration. The decoration is **not** the Goal. It is
+an optional way of making the already-intended interaction feel socially present
+rather than mechanically isolated.
 
-The interaction model receives the current turn, recent context, the
-owner-approved Social Interaction Style, bounded recent auxiliary-request
-evidence, eligible named social capabilities, target evidence, and semantic
+For example, a greeting remains the same greeting text while Social Attention
+may add gaze toward the person, a natural blink, a small nod or wave, or another
+qualified subtle body cue. Social Attention must not rewrite what Chromie says,
+create an extra user task, or make the greeting fail if the decoration cannot
+run.
+
+The Social Attention model receives the current interaction anchor, recent
+context, owner-approved Social Interaction Style, bounded recent decoration
+evidence, eligible named body capabilities, target evidence, and semantic
 resource metadata. It may produce a structured `SocialAttentionPlan` with
-`decision=express` or `decision=none`. It must not create a new user task, claim
-perception that is not present, invent a target, or infer the body backend.
-Target evidence is semantic only. Installation calibration, body coordinates,
-joint targets, and controller parameters remain entirely below the Chromie boundary.
+`decision=express` or `decision=none`. `decision=express` requires at least one
+body behavior; there is no Social-Attention speech-expression field or fallback.
+
+The same motion has different semantics depending on ownership. A user request
+such as "blink twice" is primary Activity responsibility. A blink selected while
+Chromie greets or listens is auxiliary decoration. The Capability may be the
+same, but only the first participates in Goal completion.
 
 Deterministic runtime code validates exact skill IDs, schemas, target evidence,
 confirmation policy, execution availability, latency budget, parallel timing,
-and resource conflicts. Auxiliary attention skills are not user task proposals
-and must be suppressed when they would interfere with speech, emergency
-handling, or the primary action. Backend selection, calibration, motion limits,
-collision safety, stop, and recovery remain provider-owned. Do not implement
-normal attention through rules such as "blink twice after every reply" or
-"always look right."
+resource conflicts, and provider concurrency. Accepted decoration executes
+through Activity with `auxiliary_social_attention=true` and
+`execution_role=social_decoration`. It is suppressed rather than delaying or
+conflicting with Vocal, emergency handling, or primary Activity.
+
+Social Attention is not a generic idle-animation loop. Its decoration requires a
+meaningful interaction anchor such as listening, Vocal, Activity, turn-taking,
+or interaction-bound waiting. Pure baseline embodiment/liveliness outside a
+social interaction is a separate concern.
+
+Backend selection, calibration, motion limits, collision safety, stop, and
+recovery remain provider-owned. Do not implement normal attention through rules
+such as "blink twice after every reply" or "always look right."
 
 ## LLM wording inside contracts
 

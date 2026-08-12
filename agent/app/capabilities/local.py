@@ -131,10 +131,7 @@ def vocal_performance_tool(
             "execution_constraints": {
                 "exact_mode_required": True,
                 "silent_mode_downgrade_forbidden": True,
-                "parallel_allowed_with_lanes": [
-                    "activity",
-                    "social_attention",
-                ],
+                "parallel_allowed_with_lanes": ["activity"],
             },
             "semantic_scope": {
                 "responsibility_kind": "vocal_output",
@@ -243,7 +240,6 @@ def media_playback_tools(
                         "parallel_allowed_with_lanes": [
                             "vocal",
                             "activity",
-                            "social_attention",
                         ],
                     },
                     "semantic_scope": {
@@ -306,10 +302,7 @@ def chromie_manifests(
                     "exclusive_group": "chromie.voice",
                     "resource_claims": ["chromie.voice"],
                     "execution_constraints": {
-                        "parallel_allowed_with_lanes": [
-                            "activity",
-                            "social_attention",
-                        ]
+                        "parallel_allowed_with_lanes": ["activity"]
                     },
                 },
             ),

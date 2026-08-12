@@ -41,7 +41,7 @@ class _OrientationRuntime:
             available=True,
             requires_confirmation=False,
             timeout_ms=3000,
-            metadata={"behavior_domains": ["social_attention"]},
+            metadata={"behavior_domains": ["posture_expression"]},
         )
 
     async def execute(self, response, *, session_id):
@@ -56,7 +56,6 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
         result = await execute_default_runtime_ready_orientation(
             runtime,
             enable_soridormi_skills=True,
-            social_attention_mode="on",
         )
 
         self.assertEqual(result["status"], "completed")
@@ -75,20 +74,21 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
             {"style": "neutral", "duration_s": 1.2, "hold_fraction": 0.2},
         )
         self.assertTrue(request.metadata["untargeted"])
+        self.assertEqual(request.metadata["execution_lane"], "activity")
+        self.assertEqual(request.metadata["execution_role"], "startup_orientation")
+        self.assertNotIn("auxiliary_social_attention", request.metadata)
         self.assertTrue(response.metadata["suppress_body_failure_speech"])
 
-    async def test_startup_orientation_skips_when_social_attention_is_off(self) -> None:
+    async def test_startup_orientation_is_independent_of_social_attention_policy(self) -> None:
         runtime = _OrientationRuntime()
 
         result = await execute_default_runtime_ready_orientation(
             runtime,
             enable_soridormi_skills=True,
-            social_attention_mode="off",
         )
 
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["reason"], "social_attention_not_on")
-        self.assertEqual(runtime.executed, [])
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(runtime.executed), 1)
 
 
 if __name__ == "__main__":

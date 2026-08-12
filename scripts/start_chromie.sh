@@ -499,7 +499,7 @@ Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | semantic 
 Response Composer                  | ${EFFECTIVE_RESPONSE_COMPOSER_MODEL} | response-required paths; skipped by pure ready reads
 Tool Result Interpreter            | ${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL} | post-evidence grounded delivery
 Task Continuity                    | ${EFFECTIVE_TASK_CONTINUITY_MODEL} | compatibility/auxiliary surface
-Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL} | independent peer event lane
+Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL} | background social-decoration loop
 Response Review                    | ${EFFECTIVE_RESPONSE_REVIEW_MODEL} | optional semantic response review
 EOF_MODEL_ROLES
 

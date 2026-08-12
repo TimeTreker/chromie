@@ -14,9 +14,10 @@ experience artifacts. See
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority with readiness-driven continuous progress. After admitted
-> Fast Understanding, complete native conversational answers, exact capability
-> work candidates, and peer Social Attention may advance independently while Goal
-> Association continues. Native answers enter the existing Vocal runtime;
+> Fast Understanding, complete native conversational answers, and exact capability
+> work candidates may advance independently while Goal Association continues;
+> background Social Attention may independently prepare optional body decoration
+> for the same anchored interaction. Native answers enter the existing Vocal runtime;
 > trusted safe reads may start provider work early. Goal Association later binds
 > those candidates to canonical Goals. Fully bound native conversation can close
 > without Planner/Response-Composer model calls, and fully bound information reads
@@ -59,10 +60,11 @@ experience artifacts. See
 > memory, and future integrations remain peer Capability Providers selected only
 > by planning from exact registered semantic scope. See
 > [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
-> Chromie also has three concurrent coordination lanes beneath the one Cognitive
-> Core: Social-Attention proposals, Vocal execution, and Activity execution.
-> Soridormi remains a peer Capability Provider beneath Activity and owns its
-> subtle-expression, locomotion/whole-body, and safety arbitration. See
+> Chromie has two execution lanes beneath the one Cognitive Core: Vocal and
+> Activity. Social Attention is background social-decoration cognition, not a
+> third lane; accepted decoration executes through Activity with no Goal-completion
+> authority. Soridormi remains a peer Capability Provider beneath Activity and
+> owns its subtle-expression, locomotion/whole-body, and safety arbitration. See
 > [Execution Lanes and Coordination](docs/EXECUTION_LANES_AND_COORDINATION.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -78,7 +80,7 @@ Host Orchestrator
            |-> complete native response -> Vocal --- .
            |-> exact capability progress candidate ----|
            |      `-> readiness-qualified safe read ---|
-           |-> peer Social-Attention proposal lane ----|
+           |-> background Social Attention decoration |
            `-> Goal Association -----------------------+-> canonical Goal state
                                                         |
         -> exact ready-progress adoption OR Fast Planner -> terminal Deep Planner when needed
