@@ -1210,6 +1210,134 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ["open", "open"],
         )
 
+    def test_compatible_goal_refinement_preserves_existing_plan_work(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="compatible-refinement")
+        self._create_goals(manager, "goal-cup")
+        manager.record_agent_result(
+            "sid-plan",
+            InteractionResponse(
+                metadata={
+                    "planning_result": "composed_plan",
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-cup",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-cup"],
+                            }
+                        ],
+                    ),
+                }
+            ),
+        )
+        before = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(before["plan_version"], 1)
+        self.assertEqual(before["plan_status"], "proposed")
+        self.assertEqual(before["status"], "planning")
+
+        applied = manager.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-blue-cup",
+                "associations": [
+                    {
+                        "association_id": "assoc-blue-cup",
+                        "relationship": "modify",
+                        "target_goal_ids": ["goal-cup"],
+                        "goal_update": {
+                            "description": "Pick up the blue cup."
+                        },
+                        "requires_replan": False,
+                        "confidence": 0.99,
+                        "reason_summary": "The user refined the same cup responsibility.",
+                    }
+                ],
+                "confidence": 0.99,
+                "reason_summary": "Same responsibility, compatible refinement.",
+            },
+            sid="sid-blue",
+            user_text="The blue one.",
+            route="robot_action",
+            intent="refinement",
+            atomic=True,
+        )
+
+        self.assertTrue(all(item.get("applied") is True for item in applied))
+        after = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(after["semantic_goal"]["goal_id"], "goal-cup")
+        self.assertEqual(after["goal_version"], 2)
+        self.assertEqual(after["plan_version"], 1)
+        self.assertEqual(after["plan_status"], "proposed")
+        self.assertEqual(after["status"], "planning")
+        self.assertEqual(
+            after["semantic_compatibility_history"][-1]["decision"],
+            "preserve",
+        )
+        self.assertNotIn("superseded_plan_versions", after)
+
+    def test_incompatible_goal_refinement_supersedes_plan_only_when_replan_required(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="incompatible-refinement")
+        self._create_goals(manager, "goal-cup")
+        manager.record_agent_result(
+            "sid-plan",
+            InteractionResponse(
+                metadata={
+                    "planning_result": "composed_plan",
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-cup",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-cup"],
+                            }
+                        ],
+                    ),
+                }
+            ),
+        )
+
+        applied = manager.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-red-cup",
+                "associations": [
+                    {
+                        "association_id": "assoc-red-cup",
+                        "relationship": "modify",
+                        "target_goal_ids": ["goal-cup"],
+                        "goal_update": {
+                            "description": "Pick up the red cup instead."
+                        },
+                        "requires_replan": True,
+                        "confidence": 0.99,
+                        "reason_summary": "The changed target makes the old plan incompatible.",
+                    }
+                ],
+                "confidence": 0.99,
+                "reason_summary": "Same responsibility, incompatible current Work.",
+            },
+            sid="sid-red",
+            user_text="Actually, the red one.",
+            route="robot_action",
+            intent="refinement",
+            atomic=True,
+        )
+
+        self.assertTrue(all(item.get("applied") is True for item in applied))
+        after = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(after["semantic_goal"]["goal_id"], "goal-cup")
+        self.assertEqual(after["goal_version"], 2)
+        self.assertEqual(after["plan_version"], 1)
+        self.assertEqual(after["plan_status"], "superseded")
+        self.assertEqual(after["status"], "planning")
+        self.assertEqual(after["superseded_plan_versions"], [1])
+        self.assertEqual(
+            after["semantic_compatibility_history"][-1]["decision"],
+            "supersede",
+        )
+
     def test_execution_outcome_bundle_preserves_exact_mixed_goal_evidence(self) -> None:
         manager = ConversationStateManager(base_conversation_id="outcome-bundle")
         self._create_goals(manager, "goal-walk", "goal-blink")

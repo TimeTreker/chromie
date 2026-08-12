@@ -128,9 +128,9 @@ evidence.
 2. **implemented:** the minimum bounded Situation projection is reconstructed from
    current authoritative references, revisioned across cognition, and never persisted
    as a Belief/world-state database;
-3. **implemented:** fully discharged provider-free native conversation stays transient
-   without persistent Goal state; **next:** same-Responsibility refinement, replacement,
-   cancellation, reopening, and downstream semantic compatibility;
+3. **implemented:** transient materialization plus same-Responsibility refinement
+   preserve compatible Work; **next:** genuine replacement lineage, trusted effect
+   cancellation/forward repair, and reopening across later evidence;
 4. make relevant Evidence/state deltas reactivate ready Progress or cognition
    without a central polling/priority scheduler;
 5. preserve revision provenance and forward-repair semantics across Goal, Plan,

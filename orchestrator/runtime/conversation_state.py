@@ -1032,6 +1032,9 @@ class ConversationStateManager:
         source: str | None,
     ) -> dict[str, Any]:
         now = _now_ms()
+        previous_work_status = str(context.get("status") or "open")
+        previous_commitment_state = str(context.get("commitment_state") or "none")
+        previous_plan_status = str(context.get("plan_status") or "not_planned")
         result: dict[str, Any] = {
             "operation_id": operation.operation_id,
             "operation": operation.operation,
@@ -1125,12 +1128,7 @@ class ConversationStateManager:
             ][:4]
 
             old_plan_version = max(0, int(context.get("plan_version") or 0))
-            if operation.requires_replan or operation.operation in {
-                "modify",
-                "clarification_answer",
-                "correct",
-                "replace",
-            }:
+            if operation.requires_replan:
                 if old_plan_version:
                     superseded = context.get("superseded_plan_versions")
                     if not isinstance(superseded, list):
@@ -1144,7 +1142,11 @@ class ConversationStateManager:
                     invalidated = context.get("invalidated_confirmations")
                     if not isinstance(invalidated, list):
                         invalidated = []
-                    invalidated.append({**confirmation, "invalidated_ms": now, "reason": "goal_version_changed"})
+                    invalidated.append({
+                        **confirmation,
+                        "invalidated_ms": now,
+                        "reason": "semantic_incompatibility_requires_replan",
+                    })
                     context["invalidated_confirmations"] = invalidated[-8:]
                     context["confirmation"] = None
 
@@ -1159,16 +1161,59 @@ class ConversationStateManager:
                 in {"observe_environment", "query_trusted_service"}
                 for item in context["open_information_gaps"]
             )
-            context["status"] = operation.status_update or (
-                "waiting_for_user"
-                if blocking_user_gap
-                else "needs_context"
-                if blocking_context_gap
-                else "planning"
+            preserve_work_state = (
+                not operation.requires_replan
+                and (
+                    old_plan_version > 0
+                    or previous_work_status
+                    in {
+                        "awaiting_confirmation",
+                        "committed",
+                        "scheduled",
+                        "running",
+                        "paused",
+                        "recoverable",
+                    }
+                )
             )
-            context["commitment_state"] = operation.commitment_state or (
-                "waiting_for_user" if context["status"] == "waiting_for_user" else "evaluating"
+            if preserve_work_state:
+                context["status"] = previous_work_status
+                context["commitment_state"] = previous_commitment_state
+                context["plan_status"] = previous_plan_status
+            else:
+                context["status"] = operation.status_update or (
+                    "waiting_for_user"
+                    if blocking_user_gap
+                    else "needs_context"
+                    if blocking_context_gap
+                    else "planning"
+                )
+                context["commitment_state"] = operation.commitment_state or (
+                    "waiting_for_user"
+                    if context["status"] == "waiting_for_user"
+                    else "evaluating"
+                )
+
+            compatibility_history = context.get("semantic_compatibility_history")
+            if not isinstance(compatibility_history, list):
+                compatibility_history = []
+            compatibility_history.append(
+                {
+                    "goal_version": revised.version,
+                    "previous_work_status": previous_work_status,
+                    "plan_version": old_plan_version,
+                    "decision": (
+                        "supersede" if operation.requires_replan else "preserve"
+                    ),
+                    "reason": (
+                        "requires_replan"
+                        if operation.requires_replan
+                        else "same_responsibility_compatible_revision"
+                    ),
+                    "ts_ms": now,
+                }
             )
+            context["semantic_compatibility_history"] = compatibility_history[-12:]
 
         context["task_relation"] = {
             "modify": "modify_task",

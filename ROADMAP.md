@@ -53,11 +53,11 @@ baseline**, not another broad concept-expansion phase:
    ready progress IDs, and evidence refs. It is rebuilt in-process, revisioned
    between Goal Association and planning, prompt-validated, and never owns or
    copies the referenced Goal/Evidence/provider truth.
-3. **Goal materialization now follows unfinished Responsibility.** Fully covered
-   provider-free native conversation remains transient and does not create durable
-   Goal state. Next preserve Goal identity across same-Responsibility refinement
-   and create new lineage only for a genuinely replacement Responsibility; keep
-   decomposition in Work/Plan by default.
+3. **Goal materialization and compatible refinement are implemented.** Fully
+   discharged provider-free native conversation stays transient; same-Responsibility
+   refinement preserves Goal identity and existing Work unless Goal Association
+   explicitly sets `requires_replan=true`. Next implement genuine replacement
+   lineage and trusted forward repair for already committed effects.
 4. **Implement evidence-driven revision/reactivation.** New relevant Evidence may
    revise Situation, make open Goals actionable, invalidate Work assumptions,
    close/reopen responsibility, or justify fast/slow cognition. Prefer semantic
@@ -84,8 +84,8 @@ adding a manager because a useful explanatory term exists.
 ## Current priorities
 
 1. Implement the next Continuous Mind invariant from the compressed baseline:
-   preserve Goal identity through same-Responsibility refinement/replacement and
-   downstream semantic compatibility. Preserve landed transient materialization and
+   make genuine replacement create new Goal lineage and repair already committed
+   incompatible effects forward. Preserve landed materialization/refinement and
    Situation projection; do not grow it into a manager, Belief database, world
    graph, or duplicate truth store.
 2. Preserve the merged source contracts from Issues
