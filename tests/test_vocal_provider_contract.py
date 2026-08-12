@@ -30,6 +30,8 @@ from orchestrator.runtime.skill_runtime import (
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
+    SkillRequest,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     VocalModeEvidence,
     VocalPerformanceDelivery,
@@ -104,8 +106,8 @@ def vocal_goal(mode: str = "singing") -> dict[str, object]:
         "description": "Perform the authored vocal content.",
         "source_text": "Sing a short greeting.",
         "metadata": {
-            "responsibility_kind": "spoken_response",
-            "execution_lane": "speaking",
+            "responsibility_kind": "vocal_output",
+            "execution_lane": "vocal",
             "output_mode": mode,
             "provider_required": True,
         },
@@ -184,6 +186,17 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
                     "supported_modes": ["recitation", "singing"],
                 }
             )
+
+    def test_personal_voice_definitions_share_one_exclusive_resource(self) -> None:
+        speech = local_speech_definition()
+        vocal = vocal_performance_definition(declaration("singing"))
+
+        self.assertEqual(speech.exclusive_group, "chromie.voice")
+        self.assertEqual(vocal.exclusive_group, "chromie.voice")
+        self.assertEqual(speech.metadata["resource_claims"], ["chromie.voice"])
+        self.assertEqual(vocal.metadata["resource_claims"], ["chromie.voice"])
+        self.assertEqual(speech.metadata["execution_lane"], "vocal")
+        self.assertEqual(vocal.metadata["execution_lane"], "vocal")
 
     def test_default_catalog_retains_contract_without_advertising_a_mode(self) -> None:
         speech_manifest = next(
@@ -361,17 +374,61 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 lambda _args: {
                     "scheduled": True,
                     "playback_started": True,
+                    "voice_released": True,
                     "spoken": True,
                 }
             )
         )
         self.runtime.register_provider(self.provider)
 
+    async def test_unreleased_speech_blocks_following_provider_vocal(self) -> None:
+        registry = SkillRegistry()
+        speech_definition = local_speech_definition()
+        registry.register(speech_definition)
+        registry.register(self.definition)
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(
+            LocalSpeechSkillProvider(
+                lambda _args: {
+                    "scheduled": True,
+                    "playback_started": True,
+                    "voice_released": False,
+                    "spoken": True,
+                }
+            )
+        )
+        runtime.register_provider(self.provider)
+        response = InteractionResponse(
+            interaction_id="speech-before-vocal-release-barrier",
+            speech=[
+                InteractionSpeech(
+                    text="I will say this first.",
+                    timing="sequential",
+                )
+            ],
+            skills=[
+                SkillRequest(
+                    request_id="recite-after-speech",
+                    capability_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
+                    args={"text": "Hello from Chromie.", "mode": "recitation"},
+                    timing="sequential",
+                )
+            ],
+        )
+
+        result = await runtime.execute(response)
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(len(result.results), 1)
+        self.assertEqual(result.results[0].reason_code, "personal_voice_not_released")
+        self.assertEqual(self.calls, [])
+
     async def test_coordinator_registers_qualified_peer_without_replacing_speech(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda _args: {
                 "scheduled": True,
                 "playback_started": True,
+                "voice_released": True,
                 "spoken": True,
             },
             vocal_provider=self.provider,
@@ -387,7 +444,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             coordinator.skill_definition("chromie.speak").metadata["execution_lane"],
-            "speaking",
+            "vocal",
         )
 
     async def test_exact_identity_survives_authorization_execution_and_evidence(self) -> None:
@@ -442,7 +499,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.skills[0].capability_id, VOCAL_PERFORMANCE_CAPABILITY_ID)
-        self.assertEqual(response.skills[0].metadata["execution_lane"], "speaking")
+        self.assertEqual(response.skills[0].metadata["execution_lane"], "vocal")
         execution = await self.runtime.execute(response)
         self.assertEqual(execution.status, "completed")
         vocal_result = next(

@@ -16,7 +16,7 @@ InteractionEventOwner = Literal[
 ]
 InteractionEventLane = Literal[
     "cognition",
-    "speaking",
+    "vocal",
     "activity",
     "social_attention",
 ]
@@ -26,14 +26,14 @@ InteractionEventType = Literal[
     "speech_scheduled",
     "speech_playback_started",
     "speech_not_delivered",
-    "speaking_action_committed",
-    "speaking_action_completed",
-    "speaking_action_partial",
-    "speaking_action_failed",
-    "speaking_action_cancelled",
-    "speaking_action_timed_out",
-    "speaking_action_refused",
-    "speaking_action_not_run",
+    "vocal_action_committed",
+    "vocal_action_completed",
+    "vocal_action_partial",
+    "vocal_action_failed",
+    "vocal_action_cancelled",
+    "vocal_action_timed_out",
+    "vocal_action_refused",
+    "vocal_action_not_run",
     "activity_committed",
     "activity_completed",
     "activity_partial",
@@ -139,20 +139,20 @@ class InteractionLedgerEvent(BaseModel):
     @model_validator(mode="after")
     def validate_owner_boundary(self) -> "InteractionLedgerEvent":
         if self.event_type.startswith("speech_"):
-            if self.owner != "playback_delivery" or self.lane != "speaking":
+            if self.owner != "playback_delivery" or self.lane != "vocal":
                 raise ValueError(
                     "speech events must be owned by playback_delivery in the "
-                    "speaking lane"
+                    "Vocal lane"
                 )
-        elif self.event_type.startswith("speaking_action_"):
+        elif self.event_type.startswith("vocal_action_"):
             expected_owner = (
                 "trusted_capability_runtime"
-                if self.event_type == "speaking_action_committed"
+                if self.event_type == "vocal_action_committed"
                 else "execution_closure"
             )
-            if self.owner != expected_owner or self.lane != "speaking":
+            if self.owner != expected_owner or self.lane != "vocal":
                 raise ValueError(
-                    "provider-backed speaking events must retain their trusted "
+                    "provider-backed Vocal events must retain their trusted "
                     "runtime owner"
                 )
         elif self.event_type.startswith("activity_"):
@@ -186,8 +186,8 @@ class InteractionLedgerEvent(BaseModel):
             self.event_type.startswith("activity_")
             and self.event_type != "activity_committed"
         ) or (
-            self.event_type.startswith("speaking_action_")
-            and self.event_type != "speaking_action_committed"
+            self.event_type.startswith("vocal_action_")
+            and self.event_type != "vocal_action_committed"
         )
         if terminal_activity and not self.evidence_refs:
             raise ValueError(
@@ -213,6 +213,7 @@ class InteractionContextProjection(BaseModel):
     already_spoken: list[dict[str, Any]] = Field(default_factory=list)
     pending_speech: list[dict[str, Any]] = Field(default_factory=list)
     activity: list[dict[str, Any]] = Field(default_factory=list)
+    vocal_actions: list[dict[str, Any]] = Field(default_factory=list)
     social_actions: list[dict[str, Any]] = Field(default_factory=list)
     goal_history: list[dict[str, Any]] = Field(default_factory=list)
     unresolved: list[dict[str, Any]] = Field(default_factory=list)
@@ -227,6 +228,7 @@ class InteractionContextProjection(BaseModel):
         "already_spoken",
         "pending_speech",
         "activity",
+        "vocal_actions",
         "social_actions",
         "goal_history",
         "unresolved",

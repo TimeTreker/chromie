@@ -276,7 +276,7 @@ contract.
 
 Social Attention is Chromie's proposal lane, not Soridormi's expression
 controller. It decides whether a bounded social behavior would be appropriate;
-Response Composer may coordinate that proposal with Speaking and parallel
+Response Composer may coordinate that proposal with Vocal and parallel
 Activity. The Activity lane materializes the accepted exact capability request,
 and Soridormi decides whether the attached body can safely execute it.
 

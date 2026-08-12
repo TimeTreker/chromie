@@ -206,7 +206,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     skill_id="chromie.speak",
                     args={"text": "Hello."},
                     metadata={
-                        "execution_lane": "speaking",
+                        "execution_lane": "vocal",
                         "source_goal_ids": ["goal-greet"],
                     },
                 )
@@ -221,12 +221,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         context = ledger.context("sid-1", goal_ids=["goal-greet"])
         self.assertEqual(
-            [item["event_type"] for item in context.activity],
-            ["speaking_action_committed"],
+            [item["event_type"] for item in context.vocal_actions],
+            ["vocal_action_committed"],
         )
         self.assertEqual(
             context.unresolved[0]["waiting_for"],
-            "speaking_action_terminal_result",
+            "vocal_action_terminal_result",
         )
 
     async def test_trusted_runtime_does_not_record_a_suppressed_request(

@@ -484,7 +484,7 @@ authorization, capability, execution-truth, provenance, and LLM-integrity
 failures remain non-overridable.
 
 For a model-role qualification such as Goal Association, build the cohort from
-Chromie's actual Goal lifecycle, Speaking and Activity lanes, identity and body
+Chromie's actual Goal lifecycle, Vocal and Activity lanes, identity and body
 truth, uncertainty rules, capabilities, and retained interaction context. Run
 every candidate through the same explicit benchmark adapter, package the raw
 report with `python -m benchmarks.review package`, retain reviewer identity and
@@ -736,7 +736,7 @@ members in Soridormi/MuJoCo, and then validates the retained evidence. Use
 `--rebuild-no-cache` when cached images are not acceptable and
 `--keep-deployment` only when the started stack must remain available after the
 run. Closure requires exactly one typed
-Speaking/singing Goal, at least two typed Activity/body Goals, parallel walking
+Vocal/singing Goal, at least two typed Activity/body Goals, parallel walking
 and blinking requests with the preserved 15-second duration, an
 `unavailable` or `refused` singing outcome with no executable step, completed
 Soridormi results for the exact configured walk and blink capabilities, matching

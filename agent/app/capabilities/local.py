@@ -109,7 +109,7 @@ def vocal_performance_tool(
         ),
         execution=ExecutionPolicy(
             can_run_parallel=True,
-            exclusive_group="chromie.audio",
+            exclusive_group="chromie.voice",
             timeout_s=120.0,
             idempotent=False,
             side_effect_free=False,
@@ -122,12 +122,12 @@ def vocal_performance_tool(
                 "media playback, or a body gesture."
             ),
             "interaction_executable": True,
-            "execution_lane": "speaking",
+            "execution_lane": "vocal",
             "supported_vocal_modes": supported_modes,
             "mode_evidence": evidence,
             "can_run_parallel": True,
-            "exclusive_group": "chromie.audio",
-            "resource_claims": ["audio_output"],
+            "exclusive_group": "chromie.voice",
+            "resource_claims": ["chromie.voice"],
             "execution_constraints": {
                 "exact_mode_required": True,
                 "silent_mode_downgrade_forbidden": True,
@@ -137,8 +137,8 @@ def vocal_performance_tool(
                 ],
             },
             "semantic_scope": {
-                "responsibility_kind": "spoken_response",
-                "execution_lane": "speaking",
+                "responsibility_kind": "vocal_output",
+                "execution_lane": "vocal",
                 "output_modes": supported_modes,
                 "provider_required": True,
             },
@@ -241,7 +241,7 @@ def media_playback_tools(
                         "exact_operation_required": True,
                         "persistent_playback_identity_required": True,
                         "parallel_allowed_with_lanes": [
-                            "speaking",
+                            "vocal",
                             "activity",
                             "social_attention",
                         ],
@@ -293,7 +293,7 @@ def chromie_manifests(
                 safety_class="low_risk_action",
                 execution=ExecutionPolicy(
                     can_run_parallel=True,
-                    exclusive_group="chromie.audio",
+                    exclusive_group="chromie.voice",
                     timeout_s=10.0,
                     idempotent=False,
                     side_effect_free=False,
@@ -301,10 +301,10 @@ def chromie_manifests(
                 default_failure_policy=FailurePolicy(strategy="skip"),
                 llm_hints={
                     "when_to_use": "Use to explain plans, progress, or results to the user.",
-                    "execution_lane": "speaking",
+                    "execution_lane": "vocal",
                     "can_run_parallel": True,
-                    "exclusive_group": "chromie.audio",
-                    "resource_claims": ["audio_output"],
+                    "exclusive_group": "chromie.voice",
+                    "resource_claims": ["chromie.voice"],
                     "execution_constraints": {
                         "parallel_allowed_with_lanes": [
                             "activity",
@@ -408,7 +408,7 @@ def chromie_manifests(
         display_name="Chromie Peer Media Provider",
         description=(
             "Persistent playback of existing media through exact Activity-lane "
-            "capabilities. It shares the output mixer with Speaking without "
+            "capabilities. It shares the output mixer with Vocal without "
             "becoming speech or vocal-performance evidence."
         ),
         transport=TransportSpec(

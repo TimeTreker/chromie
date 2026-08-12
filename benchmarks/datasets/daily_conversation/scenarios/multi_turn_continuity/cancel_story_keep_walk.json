@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "daily.v1.multi_turn_continuity.cancel_story_keep_walk",
-  "description": "Cancel only the Speaking Goal and preserve the independent Activity Goal.",
+  "description": "Cancel only the Vocal Goal and preserve the independent Activity Goal.",
   "inputs": {
     "language": "en-US",
     "turns": [
@@ -31,7 +31,7 @@
     }
   },
   "capabilities": [],
-  "primary_outcome": "Cancel only the Speaking Goal and preserve the independent Activity Goal.",
+  "primary_outcome": "Cancel only the Vocal Goal and preserve the independent Activity Goal.",
   "acceptable_auxiliary_behavior": [
     "Natural wording may vary while preserving the declared meaning.",
     "A narrow clarification is acceptable when material meaning remains unresolved.",

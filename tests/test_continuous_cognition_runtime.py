@@ -264,8 +264,8 @@ def spoken_goal(goal_id: str, candidate_id: str) -> GoalAssociationResolution:
                 description="Answer the user's identity question.",
                 source_text="What is your name?",
                 metadata={
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",

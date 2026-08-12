@@ -394,13 +394,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "goal_satisfaction": satisfaction,
             }
         )
-        with self.assertRaisesRegex(ValueError, "spoken_response goal must use"):
+        with self.assertRaisesRegex(ValueError, "vocal_output goal must use"):
             validate_goal_responsibility_outcomes(
                 output,
                 authoritative_goals=[
                     {
                         "goal_id": "goal-song",
-                        "metadata": {"responsibility_kind": "spoken_response"},
+                        "metadata": {"responsibility_kind": "vocal_output"},
                     }
                 ],
             )
@@ -874,7 +874,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "source_goal_ids": ["goal-weather"],
                 "safety_class": "safe_read",
                 "retryable_safe_read": True,
-                "parallel_with_speech": True,
+                "parallel_with_vocal": True,
                 "canonical_timing": "sequential",
                 "effective_timing": "parallel",
                 "runtime_timing_adjustment": "safe_read_parallel",

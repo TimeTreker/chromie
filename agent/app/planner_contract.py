@@ -699,10 +699,10 @@ def _goal_execution_metadata(goal: dict[str, Any]) -> tuple[str, str, bool]:
 def planner_response_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return direct Speaking Goals completed by ordinary authored speech.
+    """Return direct Vocal Goals completed by ordinary authored speech.
 
     Mode-specific vocal performance is deliberately excluded.  It remains in
-    the Speaking lane but requires exact provider evidence and cannot be closed
+    the Vocal lane but requires exact provider evidence and cannot be closed
     by a generic ``respond`` outcome.
     """
 
@@ -714,7 +714,7 @@ def planner_response_goal_ids(
         responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
         if (
             goal_id
-            and responsibility_kind == "spoken_response"
+            and responsibility_kind == "vocal_output"
             and output_mode in {"", "speech"}
             and not provider_required
         ):
@@ -755,7 +755,7 @@ def planner_effectful_goal_ids(
 def planner_provider_vocal_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return Speaking Goals that require mode-specific provider evidence."""
+    """Return Vocal Goals that require mode-specific provider evidence."""
 
     result: set[str] = set()
     for goal in authoritative_goals:
@@ -765,7 +765,7 @@ def planner_provider_vocal_goal_ids(
         responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
         if (
             goal_id
-            and responsibility_kind == "spoken_response"
+            and responsibility_kind == "vocal_output"
             and output_mode not in {"", "speech"}
             and provider_required
         ):
@@ -834,10 +834,10 @@ def validate_goal_responsibility_outcomes(
     for goal_id in sorted(response_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
-            raise ValueError(f"spoken_response goal requires an explicit outcome: {goal_id}")
+            raise ValueError(f"vocal_output goal requires an explicit outcome: {goal_id}")
         if outcome.disposition != "respond":
             raise ValueError(
-                "spoken_response goal must use disposition=respond and no "
+                "vocal_output goal must use disposition=respond and no "
                 f"executable step: {goal_id}"
             )
     for goal_id in sorted(provider_vocal_goal_ids):
@@ -925,7 +925,7 @@ def validate_goal_responsibility_outcomes(
     ]
     if invalid_steps:
         raise ValueError(
-            "Speaking goals can own only an exact qualified vocal Capability step: "
+            "Vocal goals can own only an exact qualified vocal Capability step: "
             + ",".join(invalid_steps)
         )
     invalid_media_steps = [
@@ -1674,7 +1674,7 @@ async def review_coordinated_action_plan_coverage(
                 "prospective acknowledgement, limitation, clarification, or other "
                 "conversational delta, but it never substitutes for an effectful or "
                 "provider-backed responsibility and never proves execution. A direct "
-                "spoken_response Goal is completed by its respond outcome rather than "
+                "vocal_output Goal is completed by its respond outcome rather than "
                 "a response-transport task step. Unavailable or refused outcomes may "
                 "represent an unmet Goal only when satisfaction remains non-exact and "
                 "the wording does not promise the unavailable work. For a material "

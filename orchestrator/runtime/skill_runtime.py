@@ -1306,6 +1306,23 @@ class SkillRuntime:
             request = self._speech_request(speech)
             (after if speech.timing == "after_skills" else before).append(request)
         scheduled = [*before, *response.skills, *after]
+        vocal_positions = [
+            index
+            for index, request in enumerate(scheduled)
+            if request.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
+        ]
+        if vocal_positions:
+            first_vocal_index = min(vocal_positions)
+            for index, request in enumerate(list(scheduled)):
+                if index >= first_vocal_index or request.capability_id != "chromie.speak":
+                    continue
+                args = dict(request.args)
+                metadata = args.get("metadata")
+                metadata = dict(metadata) if isinstance(metadata, dict) else {}
+                metadata["wait_for_voice_release"] = True
+                metadata["abort_remaining_on_failure"] = True
+                args["metadata"] = metadata
+                scheduled[index] = request.model_copy(update={"args": args})
         request_ids = [request.request_id for request in scheduled]
         if len(request_ids) != len(set(request_ids)):
             raise ValueError("scheduled request IDs must be unique within one interaction")
@@ -1402,6 +1419,16 @@ class SkillRuntime:
         items: list[tuple[SkillRequest, SkillDefinition]],
         authorization: RuntimeAuthorization,
     ) -> tuple[list[SkillResult], list[SkillTrace]]:
+        personal_voice_request_ids = [
+            request.request_id
+            for request, definition in items
+            if definition.exclusive_group == "chromie.voice"
+        ]
+        if len(personal_voice_request_ids) > 1:
+            raise ValueError(
+                "parallel execution cannot contain multiple chromie.voice owners: "
+                + ",".join(personal_voice_request_ids)
+            )
         grouped_indices: dict[tuple[str, str], list[int]] = {}
         for index, (request, definition) in enumerate(items):
             provider = self._providers[definition.provider_id]
@@ -2321,7 +2348,7 @@ class MediaPlaybackSkillProvider:
     """Adapt one qualified peer media backend to ``chromie.media.*``.
 
     Media is Activity work even though it shares a physical speaker with
-    Speaking. Every result retains the exact operation, persistent playback
+    Vocal. Every result retains the exact operation, persistent playback
     identity, bounded progress, and the declared ducking policy.
     """
 
@@ -2521,6 +2548,23 @@ class LocalSpeechSkillProvider:
             isinstance(metadata, dict) and metadata.get("wait_for_playback_start") is True
         )
         playback_started = bool(isinstance(output, dict) and output.get("playback_started") is True)
+        voice_release_required = bool(
+            isinstance(metadata, dict) and metadata.get("wait_for_voice_release") is True
+        )
+        voice_released = bool(
+            isinstance(output, dict) and output.get("voice_released") is True
+        )
+        if voice_release_required and not voice_released:
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=output if isinstance(output, dict) else {},
+                reason_code="personal_voice_not_released",
+                message="personal Vocal resource was not released after speech",
+            )
         if playback_barrier and not playback_started:
             return SkillResult(
                 request_id=request.request_id,
@@ -2649,15 +2693,15 @@ def local_speech_definition() -> SkillDefinition:
         timeout_ms=30000,
         interruptible=True,
         can_run_parallel=True,
-        exclusive_group="chromie.audio",
+        exclusive_group="chromie.voice",
         cancellation_domains=("output",),
         metadata={
             "cancellation_granularity": "global_domain",
             "effects": ["user_interaction", "audio_output"],
             "safety_class": "low_risk_action",
-            "execution_lane": "speaking",
+            "execution_lane": "vocal",
             "parallel_metadata_declared": True,
-            "resource_claims": ["audio_output"],
+            "resource_claims": ["chromie.voice"],
         },
     )
 
@@ -2683,16 +2727,16 @@ def vocal_performance_definition(
         requires_confirmation=False,
         interruptible=declaration.request_cancellation,
         can_run_parallel=True,
-        exclusive_group="chromie.audio",
+        exclusive_group="chromie.voice",
         timeout_ms=120000,
         idempotent=False,
         cancellation_domains=("output",),
         metadata={
             "effects": ["user_interaction", "audio_output", "vocal_performance"],
             "safety_class": "low_risk_action",
-            "execution_lane": "speaking",
+            "execution_lane": "vocal",
             "parallel_metadata_declared": True,
-            "resource_claims": ["audio_output"],
+            "resource_claims": ["chromie.voice"],
             "cancellation_granularity": "request",
             "supported_vocal_modes": list(declaration.supported_modes),
             "native_text_streaming": declaration.native_text_streaming,

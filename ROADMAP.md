@@ -112,7 +112,7 @@ adding a manager because a useful explanatory term exists.
    evidence track.
 6. Preserve Issue #7's source-qualified peer media-playback contract and its
    clean default-provider distinction evidence. Real operations remain a
-   separate target-evidence track; singing remains Speaking, existing-audio
+   separate target-evidence track; singing remains in Vocal, existing-audio
    playback remains Activity, and ordinary TTS is neither kind of evidence.
 7. Preserve exact provider-prefixed capability identity from model proposal
    through trusted validation, authorization, execution, and evidence. Backend
@@ -270,12 +270,12 @@ cover supported-kind negotiation, state/progress, exact operation evidence,
 cancellation, mixer policy, and private backend identity. Focused scenarios
 retain a mixed Soridormi walk plus exact media step and deterministic
 `media_output` cancellation. The default-provider live profile keeps playback
-unavailable with no media execution, keeps singing in Speaking, completes an
+unavailable with no media execution, keeps singing in Vocal, completes an
 independent Soridormi/MuJoCo walk, retains a cognition-bypassing stop-media
 receipt, and returns safe-idle. Existing audio playback therefore does not
 become authored vocal performance; real media and acoustic behavior remain
 target evidence.
-Speaking, TTS synthesis, playback transport, echo handling, audible-delivery
+Vocal, TTS synthesis, playback transport, echo handling, audible-delivery
 ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
 embodied Capability Provider beneath Activity.
 
@@ -283,7 +283,7 @@ embodied Capability Provider beneath Activity.
   execution lane, output mode, and exact-provider need; preserve this contract
   through canonical and live evidence closure.
 - Keep `singing`, `humming`, `recitation`, and other authored vocal performance
-  in Speaking even when coordinated with body work.
+  in Vocal even when coordinated with body work.
 - Keep playback of existing music, recordings, streams, and sound effects in
   Activity with an exact media-provider capability identity.
 - Use an exact provider-prefixed vocal capability such as

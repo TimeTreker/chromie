@@ -19,15 +19,15 @@ class GoalExecutionContractTests(unittest.TestCase):
         goal = GoalAssociationModelGoal.model_validate(
             {
                 "description": "边走边唱歌",
-                "responsibility_kind": "spoken_response",
-                "execution_lane": "speaking",
+                "responsibility_kind": "vocal_output",
+                "execution_lane": "vocal",
                 "output_mode": "singing",
                 "provider_required": True,
                 "bindings": [],
             }
         )
 
-        self.assertEqual(goal.execution_lane, "speaking")
+        self.assertEqual(goal.execution_lane, "vocal")
         self.assertEqual(goal.output_mode, "singing")
         self.assertTrue(goal.provider_required)
 
@@ -35,12 +35,12 @@ class GoalExecutionContractTests(unittest.TestCase):
         goal = GoalAssociationModelGoal.model_validate(
             {
                 "description": "Say hello",
-                "responsibility_kind": "spoken_response",
+                "responsibility_kind": "vocal_output",
                 "bindings": [],
             }
         )
 
-        self.assertEqual(goal.execution_lane, "speaking")
+        self.assertEqual(goal.execution_lane, "vocal")
         self.assertEqual(goal.output_mode, "speech")
         self.assertFalse(goal.provider_required)
 
@@ -49,8 +49,8 @@ class GoalExecutionContractTests(unittest.TestCase):
             GoalAssociationModelGoal.model_validate(
                 {
                     "description": "Sing a song",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": False,
                     "bindings": [],
@@ -58,11 +58,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
 
     def test_vocal_mode_cannot_be_owned_by_activity(self):
-        with self.assertRaisesRegex(ValueError, "spoken_response requires"):
+        with self.assertRaisesRegex(ValueError, "vocal_output requires"):
             GoalAssociationModelGoal.model_validate(
                 {
                     "description": "Hum a tune",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "execution_lane": "activity",
                     "output_mode": "humming",
                     "provider_required": True,
@@ -75,8 +75,8 @@ class GoalExecutionContractTests(unittest.TestCase):
             GoalAssociationModelGoal.model_validate(
                 {
                     "description": "Sing a song",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": True,
                     "bindings": [],
@@ -351,8 +351,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Tell me when the handoff is finished.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "bindings": [],
@@ -410,7 +410,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         review_prompt = ollama.prompts[2][0]
         self.assertIn("provider-owned stages", review_prompt)
         self.assertIn("Do not split pickup and handoff", review_prompt)
-        self.assertIn("not an independently satisfiable spoken_response", review_prompt)
+        self.assertIn("not an independently satisfiable vocal_output", review_prompt)
         self.assertIn("DTO to review JSON", review_prompt)
         self.assertNotIn("No previous Goal DTO is supplied", review_prompt)
         self.assertEqual(
@@ -652,8 +652,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Recommend a noodle restaurant open now.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -721,8 +721,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Recommend a noodle restaurant open now.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -853,8 +853,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "边走边唱歌。",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": True,
                     "bindings": [],
@@ -911,7 +911,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             [
                 ("activity", "body_action", True),
-                ("speaking", "singing", True),
+                ("vocal", "singing", True),
                 ("activity", "body_action", True),
             ],
         )
@@ -928,8 +928,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(
             projection["new_goals"][1]["metadata"],
             {
-                "responsibility_kind": "spoken_response",
-                "execution_lane": "speaking",
+                "responsibility_kind": "vocal_output",
+                "execution_lane": "vocal",
                 "output_mode": "singing",
                 "provider_required": True,
                 "media_operation": "none",
@@ -958,7 +958,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 {
                     "description": "边走边唱歌。",
                     "responsibility_kind": "capability_dependent",
-                    "execution_lane": "speaking",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": True,
                     "bindings": [],
@@ -994,8 +994,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "边走边唱歌。",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": True,
                     "bindings": [],
@@ -1053,7 +1053,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             [
                 ("executable_action", "activity", "body_action", True),
-                ("spoken_response", "speaking", "singing", True),
+                ("vocal_output", "vocal", "singing", True),
                 ("executable_action", "activity", "body_action", True),
             ],
         )
@@ -1491,7 +1491,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         },
                         {
                             "description": "Say the weather naturally.",
-                            "responsibility_kind": "spoken_response",
+                            "responsibility_kind": "vocal_output",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -1560,8 +1560,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Remind the user to go to bed early tonight.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -1575,8 +1575,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Explain that the Moon reflects sunlight.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -1584,8 +1584,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Remind the user to go to bed early tonight.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -1607,7 +1607,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
 
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["spoken_response", "spoken_response"],
+            ["vocal_output", "vocal_output"],
         )
         self.assertEqual(
             result.metadata["semantic_review"]["strategy"],
@@ -1639,8 +1639,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Answer whether the user needs an umbrella.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -1655,8 +1655,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Answer whether the prior rain report means an umbrella is useful.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",
@@ -1701,7 +1701,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(len(result.new_goals), 1)
         self.assertEqual(
             result.new_goals[0].metadata["responsibility_kind"],
-            "spoken_response",
+            "vocal_output",
         )
         self.assertEqual(
             result.metadata["contract_repair"]["strategy"],
@@ -1721,7 +1721,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "回应用户的请求。",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -1809,7 +1809,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Acknowledge that no more weather details will be given.",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -1940,7 +1940,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Tell a short joke.",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -1979,7 +1979,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "spoken_response"],
+            ["executable_action", "vocal_output"],
         )
 
     def test_independent_spoken_performance_survives_model_semantic_review(self):
@@ -2000,7 +2000,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Sing a short song.",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -2039,7 +2039,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["capability_dependent", "spoken_response"],
+            ["capability_dependent", "vocal_output"],
         )
         self.assertIn("such as a song, joke", ollama.prompts[1][0])
         self.assertEqual(
@@ -2071,7 +2071,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Recommend whether to take an umbrella.",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -2240,7 +2240,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Say the result.",
-                    "responsibility_kind": "spoken_response",
+                    "responsibility_kind": "vocal_output",
                     "bindings": [],
                 },
             ],
@@ -2459,7 +2459,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         },
                         {
                             "description": "Sing a song.",
-                            "responsibility_kind": "spoken_response",
+                            "responsibility_kind": "vocal_output",
                             "bindings": [],
                         },
                     ],
@@ -2507,7 +2507,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("physical_action_set", ollama.prompts[1][0])
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "executable_action", "spoken_response"],
+            ["executable_action", "executable_action", "vocal_output"],
         )
         self.assertEqual(
             result.new_goals[0].object["bindings"]["duration_s"]["value"],
@@ -2579,8 +2579,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Sing while walking forward.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "singing",
                     "provider_required": True,
                     "bindings": [],
@@ -2623,7 +2623,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             ],
             [
                 ("executable_action", "activity", "body_action", True),
-                ("spoken_response", "speaking", "singing", True),
+                ("vocal_output", "vocal", "singing", True),
                 ("executable_action", "activity", "body_action", True),
             ],
         )
@@ -3202,7 +3202,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "回应用户认为26度有点冷并准备赶紧离开的反应。",
-                        "responsibility_kind": "spoken_response",
+                        "responsibility_kind": "vocal_output",
                         "bindings": [],
                     }
                 ],
@@ -3239,7 +3239,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(len(result.new_goals), 1)
         self.assertEqual(
             result.new_goals[0].metadata["responsibility_kind"],
-            "spoken_response",
+            "vocal_output",
         )
         prompt = ollama.prompts[0][0]
         self.assertIn("latest turn is a social reaction", prompt)
@@ -3480,8 +3480,8 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Answer the user's identity question.",
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": "speech",
                     "provider_required": False,
                     "media_operation": "none",

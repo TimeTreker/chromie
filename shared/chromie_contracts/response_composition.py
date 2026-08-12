@@ -127,20 +127,20 @@ class CoordinatedResponsePlan(BaseModel):
         if len(coordination_by_id) != len(self.lane_coordination):
             raise ValueError("lane coordination IDs must be unique")
         plan_steps = {step.step_id: step for step in plan.steps}
-        coordinated_speaking_steps: set[str] = set()
+        coordinated_vocal_steps: set[str] = set()
         coordinated_activity_steps: set[str] = set()
         for group in self.lane_coordination:
-            for step_id in group.speaking_step_ids:
+            for step_id in group.vocal_step_ids:
                 step = plan_steps.get(step_id)
                 if step is None:
                     raise ValueError(
                         "lane coordination references unknown speaking step: " + step_id
                     )
-                if step_id in coordinated_speaking_steps:
+                if step_id in coordinated_vocal_steps:
                     raise ValueError(
                         "speaking step belongs to more than one lane coordination group: " + step_id
                     )
-                coordinated_speaking_steps.add(step_id)
+                coordinated_vocal_steps.add(step_id)
                 if step.timing != "parallel":
                     raise ValueError(
                         "cross-lane speaking steps must use timing=parallel: " + step_id
@@ -171,9 +171,9 @@ class CoordinatedResponsePlan(BaseModel):
                 raise ValueError(
                     "response stage references unknown lane coordination: " + coordination_id
                 )
-            if "speaking" not in coordination_group.lanes:
+            if "vocal" not in coordination_group.lanes:
                 raise ValueError(
-                    "response stage coordination requires the speaking lane: " + coordination_id
+                    "response stage coordination requires the vocal lane: " + coordination_id
                 )
             if (
                 stage.speech_act.casefold() == "ask_confirmation"
@@ -203,13 +203,21 @@ class CoordinatedResponsePlan(BaseModel):
         for group in self.lane_coordination:
             lane_set = set(group.lanes)
             if (
-                "speaking" in lane_set
-                and not group.speaking_step_ids
+                "vocal" in lane_set
+                and not group.vocal_step_ids
                 and group.coordination_id not in coordinated_speech_ids
             ):
                 raise ValueError(
-                    "speaking lane coordination requires a provider step or one "
+                    "vocal lane coordination requires a provider step or one "
                     "coordinated response stage: " + group.coordination_id
+                )
+            if (
+                group.vocal_step_ids
+                and group.coordination_id in coordinated_speech_ids
+            ):
+                raise ValueError(
+                    "one personal voice cannot run ordinary speech and provider Vocal work "
+                    "in the same parallel coordination group: " + group.coordination_id
                 )
             if (
                 "social_attention" in lane_set
@@ -342,10 +350,14 @@ class DirectResponseComposition(BaseModel):
         if not goal_ids:
             raise ValueError("direct response composition requires canonical Goal IDs")
         if any(
-            str((goal.metadata or {}).get("responsibility_kind") or "") != "spoken_response"
+            str((goal.metadata or {}).get("responsibility_kind") or "") != "vocal_output"
+            or str((goal.metadata or {}).get("output_mode") or "") != "speech"
+            or bool((goal.metadata or {}).get("provider_required"))
             for goal in association.new_goals
         ):
-            raise ValueError("planless direct composition is limited to spoken_response Goals")
+            raise ValueError(
+                "planless direct composition is limited to ordinary speech Vocal Goals"
+            )
         response = self.response_plan
         if (
             response.immediate is not None

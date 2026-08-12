@@ -32,6 +32,10 @@ class PlaybackDeliveryLifecycle:
     playback_start_waiters: dict[PlaybackKey, asyncio.Future[bool]] = field(
         default_factory=dict
     )
+    playback_release_waiters: dict[PlaybackKey, asyncio.Future[bool]] = field(
+        default_factory=dict
+    )
+    playback_released_keys: set[PlaybackKey] = field(default_factory=set)
     cancelled_playback_orders: set[PlaybackKey] = field(default_factory=set)
     turn_speech_events: dict[str, list[dict[str, Any]]] = field(
         default_factory=dict
@@ -315,6 +319,66 @@ class PlaybackDeliveryLifecycle:
         except TimeoutError:
             return False
 
+    def create_playback_release_waiter(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: str | None,
+    ) -> asyncio.Future[bool]:
+        key = self.key(generation, order, session_id)
+        waiter = self.playback_release_waiters.get(key)
+        if waiter is None or waiter.done():
+            waiter = asyncio.get_running_loop().create_future()
+            self.playback_release_waiters[key] = waiter
+        return waiter
+
+    def resolve_playback_release_waiter(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: str | None,
+        reason: str,
+    ) -> bool:
+        key = self.key(generation, order, session_id)
+        self.playback_released_keys.add(key)
+        waiter = self.playback_release_waiters.pop(key, None)
+        if waiter is None or waiter.done():
+            return False
+        waiter.set_result(True)
+        return True
+
+    def resolve_all_playback_release_waiters(self, *, reason: str) -> list[PlaybackKey]:
+        keys = list(self.playback_release_waiters)
+        for generation, order, session_id in keys:
+            self.resolve_playback_release_waiter(
+                generation=generation,
+                order=order,
+                session_id=session_id,
+                reason=reason,
+            )
+        return keys
+
+    async def wait_for_playback_release(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: str | None,
+        timeout_s: float,
+    ) -> bool:
+        key = self.key(generation, order, session_id)
+        if key in self.playback_released_keys:
+            return True
+        waiter = self.playback_release_waiters.get(key)
+        if waiter is None:
+            return False
+        try:
+            return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
+        except TimeoutError:
+            return False
+
     def cancel_order_before_start(
         self,
         *,
@@ -337,6 +401,8 @@ class PlaybackDeliveryLifecycle:
         )
 
     def reset_order_state(self) -> None:
+        self.resolve_all_playback_release_waiters(reason="reset_order_state")
+        self.playback_released_keys.clear()
         self.synthesis_order = 0
         self.next_playback_order = 0
         self.pending_audio.clear()

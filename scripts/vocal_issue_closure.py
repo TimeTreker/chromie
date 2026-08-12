@@ -342,7 +342,7 @@ def _is_truthful_response_delivery(item: dict[str, Any]) -> bool:
     metadata = metadata if isinstance(metadata, dict) else {}
     return (
         _capability_id(item) == "chromie.speak"
-        and metadata.get("execution_lane") == "speaking"
+        and metadata.get("execution_lane") == "vocal"
         and metadata.get("delivery_role") == "response"
     )
 
@@ -480,7 +480,7 @@ def validate_closure_summary(
         item
         for item in typed_goals
         if _goal_signature(item)
-        == ("spoken_response", "speaking", "singing", True)
+        == ("vocal_output", "vocal", "singing", True)
     ]
     body_goals = [
         item

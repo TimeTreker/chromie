@@ -75,7 +75,7 @@ MediaPlaybackState = Literal[
     "stopped",
     "failed",
 ]
-MediaMixerPolicy = Literal["duck_media_during_speaking"]
+MediaMixerPolicy = Literal["duck_media_during_vocal"]
 
 
 def _immutable_provider_revision(value: str) -> bool:
@@ -523,7 +523,7 @@ def media_capability_output_schema() -> dict[str, Any]:
             "delivery_evidence_id": {"type": "string"},
             "mixer_policy": {
                 "type": "string",
-                "enum": ["duck_media_during_speaking"],
+                "enum": ["duck_media_during_vocal"],
             },
             "ducking_active": {"type": "boolean"},
             "reason": {"type": "string"},

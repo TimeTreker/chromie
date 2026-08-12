@@ -117,7 +117,7 @@
         },
         {
           "key": "cognitive_runtime/qualified_vocal_provider_exact_recitation",
-          "rationale": "A qualified vocal mode must preserve its exact public capability identity, typed mode, and Speaking-lane authority through planning and Host materialization."
+          "rationale": "A qualified vocal mode must preserve its exact public capability identity, typed mode, and Vocal-lane authority through planning and Host materialization."
         },
         {
           "key": "cognitive_runtime/qualified_media_walk_parallel",

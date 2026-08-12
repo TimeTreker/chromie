@@ -552,7 +552,7 @@ class ExecutionOutcomeReconciler:
             and metadata.get("canonical_timing") == step.timing
             and metadata.get("effective_timing") == request.timing
             and metadata.get("retryable_safe_read") is True
-            and metadata.get("parallel_with_speech") is True
+            and metadata.get("parallel_with_vocal") is True
             and str(metadata.get("safety_class") or "") == "safe_read"
         )
 

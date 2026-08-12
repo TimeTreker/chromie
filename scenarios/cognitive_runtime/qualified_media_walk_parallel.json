@@ -217,7 +217,7 @@
           "media_operation": "play",
           "persistent_playback": true,
           "progress_reporting": true,
-          "mixer_policy": "duck_media_during_speaking",
+          "mixer_policy": "duck_media_during_vocal",
           "evidence_level": "source_test"
         }
       }

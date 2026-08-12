@@ -72,14 +72,14 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> local suppression: record the envelope and start no ordinary cognition
   -> otherwise: attention review -> admitted UserTurnEnvelope
   -> Fast Understanding
-       |-> complete native response -> existing Speaking runtime may start
+       |-> complete native response -> existing Vocal runtime may start
        |-> exact capability candidate -> trusted safe read may start when ready
        |-> peer Social-Attention event lane may progress independently
        `-> Goal Association resolves scoped references, Goal relations, and exact candidate bindings
   -> fully bound native conversation: deterministic canonical speech adoption
      fully bound information work: adopt canonical Plan without Fast Planner
      otherwise: Fast Planner -> terminal Deep Planner when required
-  -> reuse already-started Speaking / execution-only ready read when sufficient
+  -> reuse already-started Vocal / execution-only ready read when sufficient
      otherwise: Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
@@ -285,7 +285,7 @@ prospective acknowledgement or correction, but it still cannot claim a result
 before provider evidence. Tool Result Interpretation then contributes only the
 new grounded post-execution result, failure, or correction that remains necessary.
 
-Complete non-effectful spoken-response Goals already use the direct Core branch
+Complete non-effectful Vocal-output Goals already use the direct Core branch
 after Goal Association, without Fast or Deep Planner. Runtime records that path
 separately from terminal Fast planning and reasoned Deep escalation. True
 incremental PCM playback remains separate playback-lifecycle work; a

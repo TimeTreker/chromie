@@ -1846,7 +1846,7 @@ class ResponseComposerResolver:
         if association.clarification or association.associations or not association.new_goals:
             return None
         if any(
-            str((goal.metadata or {}).get("responsibility_kind") or "") != "spoken_response"
+            str((goal.metadata or {}).get("responsibility_kind") or "") != "vocal_output"
             for goal in association.new_goals
         ):
             return None
@@ -2420,8 +2420,8 @@ class ResponseComposerResolver:
         groups = normalized.get("lane_coordination")
         if not isinstance(groups, list) or not groups:
             return normalized
-        allowed_lanes = {"speaking", "activity", "social_attention"}
-        parallel_speaking_step_ids = {
+        allowed_lanes = {"vocal", "activity", "social_attention"}
+        parallel_vocal_step_ids = {
             step.step_id
             for step in plan.steps
             if step.timing == "parallel" and step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
@@ -2459,29 +2459,29 @@ class ResponseComposerResolver:
                     lanes.append(lane)
             activity_ids: list[str] = []
             speaking_ids: list[str] = []
-            if "speaking" in lanes:
-                for value in values_list(item.get("speaking_step_ids")):
+            if "vocal" in lanes:
+                for value in values_list(item.get("vocal_step_ids")):
                     step_id = str(value).strip()
                     if (
                         step_id
-                        and step_id in parallel_speaking_step_ids
+                        and step_id in parallel_vocal_step_ids
                         and step_id not in speaking_ids
                     ):
                         speaking_ids.append(step_id)
                 if (
                     not speaking_ids
-                    and len(parallel_speaking_step_ids) == 1
+                    and len(parallel_vocal_step_ids) == 1
                     and len(
                         [
                             group
                             for group in groups
                             if isinstance(group, dict)
-                            and "speaking" in values_list(group.get("lanes"))
+                            and "vocal" in values_list(group.get("lanes"))
                         ]
                     )
                     == 1
                 ):
-                    speaking_ids = sorted(parallel_speaking_step_ids)
+                    speaking_ids = sorted(parallel_vocal_step_ids)
             if "activity" in lanes:
                 for value in values_list(item.get("activity_step_ids")):
                     step_id = str(value).strip()
@@ -2515,8 +2515,8 @@ class ResponseComposerResolver:
             }
             if "activity" in lanes:
                 cleaned["activity_step_ids"] = activity_ids
-            if "speaking" in lanes and speaking_ids:
-                cleaned["speaking_step_ids"] = speaking_ids
+            if "vocal" in lanes and speaking_ids:
+                cleaned["vocal_step_ids"] = speaking_ids
             valid_groups.append(cleaned)
         activity_groups = [
             item
@@ -2539,9 +2539,9 @@ class ResponseComposerResolver:
         for group in valid_groups:
             lanes = {str(value).strip() for value in group.get("lanes") or []}
             coordination_id = " ".join(str(group.get("coordination_id") or "").strip().split())
-            if "speaking" not in lanes or not coordination_id:
+            if "vocal" not in lanes or not coordination_id:
                 continue
-            if group.get("speaking_step_ids"):
+            if group.get("vocal_step_ids"):
                 continue
             coordinated_stages = [
                 stage
@@ -2609,7 +2609,7 @@ class ResponseComposerResolver:
                 for item in social_attention_plan.behaviors
                 if str(item.coordination_id or "").strip()
             }
-        parallel_speaking_steps = {
+        parallel_vocal_steps = {
             step.step_id
             for step in plan.steps
             if step.timing == "parallel" and step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
@@ -2624,13 +2624,13 @@ class ResponseComposerResolver:
         dropped_ids: set[str] = set()
         for group in lane_coordination:
             lanes: list[str] = []
-            speaking_step_ids = [
-                step_id for step_id in group.speaking_step_ids if step_id in parallel_speaking_steps
+            vocal_step_ids = [
+                step_id for step_id in group.vocal_step_ids if step_id in parallel_vocal_steps
             ]
-            if "speaking" in group.lanes and (
-                group.coordination_id in speech_ids or speaking_step_ids
+            if "vocal" in group.lanes and (
+                group.coordination_id in speech_ids or vocal_step_ids
             ):
-                lanes.append("speaking")
+                lanes.append("vocal")
             if (
                 "activity" in group.lanes
                 and group.activity_step_ids
@@ -2650,7 +2650,7 @@ class ResponseComposerResolver:
                 group.model_copy(
                     update={
                         "lanes": lanes,
-                        "speaking_step_ids": (speaking_step_ids if "speaking" in lanes else []),
+                        "vocal_step_ids": (vocal_step_ids if "vocal" in lanes else []),
                         "activity_step_ids": activity_step_ids,
                     }
                 )
@@ -2809,7 +2809,7 @@ class ResponseComposerResolver:
             "Speech already delivered in this current turn is part of the live conversation. Judge its meaning, not its wording. Do not repeat or lightly paraphrase a communicative responsibility the user has already heard. You may supplement it when it covered only part of the current plan, and you may correct it when the later canonical interpretation makes it misleading. Fast speech marked scheduled is a queued current-turn communicative commitment: do not author another acknowledgement with the same semantic job while it is starting, but never treat scheduled status as proof that the user heard it or as external-fact, execution, or completion evidence. When an existing delivered or scheduled acknowledgement adequately covers pending work, reference its speech_event_id in reused_speech_event_id, copy its text only as a playback-integrity field, set reuse_current_turn_speech=true, set speech_act to the event purpose, and add the current canonical goal IDs. That stage is a structured reference to an existing conversational act, not a request to speak it again. Use reuse_current_turn_speech=false and omit reused_speech_event_id for any supplement, correction, confirmation question, result, or failure. De-duplication is based on structured act identity and delivery status, never string similarity, keyword matching, or a fixed fast-speech suppression rule. "
             "For a pure execute plan whose pending capabilities are all safe_read or external_read, never author new pre-evidence speech. If scheduled Fast speech has not reached playback_started, represent that exact event as one immediate reused-speech stage so Runtime can reuse or fulfill it; otherwise omit immediate and pre_action speech. Never state any pending measurement, condition, recommendation, conclusion, or completed lookup before matching trusted evidence exists. The post-execution tool-result interpreter owns the evidence-bound factual result. A mixed plan with an independent respond responsibility may still require model-authored speech; that speech must cover only the still-needed conversational responsibility and must not substitute for pending effect evidence. Do not mention internal tools, APIs, execution, backend, evidence IDs, or memory implementation. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
-            "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, speaking delivers model-authored communication and exact provider-qualified vocal performance, and activity executes non-speech provider work. chromie.vocal.perform is a Speaking-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Speaking or vocal-performance evidence. Media may share the physical speaker with Speaking only under its declared duck_media_during_speaking mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy an already-parallel chromie.vocal.perform step into speaking_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the speaking member only when no provider speaking_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
+            "Chromie has one Cognitive Core and three concurrent execution lanes: social_attention proposes optional social expression, vocal delivers model-authored communication and exact provider-qualified vocal performance, and activity executes non-speech provider work. chromie.vocal.perform is a Vocal-lane provider step, never response transport and never an Activity step. The exact chromie.media.* family is persistent Activity-lane playback/control, never Vocal or vocal-performance evidence. Media may share the physical speaker with Vocal only under its declared duck_media_during_vocal mixer policy; describing that overlap must not mutate either Goal, playback identity, or cancellation scope. An optional acknowledgement about pending vocal or media work remains ordinary chromie.speak delivery and is not provider completion evidence. lane_coordination describes execution overlap only; it never creates another mind, selects a provider, authorizes an effect, or weakens provider safety. Use a lane_coordination group only when the current meaning genuinely requires or benefits from overlap across at least two lanes. Copy an already-parallel chromie.vocal.perform step into vocal_step_ids; copy only already-parallel non-speech provider steps, including chromie.media.play, into activity_step_ids. A coordinated response stage may supply the Vocal member only when no provider vocal_step_ids are present; it must copy the same coordination_id and use delivery_role=activity_companion or performance. A coordinated social behavior must copy that coordination_id. Ordinary pre-action acknowledgement remains delivery_role=response with no coordination_id and keeps the playback-start barrier. Never coordinate ask_confirmation or waiting_for_user speech with effect execution. The maintained start policy is best_effort_parallel and the failure policy is independent; do not imply synchronized starts or atomic cross-provider cancellation. "
             "For clarify, emit exactly one final clarification stage that names the actual unresolved need naturally; do not add a second acknowledgement, progress line, promise, or status sentence. That stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires social_attention_plan=null and no independently added auxiliary styling; report_only may retain an advisory plan but cannot authorize body execution; on may select any supplied reviewed candidate without reasoning about simulator or physical backend metadata. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Follow the owner-approved Social Interaction Style as an active preference rather than decorative context; use recent auxiliary-behavior evidence for cooldown and repetition restraint, but never treat accepted-request evidence as proof that a behavior completed. Do not default to decision=none merely because speech alone could complete the task. Under a courteous style, meaningful direct engagement is positive scene evidence for subtle embodiment. When policy is on, at least one untargeted eligible candidate exists, and the supplied recent evidence contains no cooldown, repetition, conflict, emergency, explicit-action priority, or other concrete restraint, normally prefer decision=express with one subtle behavior for a social opening or acknowledgement. This remains semantic scene judgment, not phrase matching or a fixed gesture rule. A generic claim that expression is unnecessary solely because speech is sufficient is not a concrete restraint. Infer a scene-specific purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan and do not add speech merely to announce an auxiliary behavior. Select body behaviors only from the supplied social-attention candidates, require timing=parallel, and use decision=none with a concrete scene-specific reason when neutral language and stillness are more natural, safer, unsupported, repetitive, or unnecessary. Explicit user actions, emergency handling, response speech, and primary task execution always have priority. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "

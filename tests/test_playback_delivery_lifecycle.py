@@ -177,6 +177,49 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lifecycle.pending_audio, {})
         self.assertEqual(lifecycle.cancelled_playback_orders, set())
 
+    async def test_personal_voice_release_is_distinct_from_playback_start(self) -> None:
+        lifecycle = PlaybackDeliveryLifecycle()
+        lifecycle.create_playback_start_waiter(
+            generation=6,
+            order=2,
+            session_id="sid",
+        )
+        lifecycle.create_playback_release_waiter(
+            generation=6,
+            order=2,
+            session_id="sid",
+        )
+        lifecycle.resolve_playback_start_waiter(
+            generation=6,
+            order=2,
+            session_id="sid",
+            started=True,
+            reason="playback_start",
+        )
+
+        self.assertFalse(
+            await lifecycle.wait_for_playback_release(
+                generation=6,
+                order=2,
+                session_id="sid",
+                timeout_s=0.001,
+            )
+        )
+        lifecycle.resolve_playback_release_waiter(
+            generation=6,
+            order=2,
+            session_id="sid",
+            reason="playback_order_terminal",
+        )
+        self.assertTrue(
+            await lifecycle.wait_for_playback_release(
+                generation=6,
+                order=2,
+                session_id="sid",
+                timeout_s=0.001,
+            )
+        )
+
     async def test_generation_invalidation_releases_a_pending_output_duck(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle(playback_generation=7)
         lifecycle.begin_output_duck(

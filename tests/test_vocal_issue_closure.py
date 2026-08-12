@@ -74,8 +74,8 @@ def passing_summary() -> dict:
                         "description": "边走边唱歌",
                         "resource_responsibility": None,
                         "metadata": {
-                            "responsibility_kind": "spoken_response",
-                            "execution_lane": "speaking",
+                            "responsibility_kind": "vocal_output",
+                            "execution_lane": "vocal",
                             "output_mode": "singing",
                             "provider_required": True,
                         },
@@ -223,7 +223,7 @@ class VocalIssueClosureTests(unittest.TestCase):
                 "metadata": {
                     "source_goal_ids": ["goal-sing"],
                     "covers_goal_ids": ["goal-sing"],
-                    "execution_lane": "speaking",
+                    "execution_lane": "vocal",
                     "delivery_role": "response",
                 },
             }
@@ -242,7 +242,7 @@ class VocalIssueClosureTests(unittest.TestCase):
                 "metadata": {
                     "source_goal_ids": ["goal-sing"],
                     "covers_goal_ids": ["goal-sing"],
-                    "execution_lane": "speaking",
+                    "execution_lane": "vocal",
                     "delivery_role": "performance",
                 },
             }

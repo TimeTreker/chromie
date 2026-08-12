@@ -344,27 +344,61 @@ class PlaybackTransport:
                     started=False,
                     reason="stale_before_order",
                 )
+                host._playback_state().resolve_playback_release_waiter(
+                    generation=generation,
+                    order=order,
+                    session_id=session_id,
+                    reason="stale_before_order",
+                )
                 host.session_log(session_id, "playback_drop_stale_before_order: order=%s", order)
                 continue
             if order != host.next_playback_order:
                 host.pending_audio[order] = (generation, audio, source_rate, session_id, skip_reason)
                 continue
-            played = await host.play_one_order(generation, order, audio, source_rate, session_id, skip_reason)
+            try:
+                played = await host.play_one_order(
+                    generation, order, audio, source_rate, session_id, skip_reason
+                )
+            finally:
+                host._playback_state().resolve_playback_release_waiter(
+                    generation=generation,
+                    order=order,
+                    session_id=session_id,
+                    reason="playback_order_terminal",
+                )
             if played:
                 host.next_playback_order += 1
             while host.next_playback_order in host.pending_audio:
                 ng, na, nsr, nsid, nreason = host.pending_audio.pop(host.next_playback_order)
                 if host.is_stale_playback(ng, nsid):
+                    pending_order = host.next_playback_order
                     host.resolve_playback_start_waiter(
                         ng,
-                        host.next_playback_order,
+                        pending_order,
                         nsid,
                         started=False,
                         reason="stale_pending_order",
                     )
+                    host._playback_state().resolve_playback_release_waiter(
+                        generation=ng,
+                        order=pending_order,
+                        session_id=nsid,
+                        reason="stale_pending_order",
+                    )
                     host.next_playback_order += 1
                     continue
-                played = await host.play_one_order(ng, host.next_playback_order, na, nsr, nsid, nreason)
+                pending_order = host.next_playback_order
+                try:
+                    played = await host.play_one_order(
+                        ng, pending_order, na, nsr, nsid, nreason
+                    )
+                finally:
+                    host._playback_state().resolve_playback_release_waiter(
+                        generation=ng,
+                        order=pending_order,
+                        session_id=nsid,
+                        reason="playback_order_terminal",
+                    )
                 if played:
                     host.next_playback_order += 1
                 else:

@@ -380,7 +380,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    resource dependencies rather than a mandatory serialization of module names.
    Effectful work still requires its normal canonical planning, confirmation,
    authorization, and safety barriers. A complete native conversational answer
-   may enter the existing Speaking lane as soon as current Mind/context is
+   may enter the existing Vocal lane as soon as current Mind/context is
    sufficient, while Goal Association continues; that substantive answer is not
    `fast_speech`, which remains a progress-notification act. Bounded non-effectful
    reads may likewise advance earlier when their exact request is sufficiently
@@ -434,6 +434,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    with a response, but response composition is not the exclusive time or place
    at which Social Attention may occur. Optional Social Attention must not become
    an unnecessary execution dependency for otherwise-ready work.
+
+### One personal voice; resources constrain coexistence
+
+Chromie has one personal Vocal domain. Ordinary speech, expressive speech,
+recitation, singing, humming, and nonverbal vocalization are modes of that same
+voice, not independent mouths. Compatible body Activity may overlap Vocal work,
+but two personal Vocal modes may not overlap.
+
+Capabilities state what Chromie can do. Execution-time resources state which
+otherwise-valid work can coexist. Cognition should plan with that truth; the
+Trusted Capability Runtime must still mechanically contain resource conflicts.
+Prefer the smallest existing trusted mechanism that establishes the invariant.
+For personal voice exclusivity Chromie reuses its maintained ResourceArbiter
+rather than creating a parallel resource subsystem.
+
+Existing-media playback is Activity, not Vocal. Its mixer and physical-output
+policy are separate from the semantic `chromie.voice` resource.
 
 ## Non-goals
 

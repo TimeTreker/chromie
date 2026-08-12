@@ -1060,8 +1060,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "description": "Sing while walking.",
                     "source_text": "Walk while singing.",
                     "metadata": {
-                        "responsibility_kind": "spoken_response",
-                        "execution_lane": "speaking",
+                        "responsibility_kind": "vocal_output",
+                        "execution_lane": "vocal",
                         "output_mode": "singing",
                         "provider_required": True,
                     },
@@ -1524,8 +1524,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal_id": "goal-sing",
                     "description": "Sing while walking.",
                     "metadata": {
-                        "responsibility_kind": "spoken_response",
-                        "execution_lane": "speaking",
+                        "responsibility_kind": "vocal_output",
+                        "execution_lane": "vocal",
                         "output_mode": "singing",
                         "provider_required": True,
                     },

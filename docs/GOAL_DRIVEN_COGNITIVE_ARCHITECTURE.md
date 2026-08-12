@@ -28,7 +28,7 @@ behavior and evidence remain authoritative in [STATUS.md](STATUS.md).
 
 The Goal-Driven Cognitive Core remains the single semantic authority while the
 maintained runtime coordinates three concurrent lanes: Social-Attention
-proposals, Speaking execution, and Activity execution. These lanes do not own
+proposals, Vocal execution, and Activity execution. These lanes do not own
 independent Goals or personalities. Response Composer may author explicit
 best-effort lane coordination around parallel Canonical Plan steps; provider
 metadata and the Trusted Capability Runtime remain authoritative for actual
@@ -271,10 +271,10 @@ goal. An explicit user request to blink is.
 
 Likewise, response transport is not a user-task step. `Converse` is a native
 cognitive ability to complete a conversational responsibility from current Mind
-and context; `chromie.speak` is only the trusted Speaking transport/evidence
+and context; `chromie.speak` is only the trusted Vocal speech transport/evidence
 boundary. A complete Fast-Understanding `native_response` may begin through that
-Speaking runtime before Goal Association completes, then be explicitly bound to
-a canonical `spoken_response` Goal if persistent Goal state is needed.
+Vocal runtime before Goal Association completes, then be explicitly bound to
+a canonical `vocal_output` Goal if persistent Goal state is needed.
 
 Fast and Deep Planning may still identify a later conversational delta when
 planning or new evidence makes one necessary, but Planner text never authorizes,
@@ -628,7 +628,7 @@ Questions:
   authority scopes affect memory, disclosure, confirmation, and actions?
 - When should Chromie explain a refusal, changed intention, correction, or
   high-impact decision without exposing private chain-of-thought?
-- How do Speaking and continuous Social Attention represent real interaction
+- How do Vocal and continuous Social Attention represent real interaction
   progress even when the substantive Goal remains open?
 
 Direction:
@@ -804,7 +804,7 @@ whose semantics require it:
   another existing continuation artifact;
 - an authorized or dispatched effect -> trusted request/execution artifact;
 - reusable future meaning -> Memory; and
-- a delivered user-facing claim -> Speaking/Interaction evidence.
+- a delivered user-facing claim -> Vocal/Interaction evidence.
 
 Otherwise the interpretation may remain in Situation and expire when irrelevant.
 This "promotion escape hatch" keeps Situation soft rather than turning it into a
@@ -824,7 +824,7 @@ does not automatically create a Goal; and effectful work is not required to wait
 for a Goal merely so the Goal can act as a work permit.
 
 A complete native conversational responsibility may be understood, spoken
-through the trusted Speaking path, and completed without durable Goal state. A
+through the trusted Vocal path, and completed without durable Goal state. A
 safe exact information read may begin while Goal Association continues; if an
 owed outcome remains while the provider result is pending, that unfinished
 responsibility is then represented/bound as Goal state. Effectful work still
@@ -1127,7 +1127,7 @@ timescales, not a mandatory module pipeline:
 Admitted Observation / User Turn
   ↓
 Fast Understanding
-  ├─ complete native conversational progress ───────────────→ Speaking
+  ├─ complete native conversational progress ───────────────→ Vocal
   ├─ exact capability progress candidate ──────────────────→ readiness gate
   │                                                           ├─ ready safe progress → trusted runtime
   │                                                           └─ not ready → Goal/planning path
@@ -1555,7 +1555,7 @@ The Fast Planner is a low-latency semantic planner over:
 It may:
 
 - plan a bounded conversational Goal that actually requires planning; a
-  complete non-effectful `spoken_response` Goal uses the direct response path;
+  complete non-effectful `vocal_output` Goal uses the direct response path;
 - produce a complete direct common-skill plan;
 - propose a low-consequence bounded default;
 - produce a social attention plan;
@@ -1748,7 +1748,7 @@ runtime evidence.
 
 Partial satisfaction is not authorization to execute a degraded plan.
 
-Responsibility type also constrains the outcome. A `spoken_response` Goal is
+Responsibility type also constrains the outcome. A `vocal_output` Goal is
 satisfied by authored conversational output and cannot own a generic response-transport
 executable step. A
 `capability_dependent` Goal cannot use `respond` as a shortcut around execution
@@ -2102,7 +2102,7 @@ Planner, Deep Planner, Tool Result Interpretation, Response Composer, and any
 later cognitive stage that can otherwise repeat a Goal-scoped conversational or
 effectful responsibility. Runtime owners append the qualified facts. This
 architecture document is the authoritative owner of the term because the
-contract spans Speaking, Activity, Social Attention, and cognition; no
+contract spans Vocal, Activity, Social Attention, and cognition; no
 component-only document can own that cross-lane boundary.
 
 Every entry is immutable, replay-safe, typed by owner, lane, event type, state,
@@ -2113,8 +2113,8 @@ owners append only facts they are qualified to observe:
 |---|---|---|
 | Cognitive Runtime | Goal association and validated Plan resolution | That a planned effect started or completed |
 | Playback Delivery | speech scheduled, playback started, or not delivered | Activity execution or completion |
-| Trusted Capability Runtime | Activity, provider-backed Speaking, or Social Attention request committed; Social Attention terminal result | Completion of an unrelated Goal |
-| Execution closure | Goal-scoped Activity or provider-backed Speaking terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
+| Trusted Capability Runtime | Activity, provider-backed Vocal, or Social Attention request committed; Social Attention terminal result | Completion of an unrelated Goal |
+| Execution closure | Goal-scoped Activity or provider-backed Vocal terminal outcome with `ExecutionOutcomeBundle` evidence references | A stronger result than the referenced bundle proves |
 
 The Ledger neither edits nor replaces playback evidence,
 `TaskProposalLedger`, recent auxiliary-behavior evidence, Goal state, or
@@ -2130,7 +2130,7 @@ does not claim that Goal state was updated.
 journal, not another store. Runtime selects a bounded chronology for the
 relevant Goal IDs and includes same-turn unbound Fast speech without inventing
 Goal ownership. It exposes already audible speech, pending speech, Activity and
-provider-backed Speaking work, Social Attention actions, Goal/Plan history, and
+provider-backed Vocal work, Social Attention actions, Goal/Plan history, and
 unresolved waits. Before canonical Goal IDs exist, Goal Interpretation and Goal
 Association receive bounded recent session context; after association, later
 cognition receives the Goal-scoped projection.
@@ -2316,7 +2316,7 @@ Mind architecture:
 10. Claims about execution, observation, memory, or completion require trusted
     evidence; presentation failure cannot rewrite a trusted outcome into user
     misunderstanding or capability failure.
-11. Social Attention and Speaking are genuine interaction progress but do not
+11. Social Attention and Vocal are genuine interaction progress but do not
     independently own user Goals or effect authorization.
 12. Fast and Deep planning share canonical execution contracts when planning is
     needed; Deep does not route semantic decomposition back to Fast.
@@ -2613,7 +2613,7 @@ The cognitive loop should record, without exposing private model reasoning:
 - Fast-Understanding progress candidates and their typed kind;
 - readiness decisions and the trusted facts that allowed or blocked progress;
 - explicit progress-to-Goal bindings and Goal relationship/lifecycle changes;
-- native Speaking, capability, and Social-Attention progress start/terminal state;
+- native Vocal, capability, and Social-Attention progress start/terminal state;
 - planner invocation only when planning was actually needed, including escalation
   reason and duration;
 - canonical plan/commitment identity when one exists;
@@ -2703,7 +2703,7 @@ Chromie satisfies this architecture when:
 - uncertainty is resolved through trustworthy evidence acquisition when possible
   rather than hallucination or unnecessary deeper inference;
 - attention and compute remain responsive while slow cognition continues;
-- Speaking and Social Attention feel continuous without becoming separate semantic
+- Vocal and Social Attention feel continuous without becoming separate semantic
   authorities;
 - Reflection improves correction/calibration/experience selectively without
   becoming a latency tax or self-modification loophole;

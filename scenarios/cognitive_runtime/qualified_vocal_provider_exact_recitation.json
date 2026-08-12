@@ -3,7 +3,7 @@
   "id": "qualified_vocal_provider_exact_recitation",
   "suite": "cognitive_runtime",
   "level": "integration",
-  "description": "A source-qualified fake recitation provider keeps one exact capability identity and the Speaking lane without becoming ordinary response TTS.",
+  "description": "A source-qualified fake recitation provider keeps one exact capability identity and the Vocal lane without becoming ordinary response TTS.",
   "tags": [
     "vocal-provider",
     "source-contract",
@@ -33,8 +33,8 @@
           "description": "Recite the authored greeting using a qualified recitation provider.",
           "source_text": "Recite this greeting with the qualified recitation voice: Hello from Chromie.",
           "metadata": {
-            "responsibility_kind": "spoken_response",
-            "execution_lane": "speaking",
+            "responsibility_kind": "vocal_output",
+            "execution_lane": "vocal",
             "output_mode": "recitation",
             "provider_required": true
           }
@@ -131,9 +131,9 @@
         },
         "interruptible": true,
         "can_run_parallel": true,
-        "exclusive_group": "chromie.audio",
+        "exclusive_group": "chromie.voice",
         "resource_claims": [
-          "audio_output"
+          "chromie.voice"
         ],
         "metadata": {
           "effects": [
@@ -142,7 +142,7 @@
             "vocal_performance"
           ],
           "safety_class": "low_risk_action",
-          "execution_lane": "speaking",
+          "execution_lane": "vocal",
           "parallel_metadata_declared": true,
           "supported_vocal_modes": [
             "recitation"
@@ -197,7 +197,7 @@
       ]
     ],
     "capability_execution_lanes": [
-      "speaking"
+      "vocal"
     ],
     "speech_covers_goal_ids": [
       "goal-recitation"

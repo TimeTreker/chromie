@@ -1427,7 +1427,7 @@
           },
           "llm_hints": {
             "when_to_use": "Use after the authoritative planner has selected exact body skills that must run concurrently. Do not include speech here.",
-            "speech_boundary": "Chromie's Speaking Execution Lane owns speech and singing; link peer execution with coordination_id only."
+            "speech_boundary": "Chromie's Vocal Execution Lane owns personal voice output; link peer execution with coordination_id only."
           }
         },
         {
@@ -4220,7 +4220,7 @@
     "rules": [
       "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
       "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
-      "The Speaking Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
+      "The Vocal Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
       "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
       "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",

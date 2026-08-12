@@ -54,7 +54,7 @@ def declaration(*operations: str) -> MediaProviderDeclaration:
         request_cancellation=True,
         progress_reporting=True,
         max_concurrency=2,
-        mixer_policy="duck_media_during_speaking",
+        mixer_policy="duck_media_during_vocal",
         ducking_gain_db=-12.0,
         duck_attack_ms=40,
         duck_release_ms=180,
@@ -195,7 +195,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         self.assertEqual(capability.hints["execution_lane"], "activity")
         self.assertEqual(
             capability.hints["mixer_policy"],
-            "duck_media_during_speaking",
+            "duck_media_during_vocal",
         )
         self.assertNotIn(
             qualified.provider_id,
@@ -213,8 +213,8 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         )
         singing = GoalAssociationModelGoal(
             description="Sing a song a cappella.",
-            responsibility_kind="spoken_response",
-            execution_lane="speaking",
+            responsibility_kind="vocal_output",
+            execution_lane="vocal",
             output_mode="singing",
             provider_required=True,
             media_operation="none",
@@ -425,7 +425,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="speech-over-media",
-                    lanes=["speaking", "activity"],
+                    lanes=["vocal", "activity"],
                     activity_step_ids=["play-media"],
                     reason_summary="Speech may overlap playback only through ducking.",
                 )
@@ -443,16 +443,16 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[0].timing, "parallel")
         self.assertEqual(
             response.speech[0].metadata["media_mixer_policy"],
-            "duck_media_during_speaking",
+            "duck_media_during_vocal",
         )
         self.assertTrue(response.speech[0].metadata["media_ducking_required"])
         self.assertEqual(response.speech[0].metadata["media_ducking_gain_db"], -12.0)
         media_request = response.skills[0]
         self.assertEqual(
             media_request.metadata["media_mixer_policy"],
-            "duck_media_during_speaking",
+            "duck_media_during_vocal",
         )
-        self.assertTrue(media_request.metadata["parallel_with_speech"])
+        self.assertTrue(media_request.metadata["parallel_with_vocal"])
         self.assertEqual(media_request.metadata["source_goal_ids"], ["goal-media"])
 
     async def test_body_and_exact_media_plan_keeps_robot_action_authority(self) -> None:
@@ -524,7 +524,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result.output["state"], expected_state)
             self.assertEqual(
                 result.output["mixer_policy"],
-                "duck_media_during_speaking",
+                "duck_media_during_vocal",
             )
         self.assertEqual(self.backend.position_ms, 2500)
         self.assertEqual(self.backend.volume, 0.4)

@@ -737,6 +737,8 @@ class VoiceAssistant:
         "playback_generation": "playback_generation",
         "_tts_text_by_generation": "tts_text_by_generation",
         "playback_start_waiters": "playback_start_waiters",
+        "playback_release_waiters": "playback_release_waiters",
+        "playback_released_keys": "playback_released_keys",
         "cancelled_playback_orders": "cancelled_playback_orders",
         "_turn_speech_events": "turn_speech_events",
         "_turn_speech_event_by_playback_key": "turn_speech_event_by_playback_key",
@@ -913,6 +915,8 @@ class VoiceAssistant:
                 started,
                 reason,
             )
+        self._playback_state().resolve_all_playback_release_waiters(reason=reason)
+
 
     async def wait_for_playback_start(
         self,
@@ -1030,6 +1034,11 @@ class VoiceAssistant:
         self._remember_tts_text(generation, audio.text)
         key = self.playback_start_key(generation, order, session_id)
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        self._playback_state().create_playback_release_waiter(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+        )
         speech_event = self._register_turn_speech_event(
             session_id=session_id,
             generation=generation,
@@ -1946,6 +1955,11 @@ class VoiceAssistant:
         self._remember_tts_text(generation, sentence)
         key = self.playback_start_key(generation, order, session_id)
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        self._playback_state().create_playback_release_waiter(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+        )
         state = self.sessions.state.get(session_id or "")
         if state is not None:
             state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
@@ -2064,6 +2078,34 @@ class VoiceAssistant:
             if isinstance(metadata, dict)
             else None
         )
+        voice_release_required = bool(
+            isinstance(metadata, dict)
+            and metadata.get("wait_for_voice_release") is True
+        )
+
+        async def wait_for_voice_release(
+            generation: int,
+            orders: list[int],
+            playback_started: bool,
+        ) -> bool:
+            if not voice_release_required or not playback_started or not orders:
+                return False
+            raw_timeout_ms = (
+                metadata.get("voice_release_timeout_ms", 30000)
+                if isinstance(metadata, dict)
+                else 30000
+            )
+            try:
+                timeout_ms = max(1000, int(raw_timeout_ms))
+            except (TypeError, ValueError):
+                timeout_ms = 30000
+            return await self._playback_state().wait_for_playback_release(
+                generation=generation,
+                order=orders[-1],
+                session_id=session_id,
+                timeout_s=timeout_ms / 1000.0,
+            )
+
         if (
             isinstance(metadata, dict)
             and metadata.get("reuse_current_turn_speech") is True
@@ -2112,7 +2154,10 @@ class VoiceAssistant:
                 "playback_started",
                 "playback_completed",
             }
-            playback_barrier = metadata.get("wait_for_playback_start") is True
+            playback_barrier = (
+                metadata.get("wait_for_playback_start") is True
+                or voice_release_required
+            )
             if playback_barrier and not playback_started:
                 default_playback_timeout_ms = int(
                     getattr(
@@ -2193,6 +2238,10 @@ class VoiceAssistant:
                 "orders": orders,
                 "chunks": len(orders),
                 "playback_started": playback_started,
+                "voice_release_required": voice_release_required,
+                "voice_released": await wait_for_voice_release(
+                    generation, orders, playback_started
+                ),
                 "status": current_status() or status or "scheduled",
             }
 
@@ -2290,7 +2339,10 @@ class VoiceAssistant:
                 scheduled["speech_event_id"] = speech_event["event_id"]
         if (
             isinstance(metadata, dict)
-            and metadata.get("wait_for_playback_start") is True
+            and (
+                metadata.get("wait_for_playback_start") is True
+                or voice_release_required
+            )
             and scheduled.get("scheduled") is True
         ):
             default_playback_timeout_ms = int(
@@ -2325,6 +2377,18 @@ class VoiceAssistant:
                     session_id=session_id,
                     reason="required_playback_start_not_observed",
                 )
+        if voice_release_required and scheduled.get("scheduled") is True:
+            raw_orders = scheduled.get("orders")
+            if not isinstance(raw_orders, list):
+                raw_orders = [scheduled.get("order")]
+            orders = [int(item) for item in raw_orders if isinstance(item, int)]
+            playback_started = bool(scheduled.get("playback_started"))
+            scheduled["voice_release_required"] = True
+            scheduled["voice_released"] = await wait_for_voice_release(
+                int(scheduled.get("generation") or 0),
+                orders,
+                playback_started,
+            )
         return scheduled
 
     def ensure_playback_worker(self) -> None:

@@ -247,7 +247,7 @@ them authoritative. Review must reject candidates that merely paraphrase one
 visible phrase, assume capabilities Chromie does not own, encode one model's
 preferred DTO wording, or omit the state that makes the semantic decision hard.
 Useful variation changes Goal lifecycle, discourse reference, language,
-emotion, available capability evidence, independent Speaking and Activity
+emotion, available capability evidence, independent Vocal and Activity
 responsibilities, or another declared semantic dimension while preserving the
 same general ability under test.
 
@@ -301,7 +301,7 @@ must not use one authored sentence or one model's serialized DTO as static
 truth. For example, a running-body-Goal correction may require preservation of
 the existing Goal, the new direction or pace, and replanning responsibility
 without requiring one English description. An identity question may require
-ordinary Speaking work, truthful robotic-body grounding, and no invented role
+ordinary Vocal work, truthful robotic-body grounding, and no invented role
 without prescribing Chromie's final sentence.
 
 An executor's own `primary_task_passed=true` is not sufficient to pass a

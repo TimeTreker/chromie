@@ -16,7 +16,7 @@ experience artifacts. See
 > semantic authority with readiness-driven continuous progress. After admitted
 > Fast Understanding, complete native conversational answers, exact capability
 > work candidates, and peer Social Attention may advance independently while Goal
-> Association continues. Native answers enter the existing Speaking runtime;
+> Association continues. Native answers enter the existing Vocal runtime;
 > trusted safe reads may start provider work early. Goal Association later binds
 > those candidates to canonical Goals. Fully bound native conversation can close
 > without Planner/Response-Composer model calls, and fully bound information reads
@@ -60,7 +60,7 @@ experience artifacts. See
 > by planning from exact registered semantic scope. See
 > [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 > Chromie also has three concurrent coordination lanes beneath the one Cognitive
-> Core: Social-Attention proposals, Speaking execution, and Activity execution.
+> Core: Social-Attention proposals, Vocal execution, and Activity execution.
 > Soridormi remains a peer Capability Provider beneath Activity and owns its
 > subtle-expression, locomotion/whole-body, and safety arbitration. See
 > [Execution Lanes and Coordination](docs/EXECUTION_LANES_AND_COORDINATION.md).
@@ -75,7 +75,7 @@ Host Orchestrator
     |-> Protective Reflex -> immediate stop/cancel (no model wait)
     `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
         -> Fast Understanding
-           |-> complete native response -> Speaking --- .
+           |-> complete native response -> Vocal --- .
            |-> exact capability progress candidate ----|
            |      `-> readiness-qualified safe read ---|
            |-> peer Social-Attention proposal lane ----|

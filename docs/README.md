@@ -78,7 +78,7 @@ When documents disagree, correct the lower-authority document.
 | Which facts belong to behavior, architecture-policy, or generated-artifact tests? | `docs/TEST_OWNERSHIP.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
-| How do Social Attention, Speaking, Activity, and Soridormi body lanes coordinate concurrently? | `docs/EXECUTION_LANES_AND_COORDINATION.md` |
+| How do Social Attention, Vocal, Activity, and Soridormi body lanes coordinate concurrently? | `docs/EXECUTION_LANES_AND_COORDINATION.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |

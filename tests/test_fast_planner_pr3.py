@@ -341,8 +341,8 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                 "goal_id": "goal-vocal",
                 "description": "Perform the requested vocal output.",
                 "metadata": {
-                    "responsibility_kind": "spoken_response",
-                    "execution_lane": "speaking",
+                    "responsibility_kind": "vocal_output",
+                    "execution_lane": "vocal",
                     "output_mode": output_mode,
                     "provider_required": provider_required,
                 },
@@ -364,8 +364,8 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
         self.assertEqual(
             projection["new_goals"][0]["metadata"],
             {
-                "responsibility_kind": "spoken_response",
-                "execution_lane": "speaking",
+                "responsibility_kind": "vocal_output",
+                "execution_lane": "vocal",
                 "output_mode": "singing",
                 "provider_required": True,
             },

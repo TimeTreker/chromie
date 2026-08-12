@@ -31,14 +31,14 @@ _ACTIVITY_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
     "refused": "activity_refused",
     "not_run": "activity_not_run",
 }
-_SPEAKING_ACTION_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
-    "completed": "speaking_action_completed",
-    "partial": "speaking_action_partial",
-    "failed": "speaking_action_failed",
-    "cancelled": "speaking_action_cancelled",
-    "timed_out": "speaking_action_timed_out",
-    "refused": "speaking_action_refused",
-    "not_run": "speaking_action_not_run",
+_VOCAL_ACTION_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
+    "completed": "vocal_action_completed",
+    "partial": "vocal_action_partial",
+    "failed": "vocal_action_failed",
+    "cancelled": "vocal_action_cancelled",
+    "timed_out": "vocal_action_timed_out",
+    "refused": "vocal_action_refused",
+    "not_run": "vocal_action_not_run",
 }
 _SOCIAL_EVENT_BY_STATUS: dict[str, InteractionEventType] = {
     "completed": "social_action_completed",
@@ -225,7 +225,7 @@ class InteractionLedger:
         return self.append(
             session_id=session_id,
             owner="playback_delivery",
-            lane="speaking",
+            lane="vocal",
             event_type=event_type,
             state=status,
             subject_id=speech_event_id,
@@ -342,21 +342,21 @@ class InteractionLedger:
         for request in requests:
             metadata = request.metadata
             social = metadata.get("auxiliary_social_attention") is True
-            speaking = (
-                metadata.get("execution_lane") == "speaking" and not social
+            vocal = (
+                metadata.get("execution_lane") == "vocal" and not social
             )
             event_type: InteractionEventType = (
                 "social_action_committed"
                 if social
-                else "speaking_action_committed"
-                if speaking
+                else "vocal_action_committed"
+                if vocal
                 else "activity_committed"
             )
             lane: InteractionEventLane = (
                 "social_attention"
                 if social
-                else "speaking"
-                if speaking
+                else "vocal"
+                if vocal
                 else "activity"
             )
             plan_id = _normalized_text(metadata.get("canonical_plan_id"))
@@ -422,14 +422,14 @@ class InteractionLedger:
                     for item in goal_evidence
                 ]
             )
-            speaking = execution_lanes == ["speaking"]
+            vocal = execution_lanes == ["vocal"]
             event_type = (
-                _SPEAKING_ACTION_EVENT_BY_STATUS[outcome.status]
-                if speaking
+                _VOCAL_ACTION_EVENT_BY_STATUS[outcome.status]
+                if vocal
                 else _ACTIVITY_EVENT_BY_STATUS[outcome.status]
             )
             lane: InteractionEventLane = (
-                "speaking" if speaking else "activity"
+                "vocal" if vocal else "activity"
             )
             evidence_refs = [
                 validated.outcome_id,
@@ -593,7 +593,11 @@ class InteractionLedger:
             item
             for item in projected_events
             if item["lane"] == "activity"
-            or item["event_type"].startswith("speaking_action_")
+        ]
+        vocal_actions = [
+            item
+            for item in projected_events
+            if item["event_type"].startswith("vocal_action_")
         ]
         social_actions = [
             item
@@ -614,8 +618,8 @@ class InteractionLedger:
                 and item["event_type"] != "activity_committed"
             )
             or (
-                item["event_type"].startswith("speaking_action_")
-                and item["event_type"] != "speaking_action_committed"
+                item["event_type"].startswith("vocal_action_")
+                and item["event_type"] != "vocal_action_committed"
             )
             for evidence_ref in item["evidence_refs"]
         }
@@ -626,9 +630,9 @@ class InteractionLedger:
             elif item["event_type"] == "activity_committed":
                 if item["subject_id"] not in terminal_evidence_refs:
                     waiting_for = "activity_terminal_result"
-            elif item["event_type"] == "speaking_action_committed":
+            elif item["event_type"] == "vocal_action_committed":
                 if item["subject_id"] not in terminal_evidence_refs:
-                    waiting_for = "speaking_action_terminal_result"
+                    waiting_for = "vocal_action_terminal_result"
             elif item["event_type"] == "social_action_committed":
                 waiting_for = "social_action_terminal_result"
             if waiting_for:
@@ -648,6 +652,7 @@ class InteractionLedger:
             already_spoken=already_spoken,
             pending_speech=pending_speech,
             activity=activity,
+            vocal_actions=vocal_actions,
             social_actions=social_actions,
             goal_history=goal_history,
             unresolved=unresolved,

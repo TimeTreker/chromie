@@ -75,7 +75,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
             "lane_coordination": [
                 {
                     "coordination_id": "coord-performance",
-                    "lanes": ["speaking", "activity"],
+                    "lanes": ["vocal", "activity"],
                 }
             ],
             "confidence": 1.0,
@@ -119,7 +119,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
             "lane_coordination": [
                 {
                     "coordination_id": "coord-malformed-optional",
-                    "lanes": ["speaking", "activity"],
+                    "lanes": ["vocal", "activity"],
                 }
             ],
             "confidence": 1.0,
@@ -164,7 +164,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
                 "lane_coordination": [
                     {
                         "coordination_id": "coord-social-only",
-                        "lanes": ["speaking", "social_attention"],
+                        "lanes": ["vocal", "social_attention"],
                     }
                 ],
             }
@@ -200,7 +200,7 @@ class ResponseComposerCoordinationRepairTests(unittest.TestCase):
             "lane_coordination": [
                 {
                     "coordination_id": "coord-invalid-activity-reference",
-                    "lanes": ["speaking", "social_attention"],
+                    "lanes": ["vocal", "social_attention"],
                     "activity_step_ids": ["step-move"],
                 }
             ],

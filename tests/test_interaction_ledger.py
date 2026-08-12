@@ -214,7 +214,7 @@ class InteractionLedgerTests(unittest.TestCase):
         kwargs = {
             "session_id": "sid",
             "owner": "playback_delivery",
-            "lane": "speaking",
+            "lane": "vocal",
             "event_type": "speech_scheduled",
             "state": "scheduled",
             "subject_id": "speech-1",

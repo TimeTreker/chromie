@@ -141,7 +141,7 @@ remains available in Git history.
   mode-specific retained evidence, streaming, timing, sample, concurrency,
   cancellation, and immutable provenance properties; unsupported modes and
   silent downgrades fail closed. Provider vocal Goals now pass through canonical
-  planning instead of the ordinary direct-speech shortcut, remain Speaking
+  planning instead of the ordinary direct-speech shortcut, remain in Vocal
   during cross-lane coordination, and retain one identity through cancellation
   and outcome evidence. The default catalog still advertises no qualified mode.
 - Retained clean default-provider Level C evidence for `e558ff4`: the original
@@ -158,7 +158,7 @@ remains available in Git history.
   stop-media, and stop-all produce distinct scoped receipts. The default catalog
   remains unavailable and no physical playback claim is implied.
 - Retained default-provider text-to-MuJoCo evidence that keeps media play as an
-  unavailable Activity, keeps singing as planless Speaking, completes the
+  unavailable Activity, keeps singing as planless Vocal, completes the
   independent Soridormi walk in a mixed request, and returns safe-idle. The
   primary-text live runner now dispatches deterministic controls through the
   production Cognitive Gateway path and retains its cancellation receipt; a

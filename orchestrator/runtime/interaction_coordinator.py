@@ -109,7 +109,7 @@ class ReadyCapabilityExecution:
 
 @dataclass
 class ReadyNativeResponseExecution:
-    """One Core-authored native response already entering the Speaking lane."""
+    """One Core-authored native response already entering the Vocal lane."""
 
     candidate: CognitiveProgressCandidate
     interaction_id: str
@@ -355,7 +355,7 @@ class InteractionRuntimeCoordinator:
                 "progress_candidate_id": candidate.candidate_id,
                 "canonical_goal_binding_pending": True,
                 "goal_completion_authority": False,
-                "execution_lane": "speaking",
+                "execution_lane": "vocal",
                 "delivery_role": "response",
                 "wait_for_playback_start": True,
                 "playback_start_required_for_delivery": True,

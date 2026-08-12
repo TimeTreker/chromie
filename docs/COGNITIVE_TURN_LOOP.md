@@ -167,10 +167,10 @@ A complete native conversational response is another locally ready form of
 progress. When Fast Understanding can already answer from the current Mind and
 bounded conversation context without external acquisition, unresolved reference,
 provider evidence, effect, or deeper reasoning, it may author one substantive
-`native_response` and start it through the existing Speaking runtime while Goal
+`native_response` and start it through the existing Vocal runtime while Goal
 Association continues. This is distinct from `fast_speech`: `fast_speech` only
 communicates progress, whereas `native_response` may satisfy a conversational
-Goal. The early Speaking result remains turn-scoped until Goal Association
+Goal. The early Vocal result remains turn-scoped until Goal Association
 explicitly binds that exact progress candidate to a canonical `spoken_response`
 Goal; canonical delivery may then reuse the exact speech/result instead of
 speaking it again. The Host may validate and bind that model-authored act but may
@@ -318,7 +318,7 @@ genuinely independent new goals. A complete non-effectful `spoken_response`
 responsibility that needs no external read, memory retrieval/mutation, unresolved
 reference, or embodied effect may already have started as a Fast-Understanding
 `native_response`; Goal Association then explicitly binds that candidate to the
-canonical Goal and the Host may adopt/reuse the exact Speaking act. If no such
+canonical Goal and the Host may adopt/reuse the exact Vocal act. If no such
 ready candidate exists, a resolved `spoken_response` Goal may still move directly
 from `GOALS_RESOLVED` to `READY_TO_RESPOND`. Neither path invokes Fast or Deep
 Planner merely to transport speech. Both are model-authored semantic results,
@@ -594,7 +594,7 @@ Ledger`. Existing owners append only typed facts they are qualified to observe:
 playback owns audible speech, Cognitive Runtime owns Goal/Plan decisions, the
 Trusted Capability Runtime owns committed provider work and Social Attention
 results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
-provider-backed Speaking outcomes. No entry edits or upgrades another owner's
+provider-backed Vocal outcomes. No entry edits or upgrades another owner's
 evidence.
 
 Before Goal Association, two bounded continuity surfaces are available. First,

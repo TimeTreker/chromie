@@ -94,7 +94,7 @@ def direct_association() -> GoalAssociationResolution:
                 goal_id="goal-direct",
                 description="Respond naturally to the user's greeting.",
                 source_text="你好",
-                metadata={"responsibility_kind": "spoken_response"},
+                metadata={"responsibility_kind": "vocal_output"},
             )
         ],
         confidence=0.98,

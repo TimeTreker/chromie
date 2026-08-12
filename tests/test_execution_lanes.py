@@ -16,6 +16,9 @@ from orchestrator.runtime.skill_runtime import (
     vocal_performance_definition,
 )
 from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    InteractionSpeech,
+    SkillRequest,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
     VocalModeEvidence,
     VocalProviderArtifact,
@@ -168,7 +171,7 @@ class ExecutionLaneContractTests(unittest.TestCase):
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="together-1",
-                    lanes=["speaking", "activity", "social_attention"],
+                    lanes=["vocal", "activity", "social_attention"],
                     activity_step_ids=["walk"],
                     reason_summary="The user requested overlapping behavior.",
                 )
@@ -181,12 +184,21 @@ class ExecutionLaneContractTests(unittest.TestCase):
             },
         )
 
+    def test_vocal_group_rejects_two_personal_voice_provider_steps(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at most one personal-voice"):
+            LaneCoordinationGroup(
+                coordination_id="two-mouths",
+                lanes=["vocal", "activity"],
+                vocal_step_ids=["sing", "hum"],
+                activity_step_ids=["walk"],
+            )
+
     def test_three_lane_contract_accepts_explicit_parallel_members(self) -> None:
         composition = self._composition(self._plan())
 
         self.assertEqual(
             composition.lane_coordination[0].lanes,
-            ["speaking", "activity", "social_attention"],
+            ["vocal", "activity", "social_attention"],
         )
 
     def test_three_lane_contract_rejects_serial_activity_step(self) -> None:
@@ -219,7 +231,7 @@ class ExecutionLaneContractTests(unittest.TestCase):
                 lane_coordination=[
                     LaneCoordinationGroup(
                         coordination_id="together-1",
-                        lanes=["speaking", "activity"],
+                        lanes=["vocal", "activity"],
                         activity_step_ids=["walk"],
                     )
                 ],
@@ -261,7 +273,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.speech[0].timing, "parallel")
         self.assertFalse(response.speech[0].metadata["wait_for_playback_start"])
-        self.assertEqual(response.speech[0].metadata["execution_lane"], "speaking")
+        self.assertEqual(response.speech[0].metadata["execution_lane"], "vocal")
         self.assertEqual(response.speech[0].metadata["coordination_id"], "together-1")
 
         by_id = {item.skill_id: item for item in response.skills}
@@ -312,7 +324,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 context={},
             )
 
-    async def test_vocal_provider_step_remains_speaking_when_parallel_with_activity(self) -> None:
+    async def test_vocal_provider_step_remains_vocal_when_parallel_with_activity(self) -> None:
         vocal = vocal_performance_definition(
             VocalProviderDeclaration(
                 provider_id="fake.vocal.lane-test",
@@ -409,8 +421,8 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="vocal-with-walk",
-                    lanes=["speaking", "activity"],
-                    speaking_step_ids=["sing"],
+                    lanes=["vocal", "activity"],
+                    vocal_step_ids=["sing"],
                     activity_step_ids=["walk"],
                 )
             ],
@@ -430,14 +442,14 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         by_id = {item.capability_id: item for item in response.skills}
         self.assertEqual(
             by_id[VOCAL_PERFORMANCE_CAPABILITY_ID].metadata["execution_lane"],
-            "speaking",
+            "vocal",
         )
         self.assertTrue(by_id[VOCAL_PERFORMANCE_CAPABILITY_ID].metadata["parallel_with_activity"])
         self.assertEqual(
             by_id["soridormi.walk_forward"].metadata["execution_lane"],
             "activity",
         )
-        self.assertTrue(by_id["soridormi.walk_forward"].metadata["parallel_with_speech"])
+        self.assertTrue(by_id["soridormi.walk_forward"].metadata["parallel_with_vocal"])
 
     async def test_skill_runtime_overlaps_speech_walk_and_blink(self) -> None:
         response, walk, blink = await self._response()
@@ -476,12 +488,75 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
-            "speaking",
+            "vocal",
         )
         self.assertEqual(
             speech_provider.calls[0].metadata["coordination_id"],
             "together-1",
         )
+
+    async def test_parallel_runtime_rejects_two_personal_voice_owners(self) -> None:
+        declaration = VocalProviderDeclaration(
+            provider_id="fake.vocal.parallel-conflict",
+            supported_modes=["singing"],
+            native_text_streaming=True,
+            native_audio_streaming=True,
+            request_cancellation=True,
+            timing_mark_types=[],
+            sample_formats=["pcm_s16le"],
+            sample_rates=[24000],
+            max_concurrency=1,
+            provenance=VocalProviderProvenance(
+                implementation="Fake parallel-conflict provider",
+                software_source="https://example.invalid/vocal-conflict",
+                software_revision="0123456789abcdef",
+                software_license_id="Apache-2.0",
+                license_review_status="source_test_only",
+                model_artifacts=[
+                    VocalProviderArtifact(
+                        kind="fixture",
+                        artifact_id="fake/vocal-conflict",
+                        revision="sha256:" + "3" * 64,
+                        license_id="Apache-2.0",
+                    )
+                ],
+            ),
+            mode_evidence={
+                "singing": VocalModeEvidence(
+                    level="source_test",
+                    artifact_refs=["tests/test_execution_lanes.py#parallel-vocal-conflict"],
+                    claim_summary="Fake source test only.",
+                )
+            },
+        )
+        speech_definition = local_speech_definition()
+        vocal_definition = vocal_performance_definition(declaration)
+        registry = SkillRegistry()
+        registry.register(speech_definition)
+        registry.register(vocal_definition)
+        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime.register_provider(MockSkillProvider(speech_definition.provider_id))
+        runtime.register_provider(MockSkillProvider(vocal_definition.provider_id))
+        response = InteractionResponse(
+            interaction_id="two-personal-voices",
+            speech=[
+                InteractionSpeech(
+                    text="I am talking.",
+                    timing="parallel",
+                )
+            ],
+            skills=[
+                SkillRequest(
+                    request_id="sing-now",
+                    capability_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
+                    args={"text": "La", "mode": "singing"},
+                    timing="parallel",
+                )
+            ],
+        )
+
+        with self.assertRaisesRegex(ValueError, "multiple chromie.voice owners"):
+            await runtime.execute(response)
 
     def test_soridormi_import_preserves_provider_body_lanes(self) -> None:
         registry = SkillRegistry()

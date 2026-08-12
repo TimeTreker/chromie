@@ -8,7 +8,7 @@ lanes:
 ```text
 Chromie Cognitive Core
 ├── Social-Attention Proposal Lane
-├── Speaking Execution Lane
+├── Vocal Execution Lane
 └── Activity Execution Lane
       └── Capability Providers
           ├── Soridormi
@@ -35,13 +35,13 @@ evidence. Those require a later runtime contract and provider support.
 |---|---|---|
 | Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
 | Social-Attention Proposal Lane | bounded social proposals such as attention, natural blink, gaze, acknowledgement, or restraint | independent speech meaning, Goal creation, motor authorization |
-| Speaking Execution Lane | authored speech, TTS/vocal playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality, semantic planning, or existing-media lifecycle ownership |
+| Vocal Execution Lane | authored speech, TTS/vocal playback, vocal performance capabilities, interruption, cancellation, and output ordering | independent personality, semantic planning, or existing-media lifecycle ownership |
 | Activity Execution Lane | exact provider calls, task execution, monitoring, cancellation, recovery, and outcome collection | Goal meaning or raw motor control |
 | Soridormi | embodied feasibility, body-lane arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
 The Activity lane executes work for Goals; it does not own those Goals.
 Social Attention proposes socially appropriate behavior; it does not directly
-operate the body. Speaking delivers model-authored communication; it is not a
+operate the body. Vocal delivers Chromie-authored personal voice output; it is not a
 separate conversational agent.
 
 ## Continuous Social Attention
@@ -56,7 +56,7 @@ state changes, including:
   fails;
 - new scene/target evidence becomes available;
 - interruption or cancellation changes the interaction; and
-- speaking starts, continues, or completes.
+- Vocal output starts, continues, or completes.
 
 These triggers provide *state*, not hardcoded gestures. The Social-Attention
 cognition still decides whether expression is useful and may choose
@@ -160,7 +160,7 @@ reject duplicate resources, two primary locomotion members, an unsafe overlay,
 or unavailable body state. It does not decide whether Chromie should walk,
 blink, look, speak, or sing.
 
-Speech remains a peer Chromie Speaking-lane execution linked through the same
+Speech remains a peer Chromie Vocal-lane execution linked through the same
 `coordination_id`. Soridormi never owns speech meaning, TTS playback, or peer
 media execution.
 
@@ -174,7 +174,7 @@ effect.
 {
   "coordination_id": "performance_1",
   "relation": "parallel",
-  "lanes": ["speaking", "activity", "social_attention"],
+  "lanes": ["vocal", "activity", "social_attention"],
   "activity_step_ids": ["step_walk"],
   "start_policy": "best_effort_parallel",
   "failure_policy": "independent",
@@ -277,7 +277,7 @@ The maintained runtime:
 1. validates all coordination references and lane membership;
 2. requires referenced activity steps to be parallel Canonical Plan steps;
 3. keeps ordinary pre-action speech behind the playback-start barrier;
-4. runs Speaking and peer-provider Activity work as a best-effort parallel
+4. runs Vocal and peer-provider Activity work as a best-effort parallel
    batch;
 5. groups compatible same-provider Soridormi body members into one deterministic
    embodied compilation and execution;
@@ -287,7 +287,7 @@ The maintained runtime:
 8. records lane membership and coordination IDs in interaction evidence; and
 9. reconciles each Goal only from its own capability-specific outcome evidence.
 
-Cross-provider Speaking/body start remains best-effort. Inside Soridormi, body
+Cross-provider Vocal/body start remains best-effort. Inside Soridormi, body
 members are compiled and cancelled as one provider-local physical activity. A
 future cross-provider contract may add prepared states, a shared monotonic start
 barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
@@ -299,7 +299,7 @@ Validated Goals retain five separate completion facts instead of overloading
 
 ```text
 responsibility_kind  human completion modality
-execution_lane       speaking | activity | none
+execution_lane       vocal | activity | none
 output_mode          speech | expressive_speech | recitation | singing | humming
                      | nonverbal_vocalization | body_action | media_playback
                      | capability_work | other
@@ -313,15 +313,57 @@ deterministically materializes `responsibility_kind`, `execution_lane`, and
 `provider_required` from `output_mode`; those redundant system invariants are
 not independent LLM decisions. A bounded legacy mapping keeps retained replay
 and old test DTOs readable without reopening that model-facing state space.
-`output_mode=speech` materializes ordinary Speaking delivery without a
+`output_mode=speech` materializes ordinary Vocal speech delivery without a
 mode-specific provider requirement. Mode-specific vocal outputs materialize
-Speaking with provider evidence required. `chromie.vocal.perform` is the exact source
+Vocal output with provider evidence required. `chromie.vocal.perform` is the exact source
 contract for qualified provider execution, but the default catalog remains
 unavailable and advertises no modes. Planner may execute one such Goal only when
 a qualified declaration advertises the authoritative `output_mode`; otherwise
 it must return a per-Goal unavailable, refused, or clarification outcome rather
 than generic `respond`. Activity, body, and media execution remain separate. A
 normal vocal Goal cannot carry `resource_responsibility`.
+
+## One personal voice
+
+`Vocal` is Chromie's personal-voice execution domain:
+
+```text
+Vocal
+├── speech
+├── expressive_speech
+├── recitation
+├── singing
+├── humming
+└── nonverbal_vocalization
+```
+
+These are different semantic outcomes but one embodied personal voice. They
+share one execution-time resource:
+
+```text
+chromie.voice: exclusive
+```
+
+So `speech + singing`, `speech + humming`, and `singing + recitation` must
+serialize. Compatible Activity can still overlap Vocal work: `walk + singing`,
+`blink + speech`, and `walk + blink + singing` are valid when their providers
+are otherwise qualified.
+
+Capabilities answer **what can be done**; execution resources answer **what can
+coexist**. The Cognitive Core plans with both truths, and the Trusted Capability
+Runtime mechanically contains a bad parallel plan. This rule reuses the existing
+`ResourceArbiter`; it does not create a second Resource Manager.
+
+`chromie.voice` is not the Goal-level acquire/deliver `Resource` responsibility,
+and it is not identical to the physical speaker. Existing-media playback remains
+Activity. A qualified mixer may overlap Media and Vocal under
+`duck_media_during_vocal`.
+
+Ordinary TTS historically released its runtime request at `playback_started`,
+while PCM continued playing. The maintained playback lifecycle therefore exposes
+a separate terminal voice-release fact. Body Activity may still begin at the
+playback-start barrier, but a following Vocal mode cannot acquire `chromie.voice`
+until prior TTS has actually stopped producing Chromie's voice.
 
 ## Existing media playback
 
@@ -336,12 +378,12 @@ through a provider-returned `playback_id`; ordinary TTS delivery and
 
 When a response stage intentionally overlaps a media Activity step, both must
 reference one explicit `LaneCoordinationGroup`. The Host requires the qualified
-provider's `duck_media_during_speaking` contract and copies its gain, attack,
-and release values onto the Speaking item and media request. Missing or
+provider's `duck_media_during_vocal` contract and copies its gain, attack,
+and release values onto the Vocal item and media request. Missing or
 conflicting mixer declarations fail closed before execution. This runtime
-coordination metadata neither merges nor rewrites the Speaking and media Goals.
+coordination metadata neither merges nor rewrites the Vocal and media Goals.
 
-Media remains independently cancellable. `output_only` selects Speaking output,
+Media remains independently cancellable. `output_only` selects Vocal output,
 `media_output` selects media work across open runtime interactions, and
 `current_interaction` selects all eligible work in the foreground interaction.
 Each scope returns correlated selected/active/queued/provider-failure evidence;
@@ -349,7 +391,7 @@ none of those receipts by itself proves audible silence or a target safe state.
 
 ## Singing
 
-Speaking and singing belong to the Speaking lane, including when the user embeds
+Ordinary speech and singing belong to the Vocal lane, including when the user embeds
 the vocal request inside a compound body command such as walking while singing.
 Lane classification follows the channel that completes the outcome, not the
 sentence's verb form or the surrounding robot-action route. Singing must never
@@ -364,8 +406,8 @@ text but must not claim melodic performance; it should report the missing vocal
 capability or offer a clearly labeled alternative while leaving requested body
 actions independently planable.
 
-An executable vocal-performance step remains a Speaking member during
-cross-lane coordination. `LaneCoordinationGroup.speaking_step_ids` binds those
+An executable vocal-performance step remains a Vocal member during
+cross-lane coordination. `LaneCoordinationGroup.vocal_step_ids` binds those
 provider steps, while `activity_step_ids` binds Activity work. Response Composer
 may coordinate both in one parallel group, but it cannot relabel the vocal step
 as Activity or treat an acknowledgement through `chromie.speak` as performance
@@ -398,7 +440,7 @@ Acceptance requires:
 Acceptance requires:
 
 - one parallel Activity step;
-- one coordinated Speaking stage;
+- one coordinated Vocal speech stage;
 - no pending confirmation;
 - playback evidence and activity outcome evidence; and
 - truthful speech that does not claim activity completion before the outcome.

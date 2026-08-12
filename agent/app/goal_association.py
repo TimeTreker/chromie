@@ -88,11 +88,11 @@ GoalSegmentationDecision = Literal["create_goals", "clarify"]
 GoalAssociationDecision = Literal["associate", "create_goals", "clarify"]
 GoalResponsibilityKind = Literal[
     "executable_action",
-    "spoken_response",
+    "vocal_output",
     "capability_dependent",
     "other",
 ]
-GoalExecutionLane = Literal["speaking", "activity", "none"]
+GoalExecutionLane = Literal["vocal", "activity", "none"]
 GoalOutputMode = Literal[
     "speech",
     "expressive_speech",
@@ -130,12 +130,12 @@ _OUTPUT_MODE_EXECUTION_CONTRACT: dict[
     GoalOutputMode,
     tuple[GoalResponsibilityKind, GoalExecutionLane, bool],
 ] = {
-    "speech": ("spoken_response", "speaking", False),
-    "expressive_speech": ("spoken_response", "speaking", True),
-    "recitation": ("spoken_response", "speaking", True),
-    "singing": ("spoken_response", "speaking", True),
-    "humming": ("spoken_response", "speaking", True),
-    "nonverbal_vocalization": ("spoken_response", "speaking", True),
+    "speech": ("vocal_output", "vocal", False),
+    "expressive_speech": ("vocal_output", "vocal", True),
+    "recitation": ("vocal_output", "vocal", True),
+    "singing": ("vocal_output", "vocal", True),
+    "humming": ("vocal_output", "vocal", True),
+    "nonverbal_vocalization": ("vocal_output", "vocal", True),
     "body_action": ("executable_action", "activity", True),
     "media_playback": ("executable_action", "activity", True),
     "capability_work": ("capability_dependent", "activity", True),
@@ -230,7 +230,7 @@ class GoalAssociationModelAssociation(BaseModel):
             "restatement, explanation, comparison, or another answer from a retained "
             "Goal without changing it. A social reaction, personal feeling, practical "
             "decision, acknowledgement, or new conversational judgment is a fresh "
-            "spoken_response Goal even when prior Goal evidence supplies context. "
+            "vocal_output Goal even when prior Goal evidence supplies context. "
             "clarify means the current user "
             "turn supplies missing information for that Goal, not that the user "
             "is asking for more explanation."
@@ -478,7 +478,7 @@ class GoalAssociationModelGoal(BaseModel):
         default="other",
         description=(
             "Host-materialized responsibility class derived from output_mode. "
-            "Retained on the validated DTO for downstream compatibility; it is "
+            "Retained on the validated DTO as a Host-owned projection; it is "
             "not a model-facing decision."
         ),
     )
@@ -553,11 +553,10 @@ class GoalAssociationModelGoal(BaseModel):
         """Derive Host-owned execution invariants from one semantic output mode.
 
         Live model-facing schemas expose ``output_mode`` but not the redundant
-        responsibility/lane/provider fields. Historical fixtures may still supply
-        the older fields, so missing ``output_mode`` is inferred from the retained
-        responsibility kind before the same deterministic materialization runs.
-        Explicit legacy fields are never silently overwritten; the after-validator
-        still rejects an inconsistent retained DTO.
+        responsibility/lane/provider fields. The Host derives those projections
+        deterministically. Bounded native callers may omit the redundant mode when
+        the new responsibility kind already determines it; no old responsibility
+        or lane vocabulary is accepted.
         """
 
         if not isinstance(value, dict):
@@ -567,7 +566,7 @@ class GoalAssociationModelGoal(BaseModel):
         if mode is None:
             responsibility = str(normalized.get("responsibility_kind") or "other")
             mode = {
-                "spoken_response": "speech",
+                "vocal_output": "speech",
                 "executable_action": "body_action",
                 "capability_dependent": "capability_work",
                 "other": "other",
@@ -591,10 +590,10 @@ class GoalAssociationModelGoal(BaseModel):
         mode = self.output_mode
         provider_required = bool(self.provider_required)
 
-        if self.responsibility_kind == "spoken_response":
-            if lane != "speaking" or mode not in _VOCAL_OUTPUT_MODES:
+        if self.responsibility_kind == "vocal_output":
+            if lane != "vocal" or mode not in _VOCAL_OUTPUT_MODES:
                 raise _execution_contract_error(
-                    "spoken_response requires execution_lane=speaking and a vocal output_mode"
+                    "vocal_output requires execution_lane=vocal and a vocal output_mode"
                 )
         elif self.responsibility_kind == "executable_action":
             if lane != "activity" or mode not in {"body_action", "media_playback"}:
@@ -621,9 +620,9 @@ class GoalAssociationModelGoal(BaseModel):
                     "and provider_required=false"
                 )
 
-        if mode in _VOCAL_OUTPUT_MODES and lane != "speaking":
+        if mode in _VOCAL_OUTPUT_MODES and lane != "vocal":
             raise _execution_contract_error(
-                "vocal output_mode requires execution_lane=speaking"
+                "vocal output_mode requires execution_lane=vocal"
             )
         if mode in {"body_action", "media_playback", "capability_work"} and lane != "activity":
             raise _execution_contract_error(
@@ -640,7 +639,7 @@ class GoalAssociationModelGoal(BaseModel):
             )
         if mode == "speech" and provider_required:
             raise _execution_contract_error(
-                "ordinary speech uses Chromie's maintained Speaking delivery path and "
+                "ordinary speech uses Chromie's maintained Vocal speech-delivery path and "
                 "must set provider_required=false"
             )
         if mode == "media_playback" and self.media_operation == "none":
@@ -651,7 +650,7 @@ class GoalAssociationModelGoal(BaseModel):
             raise _execution_contract_error(
                 "media_operation is valid only for output_mode=media_playback"
             )
-        if self.resource_responsibility is not None and lane == "speaking":
+        if self.resource_responsibility is not None and lane == "vocal":
             raise _execution_contract_error(
                 "a normal vocal performance is not resource acquisition or delivery"
             )
@@ -1707,13 +1706,13 @@ class GoalAssociationResolver:
         }
         if {
             "capability_dependent",
-            "spoken_response",
+            "vocal_output",
         }.issubset(responsibility_kinds):
             triggers.append("mixed_capability_and_spoken_responsibilities")
         if (
             getattr(getattr(request, "route_decision", None), "route", "") == "tool"
             and model_output.new_goals
-            and responsibility_kinds == {"spoken_response"}
+            and responsibility_kinds == {"vocal_output"}
         ):
             # The route is advisory, but a tool-routed turn that was reduced to
             # ordinary authored speech has crossed an evidence-responsibility
@@ -1724,7 +1723,7 @@ class GoalAssociationResolver:
             getattr(getattr(request, "route_decision", None), "intent", "")
             == "recommendation"
             and model_output.new_goals
-            and responsibility_kinds == {"spoken_response"}
+            and responsibility_kinds == {"vocal_output"}
         ):
             # A recommendation route is still advisory, but it is a useful typed
             # signal that the first Goal DTO needs an independent evidence-needs
@@ -1766,7 +1765,7 @@ class GoalAssociationResolver:
             # Re-segment from the authoritative turn; the Host never merges it.
             triggers.append("resource_result_delivery_split_review")
         has_ordinary_spoken = any(
-            goal.responsibility_kind == "spoken_response"
+            goal.responsibility_kind == "vocal_output"
             and goal.output_mode == "speech"
             and not goal.provider_required
             for goal in model_output.new_goals
@@ -1815,7 +1814,7 @@ class GoalAssociationResolver:
             for goal in model_output.new_goals
         )
         has_ordinary_spoken = any(
-            goal.responsibility_kind == "spoken_response"
+            goal.responsibility_kind == "vocal_output"
             and goal.output_mode == "speech"
             and not goal.provider_required
             for goal in model_output.new_goals
@@ -2156,7 +2155,7 @@ class GoalAssociationResolver:
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields, plus progress_candidate_ids only when supplied current-turn progress candidates support that exact Goal. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
-                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When Chromie still lacks material semantic information required to define the current owed outcome, or the user's meaning itself is ambiguous, use top-level decision=clarify instead of guessing or deferring that meaning to planning. "
+                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When Chromie still lacks material semantic information required to define the current owed outcome, or the user's meaning itself is ambiguous, use top-level decision=clarify instead of guessing or deferring that meaning to planning. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
@@ -2177,11 +2176,11 @@ class GoalAssociationResolver:
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
             "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. The Host derives responsibility_kind, execution_lane, and provider_required deterministically from that mode; never emit those Host-owned fields. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
-            "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional spoken_response Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
+            "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
-            "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate spoken_response Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
+            "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
             "For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include resource_responsibility. Use resource_kind=physical_object for embodied objects and delivery_mode=physical_handover. Use resource_kind=information for weather, restaurant or place recommendations, web research, current facts, and other grounded information; use delivery_mode=spoken_explanation unless the user explicitly requests structured output. Resource identity is not source evidence: naming or pointing at the desired object or information does not by itself say where it is or which source supplies it. Set source_status=known only when the user or discourse supplies an actual source, and then source_description or source_binding_names is mandatory. Set unknown when a required source is absent, including an unresolved demonstrative whose referent or location is not established. Use provider_resolved only when source selection is intentionally delegated to the eventual provider. source_binding_names may reference only bindings in the same Goal. This semantic object must never name or imply a provider, capability ID, website, search engine, execution mode, coordinates, grasp pose, or implementation plan. Provider selection belongs only to the Planner. Put every user-visible parameter such as count, duration, speed, direction, target, or requested content into both the natural-language description and a typed binding. When the user states an unambiguous quantity in words, normalize its binding value to the equivalent numeric string without units; the model owns that semantic normalization. Description text alone is not parameter provenance for planning. "
             "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
@@ -2262,7 +2261,7 @@ class GoalAssociationResolver:
             revision_action = "Re-evaluate the semantic associations"
             state_instructions = (
                 "Re-evaluate continuity against only the supplied bounded candidate Goal IDs. "
-                "The final authoritative user turn owns the current communicative responsibility. A completed task may supply context, but a reaction, feeling, evaluation, acknowledgement, or practical decision about that context is normally a fresh spoken_response Goal rather than continuation or reference. Existing Goal bindings are provenance-stable and cannot be changed by an association. If current user meaning changes a material binding, use decision=create_goals with one fully bound replacement Goal rather than a description-only association. "
+                "The final authoritative user turn owns the current communicative responsibility. A completed task may supply context, but a reaction, feeling, evaluation, acknowledgement, or practical decision about that context is normally a fresh vocal_output Goal rather than continuation or reference. Existing Goal bindings are provenance-stable and cannot be changed by an association. If current user meaning changes a material binding, use decision=create_goals with one fully bound replacement Goal rather than a description-only association. "
             )
             output_instructions = (
                 "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
@@ -2417,14 +2416,14 @@ class GoalAssociationResolver:
             _FRESH_RESEGMENTATION_TRIGGERS.intersection(triggers)
         )
         mixed_responsibility_guidance = (
-            "For the mixed capability_dependent plus spoken_response trigger, "
+            "For the mixed capability_dependent plus vocal_output trigger, "
             "apply this independence test before returning JSON: if the capability "
             "did not run, could the proposed spoken Goal still be truthfully and "
             "fully completed? The generic act of answering a question, reporting, "
             "summarizing, explaining, or recommending from that capability result "
             "fails this test and must not be a separate Goal; return only the "
             "capability_dependent Goal, whose delivery_mode owns the later speech. "
-            "Keep a spoken_response sibling only for independently satisfiable "
+            "Keep a vocal_output sibling only for independently satisfiable "
             "content such as an unrelated joke, greeting, authored reminder, or "
             "other answer that does not depend on the capability result. Do not "
             "justify a second Goal merely as 'the subsequent verbal response'.\n\n"
@@ -2477,14 +2476,14 @@ class GoalAssociationResolver:
             "completion mode of the evidence-acquisition Goal. "
             f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
             "Current-turn progress candidates and pre-association route hints are advisory and never establish material Goal-binding provenance. A material entity or parameter needed to define what Chromie owes must be grounded in authoritative user meaning, supplied discourse/referent state, retained Goal bindings, or Situation references. If that human-level scope remains unresolved, return top-level clarification instead of inventing or defaulting it or leaving it for Planner. Planner owns execution details only after the owed outcome is semantically defined.\n\n"
-            "Keep or create a fresh spoken_response Goal when the latest turn is an "
+            "Keep or create a fresh vocal_output Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
             "decision, or other direct conversational act, even when a retained Goal "
             "supplies the topic or evidence. Do not replay the retained task as the "
             "current responsibility. Keep separate Goals when the user truly requested "
             "an independently satisfiable direct spoken or text response in addition "
             "to capability work, such as a song, joke, or unrelated social answer. "
-            "When a spoken_response item merely phrases, reports, "
+            "When a vocal_output item merely phrases, reports, "
             "explains, or interprets evidence acquired by a capability_dependent item, "
             "the capability Goal owns that delivery. Persona and wording are expression "
             "concerns, not extra Goals. A mere acknowledgement, confirmation, promise "
@@ -2496,7 +2495,7 @@ class GoalAssociationResolver:
             "on saying or repeating content while another action is performed is not "
             "a request for a verbal acknowledgement. Keep it in the action Goal's "
             "description as an expression constraint and do not create a sibling "
-            "spoken_response Goal for it. Simultaneous or ordered framing does "
+            "vocal_output Goal for it. Simultaneous or ordered framing does "
             "not merge independently observable outcomes. Preserve each responsibility "
             "exactly once and preserve its temporal relationship in the descriptions "
             "without making one Goal claim completion of its siblings. For embodied "
@@ -2507,7 +2506,7 @@ class GoalAssociationResolver:
             "make it available to a recipient. Do not split pickup and handoff merely "
             "because those provider stages can fail separately. A report that is "
             "requested only after that effect finishes is delivery owned by the same "
-            "effect Goal, not an independently satisfiable spoken_response.\n\n"
+            "effect Goal, not an independently satisfiable vocal_output.\n\n"
             "A location named directly in the final authoritative user turn must remain "
             "a complete verbatim contiguous binding value in the user's language. Never "
             "translate, transliterate, shorten, or expand it. Do not ask for provider "
@@ -2582,7 +2581,7 @@ class GoalAssociationResolver:
             f"Review triggers JSON:\n{self._bounded_json(triggers, 800)}\n\n"
             "Candidate DTO JSON:\n"
             f"{self._bounded_json(raw, 7000)}\n\n"
-            "Apply this independence test to every ordinary spoken_response beside "
+            "Apply this independence test to every ordinary vocal_output beside "
             "embodied or capability-dependent work: if the body action occurred, or "
             "if the capability work occurred, and Chromie otherwise stayed silent, "
             "did the user independently ask to "
@@ -2596,9 +2595,9 @@ class GoalAssociationResolver:
             "description and remove any Goal whose only outcome is silence, omission, "
             "or acknowledgement of the prohibition. A boundary is not an independent "
             "spoken outcome merely because the user can notice or accept compliance. "
-            "Speaking-lane authored content requires positive words, information, or a "
+            "Vocal-lane authored content requires positive words, information, or a "
             "vocal performance that the user actually asked to hear; silence and not "
-            "mentioning a topic produce no speaking-lane output. A report, explanation, "
+            "mentioning a topic produce no vocal-lane output. A report, explanation, "
             "evaluation, or recommendation whose truth or content depends on the pending "
             "capability result is delivery owned by that capability Goal, not an "
             "independent spoken Goal. This includes a contingent completion report: "
@@ -2681,7 +2680,7 @@ class GoalAssociationResolver:
             "content from capability-result delivery and from a constraint on what "
             "should not be spoken. Preserve all "
             "genuine embodied and conversational responsibilities and their typed "
-            "bindings. A speaking responsibility must require positive audible content "
+            "bindings. A vocal responsibility must require positive audible content "
             "that can be completed independently of pending capability evidence; "
             "a contingent report that pending work has finished depends on execution "
             "evidence and is capability_result_delivery_only, not independently "
@@ -2810,7 +2809,7 @@ class GoalAssociationResolver:
             )
             + "Decide with model reasoning whether responsibilities are genuinely "
             "independent and classify each by its completion channel. An authored "
-            "vocal performance belongs to spoken_response even when coordinated "
+            "vocal performance belongs to vocal_output even when coordinated "
             "with embodied work. Return only the complete final DTO as JSON. The "
             "Host owns validation, IDs, lifecycle, and persistence and does not make "
             "this semantic choice."
@@ -3221,7 +3220,7 @@ class GoalAssociationResolver:
                 ).strip()
                 if item.output_mode == "speech" and progress_kind != "native_response":
                     raise ValueError(
-                        "spoken_response Goal progress must be native_response: "
+                        "vocal_output Goal progress must be native_response: "
                         f"{candidate_id!r}"
                     )
                 if item.output_mode != "speech" and progress_kind == "native_response":

@@ -6,12 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 ChromieExecutionLane = Literal[
     "social_attention",
-    "speaking",
+    "vocal",
     "activity",
 ]
 LaneCoordinationRelation = Literal["parallel"]
 LaneCoordinationStartPolicy = Literal["best_effort_parallel"]
 LaneCoordinationFailurePolicy = Literal["independent"]
+CHROMIE_PERSONAL_VOICE_RESOURCE = "chromie.voice"
 
 
 def _normalize_text(value: Any) -> Any:
@@ -52,7 +53,7 @@ class LaneCoordinationGroup(BaseModel):
     coordination_id: str = Field(min_length=1)
     relation: LaneCoordinationRelation = "parallel"
     lanes: list[ChromieExecutionLane] = Field(min_length=2, max_length=3)
-    speaking_step_ids: list[str] = Field(default_factory=list)
+    vocal_step_ids: list[str] = Field(default_factory=list)
     activity_step_ids: list[str] = Field(default_factory=list)
     start_policy: LaneCoordinationStartPolicy = "best_effort_parallel"
     failure_policy: LaneCoordinationFailurePolicy = "independent"
@@ -63,7 +64,7 @@ class LaneCoordinationGroup(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         return _normalize_text(value)
 
-    @field_validator("speaking_step_ids", "activity_step_ids", mode="before")
+    @field_validator("vocal_step_ids", "activity_step_ids", mode="before")
     @classmethod
     def normalize_step_ids(cls, value: Any) -> list[str]:
         return _normalize_unique_text_list(value)
@@ -83,6 +84,8 @@ class LaneCoordinationGroup(BaseModel):
             raise ValueError("activity lane coordination requires activity_step_ids")
         if "activity" not in lane_set and self.activity_step_ids:
             raise ValueError("activity_step_ids require the activity lane")
-        if "speaking" not in lane_set and self.speaking_step_ids:
-            raise ValueError("speaking_step_ids require the speaking lane")
+        if "vocal" not in lane_set and self.vocal_step_ids:
+            raise ValueError("vocal_step_ids require the vocal lane")
+        if len(self.vocal_step_ids) > 1:
+            raise ValueError("one Vocal coordination group may contain at most one personal-voice provider step")
         return self

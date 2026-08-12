@@ -985,7 +985,7 @@ class CanonicalPlanRuntimeAdapter:
         language: str,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse | None:
-        """Compile GA-bound native conversation into canonical Speaking work.
+        """Compile GA-bound native conversation into canonical Vocal work.
 
         Goal Association owns the binding; the Host only verifies complete,
         non-overlapping spoken-Goal coverage and preserves the Core-authored text.
@@ -1003,7 +1003,7 @@ class CanonicalPlanRuntimeAdapter:
             return None
         if any(
             str((goal.metadata or {}).get("responsibility_kind") or "")
-            != "spoken_response"
+            != "vocal_output"
             or bool((goal.metadata or {}).get("provider_required"))
             for goal in association.new_goals
         ):
@@ -1070,7 +1070,7 @@ class CanonicalPlanRuntimeAdapter:
                         "transient_responsibility": bool(
                             runtime_context.get("transient_responsibility_ids")
                         ),
-                        "execution_lane": "speaking",
+                        "execution_lane": "vocal",
                         "delivery_role": "response",
                     },
                 )
@@ -1093,7 +1093,7 @@ class CanonicalPlanRuntimeAdapter:
             "goal_association_fingerprint": fingerprint,
             "execution_lanes": {
                 "social_attention": "peer_proposal_lane",
-                "speaking": "response_delivery",
+                "vocal": "response_delivery",
                 "activity": "idle",
             },
             "lane_coordination_groups": [],
@@ -1161,7 +1161,7 @@ class CanonicalPlanRuntimeAdapter:
                     "wait_for_playback_start": True,
                     "playback_start_required_for_delivery": True,
                     "planless_direct_response": True,
-                    "execution_lane": "speaking",
+                    "execution_lane": "vocal",
                     "delivery_role": "response",
                 },
             )
@@ -1274,7 +1274,7 @@ class CanonicalPlanRuntimeAdapter:
             "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "social_attention": "proposal_and_auxiliary_execution",
-                "speaking": "response_delivery",
+                "vocal": "response_delivery",
                 "activity": "idle",
             },
             "lane_coordination_groups": [],
@@ -1438,15 +1438,15 @@ class CanonicalPlanRuntimeAdapter:
             for item in composition.lane_coordination
             for step_id in item.activity_step_ids
         }
-        speaking_coordination_by_step_id = {
+        vocal_coordination_by_step_id = {
             step_id: item
             for item in composition.lane_coordination
-            for step_id in item.speaking_step_ids
+            for step_id in item.vocal_step_ids
         }
         plan_steps_by_id = {step.step_id: step for step in plan.steps}
         media_mixer_by_coordination_id: dict[str, dict[str, Any]] = {}
         for coordination in composition.lane_coordination:
-            if "speaking" not in coordination.lanes:
+            if "vocal" not in coordination.lanes:
                 continue
             media_step_ids = [
                 step_id
@@ -1460,15 +1460,15 @@ class CanonicalPlanRuntimeAdapter:
                 definition = self.interaction_runtime.skill_definition(
                     plan_steps_by_id[step_id].skill_id
                 )
-                if definition.metadata.get("mixer_policy") != ("duck_media_during_speaking"):
+                if definition.metadata.get("mixer_policy") != ("duck_media_during_vocal"):
                     raise ValueError(
                         "speech-over-media coordination requires the declared "
-                        "duck_media_during_speaking mixer policy: " + step_id
+                        "duck_media_during_vocal mixer policy: " + step_id
                     )
                 try:
                     mixer_contracts.append(
                         {
-                            "media_mixer_policy": "duck_media_during_speaking",
+                            "media_mixer_policy": "duck_media_during_vocal",
                             "media_ducking_gain_db": float(definition.metadata["ducking_gain_db"]),
                             "media_duck_attack_ms": int(definition.metadata["duck_attack_ms"]),
                             "media_duck_release_ms": int(definition.metadata["duck_release_ms"]),
@@ -1733,7 +1733,7 @@ class CanonicalPlanRuntimeAdapter:
             phase = str(projected["phase"])
             coordination_id = str(projected.get("coordination_id") or "").strip()
             coordination = lane_coordination_by_id.get(coordination_id)
-            coordinated_speech = bool(coordination is not None and "speaking" in coordination.lanes)
+            coordinated_speech = bool(coordination is not None and "vocal" in coordination.lanes)
             playback_barrier = (
                 projected.get("reuse_current_turn_speech") is True
                 or (not safe_read_parallel and not coordinated_speech)
@@ -1750,7 +1750,7 @@ class CanonicalPlanRuntimeAdapter:
                 "canonical_plan_id": plan.plan_id,
                 "canonical_plan_fingerprint": fingerprint,
                 "claims": projected["claims"],
-                "execution_lane": "speaking",
+                "execution_lane": "vocal",
                 "delivery_role": projected.get("delivery_role", "response"),
                 "wait_for_playback_start": playback_barrier,
                 "playback_start_required_for_delivery": playback_barrier,
@@ -1870,31 +1870,31 @@ class CanonicalPlanRuntimeAdapter:
         for step in plan.steps:
             definition = self.interaction_runtime.skill_definition(step.skill_id)
             execution_lane = str(definition.metadata.get("execution_lane") or "activity").strip()
-            if execution_lane not in {"speaking", "activity"}:
+            if execution_lane not in {"vocal", "activity"}:
                 raise ValueError(
                     "canonical plan capability has unsupported execution lane: "
                     f"{step.skill_id}={execution_lane!r}"
                 )
             if (
                 step.capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-                and execution_lane != "speaking"
+                and execution_lane != "vocal"
             ):
                 raise ValueError(
-                    "exact vocal performance capability must remain in the speaking lane"
+                    "exact vocal performance capability must remain in the vocal lane"
                 )
             if step.capability_id in MEDIA_CAPABILITY_IDS.values() and execution_lane != "activity":
                 raise ValueError(
                     "exact media playback capabilities must remain in the activity lane"
                 )
             coordination = (
-                speaking_coordination_by_step_id.get(step.step_id)
-                if execution_lane == "speaking"
+                vocal_coordination_by_step_id.get(step.step_id)
+                if execution_lane == "vocal"
                 else activity_coordination_by_step_id.get(step.step_id)
             )
             wrong_lane_coordination = (
                 activity_coordination_by_step_id.get(step.step_id)
-                if execution_lane == "speaking"
-                else speaking_coordination_by_step_id.get(step.step_id)
+                if execution_lane == "vocal"
+                else vocal_coordination_by_step_id.get(step.step_id)
             )
             if wrong_lane_coordination is not None:
                 raise ValueError(
@@ -1914,8 +1914,8 @@ class CanonicalPlanRuntimeAdapter:
                     "lane_coordination_relation": coordination.relation,
                     "lane_start_policy": coordination.start_policy,
                     "lane_failure_policy": coordination.failure_policy,
-                    "parallel_with_speech": (
-                        execution_lane != "speaking" and "speaking" in coordination.lanes
+                    "parallel_with_vocal": (
+                        execution_lane != "vocal" and "vocal" in coordination.lanes
                     ),
                     "parallel_with_activity": (
                         execution_lane != "activity" and "activity" in coordination.lanes
@@ -1929,7 +1929,7 @@ class CanonicalPlanRuntimeAdapter:
             if (
                 coordination is not None
                 and step.capability_id in MEDIA_CAPABILITY_IDS.values()
-                and "speaking" in coordination.lanes
+                and "vocal" in coordination.lanes
             ):
                 media_mixer_metadata = dict(
                     media_mixer_by_coordination_id[coordination.coordination_id]
@@ -1965,9 +1965,9 @@ class CanonicalPlanRuntimeAdapter:
                         not in {"safe_read", "planning_only"},
                         "retryable_safe_read": safe_read_parallel,
                         "execution_lane": execution_lane,
-                        "parallel_with_speech": (
+                        "parallel_with_vocal": (
                             safe_read_parallel
-                            or bool(coordination_metadata.get("parallel_with_speech"))
+                            or bool(coordination_metadata.get("parallel_with_vocal"))
                         ),
                         **coordination_metadata,
                         **media_mixer_metadata,
@@ -2058,7 +2058,7 @@ class CanonicalPlanRuntimeAdapter:
                                 "lane_coordination_relation": coordination.relation,
                                 "lane_start_policy": coordination.start_policy,
                                 "lane_failure_policy": coordination.failure_policy,
-                                "parallel_with_speech": ("speaking" in coordination.lanes),
+                                "parallel_with_vocal": ("vocal" in coordination.lanes),
                                 "parallel_with_activity": ("activity" in coordination.lanes),
                             }
                             if coordination is not None
@@ -2149,10 +2149,10 @@ class CanonicalPlanRuntimeAdapter:
             "response_composition": composition.model_dump(mode="json", exclude_none=True),
             "execution_lanes": {
                 "social_attention": "proposal_and_auxiliary_execution",
-                "speaking": (
+                "vocal": (
                     "response_delivery_and_provider_work"
                     if any(
-                        request.metadata.get("execution_lane") == "speaking" for request in skills
+                        request.metadata.get("execution_lane") == "vocal" for request in skills
                     )
                     else "response_delivery"
                 ),
@@ -2639,7 +2639,7 @@ class GoalDrivenRuntimeCoordinator:
             and not association.associations
             and bool(association.new_goals)
             and all(
-                str((goal.metadata or {}).get("responsibility_kind") or "") == "spoken_response"
+                str((goal.metadata or {}).get("responsibility_kind") or "") == "vocal_output"
                 and not bool((goal.metadata or {}).get("provider_required"))
                 and bool(str(goal.goal_id or "").strip())
                 for goal in association.new_goals
@@ -3381,7 +3381,7 @@ class GoalDrivenRuntimeCoordinator:
                     fast_planner_path
                     in {
                         "terminal",
-                        "direct_spoken_response",
+                        "direct_vocal_output",
                         "native_response_readiness_adoption",
                         "terminal_missing_ability",
                         "readiness_adoption",
@@ -3880,7 +3880,7 @@ class GoalDrivenRuntimeCoordinator:
                             },
                         )
 
-                    fast_planner_path = "direct_spoken_response"
+                    fast_planner_path = "direct_vocal_output"
                     composition_context = dict(planning_context)
                     composition_context["social_attention_owned_by_peer_lane"] = True
                     composition_context["direct_goal_association_resolution"] = (
