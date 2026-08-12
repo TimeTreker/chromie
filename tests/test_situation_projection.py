@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from orchestrator.runtime.situation import build_situation_projection
-from shared.chromie_contracts.situation import SituationProjection
+from shared.chromie_contracts.situation import (
+    CognitiveOpportunity,
+    SituationProjection,
+)
 
 
 def test_situation_projection_is_bounded_reference_only_and_reconstructable() -> None:
@@ -81,3 +84,31 @@ def test_situation_revision_can_change_focus_without_mutating_source_context() -
     assert after.focus_goal_ids == ["goal-new"]
     assert before.digest != after.digest
     assert context["active_goal_snapshots"][0]["goal_id"] == "goal-old"
+
+
+def test_cognitive_opportunity_is_stable_bounded_and_ephemeral_by_contract():
+    first = CognitiveOpportunity.create(
+        trigger="execution_outcome",
+        goal_ids=["goal-weather"],
+        evidence_refs=["outcome-1", "evidence-1"],
+        reason_codes=["missing_skill_result"],
+        recommended_cognition="fast",
+        situation_digest="a" * 64,
+    )
+    second = CognitiveOpportunity.create(
+        trigger="execution_outcome",
+        goal_ids=["goal-weather"],
+        evidence_refs=["outcome-1", "evidence-1"],
+        reason_codes=["missing_skill_result"],
+        recommended_cognition="fast",
+        situation_digest="a" * 64,
+    )
+
+    assert first == second
+    assert first.opportunity_id.startswith("cognitive_opportunity_")
+    assert first.goal_ids == ["goal-weather"]
+    assert first.recommended_cognition == "fast"
+    assert first.prompt_projection()["evidence_refs"] == [
+        "outcome-1",
+        "evidence-1",
+    ]

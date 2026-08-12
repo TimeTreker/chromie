@@ -132,3 +132,95 @@ class SituationProjection(BaseModel):
         """Return the complete bounded projection; referenced evidence stays external."""
 
         return self.model_dump(mode="json")
+
+CognitiveOpportunityTrigger = Literal[
+    "execution_outcome",
+    "situation_revision",
+    "time_condition",
+    "provider_state",
+]
+CognitiveOpportunityMode = Literal["local", "fast", "slow"]
+
+
+class CognitiveOpportunity(BaseModel):
+    """Ephemeral derived condition that may justify another cognitive act.
+
+    This is not durable Mind state and is never an authority over the referenced
+    Goal or Evidence. It exists only long enough for the current runtime to decide
+    whether no cognition, local handling, Fast cognition, or Slow cognition is
+    useful after a meaningful state transition.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    opportunity_id: str = Field(min_length=1, max_length=200)
+    trigger: CognitiveOpportunityTrigger
+    goal_ids: list[str] = Field(default_factory=list, min_length=1, max_length=8)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=16)
+    reason_codes: list[str] = Field(default_factory=list, max_length=8)
+    recommended_cognition: CognitiveOpportunityMode = "slow"
+    situation_digest: str = Field(default="", max_length=64)
+
+    @field_validator(
+        "opportunity_id",
+        "situation_digest",
+        mode="before",
+    )
+    @classmethod
+    def normalize_opportunity_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("goal_ids", "evidence_refs", "reason_codes", mode="before")
+    @classmethod
+    def normalize_opportunity_lists(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("CognitiveOpportunity list fields must be arrays")
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+        return out
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        trigger: CognitiveOpportunityTrigger,
+        goal_ids: list[str],
+        evidence_refs: list[str] | None = None,
+        reason_codes: list[str] | None = None,
+        recommended_cognition: CognitiveOpportunityMode = "slow",
+        situation_digest: str = "",
+    ) -> "CognitiveOpportunity":
+        payload = {
+            "trigger": trigger,
+            "goal_ids": goal_ids,
+            "evidence_refs": list(evidence_refs or []),
+            "reason_codes": list(reason_codes or []),
+            "recommended_cognition": recommended_cognition,
+            "situation_digest": situation_digest,
+        }
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        return cls(
+            opportunity_id=(
+                f"cognitive_opportunity_{hashlib.sha256(encoded).hexdigest()[:20]}"
+            ),
+            **payload,
+        )
+
+    def prompt_projection(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")

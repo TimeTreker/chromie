@@ -7458,6 +7458,29 @@ class VoiceAssistant:
         response.metadata["responsibility_reconciliation_results"] = (
             responsibility_results
         )
+        cognitive_opportunities = (
+            self.conversation_state.derive_execution_cognitive_opportunities(
+                bundle
+            )
+        )
+        response.metadata["cognitive_opportunities"] = [
+            item.prompt_projection() for item in cognitive_opportunities
+        ]
+        if cognitive_opportunities:
+            self.session_log(
+                session_id,
+                "cognitive_opportunity_raised: count=%s goals=%s modes=%s",
+                len(cognitive_opportunities),
+                ",".join(
+                    goal_id
+                    for item in cognitive_opportunities
+                    for goal_id in item.goal_ids
+                ),
+                ",".join(
+                    item.recommended_cognition
+                    for item in cognitive_opportunities
+                ),
+            )
         self.session_log(
             session_id,
             "cognitive_outcome_reconciled: outcome_id=%s aggregate=%s goals=%s evidence=%s",

@@ -58,11 +58,10 @@ baseline**, not another broad concept-expansion phase:
    refinement preserves Goal identity and existing Work unless Goal Association
    explicitly sets `requires_replan=true`. Next implement genuine replacement
    lineage and trusted forward repair for already committed effects.
-4. **Implement evidence-driven revision/reactivation.** New relevant Evidence may
-   revise Situation, make open Goals actionable, invalidate Work assumptions,
-   close/reopen responsibility, or justify fast/slow cognition. Prefer semantic
-   compatibility checks over a generic dependency/invalidation graph or version
-   mismatch rule.
+4. **Evidence-driven reactivation now emits bounded cognitive opportunities.**
+   Trusted non-completed execution evidence on an open Goal derives an ephemeral
+   fast/slow cognition opportunity with exact evidence references. Nothing is
+   persisted or polled; selective cognition consumes these events in a later slice.
 5. **Preserve truth semantics and repair forward.** Historical Evidence/outcomes/
    delivered speech are append-only facts; current Goal/Plan/Memory meaning may be
    provenance-preserving revised; Situation remains soft; Stable Mind and

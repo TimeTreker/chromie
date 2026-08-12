@@ -37,6 +37,7 @@ try:
         ExecutionOutcomeBundle,
         execution_outcome_fingerprint,
     )
+    from chromie_contracts.situation import CognitiveOpportunity
     from chromie_contracts.reflex import CancellationDispatchReceipt
     from chromie_contracts.semantic_task import (
         InformationGap,
@@ -59,6 +60,7 @@ except ImportError:  # pragma: no cover - repository development path
         ExecutionOutcomeBundle,
         execution_outcome_fingerprint,
     )
+    from shared.chromie_contracts.situation import CognitiveOpportunity
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
@@ -4470,6 +4472,61 @@ class ConversationStateManager:
             self._persist_task_contexts_if_enabled()
             self.last_activity_ms = _now_ms()
         return results
+
+    def derive_execution_cognitive_opportunities(
+        self,
+        bundle: ExecutionOutcomeBundle,
+        *,
+        situation_digest: str = "",
+    ) -> list[CognitiveOpportunity]:
+        """Derive ephemeral cognition opportunities from trusted outcome evidence.
+
+        The result is intentionally not persisted. An opportunity is merely a
+        bounded signal that current authoritative state changed enough that
+        another cognitive act may be useful. The referenced Goal and Evidence
+        remain authoritative in their existing owners.
+        """
+
+        if not self.enabled:
+            return []
+        validated = ExecutionOutcomeBundle.model_validate(bundle)
+        opportunities: list[CognitiveOpportunity] = []
+        for outcome in validated.goal_outcomes:
+            if outcome.status == "completed":
+                continue
+            context = self._task_context_by_goal_id(outcome.goal_id)
+            if context is None:
+                continue
+            if self._goal_responsibility_status(context) != "open":
+                continue
+            evidence_summary = context.get("evidence_summary")
+            if not isinstance(evidence_summary, dict):
+                continue
+            recorded = evidence_summary.get("execution_outcome")
+            if (
+                not isinstance(recorded, dict)
+                or recorded.get("outcome_id") != validated.outcome_id
+            ):
+                continue
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            retryable_safe_read = metadata.get("retryable_safe_read") is True
+            mode = "fast" if retryable_safe_read else "slow"
+            reason_codes = list(outcome.reason_codes) or [
+                f"execution_{outcome.status}"
+            ]
+            opportunities.append(
+                CognitiveOpportunity.create(
+                    trigger="execution_outcome",
+                    goal_ids=[outcome.goal_id],
+                    evidence_refs=[validated.outcome_id, *outcome.evidence_ids],
+                    reason_codes=reason_codes,
+                    recommended_cognition=mode,
+                    situation_digest=situation_digest,
+                )
+            )
+        return opportunities
 
     def _record_planning_metadata(
         self,

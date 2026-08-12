@@ -81,6 +81,9 @@ from .interaction_ledger import (
     InteractionLedgerEvent,
 )
 from .situation import (
+    CognitiveOpportunity,
+    CognitiveOpportunityMode,
+    CognitiveOpportunityTrigger,
     SituationConditionRef,
     SituationEvidenceKind,
     SituationEvidenceRef,
@@ -294,6 +297,9 @@ __all__ = [
     "SituationEvidenceKind",
     "SituationEvidenceRef",
     "SituationProjection",
+    "CognitiveOpportunity",
+    "CognitiveOpportunityMode",
+    "CognitiveOpportunityTrigger",
     "SEMANTIC_AUTHORITY_CONTEXT_KEY",
     "SemanticAuthorityClaim",
     "SemanticAuthorityOwner",

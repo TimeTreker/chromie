@@ -131,8 +131,8 @@ evidence.
 3. **implemented:** transient materialization plus same-Responsibility refinement
    preserve compatible Work; **next:** genuine replacement lineage, trusted effect
    cancellation/forward repair, and reopening across later evidence;
-4. make relevant Evidence/state deltas reactivate ready Progress or cognition
-   without a central polling/priority scheduler;
+4. **implemented:** trusted execution-state deltas derive ephemeral bounded
+   `CognitiveOpportunity` events for fast/slow reactivation without polling or a queue;
 5. preserve revision provenance and forward-repair semantics across Goal, Plan,
    execution outcome, speech, and Memory using existing Ledger/evidence owners;
 6. add selective Memory consolidation/forgetting and Reflection/learning

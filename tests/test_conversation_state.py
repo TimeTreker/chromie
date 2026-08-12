@@ -1691,6 +1691,20 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             binding["planned_skills"][0]["args"],
             {"location": "上海", "date": "today"},
         )
+        opportunities = manager.derive_execution_cognitive_opportunities(
+            bundle,
+            situation_digest="s" * 64,
+        )
+        self.assertEqual(len(opportunities), 1)
+        self.assertEqual(opportunities[0].goal_ids, ["goal-weather"])
+        self.assertEqual(opportunities[0].recommended_cognition, "fast")
+        self.assertEqual(
+            opportunities[0].evidence_refs,
+            ["outcome-weather-interrupted", "evidence-weather"],
+        )
+        self.assertEqual(opportunities[0].reason_codes, ["missing_skill_result"])
+        self.assertEqual(opportunities[0].situation_digest, "s" * 64)
+        self.assertNotIn("cognitive_opportunities", manager.snapshot())
 
     def test_stale_outcome_cannot_overwrite_a_newer_goal_plan_binding(self) -> None:
         manager = ConversationStateManager(base_conversation_id="stale-outcome")
