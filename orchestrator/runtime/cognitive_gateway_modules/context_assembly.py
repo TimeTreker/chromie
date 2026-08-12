@@ -18,10 +18,16 @@ class ContextAssembly:
     """Build one bounded, source-attributed context snapshot before admission."""
 
     CONTEXT_SOURCES = {
-        "conversation": "orchestrator.conversation_state",
+        "conversation_id": "orchestrator.conversation_state",
+        "session_memory": "orchestrator.conversation_state",
         "history": "orchestrator.conversation_state",
+        "pending_tasks": "orchestrator.conversation_state",
+        "active_pending_tasks": "orchestrator.conversation_state",
+        "active_task_contexts": "orchestrator.conversation_state",
+        "active_task_snapshots": "orchestrator.conversation_state",
         "active_goal_snapshots": "orchestrator.conversation_state",
         "recent_goal_snapshots": "orchestrator.conversation_state",
+        "current_task_context": "orchestrator.conversation_state",
         "interaction_engagement": "orchestrator.attention_policy",
         "interaction_context": "orchestrator.interaction_ledger",
         "mind": "orchestrator.mind",
@@ -40,7 +46,7 @@ class ContextAssembly:
         capture: GatewayTurnCapture,
         context: dict[str, Any] | None,
     ) -> GatewayContextSnapshot:
-        copied = deepcopy(context) if isinstance(context, dict) else {}
+        copied = self._project_context(context)
         captured_at = self._aware_now()
         references = self._references(copied, captured_at=captured_at)
         encoded = json.dumps(
@@ -59,6 +65,51 @@ class ContextAssembly:
             references=references,
             digest=hashlib.sha256(encoded).hexdigest(),
         )
+
+    @classmethod
+    def _project_context(
+        cls,
+        context: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Remove duplicate aggregate state before creating the bounded snapshot.
+
+        ``VoiceAssistant.build_context`` retains the complete Conversation State
+        aggregate for downstream compatibility while also publishing the leaf
+        projections used by the maintained Core. Copying both into the Gateway
+        snapshot double-counts the same semantic state and lets a bounded
+        conversation grow past the snapshot byte contract. The Gateway owns the
+        ingress projection: top-level leaf owners win, while aggregate-only legacy
+        callers are mechanically flattened without reinterpreting their meaning.
+        """
+
+        source = context if isinstance(context, dict) else {}
+        conversation = source.get("conversation")
+        projected = {
+            key: deepcopy(value)
+            for key, value in source.items()
+            if key
+            not in {
+                "conversation",
+                # These values are already owned by the retained ``mind`` object.
+                "core_principles",
+                "long_term_goals",
+                "experience_tuning_policy",
+                # These values are already owned by ``session_memory``.
+                "memory_summary",
+                "extracted_memory",
+                # Full retained task history is not Gateway/Core ingress state;
+                # active snapshots/context carry the current continuity evidence.
+                "task_contexts",
+            }
+        }
+        if not isinstance(conversation, dict):
+            return projected
+
+        for key in cls.CONTEXT_SOURCES:
+            if key in projected or key not in conversation:
+                continue
+            projected[key] = deepcopy(conversation[key])
+        return projected
 
     def _references(
         self,

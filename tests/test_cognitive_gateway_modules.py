@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from datetime import datetime, timezone
 
@@ -109,6 +110,117 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
             {reference.context_type for reference in snapshot.references},
             {"history", "active_goal_snapshots", "interaction_engagement"},
         )
+
+    def test_context_assembly_deduplicates_conversation_aggregate(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Move forward.",
+            session_id="turn-large-context",
+            conversation_id="conversation-large-context",
+            channel="text",
+        )
+        canonical_history = [{"role": "user", "text": "Canonical recent turn"}]
+        snapshot = gateway.assemble_context(
+            capture,
+            {
+                "conversation_id": "conversation-large-context",
+                "history": canonical_history,
+                "session_memory": {"memory_summary": "bounded memory"},
+                "mind": {
+                    "core_principles": [{"id": "truth", "statement": "be truthful"}],
+                    "long_term_goals": [{"id": "help", "statement": "help the family"}],
+                    "experience_tuning_policy": ["owner approval required"],
+                },
+                "core_principles": ["duplicate principle projection"],
+                "long_term_goals": ["duplicate goal projection"],
+                "experience_tuning_policy": ["duplicate tuning projection"],
+                "memory_summary": "duplicate memory projection",
+                "extracted_memory": [{"text": "duplicate extracted memory"}],
+                "task_contexts": [{"metadata": {"blob": "x" * 270000}}],
+                "conversation": {
+                    "conversation_id": "conversation-large-context",
+                    "history": [{"role": "user", "text": "stale aggregate turn"}],
+                    "session_memory": {"memory_summary": "stale aggregate memory"},
+                    "durable_profile_memory": {"entries": ["x" * 270000]},
+                    "task_store": {"path": "x" * 270000},
+                },
+            },
+        )
+
+        self.assertNotIn("conversation", snapshot.context)
+        self.assertEqual(snapshot.context["history"], canonical_history)
+        self.assertEqual(
+            snapshot.context["session_memory"],
+            {"memory_summary": "bounded memory"},
+        )
+        self.assertNotIn("core_principles", snapshot.context)
+        self.assertNotIn("long_term_goals", snapshot.context)
+        self.assertNotIn("experience_tuning_policy", snapshot.context)
+        self.assertNotIn("memory_summary", snapshot.context)
+        self.assertNotIn("extracted_memory", snapshot.context)
+        self.assertNotIn("task_contexts", snapshot.context)
+        encoded = json.dumps(
+            snapshot.context,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+        self.assertLess(len(encoded), 262144)
+
+    def test_context_assembly_flattens_legacy_conversation_leaves(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Continue.",
+            session_id="turn-legacy-context",
+            conversation_id="conversation-legacy-context",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(
+            capture,
+            {
+                "conversation": {
+                    "conversation_id": "conversation-legacy-context",
+                    "history": [{"role": "user", "text": "Earlier"}],
+                    "active_goal_snapshots": [{"goal_id": "goal-1"}],
+                    "current_task_context": {"task_id": "task-1"},
+                    "unrelated_aggregate_only_payload": "x" * 270000,
+                }
+            },
+        )
+
+        self.assertNotIn("conversation", snapshot.context)
+        self.assertEqual(
+            snapshot.context["history"],
+            [{"role": "user", "text": "Earlier"}],
+        )
+        self.assertEqual(
+            snapshot.context["active_goal_snapshots"],
+            [{"goal_id": "goal-1"}],
+        )
+        self.assertEqual(
+            snapshot.context["current_task_context"],
+            {"task_id": "task-1"},
+        )
+        self.assertNotIn("unrelated_aggregate_only_payload", snapshot.context)
+
+    def test_context_assembly_keeps_true_snapshot_size_limit_fail_closed(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "Hello",
+            session_id="turn-oversized-leaf",
+            conversation_id="conversation-oversized-leaf",
+            channel="text",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Gateway context snapshot exceeds 262144 bytes",
+        ):
+            gateway.assemble_context(
+                capture,
+                {"interaction_context": {"evidence": "x" * 270000}},
+            )
 
     def test_attention_contract_contains_no_semantic_route_or_plan(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)

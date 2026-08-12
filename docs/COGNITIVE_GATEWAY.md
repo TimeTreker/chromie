@@ -144,7 +144,13 @@ Review cannot authorize an effect.
 
 Context Assembly gathers only bounded evidence the Core needs to reason. Every
 item identifies its source, freshness, and confidence when applicable. Missing
-context remains unknown; it is never filled with invented facts.
+context remains unknown; it is never filled with invented facts. The production
+projection does not copy aggregate Conversation State beside the same state's
+leaf projections: top-level canonical leaves win, aggregate-only compatibility
+input is mechanically flattened, and retained full task history plus duplicate
+Mind/Memory aliases stay outside the Gateway snapshot. The 256 KiB snapshot
+contract remains fail-closed for genuinely oversized canonical ingress evidence;
+it is not enlarged or bypassed to accommodate duplicate state.
 
 Context Assembly does not decide that a turn belongs to an active goal. It
 provides bounded active-goal candidates and evidence; Goal Association in the
