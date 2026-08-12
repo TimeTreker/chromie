@@ -327,8 +327,10 @@ Association and state commit, Fast/Deep Planning, canonical-plan validation or
 rejection, Response Composition, runtime adaptation, fallback speech, and the
 Trusted Capability Runtime. The existing runtime event timeline adds TTS,
 playback, and provider-result observations. A canonical-plan rejection records
-that dispatch was blocked; provider start is reported only when a Trusted
-Capability Runtime trace actually contains a provider-start event.
+that dispatch was blocked. Provider start is derived only from Trusted Capability
+Runtime trace events and is scoped separately to requested Work, ordinary speech
+delivery (`chromie.speak`), and the aggregate runtime. Fallback speech therefore
+never counts as evidence that the requested capability reached its provider.
 
 Reports are stored beside the configured cognitive evidence file under
 `session-workflows/` and retain existing session, conversation, turn, and trace

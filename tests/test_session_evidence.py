@@ -7,10 +7,99 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.runtime.session import (
+    SessionTracker,
+    now_ms,
+    summarize_provider_start_evidence,
+)
+from orchestrator.runtime.skill_runtime import SkillRuntimeResult
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    InteractionSpeech,
+    SkillRequest,
+    SkillTrace,
+    SkillTraceEvent,
+)
 
 
 class SessionEvidenceTests(unittest.TestCase):
+    @staticmethod
+    def _started_trace(
+        *,
+        request_id: str,
+        capability_id: str,
+        provider_id: str,
+    ) -> SkillTrace:
+        return SkillTrace(
+            interaction_id="interaction-evidence",
+            request_id=request_id,
+            skill_id=capability_id,
+            provider_id=provider_id,
+            events=[SkillTraceEvent(type="started")],
+        )
+
+    def test_provider_start_evidence_scopes_speech_away_from_requested_work(self) -> None:
+        response = InteractionResponse(
+            interaction_id="interaction-evidence",
+            speech=[InteractionSpeech(id="speech-fallback", text="I could not do that.")],
+        )
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            traces=[
+                self._started_trace(
+                    request_id="speech-fallback",
+                    capability_id="chromie.speak",
+                    provider_id="chromie.local_speech",
+                )
+            ],
+        )
+
+        evidence = summarize_provider_start_evidence(response, execution)
+
+        self.assertEqual(evidence["requested_work_request_count"], 0)
+        self.assertEqual(evidence["speech_delivery_request_count"], 1)
+        self.assertFalse(evidence["requested_work_provider_start_observed"])
+        self.assertTrue(evidence["speech_delivery_provider_start_observed"])
+        self.assertTrue(evidence["any_provider_start_observed"])
+
+    def test_provider_start_evidence_tracks_requested_work_and_speech_independently(self) -> None:
+        response = InteractionResponse(
+            interaction_id="interaction-evidence",
+            speech=[InteractionSpeech(id="speech-result", text="Here is the result.")],
+            skills=[
+                SkillRequest(
+                    request_id="weather-request",
+                    skill_id="chromie.weather.lookup",
+                    args={"location": "Shanghai"},
+                )
+            ],
+        )
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            traces=[
+                self._started_trace(
+                    request_id="weather-request",
+                    capability_id="chromie.weather.lookup",
+                    provider_id="weather-provider",
+                ),
+                self._started_trace(
+                    request_id="speech-result",
+                    capability_id="chromie.speak",
+                    provider_id="chromie.local_speech",
+                ),
+            ],
+        )
+
+        evidence = summarize_provider_start_evidence(response, execution)
+
+        self.assertEqual(evidence["requested_work_request_count"], 1)
+        self.assertEqual(evidence["speech_delivery_request_count"], 1)
+        self.assertTrue(evidence["requested_work_provider_start_observed"])
+        self.assertTrue(evidence["speech_delivery_provider_start_observed"])
+        self.assertTrue(evidence["any_provider_start_observed"])
+
     def test_finished_session_writes_structured_and_human_workflow_reports(
         self,
     ) -> None:
@@ -101,8 +190,8 @@ class SessionEvidenceTests(unittest.TestCase):
                     "fallback_speech",
                 ],
             )
-            self.assertTrue(report["outcome"]["dispatch_blocked_before_provider"])
-            self.assertFalse(report["outcome"]["provider_start_observed"])
+            self.assertTrue(report["outcome"]["dispatch_blocked_before_requested_provider"])
+            self.assertFalse(report["outcome"]["requested_work_provider_start_observed"])
             self.assertEqual(
                 report["cognitive_stages"][0]["output"]["user_text"],
                 "Please walk",
@@ -112,7 +201,60 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertIn("Canonical Plan Rejection [rejected]", markdown)
             self.assertIn("          ▼", markdown)
             self.assertIn("Please walk", markdown)
-            self.assertIn("dispatch_blocked_before_provider", markdown)
+            self.assertIn("dispatch_blocked_before_requested_provider", markdown)
+
+    def test_fallback_speech_start_does_not_claim_requested_provider_dispatch(
+        self,
+    ) -> None:
+        tracker = SessionTracker()
+        sid = tracker.create()
+        started = now_ms()
+        tracker.record_cognitive_stage(
+            sid,
+            stage="canonical_plan_rejection",
+            started_monotonic_ms=started,
+            finished_monotonic_ms=started + 1.0,
+            status="rejected",
+            metadata={"dispatch_allowed": False},
+        )
+        response = InteractionResponse(
+            interaction_id="fallback-interaction",
+            speech=[InteractionSpeech(id="fallback-speech", text="No verified result yet.")],
+        )
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            traces=[
+                self._started_trace(
+                    request_id="fallback-speech",
+                    capability_id="chromie.speak",
+                    provider_id="chromie.local_speech",
+                )
+            ],
+        )
+        tracker.record_cognitive_stage(
+            sid,
+            stage="fallback_speech",
+            started_monotonic_ms=started + 2.0,
+            finished_monotonic_ms=started + 3.0,
+            status="selected",
+        )
+        tracker.record_cognitive_stage(
+            sid,
+            stage="trusted_capability_runtime",
+            started_monotonic_ms=started + 4.0,
+            finished_monotonic_ms=started + 5.0,
+            status="completed",
+            metadata=summarize_provider_start_evidence(response, execution),
+        )
+
+        report = tracker._workflow_report(sid, termination_state="complete")
+        outcome = report["outcome"]
+
+        self.assertFalse(outcome["requested_work_provider_start_observed"])
+        self.assertTrue(outcome["speech_delivery_provider_start_observed"])
+        self.assertTrue(outcome["any_provider_start_observed"])
+        self.assertTrue(outcome["dispatch_blocked_before_requested_provider"])
 
     def test_conversation_workflow_rollup_combines_multiple_finished_sids(
         self,

@@ -216,8 +216,7 @@ and operator rollback evidence shows that no maintained profile depends on it.
 - Keep dependency-complete Ruff and Mypy execution available in the maintained
   CI environment.
 - Continue replacing development-only mutable runtime aliases with resolved publishable digests.
-- Issue [#28](https://github.com/TimeTreker/chromie/issues/28) retains the Goal Association invalid-completion-tuple and fallback-speech provider-start evidence defects separately from model-role qualification
-  [#24](https://github.com/TimeTreker/chromie/issues/24); implementation is deferred.
+- Issue [#28](https://github.com/TimeTreker/chromie/issues/28) source containment is implemented: PR #29 removed invalid live completion tuples, and Session workflow evidence now scopes requested-Work provider start separately from `chromie.speak`; live model-role qualification remains under [#24](https://github.com/TimeTreker/chromie/issues/24).
 
 ## Open target evidence
 

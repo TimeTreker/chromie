@@ -1590,7 +1590,7 @@
       "owner": "orchestrator",
       "contract": "Retain the Trusted Capability Runtime failure as workflow evidence, then re-raise it unchanged to the existing fail-closed owner.",
       "review_status": "reviewed",
-      "body_sha256": "cec30bb54cec8c713c555cf9bb28a918f20159866656403746c5a830f485e751",
+      "body_sha256": "6ad968b48ac94c07cfe9426edada75a74059e12be66e90d93f28fe883e7b3d9c",
       "failure_signals": [
         "bare_reraise"
       ]

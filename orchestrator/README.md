@@ -422,9 +422,11 @@ terminal behavior. Finished sessions also write `session_workflow` and
 ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Goal Association,
 Fast/Deep Planner, canonical validation/rejection, Response Composer, Trusted
 Capability Runtime, TTS, playback, per-stage input/output, diagnostics, and
-timing observed for that SID. They state whether validation blocked dispatch
-and report provider start only from an actual runtime trace event. Abandoned
-sessions are retained too, and each completed SID refreshes a rolling
+timing observed for that SID. They state whether validation blocked requested
+Work and scope provider-start trace evidence separately to requested Work,
+`chromie.speak` delivery, and any runtime provider; fallback speech cannot prove
+that the requested capability dispatched. Abandoned sessions are retained too,
+and each completed SID refreshes a rolling
 conversation-correlated report so follow-up turns appear in the same ordered
 flow. Raw conversation follows
 `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT`; both formats are private evidence. The

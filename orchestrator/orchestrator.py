@@ -104,7 +104,11 @@ from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingPolicy,
     execute_default_runtime_ready_orientation,
 )
-from orchestrator.runtime.session import now_ms, record_session_workflow_stage
+from orchestrator.runtime.session import (
+    now_ms,
+    record_session_workflow_stage,
+    summarize_provider_start_evidence,
+)
 from shared.chromie_runtime.accelerator_telemetry import (
     ACCELERATOR_SAMPLE_MODULE,
 )
@@ -8288,10 +8292,7 @@ class VoiceAssistant:
                     input_payload=runtime_input,
                     output_payload=None,
                     errors=[{"reason": "interaction_cancelled"}],
-                    metadata={
-                        "request_count": len(response.skills),
-                        "provider_start_observed": False,
-                    },
+                    metadata=summarize_provider_start_evidence(response),
                 )
                 raise
             except Exception as exc:
@@ -8307,17 +8308,9 @@ class VoiceAssistant:
                     errors=[
                         {"error_type": type(exc).__name__, "error": str(exc)}
                     ],
-                    metadata={
-                        "request_count": len(response.skills),
-                        "provider_start_observed": False,
-                    },
+                    metadata=summarize_provider_start_evidence(response),
                 )
                 raise
-            provider_start_observed = any(
-                event.type == "started"
-                for trace in execution.traces
-                for event in trace.events
-            )
             record_session_workflow_stage(
                 self,
                 session_id,
@@ -8338,10 +8331,7 @@ class VoiceAssistant:
                     for result in execution.results
                     if result.status not in {"completed", "success"}
                 ],
-                metadata={
-                    "request_count": len(response.skills),
-                    "provider_start_observed": provider_start_observed,
-                },
+                metadata=summarize_provider_start_evidence(response, execution),
             )
             self.session_log(
                 session_id,

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_runtime.log_colors import colorize_for_cli
 from shared.chromie_runtime.resource_sampling import (
     RESOURCE_SAMPLE_MODULE,
@@ -37,6 +38,41 @@ logger = logging.getLogger(__name__)
 
 def now_ms() -> float:
     return time.perf_counter() * 1000.0
+
+
+def summarize_provider_start_evidence(
+    response: InteractionResponse,
+    execution: Any | None = None,
+) -> dict[str, int | bool]:
+    """Separate requested-Work dispatch from ordinary speech delivery."""
+
+    requested_ids = {
+        request.request_id
+        for request in response.skills
+        if request.skill_id != "chromie.speak"
+    }
+    speech_ids = {speech.id for speech in response.speech} | {
+        request.request_id
+        for request in response.skills
+        if request.skill_id == "chromie.speak"
+    }
+    started = [
+        trace
+        for trace in list(getattr(execution, "traces", ()) or ())
+        if any(event.type == "started" for event in trace.events)
+    ]
+    return {
+        "requested_work_request_count": len(requested_ids),
+        "speech_delivery_request_count": len(speech_ids),
+        "requested_work_provider_start_observed": any(
+            trace.request_id in requested_ids for trace in started
+        ),
+        "speech_delivery_provider_start_observed": any(
+            trace.request_id in speech_ids or trace.skill_id == "chromie.speak"
+            for trace in started
+        ),
+        "any_provider_start_observed": bool(started),
+    }
 
 
 def record_session_workflow_stage(
@@ -1104,13 +1140,23 @@ class SessionTracker:
             and item["metadata"].get("dispatch_allowed") is False
             for item in retained_stages
         )
-        provider_start_observed = any(
+        requested_work_provider_start_observed = any(
             isinstance(item.get("metadata"), dict)
-            and item["metadata"].get("provider_start_observed") is True
+            and item["metadata"].get("requested_work_provider_start_observed") is True
+            for item in trusted_runtime_stages
+        )
+        speech_delivery_provider_start_observed = any(
+            isinstance(item.get("metadata"), dict)
+            and item["metadata"].get("speech_delivery_provider_start_observed") is True
+            for item in trusted_runtime_stages
+        )
+        any_provider_start_observed = any(
+            isinstance(item.get("metadata"), dict)
+            and item["metadata"].get("any_provider_start_observed") is True
             for item in trusted_runtime_stages
         )
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "sid": sid,
             "termination_state": termination_state,
             "started_at_utc": str(session.get("started_at_utc") or ""),
@@ -1137,9 +1183,15 @@ class SessionTracker:
                 "response_chars": int(session.get("response_chars", 0)),
                 "interrupted": bool(session.get("interrupted", False)),
                 "trusted_runtime_observed": bool(trusted_runtime_stages),
-                "provider_start_observed": provider_start_observed,
-                "dispatch_blocked_before_provider": (
-                    dispatch_blocked and not provider_start_observed
+                "requested_work_provider_start_observed": (
+                    requested_work_provider_start_observed
+                ),
+                "speech_delivery_provider_start_observed": (
+                    speech_delivery_provider_start_observed
+                ),
+                "any_provider_start_observed": any_provider_start_observed,
+                "dispatch_blocked_before_requested_provider": (
+                    dispatch_blocked and not requested_work_provider_start_observed
                 ),
             },
         }
