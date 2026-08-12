@@ -3559,6 +3559,8 @@ class ConversationStateManager:
 
         if not isinstance(metadata, dict):
             return {}
+        if metadata.get("transient_responsibility") is True:
+            return {}
         plan = metadata.get("canonical_plan")
         if not isinstance(plan, dict):
             if (

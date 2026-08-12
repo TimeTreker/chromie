@@ -1062,18 +1062,28 @@ class CanonicalPlanRuntimeAdapter:
                         "planless_direct_response": True,
                         "native_response_readiness_adoption": True,
                         "progress_candidate_id": candidate.candidate_id,
+                        "transient_responsibility": bool(
+                            runtime_context.get("transient_responsibility_ids")
+                        ),
                         "execution_lane": "speaking",
                         "delivery_role": "response",
                     },
                 )
             )
 
+        transient_ids = [
+            str(item).strip()
+            for item in runtime_context.get("transient_responsibility_ids", [])
+            if str(item).strip()
+        ]
         metadata: dict[str, Any] = {
             "source": "goal_driven_cognitive_runtime",
             "cognitive_runtime_apply": True,
             "language": language,
             "planless_direct_response": True,
             "native_response_readiness_adoption": True,
+            "transient_responsibility": bool(transient_ids),
+            "transient_responsibility_ids": transient_ids,
             "goal_association": association.model_dump(mode="json", exclude_none=True),
             "goal_association_fingerprint": fingerprint,
             "execution_lanes": {
@@ -2632,6 +2642,54 @@ class GoalDrivenRuntimeCoordinator:
         )
 
     @staticmethod
+    def _transient_native_responsibility_ids(
+        association: GoalAssociationResolution,
+        candidates: dict[str, CognitiveProgressCandidate],
+    ) -> list[str]:
+        """Return immediately dischargeable conversational responsibility IDs.
+
+        Goal Association still provides bounded semantic coverage so the ready
+        native response can be checked against the exact understood outcome, but
+        no durable Goal is needed when every new responsibility is ordinary
+        provider-free speech and every one is completely covered by a supplied
+        native response candidate. This is a materialization decision, not a
+        second interpretation pass.
+        """
+
+        if (
+            association.clarification
+            or association.associations
+            or not association.new_goals
+        ):
+            return []
+        goal_by_id = {
+            str(goal.goal_id or "").strip(): goal
+            for goal in association.new_goals
+            if str(goal.goal_id or "").strip()
+        }
+        if len(goal_by_id) != len(association.new_goals):
+            return []
+        if any(
+            str((goal.metadata or {}).get("output_mode") or "") != "speech"
+            or bool((goal.metadata or {}).get("provider_required"))
+            for goal in goal_by_id.values()
+        ):
+            return []
+        covered: set[str] = set()
+        for binding in association.progress_bindings:
+            candidate = candidates.get(binding.candidate_id)
+            if candidate is None or candidate.kind != "native_response":
+                return []
+            if not binding.goal_ids or any(goal_id not in goal_by_id for goal_id in binding.goal_ids):
+                return []
+            if covered.intersection(binding.goal_ids):
+                return []
+            covered.update(binding.goal_ids)
+        if covered != set(goal_by_id):
+            return []
+        return list(goal_by_id)
+
+    @staticmethod
     def _progress_candidates_from_context(
         context: dict[str, Any],
     ) -> dict[str, CognitiveProgressCandidate]:
@@ -3303,6 +3361,7 @@ class GoalDrivenRuntimeCoordinator:
         ready_handles: dict[str, Any] = {}
         ready_start_task: asyncio.Task[dict[str, Any]] | None = None
         ready_bound_count = 0
+        transient_responsibility_ids: list[str] = []
 
         def path_metadata() -> dict[str, Any]:
             first_deep_reason = (
@@ -3328,8 +3387,16 @@ class GoalDrivenRuntimeCoordinator:
                     terminal_plan.planner_tier if terminal_plan is not None else ""
                 ),
                 "authoritative_goal_count": (
-                    len(self._association_goal_ids(association)) if association is not None else 0
+                    0
+                    if transient_responsibility_ids
+                    else (
+                        len(self._association_goal_ids(association))
+                        if association is not None
+                        else 0
+                    )
                 ),
+                "transient_responsibility_count": len(transient_responsibility_ids),
+                "transient_responsibility_ids": list(transient_responsibility_ids),
                 "fast_goal_outcome_count": (
                     len(fast_plan.goal_outcomes) if fast_plan is not None else 0
                 ),
@@ -3444,7 +3511,7 @@ class GoalDrivenRuntimeCoordinator:
                     lane=str(getattr(route_decision, "route", "") or "unknown"),
                     intent=str(getattr(route_decision, "intent", "") or "unknown"),
                     progress_candidate_ids=[
-                        item.candidate_id for item in progress_candidates
+                        item.candidate_id for item in progress_candidates.values()
                     ],
                     revision=1,
                 )
@@ -3485,6 +3552,19 @@ class GoalDrivenRuntimeCoordinator:
                         ),
                     )
 
+                transient_responsibility_ids = (
+                    self._transient_native_responsibility_ids(
+                        association,
+                        progress_candidates,
+                    )
+                    if association_status == "resolved"
+                    else []
+                )
+                if transient_responsibility_ids:
+                    planning_context["transient_responsibility_ids"] = list(
+                        transient_responsibility_ids
+                    )
+
                 # Goal Association is the model-owned semantic interpretation of the
                 # user's responsibility.  Publish that validated semantic state as
                 # soon as the stage completes so a concurrent follow-up can reason
@@ -3503,7 +3583,9 @@ class GoalDrivenRuntimeCoordinator:
                     and association_status == "resolved"
                     and not association.clarification
                 ):
-                    if has_named_goal_cancellation:
+                    if transient_responsibility_ids:
+                        goal_state_commit_stage = "transient_native_responsibility"
+                    elif has_named_goal_cancellation:
                         goal_state_commit_stage = "deferred_named_goal_cancellation"
                     else:
                         commit_started_ms = time.perf_counter() * 1000.0
@@ -3620,7 +3702,7 @@ class GoalDrivenRuntimeCoordinator:
                 turn_id=turn_id,
                 lane=str(getattr(route_decision, "route", "") or "unknown"),
                 intent=str(getattr(route_decision, "intent", "") or "unknown"),
-                progress_candidate_ids=[item.candidate_id for item in progress_candidates],
+                progress_candidate_ids=[item.candidate_id for item in progress_candidates.values()],
                 focus_goal_ids=association_goal_ids or situation.focus_goal_ids,
                 revision=situation.revision + 1,
             )
@@ -3631,10 +3713,11 @@ class GoalDrivenRuntimeCoordinator:
                     turn_id=association.turn_id,
                     interaction_id="",
                     association_id=goal_association_fingerprint(association),
-                    goal_ids=association_goal_ids,
+                    goal_ids=([] if transient_responsibility_ids else association_goal_ids),
                     relationships=[
                         *[item.relationship for item in association.associations],
-                        *(["new"] if association.new_goals else []),
+                        *(["transient"] if transient_responsibility_ids else []),
+                        *(["new"] if association.new_goals and not transient_responsibility_ids else []),
                         *(["clarify"] if association.clarification else []),
                     ],
                 )

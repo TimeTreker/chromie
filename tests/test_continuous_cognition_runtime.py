@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
@@ -317,6 +318,7 @@ def test_native_converse_runs_with_goal_association_and_skips_planner_composer()
                 raise AssertionError("Response Composer must not rewrite bound native conversation")
 
         client = Client()
+        conversation = ConversationStateManager(base_conversation_id="transient-native")
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
             adapter=CanonicalPlanRuntimeAdapter(runtime),
@@ -324,6 +326,7 @@ def test_native_converse_runs_with_goal_association_and_skips_planner_composer()
                 mode="apply",
                 apply_lanes=frozenset({"chat"}),
             ),
+            goal_state_apply=conversation.apply_goal_association_resolution,
         )
         result = await coordinator._resolve(
             object(),
@@ -345,7 +348,19 @@ def test_native_converse_runs_with_goal_association_and_skips_planner_composer()
         assert result.metadata["fast_planner_path"] == "native_response_readiness_adoption"
         assert result.metadata["native_response_readiness_adoption"] is True
         assert result.metadata["ready_result_bound_count"] == 1
+        assert result.metadata["goal_state_commit_stage"] == "transient_native_responsibility"
+        assert result.metadata["authoritative_goal_count"] == 0
+        assert result.metadata["transient_responsibility_ids"] == ["goal-native"]
+        assert conversation.active_goal_snapshots() == []
         assert result.interaction_response is not None
+        assert result.interaction_response.metadata["transient_responsibility"] is True
+        conversation.record_agent_result("session-native", result.interaction_response)
+        assert conversation.active_goal_snapshots() == []
+        assert not [
+            item
+            for item in conversation.snapshot()["pending_tasks"]
+            if item.get("type") == "goal_execution"
+        ]
         assert [item.text for item in result.interaction_response.speech] == ["I'm Chromie!"]
         assert result.interaction_response.speech[0].metadata["covers_goal_ids"] == [
             "goal-native"
