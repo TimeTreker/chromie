@@ -128,15 +128,14 @@ evidence.
 2. **implemented:** the minimum bounded Situation projection is reconstructed from
    current authoritative references, revisioned across cognition, and never persisted
    as a Belief/world-state database;
-3. **implemented:** transient materialization plus same-Responsibility refinement
-   preserve compatible Work; **next:** genuine replacement lineage, trusted effect
-   cancellation/forward repair, and reopening across later evidence;
+3. **implemented:** transient materialization, compatible same-Responsibility refinement,
+   genuine replacement lineage, and trusted Work-stop/forward repair;
 4. **implemented:** trusted execution-state deltas derive ephemeral bounded
    `CognitiveOpportunity` events for fast/slow reactivation without polling or a queue;
-5. preserve revision provenance and forward-repair semantics across Goal, Plan,
-   execution outcome, speech, and Memory using existing Ledger/evidence owners;
-6. add selective Memory consolidation/forgetting and Reflection/learning
-   promotion only where current contracts cannot already express the invariant;
+5. **next:** consume slow cognitive opportunities through selective Reflection and
+   Memory promotion without rewriting Evidence, Outcome, speech, or Stable Mind;
+6. then harden restart/revalidation so durable Goals/Memory survive while Situation
+   and volatile provider/world assumptions are reconstructed from fresh evidence;
 7. defer multi-user privacy/scoped durable consent, broader recovery/autonomy,
    competence calibration, and richer continuation semantics until a concrete
    slice requires their missing authority/lifecycle.

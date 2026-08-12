@@ -63,7 +63,9 @@ from orchestrator.runtime.named_goal_cancellation import (
     ActiveGoalCancellationRequiresRuntimeDispatch,
     NamedGoalCancellationClosureError,
     cancellation_target_goal_ids,
+    replacement_target_goal_ids,
     dispatch_named_goal_cancellation,
+    dispatch_goal_replacement,
 )
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
@@ -4079,6 +4081,15 @@ class VoiceAssistant:
         association = resolution.goal_association
         if association is None:
             return []
+        replacement_goal_ids = {
+            goal_id
+            for goal in association.new_goals
+            for goal_id in goal.supersedes_goal_ids
+        }
+        if replacement_goal_ids:
+            raise ActiveGoalCancellationRequiresRuntimeDispatch(
+                sorted(replacement_goal_ids)
+            )
         cancel_goal_ids = {
             goal_id
             for item in association.associations
@@ -4469,8 +4480,35 @@ class VoiceAssistant:
                     "metadata": response_metadata,
                 },
             )
+            replacement_goal_ids = replacement_target_goal_ids(resolution)
             cancellation_goal_ids = cancellation_target_goal_ids(resolution)
-            if cancellation_goal_ids:
+            if replacement_goal_ids:
+                goal_state_results, replacement_metadata = (
+                    await dispatch_goal_replacement(
+                        conversation_state=self.conversation_state,
+                        interaction_runtime=self.interaction_runtime,
+                        confirmation_dialogue=getattr(self, "confirmation_dialogue", None),
+                        resolution=resolution,
+                        session_id=session_id,
+                        user_text=user_text,
+                        decision=decision,
+                    )
+                )
+                response = self.interaction_runtime.prepare_response(
+                    response, session_id=session_id
+                )
+                response.metadata = {
+                    **response.metadata,
+                    "goal_state_results": goal_state_results,
+                    "goal_replacement": replacement_metadata,
+                }
+                resolution.goal_state_results = goal_state_results
+                resolution.metadata = {
+                    **resolution.metadata,
+                    "host_commit_status": "goal_replacement_work_stopped_and_committed",
+                    "goal_replacement": replacement_metadata,
+                }
+            elif cancellation_goal_ids:
                 goal_state_results, cancellation_metadata = (
                     await self._dispatch_named_goal_cancellation(
                         resolution,

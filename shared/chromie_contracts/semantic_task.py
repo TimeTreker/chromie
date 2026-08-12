@@ -19,7 +19,6 @@ TaskOperationName = Literal[
     "resume",
     "query_status",
     "correct",
-    "replace",
 ]
 
 ResponsibilityStatus = Literal[
@@ -101,6 +100,7 @@ class SemanticGoal(BaseModel):
         exclude_if=lambda value: value is None,
     )
     related_goal_ids: list[str] = Field(default_factory=list)
+    supersedes_goal_ids: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator(
@@ -118,7 +118,7 @@ class SemanticGoal(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("related_goal_ids", mode="before")
+    @field_validator("related_goal_ids", "supersedes_goal_ids", mode="before")
     @classmethod
     def normalize_related_goal_ids(cls, value: Any) -> list[str]:
         if value is None:
@@ -137,6 +137,12 @@ class SemanticGoal(BaseModel):
     def validate_related_goals(self) -> "SemanticGoal":
         if self.goal_id and self.goal_id in self.related_goal_ids:
             raise ValueError("related_goal_ids must not contain the Goal itself")
+        if self.goal_id and self.goal_id in self.supersedes_goal_ids:
+            raise ValueError("supersedes_goal_ids must not contain the Goal itself")
+        if set(self.related_goal_ids).intersection(self.supersedes_goal_ids):
+            raise ValueError(
+                "a Goal cannot treat the same prior Goal as both related and superseded"
+            )
         return self
 
     @field_validator("success_criteria", mode="before")
@@ -380,7 +386,7 @@ class SemanticTaskOperation(BaseModel):
             raise ValueError("operation=create requires goal")
         if self.operation != "create" and not self.target_task_ids:
             raise ValueError(f"operation={self.operation} requires target_task_ids")
-        if self.operation in {"modify", "clarification_answer", "correct", "replace"}:
+        if self.operation in {"modify", "clarification_answer", "correct"}:
             if (
                 not self.goal_update
                 and self.goal is None

@@ -8,6 +8,7 @@ from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.named_goal_cancellation import (
     NamedGoalCancellationClosureError,
+    dispatch_goal_replacement,
 )
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.schemas.route import RouteDecision
@@ -112,6 +113,26 @@ def _cancel_resolution(goal_ids: list[str]) -> CognitiveRuntimeResolution:
     )
 
 
+def _replacement_resolution() -> CognitiveRuntimeResolution:
+    return CognitiveRuntimeResolution(
+        mode="apply",
+        status="applied",
+        lane="robot_action",
+        goal_association=GoalAssociationResolution(
+            turn_id="turn-replace",
+            new_goals=[
+                {
+                    "goal_id": "goal-c",
+                    "description": "Wave once.",
+                    "source_text": "Actually, wave instead.",
+                    "supersedes_goal_ids": ["goal-a"],
+                }
+            ],
+            confidence=0.99,
+        ),
+    )
+
+
 class NamedGoalCancellationClosureTests(unittest.TestCase):
     def test_active_goal_dispatch_uses_exact_runtime_binding_and_commits_receipt(self) -> None:
         manager = ConversationStateManager(base_conversation_id="cancel-test")
@@ -189,6 +210,102 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         sibling = manager._task_context_by_goal_id("goal-b")
         assert sibling is not None
         self.assertNotEqual(sibling["status"], "cancelled")
+
+    def test_replacement_without_live_work_atomically_supersedes_old_and_creates_new(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="replace-test")
+        _create_goals(manager)
+        association = _replacement_resolution().goal_association
+        assert association is not None
+
+        results = manager.apply_goal_replacement_resolution(
+            association,
+            receipts=[],
+            confirmation_transition=None,
+            sid="sid-replace",
+            user_text="Actually, wave instead.",
+            route="robot_action",
+            intent="replace_goal",
+        )
+
+        self.assertTrue(any(item.get("applied") for item in results))
+        old = manager._task_context_by_goal_id("goal-a")
+        new = manager._task_context_by_goal_id("goal-c")
+        assert old is not None and new is not None
+        self.assertEqual(old["semantic_goal"]["responsibility_status"], "superseded")
+        self.assertEqual(old["metadata"]["superseded_by_goal_ids"], ["goal-c"])
+        self.assertEqual(new["semantic_goal"]["responsibility_status"], "open")
+        self.assertEqual(new["semantic_goal"]["supersedes_goal_ids"], ["goal-a"])
+
+    def test_replacement_with_live_work_requires_exact_stop_receipt_before_commit(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="replace-test")
+        _create_goals(manager)
+        context = manager._task_context_by_goal_id("goal-a")
+        assert context is not None
+        context["status"] = "running"
+        context["commitment_state"] = "executing"
+        context["metadata"] = {
+            **context.get("metadata", {}),
+            "interaction_id": "interaction-parent",
+            "canonical_plan_id": "plan-parent",
+            "canonical_plan_fingerprint": "fingerprint-parent",
+            "remaining_request_ids": ["request-a"],
+        }
+
+        class Runtime:
+            def __init__(self) -> None:
+                self.directives = []
+
+            async def cancel_scope(self, directive):
+                self.directives.append(directive)
+                return CancellationDispatchReceipt(
+                    source_turn_id=directive.source_turn_id,
+                    requested_scope="specific_goal",
+                    effective_scope="specific_goal",
+                    interaction_ids=("interaction-parent",),
+                    target_goal_ids=("goal-a",),
+                    expected_plan_id="plan-parent",
+                    expected_plan_fingerprint="fingerprint-parent",
+                    affected_goal_ids=("goal-a",),
+                    selected_request_ids=("request-a",),
+                    active_request_ids=("request-a",),
+                    cancel_requested_request_ids=("request-a",),
+                )
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.conversation_state = manager
+        assistant.interaction_runtime = Runtime()
+        assistant.confirmation_dialogue = ConfirmationDialogue()
+        assistant.session_log = lambda *args, **kwargs: None
+        resolution = _replacement_resolution()
+        decision = RouteDecision(
+            route="robot_action",
+            intent="replace_goal",
+            confidence=0.99,
+            source="llm",
+            language="en-US",
+        )
+
+        results, metadata = asyncio.run(
+            dispatch_goal_replacement(
+                conversation_state=manager,
+                interaction_runtime=assistant.interaction_runtime,
+                confirmation_dialogue=assistant.confirmation_dialogue,
+                resolution=resolution,
+                session_id="sid-replace",
+                user_text="Actually, wave instead.",
+                decision=decision,
+            )
+        )
+
+        self.assertTrue(any(item.get("applied") for item in results))
+        self.assertEqual(metadata["target_goal_ids"], ["goal-a"])
+        self.assertEqual(len(assistant.interaction_runtime.directives), 1)
+        old = manager._task_context_by_goal_id("goal-a")
+        new = manager._task_context_by_goal_id("goal-c")
+        assert old is not None and new is not None
+        self.assertEqual(old["status"], "cancelled")
+        self.assertEqual(old["semantic_goal"]["responsibility_status"], "superseded")
+        self.assertEqual(new["semantic_goal"]["responsibility_status"], "open")
 
     def test_provider_cancel_failure_rolls_back_goal_state(self) -> None:
         manager = ConversationStateManager(base_conversation_id="cancel-test")
@@ -326,7 +443,13 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         coaffected = manager._task_context_by_goal_id("goal-b")
         assert target is not None and coaffected is not None
         self.assertEqual(target["status"], "cancelled")
-        self.assertEqual(coaffected["status"], "cancelled")
+        self.assertEqual(coaffected["status"], "recoverable")
+        self.assertEqual(
+            coaffected["semantic_goal"]["responsibility_status"], "open"
+        )
+        self.assertEqual(
+            coaffected["plan_status"], "interrupted_by_widened_scope"
+        )
         self.assertTrue(
             coaffected["metadata"]["cancellation_scope_widened"]
         )

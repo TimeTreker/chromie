@@ -53,11 +53,11 @@ baseline**, not another broad concept-expansion phase:
    ready progress IDs, and evidence refs. It is rebuilt in-process, revisioned
    between Goal Association and planning, prompt-validated, and never owns or
    copies the referenced Goal/Evidence/provider truth.
-3. **Goal materialization and compatible refinement are implemented.** Fully
+3. **Goal materialization, refinement, and replacement are implemented.** Fully
    discharged provider-free native conversation stays transient; same-Responsibility
-   refinement preserves Goal identity and existing Work unless Goal Association
-   explicitly sets `requires_replan=true`. Next implement genuine replacement
-   lineage and trusted forward repair for already committed effects.
+   refinement preserves compatible Work unless `requires_replan=true`; genuine
+   replacement creates new Goal lineage, stops incompatible old Work through trusted
+   receipts, and supersedes the old Responsibility without rewriting history.
 4. **Evidence-driven reactivation now emits bounded cognitive opportunities.**
    Trusted non-completed execution evidence on an open Goal derives an ephemeral
    fast/slow cognition opportunity with exact evidence references. Nothing is
@@ -83,10 +83,9 @@ adding a manager because a useful explanatory term exists.
 ## Current priorities
 
 1. Implement the next Continuous Mind invariant from the compressed baseline:
-   make genuine replacement create new Goal lineage and repair already committed
-   incompatible effects forward. Preserve landed materialization/refinement and
-   Situation projection; do not grow it into a manager, Belief database, world
-   graph, or duplicate truth store.
+   consume slow evidence-driven cognitive opportunities through selective Reflection
+   and bounded Memory promotion. Reflection may propose current-state repair but may
+   never rewrite Evidence, ExecutionOutcome, delivered speech, or Stable Mind.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue

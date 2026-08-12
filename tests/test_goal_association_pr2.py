@@ -2165,16 +2165,19 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "confidence": 1.0,
         }
         repaired = {
-            "decision": "associate",
-            "associations": [
+            "decision": "create_goals",
+            "associations": [],
+            "new_goals": [
                 {
-                    "relationship": "replace",
-                    "target_goal_ids": ["goal-weather"],
-                    "updated_description": "Check today's weather in Neixiang.",
-                    "confidence": 1.0,
+                    "description": "Check today's weather in Neixiang.",
+                    "responsibility_kind": "capability_dependent",
+                    "bindings": [
+                        {"name": "location", "entity_type": "place", "value": "内乡", "confidence": 1.0},
+                        {"name": "date", "entity_type": "date", "value": "today", "confidence": 1.0},
+                    ],
+                    "supersedes_goal_ids": ["goal-weather"],
                 }
             ],
-            "new_goals": [],
             "referent_updates": [],
             "resolved_references": [],
             "confidence": 1.0,
@@ -2186,6 +2189,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 {
                     "description": "Check today's weather in Neixiang.",
                     "responsibility_kind": "capability_dependent",
+                    "supersedes_goal_ids": ["goal-weather"],
                     "bindings": [
                         {
                             "name": "location",
@@ -2252,10 +2256,11 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "内乡",
         )
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertEqual(
+        self.assertIn(
+            "single_new_goal_with_retained_context",
             result.metadata["semantic_review"]["triggers"],
-            ["existing_goal_semantic_update"],
         )
+        self.assertEqual(result.new_goals[0].supersedes_goal_ids, ["goal-weather"])
         self.assertIn("provenance-stable", ollama.prompts[2][0])
         self.assertIn("Do not infer a correction from words", ollama.prompts[2][0])
 
@@ -2611,7 +2616,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertIn("open_semantic_description", ollama.prompts[1][0])
         self.assertIn(
-            "Each new_goals item contains description, output_mode, optional media_operation, bindings, and optional provider-neutral resource_responsibility only",
+            "Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only",
             ollama.prompts[1][0],
         )
 
@@ -3233,6 +3238,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "resource_responsibility",
                 "progress_candidate_ids",
                 "related_goal_ids",
+                "supersedes_goal_ids",
             },
         )
         resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
@@ -3256,7 +3262,6 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "cancel",
                 "pause",
                 "resume",
-                "replace",
                 "merge",
                 "split",
                 "reference",

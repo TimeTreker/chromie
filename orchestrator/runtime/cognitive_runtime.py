@@ -3577,6 +3577,9 @@ class GoalDrivenRuntimeCoordinator:
                 has_named_goal_cancellation = any(
                     item.relationship == "cancel" for item in association.associations
                 )
+                has_goal_replacement = any(
+                    goal.supersedes_goal_ids for goal in association.new_goals
+                )
                 if (
                     self.policy.mode == "apply"
                     and self.goal_state_apply is not None
@@ -3587,6 +3590,8 @@ class GoalDrivenRuntimeCoordinator:
                         goal_state_commit_stage = "transient_native_responsibility"
                     elif has_named_goal_cancellation:
                         goal_state_commit_stage = "deferred_named_goal_cancellation"
+                    elif has_goal_replacement:
+                        goal_state_commit_stage = "deferred_goal_replacement"
                     else:
                         commit_started_ms = time.perf_counter() * 1000.0
                         try:

@@ -20,7 +20,6 @@ GoalRelationship = Literal[
     "cancel",
     "pause",
     "resume",
-    "replace",
     "merge",
     "split",
     "reference",
@@ -291,6 +290,18 @@ class GoalAssociationResolution(BaseModel):
             raise ValueError("new_goals goal_id values must be unique")
         if existing_targets.intersection(new_ids):
             raise ValueError("new_goals must not reuse target existing goal IDs")
+        new_id_set = set(new_ids)
+        superseded_ids = {
+            goal_id
+            for goal in self.new_goals
+            for goal_id in goal.supersedes_goal_ids
+        }
+        if superseded_ids.intersection(new_id_set):
+            raise ValueError("new Goals may supersede only retained prior Goal IDs")
+        if superseded_ids.intersection(existing_targets):
+            raise ValueError(
+                "a retained Goal cannot be both associated and superseded in one resolution"
+            )
         binding_ids = [item.candidate_id for item in self.progress_bindings]
         if len(binding_ids) != len(set(binding_ids)):
             raise ValueError("progress_bindings candidate_id values must be unique")

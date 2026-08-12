@@ -73,6 +73,19 @@ def cancellation_target_goal_ids(
     }
 
 
+
+def replacement_target_goal_ids(
+    resolution: CognitiveRuntimeResolution,
+) -> set[str]:
+    association = resolution.goal_association
+    if association is None:
+        return set()
+    return {
+        goal_id
+        for goal in association.new_goals
+        for goal_id in goal.supersedes_goal_ids
+    }
+
 def _request_source_goal_ids(request: SkillRequest) -> set[str]:
     metadata = request.metadata if isinstance(request.metadata, dict) else {}
     values = metadata.get("source_goal_ids") or metadata.get("covers_goal_ids")
@@ -383,7 +396,7 @@ def _build_confirmation_remainder(
     return replacement_pending, transition
 
 
-async def dispatch_named_goal_cancellation(
+async def _dispatch_goal_work_stop(
     *,
     conversation_state: Any,
     interaction_runtime: Any,
@@ -392,11 +405,14 @@ async def dispatch_named_goal_cancellation(
     session_id: str,
     user_text: str,
     decision: RouteDecision,
+    target_goal_ids: set[str],
+    target_responsibility_status: str,
+    dispatch_reason: str,
+    source: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     association = resolution.goal_association
     if association is None:
-        raise ValueError("named cancellation requires Goal Association")
-    target_goal_ids = cancellation_target_goal_ids(resolution)
+        raise ValueError("Goal Work stop requires Goal Association")
     if not target_goal_ids:
         return [], {}
     bindings_fn = getattr(
@@ -406,7 +422,11 @@ async def dispatch_named_goal_cancellation(
     )
     reconcile_fn = getattr(
         conversation_state,
-        "apply_goal_cancellation_resolution",
+        (
+            "apply_goal_replacement_resolution"
+            if target_responsibility_status == "superseded"
+            else "apply_goal_cancellation_resolution"
+        ),
         None,
     )
     if not callable(bindings_fn) or not callable(reconcile_fn):
@@ -506,7 +526,7 @@ async def dispatch_named_goal_cancellation(
             target_goal_ids=tuple(sorted(goal_ids)),
             expected_plan_id=plan_id,
             expected_plan_fingerprint=fingerprint,
-            reason="Core-resolved named Goal cancellation",
+            reason=dispatch_reason,
         )
         for (interaction_id, plan_id, fingerprint), goal_ids in grouped.items()
     ]
@@ -548,16 +568,16 @@ async def dispatch_named_goal_cancellation(
             )
 
     try:
-        goal_state_results = reconcile_fn(
-            association,
-            receipts=receipts,
-            confirmation_transition=confirmation_transition,
-            sid=session_id,
-            user_text=user_text,
-            route=decision.route,
-            intent=decision.intent,
-            source="goal_driven_named_cancellation",
-        )
+        reconcile_kwargs = {
+            "receipts": receipts,
+            "confirmation_transition": confirmation_transition,
+            "sid": session_id,
+            "user_text": user_text,
+            "route": decision.route,
+            "intent": decision.intent,
+            "source": source,
+        }
+        goal_state_results = reconcile_fn(association, **reconcile_kwargs)
     except Exception as exc:
         raise NamedGoalCancellationClosureError(
             target_goal_ids,
@@ -630,9 +650,61 @@ async def dispatch_named_goal_cancellation(
     return goal_state_results, metadata
 
 
+async def dispatch_named_goal_cancellation(
+    *,
+    conversation_state: Any,
+    interaction_runtime: Any,
+    confirmation_dialogue: ConfirmationDialogue | None,
+    resolution: CognitiveRuntimeResolution,
+    session_id: str,
+    user_text: str,
+    decision: RouteDecision,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    return await _dispatch_goal_work_stop(
+        conversation_state=conversation_state,
+        interaction_runtime=interaction_runtime,
+        confirmation_dialogue=confirmation_dialogue,
+        resolution=resolution,
+        session_id=session_id,
+        user_text=user_text,
+        decision=decision,
+        target_goal_ids=cancellation_target_goal_ids(resolution),
+        target_responsibility_status="cancelled",
+        dispatch_reason="Core-resolved named Goal cancellation",
+        source="goal_driven_named_cancellation",
+    )
+
+
+async def dispatch_goal_replacement(
+    *,
+    conversation_state: Any,
+    interaction_runtime: Any,
+    confirmation_dialogue: ConfirmationDialogue | None,
+    resolution: CognitiveRuntimeResolution,
+    session_id: str,
+    user_text: str,
+    decision: RouteDecision,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    return await _dispatch_goal_work_stop(
+        conversation_state=conversation_state,
+        interaction_runtime=interaction_runtime,
+        confirmation_dialogue=confirmation_dialogue,
+        resolution=resolution,
+        session_id=session_id,
+        user_text=user_text,
+        decision=decision,
+        target_goal_ids=replacement_target_goal_ids(resolution),
+        target_responsibility_status="superseded",
+        dispatch_reason="Core-resolved Goal replacement Work stop",
+        source="goal_driven_goal_replacement",
+    )
+
+
 __all__ = [
     "ActiveGoalCancellationRequiresRuntimeDispatch",
     "NamedGoalCancellationClosureError",
     "cancellation_target_goal_ids",
+    "replacement_target_goal_ids",
     "dispatch_named_goal_cancellation",
+    "dispatch_goal_replacement",
 ]

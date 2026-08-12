@@ -210,7 +210,6 @@ GoalAssociationModelRelationship = Literal[
     "cancel",
     "pause",
     "resume",
-    "replace",
     "merge",
     "split",
     "reference",
@@ -276,7 +275,7 @@ class GoalAssociationModelAssociation(BaseModel):
             raise ValueError(f"relationship={self.relationship} requires target_goal_ids")
         if self.relationship == "merge" and len(self.target_goal_ids) < 2:
             raise ValueError("relationship=merge requires at least two target goals")
-        if self.relationship in {"modify", "clarify", "replace"} and not (
+        if self.relationship in {"modify", "clarify"} and not (
             self.updated_description or self.resolved_gap_ids
         ):
             raise ValueError(
@@ -520,6 +519,7 @@ class GoalAssociationModelGoal(BaseModel):
     )
     progress_candidate_ids: list[str] = Field(default_factory=list, max_length=8)
     related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
 
     @field_validator("description", mode="before")
@@ -529,7 +529,12 @@ class GoalAssociationModelGoal(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("progress_candidate_ids", "related_goal_ids", mode="before")
+    @field_validator(
+        "progress_candidate_ids",
+        "related_goal_ids",
+        "supersedes_goal_ids",
+        mode="before",
+    )
     @classmethod
     def normalize_progress_candidate_ids(cls, value: Any) -> list[str]:
         if isinstance(value, str):
@@ -1715,7 +1720,7 @@ class GoalAssociationResolver:
         ):
             triggers.append("single_new_goal_with_retained_context")
         if isinstance(model_output, GoalAssociationModelOutput) and any(
-            association.relationship in {"modify", "clarify", "replace"}
+            association.relationship in {"modify", "clarify"}
             for association in model_output.associations
         ):
             triggers.append("existing_goal_semantic_update")
@@ -2087,8 +2092,8 @@ class GoalAssociationResolver:
             state_instructions = (
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields, plus progress_candidate_ids only when supplied current-turn progress candidates support that exact Goal. "
-                "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
-                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify or replace only when the user meaning actually changes and include updated_description or resolved_gap_ids. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
+                "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
+                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
@@ -2128,7 +2133,7 @@ class GoalAssociationResolver:
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
-            + "Each new_goals object contains description, output_mode, optional media_operation, bindings, optional resource_responsibility, progress_candidate_ids only when a supplied current-turn progress candidate directly supports that Goal, and related_goal_ids only when one or more supplied retained Goals are genuinely relevant context for this new responsibility. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+            + "Each new_goals object contains description, output_mode, optional media_operation, bindings, optional resource_responsibility, progress_candidate_ids only when a supplied current-turn progress candidate directly supports that Goal, related_goal_ids only when retained Goals remain relevant context, and supersedes_goal_ids only when the old Responsibility is genuinely abandoned and replaced by this new independently owed outcome. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_responsibility is provider-neutral and must follow the contract above. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
             "Owner-approved Chromie identity JSON:\n"
             f"{identity_json}\n\n"
             "Owner-approved Personality Expression JSON:\n"
@@ -2237,7 +2242,7 @@ class GoalAssociationResolver:
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
             + output_instructions
-            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, output_mode, optional media_operation, bindings, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
+            + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
             + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Resource identity is not source evidence. source_status=known requires an actual user- or discourse-supplied source and a nonempty source_description or source_binding_names; use unknown when a required source is absent, and provider_resolved only when source selection is deliberately delegated. Preserve every explicit count, duration, speed, direction, target, and other material parameter in a typed binding as well as the description; normalize an unambiguous worded quantity to a numeric-string binding value without units. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
@@ -2833,7 +2838,7 @@ class GoalAssociationResolver:
                     requires_replan=(
                         item.requires_replan
                         or item.relationship
-                        in {"modify", "clarify", "replace", "merge", "split"}
+                        in {"modify", "clarify", "merge", "split"}
                     ),
                 )
             )
@@ -3083,6 +3088,18 @@ class GoalAssociationResolver:
                     "new Goal references unknown related Goal IDs: "
                     + ", ".join(unknown_related_goal_ids)
                 )
+            unknown_superseded_goal_ids = sorted(
+                set(item.supersedes_goal_ids) - active_goal_ids
+            )
+            if unknown_superseded_goal_ids:
+                raise ValueError(
+                    "replacement Goal references unknown superseded Goal IDs: "
+                    + ", ".join(unknown_superseded_goal_ids)
+                )
+            if set(item.related_goal_ids).intersection(item.supersedes_goal_ids):
+                raise ValueError(
+                    "replacement Goal cannot also retain a superseded Goal as related context"
+                )
             new_goals.append(
                 SemanticGoal(
                     goal_id=goal_id,
@@ -3093,6 +3110,7 @@ class GoalAssociationResolver:
                     success_criteria=[item.description],
                     resource_responsibility=resource_responsibility,
                     related_goal_ids=item.related_goal_ids,
+                    supersedes_goal_ids=item.supersedes_goal_ids,
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,

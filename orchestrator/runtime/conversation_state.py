@@ -1221,7 +1221,6 @@ class ConversationStateManager:
             "modify": "modify_task",
             "clarification_answer": "clarify_task",
             "correct": "modify_task",
-            "replace": "modify_task",
             "cancel": "close_task",
             "reject": "close_task",
         }.get(operation.operation, context.get("task_relation") or "continue_task")
@@ -1460,6 +1459,8 @@ class ConversationStateManager:
         route: str | None = None,
         intent: str | None = None,
         source: str = "goal_cancellation_reconciliation",
+        target_goal_ids_override: set[str] | list[str] | tuple[str, ...] | None = None,
+        target_responsibility_status: str = "cancelled",
     ) -> list[dict[str, Any]]:
         """Atomically reconcile trusted cancellation evidence into Goal state.
 
@@ -1475,12 +1476,18 @@ class ConversationStateManager:
             if isinstance(resolution, GoalAssociationResolution)
             else GoalAssociationResolution.model_validate(resolution)
         )
-        target_goal_ids = {
-            goal_id
-            for association in resolved.associations
-            if association.relationship == "cancel"
-            for goal_id in association.target_goal_ids
-        }
+        target_goal_ids = (
+            {str(goal_id).strip() for goal_id in target_goal_ids_override if str(goal_id).strip()}
+            if target_goal_ids_override is not None
+            else {
+                goal_id
+                for association in resolved.associations
+                if association.relationship == "cancel"
+                for goal_id in association.target_goal_ids
+            }
+        )
+        if target_responsibility_status not in {"cancelled", "superseded"}:
+            raise ValueError("unsupported target responsibility transition")
         if not target_goal_ids:
             return self.apply_goal_association_resolution(
                 resolved,
@@ -1604,11 +1611,37 @@ class ConversationStateManager:
                 previous_status = str(
                     context.get("status") or "open"
                 ).lower()
-                if goal_id in coaffected_goal_ids:
-                    if previous_status not in _DONE_TASK_STATUSES:
-                        context["status"] = "cancelled"
-                        context["commitment_state"] = "cancelled"
-                        context["plan_status"] = "cancelled_by_widened_scope"
+                if goal_id in target_goal_ids:
+                    context["status"] = "cancelled"
+                    context["commitment_state"] = "cancelled"
+                    context["plan_status"] = (
+                        "work_stopped_for_replacement"
+                        if target_responsibility_status == "superseded"
+                        else "cancelled"
+                    )
+                    if target_responsibility_status == "superseded":
+                        replacement_goal_ids = [
+                            str(goal.goal_id or "")
+                            for goal in resolved.new_goals
+                            if goal_id in goal.supersedes_goal_ids and goal.goal_id
+                        ]
+                        self._set_goal_responsibility_status(
+                            context,
+                            "superseded",
+                            source=source,
+                        )
+                        metadata = context.get("metadata")
+                        if not isinstance(metadata, dict):
+                            metadata = {}
+                        context["metadata"] = {
+                            **metadata,
+                            "superseded_by_goal_ids": replacement_goal_ids,
+                        }
+                elif goal_id in coaffected_goal_ids:
+                    if self._goal_responsibility_status(context) == "open":
+                        context["status"] = "recoverable"
+                        context["commitment_state"] = "evaluating"
+                        context["plan_status"] = "interrupted_by_widened_scope"
                 confirmation = context.get("confirmation")
                 if not isinstance(confirmation, dict):
                     confirmation = {}
@@ -1642,12 +1675,50 @@ class ConversationStateManager:
                             "applied": True,
                             "status": str(context.get("status") or previous_status),
                             "state_change": (
-                                "cancelled"
-                                if previous_status not in _DONE_TASK_STATUSES
-                                else "terminal_state_unchanged"
+                                "work_interrupted_responsibility_open"
+                                if self._goal_responsibility_status(context) == "open"
+                                else "responsibility_terminal_work_recorded"
                             ),
                         }
                     )
+
+            selected_request_ids = {
+                request_id
+                for receipt in validated_receipts
+                for request_id in receipt.selected_request_ids
+            }
+            for task in self._pending_tasks:
+                if task.get("type") != "goal_execution":
+                    continue
+                task_metadata = task.get("metadata")
+                if not isinstance(task_metadata, dict):
+                    continue
+                task_goal_id = str(task_metadata.get("goal_id") or "").strip()
+                if task_goal_id in target_goal_ids:
+                    task["status"] = "cancelled"
+                    task["updated_ms"] = timestamp_ms
+                    task["metadata"] = {
+                        **task_metadata,
+                        "remaining_request_ids": [],
+                        "work_stop_source_turn_id": resolved.turn_id,
+                    }
+                elif task_goal_id in coaffected_goal_ids:
+                    remaining = self._string_list(
+                        task_metadata.get("remaining_request_ids")
+                        or task_metadata.get("request_ids")
+                    )
+                    remaining = [
+                        request_id
+                        for request_id in remaining
+                        if request_id not in selected_request_ids
+                    ]
+                    task["status"] = "recoverable"
+                    task["updated_ms"] = timestamp_ms
+                    task["metadata"] = {
+                        **task_metadata,
+                        "remaining_request_ids": remaining,
+                        "work_stop_scope_widened": True,
+                    }
 
             old_confirmation_id = str(
                 transition.get("old_confirmation_id") or ""
@@ -1798,6 +1869,51 @@ class ConversationStateManager:
             mutate,
             rollback_reason="atomic_cancellation_transaction_rolled_back",
             persistence_failure_reason="atomic_cancellation_persistence_failed",
+        )
+
+    def apply_goal_replacement_resolution(
+        self,
+        resolution: GoalAssociationResolution | dict[str, Any],
+        *,
+        receipts: list[CancellationDispatchReceipt | dict[str, Any]],
+        confirmation_transition: dict[str, Any] | None,
+        sid: str | None,
+        user_text: str,
+        route: str | None = None,
+        intent: str | None = None,
+        source: str = "goal_replacement_reconciliation",
+    ) -> list[dict[str, Any]]:
+        resolved = (
+            resolution
+            if isinstance(resolution, GoalAssociationResolution)
+            else GoalAssociationResolution.model_validate(resolution)
+        )
+        target_goal_ids = {
+            goal_id
+            for goal in resolved.new_goals
+            for goal_id in goal.supersedes_goal_ids
+        }
+        if not target_goal_ids:
+            return self.apply_goal_association_resolution(
+                resolved,
+                sid=sid,
+                user_text=user_text,
+                route=route,
+                intent=intent,
+                source=source,
+                atomic=True,
+            )
+        return self.apply_goal_cancellation_resolution(
+            resolved,
+            receipts=receipts,
+            confirmation_transition=confirmation_transition,
+            sid=sid,
+            user_text=user_text,
+            route=route,
+            intent=intent,
+            source=source,
+            target_goal_ids_override=target_goal_ids,
+            target_responsibility_status="superseded",
         )
 
     def apply_reflex_cancellation_receipt(
@@ -2386,7 +2502,6 @@ class ConversationStateManager:
             "cancel": "cancel",
             "pause": "pause",
             "resume": "resume",
-            "replace": "replace",
         }
         for association in resolved.associations:
             target_task_ids = [
@@ -2465,7 +2580,6 @@ class ConversationStateManager:
             if operation_name in {
                 "modify",
                 "clarification_answer",
-                "replace",
             } and not (association.goal_update or association.resolved_gap_ids):
                 results.append(
                     {

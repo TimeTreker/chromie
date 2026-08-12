@@ -2082,32 +2082,6 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/named_goal_cancellation.py",
-      "symbol": "dispatch_named_goal_cancellation",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "e1c6672c027d9a593fc5d662c0c88e7792824415885676abd487c11475721c02",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/named_goal_cancellation.py",
-      "symbol": "dispatch_named_goal_cancellation",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
       "path": "orchestrator/runtime/outcome_response.py",
       "symbol": "_validated_inputs",
       "ordinal": 1,
@@ -2520,6 +2494,32 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "_dispatch_goal_work_stop",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
+      "review_status": "reviewed",
+      "body_sha256": "e1c6672c027d9a593fc5d662c0c88e7792824415885676abd487c11475721c02",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "_dispatch_goal_work_stop",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
+      "review_status": "reviewed",
+      "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
+      "failure_signals": [
+        "raise"
       ]
     }
   ],
