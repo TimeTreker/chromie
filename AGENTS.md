@@ -41,6 +41,15 @@ semantics become clearer.
   features, new architecture, new runtime switches, or new terminology unless
   the change directly closes those prerequisites or a demonstrated
   safety/provenance blocker.
+- Treat the Project Charter's engineering principles and canonical architecture
+  invariants as binding constraints during normal development. A coding agent
+  may identify evidence that a principle itself should change, but must not
+  silently violate, weaken, reinterpret, or bypass that principle to make an
+  implementation easier. Before crossing that boundary, report the conflict,
+  evidence, proposed amendment, and expected impact to the project owner and
+  obtain explicit authorization. After authorization, update the canonical
+  principle/architecture truth with the implementation rather than hiding the
+  change in code, prompts, tests, compatibility paths, or local exceptions.
 - Inspect implementation and tests before editing documentation or behavior.
 - For user-visible robot weirdness, diagnose the root architectural or
   interaction-policy cause before changing prompts or phrasing.

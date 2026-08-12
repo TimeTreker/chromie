@@ -4,6 +4,29 @@ This document defines the stable purpose and boundaries of Chromie. It should
 change rarely. Current implementation and evidence belong in
 [STATUS.md](STATUS.md); delivery order belongs in [ROADMAP.md](../ROADMAP.md).
 
+### Governance of core principles
+
+The Charter's engineering principles and canonical architecture invariants are
+binding constraints for normal development. Implementations, prompts, tests,
+compatibility paths, and local exceptions must not silently weaken, reinterpret,
+or bypass them merely because doing so would make a change easier.
+
+These principles are deliberately stable, not infallible. New evidence may show
+that a principle is incomplete, internally inconsistent, or now prevents the
+correct general design. In that case the developer or coding agent should stop
+before crossing the principle boundary and present the project owner with the
+specific conflict, evidence, proposed amendment, alternatives, and expected
+architectural impact. The principle may change only after explicit project-owner
+authorization.
+
+Once such a change is authorized, update the Charter or other canonical
+architecture authority in the same change or before implementation, then make
+the runtime follow the revised rule and remove obsolete paths. **Correctness
+before Architecture** therefore permits challenging an architecture principle;
+it does not grant an implementer unilateral authority to rewrite that principle.
+The escalation is explicit, while the implementation remains governed by the
+last owner-approved canonical rule.
+
 ### One resource responsibility, dynamically bounded capabilities
 
 `AcquireAndDeliverResource` is one provider-neutral human responsibility.
