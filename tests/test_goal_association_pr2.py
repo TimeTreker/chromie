@@ -1214,6 +1214,125 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
         self.assertEqual(result.new_goals, [])
 
+    def test_repeated_ungrounded_location_becomes_material_clarification(self):
+        invented_local = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "查询并告知用户今天的本地天气。",
+                    "output_mode": "capability_work",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "本地",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "date",
+                            "entity_type": "date",
+                            "value": "今天",
+                            "confidence": 1.0,
+                        },
+                    ],
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "",
+            "confidence": 1.0,
+            "reason_summary": "查询今天的天气。",
+        }
+        invented_current = {
+            **invented_local,
+            "new_goals": [
+                {
+                    "description": "查询并告知用户当前位置今天的天气。",
+                    "output_mode": "capability_work",
+                    "bindings": [
+                        {
+                            "name": "location",
+                            "entity_type": "location",
+                            "value": "当前位置",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "date",
+                            "entity_type": "date",
+                            "value": "今天",
+                            "confidence": 1.0,
+                        },
+                    ],
+                }
+            ],
+        }
+        clarified = {
+            "decision": "clarify",
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "clarification": "你想查哪里的天气？",
+            "confidence": 1.0,
+            "reason_summary": "查询地点没有从当前输入或上下文中确定。",
+        }
+        ollama = ScriptedOllama(
+            [invented_local, invented_current, clarified]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "你好，今天天气怎么样？",
+                    language="zh-CN",
+                    route="tool",
+                    intent="capability:chromie.weather.lookup",
+                    progress_candidates=[
+                        {
+                            "candidate_id": "progress-weather",
+                            "kind": "capability",
+                            "capability_id": "chromie.weather.lookup",
+                            "args": {"location": "本地", "date": "today"},
+                            "intent": "chromie.weather.lookup",
+                            "confidence": 0.95,
+                        }
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(result.clarification, "你想查哪里的天气？")
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "goal_association.semantic_contract_resegmentation",
+        )
+        self.assertEqual(
+            ollama.prompts[2][1]["prompt_family"],
+            "goal_association.material_binding_clarification",
+        )
+        clarification_schema = ollama.prompts[2][1]["response_format"]
+        self.assertEqual(
+            clarification_schema["properties"]["decision"]["enum"],
+            ["clarify"],
+        )
+        self.assertEqual(
+            clarification_schema["properties"]["new_goals"]["maxItems"],
+            0,
+        )
+        self.assertIn(
+            "material semantic information required to define what Chromie owes",
+            ollama.prompts[2][0],
+        )
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "model_owned_material_binding_clarification",
+        )
+        self.assertEqual(
+            result.metadata["contract_repair"]["attempt_count"],
+            2,
+        )
+
     def test_explicit_location_binding_repairs_non_verbatim_model_value(self):
         mistranslated = {
             "decision": "create_goals",

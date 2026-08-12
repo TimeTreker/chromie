@@ -450,12 +450,17 @@ It is deliberately more general than a tool/read request. Current forms include:
 - `native_response`: a complete substantive conversational act that current
   Mind/context can already support; and
 - `capability`: an exact capability plus material arguments that Fast
-  Understanding has already resolved.
+  Understanding has already resolved and grounded in the current turn or
+  authoritative bounded context.
 
-A candidate is meaning, not authorization. Trusted readiness policy decides what
-may advance now. Goal Association later supplies explicit canonical Goal binding
-when the responsibility persists or needs reconciliation. The Host does not infer
-Goal ownership from route names, text similarity, or capability resemblance.
+A candidate is meaning, not authorization. A material entity or parameter that
+defines the owed human outcome cannot become ready progress while unresolved; Fast
+Understanding leaves that capability out of progress and Goal Association owns the
+clarification. Planner/provider details may remain unresolved only after the human
+outcome itself is semantically defined. Trusted readiness policy decides what may
+advance now. Goal Association later supplies explicit canonical Goal binding when
+the responsibility persists or needs reconciliation. The Host does not infer Goal
+ownership from route names, text similarity, or capability resemblance.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -1199,6 +1204,17 @@ other invalid Goal Association output. Indirect references instead retain the
 canonical value and referent ID selected by Goal Association from the supplied
 bounded discourse state. The Host checks provenance shape; it does not extract a
 place name, choose a referent, or decide the user's meaning.
+
+Goal semantic information and Planner execution information are distinct. A
+material entity or parameter that determines what Chromie owes the user must be
+resolved at the Goal boundary from the authoritative turn, discourse/referent
+state, retained Goal bindings, or other authoritative references exposed through
+Situation. Planner owns only how to realize an already-defined outcome. When one
+fresh semantic repair still repeats a maintained material-binding provenance
+violation, the Host does not permit another guessed Goal value: it narrows the
+next model schema to clarification only. The model still authors the natural
+question; Host code merely preserves the already-proven provenance boundary. A
+valid direct value or referent-backed repair continues without that clarification.
 
 Fast Goal Interpreter route and retrieval results are advisory projections.
 Query-matched capabilities may lead the semantic-review catalog, but they do

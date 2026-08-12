@@ -978,6 +978,7 @@ class GoalAssociationResolver:
         repair_attempted = False
         contract_repair_succeeded = False
         contract_repair_strategy = ""
+        contract_repair_attempt_count = 0
         semantic_review_attempted = False
         semantic_review_attempt_count = 0
         optional_referent_recovery: list[dict[str, Any]] = []
@@ -1006,6 +1007,7 @@ class GoalAssociationResolver:
                 )
             except (ValidationError, ValueError) as exc:
                 repair_attempted = True
+                contract_repair_attempt_count = 1
                 initial_validation_error = self._validation_error_json(exc)
                 fresh_typed_resegmentation = self._is_execution_contract_validation_error(
                     exc
@@ -1087,19 +1089,80 @@ class GoalAssociationResolver:
                 )
                 optional_referent_recovery.extend(recovered)
                 repair_raw = repaired
-                resolution = await self._validate_contract_output(
-                    repaired,
-                    request=request,
-                    turn_id=turn_id,
-                    output_type=output_type,
-                )
+                try:
+                    resolution = await self._validate_contract_output(
+                        repaired,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
+                except GoalAssociationFreshResegmentationError as repair_exc:
+                    repeated_material_provenance_failure = (
+                        fresh_semantic_trigger
+                        == "invalid_location_binding_provenance"
+                        and repair_exc.trigger == fresh_semantic_trigger
+                    )
+                    if not repeated_material_provenance_failure:
+                        raise
+                    contract_repair_attempt_count = 2
+                    contract_repair_strategy = (
+                        "model_owned_material_binding_clarification"
+                    )
+                    repair_validation_error = self._validation_error_json(
+                        repair_exc
+                    )
+                    clarification_schema = self._response_schema(
+                        output_type,
+                        candidate_goals,
+                        discourse_referents,
+                        progress_candidates=(
+                            request.context.get("progress_candidates") or []
+                        ),
+                        clarification_only=True,
+                    )
+                    clarified = await self.ollama.generate(
+                        self._layered_repair_prompt(
+                            request=request,
+                            candidate_goals=candidate_goals,
+                            turn_id=turn_id,
+                            output_type=output_type,
+                            raw={},
+                            validation_error=repair_validation_error,
+                        ),
+                        system=self._repair_system_prompt(output_type),
+                        options=generation_options,
+                        response_format=clarification_schema,
+                        prompt_family=(
+                            "goal_association.material_binding_clarification"
+                        ),
+                        turn_id=request.sid,
+                        attempt=3,
+                    )
+                    if not isinstance(clarified, dict):
+                        raise ValueError(
+                            "goal-association material clarification response "
+                            "is not a JSON object"
+                        ) from repair_exc
+                    clarified, recovered = (
+                        self._drop_invalid_optional_referent_introductions(
+                            clarified
+                        )
+                    )
+                    optional_referent_recovery.extend(recovered)
+                    repair_raw = clarified
+                    resolution = await self._validate_contract_output(
+                        clarified,
+                        request=request,
+                        turn_id=turn_id,
+                        output_type=output_type,
+                    )
                 contract_repair_succeeded = True
                 repair_metadata = dict(resolution.metadata)
                 repair_metadata["contract_repair"] = {
                     "attempted": True,
                     "succeeded": True,
                     "strategy": contract_repair_strategy,
-                    "attempt_count": 1,
+                    "attempt_count": contract_repair_attempt_count,
                 }
                 resolution = resolution.model_copy(update={"metadata": repair_metadata})
                 logger.info(
@@ -1263,7 +1326,7 @@ class GoalAssociationResolver:
                         "attempted": True,
                         "succeeded": True,
                         "strategy": contract_repair_strategy,
-                        "attempt_count": 1,
+                        "attempt_count": contract_repair_attempt_count,
                     }
                 review_metadata["semantic_review"] = {
                     "attempted": True,
@@ -2081,11 +2144,11 @@ class GoalAssociationResolver:
         if output_type is GoalSegmentationModelOutput:
             state_instructions = (
                 "There are no active or retained recent Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
-                "Segment the authoritative user turn into independent new Goals, or return a clarification if the meaning is materially ambiguous. "
+                "Segment the authoritative user turn into independent new Goals, or return a clarification if the human-level outcome is materially ambiguous or still lacks semantic information required to define what Chromie owes. "
             )
             output_instructions = (
                 "Return only JSON with decision, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
-                "Use decision=create_goals for a clear turn and decision=clarify only for a genuinely ambiguous user meaning. "
+                "Use decision=create_goals when every material part of the owed outcome is semantically defined. Use decision=clarify for genuinely ambiguous meaning or unresolved material semantic information required to define that outcome; do not clarify for provider or execution details of an already-defined outcome. "
                 "The decoder enforces the exact GoalSegmentationModelOutput JSON Schema. "
             )
         else:
@@ -2093,21 +2156,21 @@ class GoalAssociationResolver:
                 "Resolve continuity before creation using semantic reasoning. "
                 "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, resolved_gap_ids, and requires_replan fields, plus progress_candidate_ids only when supplied current-turn progress candidates support that exact Goal. "
                 "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
-                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When the user's meaning itself is ambiguous and Chromie must ask a question, use top-level decision=clarify instead. "
+                "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh spoken_response Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When Chromie still lacks material semantic information required to define the current owed outcome, or the user's meaning itself is ambiguous, use top-level decision=clarify instead of guessing or deferring that meaning to planning. "
                 "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
                 "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
                 "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
             )
             output_instructions = (
                 "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, clarification, confidence, and reason_summary. "
-                "Use decision=associate for continuity, decision=create_goals for independent work, or decision=clarify only for genuine ambiguity. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
+                "Use decision=associate for continuity, decision=create_goals for semantically defined independent work, or decision=clarify when meaning is genuinely ambiguous or material semantic information required to define the owed outcome is unresolved. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
                 "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
             )
         return (
             state_instructions
             + "The supplied pre-association route and intent are advisory only. "
             "They must not force a clarification branch or attach the turn to an existing Goal. "
-            "If the user's intended outcome is clear, create or associate the semantic Goal even when downstream capability planning may still need a binding; the Planner owns execution-information gaps. "
+            "Create or associate a Goal only when the human-level owed outcome is semantically defined. A material entity or parameter that determines what Chromie owes the user belongs to Goal meaning, not to Planner execution detail; if that material meaning remains unresolved after the authoritative user turn, discourse, retained-Goal bindings, and Situation context, return clarification instead of inventing a value or deferring it to planning. The Planner owns only execution information needed to realize an already-defined outcome. "
             + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
@@ -2129,7 +2192,7 @@ class GoalAssociationResolver:
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
-            "The clarification field is only a concise user-facing question. Never put analysis, rationale, translation, route labels, validator errors, model failures, or system diagnostics in clarification. Put optional compact rationale in reason_summary. If the user meaning is materially ambiguous, use decision=clarify; otherwise keep clarification empty.\n\n"
+            "The clarification field is only a concise user-facing question. Never put analysis, rationale, translation, route labels, validator errors, model failures, or system diagnostics in clarification. Put optional compact rationale in reason_summary. If the user meaning is materially ambiguous or a material semantic part of the owed outcome remains unresolved, use decision=clarify; otherwise keep clarification empty.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
             + output_instructions
@@ -2141,7 +2204,7 @@ class GoalAssociationResolver:
             + skill_section
             + "Bounded active goals JSON:\n"
             f"{self._bounded_json(candidate_goals, 6500)}\n\n"
-            "Current-turn progress candidates JSON (Core-authored bounded progress already understood before Goal Association. kind=capability is exact capability-shaped work; kind=native_response is a complete conversational answer already authored from current Mind/context. Copy candidate_id into only the canonical Goal(s) that exact progress directly satisfies or supports. Do not create, modify, or infer capabilities or rewrite response text here; an empty list means no early progress exists):\n"
+            "Current-turn progress candidates JSON (Core-authored bounded progress already understood before Goal Association. kind=capability is exact capability-shaped work; kind=native_response is a complete conversational answer already authored from current Mind/context. Candidate args are advisory and never establish material binding provenance. Copy candidate_id into only the canonical Goal(s) that exact grounded progress directly satisfies or supports. Do not create, modify, or infer capabilities or rewrite response text here; an empty list means no early progress exists):\n"
             f"{self._bounded_json(context.get('progress_candidates') or [], 3600)}\n\n"
             "Bounded active task/progress snapshots JSON:\n"
             f"{self._bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
@@ -2187,7 +2250,7 @@ class GoalAssociationResolver:
             revision_action = "Re-evaluate the independent goal segmentation"
             state_instructions = (
                 "There are no active or retained recent Goals. Existing-goal associations are structurally invalid and must not appear. "
-                "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the meaning is materially ambiguous. "
+                "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the human-level outcome is materially ambiguous or still lacks material semantic information required to define what Chromie owes. "
                 "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. A greeting attached to substantive work is framing, not a second Goal. Identity and personality shape wording only and never create a Goal. A lookup plus an interpretation derived from the same result is one Goal. "
             )
             output_instructions = (
@@ -2244,7 +2307,7 @@ class GoalAssociationResolver:
             + output_instructions
             + "Select exactly one decision branch. clarification is only a concise user-facing question and must be empty for non-clarify decisions. Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only. Choose output_mode from the work that actually completes the Goal; the Host derives the internal responsibility class, lane, and provider-evidence requirement. media_playback requires one exact media_operation; non-media Goals may omit it. "
             + _EXECUTION_CONTRACT_PROMPT
-            + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Resource identity is not source evidence. source_status=known requires an actual user- or discourse-supplied source and a nonempty source_description or source_binding_names; use unknown when a required source is absent, and provider_resolved only when source selection is deliberately delegated. Preserve every explicit count, duration, speed, direction, target, and other material parameter in a typed binding as well as the description; normalize an unambiguous worded quantity to a numeric-string binding value without units. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
+            + " Preserve resource_responsibility when the responsibility is genuinely to acquire and deliver a physical object or grounded information; never add it to a vocal performance and never insert provider or capability details into it. Resource identity is not source evidence. source_status=known requires an actual user- or discourse-supplied source and a nonempty source_description or source_binding_names; use unknown when a required source is absent, and provider_resolved only when source selection is deliberately delegated. Preserve every explicit count, duration, speed, direction, target, and other material parameter in a typed binding as well as the description; normalize an unambiguous worded quantity to a numeric-string binding value without units. Never repair missing human-level scope by inventing a default: if authoritative user, discourse, retained-Goal, and Situation context still cannot resolve material Goal meaning, return top-level clarification; Planner details begin only after the owed outcome is semantically defined. Preserve or repair explicit discourse resolution and referent updates; never use tool-result contents to infer a reference. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
@@ -2413,6 +2476,7 @@ class GoalAssociationResolver:
             "and never treat eventual spoken delivery of capability evidence as the "
             "completion mode of the evidence-acquisition Goal. "
             f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
+            "Current-turn progress candidates and pre-association route hints are advisory and never establish material Goal-binding provenance. A material entity or parameter needed to define what Chromie owes must be grounded in authoritative user meaning, supplied discourse/referent state, retained Goal bindings, or Situation references. If that human-level scope remains unresolved, return top-level clarification instead of inventing or defaulting it or leaving it for Planner. Planner owns execution details only after the owed outcome is semantically defined.\n\n"
             "Keep or create a fresh spoken_response Goal when the latest turn is an "
             "independently satisfiable reaction, feeling, acknowledgement, evaluation, "
             "decision, or other direct conversational act, even when a retained Goal "
