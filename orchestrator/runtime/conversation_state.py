@@ -369,6 +369,45 @@ class ConversationStateManager:
             "responsibility_reconciliation_history": history[-16:],
         }
 
+    @staticmethod
+    def _durable_goal_context(context: dict[str, Any]) -> dict[str, Any]:
+        """Return only durable Responsibility/provenance state for restart.
+
+        Situation, derived cognitive opportunities, current provider/runtime
+        snapshots, and optional Reflection outputs are reconstructable live state.
+        They must never become durable truth merely because they were attached to
+        an in-process Goal context.
+        """
+
+        durable = copy.deepcopy(context)
+        for key in (
+            "situation",
+            "cognitive_opportunities",
+            "reflection_resolutions",
+            "reflection_state_results",
+            "provider_status",
+            "robot_state",
+            "runtime_state",
+            "current_environment",
+            "current_body_state",
+        ):
+            durable.pop(key, None)
+        metadata = durable.get("metadata")
+        if isinstance(metadata, dict):
+            for key in (
+                "situation",
+                "cognitive_opportunities",
+                "reflection_resolutions",
+                "reflection_state_results",
+                "provider_status",
+                "robot_state",
+                "runtime_state",
+                "current_environment",
+                "current_body_state",
+            ):
+                metadata.pop(key, None)
+        return durable
+
     def _durable_task_contexts(self) -> list[dict[str, Any]]:
         if self.max_pending_tasks <= 0:
             return []
@@ -379,7 +418,7 @@ class ConversationStateManager:
             policy = str(context.get("persistence_policy") or "persist_if_unfinished").lower()
             if policy in {"ephemeral", "memory_only", "do_not_persist", "none"}:
                 continue
-            durable.append(self._json_safe(dict(context)))
+            durable.append(self._json_safe(self._durable_goal_context(context)))
         return durable[-self.max_pending_tasks :]
 
     def persist_task_contexts(self) -> bool:
@@ -475,20 +514,55 @@ class ConversationStateManager:
             original_status = str(item.get("status") or "open")
             if self._goal_responsibility_status(item) != "open":
                 continue
-            context = dict(item)
+            context = copy.deepcopy(item)
             context["conversation_id"] = self.conversation_id
             context["status"] = "recoverable"
+            context["commitment_state"] = "evaluating"
+            context["plan_status"] = "revalidation_required"
             context["task_relation"] = "continue_task"
             context["updated_ms"] = now
             metadata = context.get("metadata")
             if not isinstance(metadata, dict):
                 metadata = {}
-            context["metadata"] = {
+            previous_confirmation = (
+                copy.deepcopy(context.get("confirmation"))
+                if isinstance(context.get("confirmation"), dict)
+                else None
+            )
+            previous_remaining = self._string_list(
+                metadata.get("remaining_request_ids")
+            )
+            previous_request_statuses = metadata.get("request_statuses")
+            if not isinstance(previous_request_statuses, dict):
+                previous_request_statuses = {}
+            previous_confirmation_request_ids = self._string_list(
+                metadata.get("confirmation_request_ids")
+                or (previous_confirmation or {}).get("request_ids")
+            )
+            context["confirmation"] = None
+            metadata = {
                 **metadata,
                 "restored_from_task_store": True,
                 "restored_original_status": original_status,
                 "restored_ms": now,
+                "runtime_revalidation_required": True,
+                "recovery_previous_remaining_request_ids": previous_remaining,
+                "recovery_previous_request_statuses": dict(previous_request_statuses),
+                "recovery_previous_confirmation_request_ids": (
+                    previous_confirmation_request_ids
+                ),
+                "remaining_request_ids": [],
+                "request_statuses": {},
+                "confirmation_pending": False,
             }
+            if previous_confirmation is not None:
+                metadata["recovery_previous_confirmation"] = previous_confirmation
+            for stale_key in (
+                "confirmation_id",
+                "confirmation_request_ids",
+            ):
+                metadata.pop(stale_key, None)
+            context["metadata"] = metadata
             if not isinstance(context.get("related_sids"), list):
                 context["related_sids"] = []
             restored.append(context)
@@ -1404,6 +1478,9 @@ class ConversationStateManager:
                 and str(confirmation.get("status") or "pending").strip().lower()
                 == "pending"
             )
+            runtime_revalidation_required = bool(
+                metadata.get("runtime_revalidation_required") is True
+            )
             runtime_status = status in {
                 "committed",
                 "scheduled",
@@ -1424,8 +1501,18 @@ class ConversationStateManager:
                     "confirmation_id": confirmation_id,
                     "confirmation_pending": confirmation_pending,
                     "confirmation_request_ids": confirmation_request_ids,
+                    "requires_revalidation": runtime_revalidation_required,
+                    "revalidation_reason": (
+                        "restored_runtime_binding_requires_fresh_provider_state"
+                        if runtime_revalidation_required
+                        else ""
+                    ),
                     "requires_runtime_dispatch": bool(
-                        runtime_status or (remaining and not confirmation_pending)
+                        not runtime_revalidation_required
+                        and (
+                            runtime_status
+                            or (remaining and not confirmation_pending)
+                        )
                     ),
                 }
             )

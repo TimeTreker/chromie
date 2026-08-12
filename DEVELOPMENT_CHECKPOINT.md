@@ -134,8 +134,9 @@ evidence.
    `CognitiveOpportunity` events for fast/slow reactivation without polling or a queue;
 5. **implemented:** slow opportunities selectively invoke typed Reflection; repeated
    evidence may promote only ephemeral task/session memory, never Stable Mind or authority;
-6. **next:** harden restart/revalidation so durable Goals/Memory survive while Situation
-   and volatile provider/world assumptions are reconstructed from fresh evidence;
+6. **implemented:** restart restores unfinished Responsibility while current Work is
+   recoverable/revalidation-required; volatile Situation/provider/body/confirmation state
+   is discarded or archived as recovery provenance rather than restored as current truth;
 7. defer multi-user privacy/scoped durable consent, broader recovery/autonomy,
    competence calibration, and richer continuation semantics until a concrete
    slice requires their missing authority/lifecycle.

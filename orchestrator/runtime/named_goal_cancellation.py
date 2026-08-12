@@ -444,6 +444,21 @@ async def _dispatch_goal_work_stop(
             "named_goal_cancellation_unknown_target:"
             + ",".join(sorted(str(item) for item in unknown))
         )
+    revalidation_required = [
+        str(item.get("goal_id") or "")
+        for item in bindings
+        if item.get("requires_revalidation")
+    ]
+    if revalidation_required:
+        raise NamedGoalCancellationClosureError(
+            revalidation_required,
+            stage="runtime_revalidation_required",
+            detail=(
+                "restored Work binding cannot be cancelled or superseded until "
+                "fresh provider/runtime state revalidates it"
+            ),
+            runtime_dispatch_attempted=False,
+        )
     try:
         replacement_pending, confirmation_transition = (
             _build_confirmation_remainder(

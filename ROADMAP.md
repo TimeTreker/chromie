@@ -67,9 +67,11 @@ baseline**, not another broad concept-expansion phase:
    provenance-preserving revised; Situation remains soft; Stable Mind and
    provider/authorization/safety authority cannot be rewritten by ordinary
    cognition.
-6. **Keep learning promotion bounded.** Reflection cannot mutate historical truth,
-   Stable Mind, authority, or provider capability; provider procedural learning stays
-   provider-owned. Next reconstruct/revalidate volatile Situation and Work after restart.
+6. **Restart/revalidation is implemented for durable Goal continuity.** Only open
+   Responsibility is restored; current Work becomes recoverable/revalidation-required,
+   stale confirmation/runtime bindings lose current authority, volatile Situation/provider/
+   body projections are excluded from durable Goal state, and stale bindings cannot be
+   cancelled or superseded before fresh runtime/provider revalidation.
 7. **Widen only after the core invariants hold.** Durable scoped consent/privacy,
    multi-user identity, broader autonomy, competence calibration, and richer
    resumable cognition remain later detail work unless a current implementation
@@ -81,10 +83,10 @@ with fewer truth owners and processes, not preserving an obsolete pipeline or
 adding a manager because a useful explanatory term exists.
 ## Current priorities
 
-1. Implement the next Continuous Mind invariant from the compressed baseline:
-   harden restart/revalidation so unfinished Responsibility and selective Memory survive
-   while Situation, provider availability, and other volatile Work assumptions are
-   reconstructed from fresh authoritative evidence rather than restored as current truth.
+1. Preserve the completed Continuous Mind core invariants and widen only from concrete
+   needs. The next architecture work is scoped durable consent/privacy, multi-user identity,
+   broader autonomy/competence calibration, or richer resumable cognition when a real
+   scenario demonstrates missing lifecycle or authority.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue
