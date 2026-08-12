@@ -471,6 +471,94 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(len(summary), 1)
             self.assertIn("slowest=", summary[0]["message"])
 
+    def test_session_completion_logs_one_operator_readable_flow_line(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "events.jsonl"
+            tracker = SessionTracker(event_log_path=path)
+            sid = tracker.create()
+            tracker.log(
+                sid,
+                "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s",
+                2.5,
+                500.0,
+                80000,
+            )
+            started = now_ms()
+            tracker.record_cognitive_stage(
+                sid,
+                stage="asr",
+                started_monotonic_ms=started,
+                finished_monotonic_ms=started + 120.0,
+                status="accepted",
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="goal_interpretation",
+                started_monotonic_ms=started + 121.0,
+                finished_monotonic_ms=started + 421.0,
+                status="accepted",
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="fast_planner",
+                started_monotonic_ms=started + 422.0,
+                finished_monotonic_ms=started + 1922.0,
+                status="escalate",
+            )
+            tracker.record_cognitive_stage(
+                sid,
+                stage="deep_planner",
+                started_monotonic_ms=started + 1923.0,
+                finished_monotonic_ms=started + 2523.0,
+                status="complete",
+            )
+            tracker.state[sid]["llm_done"] = True
+            tracker.state[sid]["scheduled_tts"] = 1
+            tracker.state[sid]["queued_tts"] = 1
+            tracker.state[sid]["played_tts"] = 1
+
+            tracker.maybe_done(sid)
+
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            flow = [record for record in records if record["event"] == "session_flow"]
+            self.assertEqual(len(flow), 1)
+            message = flow[0]["message"]
+            self.assertNotIn("\n", message)
+            self.assertIn("vad[accepted]", message)
+            self.assertIn("asr[accepted,120.0ms]", message)
+            self.assertIn("goal_interpretation[accepted,300.0ms]", message)
+            self.assertIn("fast_planner[escalate,1.50s]", message)
+            self.assertIn("deep_planner[complete,600.0ms]", message)
+            self.assertIn("tts_playback[played=1/1,failed=0,skipped=0]", message)
+            self.assertIn("state=complete", message)
+            self.assertIn("slowest=fast_planner:1.50s", message)
+
+    def test_interrupted_session_logs_flow_once_before_abandonment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "events.jsonl"
+            tracker = SessionTracker(event_log_path=path)
+            first = tracker.create()
+            started = now_ms()
+            tracker.record_cognitive_stage(
+                first,
+                stage="goal_interpretation",
+                started_monotonic_ms=started,
+                finished_monotonic_ms=started + 10.0,
+                status="accepted",
+            )
+
+            tracker.create()
+
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            flow = [
+                record
+                for record in records
+                if record["event"] == "session_flow" and record["sid"] == first
+            ]
+            self.assertEqual(len(flow), 1)
+            self.assertIn("state=abandoned", flow[0]["message"])
+            self.assertIn("goal_interpretation[accepted,10.0ms]", flow[0]["message"])
+
     def test_evidence_write_failure_does_not_break_session_logging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir) / "not-a-file"

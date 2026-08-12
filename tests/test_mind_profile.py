@@ -30,7 +30,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "human child")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.6.0")
+        self.assertEqual(profile.version, "0.6.1")
         self.assertIn("family's little secretary", profile.identity.short_self_description)
         self.assertIn("six-year-old human child", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)

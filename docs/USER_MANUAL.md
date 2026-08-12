@@ -58,6 +58,16 @@ From another terminal, check readiness and recent logs:
 ./scripts/check_voice_mujoco_logs.sh
 ```
 
+When a voice session closes, the Orchestrator also prints one compact
+`session_flow:` line in the launcher terminal. It lists the retained processing
+boundaries in execution order with each stage status and duration, followed by
+TTS/playback delivery counts, total session time, and the slowest observed stage.
+`start_chromie.sh` needs no separate workflow engine for this: it already streams
+Orchestrator stdout, and the line is derived from the Session owner's existing
+workflow evidence rather than from a new tracing authority. The structured JSON
+and Markdown workflow reports remain the detailed evidence when deeper diagnosis
+is needed.
+
 Stop the paired stack with `Ctrl+C` in the launcher terminal or:
 
 ```bash

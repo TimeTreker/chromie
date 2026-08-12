@@ -257,6 +257,7 @@ class SessionTracker:
             "skipped_tts": 0,
             "llm_done": False,
             "done_logged": False,
+            "flow_summary_logged": False,
             "response_chars": 0,
             "interrupted": False,
             "workflow_events": [],
@@ -275,6 +276,7 @@ class SessionTracker:
             if prev and not prev.get("done_logged"):
                 prev["interrupted"] = True
                 self.log(previous, "session_interrupted_by_new_session: new_sid=%s", sid)
+                self._log_session_flow_summary(previous, termination_state="abandoned")
                 self._finalize_runtime_trace(previous, state="abandoned")
         self.log(sid, "session_start")
         self.trace_mark(sid, "session_started", kind="session", attributes={"sid": sid})
@@ -676,6 +678,7 @@ class SessionTracker:
                 s.get("response_chars", 0),
                 self.elapsed_ms(sid),
             )
+            self._log_session_flow_summary(sid, termination_state="complete")
             workflow = self._workflow_summary(sid)
             if workflow:
                 self.event_writer.write(
@@ -717,6 +720,7 @@ class SessionTracker:
                 kind="session",
                 attributes={"reason": str(reason or "shutdown")},
             )
+            self._log_session_flow_summary(sid, termination_state="abandoned")
             self._finalize_runtime_trace(sid, state="abandoned")
             finalized.append(sid)
         return finalized
@@ -753,6 +757,7 @@ class SessionTracker:
                     "timeout_ms": round(float(idle_timeout_ms), 3),
                 },
             )
+            self._log_session_flow_summary(sid, termination_state="abandoned")
             self._finalize_runtime_trace(sid, state="abandoned")
             finalized.append(sid)
         return finalized
@@ -872,6 +877,90 @@ class SessionTracker:
         if len(text) <= limit:
             return text
         return text[: limit - 3].rstrip() + "..."
+
+    @staticmethod
+    def _flow_duration_text(duration_ms: float) -> str:
+        duration_ms = max(0.0, float(duration_ms))
+        return (
+            f"{duration_ms:.1f}ms"
+            if duration_ms < 1000.0
+            else f"{duration_ms / 1000.0:.2f}s"
+        )
+
+    def _session_flow_summary(self, sid: str, *, termination_state: str) -> str:
+        """Render one CLI line from already-retained typed Session evidence."""
+
+        state = self.state.get(sid)
+        if not state:
+            return ""
+        events = state.get("workflow_events") or []
+        parts = (
+            ["vad[accepted]"]
+            if isinstance(events, list)
+            and any(
+                isinstance(item, dict) and item.get("event") == "vad_valid_end"
+                for item in events
+            )
+            else []
+        )
+        slowest_name = ""
+        slowest_ms = 0.0
+        stages = state.get("cognitive_workflow_stages") or []
+        if isinstance(stages, list):
+            for item in sorted(
+                (row for row in stages if isinstance(row, dict)),
+                key=lambda row: float(row.get("started_elapsed_ms") or 0.0),
+            ):
+                name = str(item.get("stage") or "stage").strip().replace(" ", "_")
+                status = str(item.get("status") or "unknown").strip().replace(" ", "_")
+                attempt = max(1, int(item.get("attempt") or 1))
+                if attempt > 1:
+                    name = f"{name}#{attempt}"
+                duration_ms = float(item.get("duration_ms") or 0.0)
+                errors = item.get("errors")
+                error_suffix = (
+                    f",errors={len(errors)}"
+                    if isinstance(errors, list) and errors
+                    else ""
+                )
+                parts.append(
+                    f"{name}[{status},{self._flow_duration_text(duration_ms)}{error_suffix}]"
+                )
+                if duration_ms > slowest_ms:
+                    slowest_name = name
+                    slowest_ms = duration_ms
+
+        scheduled = int(state.get("scheduled_tts", 0))
+        played = int(state.get("played_tts", 0))
+        failed = int(state.get("failed_tts", 0))
+        skipped = int(state.get("skipped_tts", 0))
+        if scheduled or played or failed or skipped:
+            parts.append(
+                f"tts_playback[played={played}/{scheduled},failed={failed},skipped={skipped}]"
+            )
+        if not parts:
+            return ""
+        suffix = (
+            f" | state={termination_state} "
+            f"total={self._flow_duration_text(self.elapsed_ms(sid))}"
+        )
+        if slowest_name:
+            suffix += f" slowest={slowest_name}:{self._flow_duration_text(slowest_ms)}"
+        return " -> ".join(parts) + suffix
+
+    def _log_session_flow_summary(
+        self,
+        sid: str,
+        *,
+        termination_state: str,
+    ) -> None:
+        state = self.state.get(sid)
+        if not state or state.get("flow_summary_logged"):
+            return
+        summary = self._session_flow_summary(sid, termination_state=termination_state)
+        if summary:
+            state["flow_summary_logged"] = True
+            self.log(sid, "session_flow: %s", summary)
 
     def _workflow_summary(self, sid: str) -> str:
         state = self.state.get(sid)

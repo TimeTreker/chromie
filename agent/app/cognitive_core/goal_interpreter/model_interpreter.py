@@ -1413,7 +1413,7 @@ class OllamaGoalInterpreter:
             "Cost Function:\n"
             "Speech-only conversation and capability availability=chat; catalog execution=robot_action; lookup=tool; planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns ambient suppression.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. progress=[] or kind=capability exact supplied ID+args / kind=native_response complete conversational answer. fast_speech is one short progress notification or null; null for native immediate answer, equivalent delivered/pending speech, silence, or repetition. Follow the owner-approved fast voice profile: same child/family person, not customer-service/workflow/technical prose. Never claim unobserved result, execution, or completion. Host derives the typed claim envelope. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs and typed args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence, fast_speech, progress. progress=[] or kind=capability exact supplied ID+args / kind=native_response complete conversational answer. fast_speech is one short progress notification or null; null for native immediate answer, equivalent delivered/pending speech, silence, or repetition. Use owner-approved child/family voice: first-person speech; no customer-service/workflow/status/processing narration. Never claim unobserved result, execution, or completion. Host derives the typed claim envelope. memory write=memory; recall=chat; durable memory needs current-turn consent. routes[] split responsibilities; actions[] use exact IDs and typed args (\"confidence\":0.0 means unknown). semantic_task_operations may advise create/update/resolve/replan against supplied task IDs. Omit agents, metadata, candidate_capabilities, explanations unless needed. Never output placeholder intents, hidden reasoning, free-form progress narration outside fast_speech, scratchpad, markdown, or text outside JSON."
         )
 
     @staticmethod
@@ -1439,7 +1439,8 @@ class OllamaGoalInterpreter:
             ],
             "description": (
                 "Required Goal Progress Communication decision: one brief natural "
-                "prospective notification, or null for intentional silence."
+                "person-to-person prospective utterance, or null for intentional silence; "
+                "never a task/process/workflow status label."
             ),
         }
         schema["required"] = list(
@@ -1597,7 +1598,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only. Required keys are route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null; the decision itself may not be omitted.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- A non-null fast_speech is a short prospective Goal-progress notification only. Follow the supplied fast identity/voice projection: ordinary child/family speech, not customer-service or workflow-status prose. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. It must not claim completion, physical execution, memory commit, or a tool result.\n"
+                        "- A non-null fast_speech is a short prospective Goal-progress utterance from Chromie to the person, never a workflow/status label. Follow the supplied fast identity/voice projection: ordinary child/family speech, not customer-service or operator prose. When natural, phrase it from Chromie's first-person reaction or willingness instead of narrating task or processing state. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. It must not claim completion, physical execution, memory commit, or a tool result.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Never choose interrupt or ignore.\n"
                         "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
@@ -1723,7 +1724,7 @@ class OllamaGoalInterpreter:
                         "Output Contract:\n"
                         "- Return compact JSON only with required keys route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- A non-null fast_speech must follow the supplied fast identity/voice projection and sound like ordinary child/family speech, not customer-service or workflow-status prose. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. Never claim tool results, physical completion, or memory commit.\n"
+                        "- A non-null fast_speech must sound like Chromie talking naturally to the person, never like a workflow/status label. Follow the supplied fast identity/voice projection and, when natural, use a first-person reaction or willingness rather than narrating task or processing state. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. Never claim tool results, physical completion, or memory commit.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"
