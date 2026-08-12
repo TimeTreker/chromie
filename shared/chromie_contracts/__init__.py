@@ -89,6 +89,13 @@ from .situation import (
     SituationEvidenceRef,
     SituationProjection,
 )
+from .reflection import (
+    ReflectionAction,
+    ReflectionMemoryCandidate,
+    ReflectionMemoryKind,
+    ReflectionMemoryScope,
+    ReflectionResolution,
+)
 from .semantic_authority import (
     SEMANTIC_AUTHORITY_CONTEXT_KEY,
     SemanticAuthorityClaim,
@@ -300,6 +307,11 @@ __all__ = [
     "CognitiveOpportunity",
     "CognitiveOpportunityMode",
     "CognitiveOpportunityTrigger",
+    "ReflectionAction",
+    "ReflectionMemoryCandidate",
+    "ReflectionMemoryKind",
+    "ReflectionMemoryScope",
+    "ReflectionResolution",
     "SEMANTIC_AUTHORITY_CONTEXT_KEY",
     "SemanticAuthorityClaim",
     "SemanticAuthorityOwner",

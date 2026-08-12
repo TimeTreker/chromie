@@ -33,6 +33,7 @@ from shared.chromie_contracts.interaction import (
     output_schema_sha256,
     validate_output_schema_declaration,
 )
+from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     CanonicalPlanStep,
@@ -136,6 +137,10 @@ class CognitiveAgentClient(Protocol):
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
+
+    async def resolve_reflection(
+        self, session: Any, **kwargs: Any
+    ) -> ReflectionResolution: ...
 
     async def resolve_social_attention(
         self, session: Any, **kwargs: Any

@@ -7519,6 +7519,98 @@ class VoiceAssistant:
                     for item in cognitive_opportunities
                 ),
             )
+        slow_opportunities = [
+            item
+            for item in cognitive_opportunities
+            if item.recommended_cognition == "slow"
+        ]
+        reflection_resolutions: list[dict[str, Any]] = []
+        reflection_state_results: list[dict[str, Any]] = []
+        reflection_call = getattr(
+            getattr(self, "agent_client", None),
+            "resolve_reflection",
+            None,
+        )
+        if slow_opportunities and callable(reflection_call):
+            reflection_context = {
+                "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
+                "recent_goal_snapshots": self.conversation_state.recent_goal_snapshots(),
+            }
+            association_projection = response.metadata.get("goal_association")
+            if isinstance(association_projection, dict):
+                reflection_context["goal_association_resolution"] = dict(
+                    association_projection
+                )
+            situation_projection = response.metadata.get("situation")
+            if isinstance(situation_projection, dict):
+                reflection_context["situation"] = dict(situation_projection)
+            reflection_context["execution_outcome_bundle"] = bundle.model_dump(
+                mode="json", exclude_none=True
+            )
+            reflection_context["canonical_plan"] = plan.model_dump(
+                mode="json", exclude_none=True
+            )
+            reflection_route = self._execution_outcome_route(response, plan)
+            reflection_decision = RouteDecision(
+                route=reflection_route,
+                intent="selective_reflection",
+                confidence=1.0,
+                source="trusted_execution_outcome",
+                language=str(response.metadata.get("language") or "en-US"),
+            )
+            reflection_session = await self.get_http_session()
+            reflection_calls = []
+            for opportunity in slow_opportunities:
+                context = {
+                    **reflection_context,
+                    "cognitive_opportunity": opportunity.prompt_projection(),
+                }
+                reflection_calls.append(
+                    reflection_call(
+                        reflection_session,
+                        text=self._execution_outcome_user_text(response, plan),
+                        route_decision=reflection_decision,
+                        sid=session_id,
+                        context=context,
+                        history=self.conversation_state.get_history(),
+                        timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
+                    )
+                )
+            reflected = await asyncio.gather(
+                *reflection_calls,
+                return_exceptions=True,
+            )
+            for opportunity, item in zip(
+                slow_opportunities, reflected, strict=True
+            ):
+                if isinstance(item, BaseException):
+                    self.session_log(
+                        session_id,
+                        "selective_reflection_unavailable: opportunity=%s error_type=%s error=%s",
+                        opportunity.opportunity_id,
+                        type(item).__name__,
+                        item,
+                    )
+                    continue
+                reflection_resolutions.append(item.prompt_projection())
+                try:
+                    reflection_state_results.extend(
+                        self.conversation_state.apply_reflection_resolution(
+                            item,
+                            sid=session_id,
+                        )
+                    )
+                except Exception as exc:
+                    self.session_log(
+                        session_id,
+                        "selective_reflection_state_rejected: opportunity=%s error_type=%s error=%s",
+                        opportunity.opportunity_id,
+                        type(exc).__name__,
+                        exc,
+                    )
+            response.metadata["reflection_resolutions"] = reflection_resolutions
+            response.metadata["reflection_state_results"] = reflection_state_results
+
         self.session_log(
             session_id,
             "cognitive_outcome_reconciled: outcome_id=%s aggregate=%s goals=%s evidence=%s",

@@ -132,9 +132,9 @@ evidence.
    genuine replacement lineage, and trusted Work-stop/forward repair;
 4. **implemented:** trusted execution-state deltas derive ephemeral bounded
    `CognitiveOpportunity` events for fast/slow reactivation without polling or a queue;
-5. **next:** consume slow cognitive opportunities through selective Reflection and
-   Memory promotion without rewriting Evidence, Outcome, speech, or Stable Mind;
-6. then harden restart/revalidation so durable Goals/Memory survive while Situation
+5. **implemented:** slow opportunities selectively invoke typed Reflection; repeated
+   evidence may promote only ephemeral task/session memory, never Stable Mind or authority;
+6. **next:** harden restart/revalidation so durable Goals/Memory survive while Situation
    and volatile provider/world assumptions are reconstructed from fresh evidence;
 7. defer multi-user privacy/scoped durable consent, broader recovery/autonomy,
    competence calibration, and richer continuation semantics until a concrete

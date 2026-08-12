@@ -84,6 +84,7 @@ from .task_continuity import TaskContinuityResolver
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
+from .reflection import ReflectionResolver
 from .response_composer import ResponseComposerResolver
 from .tool_result_interpreter import ToolResultInterpreter
 from .schema import AgentResult, AgentRunRequest, HealthResponse
@@ -470,6 +471,27 @@ deep_planner_resolver = (
     if deep_planner_client is not None
     else None
 )
+reflection_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.deep_planner_model,
+        timeout_ms=settings.deep_planner_timeout_ms,
+        purpose="reflection",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.deep_planner_enabled
+    else None
+)
+reflection_resolver = (
+    ReflectionResolver(
+        reflection_client,
+        num_ctx=settings.deep_planner_num_ctx,
+        num_predict=settings.deep_planner_num_predict,
+    )
+    if reflection_client is not None
+    else None
+)
+
 response_composer_client = (
     OllamaClient(
         settings.ollama_url,
@@ -718,6 +740,13 @@ async def resolve_deep_plan(request: AgentRunRequest):
             prepared.context
         ),
     )
+
+
+@app.post("/reflection")
+async def resolve_reflection(request: AgentRunRequest):
+    if reflection_resolver is None:
+        raise HTTPException(status_code=503, detail="Reflection is disabled")
+    return await reflection_resolver.resolve(request)
 
 
 @app.post("/social-attention/plan", response_model=SocialAttentionPlan)

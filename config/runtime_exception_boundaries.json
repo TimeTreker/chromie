@@ -1051,6 +1051,19 @@
       "ordinal": 6,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
+      "contract": "Preserve the trusted execution outcome and open Responsibility when optional selective Reflection state application fails; retain a diagnostic and do not invent memory, completion, or effect authority.",
+      "review_status": "reviewed",
+      "body_sha256": "103ff539ff211f0b20423fad0deb41dc90f8cc999cba0a8d4ef59c2276737d22",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._close_cognitive_execution",
+      "ordinal": 7,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
       "body_sha256": "c3aa4f6cdba522eea0f98acfc392ba4f8b76ecbfa50dcce2568096039e5850fc",
@@ -1334,19 +1347,6 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/session.py",
-      "symbol": "record_session_workflow_stage",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator.session",
-      "contract": "Keep optional Session workflow evidence from changing ASR, cognition, fallback, or execution behavior while retaining a visible warning when the real recorder fails.",
-      "review_status": "reviewed",
-      "body_sha256": "7c1d3718a57f4fc602bc2e8723075b6a4526e3d9037f972676bc340c73b55b22",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._record_soridormi_post_status",
       "ordinal": 1,
@@ -1391,6 +1391,20 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._resolve_pending_confirmation_meaning",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "A failed Goal Association confirmation interpretation returns ambiguous and cannot authorize the pending request.",
+      "review_status": "reviewed",
+      "body_sha256": "944a71aa7869931ca23edd9b34c43a65e6a6a41e0a86be929c73262153b551f3",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._review_task_continuity",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -1415,20 +1429,6 @@
       "body_sha256": "e10f26eb26bbe1f02379c69d4c04d8541802b9b1b09c4ab0390a0c75ebfb482a",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._resolve_pending_confirmation_meaning",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "A failed Goal Association confirmation interpretation returns ambiguous and cannot authorize the pending request.",
-      "review_status": "reviewed",
-      "body_sha256": "944a71aa7869931ca23edd9b34c43a65e6a6a41e0a86be929c73262153b551f3",
-      "failure_signals": [
-        "diagnostic",
-        "return"
       ]
     },
     {
@@ -2082,6 +2082,32 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "_dispatch_goal_work_stop",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
+      "review_status": "reviewed",
+      "body_sha256": "e1c6672c027d9a593fc5d662c0c88e7792824415885676abd487c11475721c02",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/named_goal_cancellation.py",
+      "symbol": "_dispatch_goal_work_stop",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
+      "review_status": "reviewed",
+      "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/outcome_response.py",
       "symbol": "_validated_inputs",
       "ordinal": 1,
@@ -2325,6 +2351,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/session.py",
+      "symbol": "record_session_workflow_stage",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator.session",
+      "contract": "Keep optional Session workflow evidence from changing ASR, cognition, fallback, or execution behavior while retaining a visible warning when the real recorder fails.",
+      "review_status": "reviewed",
+      "body_sha256": "7c1d3718a57f4fc602bc2e8723075b6a4526e3d9037f972676bc340c73b55b22",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/skill_adapters.py",
       "symbol": "_with_residual_replan",
       "ordinal": 1,
@@ -2333,6 +2372,19 @@
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
       "body_sha256": "db51771e88ff730d27111c8d9e1c25f1295cdf4e8ae6f4713c92db86bf83d268",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/skill_runtime.py",
+      "symbol": "MediaPlaybackSkillProvider.execute",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator",
+      "contract": "Map backend or lifecycle-schema failures into a correlated failed media Capability result without claiming completion or selecting another operation.",
+      "review_status": "reviewed",
+      "body_sha256": "c78deeee73fe46e96f8f3609c3d1432edffce918785f81a491e6679fe5935483",
       "failure_signals": [
         "return"
       ]
@@ -2399,19 +2451,6 @@
       "contract": "Map backend or delivery-schema failures into a correlated failed vocal Capability result without claiming completion or selecting another mode.",
       "review_status": "reviewed",
       "body_sha256": "fa785da94b08f604d54977232e82f62769a1385d78f24be789a3c97b960c6c9e",
-      "failure_signals": [
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/skill_runtime.py",
-      "symbol": "MediaPlaybackSkillProvider.execute",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map backend or lifecycle-schema failures into a correlated failed media Capability result without claiming completion or selecting another operation.",
-      "review_status": "reviewed",
-      "body_sha256": "c78deeee73fe46e96f8f3609c3d1432edffce918785f81a491e6679fe5935483",
       "failure_signals": [
         "return"
       ]
@@ -2494,32 +2533,6 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/named_goal_cancellation.py",
-      "symbol": "_dispatch_goal_work_stop",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
-      "review_status": "reviewed",
-      "body_sha256": "e1c6672c027d9a593fc5d662c0c88e7792824415885676abd487c11475721c02",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/named_goal_cancellation.py",
-      "symbol": "_dispatch_goal_work_stop",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the exact Goal Work-stop boundary and fail closed without committing cancellation or replacement semantics when runtime/evidence closure is uncertain.",
-      "review_status": "reviewed",
-      "body_sha256": "e072562ebc9fea2cbe7665b5912f1aa3e43fcec0f985fc8feffce52e20219210",
-      "failure_signals": [
-        "raise"
       ]
     }
   ],

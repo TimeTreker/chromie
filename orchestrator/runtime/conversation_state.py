@@ -39,6 +39,7 @@ try:
     )
     from chromie_contracts.situation import CognitiveOpportunity
     from chromie_contracts.reflex import CancellationDispatchReceipt
+    from chromie_contracts.reflection import ReflectionResolution
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -62,6 +63,7 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_contracts.situation import CognitiveOpportunity
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+    from shared.chromie_contracts.reflection import ReflectionResolution
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -4585,6 +4587,143 @@ class ConversationStateManager:
         if changed:
             self._persist_task_contexts_if_enabled()
             self.last_activity_ms = _now_ms()
+        return results
+
+    def apply_reflection_resolution(
+        self,
+        resolution: ReflectionResolution | dict[str, Any],
+        *,
+        sid: str | None,
+    ) -> list[dict[str, Any]]:
+        """Apply bounded forward-repair proposals without rewriting history.
+
+        Reflection may request replanning and may propose non-durable task/session
+        memory. Memory promotion is accepted only after matching reason evidence
+        has appeared in an earlier Reflection for the same Goal. Durable profile
+        memory remains exclusively behind the existing explicit-consent boundary.
+        """
+
+        if not self.enabled:
+            return []
+        reflected = (
+            resolution
+            if isinstance(resolution, ReflectionResolution)
+            else ReflectionResolution.model_validate(resolution)
+        )
+        results: list[dict[str, Any]] = []
+        memory_entries: list[MemoryEntry] = []
+        now = _now_ms()
+        for goal_id in reflected.goal_ids:
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                raise ValueError(f"reflection references unknown Goal: {goal_id}")
+            if self._goal_responsibility_status(context) != "open":
+                results.append({
+                    "goal_id": goal_id,
+                    "applied": False,
+                    "reason": "reflection_target_not_open",
+                })
+                continue
+
+            evidence_summary = context.get("evidence_summary")
+            recorded = (
+                evidence_summary.get("execution_outcome")
+                if isinstance(evidence_summary, dict)
+                else None
+            )
+            if not isinstance(recorded, dict):
+                raise ValueError("reflection requires recorded execution evidence")
+            allowed_refs = {str(recorded.get("outcome_id") or "").strip()}
+            allowed_refs.update(
+                str(item).strip()
+                for item in recorded.get("evidence_ids") or []
+                if str(item).strip()
+            )
+            unknown_refs = set(reflected.evidence_refs) - allowed_refs
+            if unknown_refs:
+                raise ValueError(
+                    "reflection references evidence outside the recorded outcome: "
+                    + ",".join(sorted(unknown_refs))
+                )
+
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            history = metadata.get("reflection_history")
+            if not isinstance(history, list):
+                history = []
+            current_reasons = set(reflected.reason_codes)
+            repeated_pattern = any(
+                current_reasons.intersection(
+                    str(item).strip()
+                    for item in previous.get("reason_codes") or []
+                    if str(item).strip()
+                )
+                for previous in history
+                if isinstance(previous, dict)
+            )
+
+            if "replan" in reflected.actions:
+                context["status"] = "planning"
+                context["commitment_state"] = "evaluating"
+                context["plan_status"] = "reflection_replan_requested"
+            if "clarify" in reflected.actions:
+                context["status"] = "waiting_for_user"
+                context["commitment_state"] = "waiting_for_user"
+                context["plan_status"] = "reflection_clarification_needed"
+            if "correct_user" in reflected.actions:
+                metadata["reflection_correction_candidate"] = {
+                    "text": reflected.correction_text,
+                    "opportunity_id": reflected.opportunity_id,
+                    "evidence_refs": list(reflected.evidence_refs),
+                }
+
+            promoted = 0
+            if "propose_memory" in reflected.actions and repeated_pattern:
+                for candidate in reflected.memory_candidates:
+                    memory_entries.append(
+                        MemoryEntry(
+                            scope=candidate.scope,
+                            kind=candidate.kind,
+                            text=candidate.text,
+                            confidence=candidate.confidence,
+                            source_sids=[sid] if sid else [],
+                            source_turn_ids=[str(recorded.get("turn_id") or "")]
+                            if str(recorded.get("turn_id") or "").strip()
+                            else [],
+                            persistence_policy="ephemeral",
+                        )
+                    )
+                    promoted += 1
+
+            history.append({
+                "opportunity_id": reflected.opportunity_id,
+                "actions": list(reflected.actions),
+                "reason_codes": list(reflected.reason_codes),
+                "evidence_refs": list(reflected.evidence_refs),
+                "memory_candidates": len(reflected.memory_candidates),
+                "memory_promoted": promoted,
+                "ts_ms": now,
+            })
+            context["metadata"] = {
+                **metadata,
+                "reflection_history": history[-12:],
+            }
+            context["updated_ms"] = now
+            results.append({
+                "goal_id": goal_id,
+                "applied": True,
+                "actions": list(reflected.actions),
+                "memory_promoted": promoted,
+                "repeated_pattern": repeated_pattern,
+                "responsibility_status": self._goal_responsibility_status(context),
+            })
+
+        if memory_entries:
+            self._memory_store.add_many(memory_entries)
+        if results:
+            self._persist_task_contexts_if_enabled()
+            self.last_activity_ms = now
         return results
 
     def derive_execution_cognitive_opportunities(

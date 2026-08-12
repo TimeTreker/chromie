@@ -58,19 +58,18 @@ baseline**, not another broad concept-expansion phase:
    refinement preserves compatible Work unless `requires_replan=true`; genuine
    replacement creates new Goal lineage, stops incompatible old Work through trusted
    receipts, and supersedes the old Responsibility without rewriting history.
-4. **Evidence-driven reactivation now emits bounded cognitive opportunities.**
-   Trusted non-completed execution evidence on an open Goal derives an ephemeral
-   fast/slow cognition opportunity with exact evidence references. Nothing is
-   persisted or polled; selective cognition consumes these events in a later slice.
+4. **Evidence-driven reactivation and selective Reflection are implemented.**
+   Trusted non-completed execution evidence derives an ephemeral fast/slow opportunity.
+   Only slow opportunities invoke typed Reflection; its Goal/evidence references are
+   runtime-bound, and repeated evidence may promote ephemeral task/session memory only.
 5. **Preserve truth semantics and repair forward.** Historical Evidence/outcomes/
    delivered speech are append-only facts; current Goal/Plan/Memory meaning may be
    provenance-preserving revised; Situation remains soft; Stable Mind and
    provider/authorization/safety authority cannot be rewritten by ordinary
    cognition.
-6. **Keep Memory/Reflection/learning selective.** Promote only reusable meaning;
-   keep provider procedural learning provider-owned; reconstruct/revalidate
-   volatile Situation after restart rather than persisting a complete world
-   model.
+6. **Keep learning promotion bounded.** Reflection cannot mutate historical truth,
+   Stable Mind, authority, or provider capability; provider procedural learning stays
+   provider-owned. Next reconstruct/revalidate volatile Situation and Work after restart.
 7. **Widen only after the core invariants hold.** Durable scoped consent/privacy,
    multi-user identity, broader autonomy, competence calibration, and richer
    resumable cognition remain later detail work unless a current implementation
@@ -83,9 +82,9 @@ adding a manager because a useful explanatory term exists.
 ## Current priorities
 
 1. Implement the next Continuous Mind invariant from the compressed baseline:
-   consume slow evidence-driven cognitive opportunities through selective Reflection
-   and bounded Memory promotion. Reflection may propose current-state repair but may
-   never rewrite Evidence, ExecutionOutcome, delivered speech, or Stable Mind.
+   harden restart/revalidation so unfinished Responsibility and selective Memory survive
+   while Situation, provider availability, and other volatile Work assumptions are
+   reconstructed from fresh authoritative evidence rather than restored as current truth.
 2. Preserve the merged source contracts from Issues
    [#17](https://github.com/TimeTreker/chromie/issues/17) and
    [#18](https://github.com/TimeTreker/chromie/issues/18) and merged Issue

@@ -10,6 +10,7 @@ from shared.chromie_contracts.core_interpretation import CoreInterpretationResul
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
 from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
@@ -252,6 +253,47 @@ class AgentClient:
             runtime_tracer.merge_fragment_from_metadata(result.metadata)
             span.set_attribute("disposition", result.disposition)
             span.set_attribute("step_count", len(result.steps))
+            return result
+
+    async def resolve_reflection(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        text: str,
+        route_decision: RouteDecision,
+        sid: str | None = None,
+        context: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ReflectionResolution:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_reflection",
+            kind="tool_call",
+            attributes={"endpoint": "/reflection", "timeout_ms": effective_timeout_ms},
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/reflection",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent reflection endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = ReflectionResolution.model_validate_json(body)
+            span.set_attribute("action_count", len(result.actions))
             return result
 
     async def compose_response_plan(
