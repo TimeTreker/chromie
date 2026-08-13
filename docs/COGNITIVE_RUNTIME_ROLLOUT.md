@@ -5,8 +5,8 @@
 **Implementation:** present in the repository.
 
 **Automated verification:** dependency-light unit tests and retained cognitive
-runtime scenarios cover report-only operation, lane-gated apply, trusted host
-validation, bounded same-tier replanning, atomic Goal-state application,
+runtime scenarios cover report-only operation, lane-gated apply, Fast-to-Deep
+escalation, trusted terminal host validation, atomic Goal-state application,
 response composition, legacy rollback, and evidence classification.
 
 **Target validation:** open. No live model-stack or MuJoCo evidence created by
@@ -44,8 +44,7 @@ User Turn
        → Deep Planner
 → trusted host CanonicalPlan validation
    ├─ valid
-   └─ structured rejection
-       → one bounded Deep Planner revision
+   └─ structured rejection → fail closed
 → Response Composer
 → trusted runtime adapter
 → atomic Goal-state application
@@ -55,8 +54,9 @@ User Turn
 ```
 
 The main planning direction is acyclic. Deep planning never returns semantic
-work to Fast planning. The only loop is a bounded same-tier Deep Planner
-revision from structured trusted-validator feedback.
+work to Fast planning. Deep Planner may make one bounded same-tier revision
+inside its own transaction. Trusted Host validation is terminal and does not
+invoke another semantic planner after rejecting the terminal plan.
 
 Goal Association uses Ollama schema-constrained generation with state-specific
 small model-facing DTOs. When active Goal IDs exist,
@@ -235,8 +235,6 @@ The defaults are:
 
 ```env
 ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=25000
-ORCH_COGNITIVE_HOST_REPLAN_BUDGET=1
-
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=3500
 ORCH_FAST_PLANNER_TIMEOUT_MS=3000
 ORCH_DEEP_PLANNER_TIMEOUT_MS=10000
@@ -244,8 +242,9 @@ ORCH_RESPONSE_COMPOSER_TIMEOUT_MS=5000
 ```
 
 The total budget prevents a sequence of individually legal calls from creating
-unbounded turn latency. The host replan budget permits at most one Deep Planner
-revision after trusted runtime rejection.
+unbounded turn latency. Fast Planner may escalate once to Deep Planner, and Deep
+Planner owns its one bounded internal revision. Host validation cannot spend the
+remaining runtime budget on another semantic planning pass.
 
 A timeout produces a structured fallback cause. It never authorizes partial
 work.
@@ -270,8 +269,10 @@ Validation includes:
 
 If one step is invalid, no effectful step is committed.
 
-The validator returns structured feedback to the Deep Planner when the bounded
-replan budget remains. The revised plan passes the same validation again.
+The validator either accepts the terminal plan or rejects it. Deep Planner has
+already consumed any permitted internal revision before returning that plan; a
+Host rejection therefore fails closed, commits no Goal state, and starts no
+effect.
 
 ## 8. Runtime adaptation
 
@@ -386,7 +387,7 @@ A record includes:
 - Goal-state application results;
 - per-stage and total latency;
 - fallback reason;
-- host replan count.
+- terminal-plan validation outcome.
 
 An `applied` record is written only after trusted host preparation and atomic
 Goal-state application succeed. A technical fallback, state rejection, or
@@ -637,7 +638,7 @@ Before widening an apply lane, review:
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
 2. Do Fast plans apply only with complete high-confidence coverage?
 3. Do compound Goals escalate without leaking partial skills?
-4. Does one bounded Deep revision resolve trusted-validator feedback?
+4. Does Deep consume at most one internal revision before terminal Host validation?
 5. Are material alternatives held for request-bound approval?
 6. Does speech match the current plan and execution state?
 7. Are all applied events recorded only after host preparation and Goal commit?
@@ -652,7 +653,7 @@ PR7 implementation is automatically verified when:
 - the unified pipeline supports `off`, `report_only`, and `apply`;
 - apply is lane-gated and rollback-safe;
 - Fast escalation reaches Deep once and never returns to Fast;
-- trusted runtime rejection can trigger one bounded same-tier revision;
+- Deep owns at most one internal revision and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
 - response composition is fingerprint-bound to the terminal plan;

@@ -95,17 +95,15 @@ parallel manager objects.
   be cached; changing facts such as weather, news, prices, schedules, and law are
   acquired through trusted information paths.
 ## Recent architecture closure
-Base `main` already contains the Vocal, Social Attention, Responsibility
-coverage, `output_mode`, entailment, and Charter closures through `0d15443`.
 The working tree now replaces Goal Association's review/alignment chain with a
 bounded five-invocation transaction, one nested resource authority plus frozen
-Planner projection, and no valid-`none` Social Attention critic. This is source
-work, not a new target-evidence claim.
-The compound failure that motivated several changes was conceptually
-`walk + sing + blink`: independently observable requested outcomes remain separate
-Responsibilities; an unavailable singing provider leaves an unavailable singing
-Goal rather than deleting/replacing it; final language may claim only the subset
-supported by trusted outcome evidence.
+Planner projection, and no valid-`none` Social Attention critic. The Fast Goal
+Interpreter now performs one primary interpretation plus at most one mechanical
+DTO repair; low confidence delegates once to Deep Thinking, while semantic
+contradictions fail closed. Fast Planner may escalate once to Deep Planner, Deep
+owns at most one same-tier revision, and trusted Host rejection is terminal rather
+than a third semantic-planning pass. This is source work, not a new target-evidence
+claim.
 ## Do not resurrect
 - independent Router semantic authority;
 - `social_attention` as a third execution lane or standalone Goal;
@@ -116,6 +114,9 @@ supported by trusted outcome evidence.
 - random idle animation disguised as Social Attention;
 - silent capability substitution, evidence promotion, or response text as proof;
 - compatibility machinery for an owner-replaced architecture;
+- online semantic repair chains, reviewer-of-reviewer flows, and repair-of-repair;
+- Host replanning after a terminal Deep plan has failed trusted validation;
+- model-authored duplicate copies of one semantic fact;
 - managers/layers/prompt mountains without a distinct required owner or invariant.
 ## Engineering decision rule
 The Charter requires the **best-known technically justified architecture** as the
@@ -129,8 +130,9 @@ This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
 Do not add another top-level layer. Finish the canonical source gate, then clean
-committed qualification for the nested resource authority, derived Planner view,
-bounded coverage transaction, and terminal Social Attention `none`. Historical
+committed qualification for the nested resource authority, bounded Goal
+Association transaction, terminal Social Attention `none`, bounded Fast/Deep
+cognitive escalation, and terminal Host validation. Historical
 `.chromie/acceptance/voice-log-water-fixed-67` predates this refactor and is not
 current-tree proof; it proves neither literal 100-metre travel, physical water,
 microphone/speaker behavior, nor hardware.

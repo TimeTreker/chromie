@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "id": "chinese_nod_blink_generic_chat_repaired",
+  "id": "chinese_nod_blink_primary_grounded",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The live Chinese compound body request must be semantically rechecked when the quick model emits a generic chat acknowledgement, then grounded to both exact abilities without phrase-rule recovery.",
+  "description": "The primary Chinese Goal Interpretation preserves both independently requested body actions and grounds them to exact catalog abilities without a semantic reviewer.",
   "tags": [
     "voice-log",
     "zh-CN",
-    "generic-chat-review",
+    "primary-interpretation",
     "compound",
     "nod",
     "blink",
@@ -74,15 +74,6 @@
       {
         "stage": "quick_intent",
         "decision": {
-          "route": "chat",
-          "intent": "acknowledge",
-          "confidence": 0.95,
-          "language": "zh-CN"
-        }
-      },
-      {
-        "stage": "capability_grounding_review",
-        "decision": {
           "route": "robot_action",
           "intent": "compound_common_catalog_task",
           "confidence": 0.97,
@@ -114,10 +105,9 @@
     "route": "robot_action",
     "intent": "compound_common_catalog_task",
     "source": "llm",
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "capability_grounding_review"
+      "quick_intent"
     ],
     "actions": [
       {
@@ -140,9 +130,14 @@
       "speech.answer"
     ],
     "metadata_json_contains": [
-      "generic_chat_affordance_review",
+      "goal_interpreter_transaction",
       "soridormi.nod_yes",
       "soridormi.blink_eyes"
+    ],
+    "metadata_json_forbid": [
+      "semantic_route_repair",
+      "capability_grounding_review",
+      "generic_chat_affordance_review"
     ]
   }
 }

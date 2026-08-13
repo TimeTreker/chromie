@@ -296,7 +296,7 @@
       ]
     },
     {
-      "boolean": false,
+      "boolean": true,
       "category": "service_internal",
       "key": "AGENT_DEEP_PLANNER_MAX_REPLANS",
       "owners": [
@@ -735,16 +735,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
       "boolean": false,
       "category": "service_internal",
       "key": "AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE",
@@ -880,16 +870,6 @@
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
       ]
     },
     {
@@ -2891,15 +2871,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_COGNITIVE_HOST_REPLAN_BUDGET",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
       "boolean": false,
       "category": "profile_constant",
       "key": "ORCH_COGNITIVE_RUNTIME_MODE",
@@ -4826,12 +4797,12 @@
     "category_counts": {
       "acceptance_override": 57,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 145,
+      "profile_constant": 144,
       "public_choice": 9,
-      "service_internal": 243
+      "service_internal": 241
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 454
+    "total_keys": 451
   }
 }

@@ -682,10 +682,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "task_proposals": [
                         {
                             "id": (
-                                "semantic_route_repair:ability:0:"
+                                "quick_intent:ability:0:"
                                 "local.restaurant_recommendation"
                             ),
-                            "source": "semantic_route_repair",
+                            "source": "quick_intent",
                             "proposal_kind": "ability",
                             "task_type": "ability.requested",
                             "state": "missing_ability",
@@ -2069,7 +2069,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ],
         )
 
-    def test_runtime_conflict_triggers_one_deep_replan(self):
+    def test_runtime_conflict_fails_closed_without_host_replan(self):
         walk = SkillDefinition(
             skill_id="soridormi.walk_forward",
             provider_id="soridormi.mcp",
@@ -2143,22 +2143,23 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             policy=CognitiveRuntimePolicy(
                 mode="apply",
                 apply_lanes=frozenset({"robot_action"}),
-                host_replan_budget=1,
             ),
         )
         result = self.run_resolution(
             coordinator, client, text="边走边眨眼。", route="robot_action"
         )
-        self.assertEqual(result.status, "applied")
-        self.assertEqual(result.metadata["runtime_replan_count"], 1)
-        self.assertIn("runtime_validator_feedback", client.deep_contexts[1])
+        self.assertEqual(result.status, "error")
+        self.assertIn(
+            "runtime validation rejected terminal canonical plan",
+            result.fallback_reason,
+        )
+        self.assertEqual(len(client.deep_contexts), 1)
+        self.assertNotIn("host_replan", client.deep_contexts[0].values())
         self.assertEqual(
             [step.timing for step in result.terminal_plan.steps],
-            ["sequential", "sequential"],
+            ["parallel", "parallel"],
         )
-        self.assertTrue(
-            all(item.requires_confirmation for item in result.interaction_response.skills)
-        )
+        self.assertIsNone(result.interaction_response)
 
     def test_host_keeps_attention_with_matching_runtime_evidence(self):
         plan = respond_plan()

@@ -119,7 +119,6 @@ class CognitiveRuntimePolicy:
     apply_lanes: frozenset[str] = frozenset({"chat", "memory", "robot_action", "tool"})
     fallback_policy: str = "fail_closed"
     max_total_ms: int = 25000
-    host_replan_budget: int = 1
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
     deep_planner_timeout_ms: int = 10000
@@ -3396,10 +3395,6 @@ class GoalDrivenRuntimeCoordinator:
                     resolution = attach_core_identity(resolution)
                     span.set_attribute("result_status", resolution.status)
                     span.set_attribute("lane", resolution.lane)
-                    span.set_attribute(
-                        "runtime_replan_count",
-                        resolution.metadata.get("runtime_replan_count", 0),
-                    )
                     if resolution.status == "error":
                         span.set_status("error")
         except BaseException:
@@ -3952,7 +3947,6 @@ class GoalDrivenRuntimeCoordinator:
                                 timings=timings,
                                 started=started,
                                 metadata={
-                                    "runtime_replan_count": 0,
                                     "planless_direct_response": True,
                                     "native_response_readiness_adoption": True,
                                     "stage_diagnostics": stage_diagnostics,
@@ -3971,7 +3965,6 @@ class GoalDrivenRuntimeCoordinator:
                             timings=timings,
                             started=started,
                             metadata={
-                                "runtime_replan_count": 0,
                                 "planless_direct_response": True,
                                 "native_response_readiness_adoption": True,
                                 "stage_diagnostics": stage_diagnostics,
@@ -4089,7 +4082,6 @@ class GoalDrivenRuntimeCoordinator:
                             timings=timings,
                             started=started,
                             metadata={
-                                "runtime_replan_count": 0,
                                 "planless_direct_response": True,
                                 "stage_diagnostics": stage_diagnostics,
                                 **path_metadata(),
@@ -4106,7 +4098,6 @@ class GoalDrivenRuntimeCoordinator:
                         timings=timings,
                         started=started,
                         metadata={
-                            "runtime_replan_count": 0,
                             "planless_direct_response": True,
                             "stage_diagnostics": stage_diagnostics,
                             **path_metadata(),
@@ -4254,96 +4245,13 @@ class GoalDrivenRuntimeCoordinator:
                     attempt=1,
                     metadata={"dispatch_allowed": False},
                 )
-            replan_count = 0
-            while runtime_errors and replan_count < self.policy.host_replan_budget:
-                replan_count += 1
-                if fast_plan is None:
-                    raise ValueError("runtime replan requires an existing fast plan")
-                deep_context = dict(planning_context)
-                deep_context["fast_plan_resolution"] = self._fast_plan_context_for_deep(
-                    fast_plan,
-                    path_classification=fast_planner_path,
-                )
-                deep_context["runtime_validator_feedback"] = runtime_errors
-                deep_context["deep_planner_invocation_reason"] = "host_replan"
-                deep_planner_invocation_reasons.append("host_replan")
-                stage = time.perf_counter()
-                terminal_plan = await self._observe_workflow_stage(
-                    sid=sid,
-                    stage="deep_planner",
-                    input_payload={
-                        "user_text": text,
-                        "goal_association": association,
-                        "fast_plan": fast_plan,
-                        "validation_feedback": runtime_errors,
-                        "invocation_reason": "host_replan",
-                    },
-                    operation=self.agent_client.resolve_deep_plan(
-                        session,
-                        text=text,
-                        route_decision=route_decision,
-                        sid=sid,
-                        context=deep_context,
-                        history=history,
-                        timeout_ms=self.policy.deep_planner_timeout_ms,
-                    ),
-                    attempt=replan_count + 1,
-                )
-                timings[f"runtime_replan_{replan_count}"] = (time.perf_counter() - stage) * 1000.0
-                deep_failure = self._optional_stage_failure_metadata(
-                    "deep_planner", terminal_plan.metadata
-                )
-                if deep_failure is not None:
-                    raise CognitiveStageFailure("deep_planner", deep_failure)
-                lane = self.adapter.lane_for_plan(terminal_plan)
-                if lane == "robot_action" and source_route != "robot_action":
-                    return self._finish(
-                        mode=self.policy.mode,
-                        status="error",
-                        lane=lane,
-                        association=association,
-                        fast_plan=fast_plan,
-                        terminal_plan=terminal_plan,
-                        composition=None,
-                        timings=timings,
-                        started=started,
-                        fallback_reason=("terminal_plan_exceeds_source_route_effect_envelope"),
-                        metadata={
-                            "failure_stage": "authority_boundary",
-                            "failure_class": "route_effect_escalation",
-                            "failure_domain": "cognitive_runtime",
-                            "architecture_attribution": "not_evaluated",
-                            "retryable": False,
-                            "source_route": source_route,
-                            "terminal_lane": lane,
-                            "stage_diagnostics": stage_diagnostics,
-                            **path_metadata(),
-                        },
-                    )
-                runtime_errors = await self._observe_workflow_stage(
-                    sid=sid,
-                    stage="canonical_plan_validation",
-                    input_payload={"canonical_plan": terminal_plan},
-                    operation=self.adapter.validation_errors(terminal_plan),
-                    attempt=replan_count + 1,
-                    metadata={"phase": "host_replan"},
-                )
-                if runtime_errors:
-                    self._record_workflow_stage(
-                        sid=sid,
-                        stage="canonical_plan_rejection",
-                        started_monotonic_ms=time.perf_counter() * 1000.0,
-                        finished_monotonic_ms=time.perf_counter() * 1000.0,
-                        status="rejected",
-                        input_payload={"canonical_plan": terminal_plan},
-                        output_payload={"validation_errors": runtime_errors},
-                        errors=list(runtime_errors),
-                        attempt=replan_count + 1,
-                        metadata={"dispatch_allowed": False},
-                    )
             if runtime_errors:
+                # Fast Planner already escalated to Deep Planner when needed, and
+                # Deep Planner owns its one bounded same-tier revision.  The Host
+                # validates authority and runtime contracts; it must not become a
+                # third semantic planner after rejecting the terminal plan.
                 raise ValueError(
-                    "runtime validation rejected canonical plan: "
+                    "runtime validation rejected terminal canonical plan: "
                     + json.dumps(runtime_errors, ensure_ascii=False)
                 )
 
@@ -4446,7 +4354,6 @@ class GoalDrivenRuntimeCoordinator:
                         timings=timings,
                         started=started,
                         metadata={
-                            "runtime_replan_count": replan_count,
                             "execution_only_safe_read": True,
                             "stage_diagnostics": stage_diagnostics,
                             **path_metadata(),
@@ -4464,7 +4371,6 @@ class GoalDrivenRuntimeCoordinator:
                     timings=timings,
                     started=started,
                     metadata={
-                        "runtime_replan_count": replan_count,
                         "execution_only_safe_read": True,
                         "stage_diagnostics": stage_diagnostics,
                         **path_metadata(),
@@ -4634,7 +4540,6 @@ class GoalDrivenRuntimeCoordinator:
                     timings=timings,
                     started=started,
                     metadata={
-                        "runtime_replan_count": replan_count,
                         "stage_diagnostics": stage_diagnostics,
                         "architecture_attribution": (
                             "not_evaluated" if stage_diagnostics else "not_evaluated"
@@ -4654,7 +4559,6 @@ class GoalDrivenRuntimeCoordinator:
                 timings=timings,
                 started=started,
                 metadata={
-                    "runtime_replan_count": replan_count,
                     "stage_diagnostics": stage_diagnostics,
                     "architecture_attribution": (
                         "not_evaluated" if stage_diagnostics else "not_evaluated"

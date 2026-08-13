@@ -1258,28 +1258,37 @@ Goal semantic information and Planner execution information are distinct. A
 material entity or parameter that determines what Chromie owes the user must be
 resolved at the Goal boundary from the authoritative turn, discourse/referent
 state, retained Goal bindings, or other authoritative references exposed through
-Situation. Planner owns only how to realize an already-defined outcome. When one
-fresh semantic repair still repeats a maintained material-binding provenance
-violation, the Host does not permit another guessed Goal value: it narrows the
-next model schema to clarification only. The model still authors the natural
-question; Host code merely preserves the already-proven provenance boundary. A
-valid direct value or referent-backed repair continues without that clarification.
+Situation. Planner owns only how to realize an already-defined outcome. A
+material-binding provenance contradiction is not repaired by copying values from
+an earlier candidate or by narrowing the Host schema to a guessed clarification.
+The primary Goal Association DTO may receive its one mechanical repair; a rejected
+coverage proof may permit one fresh source-based interpretation, whose model may
+choose a genuine clarification when the user can resolve the gap. Invalid or
+repeatedly incomplete output fails closed with no Goal commit or effect.
 
-Fast Goal Interpreter route and retrieval results are advisory projections.
-Query-matched capabilities may lead the semantic-review catalog, but they do
-not erase the supplied common or full catalog. Semantic repair receives a
-candidate-first, de-duplicated union so an incorrect first route cannot remove
-the exact affordance needed to correct itself. The Host may order and validate
-that supplied evidence; it may not infer the route from the user's wording.
+Fast Goal Interpreter route and retrieval results are advisory projections. Its
+maintained transaction is deliberately smaller than Goal Association's:
 
-Structured semantic review has one logical model contract even when an Ollama
-model template does not honor JSON Schema on `/api/chat`. After a structurally
-invalid chat completion, the Goal Interpreter may retry that exact model,
-schema, prompt content, decoder options, and output budget once through
-`/api/generate`. This is transport compatibility containment, not semantic
-escalation or a model-name exception. The result crosses the same catalog and
-route validators. If either transport remains malformed or ungrounded, review
-fails closed to typed clarification rather than preserving the suspect route.
+```text
+primary fast interpretation
+  -> optional one mechanical DTO repair
+  -> accept, delegate low confidence to Deep Thinking, or fail closed
+```
+
+It does not run an intent reviewer, semantic-route repair, generic-chat critic,
+capability-grounding reviewer, or repair-of-review chain. Deterministic code may
+validate schema, catalog identity, authorization-independent effect shape, and
+impossible route/intent combinations, but it may not manufacture ordinary user
+meaning. A valid low-confidence interpretation is delegated once to Deep Thinking
+with the original admitted turn and bounded evidence; Deep Thinking is a deeper
+interpretation before commitment, not a patch of the Fast DTO. A semantic
+contradiction or a second malformed DTO is retained as technical evidence and
+fails closed.
+
+Transport retry of the exact same immutable request may be handled by the client
+as provider reliability evidence, but it is not a new semantic invocation and may
+not change prompt, schema, decoder options, or meaning. The Goal Interpreter does
+not switch transports to obtain a more agreeable semantic answer.
 
 ### 5.2 Stable-to-volatile model prompt ordering
 
@@ -1709,16 +1718,14 @@ The Deep Planner receives:
 - current information gaps and confirmations.
 
 Deep Planner is exceptional. It is invoked when semantic uncertainty,
-incomplete or compound coverage, nontrivial dependencies, material
-alternatives, novelty or broader context, or safety/resource reasoning requires
-the wider planning boundary. A structured semantic or plan validation rejection
-may justify Deep only when its failure contract explicitly requires broader
-reasoning. Technical schema/model-contract failure receives bounded same-tier
-repair. Any later Deep recovery is explicitly classified as recovery, retains
-the Fast failure evidence, and fails closed unless it produces a valid plan; it
-is not semantic escalation. Model confidence alone neither grants a direct/Fast
-bypass nor forces escalation, and it never replaces deterministic effect and
-safety validation.
+incomplete or compound coverage, nontrivial dependencies, material alternatives,
+novelty or broader context, or safety/resource reasoning requires the wider
+planning boundary. Fast-to-Deep is the one planning escalation, not repair of an
+already committed Goal or execution result. Deep Planner receives the original
+Goal truth, the Fast draft and failure evidence, and the full planning boundary.
+It may make at most one same-tier schema/validator-feedback revision; continued
+invalidity fails closed. Model confidence alone neither grants a direct/Fast
+bypass nor replaces deterministic effect and safety validation.
 
 It may produce:
 
@@ -1757,10 +1764,12 @@ returns complete coverage or response text. Before canonical planning, each
 must own an executable step, have delivered evidence-bound dialogue for that
 same Goal, or carry an explicit `clarify`, `escalate`, `unavailable`, or
 `refused` outcome. An unresolved effectful Goal with zero owned steps and no
-such evidence is a contract failure: Fast receives its bounded same-tier repair
-and then escalates; Deep receives its bounded replan and then clarifies. The
-Host validates typed Goal metadata and ownership only; it does not infer effect
-from phrases.
+such evidence is a contract failure: Fast may make its one mechanical contract
+revision and then escalate; Deep may make its one same-tier revision and then
+fails closed or returns an explicit model-authored clarification/unavailable/
+refused outcome. The Host validates typed Goal metadata and ownership only; it
+does not infer effect from phrases and never invokes a third semantic planning
+pass after rejecting the terminal plan.
 
 `plan_relation` and `user_confirmation_required` are typed semantic decisions
 at the model boundary. A safe adjustment or alternative must be executable and
@@ -2619,7 +2628,7 @@ Deliver:
 - staged `off`, `report_only`, and `apply` rollout;
 - lane-gated application with compatibility and fail-closed fallback policy;
 - migration from task continuity to atomic Goal continuity application;
-- trusted host validation and one bounded same-tier Deep revision;
+- trusted host terminal validation after Fast-to-Deep planning, with no Host-owned semantic replan;
 - complete dependency-light cognitive runtime scenarios;
 - operational evidence classification and rollback;
 - live-text and MuJoCo evidence collection entry points.
@@ -2651,7 +2660,7 @@ Exit criteria:
 - emergency fallback requires both service gates and a non-empty matching-turn
   claim;
 - model-facing Goal Association values are schema constrained and receive at
-  most one bounded contract repair;
+  most one mechanical DTO repair before the bounded coverage transaction;
 - contract exhaustion fails closed;
 - automated authority and schema-boundary checks pass;
 - retained live-text and MuJoCo evidence is reviewed before target behavior is

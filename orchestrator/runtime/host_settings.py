@@ -285,7 +285,6 @@ class CognitionSettings:
     requested_fallback_policy: str
     legacy_semantic_fallback_enabled: bool
     runtime_timeout_ms: int
-    host_replan_budget: int
     social_attention_mode: str
     capability_manifest_paths: str
     soridormi_manifest: Path
@@ -742,12 +741,6 @@ class HostSettingsSnapshot:
                     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
                     25000,
                     minimum=1000,
-                ),
-                host_replan_budget=_int(
-                    values,
-                    "ORCH_COGNITIVE_HOST_REPLAN_BUDGET",
-                    1,
-                    minimum=0,
                 ),
                 social_attention_mode=social_mode,
                 capability_manifest_paths=_text(

@@ -6,10 +6,10 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import ValidationError
 
 from ...clients.ollama_client import OllamaGenerationError
 from ...settings import agent_service_settings
@@ -80,205 +80,8 @@ ROUTE_ITEM_PRIMARY_RANK = {
 }
 REVIEW_STAGES = {
     "addressedness_review",
-    "intent_review",
     "post_interrupt_review",
-    "semantic_route_repair",
-    "capability_grounding_review",
 }
-
-
-class SemanticRouteRepairDesiredAbility(BaseModel):
-    """One understood but currently unavailable user ability request."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    ability_id: str = Field(min_length=3, max_length=160)
-    intent: str = Field(min_length=1, max_length=240)
-    status: Literal["missing_ability"] = "missing_ability"
-    confidence: float = Field(ge=0.0, le=1.0)
-    reason: str = Field(min_length=1, max_length=500)
-
-
-class SemanticRouteRepairMetadata(BaseModel):
-    """Bounded metadata allowed only for terminal missing-ability repair."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    desired_abilities: list[SemanticRouteRepairDesiredAbility] = Field(
-        min_length=1,
-        max_length=4,
-    )
-
-
-class CapabilityGroundingRepairAction(BaseModel):
-    """One model-proposed action that remains subject to catalog validation."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    capability_id: str = Field(min_length=1, max_length=200)
-    args: dict[str, Any] = Field(default_factory=dict)
-    sequence: int = Field(default=0, ge=0, le=31)
-    timing: Literal["sequential", "parallel"] = "sequential"
-    confidence: float = Field(ge=0.0, le=1.0)
-    reason: str | None = Field(default=None, min_length=1, max_length=160)
-
-
-class SemanticRouteRepairOutput(BaseModel):
-    """Bounded semantic repair DTO with an honest missing-ability terminal."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    route: str
-    intent: str = Field(min_length=1, max_length=120)
-    confidence: float = Field(ge=0.0, le=1.0)
-    speak_first: str | None = Field(default=None, min_length=1, max_length=240)
-    limitation: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=220,
-        description=(
-            "Complete natural missing-ability response: acknowledge the understood "
-            "user outcome, state the capability limitation truthfully, and apologize "
-            "naturally when appropriate without implying execution or search results."
-        ),
-    )
-    metadata: SemanticRouteRepairMetadata | None = None
-    actions: list[CapabilityGroundingRepairAction] = Field(
-        default_factory=list, max_length=8
-    )
-
-    @model_validator(mode="after")
-    def validate_missing_ability_terminal(self) -> "SemanticRouteRepairOutput":
-        is_missing = self.intent == "missing_or_unsupported_ability"
-        if self.actions and self.route != "robot_action":
-            raise ValueError("actions are allowed only for route=robot_action")
-        if is_missing:
-            if self.actions:
-                raise ValueError("missing ability output must not contain actions")
-            if self.route != "clarify":
-                raise ValueError(
-                    "missing_or_unsupported_ability requires route=clarify"
-                )
-            if not str(self.limitation or "").strip():
-                raise ValueError(
-                    "missing_or_unsupported_ability requires truthful limitation"
-                )
-            if str(self.speak_first or "").strip():
-                raise ValueError(
-                    "missing_or_unsupported_ability uses limitation as the complete spoken response"
-                )
-            if self.metadata is None or not self.metadata.desired_abilities:
-                raise ValueError(
-                    "missing_or_unsupported_ability requires desired_abilities"
-                )
-        else:
-            if self.metadata is not None:
-                raise ValueError(
-                    "desired_abilities metadata is allowed only for missing ability"
-                )
-            if self.limitation is not None:
-                raise ValueError(
-                    "limitation is allowed only for missing ability"
-                )
-        return self
-
-
-def _semantic_route_repair_response_schema() -> dict[str, Any]:
-    """Expose cross-field repair invariants to the model-facing JSON schema.
-
-    Pydantic's ``model_validator`` remains the final decoder boundary, but Ollama
-    must see the same impossible-state rules.  Otherwise a structurally valid
-    object such as ``route=chat`` plus an executable speech action can survive
-    constrained generation and fail only after decoding.
-    """
-
-    schema = SemanticRouteRepairOutput.model_json_schema()
-    metadata_ref = {"$ref": "#/$defs/SemanticRouteRepairMetadata"}
-    schema["allOf"] = [
-        {
-            "if": {
-                "properties": {
-                    "intent": {"const": "missing_or_unsupported_ability"}
-                },
-                "required": ["intent"],
-            },
-            "then": {
-                "properties": {
-                    "route": {"const": "clarify"},
-                    "speak_first": {"type": "null"},
-                    "limitation": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 220,
-                    },
-                    "metadata": metadata_ref,
-                    "actions": {"type": "array", "maxItems": 0},
-                },
-                "required": ["limitation", "metadata"],
-            },
-            "else": {
-                "properties": {
-                    "limitation": {"type": "null"},
-                    "metadata": {"type": "null"},
-                }
-            },
-        },
-        {
-            "if": {
-                "properties": {"actions": {"minItems": 1}},
-                "required": ["actions"],
-            },
-            "then": {
-                "properties": {"route": {"const": "robot_action"}},
-                "not": {
-                    "properties": {
-                        "intent": {"const": "missing_or_unsupported_ability"}
-                    },
-                    "required": ["intent"],
-                },
-            },
-        },
-    ]
-    return schema
-
-
-def _semantic_route_spoken_text(
-    output: SemanticRouteRepairOutput,
-    *,
-    language: str | None,
-) -> str | None:
-    """Return model-authored wording without changing its semantic failure state."""
-
-    del language
-    if output.intent != "missing_or_unsupported_ability":
-        return output.speak_first
-    limitation = " ".join(str(output.limitation or "").strip().split())
-    return limitation or None
-
-
-def _validate_missing_ability_output_against_catalog(
-    output: SemanticRouteRepairOutput,
-    request: RouteRequest,
-) -> None:
-    """Keep a missing-ability request distinct from available capabilities."""
-
-    if (
-        output.intent != "missing_or_unsupported_ability"
-        or output.metadata is None
-    ):
-        return
-    available_ids = _capability_ids_from_request(request)
-    collisions = sorted(
-        item.ability_id
-        for item in output.metadata.desired_abilities
-        if item.ability_id in available_ids
-    )
-    if collisions:
-        raise ValueError(
-            "missing ability_id must describe the absent user-facing ability, "
-            "not reuse an available capability_id: "
-            + ", ".join(collisions)
-        )
 
 
 PLACEHOLDER_CAPABILITY_INTENTS = {
@@ -489,8 +292,8 @@ def _route_intent_contract_conflict(
 ) -> str | None:
     """Return a structural route/intent conflict without interpreting user text.
 
-    Semantic repair is delegated to a model. This guard only notices that the
-    model's own output contradicts a declared route contract.
+    No semantic repair follows this guard. It only detects that the model's
+    own output contradicts a declared route contract so the turn can fail closed.
     """
 
     intent = str(decision.intent or "").strip()
@@ -1306,8 +1109,6 @@ class OllamaGoalInterpreter:
         timeout_ms: int,
         review_timeout_ms: int | None = None,
         confidence_threshold: float,
-        slow_review_recovery_enabled: bool = True,
-        generic_chat_review_enabled: bool = True,
         num_ctx: int = 4096,
         num_predict: int = 512,
         keep_alive: str | None = None,
@@ -1322,8 +1123,6 @@ class OllamaGoalInterpreter:
             (review_timeout_ms if review_timeout_ms is not None else timeout_ms) / 1000.0,
         )
         self.confidence_threshold = confidence_threshold
-        self.slow_review_recovery_enabled = slow_review_recovery_enabled
-        self.generic_chat_review_enabled = bool(generic_chat_review_enabled)
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
         self.prompt_chars_per_token_estimate = (
@@ -1582,80 +1381,6 @@ class OllamaGoalInterpreter:
         ]
         return payload
 
-    def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
-        abilities_json = json.dumps(
-            _compact_candidate_capabilities(
-                _review_capabilities_from_request(request),
-                limit=16,
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        mind = request.context.get("mind", {})
-        session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
-        recent_dialogue = _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1400)
-        active_goals = _bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1000)
-        active_tasks = _bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1200)
-        return {
-            "model": self.review_model or self.model,
-            "stream": False,
-            "think": False,
-            "format": self._route_response_schema(),
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Global Context Group:\n"
-                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
-                        f"{_goal_interpretation_fast_context_section(mind)}\n\n"
-                        "Session Context Group:\n"
-                        f"- Language hint: {request.language or 'auto'}\n"
-                        f"- Bounded session context JSON: {session_context}\n"
-                        f"- Recent accepted dialogue JSON: {recent_dialogue}\n"
-                        f"- Active Goal JSON: {active_goals}\n"
-                        f"- Active Task/progress JSON: {active_tasks}\n\n"
-                        "Current Job:\n"
-                        "- You are now acting as Chromie's semantic route reviewer.\n"
-                        "- Use semantic generalization from meaning, session context, and supplied common ability descriptions.\n"
-                        "- Do not use phrase rules, and do not turn prompt wording into keyword rules.\n"
-                        "- The deterministic emergency/noise filter already passed before this review.\n\n"
-                        "Task Context Group:\n"
-                        "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
-                        "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable common ability can satisfy them.\n"
-                        "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
-                        "- capability_inquiry applies only when the user is asking about Chromie's abilities, not when discussing capabilities of another person, model, vehicle, sensor, or system.\n"
-                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless a supplied executable Capability is explicitly selected.\n"
-                        "- For external information, use tool only when the model selects an exact supplied Capability; domain methods come from disclosed Agent Skills, not Host topic rules.\n"
-                        "- Never choose ignore. A separate focused addressedness stage owns bounded ambient suppression.\n"
-                        "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
-                        "- Choose deep_thought for complex reasoning, debugging, design, implementation planning, or multi-step task-session work.\n\n"
-                        "Output Contract:\n"
-                        "- Return compact JSON only. Required keys are route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null; the decision itself may not be omitted.\n"
-                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
-                        "- A non-null fast_speech is a short prospective Goal-progress utterance from Chromie to the person, never a workflow/status label. Follow the supplied fast identity/voice projection: ordinary child/family speech, not customer-service or operator prose. When natural, phrase it from Chromie's first-person reaction or willingness instead of narrating task or processing state. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. It must not claim completion, physical execution, memory commit, or a tool result.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- Never choose interrupt or ignore.\n"
-                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short generic semantic intent."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Task Context Group:\n"
-                        f"- Latest user input: {request.text}\n"
-                        f"- Common ability catalog JSON: {abilities_json}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": self.num_predict,
-            },
-        }
-
     def build_addressedness_review_payload(
         self,
         request: RouteRequest,
@@ -1715,232 +1440,6 @@ class OllamaGoalInterpreter:
                 # latency on every inactive turn.
                 "num_ctx": self.num_ctx,
                 "num_predict": 32,
-            },
-        }
-
-    def build_deterministic_route_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
-        abilities_json = json.dumps(
-            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        mind = request.context.get("mind", {})
-        session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
-        recent_dialogue = _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1400)
-        active_goals = _bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1000)
-        active_tasks = _bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1200)
-        return {
-            "model": self.model,
-            "stream": False,
-            "think": False,
-            "format": "json",
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Global Context Group:\n"
-                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
-                        f"{_goal_interpretation_fast_context_section(mind)}\n\n"
-                        "Session Context Group:\n"
-                        f"- Language hint: {request.language or 'auto'}\n"
-                        f"- Bounded session context JSON: {session_context}\n"
-                        f"- Recent accepted dialogue JSON: {recent_dialogue}\n"
-                        f"- Active Goal JSON: {active_goals}\n"
-                        f"- Active Task/progress JSON: {active_tasks}\n\n"
-                        "Current Job:\n"
-                        "- Repair a realtime robot route after the deterministic emergency/noise filter already passed.\n"
-                        "- The fast goal interpreter incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and common abilities.\n"
-                        "- Decide from meaning and common ability descriptions, not phrase rules.\n\n"
-                        "Task Context Group:\n"
-                        "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
-                        "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
-                        "- Use task context and recent action history for follow-ups, but never as standalone authorization.\n\n"
-                        "Output Contract:\n"
-                        "- Return compact JSON only with required keys route, intent, confidence, and fast_speech. fast_speech must be one short natural string or null.\n"
-                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- A non-null fast_speech must sound like Chromie talking naturally to the person, never like a workflow/status label. Follow the supplied fast identity/voice projection and, when natural, use a first-person reaction or willingness rather than narrating task or processing state. If the user asks whether an external proposition is true, acknowledge checking it instead of asserting it before evidence. Never claim tool results, physical completion, or memory commit.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- Do not use interrupt or ignore.\n"
-                        "- For a selected capability, set intent to capability:<exact capability_id>. Domain-specific bindings belong in the typed route item or metadata authored by the model.\n"
-                        "- Confidence is semantic routing confidence; use at least 0.72 when the request clearly maps to a common ability."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Task Context Group:\n"
-                        f"- Latest user input: {request.text}\n"
-                        f"- Common ability catalog JSON: {abilities_json}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": self.num_predict,
-            },
-        }
-
-    def build_semantic_route_repair_payload(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-        *,
-        reason: str,
-        model: str | None = None,
-    ) -> dict[str, Any]:
-        # Query matches lead this lossless recovery projection, followed by the
-        # common and full snapshots.  Keep a complete bounded slice here:
-        # route-specific narrowing must not hide the exact affordance that made
-        # semantic repair necessary.
-        abilities_json = _bounded_json_array(
-            _compact_prompt_capabilities(
-                _review_capabilities_from_request(request),
-                limit=24,
-                include_value_contracts=True,
-            ),
-            max_chars=3600,
-        )
-        session_context = _bounded_json(
-            _goal_interpretation_prompt_context(request.context),
-            max_chars=900,
-        )
-        previous = {
-            "route": decision.route,
-            "intent": decision.intent,
-            "confidence": decision.confidence,
-        }
-        recent_goals_json = _bounded_json_array(
-            _compact_recent_goal_snapshots(request.context),
-            max_chars=1400,
-        )
-        verified_tool_index_json = _bounded_json_array(
-            _compact_verified_tool_memory_index(request.context),
-            max_chars=1600,
-        )
-        mind = request.context.get("mind", {})
-        global_context = _goal_interpretation_global_context_section(mind)
-        return {
-            "model": model or self.review_model or self.model,
-            "stream": False,
-            "think": False,
-            "format": _semantic_route_repair_response_schema(),
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Global Context Group:\n"
-                        f"{global_context}\n\n"
-                        "Current Job:\n"
-                        "Repair one semantic route from the latest user turn. "
-                        "Runtime diagnostics and the rejected decision are not user-semantic evidence. "
-                        "First understand the requested outcome independently of the catalog, then compare that outcome with exact supplied ability descriptions. "
-                        "Return route, intent, and confidence. For robot_action, actions may contain exact supplied capability IDs with typed args, sequence, timing, and confidence. Limitation and metadata are allowed only for a terminal missing-ability result. "
-                        "Valid routes are chat, deep_thought, robot_action, tool, memory, and clarify. "
-                        "Stable general-knowledge questions that can be answered from model knowledge or reasoning remain chat; asking for a fact does not by itself request a lookup or reveal a missing ability. Use tool or a terminal missing-ability result only when the requested outcome semantically requires current, external, private, or runtime evidence, or when the user explicitly asks Chromie to search, retrieve, look up, or check an outside source. "
-                        "A standalone greeting or thanks remains chat, but social framing attached "
-                        "to a substantive request must not replace the substantive lane. "
-                        "A topical match to a Capability is not itself an execution request. When "
-                        "the latest turn asks to interpret, clarify, or restate a retained completed "
-                        "Goal and the bounded verified-tool index already contains its result "
-                        "provenance, retain chat unless the user requests new bindings or fresh data. "
-                        "A material binding correction to an external-read Goal requires a new exact read "
-                        "when the corrected answer still depends on external facts. Never relabel an older "
-                        "result with the corrected binding or present the old facts as the corrected entity's result. "
-                        "When the latest turn supplies an exact replacement binding for that read, preserve it "
-                        "verbatim and continue the existing lookup responsibility. Do not ask the user to perform "
-                        "provider canonicalization or add administrative granularity merely because multiple "
-                        "real-world matches might exist; the selected Capability must resolve the supplied value "
-                        "or report its own ambiguity. "
-                        "Use tool only when the model selects an exact supplied external-read Capability. "
-                        "For one exact executable body capability, use robot_action and intent=capability:<exact supplied id>. For a compound body request, include one ordered action per exact supplied capability and use a semantic compound intent. "
-                        "Never substitute the nearest topical Capability merely because it shares an entity or binding such as a location, date, number, or person. "
-                        "Use the terminal missing-ability result only when the latest user turn itself asks Chromie for a clear external lookup, evidence-dependent recommendation, or action that no exact supplied Capability can perform. "
-                        "A bare location, preference, entity name, correction, or other context statement is not a missing ability by itself; retain chat so Goal Association can decide whether it continues an earlier Goal or is independent. "
-                        "When the requested outcome is clear but no exact supplied Capability can perform it, do not ask for parameters that cannot make an absent ability executable and do not imply that Chromie will check. "
-                        "Return route=clarify, intent=missing_or_unsupported_ability, one brief complete truthful response in limitation, and metadata.desired_abilities with status=missing_ability, a stable semantic ability_id, the understood intent, confidence, and reason. In limitation, first acknowledge the understood user outcome, then state that the required ability is not currently available to Chromie, with a natural apology when appropriate. Omit speak_first. "
-                        "The missing ability_id names the absent user-facing ability. It must not equal or reuse any capability_id in Supplied abilities JSON; for example, a restaurant request must not be recorded as chromie.weather.lookup merely because both use a location. "
-                        "The terminal limitation is the complete final response. It may acknowledge what the user wanted, but it must describe capability state only: no lookup or action was attempted and no result exists. Capability-unavailable, execution-failed, and empty-result states are different facts and must never be substituted for one another. It must not ask a follow-up question, request a location or preference, or end with a question mark. "
-                        "Apply the owner-approved identity and personality from Global Context naturally. Chromie should sound like herself: a warm six-year-old child in her family, not customer service, an adult operator, or a software error message. "
-                        "Use simple age-appropriate learning language rather than formal system language. Speech itself is only a delivery channel: a speech-delivery capability never satisfies a missing external lookup, recommendation, or embodied ability and must not be proposed in actions as a substitute for the absent capability. Chromie may warmly hope to learn the ability later, but must not claim that learning has started or guarantee that the ability will be added. "
-                        "Use intent=clarify_uncertain_request only when the user's meaning itself remains genuinely underdetermined, or when one exact supplied Capability exists but requires a user-provided binding before provider resolution. Never pair route=chat with a clarification intent. "
-                        "No analysis, hidden rationale, markdown, or fields outside the declared schema. Actions are proposals only and must use exact supplied capability IDs."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Repair reason: {reason}\n"
-                        f"Latest user input: {request.text}\n"
-                        f"Language hint: {request.language or 'auto'}\n"
-                        f"Bounded context JSON: {session_context}\n"
-                        f"Recent terminal Goal snapshot JSON: {recent_goals_json}\n"
-                        f"Verified completed tool-memory index JSON: {verified_tool_index_json}\n"
-                        f"Supplied abilities JSON: {abilities_json}\n"
-                        f"Rejected minimal decision JSON: {_bounded_json(previous, max_chars=500)}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": 512,
-            },
-        }
-
-    def build_placeholder_capability_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
-        abilities_json = _bounded_json(
-            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
-            max_chars=1800,
-        )
-        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=1400)
-        return {
-            "model": self.model,
-            "stream": False,
-            "think": False,
-            "format": "json",
-            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Current Job:\n"
-                        "- Repair a malformed route for Chromie after the emergency/noise filter already passed.\n"
-                        "- The fast goal interpreter returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
-                        "- Decide from semantic meaning, bounded context, and common abilities, not phrase rules.\n\n"
-                        "Task Context Group:\n"
-                        "- Speech-only conversation and questions about whether an ability is available are chat; use a semantic intent such as capability_inquiry when appropriate.\n"
-                        "- A request to perform an available interaction_executable physical capability now is robot_action. Decide inquiry versus execution from meaning and context, not phrase patterns.\n"
-                        "- Use deep_thought for complex reasoning or planning.\n\n"
-                        "- Use working memory, task context, and recent action history to resolve follow-ups, but not to authorize side effects.\n\n"
-                        "Output Contract:\n"
-                        "- Return compact JSON only with keys route, intent, and confidence.\n"
-                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
-                        "- Do not output chain-of-thought, hidden reasoning, analysis, free-form progress narration outside structured speech fields, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from the common ability catalog.\n"
-                        "- Never return placeholder intents such as capability or capability:<exact capability_id>.\n"
-                        "- Confidence is semantic routing confidence."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Latest user input: {request.text}\n"
-                        f"Language hint: {request.language or 'auto'}\n"
-                        f"Bounded session context JSON: {session_context}\n"
-                        f"Common ability catalog JSON: {abilities_json}"
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": self.num_predict,
             },
         }
 
@@ -2274,132 +1773,6 @@ class OllamaGoalInterpreter:
                 },
             )
 
-    async def _structured_generate_from_chat_payload(
-        self,
-        payload: dict[str, Any],
-        *,
-        stage: str,
-    ) -> dict[str, Any]:
-        """Retry one schema-bound chat request through Ollama generate.
-
-        Some Ollama model templates accept the exact JSON Schema on
-        ``/api/generate`` but ignore it on ``/api/chat``.  This fallback keeps
-        the logical prompt, model, decoder schema, and budgets unchanged.  It
-        runs only after the chat transport returned a structurally invalid
-        result, so it is compatibility containment rather than semantic
-        escalation or a model-name special case.
-        """
-
-        system_parts: list[str] = []
-        prompt_parts: list[str] = []
-        for message in payload.get("messages") or []:
-            if not isinstance(message, dict):
-                continue
-            role = str(message.get("role") or "user").strip().lower()
-            content = str(message.get("content") or "")
-            if role == "system":
-                system_parts.append(content)
-            else:
-                prompt_parts.append(f"{role.title()}:\n{content}")
-        generate_payload: dict[str, Any] = {
-            key: payload[key]
-            for key in ("model", "stream", "think", "format", "keep_alive", "options")
-            if key in payload
-        }
-        generate_payload["system"] = "\n\n".join(system_parts)
-        generate_payload["prompt"] = "\n\n".join(prompt_parts)
-        timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
-        call_id = new_llm_call_id("goal_interpreter")
-        started = time.perf_counter()
-        data: dict[str, Any] | None = None
-        try:
-            async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
-                response = await client.post(
-                    f"{self.ollama_url}/api/generate",
-                    json=generate_payload,
-                )
-                response.raise_for_status()
-                generated = response.json()
-            data = {
-                **generated,
-                "message": {"content": str(generated.get("response") or "")},
-            }
-            self._validate_completion(payload, data, stage=stage)
-        except (httpx.HTTPError, ValueError, TypeError, OllamaGenerationError) as exc:
-            log_llm_call_evidence(
-                logger,
-                call_id=call_id,
-                purpose="goal_interpreter",
-                stage=f"{stage}.generate_compatibility_fallback",
-                transport="ollama.generate",
-                request=generate_payload,
-                response=data,
-                status="failed",
-                elapsed_ms=(time.perf_counter() - started) * 1000.0,
-                correlations={},
-                error={
-                    "error_type": type(exc).__name__,
-                    "message": str(exc),
-                },
-            )
-            raise
-        log_llm_call_evidence(
-            logger,
-            call_id=call_id,
-            purpose="goal_interpreter",
-            stage=f"{stage}.generate_compatibility_fallback",
-            transport="ollama.generate",
-            request=generate_payload,
-            response=data,
-            status="accepted",
-            elapsed_ms=(time.perf_counter() - started) * 1000.0,
-            correlations={},
-        )
-        return data
-
-    async def _semantic_route_repair_output(
-        self,
-        payload: dict[str, Any],
-        *,
-        stage: str,
-        request: RouteRequest,
-    ) -> tuple[SemanticRouteRepairOutput, str]:
-        """Return one typed semantic repair with bounded transport fallback."""
-
-        reviewed = await self._chat_logged(payload, stage=stage, request=request)
-        content = str(reviewed.get("message", {}).get("content") or "")
-        try:
-            return (
-                SemanticRouteRepairOutput.model_validate(
-                    _extract_json_object(content)
-                ),
-                "chat",
-            )
-        except (ValidationError, ValueError) as chat_exc:
-            logger.warning(
-                "goal_interpreter_structured_transport_fallback "
-                "sid=%s stage=%s model=%s chat_error_type=%s raw_chars=%s raw_hash=%s",
-                request.sid,
-                stage,
-                payload.get("model") or self.model,
-                type(chat_exc).__name__,
-                len(content),
-                _short_hash(content),
-            )
-        generated = await self._structured_generate_from_chat_payload(
-            payload,
-            stage=stage,
-        )
-        self._log_response_summary(generated, stage=stage, request=request)
-        generated_content = str(generated.get("message", {}).get("content") or "")
-        return (
-            SemanticRouteRepairOutput.model_validate(
-                _extract_json_object(generated_content)
-            ),
-            "generate_compatibility_fallback",
-        )
-
-
     async def _chat_logged(
         self,
         payload: dict[str, Any],
@@ -2623,7 +1996,7 @@ class OllamaGoalInterpreter:
 
     @staticmethod
     def _discard_invalid_progress_proposals(parsed: dict[str, Any]) -> list[str]:
-        """Fail closed per advisory progress item after one model repair.
+        """Fail closed per advisory progress item during one mechanical DTO retry.
 
         Fast progress is optional cognitive evidence, never a Goal or execution
         authorization.  Dropping an invalid item preserves the valid route
@@ -2646,561 +2019,39 @@ class OllamaGoalInterpreter:
             parsed["progress"] = retained
         return discarded
 
-    async def _review_route_only_robot_action(
+    def _semantic_contract_error(
         self,
         request: RouteRequest,
         decision: RouteDecision,
-    ) -> RouteDecision:
-        if not self.slow_review_recovery_enabled or not self.review_model:
-            return decision
-        if decision.route != "robot_action" or decision.intent.startswith("capability:") or decision.actions:
-            return decision
+    ) -> str | None:
+        """Return one terminal semantic-contract error without re-deciding meaning.
 
-        try:
-            reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
-            reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
-        except Exception as exc:
-            _raise_if_llm_budget_failure(exc)
-            raw_content = ""
-            if isinstance(locals().get("reviewed"), dict):
-                raw_content = str(reviewed.get("message", {}).get("content") or "")
-            logger.warning(
-                "LLM review model intent check failed: error_type=%s error=%s raw_chars=%s raw_hash=%s raw_preview=%r",
-                type(exc).__name__,
-                exc,
-                len(raw_content),
-                _short_hash(raw_content),
-                raw_content[:240],
-            )
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=(
-                    "underspecified robot_action semantic review failed: "
-                    f"{type(exc).__name__}"
-                ),
-            )
-
-        if reviewed_decision.route != "robot_action":
-            reviewed_decision.reason = (
-                f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-            ) + f"review_model:{self.review_model} overrode underspecified robot_action"
-            logger.info(
-                "LLM review model changed underspecified robot_action to %s",
-                reviewed_decision.route,
-            )
-            return reviewed_decision
-        if (
-            reviewed_decision.intent.startswith("capability:")
-            or reviewed_decision.actions
-            or (
-                reviewed_decision.intent
-                and reviewed_decision.intent not in {"unknown", "robot_action"}
-                and not _is_placeholder_capability_intent(reviewed_decision.intent)
-            )
-        ):
-            reviewed_decision.reason = (
-                f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-            ) + f"review_model:{self.review_model} selected exact skill for underspecified robot_action"
-            logger.info(
-                "LLM review model completed underspecified robot_action as %s",
-                reviewed_decision.intent,
-            )
-            return reviewed_decision
-        return decision
-
-    async def _review_generic_chat_affordance(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        """Semantically recheck every chat proposal against non-chat affordances.
-
-        This is deliberately model-based.  The deterministic trigger observes
-        only that the first model returned chat while the supplied catalog
-        contains executable non-chat affordances. Intent labels are open-ended
-        model output and cannot safely decide whether the recheck runs. The
-        trigger does not inspect user words or choose a route by phrase rules.
+        The fast Goal Interpreter owns this one candidate. Deterministic code may
+        reject contradictions and placeholders, but it does not call another model
+        to rewrite the candidate. Low confidence remains explicit evidence for the
+        existing Deep Thinking handoff in ``engine.py``.
         """
 
-        if not self.generic_chat_review_enabled or not self.slow_review_recovery_enabled:
-            return decision
-        if decision.route != "chat":
-            return decision
-        if not _has_executable_non_chat_affordance(request):
-            return decision
-
-        try:
-            minimal, structured_transport = await self._semantic_route_repair_output(
-                self.build_semantic_route_repair_payload(
-                    request,
-                    decision,
-                    reason="chat_or_social_framing_requires_capability_grounding_review",
-                    model=self.review_model or self.model,
-                ),
-                stage="capability_grounding_review",
-                request=request,
+        if is_disallowed_model_control_route(request, decision):
+            return (
+                f"deterministic-only route {decision.route!r} was returned after "
+                "the Gateway/emergency filter had already passed"
             )
-            _validate_missing_ability_output_against_catalog(minimal, request)
-            reviewed_decision = finalize_decision(
-                RouteDecision(
-                    route=minimal.route,
-                    intent=minimal.intent,
-                    confidence=minimal.confidence,
-                    language=request.language or "auto",
-                    speak_first=_semantic_route_spoken_text(
-                        minimal, language=request.language
-                    ),
-                    metadata=(
-                        minimal.metadata.model_dump(mode="json")
-                        if minimal.metadata is not None
-                        else {}
-                    ),
-                    actions=[
-                        action.model_dump(mode="json", exclude_none=True)
-                        for action in minimal.actions
-                    ],
-                    source="llm",
-                ),
-                request,
-                source="llm",
-            )
-        except Exception as exc:
-            logger.warning(
-                "generic chat capability review failed sid=%s error_type=%s error=%s",
-                request.sid,
-                type(exc).__name__,
-                exc,
-            )
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=(
-                    "chat capability grounding review failed safely: "
-                    f"{type(exc).__name__}"
-                ),
-            )
-
-        conflict = _route_intent_contract_conflict(request, reviewed_decision)
-        if conflict is not None:
-            logger.warning(
-                "generic chat capability review remained inconsistent sid=%s conflict=%s",
-                request.sid,
-                conflict,
-            )
-            return decision
-        if is_disallowed_model_control_route(request, reviewed_decision):
-            return decision
-        if reviewed_decision.route != "clarify" and (
-            reviewed_decision.confidence < self.confidence_threshold
-        ):
-            return decision
-        if (
-            reviewed_decision.route == "chat"
-            and reviewed_decision.intent == decision.intent
-        ):
-            return decision
-
-        metadata = dict(reviewed_decision.metadata or {})
-        metadata["generic_chat_affordance_review"] = {
-            "status": (
-                "intent_corrected"
-                if reviewed_decision.route == decision.route
-                else "reclassified"
-            ),
-            "original_route": decision.route,
-            "original_intent": decision.intent,
-            "reviewed_route": reviewed_decision.route,
-            "reviewed_intent": reviewed_decision.intent,
-            "structured_transport": structured_transport,
-        }
-        reviewed_decision = reviewed_decision.model_copy(update={"metadata": metadata})
-        reviewed_decision.reason = (
-            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-        ) + "generic chat output rechecked against supplied executable affordances"
-        logger.info(
-            "generic chat capability review reclassified sid=%s original=%s/%s reviewed=%s/%s confidence=%.2f",
-            request.sid,
-            decision.route,
-            decision.intent,
-            reviewed_decision.route,
-            reviewed_decision.intent,
-            reviewed_decision.confidence,
-        )
-        return reviewed_decision
-
-    def _safe_semantic_clarification(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-        *,
-        reason: str,
-    ) -> RouteDecision:
-        metadata = {
-            key: value
-            for key, value in (decision.metadata or {}).items()
-            if key
-            not in {
-                "route_items",
-                "route_item_count",
-                "route_stage_outputs",
-                "task_list",
-                "task_proposals",
-                "route_merge",
-                "tool_name",
-                "tool_capability_id",
-                "weather_query",
-            }
-        }
-        metadata.update(
-            {
-                "llm_clarification_required": True,
-                "semantic_route_repair": {
-                    "status": "clarify",
-                    "reason": reason,
-                    "original_route": decision.route,
-                    "original_intent": decision.intent,
-                    "original_confidence": decision.confidence,
-                },
-                "thinking_ack_allowed": False,
-            }
-        )
-        return finalize_decision(
-            RouteDecision(
-                route="clarify",
-                agents=["speaker_agent"],
-                intent="clarify_uncertain_request",
-                confidence=min(float(decision.confidence), 0.45),
-                language=request.language or decision.language or "auto",
-                priority=decision.priority,
-                needs_agent=True,
-                should_speak=True,
-                candidate_capabilities=list(decision.candidate_capabilities),
-                reason=(f"{decision.reason}; " if decision.reason else "") + reason,
-                source="llm",
-                metadata=metadata,
-            ),
-            request,
-            source="llm",
-        )
-
-    async def _repair_semantic_route(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-        *,
-        reason: str,
-    ) -> RouteDecision:
-        try:
-            minimal, structured_transport = await self._semantic_route_repair_output(
-                self.build_semantic_route_repair_payload(
-                    request,
-                    decision,
-                    reason=reason,
-                ),
-                stage="semantic_route_repair",
-                request=request,
-            )
-            _validate_missing_ability_output_against_catalog(minimal, request)
-            repaired_decision = finalize_decision(
-                RouteDecision(
-                    route=minimal.route,
-                    intent=minimal.intent,
-                    confidence=minimal.confidence,
-                    language=request.language or "auto",
-                    speak_first=_semantic_route_spoken_text(
-                        minimal, language=request.language
-                    ),
-                    metadata=(
-                        minimal.metadata.model_dump(mode="json")
-                        if minimal.metadata is not None
-                        else {}
-                    ),
-                    actions=[
-                        action.model_dump(mode="json", exclude_none=True)
-                        for action in minimal.actions
-                    ],
-                    source="llm",
-                ),
-                request,
-                source="llm",
-            )
-        except Exception as exc:
-            _raise_if_llm_budget_failure(exc)
-            logger.warning(
-                "semantic route repair failed sid=%s reason=%s error_type=%s error=%s",
-                request.sid,
-                reason,
-                type(exc).__name__,
-                exc,
-            )
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=f"{reason}; semantic repair failed",
-            )
-
-        conflict = _route_intent_contract_conflict(request, repaired_decision)
-        if (
-            repaired_decision.route == "deep_thought"
-            and repaired_decision.intent in {"", "unknown", "deep_thought_low_confidence"}
-        ):
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=f"{reason}; repaired decision remained semantically unresolved",
-            )
-        if conflict is not None:
-            logger.warning(
-                "semantic route repair remained inconsistent sid=%s conflict=%s route=%s intent=%s",
-                request.sid,
-                conflict,
-                repaired_decision.route,
-                repaired_decision.intent,
-            )
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=f"{reason}; repaired decision still violates {conflict}",
-            )
-        if is_disallowed_model_control_route(request, repaired_decision):
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=f"{reason}; repair returned deterministic-only route",
-            )
-        if (
-            repaired_decision.route != "clarify"
-            and repaired_decision.confidence < self.confidence_threshold
-        ):
-            return self._safe_semantic_clarification(
-                request,
-                decision,
-                reason=f"{reason}; repaired decision remained low confidence",
-            )
-
-        metadata = dict(repaired_decision.metadata or {})
-        metadata["semantic_route_repair"] = {
-            "status": "repaired",
-            "reason": reason,
-            "original_route": decision.route,
-            "original_intent": decision.intent,
-            "original_confidence": decision.confidence,
-            "structured_transport": structured_transport,
-        }
-        repaired_decision = repaired_decision.model_copy(update={"metadata": metadata})
-        repair_model = self.review_model or self.model
-        repaired_decision.reason = (
-            f"{repaired_decision.reason}; " if repaired_decision.reason else ""
-        ) + f"repair_model:{repair_model} semantic route repair after {reason}"
-        logger.info(
-            "semantic route repaired sid=%s reason=%s original=%s/%s repaired=%s/%s confidence=%.2f",
-            request.sid,
-            reason,
-            decision.route,
-            decision.intent,
-            repaired_decision.route,
-            repaired_decision.intent,
-            repaired_decision.confidence,
-        )
-        return repaired_decision
-
-    async def _repair_route_intent_contract(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
         conflict = _route_intent_contract_conflict(request, decision)
-        if conflict is None:
-            return decision
-        return await self._repair_semantic_route(
-            request,
-            decision,
-            reason=conflict,
-        )
-
-    async def _review_ambiguous_deep_thought(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        if decision.route != "deep_thought":
-            return decision
-        ambiguous_shape = decision.intent in {"", "unknown"} and not decision.reason
-        low_confidence = (
-            decision.confidence < self.confidence_threshold
-            or decision.intent == "deep_thought_low_confidence"
-        )
-        if not ambiguous_shape and not low_confidence:
-            return decision
-
-        reason = (
-            "ambiguous_deep_thought_without_semantic_intent"
-            if ambiguous_shape
-            else "low_confidence_deep_thought_requires_semantic_review"
-        )
-        if self.slow_review_recovery_enabled and self.review_model:
-            try:
-                reviewed = await self._chat_logged(
-                    self.build_intent_review_payload(request),
-                    stage="intent_review",
-                    request=request,
-                )
-                reviewed_decision = self._decision_from_response(
-                    request,
-                    reviewed,
-                    stage="intent_review",
-                )
-            except Exception as exc:
-                _raise_if_llm_budget_failure(exc)
-                logger.warning(
-                    "LLM review model uncertain deep_thought check failed: %s",
-                    exc,
-                )
-            else:
-                conflict = _route_intent_contract_conflict(request, reviewed_decision)
-                review_resolved = not (
-                    reviewed_decision.route == "deep_thought"
-                    and reviewed_decision.intent
-                    in {"", "unknown", "deep_thought_low_confidence"}
-                )
-                if (
-                    conflict is None
-                    and review_resolved
-                    and not is_disallowed_model_control_route(
-                        request,
-                        reviewed_decision,
-                    )
-                    and (
-                        reviewed_decision.route == "clarify"
-                        or reviewed_decision.confidence >= self.confidence_threshold
-                    )
-                ):
-                    review_label = (
-                        "ambiguous deep_thought"
-                        if ambiguous_shape
-                        else "uncertain deep_thought"
-                    )
-                    reviewed_decision.reason = (
-                        f"{reviewed_decision.reason}; "
-                        if reviewed_decision.reason
-                        else ""
-                    ) + f"review_model:{self.review_model} reviewed {review_label}"
-                    logger.info(
-                        "LLM review model changed uncertain deep_thought to %s/%s",
-                        reviewed_decision.route,
-                        reviewed_decision.intent,
-                    )
-                    return reviewed_decision
-
-        return await self._repair_semantic_route(
-            request,
-            decision,
-            reason=reason,
-        )
-
-    async def _recover_deterministic_only_decision(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        reason_prefix = (
-            f"fast goal interpreter returned deterministic-only route {decision.route} "
-            "after deterministic emergency/noise filter did not match"
-        )
-        if not self.slow_review_recovery_enabled:
-            logger.info("%s; slow repair disabled; using safe chat fallback", reason_prefix)
-            return fallback_decision(
-                request,
-                reason=f"{reason_prefix}; slow repair disabled",
-            )
-        if self.slow_review_recovery_enabled and self.review_model:
-            try:
-                reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
-                reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
-            except Exception as exc:
-                _raise_if_llm_budget_failure(exc)
-                logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
-            else:
-                if not is_disallowed_model_control_route(
-                    request,
-                    reviewed_decision,
-                ):
-                    if reviewed_decision.confidence >= self.confidence_threshold:
-                        reviewed_decision.reason = (
-                            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-                        ) + f"{reason_prefix}; review_model:{self.review_model} recovered fast-interpreter mistake"
-                        logger.info(
-                            "LLM review model recovered invalid deterministic-only route %s to %s",
-                            decision.route,
-                            reviewed_decision.route,
-                        )
-                        return reviewed_decision
-                    logger.info(
-                        "LLM review model returned low-confidence recovery %.2f for invalid %s; trying fast repair",
-                        reviewed_decision.confidence,
-                        decision.route,
-                    )
-        try:
-            repaired = await self._chat_logged(self.build_deterministic_route_repair_payload(request), stage="deterministic_route_repair", request=request)
-            repaired_decision = self._decision_from_response(request, repaired, stage="deterministic_route_repair")
-        except Exception as exc:
-            _raise_if_llm_budget_failure(exc)
-            logger.warning("LLM fast route repair failed: %s", exc)
-        else:
-            if not is_disallowed_model_control_route(request, repaired_decision):
-                repaired_decision.reason = (
-                    f"{repaired_decision.reason}; " if repaired_decision.reason else ""
-                ) + f"{reason_prefix}; fast_model:{self.model} repaired fast-interpreter mistake"
-                logger.info(
-                    "LLM fast repair recovered invalid deterministic-only route %s to %s",
-                    decision.route,
-                    repaired_decision.route,
-                )
-                return repaired_decision
-        logger.info(
-            "Goal Interpreter model returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
-            decision.route,
-        )
-        return fallback_decision(request, reason=reason_prefix)
-
-    async def _recover_placeholder_capability_decision(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-    ) -> RouteDecision:
-        reason_prefix = (
-            "fast goal interpreter returned robot_action with placeholder capability intent "
-            f"{decision.intent!r}"
-        )
-        if not self.slow_review_recovery_enabled:
-            logger.info("%s; slow repair disabled; using safe chat fallback", reason_prefix)
-            return fallback_decision(
-                request,
-                reason=f"{reason_prefix}; slow repair disabled",
-            )
-        try:
-            repaired = await self._chat_logged(self.build_placeholder_capability_repair_payload(request), stage="placeholder_capability_repair", request=request)
-            repaired_decision = self._decision_from_response(request, repaired, stage="placeholder_capability_repair")
-        except Exception as exc:
-            _raise_if_llm_budget_failure(exc)
-            logger.warning("LLM placeholder capability repair failed: %s", exc)
-        else:
-            if (
-                not is_disallowed_model_control_route(request, repaired_decision)
-                and not _is_placeholder_capability_intent(repaired_decision.intent)
-            ):
-                repaired_decision.reason = (
-                    f"{repaired_decision.reason}; " if repaired_decision.reason else ""
-                ) + f"{reason_prefix}; fast_model:{self.model} repaired placeholder capability intent"
-                logger.info(
-                    "LLM fast repair recovered placeholder capability intent to %s/%s",
-                    repaired_decision.route,
-                    repaired_decision.intent,
-                )
-                return repaired_decision
-        logger.info("%s; using safe chat fallback", reason_prefix)
-        return fallback_decision(request, reason=reason_prefix)
+        if conflict is not None:
+            return conflict
+        if (
+            decision.route == "robot_action"
+            and _is_placeholder_capability_intent(decision.intent)
+        ):
+            return "robot_action_placeholder_capability_intent"
+        if (
+            decision.route == "robot_action"
+            and not decision.actions
+            and str(decision.intent or "").strip() in {"", "unknown", "robot_action"}
+        ):
+            return "robot_action_missing_semantic_intent"
+        return None
 
     async def review_after_priority_interrupt(
         self,
@@ -3318,115 +2169,57 @@ class OllamaGoalInterpreter:
             source="llm",
         )
 
-    def _low_confidence_deep_thought_decision(
-        self,
-        request: RouteRequest,
-        decision: RouteDecision,
-        *,
-        reason_prefix: str | None = None,
-    ) -> RouteDecision:
-        candidates = decision.candidate_capabilities
-        if not candidates:
-            raw_candidates = request.context.get("common_ability_catalog", [])
-            if not raw_candidates:
-                raw_candidates = request.context.get("prompt_capabilities_common", [])
-            if not raw_candidates:
-                raw_candidates = request.context.get("full_ability_catalog", [])
-            if not raw_candidates:
-                raw_candidates = request.context.get("prompt_capabilities_all", [])
-            candidates = raw_candidates if isinstance(raw_candidates, list) else []
-        reason_parts = [
-            reason_prefix
-            or f"fast goal interpreter confidence {decision.confidence:.2f} below threshold {self.confidence_threshold:.2f}",
-            f"quick_route={decision.route}",
-            f"quick_intent={decision.intent}",
-        ]
-        if decision.reason:
-            reason_parts.append(f"quick_reason={decision.reason}")
-        inherited_metadata = {
-            key: value
-            for key, value in (decision.metadata or {}).items()
-            if key
-            not in {
-                "route_items",
-                "route_item_count",
-                "route_stage_outputs",
-                "task_list",
-                "task_proposals",
-                "route_merge",
-            }
-        }
-        return finalize_decision(
-            RouteDecision(
-                route="deep_thought",
-                agents=["deepthinking_agent", "speaker_agent"],
-                intent="deep_thought_low_confidence",
-                confidence=decision.confidence,
-                language=decision.language or request.language or "auto",
-                priority=decision.priority,
-                speak_first=decision.speak_first,
-                needs_agent=True,
-                should_speak=True,
-                candidate_capabilities=candidates,
-                reason="; ".join(reason_parts),
-                source="llm",
-                metadata={
-                    **inherited_metadata,
-                    "thinking_ack_allowed": bool(decision.speak_first),
-                    "thinking_ack_source": (
-                        "quick_llm_speak_first" if decision.speak_first else "none"
-                    ),
-                },
-            ),
-            request,
-            source="llm",
-        )
-
     async def route(self, request: RouteRequest) -> RouteDecision:
+        """Run one fast interpretation with at most one mechanical DTO repair.
+
+        Ordinary semantic output is never rewritten by a second Goal Interpreter.
+        Low confidence remains explicit and is delegated by ``engine.py`` to the
+        existing Deep Thinking path. Structural contradictions fail closed; they
+        become reflection/evaluation evidence rather than an online repair chain.
+        """
+
         payload = self.build_payload(request)
+        invocation_families = ["goal_interpreter.primary"]
+        contract_repair_attempted = False
 
         try:
-            data = await self._chat_logged(payload, stage="quick_intent", request=request)
+            data = await self._chat_logged(
+                payload,
+                stage="quick_intent",
+                request=request,
+            )
         except Exception as exc:
-            logger.warning("Ollama Goal Interpreter request failed: %s: %s", type(exc).__name__, exc)
-            if self.slow_review_recovery_enabled and self.review_model:
-                try:
-                    reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
-                    reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
-                except Exception as review_exc:
-                    _raise_if_llm_budget_failure(review_exc)
-                    logger.warning("LLM review model primary-error recovery failed: %s", review_exc)
-                else:
-                    if not is_disallowed_model_control_route(
-                        request,
-                        reviewed_decision,
-                    ):
-                        reviewed_decision.reason = (
-                            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-                        ) + f"primary goal interpreter error {type(exc).__name__}; review_model:{self.review_model} recovered route"
-                        logger.info(
-                            "LLM review model recovered primary goal interpreter error to %s/%s",
-                            reviewed_decision.route,
-                            reviewed_decision.intent,
-                        )
-                        return reviewed_decision
             _raise_if_llm_budget_failure(exc)
+            logger.warning(
+                "Ollama Goal Interpreter request failed: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
             return fallback_decision(
                 request,
                 reason=f"goal_interpreter_error:{type(exc).__name__}: {exc}",
             )
 
-        content = ""
+        content = str(data.get("message", {}).get("content") or "")
         try:
-            content = data.get("message", {}).get("content", "")
-            decision = self._decision_from_response(request, data, stage="quick_intent")
+            decision = self._decision_from_response(
+                request,
+                data,
+                stage="quick_intent",
+            )
         except (ValueError, ValidationError) as exc:
-            logger.warning("Invalid Goal Interpreter model response: %s; content=%r", exc, content[:500])
+            contract_repair_attempted = True
+            invocation_families.append("goal_interpreter.dto_repair")
+            logger.warning(
+                "Invalid Goal Interpreter DTO: %s; content=%r",
+                exc,
+                content[:500],
+            )
             try:
                 repaired = await self._chat_logged(
                     self.build_contract_repair_payload(
                         request,
-                        previous_content=str(content or ""),
+                        previous_content=content,
                         validation_error=exc,
                     ),
                     stage="quick_intent_contract_repair",
@@ -3438,62 +2231,49 @@ class OllamaGoalInterpreter:
                     stage="quick_intent_contract_repair",
                     allow_bounded_contract_recovery=True,
                 )
-                logger.info("Goal Interpreter model recovered with typed contract repair")
             except Exception as repair_exc:
                 _raise_if_llm_budget_failure(repair_exc)
-                logger.warning("Goal Interpreter typed contract repair failed: %s", repair_exc)
-                return fallback_decision(request, reason=f"invalid_goal_interpreter_response: {exc}")
-
-        if (
-            decision.route == "deep_thought"
-            and decision.intent in {"", "unknown"}
-            and not decision.reason
-        ):
-            reviewed = await self._review_ambiguous_deep_thought(request, decision)
-            if not (
-                reviewed.route == "deep_thought"
-                and reviewed.intent in {"", "unknown"}
-                and not reviewed.reason
-            ):
-                decision = reviewed
-            else:
-                logger.info(
-                    "Goal Interpreter model returned ambiguous deep_thought without intent or reason; using safe fallback"
+                logger.warning(
+                    "Goal Interpreter DTO repair failed: %s",
+                    repair_exc,
                 )
                 return fallback_decision(
                     request,
-                    reason="ambiguous_llm_deep_thought_without_intent_or_reason",
+                    reason=(
+                        "invalid_goal_interpreter_response_after_one_dto_repair: "
+                        f"{type(repair_exc).__name__}: {repair_exc}"
+                    ),
                 )
-        else:
-            decision = await self._review_ambiguous_deep_thought(request, decision)
-        decision = await self._review_route_only_robot_action(request, decision)
-        # Route/intent contradictions are repaired by a semantic model. The
-        # deterministic host checks only the model-authored contract and never
-        # infers weather, tool, or physical intent from user-text keywords.
-        decision = await self._repair_route_intent_contract(request, decision)
-        # The deployed Core entry receives a Gateway-admitted envelope, so
-        # addressedness has already been decided upstream. Preserve the old
-        # reviewer only for explicit compatibility entrypoints and historical
-        # replays that do not carry the admission marker.
+
+        semantic_error = self._semantic_contract_error(request, decision)
+        if semantic_error is not None:
+            return fallback_decision(
+                request,
+                reason=f"goal_interpreter_semantic_contract_failed:{semantic_error}",
+            )
+
+        # Maintained requests are already admitted by Cognitive Gateway. Keep the
+        # legacy inactive addressedness review only for explicit compatibility
+        # callers and historical replays; it is not an ordinary repair path.
         if request.context.get("gateway_admission_complete") is not True:
             decision = await self._review_inactive_addressedness(request, decision)
-        decision = await self._review_generic_chat_affordance(request, decision)
+            semantic_error = self._semantic_contract_error(request, decision)
+            if semantic_error is not None:
+                return fallback_decision(
+                    request,
+                    reason=(
+                        "goal_interpreter_compatibility_review_contract_failed:"
+                        f"{semantic_error}"
+                    ),
+                )
 
-        if decision.route == "ignore":
-            if is_allowed_model_ignore(request, decision):
-                return decision
-            recovered = await self._recover_deterministic_only_decision(
-                request,
-                decision,
-            )
-            return recovered
-
-        if decision.route in DETERMINISTIC_ONLY_ROUTES:
-            recovered = await self._recover_deterministic_only_decision(request, decision)
-            return recovered
-
-        if decision.route == "robot_action" and _is_placeholder_capability_intent(decision.intent):
-            recovered = await self._recover_placeholder_capability_decision(request, decision)
-            return recovered
-
-        return decision
+        metadata = dict(decision.metadata or {})
+        metadata["goal_interpreter_transaction"] = {
+            "logical_invocation_count": len(invocation_families),
+            "logical_invocation_budget": 2,
+            "prompt_families": invocation_families,
+            "contract_repair_attempted": contract_repair_attempted,
+            "semantic_repair_attempted": False,
+            "terminal_state": "accepted",
+        }
+        return decision.model_copy(update={"metadata": metadata})

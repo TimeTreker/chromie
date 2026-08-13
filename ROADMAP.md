@@ -103,10 +103,11 @@ adding a manager because a useful explanatory term exists.
    Chromie `a36444b` and Soridormi `fa8080d2` retain exact compound arguments,
    ordered MuJoCo execution, provider-start deterministic cancellation, and
    safe-idle recovery. The dependency-complete source gate and rebuilt clean
-   generated-speech/GPU profile remain bound to `90aa72a`; the absent
-   independent semantic reviewer remains an explicit non-release gap. Hard
-   semantic, delivery-evidence, safety, provider, or provenance failures remain
-   non-averageable blockers.
+   generated-speech/GPU profile remain bound to `90aa72a`. Current source
+   replaces the former online semantic-review/recovery chain with bounded Fast
+   interpretation, one Deep escalation for low confidence, and terminal Host
+   validation. Hard semantic, delivery-evidence, safety, provider, or provenance
+   failures remain non-averageable blockers.
 4. Keep every admitted non-operational turn on one Goal-driven semantic path.
    Interpretation failure must remain an explicit unavailable outcome; it must
    never be converted into plausible chat, tool, memory, or motion intent.
@@ -229,30 +230,35 @@ Exit criteria:
 
 ### Interpretation and capability grounding
 
-- Issue [#20](https://github.com/TimeTreker/chromie/issues/20) owns the current
-  P0 containment line: schema-bound semantic review must use a transport that
-  the selected Ollama model actually honors, advisory route narrowing must not
-  destroy the supplied recovery catalog, and an unresolved typed effectful Goal
-  must never become a successful zero-step response.
-- Treat non-empty interpretation failure as `interpretation_unavailable`.
-- Permit semantic repair to return only strictly typed, catalog-backed action
-  proposals for `robot_action`.
+- Preserve one Fast Goal Interpretation transaction: one primary interpretation,
+  at most one mechanical DTO repair, then accept, delegate low confidence once to
+  Deep Thinking, or fail closed.
+- Treat non-empty interpretation failure as `interpretation_unavailable`; never
+  rewrite it into plausible chat, tool, memory, or motion intent.
+- Keep semantic reconsideration source-based. Do not restore intent reviewers,
+  generic-chat critics, capability-grounding reviewers, contract-loss recovery,
+  or repair-of-repair around previous model output.
+- Preserve Goal Association's independent evidence-bearing coverage certificate
+  and one fresh source-based interpretation after rejection; the certificate is
+  immutable evidence, not a second Goal authority.
 - Revalidate capability IDs, argument schemas, confidence, confirmation policy,
-  resources, and effect envelopes after every model stage.
+  resources, and effect envelopes at trusted boundaries. Fast may escalate once
+  to Deep Planner; Deep owns at most one internal revision; Host rejection is
+  terminal.
 - Expand general-ability scenarios rather than phrase-specific routing rules.
 
 Exit criteria:
 
 - no fallback invents an ordinary semantic lane;
-- malformed structured review either receives one same-contract transport
-  compatibility retry or fails closed;
-- candidate ordering remains advisory while the supplied common/full catalog
-  stays available to semantic repair;
+- a second malformed Fast DTO or semantic contradiction fails closed;
+- low-confidence Fast meaning reaches Deep Thinking without an intermediate
+  semantic repair model;
 - an effectful Goal has an owned executable step, delivered evidence for the
   same Goal, or an explicit clarify/escalate/unavailable/refused outcome;
 - compound body requests retain ordered exact capabilities;
 - missing abilities remain honest terminal outcomes;
-- behavior scenarios cover unavailable, repair, and rejection paths.
+- semantic outcome tests enforce the logical model-call budgets instead of an
+  exact historical prompt sequence.
 
 ### Vocal semantics and provider qualification
 
@@ -321,7 +327,7 @@ Exit criteria:
 ### Conditional vocal-hosting review
 
 Do not move TTS, playback, microphone, speaker, or media execution into
-Soridormi as part of the vocal semantic repair. Reopen the hosting decision only
+Soridormi as part of the vocal architecture work. Reopen the hosting decision only
 when retained evidence demonstrates at least one concrete blocker that the
 current peer-provider boundary cannot meet, such as:
 

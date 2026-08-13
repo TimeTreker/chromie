@@ -2,23 +2,19 @@ from __future__ import annotations
 
 import unittest
 
-from jsonschema import Draft202012Validator
-
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
-    SemanticRouteRepairOutput,
     _payload_message_texts,
-    _semantic_route_repair_response_schema,
-    _semantic_route_spoken_text,
-    _validate_missing_ability_output_against_catalog,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import (
-    RouteDecision,
     RouteRequest,
+    annotate_pipeline_stage_outputs,
 )
 
 
-class MissingAbilitySemanticReviewTests(unittest.TestCase):
+class MissingAbilityPrimaryInterpretationTests(unittest.IsolatedAsyncioTestCase):
+    """Missing abilities are primary semantic output, not a repair workflow."""
+
     def _interpreter(self) -> OllamaGoalInterpreter:
         return OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
@@ -28,7 +24,7 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
             confidence_threshold=0.55,
         )
 
-    def test_semantic_repair_uses_mind_and_child_warmth_contract(self) -> None:
+    def test_primary_prompt_uses_mind_and_missing_ability_contract(self) -> None:
         request = RouteRequest(
             sid="restaurant-tone",
             text="你能帮我看看龙兴天街附近有什么好吃的吗？",
@@ -54,174 +50,85 @@ class MissingAbilitySemanticReviewTests(unittest.TestCase):
                 ],
             },
         )
-        payload = self._interpreter().build_semantic_route_repair_payload(
-            request,
-            RouteDecision(
-                route="chat",
-                intent="recommendation_request",
-                confidence=0.95,
-            ),
-            reason="generic_chat_capability_review",
-        )
 
-        system_text, _, _ = _payload_message_texts(payload)
+        payload = self._interpreter().build_payload(request)
+        system_text, user_text, _ = _payload_message_texts(payload)
 
-        self.assertIn("Global Context Group", system_text)
-        self.assertIn("six-year-old child", system_text)
-        self.assertIn("warm, natural, and family-like", system_text)
-        self.assertIn("A bare location", system_text)
-        self.assertIn("must not equal or reuse any capability_id", system_text)
-        self.assertIn("must not ask a follow-up question", system_text)
-        self.assertIn("first acknowledge the understood user outcome", system_text)
-        self.assertIn("Capability-unavailable, execution-failed, and empty-result", system_text)
-        self.assertIn("Limitation and metadata are allowed only", system_text)
-        self.assertIn("speech-delivery capability never satisfies", system_text)
-        self.assertIn("must not claim that learning has started", system_text)
+        self.assertIn("fast Goal Interpretation model", system_text)
+        self.assertIn("metadata.desired_abilities", system_text)
+        self.assertIn("status=missing_ability", system_text)
+        self.assertIn("chromie_default_mind", user_text)
+        self.assertIn("owner-approved mind profile", user_text)
+        self.assertIn("child/family voice", user_text)
+        self.assertIn("chromie.weather.lookup", user_text)
 
-    def test_missing_ability_speech_preserves_model_authored_complete_response(self) -> None:
-        output = SemanticRouteRepairOutput.model_validate(
-            {
-                "route": "clarify",
-                "intent": "missing_or_unsupported_ability",
-                "confidence": 1.0,
-                "limitation": "我知道你想让我帮你找附近好吃的餐厅，不过这个我现在还不会查，对不起呀。",
-                "metadata": {
-                    "desired_abilities": [
-                        {
-                            "ability_id": "local.restaurant_recommendation",
-                            "intent": "查找并推荐用户附近的优质餐厅",
-                            "status": "missing_ability",
-                            "confidence": 1.0,
-                            "reason": "当前没有餐厅搜索能力。",
-                        }
-                    ]
-                },
-            }
-        )
-
-        self.assertEqual(
-            _semantic_route_spoken_text(output, language="zh-CN"),
-            "我知道你想让我帮你找附近好吃的餐厅，不过这个我现在还不会查，对不起呀。",
-        )
-
-
-    def test_model_facing_schema_rejects_log_shaped_missing_ability_invalid_states(self) -> None:
-        schema = _semantic_route_repair_response_schema()
-        Draft202012Validator.check_schema(schema)
-        validator = Draft202012Validator(schema)
-
-        valid_missing = {
-            "route": "clarify",
-            "intent": "missing_or_unsupported_ability",
-            "confidence": 1.0,
-            "speak_first": None,
-            "limitation": (
-                "我知道你想让我帮你找附近好吃的地方，不过这个我现在还不会查，对不起呀。"
-            ),
-            "metadata": {
-                "desired_abilities": [
-                    {
-                        "ability_id": "local.restaurant_recommendation",
-                        "intent": "推荐用户附近的餐厅",
-                        "status": "missing_ability",
-                        "confidence": 1.0,
-                        "reason": "当前能力目录没有本地商家搜索能力。",
-                    }
-                ]
-            },
-            "actions": [],
-        }
-        self.assertEqual(list(validator.iter_errors(valid_missing)), [])
-
-        chat_speech_substitution = {
-            "route": "chat",
-            "intent": "N/A",
-            "confidence": 1.0,
-            "speak_first": None,
-            "limitation": None,
-            "metadata": None,
-            "actions": [
-                {
-                    "capability_id": "chromie.speak",
-                    "args": {"text": "capability limitation"},
-                    "sequence": 0,
-                    "timing": "sequential",
-                    "confidence": 1.0,
-                }
-            ],
-        }
-        self.assertTrue(list(validator.iter_errors(chat_speech_substitution)))
-
-        malformed_missing = {
-            "route": "chat",
-            "intent": "missing_or_unsupported_ability",
-            "confidence": 1.0,
-            "speak_first": None,
-            "limitation": None,
-            "metadata": valid_missing["metadata"],
-            "actions": [],
-        }
-        self.assertTrue(list(validator.iter_errors(malformed_missing)))
-
-    def test_missing_ability_id_cannot_reuse_available_weather_capability(self) -> None:
-        request = RouteRequest(
-            sid="restaurant-grounding",
-            text="帮我推荐附近好吃的地方。",
-            language="zh-CN",
-            context={
-                "prompt_capabilities_common": [
-                    {
-                        "capability_id": "chromie.weather.lookup",
-                        "description": "Look up current weather for a location.",
-                        "route": "tool",
-                        "interaction_executable": True,
-                    }
-                ]
-            },
-        )
-        output = SemanticRouteRepairOutput.model_validate(
-            {
-                "route": "clarify",
-                "intent": "missing_or_unsupported_ability",
-                "confidence": 1.0,
-                "limitation": "我现在还没学会怎么帮你找好吃的餐厅呢。",
-                "metadata": {
-                    "desired_abilities": [
-                        {
-                            "ability_id": "chromie.weather.lookup",
-                            "intent": "推荐用户附近好吃的餐厅",
-                            "status": "missing_ability",
-                            "confidence": 1.0,
-                            "reason": "当前没有餐厅或本地商家搜索能力。",
-                        }
-                    ]
-                },
-            }
-        )
-
-        with self.assertRaisesRegex(
-            ValueError,
-            "not reuse an available capability_id",
-        ):
-            _validate_missing_ability_output_against_catalog(output, request)
-
-        assert output.metadata is not None
-        valid = output.model_copy(
-            update={
-                "metadata": output.metadata.model_copy(
-                    update={
-                        "desired_abilities": [
-                            output.metadata.desired_abilities[0].model_copy(
-                                update={
-                                    "ability_id": "local.restaurant_recommendation"
-                                }
-                            )
-                        ]
-                    }
+    async def test_primary_missing_ability_is_terminal_after_one_model_call(self) -> None:
+        class MissingAbilityInterpreter(OllamaGoalInterpreter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="quality-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
                 )
-            }
+                self.stages: list[str] = []
+
+            async def _chat(self, payload: dict, *, stage: str = "unknown") -> dict:
+                self.stages.append(stage)
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"clarify",'
+                            '"intent":"missing_or_unsupported_ability",'
+                            '"confidence":0.96,"fast_speech":'
+                            '"我知道你想找附近好吃的地方，不过这个我现在还不会查。",'
+                            '"progress":[],"metadata":{"desired_abilities":[{'
+                            '"ability_id":"local.restaurant_recommendation",'
+                            '"intent":"推荐用户附近的餐厅",'
+                            '"status":"missing_ability","confidence":0.96,'
+                            '"reason":"当前能力目录没有本地商家搜索能力。"}]}}'
+                        )
+                    }
+                }
+
+        interpreter = MissingAbilityInterpreter()
+        decision = await interpreter.route(
+            RouteRequest(
+                text="帮我推荐附近好吃的地方。",
+                language="zh-CN",
+                context={
+                    "gateway_admission_complete": True,
+                    "prompt_capabilities_common": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            )
         )
-        _validate_missing_ability_output_against_catalog(valid, request)
+
+        self.assertEqual(interpreter.stages, ["quick_intent"])
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(
+            decision.metadata["desired_abilities"][0]["ability_id"],
+            "local.restaurant_recommendation",
+        )
+        transaction = decision.metadata["goal_interpreter_transaction"]
+        self.assertEqual(transaction["logical_invocation_count"], 1)
+        self.assertFalse(transaction["semantic_repair_attempted"])
+
+        annotated = annotate_pipeline_stage_outputs(decision)
+        ability_proposals = [
+            item
+            for item in annotated.metadata["task_proposals"]
+            if item.get("proposal_kind") == "ability"
+        ]
+        self.assertEqual(len(ability_proposals), 1)
+        self.assertEqual(ability_proposals[0]["state"], "missing_ability")
+        self.assertFalse(ability_proposals[0]["effectful"])
 
 
 if __name__ == "__main__":

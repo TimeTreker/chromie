@@ -492,10 +492,10 @@ Role                               | Model                            | Maintain
 -----------------------------------+----------------------------------+----------------------------------------------
 Cognitive Gateway attention        | ${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL} | ingress attention review
 Fast intent (Goal Interpreter)     | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL} | fast understanding / readiness candidates
-Goal Interpreter review            | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL} | bounded semantic review/repair when required
+Post-interrupt review (optional)    | ${EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL} | compatibility-only confirmation after an applied interrupt
 Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL} | Goal continuity and candidate binding
 Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL} | fallback when readiness does not fully cover Goals
-Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | semantic escalation / bounded replan only
+Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | terminal planning escalation / at most one internal revision
 Response Composer                  | ${EFFECTIVE_RESPONSE_COMPOSER_MODEL} | response-required paths; skipped by pure ready reads
 Tool Result Interpreter            | ${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL} | post-evidence grounded delivery
 Task Continuity                    | ${EFFECTIVE_TASK_CONTINUITY_MODEL} | compatibility/auxiliary surface

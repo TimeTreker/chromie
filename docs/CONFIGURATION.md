@@ -260,7 +260,7 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
 | `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Goal Interpreter model for semantic interpretation while the emergency filter remains deterministic. |
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; reserved for the optional post-interrupt compatibility review only. It is not an ordinary semantic repair model. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the fast semantic interpretation budget. |
 | `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast Goal Interpreter model path. |
@@ -269,14 +269,12 @@ uncertainty, malformed output, and model failure all fail open.
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Goal Interpreter Ollama calls so the warmed routing model remains resident. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Agent startup lifecycle warms the Goal Interpreter LLM during startup so the first live turn does not pay cold model load time. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Goal Interpreter model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Goal Interpreter model, while the larger review model remains bounded and fail-safe. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for the optional post-interrupt compatibility review. Ordinary Fast interpretation never enters a second semantic reviewer. |
 | `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Goal Interpreter budget for one catalog snapshot; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Goal-Interpreter-side cache for the prompt catalog snapshot. The fast Goal Interpretation path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
 | `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
-| `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale fast-interpreter outputs. |
-| `AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, the embedded Goal Interpreter logs the full raw LLM JSON output after the default bounded raw-output summary. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, the embedded Goal Interpreter logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
@@ -284,7 +282,11 @@ uncertainty, malformed output, and model failure all fail open.
 
 Hard interrupt, stop, silence, and unusable-audio rules always run before model
 routing and cannot be disabled by environment configuration. Normal intent is
-not selected by phrase rules.
+not selected by phrase rules. Fast Goal Interpretation makes one primary semantic
+call and may make one mechanical DTO repair. A valid result below the confidence
+threshold delegates once to Deep Thinking from the authoritative admitted turn;
+semantic contradictions and a second malformed DTO fail closed rather than
+entering an online repair workflow.
 
 ## Goal association before segmentation
 
@@ -338,7 +340,7 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
-| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `2`; maximum validator-feedback revisions within the Deep Planner, allowing one safety correction and one subsequent semantic-coverage/contract correction. |
+| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `1`; maximum same-tier schema or validator-feedback revision inside Deep Planner. Continued invalidity fails closed. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
 | `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
 | `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |
@@ -385,8 +387,7 @@ canonical plan copy, and its fingerprint remain host-owned.
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
 | `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; explicit rollback-only direct-LLM/legacy CapabilityAgent compatibility gate. Every maintained operator mode sets `0`. Even when manually enabled, it cannot take authority for a route already inside a Goal-driven `apply` lane. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
-| `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast-to-Deep planning, response composition, and runtime adaptation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |

@@ -305,7 +305,7 @@ class ExperienceManagerTests(unittest.TestCase):
                         },
                         "proposals": [
                             {
-                                "id": "semantic_route_repair:ability:0",
+                                "id": "quick_intent:ability:0",
                                 "state": "missing_ability",
                                 "ability_id": "local.restaurant_recommendation",
                                 "reason": "No restaurant lookup capability is available.",

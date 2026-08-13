@@ -312,86 +312,6 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._recover_deterministic_only_decision",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "70559a57f3273c0863225d8525978d781c3b600cf19148b6225ee92c209199aa",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._recover_deterministic_only_decision",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "46ffdadeffcda1f5a71020a029d51e6c136274f92ece002f9eba0a3bb14a4ba8",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._recover_placeholder_capability_decision",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "a3e5c8db7a2aa6a6cdf39d62e52bdcb9d9c742c06e2bb65434989151635b4345",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._repair_semantic_route",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "9dac72040c73fb182ddc700537231e4a48acd877a29f0790ff48d7d22e5b47af",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_ambiguous_deep_thought",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "168767ab6cf868bd5a5deff287ccdb8c6daf2aef05fc3043abddeb61814ae2a2",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_generic_chat_affordance",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "4b100597b7dcb8bf19a328efc07461106a44eea2611cf9caf2970b0f487e0cbc",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter._review_inactive_addressedness",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -406,32 +326,16 @@
     },
     {
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._review_route_only_robot_action",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "589e1c97c60a15717928e041be17f8d5a12e41ac6cd1205750f366a1cbf7a510",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.route",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "521d46f4f94411506d1f1eb1fb6dadd59f6dceed3bd2e5d2bb01713d49bea617",
+      "body_sha256": "422c3b1bcf0487cb55a3361f9f98c844020ed268c15d5256b51ac84e9c49771e",
       "failure_signals": [
         "diagnostic",
-        "return",
-        "state_update"
+        "return"
       ]
     },
     {
@@ -442,20 +346,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "2b7829a8016d3954e91985778cd95b8d306c2803c572512eae2e1ecea95d1766",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.route",
-      "ordinal": 3,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "If typed contract repair fails, re-raise an LLM budget failure; otherwise log the repair failure and return the empty-input outcome or raise typed interpretation_unavailable without authorizing a semantic lane or effect.",
-      "review_status": "reviewed",
-      "body_sha256": "77f45f0c38cf48857e9a5d24bd5e4d0706a6cf603b3c911eac18e812cc71e69c",
+      "body_sha256": "50c043502e41c210cce506756a4b88c3eb531bf1f278c29fdca047ff3da9e4c2",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -2549,6 +2440,6 @@
       ]
     }
   ],
-  "reviewed_at": "2026-08-08",
+  "reviewed_at": "2026-08-13",
   "review_contract": "Classification and normalized source handler body reviewed; any handler body or failure-signal change requires re-audit."
 }

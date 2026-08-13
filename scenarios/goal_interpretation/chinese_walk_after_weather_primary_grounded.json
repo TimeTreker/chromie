@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "id": "chinese_walk_after_weather_intent_repaired",
+  "id": "chinese_walk_after_weather_primary_grounded",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; the Host does not repair a stale domain decision.",
+  "description": "The walking request remains grounded because the quick model authors the exact walking Capability directly even when weather context is present; no Host-side semantic correction is required.",
   "tags": [
     "voice-log",
     "goal-interpretation-contract",

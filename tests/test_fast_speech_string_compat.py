@@ -50,7 +50,7 @@ class FastSpeechStringCompatibilityTests(unittest.TestCase):
                     )
                 }
             },
-            stage="intent_review",
+            stage="quick_intent",
         )
 
         self.assertEqual(decision.route, "tool")

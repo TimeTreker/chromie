@@ -410,7 +410,6 @@ class VoiceAssistant:
                 "post-acquisition semantic fallback is forced to fail_closed"
             )
         self.cognitive_runtime_timeout_ms = cognition_settings.runtime_timeout_ms
-        self.cognitive_host_replan_budget = cognition_settings.host_replan_budget
         self.cognitive_evidence_enabled = evidence_settings.cognitive_enabled
         self.cognitive_evidence_include_text = (
             evidence_settings.cognitive_include_text
@@ -655,7 +654,6 @@ class VoiceAssistant:
             apply_lanes=self.cognitive_apply_lanes,
             fallback_policy=self.cognitive_fallback_policy,
             max_total_ms=self.cognitive_runtime_timeout_ms,
-            host_replan_budget=self.cognitive_host_replan_budget,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
             deep_planner_timeout_ms=self.deep_planner_timeout_ms,

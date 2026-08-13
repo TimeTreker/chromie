@@ -37,15 +37,15 @@
           "rationale": "Noisy or uncertain hearing should remain honest and clarifyable."
         },
         {
-          "key": "goal_interpretation/unclear_headset_fragment_semantic_clarification",
-          "rationale": "A low-confidence referential fragment must clarify instead of fabricating understanding."
+          "key": "goal_interpretation/unclear_headset_fragment_delegates_to_deep_thinking",
+          "rationale": "A low-confidence referential fragment must delegate once to Deep Thinking instead of fabricating understanding or entering a repair chain."
         },
         {
           "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
           "rationale": "A prior weather turn must not contaminate repeated physical-action interpretation."
         },
         {
-          "key": "goal_interpretation/chinese_walk_after_weather_intent_repaired",
+          "key": "goal_interpretation/chinese_walk_after_weather_primary_grounded",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         },
         {
@@ -104,7 +104,7 @@
           "rationale": "Mixed speech and body requests should keep each lane grounded."
         },
         {
-          "key": "goal_interpretation/walk_forward_stale_weather_route_repaired",
+          "key": "goal_interpretation/walk_forward_stale_weather_primary_grounded",
           "rationale": "An internally inconsistent stale weather route is semantically repaired to the exact walking affordance."
         },
         {
@@ -112,7 +112,7 @@
           "rationale": "The same walking request remains grounded across repeated turns after a weather query."
         },
         {
-          "key": "goal_interpretation/chinese_walk_after_weather_intent_repaired",
+          "key": "goal_interpretation/chinese_walk_after_weather_primary_grounded",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         },
         {
@@ -306,7 +306,7 @@
               "type": "locomotion.turn",
               "arg_ranges": {
                 "yaw_radps": {
-                  "min": 0.000001
+                  "min": 1e-06
                 }
               }
             }
@@ -431,7 +431,7 @@
           "rationale": "Before Goals and Plans exist, stale physical safety-prelude metadata is rejected and silence remains valid instead of implying motion authority."
         },
         {
-          "key": "cognitive_runtime/compound_walk_blink_runtime_replan",
+          "key": "cognitive_runtime/compound_walk_blink_deep_alternative",
           "rationale": "A confirmation-bound safe adjustment explains the changed plan in Chromie's natural voice and binds that exact speech to the Host confirmation instead of exposing capability IDs or arguments."
         }
       ],

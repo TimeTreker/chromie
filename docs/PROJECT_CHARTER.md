@@ -509,6 +509,22 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    stronger architecture cleanly and remove obsolete paths rather than preserving a
    known inferior design for convenience.
 
+33. **Cognitive reconsideration is bounded, source-based, and non-recursive.**
+   A model output that is mechanically malformed may receive at most one
+   same-stage DTO repair under the same authoritative meaning and schema. A
+   semantic doubt or contradiction must not be repaired by repeatedly rewriting
+   the previous model output: the stage either escalates once from the original
+   admitted meaning to its designated deeper cognition, follows an explicitly
+   bounded transaction such as Principle 30, or fails closed. Low-confidence Fast
+   Understanding may delegate once to Deep Thinking before Goal truth is
+   committed. Fast Planning may escalate once to Deep Planning; Deep Planning may
+   make at most one same-tier validator-feedback revision. Trusted Host validation
+   is terminal authority and cannot invoke another semantic planner after rejecting
+   the resulting plan. No later planner may reinterpret or repair already committed
+   Goal meaning. Failure evidence may be retained immutably for Reflection,
+   evaluation, and future improvement, but it has no authority to mutate the
+   current turn, authorize an effect, or create a repair-of-repair workflow.
+
 ### One personal voice; resources constrain coexistence
 
 Chromie has one personal Vocal domain. Ordinary speech, expressive speech,

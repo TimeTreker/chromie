@@ -76,8 +76,6 @@ goal_interpreter = OllamaGoalInterpreter(
     timeout_ms=settings.llm_timeout_ms,
     review_timeout_ms=settings.review_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
-    slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
-    generic_chat_review_enabled=settings.generic_chat_review_enabled,
     num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,
     keep_alive=settings.llm_keep_alive,
@@ -1363,7 +1361,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
                         )
                     elif (
                         llm_decision.confidence < settings.confidence_threshold
-                        and llm_decision.route not in {"chat", "deep_thought", "clarify"}
+                        and llm_decision.route not in {"deep_thought", "clarify"}
                     ):
                         decision = _deep_thought_from_low_confidence(request, llm_decision)
                     else:

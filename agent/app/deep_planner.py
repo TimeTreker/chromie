@@ -87,7 +87,7 @@ class DeepPlannerResolver:
         num_ctx: int = 8192,
         num_predict: int = 1024,
         max_capabilities: int = 96,
-        max_replans: int = 2,
+        max_replans: int = 1,
         min_goal_satisfaction: float = 0.75,
     ) -> None:
         self.ollama = ollama
@@ -96,7 +96,7 @@ class DeepPlannerResolver:
         self.num_ctx = max(4096, int(num_ctx))
         self.num_predict = max(256, int(num_predict))
         self.max_capabilities = max(1, min(256, int(max_capabilities)))
-        self.max_replans = max(0, min(2, int(max_replans)))
+        self.max_replans = max(0, min(1, int(max_replans)))
         self.min_goal_satisfaction = max(0.0, min(1.0, float(min_goal_satisfaction)))
 
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:

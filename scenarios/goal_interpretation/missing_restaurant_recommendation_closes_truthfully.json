@@ -3,11 +3,12 @@
   "id": "missing_restaurant_recommendation_closes_truthfully",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A request for nearby restaurant recommendations closes with a concise model-authored limitation when the catalog has no matching external-information ability.",
+  "description": "A request for nearby restaurant recommendations closes from the primary interpretation with a concise truthful limitation when the catalog has no matching external-information ability.",
   "tags": [
     "missing-ability",
     "external-information",
     "terminal-closure",
+    "primary-interpretation",
     "recommendation",
     "zh-CN"
   ],
@@ -41,15 +42,6 @@
       {
         "stage": "quick_intent",
         "decision": {
-          "route": "chat",
-          "intent": "respond_to_user",
-          "confidence": 0.95,
-          "language": "zh-CN"
-        }
-      },
-      {
-        "stage": "capability_grounding_review",
-        "decision": {
           "route": "clarify",
           "intent": "missing_or_unsupported_ability",
           "confidence": 1.0,
@@ -73,10 +65,9 @@
     "route": "clarify",
     "intent": "missing_or_unsupported_ability",
     "source": "llm",
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "quick_intent",
-      "capability_grounding_review"
+      "quick_intent"
     ],
     "fast_speech_present": false,
     "metadata_json_contains": [
@@ -87,6 +78,10 @@
     "task_types_forbid": [
       "task.use_tool",
       "task.execute_skill"
+    ],
+    "metadata_json_forbid": [
+      "capability_grounding_review",
+      "semantic_route_repair"
     ]
   }
 }

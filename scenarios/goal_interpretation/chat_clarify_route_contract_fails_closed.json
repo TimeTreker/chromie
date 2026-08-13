@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "chat_clarify_route_contract_fails_closed",
+  "suite": "goal_interpretation",
+  "level": "integration",
+  "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must fail closed after the primary interpretation instead of entering a semantic repair workflow.",
+  "tags": [
+    "goal-interpretation-contract",
+    "fail-closed",
+    "clarify",
+    "model-authority"
+  ],
+  "input": {
+    "text": "Make that one colder.",
+    "language": "en-US"
+  },
+  "stub": {
+    "interpretation_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 75,
+      "capabilities": []
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "chat",
+          "intent": "clarify",
+          "confidence": 0.95,
+          "language": "en-US"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "status": "interpretation_unavailable",
+    "failure_reason_contains": [
+      "goal_interpreter_semantic_contract_failed",
+      "route_name_intent_mismatch"
+    ],
+    "llm_calls": 1,
+    "llm_stages": [
+      "quick_intent"
+    ]
+  }
+}

@@ -85,8 +85,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
@@ -519,7 +517,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 "EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL"
             ),
             "Fast intent (Goal Interpreter)": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
-            "Goal Interpreter review": (
+            "Post-interrupt review (optional)": (
                 "EFFECTIVE_AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
             ),
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",

@@ -130,12 +130,11 @@ class _GoalInterpretationLlm:
 
 
 class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
-    """Run the real Goal Interpretation recovery pipeline with deterministic model output.
+    """Run the bounded Goal Interpretation transaction with scripted model output.
 
-    This is intentionally closer to a live Goal Interpretation turn than `_GoalInterpretationLlm`: the
-    quick decision, review, semantic repair, normalization, and validators all
-    run through `OllamaGoalInterpreter.route()`. Only the external model completion is
-    replaced by a file-backed script.
+    The primary interpretation, optional one DTO repair, normalization, and
+    deterministic validators run through ``OllamaGoalInterpreter.route()``.
+    Only the external model completion is replaced by a file-backed script.
     """
 
     def __init__(
@@ -149,7 +148,6 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
             timeout_ms=1000,
             review_timeout_ms=1000,
             confidence_threshold=0.55,
-            slow_review_recovery_enabled=True,
             num_predict=160,
         )
         self.script = [dict(item) for item in script]
@@ -584,7 +582,6 @@ class _CognitiveScenarioClient:
         self.stub = stub
         self.deep_plans = list(stub.get("deep_plans") or [])
         self.calls: list[str] = []
-        self.deep_contexts: list[dict[str, Any]] = []
 
     async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
         del args, kwargs
@@ -599,7 +596,6 @@ class _CognitiveScenarioClient:
     async def resolve_deep_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
         del args
         self.calls.append("deep_plan")
-        self.deep_contexts.append(dict(kwargs.get("context") or {}))
         if not self.deep_plans:
             raise AssertionError("cognitive scenario deep-plan script exhausted")
         return CanonicalPlan.model_validate(self.deep_plans.pop(0))
@@ -1883,7 +1879,6 @@ async def evaluate_cognitive_runtime_scenario(
             mode=mode,
             apply_lanes=apply_lanes,
             fallback_policy=str(stub.get("fallback_policy") or "legacy"),
-            host_replan_budget=int(stub.get("host_replan_budget", 1)),
         ),
     )
     decision_raw = stub.get("route_decision") or {
@@ -1961,10 +1956,6 @@ async def evaluate_cognitive_runtime_scenario(
         "speech_covers_goal_ids": speech_covers_goal_ids,
         "requires_confirmation": interaction.requires_confirmation if interaction else False,
         "calls": list(client.calls),
-        "runtime_replan_count": int(resolution.metadata.get("runtime_replan_count", 0)),
-        "deep_feedback_present": any(
-            "runtime_validator_feedback" in context for context in client.deep_contexts
-        ),
     }
     expect = scenario.expect
     errors: list[str] = []
@@ -2033,13 +2024,6 @@ async def evaluate_cognitive_runtime_scenario(
                 "confirmation_prompt is not one of the authoritative speech stages: "
                 f"{actual['confirmation_prompt']!r} not in {actual['speech_texts']!r}"
             )
-    if "runtime_replan_count" in expect and actual["runtime_replan_count"] != int(expect["runtime_replan_count"]):
-        errors.append(
-            f"runtime_replan_count={actual['runtime_replan_count']}, "
-            f"expected {int(expect['runtime_replan_count'])}"
-        )
-    if expect.get("deep_feedback_present") is True and not actual["deep_feedback_present"]:
-        errors.append("runtime validator feedback did not reach Deep Planner")
     if "calls" in expect and actual["calls"] != list(expect["calls"]):
         errors.append(f"calls={actual['calls']!r}, expected {list(expect['calls'])!r}")
     return {"ok": not errors, "errors": errors, "actual": actual}

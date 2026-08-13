@@ -21,7 +21,6 @@
       "robot_action",
       "tool"
     ],
-    "host_replan_budget": 0,
     "route_decision": {
       "route": "robot_action",
       "intent": "parallel_body_and_media_activity",

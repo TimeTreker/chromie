@@ -451,7 +451,7 @@ class Settings(BaseModel):
     )
     deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
     deep_planner_max_replans: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "2")), ge=0, le=2
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "1")), ge=0, le=1
     )
     response_composer_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()
@@ -577,14 +577,6 @@ class GoalInterpreterSettings(BaseModel):
     )
     post_interrupt_review_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    slow_review_recovery_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
-    generic_chat_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))

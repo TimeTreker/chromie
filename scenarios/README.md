@@ -131,27 +131,23 @@ contain deterministic expectations. Normal regression runs must not depend on
 an LLM to decide whether the robot behaved correctly.
 
 
-### Scripted Goal Interpretation recovery scenarios
+### Scripted bounded Goal Interpretation scenarios
 
 Goal Interpretation fixtures may use `stub.llm_script` instead of one final
-`stub.llm_decision`. The scenario runner then executes the real
-`OllamaGoalInterpreter.route()` normalization, review, semantic-repair, and validation
-pipeline while replacing only external model completions. Each scripted item
-may declare the expected model stage and a compact decision:
+`stub.llm_decision`. The scenario runner then executes the real bounded
+`OllamaGoalInterpreter.route()` normalization and validation transaction while
+replacing only external model completions. A script contains one primary stage
+and, only when that output is mechanically invalid, one DTO-repair stage:
 
 ```json
 {
   "llm_script": [
     {
       "stage": "quick_intent",
-      "decision": {
-        "route": "chat",
-        "intent": "clarify",
-        "confidence": 0.90
-      }
+      "content": "{not valid JSON"
     },
     {
-      "stage": "semantic_route_repair",
+      "stage": "quick_intent_contract_repair",
       "decision": {
         "route": "clarify",
         "intent": "ambiguous_reference",

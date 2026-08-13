@@ -102,14 +102,6 @@ class ComposeConfigurationTests(unittest.TestCase):
             "AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED: ${AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED:-0}",
             agent_block,
         )
-        self.assertIn(
-            "AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED: ${AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED:-1}",
-            agent_block,
-        )
-        self.assertIn(
-            "AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED: ${AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED:-1}",
-            agent_block,
-        )
 
     def test_agent_is_the_only_cognitive_service_and_owns_goal_interpretation(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
