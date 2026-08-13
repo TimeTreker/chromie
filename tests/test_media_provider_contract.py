@@ -202,21 +202,15 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
             json.dumps(capability.model_dump(mode="json"), sort_keys=True),
         )
 
-    def test_goal_contract_keeps_playback_activity_and_singing_speaking(self) -> None:
+    def test_goal_contract_keeps_playback_activity_and_singing_vocal(self) -> None:
         playback = GoalAssociationModelGoal(
             description="Play a song.",
-            responsibility_kind="executable_action",
-            execution_lane="activity",
             output_mode="media_playback",
-            provider_required=True,
             media_operation="play",
         )
         singing = GoalAssociationModelGoal(
             description="Sing a song a cappella.",
-            responsibility_kind="vocal_output",
-            execution_lane="vocal",
             output_mode="singing",
-            provider_required=True,
             media_operation="none",
         )
 
@@ -226,10 +220,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exact media_operation"):
             GoalAssociationModelGoal(
                 description="Play a song.",
-                responsibility_kind="executable_action",
-                execution_lane="activity",
                 output_mode="media_playback",
-                provider_required=True,
             )
 
     def test_goal_projection_retains_exact_media_operation_for_planners(self) -> None:

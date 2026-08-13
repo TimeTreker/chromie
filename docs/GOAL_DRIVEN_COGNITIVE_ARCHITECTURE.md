@@ -1203,10 +1203,20 @@ bounded Goal/dialogue state, and trusted evidence remain authoritative.
 The host owns all transport and persistence mechanics, including turn IDs,
 association IDs, goal IDs, versions, source text, default object/constraint
 containers, metadata, and construction of the canonical
-`GoalAssociationResolution`. Ignoring model-authored transport noise such as an
-extra `id` is not semantic interpretation; semantic descriptions and
-relationships still come only from the model and remain subject to schema and
-host validation.
+`GoalAssociationResolution`. Model-authored copies of those Host-owned Goal
+fields are rejected rather than ignored or merged into canonical state; the
+bounded model may revise one invalid schema result, but the Host never treats
+transport noise as semantic input.
+
+A new Goal has exactly one model-authored execution truth: `output_mode`.
+`responsibility_kind`, `execution_lane`, and `provider_required` are deterministic
+Host projections and therefore do not exist in the model-facing Goal schema.
+There is no reverse mapping from a legacy responsibility/lane tuple back into a
+mode and no default that silently turns an omitted mode into ordinary speech.
+After `output_mode` validates, the Host may materialize those projections in
+canonical Goal metadata for downstream Planner/runtime consumers. This preserves
+one source of semantic truth without forcing downstream stages to repeat the
+same derivation.
 
 Typed entity provenance is part of that validation. When the model declares a
 new directly named location binding without a supplied referent, its value must

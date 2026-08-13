@@ -455,6 +455,16 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    rejected audit permits one fresh model-owned resegmentation followed by one
    recheck; repeated incompleteness fails closed rather than committing partial
    canonical Goal truth.
+31. **One model-authored semantic fact must have one model-facing source of truth.**
+   When other execution fields are deterministic projections of one semantic
+   decision, they do not belong beside that decision as writable model inputs.
+   Goal Association therefore authors `output_mode` as the sole execution
+   discriminant; the Host derives responsibility kind, execution lane, and
+   provider requirement only after validation and may retain those projections in
+   canonical metadata for downstream use. Missing `output_mode` or model-authored
+   copies of those Host projections are schema defects, not invitations for
+   compatibility inference. Do not accept a reverse mapping that can silently
+   manufacture or downgrade semantic intent.
 
 ### One personal voice; resources constrain coexistence
 

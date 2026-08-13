@@ -202,14 +202,15 @@ recitation, singing, humming, nonverbal vocalization, body action, media
 playback, capability work, or other; `provider_required` says whether an
 exact registered Capability Provider beyond ordinary authored speech delivery
 must return completion evidence; and `media_operation` is one exact persistent
-playback operation for `media_playback` or `none` otherwise. The live
-model-facing decoder chooses `output_mode` plus `media_operation` only when
-media lifecycle semantics require it. The Host then deterministically
-materializes `responsibility_kind`, `execution_lane`, and `provider_required`
-from that semantic choice. This keeps system invariants out of model output and
-makes contradictory completion tuples unrepresentable at the live decoder
-boundary while retained legacy DTOs remain readable through bounded
-compatibility materialization.
+playback operation for `media_playback` or `none` otherwise. The live model-facing Goal schema has exactly one execution discriminant:
+`output_mode`, plus `media_operation` only when media lifecycle semantics require
+it. `responsibility_kind`, `execution_lane`, and `provider_required` are not model
+input fields. The Host exposes them only as deterministic projections of the
+validated mode when it materializes canonical Goal metadata. Missing
+`output_mode` and model-authored copies of those Host projections are schema
+violations; there is no reverse inference or legacy execution-tuple compatibility
+path. This keeps one semantic source of truth at the model boundary and makes
+contradictory completion tuples structurally unrepresentable.
 Mode-specific vocal output remains Vocal but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
 delivery of a capability result remains part of that capability-dependent Goal

@@ -25,70 +25,60 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             )
 
-    def test_singing_is_speaking_and_requires_mode_specific_provider(self):
+    def test_singing_derives_vocal_provider_contract(self):
         goal = GoalAssociationModelGoal.model_validate(
             {
                 "description": "边走边唱歌",
-                "responsibility_kind": "vocal_output",
-                "execution_lane": "vocal",
                 "output_mode": "singing",
-                "provider_required": True,
                 "bindings": [],
             }
         )
 
+        self.assertEqual(goal.responsibility_kind, "vocal_output")
         self.assertEqual(goal.execution_lane, "vocal")
-        self.assertEqual(goal.output_mode, "singing")
         self.assertTrue(goal.provider_required)
 
-    def test_legacy_direct_response_maps_to_ordinary_speech_only(self):
-        goal = GoalAssociationModelGoal.model_validate(
-            {
-                "description": "Say hello",
-                "responsibility_kind": "vocal_output",
-                "bindings": [],
-            }
-        )
-
-        self.assertEqual(goal.execution_lane, "vocal")
-        self.assertEqual(goal.output_mode, "speech")
-        self.assertFalse(goal.provider_required)
-
-    def test_generic_speech_delivery_cannot_claim_singing(self):
-        with self.assertRaisesRegex(ValueError, "mode-specific vocal output"):
+    def test_output_mode_is_required(self):
+        with self.assertRaisesRegex(ValueError, "output_mode"):
             GoalAssociationModelGoal.model_validate(
                 {
-                    "description": "Sing a song",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "output_mode": "singing",
-                    "provider_required": False,
+                    "description": "Say hello",
                     "bindings": [],
                 }
             )
 
-    def test_vocal_mode_cannot_be_owned_by_activity(self):
-        with self.assertRaisesRegex(ValueError, "vocal_output requires"):
+    def test_host_execution_projection_fields_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Extra inputs are not permitted"):
             GoalAssociationModelGoal.model_validate(
                 {
-                    "description": "Hum a tune",
+                    "description": "Sing a song",
+                    "output_mode": "singing",
                     "responsibility_kind": "vocal_output",
-                    "execution_lane": "activity",
-                    "output_mode": "humming",
+                    "execution_lane": "vocal",
                     "provider_required": True,
                     "bindings": [],
                 }
             )
+
+    def test_output_mode_derives_ordinary_speech_contract(self):
+        goal = GoalAssociationModelGoal.model_validate(
+            {
+                "description": "Say hello",
+                "output_mode": "speech",
+                "bindings": [],
+            }
+        )
+
+        self.assertEqual(goal.responsibility_kind, "vocal_output")
+        self.assertEqual(goal.execution_lane, "vocal")
+        self.assertFalse(goal.provider_required)
 
     def test_vocal_goal_rejects_resource_responsibility(self):
         with self.assertRaisesRegex(ValueError, "not resource acquisition"):
             GoalAssociationModelGoal.model_validate(
                 {
                     "description": "Sing a song",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "singing",
-                    "provider_required": True,
                     "bindings": [],
                     "resource_responsibility": {
                         "resource_kind": "information",
@@ -104,10 +94,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         goal = GoalAssociationModelGoal.model_validate(
             {
                 "description": "Bring the requester a bottle of water",
-                "responsibility_kind": "executable_action",
-                "execution_lane": "activity",
                 "output_mode": "body_action",
-                "provider_required": True,
                 "bindings": [],
                 "resource_responsibility": {
                     "resource_kind": "physical_object",
@@ -325,10 +312,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Pick up the red mug and hand it to me.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "object_color",
@@ -360,10 +344,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "description": (
                         "Acquire and hand me the red mug, then report completion."
                     ),
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "object_color",
@@ -387,10 +368,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Tell me when the handoff is finished.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "bindings": [],
                 },
             ],
@@ -471,10 +449,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Put the item over there.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "media_operation": "none",
                     "bindings": [],
                     "resource_responsibility": {
@@ -699,10 +674,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Recommend a noodle restaurant open now.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 }
@@ -718,10 +690,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Find a noodle restaurant that is open now.",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
                     "output_mode": "capability_work",
-                    "provider_required": True,
                     "media_operation": "none",
                     "bindings": [],
                     "resource_responsibility": {
@@ -768,10 +737,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Recommend a noodle restaurant open now.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 }
@@ -787,10 +753,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Find a noodle restaurant that is open now.",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
                     "output_mode": "capability_work",
-                    "provider_required": True,
                     "media_operation": "none",
                     "bindings": [],
                     "resource_responsibility": {
@@ -862,26 +825,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "往前走15秒。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "边走边唱歌。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "同时眨眼睛。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -892,26 +846,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "往前走15秒。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "边走边唱歌。",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "singing",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "同时眨眼睛。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -1116,132 +1061,52 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertIn("responsibility-coverage audit JSON", resegmentation_prompt)
         self.assertIn("No previous Goal DTO is supplied", resegmentation_prompt)
 
-    def test_invalid_typed_compound_uses_fresh_model_owned_resegmentation(self):
+    def test_legacy_host_execution_fields_require_schema_repair(self):
         invalid = {
             "decision": "create_goals",
             "new_goals": [
                 {
-                    "description": "向前走15秒。",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
-                    "output_mode": "body_action",
-                    "provider_required": True,
-                    "bindings": [
-                        {
-                            "name": "duration",
-                            "entity_type": "time_duration",
-                            "value": "15秒",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "边走边唱歌。",
-                    "responsibility_kind": "capability_dependent",
+                    "description": "Say hello.",
+                    "output_mode": "speech",
+                    "responsibility_kind": "vocal_output",
                     "execution_lane": "vocal",
-                    "output_mode": "singing",
-                    "provider_required": True,
+                    "provider_required": False,
                     "bindings": [],
-                },
-                {
-                    "description": "同时眨眼睛。",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
-                    "output_mode": "body_action",
-                    "provider_required": True,
-                    "bindings": [],
-                },
+                }
             ],
             "confidence": 1.0,
         }
-        resegmented = {
+        repaired = {
             "decision": "create_goals",
             "new_goals": [
                 {
-                    "description": "向前走15秒。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
-                    "output_mode": "body_action",
-                    "provider_required": True,
-                    "bindings": [
-                        {
-                            "name": "duration",
-                            "entity_type": "time_duration",
-                            "value": "15秒",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "边走边唱歌。",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "output_mode": "singing",
-                    "provider_required": True,
+                    "description": "Say hello.",
+                    "output_mode": "speech",
                     "bindings": [],
-                },
-                {
-                    "description": "同时眨眼睛。",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
-                    "output_mode": "body_action",
-                    "provider_required": True,
-                    "bindings": [],
-                },
+                }
             ],
             "confidence": 1.0,
         }
-        coverage = responsibility_coverage(
-            responsibility_item("往前走个15秒", 0),
-            responsibility_item("边走边唱歌", 1),
-            responsibility_item("眨眼睛", 2),
-        )
-        ollama = ScriptedOllama(
-            [invalid, resegmented, coverage, binding_audit([], [], [])]
-        )
+        ollama = ScriptedOllama([invalid, repaired])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
-                request(
-                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
-                    language="zh-CN",
-                    route="robot_action",
-                    intent="capability:soridormi.walk_forward",
-                )
+                request("Say hello.", language="en-US")
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(ollama.prompts), 2)
         repair_prompt, repair_kwargs = ollama.prompts[1]
-        self.assertEqual(
-            repair_kwargs["prompt_family"],
-            "goal_association.typed_execution_resegmentation",
-        )
-        self.assertIn("No previous Goal DTO is supplied", repair_prompt)
-        self.assertIn("invalid_typed_execution_contract", repair_prompt)
-        self.assertIn("output_mode is the completion discriminant", repair_prompt)
-        self.assertNotIn("The only valid typed tuples are", repair_prompt)
-        self.assertNotIn('"responsibility_kind":"capability_dependent"', repair_prompt)
+        self.assertEqual(repair_kwargs["prompt_family"], "goal_association.repair")
+        self.assertIn("Extra inputs are not permitted", repair_prompt)
         self.assertEqual(
             result.metadata["contract_repair"]["strategy"],
-            "model_owned_fresh_typed_resegmentation",
+            "schema_constrained_model_revision",
         )
-        self.assertEqual(
-            [
-                (
-                    goal.metadata["responsibility_kind"],
-                    goal.metadata["execution_lane"],
-                    goal.metadata["output_mode"],
-                    goal.metadata["provider_required"],
-                )
-                for goal in result.new_goals
-            ],
-            [
-                ("executable_action", "activity", "body_action", True),
-                ("vocal_output", "vocal", "singing", True),
-                ("executable_action", "activity", "body_action", True),
-            ],
-        )
+        self.assertEqual(result.new_goals[0].metadata["output_mode"], "speech")
+        self.assertEqual(result.new_goals[0].metadata["execution_lane"], "vocal")
+        self.assertFalse(result.new_goals[0].metadata["provider_required"])
+
 
     def test_empty_optional_referent_introduction_does_not_discard_weather_goal(self):
         ollama = FakeOllama(
@@ -1250,7 +1115,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "Check Chongqing weather tomorrow.",
-                        "responsibility_kind": "capability_dependent",
+                        "output_mode": "capability_work",
                         "bindings": [
                             {
                                 "name": "location",
@@ -1327,7 +1192,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         "description": (
                             "Recommend interesting places near the user."
                         ),
-                        "responsibility_kind": "capability_dependent",
+                        "output_mode": "capability_work",
                         "bindings": [],
                     }
                 ],
@@ -1524,7 +1389,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Check whether it is raining in Xiang County.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -1542,7 +1407,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Check whether it is raining in 河南省内乡县.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -1588,7 +1453,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "查询今天内乡是否下雨。",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -1608,7 +1473,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "查询今天内乡是否下雨。",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -1664,7 +1529,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Look up today's weather.",
-                            "responsibility_kind": "capability_dependent",
+                            "output_mode": "capability_work",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -1676,7 +1541,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                         },
                         {
                             "description": "Say the weather naturally.",
-                            "responsibility_kind": "vocal_output",
+                            "output_mode": "speech",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -1694,7 +1559,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Look up and answer with today's weather.",
-                            "responsibility_kind": "capability_dependent",
+                            "output_mode": "capability_work",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -1736,19 +1601,13 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Determine why the Moon shines.",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
                     "output_mode": "capability_work",
-                    "provider_required": True,
                     "media_operation": "none",
                     "bindings": [],
                 },
                 {
                     "description": "Remind the user to go to bed early tonight.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 },
@@ -1760,19 +1619,13 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Explain that the Moon reflects sunlight.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 },
                 {
                     "description": "Remind the user to go to bed early tonight.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 },
@@ -1808,10 +1661,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Look up whether rain in Chongqing requires an umbrella.",
-                    "responsibility_kind": "capability_dependent",
-                    "execution_lane": "activity",
                     "output_mode": "capability_work",
-                    "provider_required": True,
                     "media_operation": "none",
                     "bindings": [
                         {
@@ -1824,10 +1674,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Answer whether the user needs an umbrella.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 },
@@ -1840,10 +1687,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Answer whether the prior rain report means an umbrella is useful.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                 }
@@ -1901,12 +1745,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "跑出50米并帮用户拿一杯水，然后返回。",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [],
                 },
                 {
                     "description": "回应用户的请求。",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "speech",
                     "bindings": [],
                 },
             ],
@@ -1917,7 +1761,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "往前移动50米。",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [
                         {
                             "name": "distance",
@@ -1929,7 +1773,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "拿一杯水并带回给用户。",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [
                         {
                             "name": "resource",
@@ -1986,7 +1830,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Nod twice.",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [
                         {
                             "name": "count",
@@ -1998,7 +1842,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Acknowledge that no more weather details will be given.",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "speech",
                     "bindings": [],
                 },
             ],
@@ -2009,7 +1853,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Nod twice without giving more weather details.",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [
                         {
                             "name": "count",
@@ -2126,7 +1970,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Blink twice.",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [
                         {
                             "name": "count",
@@ -2138,7 +1982,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Tell a short joke.",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "speech",
                     "bindings": [],
                 },
             ],
@@ -2190,7 +2034,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Look up today's weather in Neixiang County.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -2202,7 +2046,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Sing a short song.",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "singing",
                     "bindings": [],
                 },
             ],
@@ -2231,7 +2075,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             responsibility_item("Check today's weather in Neixiang County", 0),
             responsibility_item("sing a short song", 1),
         )
-        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
+        ollama = ScriptedOllama([mixed, mixed, coverage])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
@@ -2242,15 +2086,16 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 4)
+        self.assertEqual(len(ollama.prompts), 3)
         self.assertEqual(
             [goal.metadata["responsibility_kind"] for goal in result.new_goals],
             ["capability_dependent", "vocal_output"],
         )
+        self.assertEqual(result.new_goals[1].metadata["output_mode"], "singing")
         self.assertIn("such as a song, joke", ollama.prompts[1][0])
         self.assertEqual(
             ollama.prompts[2][1]["prompt_family"],
-            "goal_association.independence_adjudication",
+            "goal_association.responsibility_coverage",
         )
 
     def test_capability_result_recommendation_is_owned_by_capability_goal(self):
@@ -2259,7 +2104,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Check tomorrow's weather in Shanghai.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -2277,7 +2122,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Recommend whether to take an umbrella.",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "speech",
                     "bindings": [],
                 },
             ],
@@ -2382,12 +2227,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Turn in place.",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [],
                 },
                 {
                     "description": "Look at the user for 2 seconds.",
-                    "responsibility_kind": "executable_action",
+                    "output_mode": "body_action",
                     "bindings": [],
                 },
             ],
@@ -2445,12 +2290,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Look up today's weather.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [],
                 },
                 {
                     "description": "Say the result.",
-                    "responsibility_kind": "vocal_output",
+                    "output_mode": "speech",
                     "bindings": [],
                 },
             ],
@@ -2499,7 +2344,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Check today's weather in Neixiang.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {"name": "location", "entity_type": "place", "value": "内乡", "confidence": 1.0},
                         {"name": "date", "entity_type": "date", "value": "today", "confidence": 1.0},
@@ -2517,7 +2362,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Check today's weather in Neixiang.",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "supersedes_goal_ids": ["goal-weather"],
                     "bindings": [
                         {
@@ -2641,6 +2486,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Walk while blinking and singing.",
+                            "output_mode": "body_action",
                             "bindings": [
                                 {
                                     "name": "actions",
@@ -2650,7 +2496,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                                 }
                             ],
                         },
-                        {"description": "Sing a song.", "bindings": []},
+                        {"description": "Sing a song.", "output_mode": "singing", "bindings": []},
                     ],
                     "confidence": 1.0,
                 },
@@ -2659,17 +2505,17 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "Walk forward for 15 seconds.",
-                            "responsibility_kind": "executable_action",
+                            "output_mode": "body_action",
                             "bindings": [],
                         },
                         {
                             "description": "Blink eyes.",
-                            "responsibility_kind": "executable_action",
+                            "output_mode": "body_action",
                             "bindings": [],
                         },
                         {
                             "description": "Sing a song.",
-                            "responsibility_kind": "vocal_output",
+                            "output_mode": "singing",
                             "bindings": [],
                         },
                     ],
@@ -2742,10 +2588,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "description": (
                         "Walk forward for 15 seconds while singing and blinking."
                     ),
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "duration",
@@ -2757,18 +2600,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Sing while walking forward.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "Blink eyes while walking forward.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -2779,10 +2616,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Walk forward for 15 seconds.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [
                         {
                             "name": "duration",
@@ -2794,18 +2628,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "description": "Sing while walking forward.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "singing",
-                    "provider_required": True,
                     "bindings": [],
                 },
                 {
                     "description": "Blink eyes while walking forward.",
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
                     "output_mode": "body_action",
-                    "provider_required": True,
                     "bindings": [],
                 },
             ],
@@ -2870,58 +2698,80 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["authority"], "advisory")
 
     def test_can_update_existing_goal_and_create_independent_new_goal(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.91, "updated_description": "Get iced coffee"}], "new_goals": [{"description": "Report the current weather.", "source_text": "顺便查一下天气。", "beneficiary": "user", "constraints": {}, "success_criteria": ["Current weather is reported."], "metadata": {}}], "confidence": 0.91})
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("咖啡要冰的，顺便查一下天气。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
+        ollama = FakeOllama(
+            {
+                "associations": [
+                    {
+                        "relationship": "modify",
+                        "target_goal_ids": ["goal-coffee"],
+                        "confidence": 0.91,
+                        "updated_description": "Get iced coffee",
+                    }
+                ],
+                "new_goals": [
+                    {
+                        "description": "Report the current weather.",
+                        "output_mode": "capability_work",
+                    }
+                ],
+                "confidence": 0.91,
+            }
+        )
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "咖啡要冰的，顺便查一下天气。",
+                    active_goals=[active_goal("goal-coffee", "Get coffee")],
+                )
+            )
+        )
         self.assertEqual(len(result.associations), 1)
         self.assertEqual(len(result.new_goals), 1)
         self.assertEqual(result.new_goals[0].description, "Report the current weather.")
         self.assertTrue(result.new_goals[0].goal_id.startswith("goal_"))
 
-    def test_model_transport_noise_is_ignored_and_host_owns_canonical_fields(self):
-        ollama = FakeOllama({
+    def test_model_goal_transport_noise_is_rejected_and_host_owns_canonical_fields(self):
+        noisy = {
             "new_goals": [
                 {
                     "id": "goal_1",
-                    "constraints": [],
-                    "source_text": "Look at me for two seconds",
-                    "success_criteria": "User is observed",
-                    "description": "Look at the user for two seconds",
-                },
-                {
-                    "id": "goal_2",
-                    "constraints": [],
-                    "description": "Blink twice",
-                },
+                    "source_text": "model-authored source",
+                    "constraints": {"invented": True},
+                    "success_criteria": ["model-authored criterion"],
+                    "description": "Respond to the greeting",
+                    "output_mode": "speech",
+                }
             ],
             "confidence": 0.94,
-        })
+        }
+        repaired = {
+            "new_goals": [
+                {
+                    "description": "Respond to the greeting",
+                    "output_mode": "speech",
+                }
+            ],
+            "confidence": 0.94,
+        }
+        ollama = ScriptedOllama([noisy, repaired])
 
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
-                request("Look at me for two seconds, then blink twice.", language="en-US")
+                request("Hello.", language="en-US")
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Look at the user for two seconds", "Blink twice"],
-        )
-        self.assertTrue(all(goal.goal_id.startswith("goal_") for goal in result.new_goals))
-        self.assertNotIn("goal_1", [goal.goal_id for goal in result.new_goals])
-        self.assertTrue(all(goal.constraints == {} for goal in result.new_goals))
-        self.assertTrue(
-            all(
-                goal.source_text == "Look at me for two seconds, then blink twice."
-                for goal in result.new_goals
-            )
-        )
-        self.assertEqual(
-            [goal.success_criteria for goal in result.new_goals],
-            [["Look at the user for two seconds"], ["Blink twice"]],
-        )
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(ollama.prompts[1][1]["prompt_family"], "goal_association.repair")
+        self.assertEqual([goal.description for goal in result.new_goals], ["Respond to the greeting"])
+        self.assertTrue(result.new_goals[0].goal_id.startswith("goal_"))
+        self.assertNotEqual(result.new_goals[0].goal_id, "goal_1")
+        self.assertEqual(result.new_goals[0].source_text, "Hello.")
+        self.assertEqual(result.new_goals[0].constraints, {})
+        self.assertEqual(result.new_goals[0].success_criteria, ["Respond to the greeting"])
         self.assertEqual(result.metadata["model_contract"], "GoalSegmentationModelOutput")
         self.assertTrue(result.metadata["host_generated_identifiers"])
+
 
     def test_missing_minimal_description_uses_one_model_repair(self):
         ollama = ScriptedOllama([
@@ -2934,11 +2784,16 @@ class GoalAssociationResolverTests(unittest.TestCase):
             },
             {
                 "new_goals": [
-                    {"description": "Walk forward for one second"},
-                    {"description": "Blink twice"},
+                    {"description": "Walk forward for one second", "output_mode": "body_action"},
+                    {"description": "Blink twice", "output_mode": "body_action"},
                 ],
                 "confidence": 0.9,
             },
+            responsibility_coverage(
+                responsibility_item("Walk forward for one second", 0),
+                responsibility_item("Blink twice", 1),
+            ),
+            binding_audit([], []),
         ])
 
         result = asyncio.run(
@@ -2947,7 +2802,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertEqual(
             [goal.description for goal in result.new_goals],
             ["Walk forward for one second", "Blink twice"],
@@ -2967,6 +2822,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "查询今晚重庆天气并判断是否炎热。",
+                        "output_mode": "capability_work",
                         "bindings": [
                             {
                                 "name": "location",
@@ -3031,6 +2887,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "查询今天内乡是否下雨。",
+                            "output_mode": "capability_work",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -3061,6 +2918,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                     "new_goals": [
                         {
                             "description": "查询今天内乡是否下雨。",
+                            "output_mode": "capability_work",
                             "bindings": [
                                 {
                                     "name": "location",
@@ -3124,6 +2982,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "确认用户纠正的地点是内乡。",
+                        "output_mode": "speech",
                         "bindings": [
                             {
                                 "name": "location",
@@ -3199,7 +3058,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "查询用户纠正后的内乡天气。",
-                    "responsibility_kind": "capability_dependent",
+                    "output_mode": "capability_work",
                     "bindings": [
                         {
                             "name": "location",
@@ -3294,6 +3153,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "查询今天内乡是否下雨。",
+                        "output_mode": "capability_work",
                         "bindings": [
                             {
                                 "name": "location",
@@ -3422,7 +3282,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "description": "回应用户认为26度有点冷并准备赶紧离开的反应。",
-                        "responsibility_kind": "vocal_output",
+                        "output_mode": "speech",
                         "bindings": [],
                     }
                 ],
@@ -3700,10 +3560,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             "new_goals": [
                 {
                     "description": "Answer the user's identity question.",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                     "media_operation": "none",
                     "bindings": [],
                     "progress_candidate_ids": ["progress-native-answer"],
@@ -3942,6 +3799,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         ollama = FakeOllama({
             "new_goals": [{
                 "description": "Blink twice",
+                "output_mode": "body_action",
                 "source_text": "Blink twice",
                 "constraints": {},
                 "success_criteria": ["Blink twice"],
@@ -3996,7 +3854,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 },
                 {
                     "new_goals": [
-                        {"description": "Respond naturally to the user's greeting"}
+                        {"description": "Respond naturally to the user's greeting", "output_mode": "speech"}
                     ],
                     "clarification": "",
                     "confidence": 0.98,
@@ -4036,13 +3894,18 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 invalid_live_output,
                 {
                     "new_goals": [
-                        {"description": "Look at the user for two seconds"},
-                        {"description": "Blink twice"},
+                        {"description": "Look at the user for two seconds", "output_mode": "body_action"},
+                        {"description": "Blink twice", "output_mode": "body_action"},
                     ],
                     "clarification": "",
                     "confidence": 0.96,
                     "reason_summary": "Two independent requested actions.",
                 },
+                responsibility_coverage(
+                    responsibility_item("Look at me for two seconds", 0),
+                    responsibility_item("blink twice", 1),
+                ),
+                binding_audit([], []),
             ]
         )
 
@@ -4055,7 +3918,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 4)
         self.assertTrue(result.metadata["contract_repair"]["succeeded"])
         self.assertEqual(result.associations, [])
         self.assertEqual(
@@ -4120,7 +3983,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             {
                 "decision": "create_goals",
                 "new_goals": [
-                    {"description": "Check today's weather in Chongqing"}
+                    {"description": "Check today's weather in Chongqing", "output_mode": "capability_work"}
                 ],
                 "clarification": (
                     "The request is already explicit; this explanatory text belongs "

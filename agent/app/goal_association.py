@@ -8,7 +8,6 @@ import logging
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
-from pydantic_core import PydanticCustomError
 
 from .clients.ollama_client import (
     LayeredPrompt,
@@ -115,17 +114,6 @@ GoalMediaOperation = Literal[
     "volume",
     "status",
 ]
-_VOCAL_OUTPUT_MODES = frozenset(
-    {
-        "speech",
-        "expressive_speech",
-        "recitation",
-        "singing",
-        "humming",
-        "nonverbal_vocalization",
-    }
-)
-_MODE_SPECIFIC_VOCAL_OUTPUTS = _VOCAL_OUTPUT_MODES - {"speech"}
 _OUTPUT_MODE_EXECUTION_CONTRACT: dict[
     GoalOutputMode,
     tuple[GoalResponsibilityKind, GoalExecutionLane, bool],
@@ -150,7 +138,6 @@ _FRESH_RESEGMENTATION_TRIGGERS = frozenset(
         "multi_embodied_responsibility_review",
         "recommendation_route_spoken_responsibility_review",
         "tool_route_spoken_responsibility_review",
-        "invalid_typed_execution_contract",
         "resource_result_delivery_split_review",
         "responsibility_coverage_rejected",
     }
@@ -179,9 +166,9 @@ _EXECUTION_CONTRACT_PROMPT = (
     "Classify each Goal by the semantic work that must actually complete the "
     "human outcome, not by the channel used later to report that outcome. In the "
     "model-facing Goal JSON, output_mode is the completion discriminant; the Host "
-    "deterministically derives responsibility_kind, execution_lane, and "
-    "provider_required from that choice, so do not emit or duplicate those "
-    "Host-owned invariants. Use capability_work only when completion depends on "
+    "deterministically derives responsibility kind, execution lane, and "
+    "provider requirement from that choice. Those Host-owned projections are not "
+    "fields in the model schema. Use capability_work only when completion depends on "
     "fresh external, private, or runtime evidence from a registered non-vocal "
     "Capability. Stable general knowledge, reasoning, creative content, and an "
     "immediate conversational reminder that Chromie can author without fresh "
@@ -196,10 +183,6 @@ _EXECUTION_CONTRACT_PROMPT = (
     "while completing another requested outcome is a constraint on that outcome, "
     "not an independently satisfiable spoken Goal."
 )
-
-
-def _execution_contract_error(message: str) -> PydanticCustomError:
-    return PydanticCustomError("goal_execution_contract", message)
 
 
 GoalAssociationModelRelationship = Literal[
@@ -470,41 +453,20 @@ class GoalAssociationModelResourceResponsibility(BaseModel):
 
 
 class GoalAssociationModelGoal(BaseModel):
-    """Minimal model-facing semantic goal. IDs and persistence fields are host-owned."""
+    """Minimal model-facing semantic Goal; ``output_mode`` is the sole execution truth."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     description: str = Field(min_length=1)
-    responsibility_kind: GoalResponsibilityKind = Field(
-        default="other",
-        description=(
-            "Host-materialized responsibility class derived from output_mode. "
-            "Retained on the validated DTO as a Host-owned projection; it is "
-            "not a model-facing decision."
-        ),
-    )
-    execution_lane: GoalExecutionLane | None = Field(
-        default=None,
-        description=(
-            "Host-materialized execution lane derived from output_mode; not a "
-            "model-facing decision."
-        ),
-    )
-    output_mode: GoalOutputMode | None = Field(
-        default=None,
+    output_mode: GoalOutputMode = Field(
         description=(
             "Semantic work that completes this Goal, not the later channel used "
             "to deliver its result. Choose capability_work when fresh external, "
             "private, or runtime evidence is required; choose speech for directly "
             "authored ordinary conversation; use exact embodied, media, or vocal "
-            "modes when those effects are the requested outcome."
-        ),
-    )
-    provider_required: bool | None = Field(
-        default=None,
-        description=(
-            "Host-materialized provider-evidence requirement derived from "
-            "output_mode; not a model-facing decision."
+            "modes when those effects are the requested outcome. This is the sole "
+            "model-authored execution discriminant; the Host derives responsibility "
+            "kind, execution lane, and provider requirement from it."
         ),
     )
     media_operation: GoalMediaOperation = Field(
@@ -522,6 +484,18 @@ class GoalAssociationModelGoal(BaseModel):
     related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
+
+    @property
+    def responsibility_kind(self) -> GoalResponsibilityKind:
+        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][0]
+
+    @property
+    def execution_lane(self) -> GoalExecutionLane:
+        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][1]
+
+    @property
+    def provider_required(self) -> bool:
+        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][2]
 
     @field_validator("description", mode="before")
     @classmethod
@@ -548,113 +522,14 @@ class GoalAssociationModelGoal(BaseModel):
             if (normalized := " ".join(str(item or "").strip().split()))
         ))
 
-    @model_validator(mode="before")
-    @classmethod
-    def materialize_execution_contract(cls, value: Any) -> Any:
-        """Derive Host-owned execution invariants from one semantic output mode.
-
-        Live model-facing schemas expose ``output_mode`` but not the redundant
-        responsibility/lane/provider fields. The Host derives those projections
-        deterministically. Bounded native callers may omit the redundant mode when
-        the new responsibility kind already determines it; no old responsibility
-        or lane vocabulary is accepted.
-        """
-
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        mode = normalized.get("output_mode")
-        if mode is None:
-            responsibility = str(normalized.get("responsibility_kind") or "other")
-            mode = {
-                "vocal_output": "speech",
-                "executable_action": "body_action",
-                "capability_dependent": "capability_work",
-                "other": "other",
-            }.get(responsibility, "other")
-            normalized["output_mode"] = mode
-        contract = _OUTPUT_MODE_EXECUTION_CONTRACT.get(str(mode))
-        if contract is not None:
-            responsibility, lane, provider_required = contract
-            normalized.setdefault("responsibility_kind", responsibility)
-            if normalized.get("execution_lane") is None:
-                normalized["execution_lane"] = lane
-            if normalized.get("provider_required") is None:
-                normalized["provider_required"] = provider_required
-        if normalized.get("media_operation") is None:
-            normalized["media_operation"] = "none"
-        return normalized
-
     @model_validator(mode="after")
-    def validate_execution_contract(self) -> "GoalAssociationModelGoal":
-        lane = self.execution_lane
-        mode = self.output_mode
-        provider_required = bool(self.provider_required)
-
-        if self.responsibility_kind == "vocal_output":
-            if lane != "vocal" or mode not in _VOCAL_OUTPUT_MODES:
-                raise _execution_contract_error(
-                    "vocal_output requires execution_lane=vocal and a vocal output_mode"
-                )
-        elif self.responsibility_kind == "executable_action":
-            if lane != "activity" or mode not in {"body_action", "media_playback"}:
-                raise _execution_contract_error(
-                    "executable_action requires activity lane and body_action or media_playback"
-                )
-            if not provider_required:
-                raise _execution_contract_error(
-                    "executable_action requires provider_required=true"
-                )
-        elif self.responsibility_kind == "capability_dependent":
-            if lane != "activity" or mode != "capability_work":
-                raise _execution_contract_error(
-                    "capability_dependent requires activity lane and capability_work"
-                )
-            if not provider_required:
-                raise _execution_contract_error(
-                    "capability_dependent requires provider_required=true"
-                )
-        else:
-            if lane != "none" or mode != "other" or provider_required:
-                raise _execution_contract_error(
-                    "other responsibility requires execution_lane=none, output_mode=other, "
-                    "and provider_required=false"
-                )
-
-        if mode in _VOCAL_OUTPUT_MODES and lane != "vocal":
-            raise _execution_contract_error(
-                "vocal output_mode requires execution_lane=vocal"
-            )
-        if mode in {"body_action", "media_playback", "capability_work"} and lane != "activity":
-            raise _execution_contract_error(
-                "activity output_mode requires execution_lane=activity"
-            )
-        if mode == "other" and lane != "none":
-            raise _execution_contract_error(
-                "output_mode=other requires execution_lane=none"
-            )
-        if mode in _MODE_SPECIFIC_VOCAL_OUTPUTS and not provider_required:
-            raise _execution_contract_error(
-                "mode-specific vocal output requires provider_required=true; ordinary "
-                "speech delivery is not evidence for that mode"
-            )
-        if mode == "speech" and provider_required:
-            raise _execution_contract_error(
-                "ordinary speech uses Chromie's maintained Vocal speech-delivery path and "
-                "must set provider_required=false"
-            )
-        if mode == "media_playback" and self.media_operation == "none":
-            raise _execution_contract_error(
-                "media_playback requires one exact media_operation"
-            )
-        if mode != "media_playback" and self.media_operation != "none":
-            raise _execution_contract_error(
-                "media_operation is valid only for output_mode=media_playback"
-            )
-        if self.resource_responsibility is not None and lane == "vocal":
-            raise _execution_contract_error(
-                "a normal vocal performance is not resource acquisition or delivery"
-            )
+    def validate_mode_specific_fields(self) -> "GoalAssociationModelGoal":
+        if self.output_mode == "media_playback" and self.media_operation == "none":
+            raise ValueError("media_playback requires one exact media_operation")
+        if self.output_mode != "media_playback" and self.media_operation != "none":
+            raise ValueError("media_operation is valid only for output_mode=media_playback")
+        if self.resource_responsibility is not None and self.execution_lane == "vocal":
+            raise ValueError("a normal vocal performance is not resource acquisition or delivery")
         return self
 
 
@@ -1134,21 +1009,14 @@ class GoalAssociationResolver:
                 repair_attempted = True
                 contract_repair_attempt_count = 1
                 initial_validation_error = self._validation_error_json(exc)
-                fresh_typed_resegmentation = self._is_execution_contract_validation_error(
-                    exc
-                )
                 fresh_semantic_trigger = (
                     exc.trigger
                     if isinstance(exc, GoalAssociationFreshResegmentationError)
                     else ""
                 )
-                fresh_resegmentation = bool(
-                    fresh_typed_resegmentation or fresh_semantic_trigger
-                )
+                fresh_resegmentation = bool(fresh_semantic_trigger)
                 contract_repair_strategy = (
-                    "model_owned_fresh_typed_resegmentation"
-                    if fresh_typed_resegmentation
-                    else "model_owned_fresh_goal_resegmentation"
+                    "model_owned_fresh_goal_resegmentation"
                     if fresh_semantic_trigger
                     else "schema_constrained_model_revision"
                 )
@@ -1161,18 +1029,13 @@ class GoalAssociationResolver:
                     self._bounded_json(raw, 4000),
                 )
                 if fresh_resegmentation:
-                    resegmentation_trigger = (
-                        "invalid_typed_execution_contract"
-                        if fresh_typed_resegmentation
-                        else fresh_semantic_trigger
-                    )
                     repaired = await self.ollama.generate(
                         self._build_semantic_review_prompt(
                             request=request,
                             candidate_goals=candidate_goals,
                             output_type=output_type,
                             raw={},
-                            triggers=[resegmentation_trigger],
+                            triggers=[fresh_semantic_trigger],
                         ),
                         system=self._semantic_review_system_prompt(
                             output_type,
@@ -1180,11 +1043,7 @@ class GoalAssociationResolver:
                         ),
                         options=generation_options,
                         response_format=response_schema,
-                        prompt_family=(
-                            "goal_association.typed_execution_resegmentation"
-                            if fresh_typed_resegmentation
-                            else "goal_association.semantic_contract_resegmentation"
-                        ),
+                        prompt_family="goal_association.semantic_contract_resegmentation",
                         turn_id=request.sid,
                         attempt=2,
                     )
@@ -2101,29 +1960,6 @@ class GoalAssociationResolver:
             default=str,
         )[:6000]
 
-    @staticmethod
-    def _is_execution_contract_validation_error(exc: Exception) -> bool:
-        """Return true only when every defect is a typed Goal tuple mismatch.
-
-        The Host does not repair or reclassify the semantic fields. It uses this
-        distinction only to choose a fresh model-owned resegmentation that omits
-        the invalid DTO, avoiding repair anchoring on mutually inconsistent typed
-        labels. Missing fields and unrelated schema defects still use the normal
-        exact-error repair path.
-        """
-
-        if not isinstance(exc, ValidationError):
-            return False
-        errors = exc.errors(include_url=False)
-        if not errors:
-            return False
-        for error in errors:
-            location = tuple(error.get("loc") or ())
-            if not location or location[0] != "new_goals":
-                return False
-            if error.get("type") != "goal_execution_contract":
-                return False
-        return True
 
     @staticmethod
     def _response_schema(
@@ -2184,41 +2020,6 @@ class GoalAssociationResolver:
                                 items["enum"] = active_ids
                             else:
                                 related_field["maxItems"] = 0
-                    if (
-                        "responsibility_kind" in node_properties
-                        and "output_mode" in node_properties
-                    ):
-                        # The model chooses one semantic completion mode.  The Host
-                        # materializes the redundant responsibility/lane/provider
-                        # invariants after decoding, so illegal cross-field tuples
-                        # are not representable at the model boundary.
-                        for field_name in (
-                            "responsibility_kind",
-                            "execution_lane",
-                            "provider_required",
-                        ):
-                            node_properties.pop(field_name, None)
-                        node_required = [
-                            field_name
-                            for field_name in list(node.get("required") or [])
-                            if field_name
-                            not in {
-                                "responsibility_kind",
-                                "execution_lane",
-                                "provider_required",
-                            }
-                        ]
-                        if "output_mode" not in node_required:
-                            node_required.append("output_mode")
-                        node["required"] = node_required
-                        output_mode = node_properties.get("output_mode")
-                        if isinstance(output_mode, dict):
-                            output_mode.pop("anyOf", None)
-                            output_mode.pop("default", None)
-                            output_mode["type"] = "string"
-                            output_mode["enum"] = list(
-                                _OUTPUT_MODE_EXECUTION_CONTRACT
-                            )
                     target_ids = node_properties.get("target_goal_ids")
                     if isinstance(target_ids, dict):
                         target_ids["items"] = {
@@ -2436,7 +2237,7 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-            "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. The Host derives responsibility_kind, execution_lane, and provider_required deterministically from that mode; never emit those Host-owned fields. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
+            "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
@@ -2707,7 +2508,7 @@ class GoalAssociationResolver:
             "No previous Goal DTO is supplied for this review. Reconstruct the "
             "segmentation independently from the authoritative user turn so an "
             "earlier completion-modality label cannot anchor the result. Do not "
-            "try to preserve an earlier description, ordering, or responsibility_kind.\n\n"
+            "try to preserve an earlier description, ordering, or execution classification.\n\n"
             if fresh_resegmentation
             else (
                 "DTO to review JSON:\n"
@@ -3201,13 +3002,7 @@ class GoalAssociationResolver:
             item
             for item in goals
             if isinstance(item, dict)
-            and (
-                item.get("output_mode") in {"body_action", "media_playback"}
-                or (
-                    item.get("output_mode") is None
-                    and item.get("responsibility_kind") == "executable_action"
-                )
-            )
+            and item.get("output_mode") in {"body_action", "media_playback"}
         ]
         if len(goals) < 2 or not executable:
             return False
