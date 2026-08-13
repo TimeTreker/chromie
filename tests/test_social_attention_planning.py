@@ -12,7 +12,10 @@ from agent.app.runtime import InteractionRuntime
 from agent.app.social_attention import SocialAttentionPlanner
 from agent.app.schema import AgentRunRequest
 from shared.chromie_contracts.interaction import FORBIDDEN_LOW_LEVEL_FIELDS, SkillRequest
-from shared.chromie_contracts.social_attention import SocialAttentionPlan
+from shared.chromie_contracts.social_attention import (
+    SocialAttentionPlan,
+    SocialAttentionRequest,
+)
 
 
 class _ConversationOllama:
@@ -159,6 +162,144 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             exclusive_group="face_expression",
             resource_claims=["face_expression"],
         )
+
+    def test_background_prompt_preserves_primary_action_and_social_context(self) -> None:
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="social-attention-test",
+            turn_id="turn-explicit-blink",
+            event="understanding_ready",
+            text="Blink twice, and be cute.",
+            language="en-US",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": ["soridormi.blink_eyes"],
+                    "primary_progress": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "args": {"count": 2},
+                        }
+                    ],
+                },
+                "social_interaction_style": {
+                    "owner_approved": True,
+                    "warmth": "warm",
+                },
+                "recent_auxiliary_behavior_evidence": [
+                    {"skill_id": "soridormi.nod_yes", "event": "speaking"}
+                ],
+            },
+        )
+
+        prompt = planner._prompt(
+            request,
+            [self._blink().model_dump(mode="json")],
+        )
+
+        self.assertIn('"social_interaction_style"', prompt)
+        self.assertIn('"recent_auxiliary_behavior_evidence"', prompt)
+        self.assertIn('"count": 2', prompt)
+        self.assertIn("explicit user action remains mandatory", prompt)
+        self.assertIn("different compatible cue", prompt)
+
+    async def test_background_request_uses_session_id_when_live_candidates_exist(self) -> None:
+        attention = _AttentionOllama(
+            {
+                "decision": "none",
+                "target": {
+                    "target_ref": "none",
+                    "source": "none",
+                    "confidence": 0.0,
+                    "metadata": {},
+                },
+                "behaviors": [],
+                "confidence": 0.86,
+                "reason": "The exact primary blink should remain unembellished.",
+            }
+        )
+        planner = SocialAttentionPlanner(
+            AgentServices(
+                social_attention_mode="on",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="social-attention-background-session",
+            turn_id="turn-explicit-blink",
+            event="understanding_ready",
+            text="Blink twice.",
+            language="en-US",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_candidates": [
+                    self._blink().model_dump(mode="json")
+                ],
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": ["soridormi.blink_eyes"],
+                    "primary_progress": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "args": {"count": 2},
+                        }
+                    ],
+                },
+            },
+        )
+
+        plan = await planner.plan(request)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan.decision, "none")
+        self.assertEqual(len(attention.prompts), 1)
+
+    async def test_background_candidates_exclude_explicit_primary_activity(self) -> None:
+        blink = self._blink().model_copy(
+            update={"behavior_domains": ["social_attention", "facial_expression"]}
+        )
+        attention = self._express_attention().model_copy(
+            update={"behavior_domains": ["social_attention", "head_expression"]}
+        )
+        runtime = InteractionRuntime(
+            AgentServices(
+                capability_catalog=_DomainCatalog([blink, attention]),  # type: ignore[arg-type]
+                social_attention_mode="on",
+            )
+        )
+        request = SocialAttentionRequest(
+            session_id="social-attention-background-session",
+            turn_id="turn-explicit-blink-cute",
+            event="understanding_ready",
+            text="Blink twice and be cute.",
+            language="en-US",
+            intent="semantic_capability_planning",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": ["soridormi.blink_eyes"],
+                    "primary_progress": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "args": {"count": 2},
+                        }
+                    ],
+                },
+            },
+        )
+
+        await runtime.prepare_social_attention_context(request)
+
+        candidate_ids = {
+            item["capability_id"]
+            for item in request.context["social_attention_candidates"]
+        }
+        self.assertEqual(candidate_ids, {"soridormi.express_attention"})
 
     async def test_model_selects_subtle_attention_with_provider_target_evidence(self) -> None:
         attention = _AttentionOllama(

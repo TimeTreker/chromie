@@ -852,9 +852,53 @@ class CanonicalPlanRuntimeAdapter:
 
         requests: list[SkillRequest] = []
         reasons: list[str] = []
+        interaction_state = runtime_context.get("social_attention_interaction_state")
+        if not isinstance(interaction_state, dict):
+            interaction_state = {}
+        raw_primary_ids = interaction_state.get("primary_capability_ids")
+        primary_capability_ids = {
+            str(item).strip()
+            for item in raw_primary_ids
+            if str(item).strip()
+        } if isinstance(raw_primary_ids, list) else set()
+        primary_definitions: dict[str, Any] = {}
+        unresolved_embodied_primary_ids: set[str] = set()
+        for capability_id in sorted(primary_capability_ids):
+            try:
+                await self.interaction_runtime.ensure_skill_definitions([capability_id])
+                primary_definition = self.interaction_runtime.skill_definition(capability_id)
+            except (TypeError, ValueError, ValidationError, RuntimeError):
+                if capability_id.startswith("soridormi."):
+                    unresolved_embodied_primary_ids.add(capability_id)
+                continue
+            primary_metadata = (
+                primary_definition.metadata
+                if isinstance(primary_definition.metadata, dict)
+                else {}
+            )
+            primary_effects = {
+                str(item).strip().lower()
+                for item in primary_metadata.get("effects", [])
+                if str(item).strip()
+            }
+            if capability_id.startswith("soridormi.") or primary_effects.intersection(
+                {"physical_motion", "visual_expression", "social_expression"}
+            ):
+                primary_definitions[capability_id] = primary_definition
         seen: set[str] = set()
         for index, behavior in enumerate(plan.behaviors):
             try:
+                if behavior.skill_id in primary_capability_ids:
+                    reasons.append(
+                        f"duplicates_primary_activity:{behavior.skill_id}"
+                    )
+                    continue
+                if unresolved_embodied_primary_ids:
+                    reasons.extend(
+                        f"primary_definition_unavailable:{capability_id}"
+                        for capability_id in sorted(unresolved_embodied_primary_ids)
+                    )
+                    continue
                 await self.interaction_runtime.ensure_skill_definitions([behavior.skill_id])
                 definition = self.interaction_runtime.skill_definition(behavior.skill_id)
                 metadata = definition.metadata if isinstance(definition.metadata, dict) else {}
@@ -886,6 +930,13 @@ class CanonicalPlanRuntimeAdapter:
                     and metadata.get("parallel_metadata_declared") is not True
                 ):
                     reasons.append(f"parallel_metadata_missing:{behavior.skill_id}")
+                    continue
+                if self._attention_conflicts_with_primary(
+                    definition,
+                    behavior.timing,
+                    primary_definitions,
+                ):
+                    reasons.append(f"resource_conflict:{behavior.skill_id}")
                     continue
                 schema_errors = validate_args_for_schema(behavior.args, definition.input_schema)
                 if schema_errors:
@@ -2968,10 +3019,48 @@ class GoalDrivenRuntimeCoordinator:
         social_context = dict(context)
         social_context.pop("social_attention_owned_by_background_loop", None)
         social_context["social_attention_event"] = event
+        primary_progress: list[dict[str, Any]] = []
+        primary_capability_ids: list[str] = []
+        seen_primary_ids: set[str] = set()
+
+        def retain_primary_progress(rows: Any) -> None:
+            if not isinstance(rows, list):
+                return
+            for row in rows[:12]:
+                if not isinstance(row, dict):
+                    continue
+                capability_id = str(
+                    row.get("capability_id") or row.get("skill_id") or ""
+                ).strip()
+                if not capability_id:
+                    continue
+                if capability_id not in seen_primary_ids:
+                    seen_primary_ids.add(capability_id)
+                    primary_capability_ids.append(capability_id)
+                projection = {
+                    key: row[key]
+                    for key in (
+                        "candidate_id",
+                        "step_id",
+                        "capability_id",
+                        "skill_id",
+                        "intent",
+                        "args",
+                    )
+                    if key in row
+                }
+                primary_progress.append(projection)
+
+        retain_primary_progress(social_context.get("progress_candidates"))
+        retain_primary_progress(social_context.get("execution_capabilities"))
+        canonical_plan = social_context.get("canonical_plan_resolution")
+        if isinstance(canonical_plan, dict):
+            retain_primary_progress(canonical_plan.get("steps"))
         social_context["social_attention_interaction_state"] = {
             "event": event,
-            "progress_candidates": list(social_context.get("progress_candidates") or []),
-            "primary_work_known": bool(social_context.get("progress_candidates")),
+            "primary_capability_ids": primary_capability_ids,
+            "primary_progress": primary_progress,
+            "primary_work_known": bool(primary_progress),
         }
         recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
         social_context["recent_auxiliary_behavior_evidence"] = (

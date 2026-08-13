@@ -93,8 +93,12 @@ natural speech
 ```
 
 Chromie should make this loop responsive, interruptible, understandable, and
-portable across a simulator and later physical robots without exposing low-level
-robot controls to a language model.
+portable across qualified embodied providers without exposing low-level robot
+controls to a language model. Chromie's cognitive and interaction contracts do
+not know whether the active body is simulated or physical. A qualified simulator
+is sufficient for Chromie's core embodied-interaction outcome; commissioning or
+deploying a physical robot is an optional provider-integration concern, not a
+prerequisite for project success.
 
 ## Product outcome
 
@@ -106,8 +110,8 @@ A successful Chromie release lets an operator:
 - approve, decline, interrupt, cancel, or stop work deterministically;
 - see correlated evidence of what was proposed, authorized, executed, and
   recovered;
-- move the same high-level interaction contract from simulation to a
-  commissioned physical provider.
+- run the same high-level interaction contract against a qualified embodied
+  provider without exposing or branching on its backend identity.
 
 ## System boundaries
 
@@ -187,7 +191,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    cognitive, personality, and Social Attention policies must not branch on
    whether the active Soridormi provider is simulated or physical. Backend
    selection, body adaptation, calibration, and physical safety remain below
-   the Chromie semantic boundary.
+   the Chromie semantic boundary. Simulator qualification is sufficient for the
+   core Chromie contract; physical-provider qualification is optional and proves
+   only that provider/deployment.
 2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
    Outside deterministic operational controls, normal conversation, memory,
    tool, robot-action,
@@ -232,12 +238,17 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    understanding and contract validation. When valid meaning cannot be
    established, the Core returns a typed unavailable, clarification, or refusal
    outcome; it never invents an ordinary lane.
-8. **Simulation precedes hardware.** Logical closure, failure handling, and
-   recovery are proven in simulation before physical commissioning.
+8. **Simulation is the core embodied target.** Logical closure, failure
+   handling, execution evidence, and recovery are proven against a qualified
+   simulator. If a physical provider is commissioned, it must preserve the same
+   contracts and pass its own additional safety qualification, but that optional
+   deployment is not a Chromie completion gate.
 9. **Evidence is part of the product.** Implemented, automatically verified,
    target validated, and release ready are separate states.
-10. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
-   supervised multi-skill, and broader autonomy are distinct gates.
+10. **Optional physical rollout is progressive and provider-owned.** When a
+   physical deployment is pursued, shadow, dry-run, bounded single-skill,
+   supervised multi-skill, and broader autonomy are distinct Soridormi/provider
+   gates. Chromie must not branch cognitively on those backend stages.
 11. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
 12. **Benchmarks evaluate intelligence; they do not implement it.** Cognitive,
@@ -523,6 +534,8 @@ Chromie is not:
 - a general-purpose distributed workflow engine;
 - a durable personal-memory platform;
 - an unattended physical-robot autonomy product in the current development scope;
+- a physical-robot deployment or commissioning project, or a claim that such a
+  deployment is required to complete Chromie's core interaction architecture;
 - proof that every hardware profile, GPU, audio device, or robot is supported.
 
 ## Definition of success
@@ -535,6 +548,10 @@ without weakening the others:
 - contract portability across providers;
 - measurable simulator or target evidence;
 - operability, privacy, and release supportability.
+
+For the embodied path, a qualified simulator can satisfy the core evidence
+outcome. Physical-provider evidence is optional, provider-specific qualification
+and must never be used to change Chromie's semantic behavior.
 
 New features that do not help close the current milestone, remove a documented
 blocker, or strengthen one of these outcomes should normally wait.

@@ -55,17 +55,27 @@ The authoritative goal-driven path is:
 ```text
 Cognitive Gateway
 → Goal-Driven Cognitive Core
-→ CanonicalPlan
-→ Response Composer optional SocialAttentionPlan
+→ anchored interaction-state event
+→ background Social Attention planner
 → Host validation/materialization
 → Provider acceptance/completion
 ```
 
-The Agent `/interaction` compatibility path still contains a standalone,
-body-only `SocialAttentionPlanner`. It exists for compatibility and must not be
-used to claim authoritative baseline evidence. The maintained live-service
-harness must prove that the goal-driven runtime acquired the turn and that
-Response Composer was the proposal source.
+The goal-driven Runtime coalesces current-turn background events and supplies
+primary-progress context, owner-approved Social Interaction Style, bounded
+recent-decoration evidence, target evidence, and the reviewed live Capability
+set. Candidate preparation removes any explicit primary Capability from the
+model's allowed enum. The Host independently repeats duplicate-primary and
+resource-conflict checks before the Trusted Capability Runtime.
+
+The Agent `/interaction` path still contains a request-local use of the same
+body-only planner for compatibility. Response Composer also retains the optional
+plan field in its schema, but the maintained goal-driven path marks Social
+Attention as background-owned and disables that duplicate decision source.
+Neither compatibility surface may be used to claim authoritative baseline
+evidence. The maintained live-service harness must prove that the goal-driven
+runtime acquired the turn and that the background planner was the proposal
+source.
 
 ### Evidence and execution profiles
 
@@ -263,6 +273,8 @@ The maintained gates cover:
 - explicit stillness;
 - stop and emergency priority;
 - explicit action priority;
+- explicit-action preservation with optional different compatible decoration;
+- duplicate-primary and resource-conflict suppression;
 - Provider, unavailable-capability, rejection, and schema fail-closed behavior;
 - primary-response and primary-work non-blocking behavior;
 - backend and calibration neutrality.
@@ -273,11 +285,27 @@ scope, and complete one-result-per-scenario coverage. It does not
 score naturalness, empathy, personality quality, or model preference. Those
 remain reviewed qualitative dimensions.
 
-## Remaining evidence work
+## Closure state and remaining evidence
 
-The next repository increment should connect the first-party adapter contract to
-the maintained model-only and authoritative cognitive-runtime harnesses, then
-retain the first 128-case baseline across the validated homogeneous run bundle. After that, the same fixed scenarios and
-identity contract can be used for model comparison, stress distribution,
-selected MuJoCo evidence, earliest-error-boundary classification, and reviewed
-regression promotion.
+The Social Attention behavior design and source implementation are closed for
+this increment. Focused source tests cover background request identity, primary
+Capability exclusion, optional compatible decoration, duplicate/resource
+rejection, non-blocking/coalescing behavior, style, and evidence grounding.
+
+Formal target qualification is not closed. Rebuilt working-tree planner probes
+accepted greeting, exact blink, and playful-blink inputs; explicit primary blink
+was absent from the auxiliary candidate enum and the model safely selected no
+decoration. Retained full-path diagnostics then completed both exact blink and
+“Blink twice and be cute” through Soridormi/MuJoCo. The latter retained one
+`body_action` Goal, executed `soridormi.blink_eyes(count=2)` exactly once, and
+returned standing/safe-idle. Intermediate failed runs exposed and closed upstream
+Goal-segmentation, extra-candidate coverage, contradictory-decision, and
+clarification-escape defects. These dirty-working-tree artifacts are diagnostic
+evidence, not a source-bound baseline.
+
+To close formal qualification, connect the first-party adapter contract to the
+authoritative cognitive-runtime harness, commit/rebuild the exact source, retain
+the 128-case homogeneous mode/style bundle, and complete fingerprint-bound human
+review. The same fixed scenarios can then support model comparison, stress
+distribution, selected MuJoCo evidence, earliest-error classification, and
+reviewed regression promotion.

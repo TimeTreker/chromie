@@ -324,18 +324,20 @@ class InteractionRuntime(_AgentPipeline):
         mode = self.services.effective_social_attention_mode()
         # Policy is host-owned runtime context, not a model preference. Clear any
         # caller-supplied/stale candidates before rebuilding the eligible view.
-        peer_owned = request.context.get("social_attention_owned_by_background_loop") is True
+        background_owned = (
+            request.context.get("social_attention_owned_by_background_loop") is True
+        )
         request.context["social_attention_policy"] = {
-            "mode": "off" if peer_owned else mode,
-            "planning_enabled": mode != "off" and not peer_owned,
-            "execution_enabled": mode == "on" and not peer_owned,
+            "mode": "off" if background_owned else mode,
+            "planning_enabled": mode != "off" and not background_owned,
+            "execution_enabled": mode == "on" and not background_owned,
             "embodiment_independent": True,
-            "owner": "background_loop" if peer_owned else "local_request",
+            "owner": "background_loop" if background_owned else "local_request",
         }
         request.context.pop("social_attention_candidates", None)
         request.context.pop("social_attention_candidate_source", None)
         request.context.pop("social_attention_target_evidence", None)
-        if mode == "off" or peer_owned:
+        if mode == "off" or background_owned:
             return
         catalog = self.services.capability_catalog
         if catalog is None:
@@ -356,6 +358,23 @@ class InteractionRuntime(_AgentPipeline):
             for capability_id in self.services.social_attention_capability_ids
             if capability_id
         }
+        interaction_state = request.context.get(
+            "social_attention_interaction_state"
+        )
+        raw_primary_ids = (
+            interaction_state.get("primary_capability_ids")
+            if isinstance(interaction_state, dict)
+            else []
+        )
+        primary_capability_ids = (
+            {
+                str(capability_id).strip()
+                for capability_id in raw_primary_ids
+                if str(capability_id).strip()
+            }
+            if isinstance(raw_primary_ids, list)
+            else set()
+        )
         candidate_ids: list[str] = []
         seen_ids: set[str] = set()
 
@@ -381,6 +400,12 @@ class InteractionRuntime(_AgentPipeline):
 
         candidates: list[dict[str, Any]] = []
         for capability_id in candidate_ids:
+            # An explicit primary Activity is never an eligible decoration.
+            # The trusted Host repeats this check before execution, but keeping
+            # it out of the model's enum prevents a proposal from wasting the
+            # optional Social Attention opportunity on the primary action.
+            if capability_id in primary_capability_ids:
+                continue
             item = None
             if hasattr(catalog, "get_capability"):
                 try:

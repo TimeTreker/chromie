@@ -795,7 +795,7 @@
       "owner": "agent",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "2c8bbb84af5b800c23f25d51970c0cb4d49ef9557b3b5d125134b82b5d5922ab",
+      "body_sha256": "2a1ba18c96526d9909bd620b3ba696a68568fafaf857c8b07bd970925c03b96d",
       "failure_signals": [
         "diagnostic",
         "return",

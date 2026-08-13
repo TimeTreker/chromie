@@ -619,9 +619,21 @@ such as "blink twice" is primary Activity responsibility. A blink selected while
 Chromie greets or listens is auxiliary decoration. The Capability may be the
 same, but only the first participates in Goal completion.
 
+An explicit action can also carry social framing. "Blink twice and be cute"
+still makes exactly two blinks mandatory primary Activity; it does not authorize
+Social Attention to replace, repeat, or alter them. From the supplied utterance
+and Core context, the Social Attention model may optionally choose a
+**different**, compatible small cue when that improves the interaction and fits
+the owner-approved style and recent-decoration evidence. "Blink twice" as a
+capability test may naturally receive no extra cue, while "do something cute"
+requires normal Cognitive Core / Goal reasoning because it asks Chromie to
+choose the primary behavior. The Host never implements this distinction with a
+"cute" phrase rule.
+
 Deterministic runtime code validates exact skill IDs, schemas, target evidence,
 confirmation policy, execution availability, latency budget, parallel timing,
-resource conflicts, and provider concurrency. Accepted decoration executes
+duplicate-primary rejection, resource conflicts, and provider concurrency.
+Accepted decoration executes
 through Activity with `auxiliary_social_attention=true` and
 `execution_role=social_decoration`. It is suppressed rather than delaying or
 conflicting with Vocal, emergency handling, or primary Activity.

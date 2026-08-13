@@ -529,6 +529,37 @@ def blink_definition() -> SkillDefinition:
     )
 
 
+def nod_definition(*, resource_claim: str = "visual.head") -> SkillDefinition:
+    return SkillDefinition(
+        skill_id="chromie.social.nod",
+        version="1.0",
+        provider_id="test.social",
+        description="test independent nod",
+        input_schema={
+            "type": "object",
+            "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 4}},
+            "required": ["count"],
+            "additionalProperties": False,
+        },
+        output_schema=OUTPUT_SCHEMA,
+        available=True,
+        requires_confirmation=False,
+        interruptible=True,
+        can_run_parallel=True,
+        timeout_ms=1000,
+        requires_safety_monitor=False,
+        metadata={
+            "effects": ["physical_motion"],
+            "safety_class": "low_risk_action",
+            "behavior_domains": ["social_attention"],
+            "parallel_metadata_declared": True,
+            "resource_claims": [resource_claim],
+            "control_coupling": "independent_output",
+            "execution_lane": "activity",
+        },
+    )
+
+
 class SocialProvider:
     provider_id = "test.social"
 
@@ -593,6 +624,139 @@ def test_independent_social_attention_uses_same_trusted_runtime_without_goal_aut
     asyncio.run(scenario())
 
 
+def test_social_attention_cannot_duplicate_explicit_primary_activity():
+    async def scenario():
+        runtime = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
+        definition = blink_definition()
+        provider = SocialProvider()
+        runtime.registry.register(definition)
+        runtime.runtime.register_provider(provider)
+        adapter = CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="on")
+        plan = SocialAttentionPlan.model_validate(
+            {
+                "purpose": "engagement",
+                "decision": "express",
+                "behaviors": [
+                    {
+                        "capability_id": definition.skill_id,
+                        "args": {"count": 1},
+                        "timing": "parallel",
+                    }
+                ],
+                "confidence": 0.9,
+            }
+        )
+
+        result = await adapter.execute_social_attention_event(
+            plan=plan,
+            session_id="session-social-primary",
+            turn_id="turn-social-primary",
+            event="understanding_ready",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [definition.skill_id]
+                }
+            },
+        )
+
+        assert result["status"] == "rejected"
+        assert result["materialized_count"] == 0
+        assert f"duplicates_primary_activity:{definition.skill_id}" in result["reasons"]
+        assert provider.calls == 0
+
+    asyncio.run(scenario())
+
+
+def test_social_attention_allows_a_different_compatible_auxiliary_cue():
+    async def scenario():
+        runtime = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
+        primary = blink_definition()
+        auxiliary = nod_definition()
+        provider = SocialProvider()
+        runtime.registry.register(primary)
+        runtime.registry.register(auxiliary)
+        runtime.runtime.register_provider(provider)
+        adapter = CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="on")
+        plan = SocialAttentionPlan.model_validate(
+            {
+                "purpose": "engagement",
+                "decision": "express",
+                "behaviors": [
+                    {
+                        "capability_id": auxiliary.skill_id,
+                        "args": {"count": 1},
+                        "timing": "parallel",
+                        "reason": "A small compatible cue supports the playful framing.",
+                    }
+                ],
+                "confidence": 0.9,
+            }
+        )
+
+        result = await adapter.execute_social_attention_event(
+            plan=plan,
+            session_id="session-social-compatible",
+            turn_id="turn-social-compatible",
+            event="understanding_ready",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [primary.skill_id]
+                }
+            },
+        )
+
+        assert result["status"] == "completed"
+        assert result["materialized_count"] == 1
+        assert provider.calls == 1
+
+    asyncio.run(scenario())
+
+
+def test_social_attention_rejects_a_different_cue_that_conflicts_with_primary_activity():
+    async def scenario():
+        runtime = InteractionRuntimeCoordinator(lambda payload: {"scheduled": True})
+        primary = blink_definition()
+        auxiliary = nod_definition(resource_claim="visual.eyes")
+        provider = SocialProvider()
+        runtime.registry.register(primary)
+        runtime.registry.register(auxiliary)
+        runtime.runtime.register_provider(provider)
+        adapter = CanonicalPlanRuntimeAdapter(runtime, social_attention_mode="on")
+        plan = SocialAttentionPlan.model_validate(
+            {
+                "purpose": "engagement",
+                "decision": "express",
+                "behaviors": [
+                    {
+                        "capability_id": auxiliary.skill_id,
+                        "args": {"count": 1},
+                        "timing": "parallel",
+                    }
+                ],
+                "confidence": 0.9,
+            }
+        )
+
+        result = await adapter.execute_social_attention_event(
+            plan=plan,
+            session_id="session-social-conflict",
+            turn_id="turn-social-conflict",
+            event="understanding_ready",
+            context={
+                "social_attention_interaction_state": {
+                    "primary_capability_ids": [primary.skill_id]
+                }
+            },
+        )
+
+        assert result["status"] == "rejected"
+        assert result["materialized_count"] == 0
+        assert f"resource_conflict:{auxiliary.skill_id}" in result["reasons"]
+        assert provider.calls == 0
+
+    asyncio.run(scenario())
+
+
 def test_social_attention_background_loop_does_not_wait_for_goal_association():
     async def scenario():
         candidate = CognitiveProgressCandidate(
@@ -621,8 +785,10 @@ def test_social_attention_background_loop_does_not_wait_for_goal_association():
         client = Client(runtime, association)
         adapter = CanonicalPlanRuntimeAdapter(runtime)
         social_executed = asyncio.Event()
+        captured_social_context = {}
 
         async def execute_social_attention_event(**kwargs):
+            captured_social_context.update(kwargs["context"])
             social_executed.set()
             return {"status": "not_executed", "materialized_count": 0}
 
@@ -651,6 +817,13 @@ def test_social_attention_background_loop_does_not_wait_for_goal_association():
         assert "social" in client.calls
         assert client.calls.index("social") < client.calls.index("association") or social_planned.is_set()
         assert "compose" not in client.calls
+        interaction_state = captured_social_context[
+            "social_attention_interaction_state"
+        ]
+        assert interaction_state["primary_capability_ids"] == [
+            candidate.capability_id
+        ]
+        assert interaction_state["primary_progress"][0]["args"] == candidate.args
 
     asyncio.run(scenario())
 

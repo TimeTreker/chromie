@@ -29,9 +29,14 @@ experience artifacts. See
 > The contracts and host path are automatically verified and default to
 > authoritative chat plus registered safe read-only tools in the common safe
 > base; the maintained Soridormi launcher widens authority to simulator robot
-> actions. Historical voice-pipeline and
-> text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
-> The canonical local gate is reproducible again. Issues #1, #5, #6, and #7
+> actions. The complete microphone/automated-audio -> Chromie -> Soridormi ->
+> MuJoCo path is implemented. Retained evidence includes full synthetic and
+> virtual-microphone MuJoCo runs, clean Goal-driven generated-voice evidence,
+> clean Goal-driven MuJoCo execution/cancellation, and one supervised physical
+> microphone -> audible-speaker turn. These artifacts are revision-bound, so a
+> later source change does not silently inherit their exact-revision claim, but
+> that provenance rule does not make the implemented core path unfinished.
+> Issues #1, #5, #6, and #7
 > have been merged to `main`; their retained evidence remains bound to the
 > exact recorded revisions and does not automatically become evidence for a
 > later merge commit. Any gate claim must use
@@ -40,13 +45,14 @@ experience artifacts. See
 > the current-revision microphone-to-audible-response loop is implemented. The
 > latest automated generated-speech run exercised VAD, ASR, the live
 > Gateway/Core, TTS, playback, and deterministic interruption on an RTX 5090.
-> That run also exposed evidence and semantic-contract defects now tracked in
-> the post-merge audit; it is diagnostic, not release or physical-audio proof.
-> Default
+> A separate clean supervised run has already validated the basic physical
+> microphone -> ASR -> cognition -> TTS -> audible-speaker chain. Default
 > audio selections now follow OS device changes during runtime, while explicit
-> selections remain pinned; supervised physical hot-plug evidence is still open.
-> The active delivery line is clean post-merge source and non-physical
-> target-evidence closure. No release version
+> selections remain pinned; broader device distribution, acoustic barge-in,
+> hot-plug, and latency characterization are optional qualification scopes, not
+> missing core interaction functionality. Physical-robot deployment is likewise
+> an optional Soridormi/provider integration and is not a Chromie completion
+> condition. No release version
 > or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 >
@@ -109,9 +115,9 @@ There is no independent Router service or `/route` compatibility API.
 Chromie never gives raw motor, joint, actuator, or torque controls to the
 language model. The legacy `hardware/` daemon is mock compatibility only.
 
-## What works in source and automated tests
+## Implemented core path and retained evidence
 
-These are implementation claims, not current-revision live qualification:
+The core interaction architecture is implemented:
 
 - Capture microphone audio, transcribe final utterances, and play ordered TTS.
 - Admit normal turns through Cognitive Gateway before Goal-driven reasoning.
@@ -127,22 +133,39 @@ These are implementation claims, not current-revision live qualification:
 - Evaluate behavior through module, integration, E2E, stress, and General
   Ability tooling.
 
-## Not yet proven on the current revision
+Retained target evidence additionally proves:
+
+- full synthetic and virtual-microphone speech input through VAD, ASR,
+  cognition, Trusted Capability Runtime, TTS, and MuJoCo on their recorded
+  revisions;
+- clean Goal-driven compound MuJoCo execution, deterministic provider-start
+  cancellation, Goal reconciliation, and safe-idle recovery;
+- clean generated-speech VAD/ASR/Gateway/Core/TTS/playback and interruption; and
+- one supervised physical microphone -> ASR -> cognition -> TTS -> audible
+  speaker turn.
+
+## Remaining qualification, not missing core functionality
 
 - clean full-matrix generated-speech acceptance after the post-merge fixes;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
-- paired Chromie/Soridormi MuJoCo execution and safe idle bound to the final
-  post-audit revision;
 - the reviewed Social Attention live baseline;
-- physical microphone and speaker behavior;
 - second-machine LAN exposure validation;
-- physical robot and Jetson deployment.
+- broader/bilingual audio quality, physical acoustic barge-in, hot-plug, and a
+  declared latency budget; and
+- exact-revision rebinding when a release or publication claim requires it.
+
+Physical robot/Jetson deployment is deliberately absent from this list. Chromie
+uses provider-neutral semantic capabilities and does not need to know whether
+Soridormi executes them in MuJoCo or on a commissioned body. Physical deployment
+may be qualified separately for that provider, but it is not a core project
+goal or release gate.
 
 Until the canonical gate, narrow live voice proof, and default target-evidence
 profile close, new architecture layers, ordinary behavior flags, standalone
 design documents, and project terminology are frozen unless required to remove
-a demonstrated blocker.
+a demonstrated blocker. These are exact-revision delivery/provenance gates, not
+evidence that the already-implemented core voice/MuJoCo path is absent.
 
 ## Quick start
 
@@ -211,7 +234,7 @@ For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
 | Compatibility voice | cognitive runtime off, explicit legacy path | Emergency rollback only |
 | Goal-driven speech | cognitive apply on, `chat,memory,tool` lanes, Soridormi skills off | Common safe base |
 | Goal-driven MuJoCo | cognitive apply on, `chat,memory,robot_action,tool`, Soridormi skills on | Maintained simulator launcher |
-| Physical robot | commissioned Soridormi plus physical gates | Experimental, unsupported |
+| Physical robot | commissioned Soridormi plus physical gates | Optional provider integration; experimental and outside core acceptance |
 
 Effectful providers and physical gates remain default-off in the common safe
 base. Configuration semantics are maintained in

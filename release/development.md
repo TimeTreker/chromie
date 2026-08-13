@@ -22,11 +22,14 @@ does not promise support for any deployment target.
 
 ## Explicit Non-Claims
 
-- no production physical-robot support;
-- no general human microphone/speaker support;
-- no verified Jetson distribution;
+- physical-robot deployment is optional provider work outside core Chromie
+  acceptance; no production physical-provider claim is made here;
+- the retained supervised reference-host microphone/speaker pass is not a claim
+  that every human voice, audio device, language, or acoustic environment works;
+- no verified Jetson distribution is claimed or required for core completion;
 - no unattended deployment;
-- no claim that historical evidence validates the current Goal-driven authority path.
+- no claim that one revision's retained evidence automatically validates every
+  later source revision.
 
 ## Engineering Evidence Needed
 

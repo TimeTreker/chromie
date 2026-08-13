@@ -13,13 +13,22 @@ milestones and component notes.
 | D | Target GPU/audio/hardware | Real latency, device behavior, hardware safety, recovery, and release supportability. |
 
 A higher level does not replace lower-level regression tests.
- The active Gateway/Core qualification procedure is [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
+
+Chromie's core embodied acceptance target is a qualified simulator provider.
+The cognitive and interaction layers must not know whether Soridormi's backend
+is MuJoCo or a physical body. Level D physical-robot evidence is therefore an
+optional provider/deployment qualification, not a prerequisite for core Chromie
+completion. Physical audio remains valid direct evidence for the host voice
+device path and is independent of robot embodiment.
+
+The active Gateway/Core qualification procedure is [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## Current evidence summary
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
+| Core voice-to-embodied path | Full speech/control/runtime acceptance tooling and exact evidence contracts are implemented | Retained synthetic and virtual-microphone runs completed VAD, ASR, cognition, TTS/playback, and trusted dispatch; clean `90aa72a` validates the Goal-driven generated-voice path | Clean paired Chromie `a36444b` / Soridormi `fa8080d2` completed Goal-driven compound MuJoCo execution, cancellation, reconciliation, and safe idle | The host voice-device chain separately passed one supervised physical microphone-to-audible-speaker turn; physical robot deployment is optional and not needed to complete this row |
 | Narrow current-revision live voice loop | Strict profile and focused rejection/regression tests pass | Clean `90aa72a` rebuilt comprehensive profile passed all mechanical voice/GPU checks with one independent-review skip; merged `a36444b` paired services remained healthy with clean logs | Not applicable | Target validated for one supervised English physical microphone-to-audible-response turn in `20260809T122818Z`; broader accuracy, latency, and release claims remain open |
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Clean rebuilt comprehensive model distribution passed its mechanical matrix; the independent semantic reviewer remains an explicit skip | Clean merged `a36444b` paired proof completed exact compound planning/execution and deterministic provider-start cancellation against Soridormi `fa8080d2` | Not claimed |
@@ -1184,8 +1193,10 @@ acoustic and Gateway receipts. Both acoustic receipts must retain
 confirmed-speech-to-silence must each be at most 250 ms. A pause/restart error,
 late old-session TTS or playback, dispatch failure, duplicate start, missing
 terminal completion, or cross-case overlap is a hard failure. Captured-output
-replay is automated-only; physical microphone and speaker behavior still
-requires supervised evidence.
+replay is automated-only; physical acoustic barge-in behavior still requires
+its own supervised evidence. The basic physical
+microphone-to-audible-speaker chain already has separate supervised evidence in
+`20260809T122818Z`.
 
 The current development compatibility policy lists `synthetic`,
 `virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy

@@ -83,6 +83,35 @@ Both paths may eventually use the same qualified `soridormi.blink_eyes`
 Capability. The first is requested work; the second is auxiliary social
 appearance. Trusted metadata and reconciliation must preserve that distinction.
 
+### Explicit action plus social framing
+
+An explicit body request stays exact primary Activity even when its wording also
+suggests a social purpose. Social Attention may reason over that supplied
+meaning, but it cannot reinterpret, replace, or embellish the required action
+itself.
+
+For example:
+
+- "Blink twice" requires exactly the primary blink work. If the surrounding
+  interaction merely looks like a capability test, stillness around it may be
+  the most natural Social Attention decision.
+- "Blink twice and be cute" still requires exactly two primary blinks. The
+  playful framing may support one **different**, compatible auxiliary cue, such
+  as a small head tilt or nod, when an eligible Capability, owner-approved style,
+  recent-decoration evidence, and resource policy all support it.
+- "Do something cute" does not specify a required motion. It belongs in normal
+  Cognitive Core / Goal reasoning, which may choose the primary behavior; it is
+  not reduced to optional Social Attention decoration.
+
+The model owns this semantic judgment from the utterance and supplied Core
+context. The Host does not map words such as "cute" to a gesture. Trusted code
+only guarantees containment: an auxiliary proposal cannot duplicate a primary
+Capability, change its arguments or completion meaning, or overlap an exclusive
+group/resource. Explicit exact-only action, stillness, emergency state,
+incompatibility, repetition, or weak contextual support resolves to no
+decoration. A pleasant surprise therefore means bounded contextual variation,
+not a random extra movement.
+
 ## Interaction anchor versus idle embodiment
 
 Social Attention is not a generic idle-animation system.
@@ -176,6 +205,10 @@ the applicable cognitive/response owner.
 - capability arguments, social function, target selection, and bounded semantic
   intensity parameters supplied by the public schema.
 
+When primary Activity already owns an exact Capability, the model may select
+only a different compatible auxiliary candidate. Selecting none remains valid
+and often preferable.
+
 It does **not** decide speech text, speech style fields, user Goal meaning,
 provider identity, or motor implementation.
 
@@ -236,6 +269,7 @@ The Host / Trusted Capability Runtime may:
 - enforce confirmation, safety, and availability policy;
 - reject low-level motor fields;
 - detect resource and embodied-concurrency conflicts with primary Activity;
+- reject an auxiliary Capability that duplicates explicit primary Activity;
 - cap auxiliary behavior count;
 - apply emergency, latency, cooldown, and repetition suppression;
 - require Social Attention body requests to remain parallel and conflict-free;
@@ -327,6 +361,8 @@ Tests should prove the semantic boundary rather than one fixed gesture:
 - decoration cannot satisfy primary Goal completion;
 - explicit "blink twice" remains required Activity while an incidental blink is
   optional decoration;
+- social framing may justify a different compatible cue but never a duplicate
+  or mutation of the explicit action;
 - a decoration conflict/failure does not fail unrelated primary work;
 - backend metadata changes do not change Chromie's social decision semantics;
 - target-specific decoration requires evidence for that target;

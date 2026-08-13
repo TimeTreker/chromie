@@ -71,7 +71,12 @@ parallel manager objects.
 - **Social Attention is decoration, not responsibility.** Small gaze/blink/nod/
   wave/posture cues may accompany a socially anchored interaction through Activity,
   fail-soft and with no Goal-completion authority. Explicitly requested versions of
-  the same physical actions are ordinary Activity. Idle liveliness is separate.
+  the same physical actions are ordinary Activity. Social framing may justify a
+  different compatible auxiliary cue, but never duplication, mutation, or
+  completion of that explicit action. Idle liveliness is separate.
+- **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
+  core embodied outcome; cognition must not know the backend, and physical-robot
+  commissioning is optional provider work rather than a Chromie completion gate.
 - **Reality enters through evidence.** Provider evidence and reconciliation own
   runtime truth; cognition may explain that truth but may not promote it.
 - **Semantic review is a local stage/pattern, not a global second Cognitive Core.**
@@ -120,16 +125,15 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Do not add another top-level architecture layer without new evidence. The recent
-architecture defects are contained; next work should be evidence-driven validation
-and concrete root-cause repair at the earliest responsible boundary. High-value
-probes include compound Vocal+Activity requests, unavailable vocal modes, Social
-Attention during real greeting/listening without standalone decoration, and
-speech-to-later-Vocal resource release. Scenarios are probes for general invariants,
-not phrase-specific targets.
-Baseline non-social liveliness (idle blink/breathing/posture) remains deliberately
-separate from Social Attention and deferred until a concrete product requirement
-justifies its owner, policy, and execution semantics.
+Do not add another top-level architecture layer without new evidence. Social
+Attention's source boundary is implemented: canonical session identity, primary
+Capability exclusion, and repeated trusted duplicate/resource checks. The Goal
+boundary keeps broad social impressions as concrete-effect framing unless positive
+audible content is independently requested; coverage rejects extra Goals and
+clarification escape. Working-tree diagnostics retained exact blink and “blink
+twice and be cute” as one body Goal and one `soridormi.blink_eyes(count=2)` MuJoCo
+completion. Remaining work is the clean committed 128-case bundle and human review.
+Non-social liveliness remains separate and deferred pending a concrete requirement.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

@@ -25,6 +25,98 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             )
 
+    def test_responsibility_coverage_can_reject_unjustified_goal_candidate(self):
+        review = GoalResponsibilityCoverageReview.model_validate(
+            responsibility_coverage(
+                responsibility_item("Blink twice", 0),
+                responsibility_item("be playful", 0, role="constraint"),
+                decision="reject",
+                unjustified_candidate_indices=[1],
+            )
+        )
+
+        self.assertEqual(review.decision, "reject")
+        self.assertEqual(review.unjustified_candidate_indices, [1])
+
+    def test_responsibility_coverage_normalizes_redundant_model_decision(self):
+        invalid = responsibility_coverage(
+            responsibility_item("Blink twice.", 0),
+            decision="reject",
+        )
+        ollama = ScriptedOllama([invalid])
+        resolver = GoalAssociationResolver(ollama)
+
+        review = asyncio.run(
+            resolver._run_responsibility_coverage_audit(
+                request=request(
+                    "Blink twice.",
+                    language="en-US",
+                    route="robot_action",
+                    intent="capability:soridormi.blink_eyes",
+                ),
+                raw={
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Blink twice.",
+                            "output_mode": "body_action",
+                            "bindings": [],
+                        }
+                    ],
+                },
+                generation_options={"temperature": 0},
+                prompt_family="goal_association.responsibility_coverage",
+                attempt=5,
+            )
+        )
+
+        self.assertEqual(review.decision, "accept")
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_responsibility_coverage_repairs_invalid_item_contract(self):
+        invalid = responsibility_coverage(
+            responsibility_item("Blink twice.", 0),
+            decision="accept",
+        )
+        invalid["items"][0]["candidate_goal_indices"] = [0, 0]
+        repaired = responsibility_coverage(
+            responsibility_item("Blink twice.", 0),
+            decision="accept",
+        )
+        ollama = ScriptedOllama([invalid, repaired])
+
+        review = asyncio.run(
+            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
+                request=request(
+                    "Blink twice.",
+                    language="en-US",
+                    route="robot_action",
+                    intent="capability:soridormi.blink_eyes",
+                ),
+                raw={
+                    "decision": "create_goals",
+                    "new_goals": [
+                        {
+                            "description": "Blink twice.",
+                            "output_mode": "body_action",
+                            "bindings": [],
+                        }
+                    ],
+                },
+                generation_options={"temperature": 0},
+                prompt_family="goal_association.responsibility_coverage",
+                attempt=5,
+            )
+        )
+
+        self.assertEqual(review.decision, "accept")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "goal_association.responsibility_coverage.contract_repair",
+        )
+        self.assertIn("speech response does not cover requested body motion", ollama.prompts[1][0])
+
     def test_singing_derives_vocal_provider_contract(self):
         goal = GoalAssociationModelGoal.model_validate(
             {
@@ -202,10 +294,17 @@ def responsibility_item(
     }
 
 
-def responsibility_coverage(*items, decision="accept"):
+def responsibility_coverage(
+    *items,
+    decision="accept",
+    unjustified_candidate_indices=None,
+):
     return {
         "decision": decision,
         "items": list(items),
+        "unjustified_candidate_indices": list(
+            unjustified_candidate_indices or []
+        ),
         "reason_summary": "Candidate Goals account for the audited user meaning.",
     }
 
@@ -1057,9 +1156,20 @@ class GoalAssociationResolverTests(unittest.TestCase):
         coverage_prompt = ollama.prompts[2][0]
         self.assertIn("independently satisfiable responsibility", coverage_prompt)
         self.assertIn("provider availability", coverage_prompt)
+        self.assertIn("observable completion meaning", coverage_prompt)
         resegmentation_prompt = ollama.prompts[3][0]
         self.assertIn("responsibility-coverage audit JSON", resegmentation_prompt)
         self.assertIn("No previous Goal DTO is supplied", resegmentation_prompt)
+        self.assertIn("Do not use clarification to explain", resegmentation_prompt)
+        resegmentation_schema = ollama.prompts[3][1]["response_format"]
+        self.assertEqual(
+            resegmentation_schema["properties"]["decision"]["enum"],
+            ["create_goals"],
+        )
+        self.assertEqual(
+            resegmentation_schema["properties"]["new_goals"]["minItems"],
+            1,
+        )
 
     def test_legacy_host_execution_fields_require_schema_repair(self):
         invalid = {
@@ -1963,6 +2073,92 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "reason_summary",
             ],
         )
+
+    def test_independence_adjudication_keeps_social_style_on_embodied_goal(self):
+        mixed = {
+            "decision": "create_goals",
+            "new_goals": [
+                {
+                    "description": "Blink twice while presenting the action cutely.",
+                    "output_mode": "body_action",
+                    "bindings": [
+                        {
+                            "name": "count",
+                            "entity_type": "number",
+                            "value": "2",
+                            "confidence": 1.0,
+                        }
+                    ],
+                },
+                {
+                    "description": "Provide a cute acknowledgement.",
+                    "output_mode": "speech",
+                    "bindings": [],
+                },
+            ],
+            "confidence": 1.0,
+        }
+        adjudication = {
+            "candidate_decisions": [
+                {
+                    "candidate_goal_index": 0,
+                    "completion_mode": "positive_effect",
+                    "audible_content_summary": "",
+                    "final_goal_description": (
+                        "Blink twice while presenting the action cutely."
+                    ),
+                    "reason_summary": (
+                        "The blink is the requested positive effect and owns its style."
+                    ),
+                },
+                {
+                    "candidate_goal_index": 1,
+                    "completion_mode": "expression_style_constraint_only",
+                    "audible_content_summary": "",
+                    "final_goal_description": "",
+                    "reason_summary": (
+                        "The acknowledgement only promotes the action's social style."
+                    ),
+                },
+            ],
+            "reason_summary": (
+                "The social-presentation modifier belongs to the embodied effect."
+            ),
+        }
+        coverage = responsibility_coverage(
+            responsibility_item("Blink twice", 0),
+            responsibility_item("be cute", 0, role="constraint"),
+        )
+        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Blink twice and be cute.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(
+            result.new_goals[0].description,
+            "Blink twice while presenting the action cutely.",
+        )
+        self.assertEqual(
+            result.new_goals[0].metadata["responsibility_kind"],
+            "executable_action",
+        )
+        adjudication_prompt = ollama.prompts[2][0]
+        self.assertIn("expression_style_constraint_only", adjudication_prompt)
+        self.assertIn("not positive authored content", adjudication_prompt)
+        adjudication_schema = ollama.prompts[2][1]["response_format"]
+        completion_modes = adjudication_schema["$defs"][
+            "GoalIndependenceCandidateDecision"
+        ]["properties"]["completion_mode"]
+        self.assertIn("expression_style_constraint_only", completion_modes["enum"])
+        coverage_prompt = ollama.prompts[3][0]
+        self.assertIn("social-presentation modifier", coverage_prompt)
+        self.assertIn("role=constraint", coverage_prompt)
+        self.assertIn("broad desired social impression", coverage_prompt)
+        self.assertIn("unjustified_candidate_indices", coverage_prompt)
 
     def test_independence_adjudication_preserves_requested_authored_content(self):
         mixed = {

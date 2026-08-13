@@ -109,6 +109,15 @@ If the user explicitly asks "blink twice", that blink is instead primary
 Activity responsibility. The physical Capability may be the same; the semantic
 role and completion authority are not.
 
+Social meaning may coexist with that exact responsibility. For "blink twice and
+be cute", Core still owns the two required blinks. Background Social Attention
+may use the supplied playful framing to propose one different compatible cue;
+it may not issue another blink, change the count, replace the primary action, or
+claim its completion. Trusted Runtime rejects duplicate Capability IDs and
+declared resource/exclusive-group conflicts. When the request is exact-only,
+calls for stillness, lacks sufficient social support, or has no compatible cue,
+the auxiliary decision is `none`.
+
 ## Soridormi embodied compilation contract
 
 Soridormi is a peer Capability Provider beneath Chromie's Activity lane. It

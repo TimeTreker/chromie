@@ -9,6 +9,9 @@ Gateway owns ingress, protective reflexes, and attention admission. The
 Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
 association, planning, response composition, and outcome reconciliation.
 Provider and Host boundaries remain the only authorities for effects.
+The core embodied target is a qualified simulator provider. Chromie's cognition
+must remain backend-neutral; physical-robot commissioning is optional
+Soridormi/provider work and is not a Chromie milestone or release prerequisite.
 
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
@@ -120,7 +123,9 @@ adding a manager because a useful explanatory term exists.
    neutral late-binding alias merely to relocate implementation.
 8. Close source-bound and target-bound evidence separately. A passing source
    gate does not prove GPU, microphone, speaker, simulator, or physical-provider
-   behavior.
+   behavior. Core embodied closure requires simulator evidence; physical-provider
+   evidence is recorded only when an optional concrete deployment is being
+   qualified and never blocks ordinary Chromie completion.
 9. Reduce compatibility surfaces only after the maintained path has equivalent
    retained evidence. Compatibility code must be gated, named, and unable to
    re-enter after Goal-driven authority has been selected.

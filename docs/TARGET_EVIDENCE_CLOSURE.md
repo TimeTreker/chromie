@@ -25,13 +25,15 @@ revision cannot be mixed into the closure. A completed closure report always
 contains `release_qualified=false`; product or physical release approval remains
 a separate owner decision.
 
-The strict current-revision `speech-only` verifier is implemented. Retained
-physical attempts have reached VAD/ASR, but no attempt has produced the required
-intelligible utterance and complete audible-response evidence, so physical target
-validation remains open without a claim. That does not block
-`source_bound_development`, whose required tracks are non-physical. It remains required for
-`supervised_physical_pilot` and does not satisfy Gateway/Core MuJoCo, Agent
-Skill/weather, Social Attention, LAN, or physical-robot tracks.
+The strict source-bound `speech-only` verifier is implemented. Clean supervised
+evidence at host revision `f8d5eae61d8556dc2bae0404bc97726f60ceb0e1`
+completed the physical microphone -> VAD/ASR -> Goal-driven cognition -> TTS ->
+audible-speaker chain for one English turn. Broader device distribution,
+bilingual accuracy, acoustic barge-in, hot-plug, and latency characterization
+remain narrower optional claims; they do not reopen the basic voice-device path.
+Physical voice does not block `source_bound_development`, whose required tracks
+are non-physical, and it does not substitute for Gateway/Core MuJoCo, Agent
+Skill/weather, Social Attention, or LAN evidence.
 
 ## Profiles
 
@@ -46,10 +48,10 @@ Required tracks:
   review;
 - loopback-local and second-machine LAN exposure evidence.
 
-Physical voice and physical robot evidence are optional and do not affect this
-profile's development closure claim.
+This is the core Chromie development-closure profile. Physical voice and
+physical robot evidence are optional and do not affect its result.
 
-### `supervised_physical_pilot`
+### `supervised_physical_pilot` (optional integration profile)
 
 Requires every source-bound development track plus:
 
@@ -59,7 +61,8 @@ Requires every source-bound development track plus:
   state.
 
 Simulation, virtual audio, or operator-free execution cannot satisfy this
-profile.
+optional profile. Failure or absence of this profile does not make the core
+Chromie architecture incomplete.
 
 ## Initialize one closure
 
@@ -276,6 +279,10 @@ or synthetic audio cannot substitute for them.
 ## Optional physical robot evidence
 
 Physical robot evidence is never collected automatically by the closure tool.
+It qualifies one commissioned Soridormi/provider deployment; it is not required
+for Chromie source-bound development closure or core release semantics. Chromie
+must receive the same semantic Capability and evidence contracts without being
+told whether the backend is MuJoCo or a physical body.
 The supervised report must contain:
 
 ```json

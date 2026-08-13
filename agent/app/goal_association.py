@@ -177,11 +177,24 @@ _EXECUTION_CONTRACT_PROMPT = (
     "use their exact vocal mode. The fact that a capability result will later be "
     "spoken does not turn its owned work into speech. If no matching provider is "
     "available, preserve the evidence-dependent completion mode so downstream "
-    "planning can report the limitation instead of inventing an answer. "
+    "planning can report the limitation instead of inventing an answer. Never "
+    "replace a requested embodied effect with a speech Goal because the current "
+    "input channel is text, because later acknowledgement is spoken, or because "
+    "of an unsupported assumption that Chromie has no embodied Capability. "
     "media_operation is meaningful only for media_playback; otherwise omit it or "
     "leave it as none. A negative instruction that limits what Chromie may say "
     "while completing another requested outcome is a constraint on that outcome, "
-    "not an independently satisfiable spoken Goal."
+    "not an independently satisfiable spoken Goal. A manner, mood, persona, or "
+    "social-presentation directive attached to another requested effect is likewise "
+    "an expression constraint on that effect, not an additional spoken Goal. Preserve "
+    "that framing in the effect Goal. Create a separate vocal Goal only when the user "
+    "requests independently observable positive words, information, or a vocal "
+    "performance—not merely because wording or speech could help convey the style. "
+    "When a concrete requested effect is accompanied by a broad desired social "
+    "impression but no words, information, vocal performance, or second effect "
+    "modality is specified, apply that impression as embodiment-wide expression "
+    "framing to the concrete effect. Do not invent an audible modality from an "
+    "adjective, state directive, conjunction, or imperative grammar."
 )
 
 
@@ -736,7 +749,18 @@ class GoalResponsibilityCoverageReview(BaseModel):
 
     decision: Literal["accept", "reject"]
     items: list[GoalResponsibilityCoverageItem] = Field(min_length=1, max_length=16)
+    unjustified_candidate_indices: list[int] = Field(
+        default_factory=list,
+        max_length=8,
+    )
     reason_summary: str = Field(min_length=1, max_length=1200)
+
+    @field_validator("unjustified_candidate_indices")
+    @classmethod
+    def unique_unjustified_candidate_indices(cls, value: list[int]) -> list[int]:
+        if len(value) != len(set(value)):
+            raise ValueError("unjustified_candidate_indices must be unique")
+        return value
 
     @field_validator("reason_summary", mode="before")
     @classmethod
@@ -745,17 +769,18 @@ class GoalResponsibilityCoverageReview(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @model_validator(mode="after")
-    def validate_decision(self) -> "GoalResponsibilityCoverageReview":
+    @staticmethod
+    def derived_decision(
+        items: list[GoalResponsibilityCoverageItem],
+        unjustified_candidate_indices: list[int] | None = None,
+    ) -> Literal["accept", "reject"]:
+        """Derive the redundant decision from model-owned item judgments."""
+
         material = [
             item
-            for item in self.items
+            for item in items
             if item.role in {"responsibility", "constraint"}
         ]
-        if not material:
-            raise ValueError(
-                "coverage review for created Goals requires material user meaning"
-            )
         uncovered = [
             item
             for item in material
@@ -772,18 +797,34 @@ class GoalResponsibilityCoverageReview(BaseModel):
                 independent_owner_counts[goal_index] = (
                     independent_owner_counts.get(goal_index, 0) + 1
                 )
-        overmerged = [
-            goal_index
-            for goal_index, count in independent_owner_counts.items()
-            if count > 1
+        overmerged = any(count > 1 for count in independent_owner_counts.values())
+        return (
+            "reject"
+            if uncovered or overmerged or unjustified_candidate_indices
+            else "accept"
+        )
+
+    @model_validator(mode="after")
+    def validate_decision(self) -> "GoalResponsibilityCoverageReview":
+        material = [
+            item
+            for item in self.items
+            if item.role in {"responsibility", "constraint"}
         ]
-        has_problem = bool(uncovered or overmerged)
-        if self.decision == "accept" and has_problem:
+        if not material:
+            raise ValueError(
+                "coverage review for created Goals requires material user meaning"
+            )
+        derived_decision = self.derived_decision(
+            material,
+            self.unjustified_candidate_indices,
+        )
+        if self.decision == "accept" and derived_decision == "reject":
             raise ValueError(
                 "accepted responsibility coverage cannot contain missing, ambiguous, "
                 "or over-merged independently satisfiable requirements"
             )
-        if self.decision == "reject" and not has_problem:
+        if self.decision == "reject" and derived_decision == "accept":
             raise ValueError(
                 "rejected responsibility coverage requires a missing, ambiguous, "
                 "or over-merged requirement"
@@ -801,6 +842,7 @@ class GoalIndependenceCandidateDecision(BaseModel):
         "positive_effect",
         "independently_requested_authored_content",
         "capability_result_delivery_only",
+        "expression_style_constraint_only",
         "silence_or_omission_only",
     ]
     audible_content_summary: str = Field(default="", max_length=500)
@@ -1283,6 +1325,7 @@ class GoalAssociationResolver:
                         ).completion_mode
                         not in {
                             "capability_result_delivery_only",
+                            "expression_style_constraint_only",
                             "silence_or_omission_only",
                         }
                     ]
@@ -1371,7 +1414,13 @@ class GoalAssociationResolver:
                             fresh_resegmentation=True,
                         ),
                         options=generation_options,
-                        response_format=response_schema,
+                        response_format=(
+                            self._responsibility_resegmentation_response_schema(
+                                response_schema,
+                                output_type=output_type,
+                                coverage_review=coverage_review,
+                            )
+                        ),
                         prompt_family=(
                             "goal_association.responsibility_resegmentation"
                         ),
@@ -2240,6 +2289,7 @@ class GoalAssociationResolver:
             "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
             f"{_EXECUTION_CONTRACT_PROMPT} "
             "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
+            "A requested manner, mood, persona, or social presentation attached to a substantive action or other effect is a constraint on how that effect should be expressed, not a second Goal. Keep it in the substantive Goal description. It becomes a separate vocal Goal only when the user independently asks to hear positive authored content or a vocal performance that remains satisfiable without the substantive effect. "
             "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
             "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
             "A factual lookup and the user's requested interpretation of that same evidence are one Goal when one capability result can satisfy both, such as checking weather and judging whether it is hot. Do not split evidence acquisition from the answer derived from that evidence. "
@@ -2549,7 +2599,16 @@ class GoalAssociationResolver:
             "When a vocal_output item merely phrases, reports, "
             "explains, or interprets evidence acquired by a capability_dependent item, "
             "the capability Goal owns that delivery. Persona and wording are expression "
-            "concerns, not extra Goals. A mere acknowledgement, confirmation, promise "
+            "concerns, not extra Goals. A manner, mood, persona, or social-presentation "
+            "directive attached to an embodied or capability effect stays an expression "
+            "constraint on that effect. It does not become independently requested "
+            "authored speech merely because speech could also express the desired style. "
+            "If the turn specifies a concrete effect plus only a broad desired social "
+            "impression, with no requested words, information, vocal performance, or "
+            "second effect modality, keep one effect Goal and preserve the impression as "
+            "embodiment-wide expression framing. A conjunction, adjective, or state "
+            "imperative does not supply an audible modality. "
+            "A mere acknowledgement, confirmation, promise "
             "of willingness, or progress prelude for executable work is prospective "
             "conversation attached to the existing responsibility, not a new Goal; "
             "use Interaction Context so later stages do not repeat an already fulfilled "
@@ -2668,7 +2727,17 @@ class GoalAssociationResolver:
             "finished can be authored truthfully only from that work's execution "
             "result, so classify it as capability_result_delivery_only even though "
             "the eventual report is audible. Do not treat the requested timing of a "
-            "result-dependent report as independently authored content. Do not remove "
+            "result-dependent report as independently authored content. When an apparent "
+            "spoken Goal only restates a requested manner, mood, persona, or social "
+            "presentation for the sibling effect, classify it as "
+            "expression_style_constraint_only and preserve that framing in the surviving "
+            "effect Goal's final_goal_description. Such framing is not positive authored "
+            "content merely because it can influence wording or is written as a command. "
+            "independently_requested_authored_content requires actual user-requested "
+            "words, information, a recognizable social reply, or a vocal performance; "
+            "audible_content_summary must summarize that content, not repeat a style or "
+            "state directive and not invent a remark that the user did not request. "
+            "Do not remove "
             "genuinely requested "
             "independent speech. Preserve every explicit material action binding, "
             "including normalized worded quantities, and all valid associations and "
@@ -2682,6 +2751,9 @@ class GoalAssociationResolver:
             "capability_result_delivery_only when the apparent spoken outcome can be "
             "authored only after and from a pending capability result; exclude that "
             "candidate because the capability Goal owns result delivery. Use "
+            "expression_style_constraint_only when a candidate merely promotes the "
+            "manner, mood, persona, or social presentation of a sibling effect into "
+            "speech; exclude it because the surviving effect Goal owns that framing. Use "
             "silence_or_omission_only when compliance consists only of withholding, "
             "omitting, or not repeating content. Descriptive fields on an excluded "
             "candidate are ignored. For every kept candidate, use final_goal_description "
@@ -2747,7 +2819,11 @@ class GoalAssociationResolver:
             "that can be completed independently of pending capability evidence; "
             "a contingent report that pending work has finished depends on execution "
             "evidence and is capability_result_delivery_only, not independently "
-            "authored content. "
+            "authored content. A manner, mood, persona, or social-presentation modifier "
+            "of another effect is expression_style_constraint_only, not independently "
+            "authored content, unless positive audible content is separately requested. "
+            "Never infer an audible modality merely from a broad social impression, "
+            "adjective, state directive, conjunction, or imperative grammar. "
             "silence, omission, and not repeating a topic are delivery constraints even "
             "when the user explicitly requests them. Return one completion-mode decision "
             "for every zero-based candidate Goal index, final descriptions for kept "
@@ -2823,13 +2899,114 @@ class GoalAssociationResolver:
                 architecture_attribution="not_evaluated",
                 retryable=True,
             )
-        review = GoalResponsibilityCoverageReview.model_validate(coverage_raw)
-        self._validate_responsibility_coverage_review(
-            review,
-            request=request,
-            goal_count=goal_count,
+        coverage_raw = self._normalize_responsibility_coverage_decision(
+            coverage_raw,
+            sid=request.sid,
         )
-        return review
+        try:
+            review = GoalResponsibilityCoverageReview.model_validate(coverage_raw)
+            self._validate_responsibility_coverage_review(
+                review,
+                request=request,
+                goal_count=goal_count,
+            )
+            return review
+        except (ValidationError, ValueError) as exc:
+            validation_error = self._validation_error_json(exc)
+            logger.warning(
+                "goal_association_responsibility_coverage_contract_repair_start "
+                "sid=%s validation_errors=%s raw_output=%s",
+                request.sid,
+                validation_error,
+                self._bounded_json(coverage_raw, 4000),
+            )
+            repaired_raw = await self.ollama.generate(
+                self._build_responsibility_coverage_repair_prompt(
+                    request=request,
+                    raw=raw,
+                    invalid_review=coverage_raw,
+                    validation_error=validation_error,
+                ),
+                system=self._responsibility_coverage_system_prompt(),
+                options=generation_options,
+                response_format=self._responsibility_coverage_response_schema(
+                    goal_count
+                ),
+                prompt_family=f"{prompt_family}.contract_repair",
+                turn_id=request.sid,
+                attempt=attempt + 1,
+            )
+            if not isinstance(repaired_raw, dict):
+                raise OllamaGenerationError(
+                    "goal-association responsibility coverage repair response is "
+                    "not a JSON object",
+                    failure_class="structured_output_invalid",
+                    failure_domain="model_contract",
+                    architecture_attribution="not_evaluated",
+                    retryable=True,
+                ) from exc
+            repaired_raw = self._normalize_responsibility_coverage_decision(
+                repaired_raw,
+                sid=request.sid,
+            )
+            review = GoalResponsibilityCoverageReview.model_validate(repaired_raw)
+            self._validate_responsibility_coverage_review(
+                review,
+                request=request,
+                goal_count=goal_count,
+            )
+            logger.info(
+                "goal_association_responsibility_coverage_contract_repair_done "
+                "sid=%s decision=%s",
+                request.sid,
+                review.decision,
+            )
+            return review
+
+    @staticmethod
+    def _normalize_responsibility_coverage_decision(
+        raw: dict[str, Any],
+        *,
+        sid: str,
+    ) -> dict[str, Any]:
+        """Resolve only the redundant decision from validated semantic items.
+
+        The model still owns every role, coverage, independence, and ownership
+        judgment. The Host merely prevents a contradictory top-level boolean from
+        discarding those same judgments.
+        """
+
+        raw_items = raw.get("items")
+        if not isinstance(raw_items, list):
+            return raw
+        try:
+            items = [
+                GoalResponsibilityCoverageItem.model_validate(item)
+                for item in raw_items
+            ]
+        except ValidationError:
+            return raw
+        if not items:
+            return raw
+        raw_unjustified = raw.get("unjustified_candidate_indices") or []
+        if not isinstance(raw_unjustified, list) or not all(
+            isinstance(index, int) for index in raw_unjustified
+        ):
+            return raw
+        derived = GoalResponsibilityCoverageReview.derived_decision(
+            items,
+            raw_unjustified,
+        )
+        if raw.get("decision") == derived:
+            return raw
+        logger.warning(
+            "goal_association_responsibility_coverage_decision_normalized "
+            "sid=%s model_decision=%s derived_decision=%s",
+            sid,
+            raw.get("decision"),
+            derived,
+        )
+        return {**raw, "decision": derived}
 
     @staticmethod
     def _responsibility_coverage_response_schema(goal_count: int) -> dict[str, Any]:
@@ -2850,7 +3027,21 @@ class GoalAssociationResolver:
                 if isinstance(index_items, dict):
                     index_items["type"] = "integer"
                     index_items["enum"] = list(range(max(0, goal_count)))
-        schema["required"] = ["decision", "items", "reason_summary"]
+        unjustified = schema.get("properties", {}).get(
+            "unjustified_candidate_indices"
+        )
+        if isinstance(unjustified, dict):
+            unjustified["uniqueItems"] = True
+            unjustified_items = unjustified.get("items")
+            if isinstance(unjustified_items, dict):
+                unjustified_items["type"] = "integer"
+                unjustified_items["enum"] = list(range(max(0, goal_count)))
+        schema["required"] = [
+            "decision",
+            "items",
+            "unjustified_candidate_indices",
+            "reason_summary",
+        ]
         schema["additionalProperties"] = False
         return schema
 
@@ -2863,7 +3054,10 @@ class GoalAssociationResolver:
             "material responsibilities, constraints, context, and conversational "
             "framing without planning or selecting capabilities. A positive observable "
             "outcome the user can independently judge is a responsibility, not a "
-            "constraint or decoration. Return JSON only."
+            "constraint or decoration. Do not invent a vocal outcome from a broad "
+            "social impression when no words, information, or vocal performance were "
+            "requested. Explicitly list Goal candidates that have no positive "
+            "responsibility owner. Return JSON only."
         )
 
     def _build_responsibility_coverage_prompt(
@@ -2884,7 +3078,14 @@ class GoalAssociationResolver:
             "outcome Chromie owes, role=constraint for a modifier/prohibition/timing "
             "condition on such an outcome, role=context for reference/background that "
             "does not itself need completion, and role=framing for politeness or social "
-            "preamble attached to substantive work.\n\n"
+            "preamble attached to substantive work. A manner, mood, persona, or social-"
+            "presentation modifier attached to a requested effect is role=constraint "
+            "on that effect; it is not a second responsibility merely because speech "
+            "could also convey the style. When a concrete effect is requested together "
+            "with a broad desired social impression but no words, information, vocal "
+            "performance, or second effect modality is specified, that impression is "
+            "embodiment-wide framing on the concrete effect. Do not infer speech from "
+            "an adjective, state directive, conjunction, or imperative grammar.\n\n"
             "Set independently_satisfiable=true only when the user could reasonably "
             "judge that positive outcome completed even if sibling outcomes did not "
             "happen. Every independently satisfiable responsibility must own its own "
@@ -2898,10 +3099,17 @@ class GoalAssociationResolver:
             "coverage=missing when material meaning has no Goal owner, and "
             "clarification_required only when the human-level responsibility itself "
             "cannot be determined without asking the user. Context and framing have "
-            "no Goal indices. Every Goal candidate must be justified by at least one "
-            "covered responsibility. decision=accept only when no material meaning is "
-            "missing/ambiguous and no Goal candidate owns more than one independently "
-            "satisfiable responsibility. Otherwise decision=reject.\n\n"
+            "no Goal indices. Coverage also requires the candidate's output_mode and "
+            "observable completion meaning to match the requested responsibility: "
+            "speech cannot cover requested body motion, media control, external "
+            "evidence work, or a vocal performance. Every Goal candidate must be "
+            "justified by at least one covered role=responsibility item; a constraint "
+            "alone never justifies another Goal. Put every candidate index without "
+            "positive responsibility ownership in unjustified_candidate_indices. Use "
+            "[] only when all candidates have such ownership. decision=accept only when "
+            "no material meaning is missing/ambiguous, no Goal candidate owns more than "
+            "one independently satisfiable responsibility, and "
+            "unjustified_candidate_indices is empty. Otherwise decision=reject.\n\n"
             "Do not add, remove, rename, plan, execute, or complete Goals. Do not use "
             "provider availability to decide whether a responsibility exists. An "
             "unavailable requested effect remains a responsibility.\n\n"
@@ -2911,6 +3119,29 @@ class GoalAssociationResolver:
             "coverage must still be anchored by source_excerpt from the final turn):\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 3000)}\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
+        )
+
+    def _build_responsibility_coverage_repair_prompt(
+        self,
+        *,
+        request: AgentRunRequest,
+        raw: dict[str, Any],
+        invalid_review: dict[str, Any],
+        validation_error: str,
+    ) -> str:
+        return (
+            self._build_responsibility_coverage_prompt(request=request, raw=raw)
+            + "\n\nThe previous audit JSON was internally invalid. Re-audit from the "
+            "authoritative turn; do not merely flip decision or preserve a prior "
+            "coverage label. A responsibility is covered only when the candidate "
+            "Goal preserves the kind of observable completion the user requested. "
+            "A speech response does not cover requested body motion, media control, "
+            "external evidence work, or a vocal performance. Mark changed or "
+            "substituted completion meaning as coverage=missing and decision=reject.\n\n"
+            "Previous invalid audit JSON:\n"
+            f"{self._bounded_json(invalid_review, 5000)}\n\n"
+            "Mechanical validation feedback JSON:\n"
+            f"{validation_error}"
         )
 
     @staticmethod
@@ -2938,8 +3169,6 @@ class GoalAssociationResolver:
                     "responsibility coverage references unknown Goal candidate indices: "
                     + ",".join(str(value) for value in invalid_indices)
                 )
-        if review.decision != "accept":
-            return
         responsibility_owned_indices = {
             goal_index
             for item in review.items
@@ -2947,6 +3176,23 @@ class GoalAssociationResolver:
             for goal_index in item.candidate_goal_indices
         }
         expected_indices = set(range(goal_count))
+        unjustified_indices = set(review.unjustified_candidate_indices)
+        invalid_unjustified = sorted(unjustified_indices - expected_indices)
+        if invalid_unjustified:
+            raise ValueError(
+                "responsibility coverage names unknown unjustified Goal candidates: "
+                + ",".join(str(value) for value in invalid_unjustified)
+            )
+        mechanically_unjustified = expected_indices - responsibility_owned_indices
+        if unjustified_indices != mechanically_unjustified:
+            raise ValueError(
+                "responsibility coverage must explicitly name every and only Goal "
+                "candidate without positive responsibility ownership; expected="
+                f"{sorted(mechanically_unjustified)} actual="
+                f"{sorted(unjustified_indices)}"
+            )
+        if review.decision != "accept":
+            return
         if responsibility_owned_indices != expected_indices:
             missing = sorted(expected_indices - responsibility_owned_indices)
             extra = sorted(responsibility_owned_indices - expected_indices)
@@ -2981,8 +3227,42 @@ class GoalAssociationResolver:
             + self._bounded_json(coverage_review.model_dump(mode="json"), 7000)
             + "\n\nReturn a fresh complete Goal segmentation that gives every independently "
             "satisfiable responsibility exactly one Goal owner while keeping "
-            "constraints/context/framing subordinate."
+            "constraints/context/framing subordinate. If no audit item has "
+            "coverage=clarification_required, the human responsibility is already "
+            "semantically defined: return created Goals and keep clarification empty. "
+            "Do not use clarification to explain your segmentation."
         )
+
+    @staticmethod
+    def _responsibility_resegmentation_response_schema(
+        response_schema: dict[str, Any],
+        *,
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        coverage_review: GoalResponsibilityCoverageReview,
+    ) -> dict[str, Any]:
+        """Close the clarify branch when the audit found no semantic ambiguity."""
+
+        schema = copy.deepcopy(response_schema)
+        clarification_required = any(
+            item.coverage == "clarification_required"
+            for item in coverage_review.items
+        )
+        if clarification_required or output_type is not GoalSegmentationModelOutput:
+            return schema
+        properties = schema.get("properties", {})
+        decision = properties.get("decision")
+        if isinstance(decision, dict):
+            decision["type"] = "string"
+            decision["enum"] = ["create_goals"]
+        clarification = properties.get("clarification")
+        if isinstance(clarification, dict):
+            clarification["maxLength"] = 0
+        new_goals = properties.get("new_goals")
+        if isinstance(new_goals, dict):
+            new_goals["minItems"] = 1
+        return schema
 
     @staticmethod
     def _binding_audit_required(raw: dict[str, Any]) -> bool:

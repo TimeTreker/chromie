@@ -44,12 +44,17 @@ class SocialAttentionPlanner:
         if client is None or not isinstance(candidates, list) or not candidates:
             return None
 
+        session_id = (
+            request.session_id
+            if isinstance(request, SocialAttentionRequest)
+            else request.sid
+        )
         prompt = self._prompt(request, candidates)
         started = time.perf_counter()
         logger.info(
             "social_attention_plan_start sid=%s mode=%s timeout_ms=%s num_ctx=%s "
             "num_predict=%s prompt_chars=%s candidates=%s",
-            request.sid,
+            session_id,
             self.services.effective_social_attention_mode(),
             getattr(client, "timeout_ms", None),
             int(self.services.social_attention_num_ctx),
@@ -89,7 +94,7 @@ class SocialAttentionPlanner:
                 "social_attention_plan_failed sid=%s failure_class=%s failure_domain=%s "
                 "architecture_attribution=%s retryable=%s elapsed_ms=%.1f "
                 "error_type=%s error=%s",
-                request.sid,
+                session_id,
                 failure.get("failure_class"),
                 failure.get("failure_domain"),
                 failure.get("architecture_attribution"),
@@ -115,7 +120,7 @@ class SocialAttentionPlanner:
             logger.warning(
                 "social_attention_plan_invalid sid=%s failure_class=%s failure_domain=%s "
                 "architecture_attribution=%s retryable=true elapsed_ms=%.1f error=%s",
-                request.sid,
+                session_id,
                 failure["failure_class"],
                 failure["failure_domain"],
                 failure["architecture_attribution"],
@@ -138,7 +143,7 @@ class SocialAttentionPlanner:
             logger.warning(
                 "social_attention_plan_invalid sid=%s failure_class=%s failure_domain=%s "
                 "architecture_attribution=%s retryable=%s elapsed_ms=%.1f error=%s",
-                request.sid,
+                session_id,
                 failure.get("failure_class"),
                 failure.get("failure_domain"),
                 failure.get("architecture_attribution"),
@@ -157,7 +162,7 @@ class SocialAttentionPlanner:
         logger.info(
             "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f "
             "architecture_attribution=not_evaluated ms=%.1f",
-            request.sid,
+            session_id,
             plan.decision,
             len(plan.behaviors),
             plan.confidence,
@@ -222,6 +227,11 @@ class SocialAttentionPlanner:
             "priority": priority,
             "goal_interpretation_actions": actions,
             "interaction_state": request.context.get("social_attention_interaction_state") or {},
+            "social_interaction_style": request.context.get("social_interaction_style") or {},
+            "recent_auxiliary_behavior_evidence": request.context.get(
+                "recent_auxiliary_behavior_evidence"
+            )
+            or [],
             "recent_history": list(request.history[-4:]),
             "attention_target_evidence": request.context.get("social_attention_target_evidence")
             or {"available": False},
@@ -231,10 +241,16 @@ class SocialAttentionPlanner:
         return (
             "Plan optional Social Attention for the supplied interaction event.\n"
             "The event is a state transition such as understanding becoming ready, work starting, waiting, evidence arriving, or speaking; it is not a user Goal.\n"
-            "Attention is the goal; blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
+            "Social Attention is subordinate decoration, never the user Goal. Blinking, gaze, nodding, and other supplied Capabilities are only possible expressions.\n"
+            "Every explicit user action remains mandatory, exact, and completion-owning primary Activity when represented in interaction_state. "
+            "Never replace it, duplicate its capability, change its count or args, or treat decoration as its completion. "
+            "When the utterance and supplied primary context support a playful, warm, or otherwise social framing, you may add at most a different compatible cue; this is optional, not an automatic consequence of any body-action request. "
+            "Choose none when the user requires exact-only action or stillness, or when no different compatible cue is supported.\n"
             "Choose decision=none when speech alone is natural, when a gesture would be repetitive, distracting, "
             "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "
             "one is available.\n"
+            "Use owner-approved Social Interaction Style and recent auxiliary evidence to keep variation contextual and restrained. "
+            "A pleasant surprise is bounded contextual variation, never an unrelated random gesture.\n"
             "Use only supplied semantic target evidence. Never invent a perceived person, target location, "
             "body calibration, joint target, or controller parameter.\n"
             "Do not create or change the user's primary task or response text. Do not add speech, tool calls, memory writes, or raw "
