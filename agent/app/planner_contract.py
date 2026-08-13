@@ -92,6 +92,18 @@ _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
 )
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
+_INFORMATION_TEMPORAL_ENTITY_TYPES = frozenset(
+    {
+        "day_part",
+        "date",
+        "date_range",
+        "time",
+        "time_frame",
+        "time_period",
+        "temporal_period",
+        "temporal_scope",
+    }
+)
 _LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
 
@@ -1377,6 +1389,72 @@ def validate_resource_responsibility_capability_grounding(
         )
 
 
+def canonical_resource_argument_response_schema(
+    base_schema: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Make one canonical resource Goal's provider projection read-only.
+
+    Capability selection and step ownership remain model-authored. When the turn
+    has exactly one canonical resource Goal, any selected Capability branch that
+    accepts complete resource/source/recipient objects receives those objects as
+    decoder constants instead of a second writable semantic copy.
+    """
+
+    resource_goals = [
+        goal
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and isinstance(goal.get("resource_responsibility"), dict)
+    ]
+    if len(resource_goals) != 1 or len(authoritative_goals) != 1:
+        return base_schema
+    responsibility = resource_goals[0]["resource_responsibility"]
+    exact_arguments = {
+        name: copy.deepcopy(responsibility[name])
+        for name in ("resource", "source", "recipient")
+        if isinstance(responsibility.get(name), dict)
+    }
+    if not exact_arguments:
+        return base_schema
+
+    schema = copy.deepcopy(base_schema)
+    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+    branches = step_schema.get("oneOf") if isinstance(step_schema, dict) else None
+    if not isinstance(branches, list):
+        return base_schema
+
+    constrained = False
+    for branch in branches:
+        properties = branch.get("properties") if isinstance(branch, dict) else None
+        args = properties.get("args") if isinstance(properties, dict) else None
+        argument_properties = args.get("properties") if isinstance(args, dict) else None
+        if not isinstance(argument_properties, dict):
+            continue
+        required = args.setdefault("required", [])
+        for name, value in exact_arguments.items():
+            if name not in argument_properties:
+                continue
+            argument_properties[name] = {"const": value}
+            if isinstance(required, list) and name not in required:
+                required.append(name)
+            constrained = True
+    if not constrained:
+        return base_schema
+
+    parameter_resolutions = schema.get("properties", {}).get(
+        "parameter_resolutions"
+    )
+    if isinstance(parameter_resolutions, dict):
+        parameter_resolutions["maxItems"] = 0
+        parameter_resolutions["description"] = (
+            "Canonical resource/source/recipient arguments are deterministic "
+            "read-only projections and require no Planner-authored resolutions."
+        )
+    return schema
+
+
 def resource_grounding_repair_response_schema(
     base_schema: dict[str, Any],
     *,
@@ -2102,12 +2180,28 @@ def validate_goal_binding_argument_grounding(
         return
 
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
+    information_goal_ids: set[str] = set()
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
         if goal_id:
             bindings_by_goal[goal_id] = _goal_binding_map(goal)
+            responsibility = goal.get("resource_responsibility")
+            resource = (
+                responsibility.get("resource")
+                if isinstance(responsibility, dict)
+                else None
+            )
+            if isinstance(resource, dict) and resource.get("kind") == "information":
+                information_goal_ids.add(goal_id)
+
+    def nested_values(value: Any) -> list[Any]:
+        if isinstance(value, dict):
+            return [item for child in value.values() for item in nested_values(child)]
+        if isinstance(value, list):
+            return [item for child in value for item in nested_values(child)]
+        return [value]
 
     for step in output.steps:
         claimed_goal_ids = [
@@ -2146,6 +2240,24 @@ def validate_goal_binding_argument_grounding(
                 raise ValueError(
                     "planner step argument contradicts authoritative Goal binding: "
                     f"{step.step_id}.{name}={actual!r}, expected={expected!r}"
+                )
+
+        argument_values = nested_values(step.args)
+        for goal_id in claimed_goal_ids:
+            if goal_id not in information_goal_ids:
+                continue
+            for name, binding in bindings_by_goal[goal_id].items():
+                if binding["entity_type"] not in _INFORMATION_TEMPORAL_ENTITY_TYPES:
+                    continue
+                expected = binding["value"]
+                if any(
+                    _material_values_equal(actual, expected, list_compatible=False)
+                    for actual in argument_values
+                ):
+                    continue
+                raise ValueError(
+                    "information capability step omits authoritative temporal scope: "
+                    f"goal_id={goal_id!r}, binding={name!r}, value={expected!r}"
                 )
 
         if step.capability_id == "chromie.memory.retrieve_verified_tool_result":
@@ -2527,6 +2639,8 @@ def validate_explicit_numeric_parameter_grounding(
                 for item in value
                 for number in nested_numbers(item)
             }
+        if isinstance(value, str):
+            return set(literals(value))
         number = numeric(value)
         return {number} if number is not None else set()
 
@@ -3326,6 +3440,7 @@ def canonical_plan_response_schema(
             allowed_skills=allowed_skills,
             capability_input_schemas=capability_input_schemas,
         )
+    _constrain_terminal_unresolved(schema)
     return schema
 
 
@@ -3879,6 +3994,7 @@ def fast_multi_goal_response_schema(
     schema["properties"] = {
         key: properties[key] for key in preferred_property_order if key in properties
     }
+    _constrain_terminal_unresolved(schema)
     return schema
 
 
@@ -3958,6 +4074,40 @@ def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
             ]
         }
     )
+
+
+def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
+    """Align decoder branches with terminal unresolved-work validators."""
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if (
+                isinstance(properties, dict)
+                and isinstance(properties.get("disposition"), dict)
+                and isinstance(properties.get("unresolved"), dict)
+            ):
+                node.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {
+                                "disposition": {"enum": ["execute", "respond"]}
+                            },
+                            "required": ["disposition"],
+                        },
+                        "then": {
+                            "properties": {"unresolved": {"maxItems": 0}},
+                            "required": ["unresolved"],
+                        },
+                    }
+                )
+            for value in list(node.values()):
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
 
 
 def planner_contract_diagnostics(

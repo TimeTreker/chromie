@@ -136,9 +136,6 @@ class SocialAttentionPlanner:
             return None
         repair_attempted = False
         repair_succeeded = False
-        semantic_review_attempted = False
-        semantic_review_succeeded = False
-        semantic_review_error = ""
         validation_error: Exception | None = None
         try:
             plan = SocialAttentionPlan.model_validate(raw)
@@ -199,69 +196,6 @@ class SocialAttentionPlanner:
                 validation_error,
             )
             return None
-        if self._none_semantic_review_warranted(request, candidates, plan):
-            semantic_review_attempted = True
-            logger.info(
-                "social_attention_none_semantic_review_start sid=%s",
-                session_id,
-            )
-            try:
-                reviewed = await client.generate(
-                    self._none_semantic_review_prompt(prompt=prompt),
-                    system=system_prompt,
-                    options={**generation_options, "temperature": 0.35},
-                    response_format=response_schema,
-                    prompt_family="social_attention.none_semantic_review",
-                    turn_id=session_id,
-                    attempt=3 if repair_attempted else 2,
-                )
-                if not isinstance(reviewed, dict):
-                    raise ValueError(
-                        "social attention none semantic review did not return a JSON object"
-                    )
-                try:
-                    plan = SocialAttentionPlan.model_validate(reviewed)
-                except ValidationError as review_validation_exc:
-                    reviewed_repair = await client.generate(
-                        self._repair_prompt(
-                            prompt=self._none_semantic_review_prompt(prompt=prompt),
-                            raw=reviewed,
-                            validation_error=review_validation_exc,
-                        ),
-                        system=system_prompt,
-                        options={**generation_options, "temperature": 0.2},
-                        response_format=response_schema,
-                        prompt_family=(
-                            "social_attention.none_semantic_review_contract_repair"
-                        ),
-                        turn_id=session_id,
-                        attempt=4 if repair_attempted else 3,
-                    )
-                    if not isinstance(reviewed_repair, dict):
-                        raise ValueError(
-                            "social attention none-review contract repair did not "
-                            "return a JSON object"
-                        ) from review_validation_exc
-                    plan = SocialAttentionPlan.model_validate(reviewed_repair)
-                semantic_review_succeeded = True
-                logger.info(
-                    "social_attention_none_semantic_review_done sid=%s "
-                    "status=success decision=%s behaviors=%s",
-                    session_id,
-                    plan.decision,
-                    len(plan.behaviors),
-                )
-            except Exception as review_exc:
-                # Decoration is fail-soft. Preserve the first valid no-decoration
-                # decision when its independent semantic review is unavailable.
-                semantic_review_error = (
-                    f"{type(review_exc).__name__}: {str(review_exc)[:400]}"
-                )
-                logger.warning(
-                    "social_attention_none_semantic_review_failed sid=%s error=%s",
-                    session_id,
-                    semantic_review_error,
-                )
         planner_ms = (time.perf_counter() - started) * 1000.0
         request.context.pop("social_attention_failure", None)
         plan.metadata = {
@@ -272,15 +206,6 @@ class SocialAttentionPlanner:
                 "attempted": repair_attempted,
                 "succeeded": repair_succeeded,
                 "attempt_count": 2 if repair_attempted else 1,
-            },
-            "none_semantic_review": {
-                "attempted": semantic_review_attempted,
-                "succeeded": semantic_review_succeeded,
-                **(
-                    {"error": semantic_review_error}
-                    if semantic_review_error
-                    else {}
-                ),
             },
         }
         logger.info(
@@ -388,89 +313,6 @@ class SocialAttentionPlanner:
             + cls._validation_error_json(validation_error)
         )
 
-    @staticmethod
-    def _none_semantic_review_warranted(
-        request: AgentRunRequest | SocialAttentionRequest,
-        candidates: list[dict[str, Any]],
-        plan: SocialAttentionPlan,
-    ) -> bool:
-        """Detect a fresh, policy-backed opportunity needing independent review.
-
-        This trigger does not select a gesture. It uses only typed policy, event,
-        recency, and catalog executability facts to decide whether a model-authored
-        ``none`` deserves one bounded second semantic judgment.
-        """
-
-        if plan.decision != "none":
-            return False
-        event = (
-            request.event
-            if isinstance(request, SocialAttentionRequest)
-            else str(request.context.get("social_attention_event") or "speaking")
-        )
-        if event not in {"understanding_ready", "work_started"}:
-            return False
-        style = request.context.get("social_interaction_style")
-        if not isinstance(style, dict) or style.get("owner_approved") is not True:
-            return False
-        recent = request.context.get("recent_auxiliary_behavior_evidence")
-        if isinstance(recent, list) and recent:
-            return False
-        interaction_state = request.context.get("social_attention_interaction_state")
-        raw_primary_ids = (
-            interaction_state.get("primary_capability_ids")
-            if isinstance(interaction_state, dict)
-            else []
-        )
-        if not isinstance(raw_primary_ids, list):
-            raw_primary_ids = []
-        primary_ids = {
-            str(item).strip()
-            for item in raw_primary_ids
-            if str(item).strip()
-        }
-        return any(
-            isinstance(candidate, dict)
-            and str(candidate.get("capability_id") or "").strip() not in primary_ids
-            and candidate.get("available") is not False
-            and candidate.get("interaction_executable") is True
-            and not bool(candidate.get("requires_confirmation"))
-            and candidate.get("can_run_parallel") is True
-            and candidate.get("parallel_metadata_declared") is True
-            for candidate in candidates
-        )
-
-    @staticmethod
-    def _none_semantic_review_prompt(
-        *,
-        prompt: str,
-    ) -> str:
-        return (
-            prompt
-            + "\n\nIndependently review the first planner's decision=none. Do not "
-            "copy, preserve, or assume that decision or its explanation is correct. "
-            "Re-evaluate the "
-            "actual interaction event, owner-approved style, recent evidence, and "
-            "eligible catalog semantics, then return one complete fresh plan. A "
-            "concrete, direct, or capability-dependent request is still interpersonal "
-            "engagement and is not evidence of exact-only action, stillness, no social "
-            "context, or inevitable competition. Those restrictions require actual "
-            "supplied evidence. The candidate list for this bounded review already "
-            "contains at least one execution-eligible independent or parallel-safe "
-            "cue, and recent evidence contains no decoration requiring cooldown. "
-            "Under an owner-approved courteous style, one subtle cue is the expected "
-            "default for this fresh acknowledgement moment unless the supplied scene "
-            "contains a concrete counter-signal. Absence of playful, emotional, or "
-            "explicitly social wording is not a counter-signal. When target evidence "
-            "is unavailable, select only an untargeted behavior and keep target.source "
-            "and target.target_ref equal to none. Preserve decision=none when actual "
-            "scene-specific "
-            "evidence genuinely makes stillness more natural, safer, repetitive, "
-            "unsupported, or conflicting. Never force expression merely to reverse "
-            "the first result. The first result's rationale is deliberately omitted "
-            "because it is not evidence. Return a fresh judgment from the interaction "
-            "context above."
-        )
 
     def _prompt(
         self,

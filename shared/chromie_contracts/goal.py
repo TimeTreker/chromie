@@ -255,6 +255,11 @@ class GoalAssociationResolution(BaseModel):
 
     schema_version: int = Field(default=1, ge=1)
     turn_id: str = Field(min_length=1)
+    resolution_status: Literal[
+        "resolved",
+        "needs_clarification",
+        "fail_closed",
+    ] = "resolved"
     associations: list[GoalAssociation] = Field(default_factory=list)
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
@@ -264,6 +269,21 @@ class GoalAssociationResolution(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_explicit_terminal_status(cls, value: Any) -> Any:
+        """Keep older producers compatible while making terminal state explicit."""
+
+        if not isinstance(value, dict) or value.get("resolution_status"):
+            return value
+        normalized = dict(value)
+        normalized["resolution_status"] = (
+            "needs_clarification"
+            if str(normalized.get("clarification") or "").strip()
+            else "resolved"
+        )
+        return normalized
 
     @field_validator("turn_id", "clarification", "reason_summary", mode="before")
     @classmethod
@@ -322,6 +342,32 @@ class GoalAssociationResolution(BaseModel):
         ):
             raise ValueError(
                 "clarification result must not also propose goal or discourse changes"
+            )
+        if self.resolution_status == "fail_closed":
+            if (
+                self.clarification
+                or self.new_goals
+                or self.associations
+                or self.referent_updates
+                or self.resolved_references
+                or self.progress_bindings
+                or self.confidence != 0.0
+            ):
+                raise ValueError(
+                    "fail-closed resolution must contain no semantic operation, "
+                    "clarification, or confidence"
+                )
+            return self
+        if (
+            self.resolution_status == "needs_clarification"
+            and not self.clarification
+        ):
+            raise ValueError(
+                "needs_clarification resolution requires a user-answerable question"
+            )
+        if self.resolution_status == "resolved" and self.clarification:
+            raise ValueError(
+                "resolved status cannot carry a clarification question"
             )
         if (
             not self.clarification
@@ -386,6 +432,7 @@ class GoalAssociationResolution(BaseModel):
         projection = {
             "schema_version": self.schema_version,
             "turn_id": self.turn_id,
+            "resolution_status": self.resolution_status,
             "associations": associations,
             "new_goals": new_goals,
             "referent_updates": referent_updates,

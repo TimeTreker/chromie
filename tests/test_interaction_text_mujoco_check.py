@@ -445,6 +445,47 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_validate_contract_accepts_exact_local_tool_skill(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "tool",
+                "intent": "weather_lookup",
+                "confidence": 0.99,
+                "language": "en-US",
+                "source": "llm",
+                "actions": [],
+            }
+        )
+        response = InteractionResponse.model_validate(
+            {
+                "skills": [
+                    {
+                        "skill_id": "chromie.weather.lookup",
+                        "args": {
+                            "location": "chongqing",
+                            "period": "tonight",
+                        },
+                        "timing": "sequential",
+                    }
+                ]
+            }
+        )
+
+        errors = validate_contract(
+            route=route,
+            response=response,
+            expected_route="tool",
+            expected_skills=["chromie.weather.lookup"],
+            expect_no_skills=False,
+            expected_args=[
+                (0, "location", "chongqing"),
+                (0, "period", "tonight"),
+            ],
+            arg_tolerance=1e-6,
+        )
+
+        self.assertEqual(errors, [])
+
     def test_build_debug_summary_describes_route_stages_tasks_and_skills(self) -> None:
         route = RouteDecision.model_validate(
             {

@@ -12,6 +12,7 @@ from agent.app.planner_contract import (
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
     canonical_goal_grounding,
+    canonical_resource_argument_response_schema,
     resource_grounding_repair_response_schema,
     validate_resource_responsibility_capability_grounding,
 )
@@ -141,9 +142,24 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             resource=ResourceDescriptor(
                 kind="physical_object",
                 description="a bottle of water",
-                quantity="one",
+                quantity="1",
             ),
-            source=ResourceSource(status="known", description="100 meters ahead"),
+            source=ResourceSource(
+                status="known",
+                description="100 meters ahead",
+                bindings={
+                    "distance": {
+                        "name": "distance",
+                        "entity_type": "distance",
+                        "value": "100",
+                    },
+                    "direction": {
+                        "name": "direction",
+                        "entity_type": "direction",
+                        "value": "ahead",
+                    },
+                },
+            ),
             recipient=ResourceRecipient(description="requester"),
             delivery_mode="physical_handover",
         )
@@ -163,6 +179,160 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     **payload,
                     "metadata": {"capability_id": "soridormi.fetch_object"},
                 }
+            )
+
+    def test_canonical_resource_projection_is_decoder_read_only(self) -> None:
+        base_schema = {
+            "$defs": {
+                "PlannerModelStep": {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "capability_id": {
+                                    "enum": [
+                                        "soridormi.acquire_and_deliver_resource"
+                                    ]
+                                },
+                                "args": {
+                                    "type": "object",
+                                    "properties": {
+                                        "resource": {"type": "object"},
+                                        "source": {"type": "object"},
+                                        "recipient": {"type": "object"},
+                                    },
+                                    "required": [],
+                                },
+                            }
+                        }
+                    ]
+                }
+            },
+            "properties": {
+                "parameter_resolutions": {
+                    "type": "array",
+                    "maxItems": 8,
+                }
+            },
+        }
+
+        projected = canonical_resource_argument_response_schema(
+            base_schema,
+            authoritative_goals=[self._resource_goal()],
+        )
+        args = projected["$defs"]["PlannerModelStep"]["oneOf"][0][
+            "properties"
+        ]["args"]
+        responsibility = self._resource_goal()["resource_responsibility"]
+        self.assertEqual(
+            args["properties"]["resource"]["const"],
+            responsibility["resource"],
+        )
+        self.assertEqual(
+            args["properties"]["source"]["const"],
+            responsibility["source"],
+        )
+        self.assertEqual(
+            args["properties"]["recipient"]["const"],
+            responsibility["recipient"],
+        )
+        self.assertEqual(
+            set(args["required"]),
+            {"resource", "source", "recipient"},
+        )
+        self.assertEqual(
+            projected["properties"]["parameter_resolutions"]["maxItems"],
+            0,
+        )
+        self.assertEqual(
+            base_schema["properties"]["parameter_resolutions"]["maxItems"],
+            8,
+        )
+
+    def test_canonical_known_source_rejects_summary_without_typed_bindings(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "source.bindings"):
+            ResourceSource(
+                status="known",
+                description="100 meters ahead",
+            )
+
+    def test_canonical_source_summary_rejects_unbound_numeric_fact(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "numeric facts.*source.bindings",
+        ):
+            ResourceSource(
+                status="known",
+                description="100 meters ahead",
+                bindings={
+                    "direction": {
+                        "name": "direction",
+                        "entity_type": "direction",
+                        "value": "ahead",
+                    }
+                },
+            )
+
+    def test_canonical_resource_rejects_duplicate_typed_fact_across_owners(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "both resource attributes and source bindings",
+        ):
+            AcquireAndDeliverResource(
+                resource=ResourceDescriptor(
+                    kind="physical_object",
+                    description="a bottle of water",
+                    quantity="1",
+                    attributes={
+                        "distance_to_source": {
+                            "name": "distance_to_source",
+                            "entity_type": "distance",
+                            "value": "100m",
+                        }
+                    },
+                ),
+                source=ResourceSource(
+                    status="known",
+                    description="100 meters ahead",
+                    bindings={
+                        "location_offset": {
+                            "name": "location_offset",
+                            "entity_type": "distance",
+                            "value": "100m",
+                        }
+                    },
+                ),
+                delivery_mode="physical_handover",
+            )
+
+    def test_canonical_resource_rejects_equivalent_measurement_aliases(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "equivalent typed measurement.*resource attributes and source",
+        ):
+            AcquireAndDeliverResource(
+                resource=ResourceDescriptor(
+                    kind="physical_object",
+                    description="a bottle of water",
+                    quantity="1",
+                    attributes={
+                        "distance": {
+                            "name": "distance",
+                            "entity_type": "measurement",
+                            "value": "100m",
+                        }
+                    },
+                ),
+                source=ResourceSource(
+                    status="known",
+                    bindings={
+                        "location_description": {
+                            "name": "location_description",
+                            "entity_type": "location_instruction",
+                            "value": "100 meters ahead",
+                        }
+                    },
+                ),
+                delivery_mode="physical_handover",
             )
 
     def test_builtin_information_providers_share_resource_responsibility(self) -> None:
@@ -750,20 +920,27 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     {
                         "description": "Fetch a bottle of water and deliver it to the requester.",
                         "output_mode": "body_action",
-                        "bindings": [
-                            {
-                                "name": "source_location",
-                                "entity_type": "place",
-                                "value": "100 meters ahead",
-                                "confidence": 1.0,
-                            }
-                        ],
+                        "bindings": [],
                         "resource_responsibility": {
-                            "resource_kind": "physical_object",
-                            "resource_description": "a bottle of water",
-                            "source_status": "known",
-                            "source_binding_names": ["source_location"],
-                            "recipient_description": "requester",
+                            "resource": {
+                                "kind": "physical_object",
+                                "description": "a bottle of water",
+                                "quantity": "1",
+                                "attributes": [],
+                            },
+                            "source": {
+                                "status": "known",
+                                "description": "100 meters ahead",
+                                "bindings": [
+                                    {
+                                        "name": "source_location",
+                                        "entity_type": "place",
+                                        "value": "100 meters ahead",
+                                        "confidence": 1.0,
+                                    }
+                                ],
+                            },
+                            "recipient": {"description": "requester"},
                             "delivery_mode": "physical_handover",
                         },
                     }
@@ -804,6 +981,10 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         self.assertEqual(
             responsibility.source.bindings["source_location"]["value"],
             "100 meters ahead",
+        )
+        self.assertEqual(
+            set(resolution.new_goals[0].object["bindings"]),
+            {"source_location", "quantity"},
         )
         serialized = responsibility.model_dump(mode="json")
         self.assertNotIn("provider_id", serialized)

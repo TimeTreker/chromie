@@ -611,7 +611,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "d2a2f3c358fc4ea0d5438046c46d851fc057d19a31aed8315fba069fa26713ba",
+      "body_sha256": "f134df9636ac9ef47aab7364590ece2f367e81276e0f07b37f00424f48c943f8",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -812,20 +812,6 @@
       "review_status": "reviewed",
       "body_sha256": "fb3ca836c46246b2306e3f1a7ca2f4279b180c42ecbdb7c46bd9325f3ecaad74",
       "failure_signals": [
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/social_attention.py",
-      "symbol": "SocialAttentionPlanner.plan",
-      "ordinal": 3,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Retain an unavailable optional none-decision semantic review as typed diagnostic metadata while preserving the first valid fail-soft no-decoration plan.",
-      "review_status": "reviewed",
-      "body_sha256": "8e556eb9899f9008b15e2fc749ae72a1f68d70169520071eb9cb301e1957f64a",
-      "failure_signals": [
-        "diagnostic",
         "state_update"
       ]
     },

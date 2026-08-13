@@ -447,7 +447,19 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "clarification": "",
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
-                }
+                },
+                {
+                    "items": [
+                        {
+                            "source_excerpt": "F.",
+                            "role": "responsibility",
+                            "coverage": "covered",
+                            "independently_satisfiable": True,
+                            "candidate_goal_indices": [0],
+                        }
+                    ],
+                    "reason_summary": "The candidate covers the conversational act.",
+                },
             ]
         )
         resolution = await GoalAssociationResolver(ollama).resolve(  # type: ignore[arg-type]
@@ -461,7 +473,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             resolution.new_goals[0].description,
             "Respond naturally to F.",
         )
-        self.assertEqual(len(ollama.schemas), 1)
+        self.assertEqual(len(ollama.schemas), 2)
         self.assertEqual(
             ollama.schemas[0]["properties"]["decision"]["enum"],
             ["create_goals", "clarify"],

@@ -3,465 +3,25 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+from jsonschema import Draft202012Validator
+from pydantic import ValidationError
+
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import (
     GoalAssociationModelGoal,
-    GoalAssociationModelOutput,
     GoalAssociationResolver,
-    GoalResponsibilityCoverageReview,
+    GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
 )
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
-
-
-class GoalExecutionContractTests(unittest.TestCase):
-    def test_response_schema_prevents_canonical_binding_category_conflicts(self):
-        schema = GoalAssociationResolver._response_schema(
-            GoalSegmentationModelOutput,
-            [],
-            [],
-        )
-
-        binding_schema = schema["$defs"]["GoalAssociationModelBinding"]
-        clauses = binding_schema["allOf"]
-        distance_clause = next(
-            clause
-            for clause in clauses
-            if clause["if"]["properties"]["name"].get("enum") == ["distance"]
-        )
-        self.assertEqual(
-            distance_clause["then"]["properties"]["entity_type"]["enum"],
-            ["distance"],
-        )
-
-    def test_canonical_binding_name_cannot_contradict_entity_type(self):
-        model_output = GoalSegmentationModelOutput.model_validate(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": "Move a specified distance.",
-                        "output_mode": "body_action",
-                        "bindings": [
-                            {
-                                "name": "distance",
-                                "entity_type": "quantity",
-                                "value": "100",
-                            }
-                        ],
-                    }
-                ],
-                "confidence": 1.0,
-            }
-        )
-
-        self.assertEqual(
-            GoalAssociationResolver._binding_semantic_contract_conflicts(
-                model_output
-            ),
-            ["new_goals[0].bindings[0]=distance/quantity"],
-        )
-
-    def test_responsibility_coverage_cannot_accept_overmerged_independent_outcomes(self):
-        with self.assertRaisesRegex(ValueError, "over-merged"):
-            GoalResponsibilityCoverageReview.model_validate(
-                responsibility_coverage(
-                    responsibility_item("walk", 0),
-                    responsibility_item("sing", 0),
-                )
-            )
-
-    def test_responsibility_coverage_rejects_conflicting_roles_for_same_fragment(self):
-        with self.assertRaisesRegex(ValueError, "exactly one coverage item"):
-            GoalResponsibilityCoverageReview.model_validate(
-                responsibility_coverage(
-                    responsibility_item("walk forward 100 meters", 0),
-                    responsibility_item(
-                        "walk forward 100 meters",
-                        0,
-                        role="constraint",
-                    ),
-                    responsibility_item("bring me water", 1),
-                )
-            )
-
-    def test_responsibility_coverage_cannot_duplicate_one_responsibility_owner(self):
-        with self.assertRaisesRegex(ValueError, "exactly one coverage item"):
-            GoalResponsibilityCoverageReview.model_validate(
-                responsibility_coverage(
-                    responsibility_item("bring me water", 0),
-                    responsibility_item("bring me water", 1),
-                )
-            )
-
-    def test_responsibility_coverage_can_reject_unjustified_goal_candidate(self):
-        review = GoalResponsibilityCoverageReview.model_validate(
-            responsibility_coverage(
-                responsibility_item("Blink twice", 0),
-                responsibility_item("be playful", 0, role="constraint"),
-                decision="reject",
-                unjustified_candidate_indices=[1],
-            )
-        )
-
-        self.assertEqual(review.decision, "reject")
-        self.assertEqual(review.unjustified_candidate_indices, [1])
-
-    def test_responsibility_coverage_normalizes_redundant_model_decision(self):
-        invalid = responsibility_coverage(
-            responsibility_item("Blink twice.", 0),
-            decision="reject",
-        )
-        ollama = ScriptedOllama([invalid])
-        resolver = GoalAssociationResolver(ollama)
-
-        review = asyncio.run(
-            resolver._run_responsibility_coverage_audit(
-                request=request(
-                    "Blink twice.",
-                    language="en-US",
-                    route="robot_action",
-                    intent="capability:soridormi.blink_eyes",
-                ),
-                raw={
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Blink twice.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        }
-                    ],
-                },
-                generation_options={"temperature": 0},
-                prompt_family="goal_association.responsibility_coverage",
-                attempt=5,
-            )
-        )
-
-        self.assertEqual(review.decision, "accept")
-        self.assertEqual(len(ollama.prompts), 1)
-
-    def test_responsibility_coverage_normalizes_context_and_framing_projections(self):
-        normalized = GoalAssociationResolver._normalize_responsibility_coverage_decision(
-            responsibility_coverage(
-                responsibility_item("bring me water", 0),
-                responsibility_item(
-                    "please",
-                    role="framing",
-                    coverage="missing",
-                ),
-                decision="reject",
-            ),
-            sid="sid-framing",
-            goal_count=1,
-        )
-
-        review = GoalResponsibilityCoverageReview.model_validate(normalized)
-
-        self.assertEqual(review.decision, "accept")
-        self.assertEqual(review.items[1].coverage, "covered")
-        self.assertFalse(review.items[1].independently_satisfiable)
-        self.assertEqual(review.items[1].candidate_goal_indices, [])
-
-    def test_responsibility_coverage_repairs_invalid_item_contract(self):
-        invalid = responsibility_coverage(
-            responsibility_item("Blink twice.", 0),
-            decision="accept",
-        )
-        invalid["items"][0]["candidate_goal_indices"] = [0, 0]
-        repaired = responsibility_coverage(
-            responsibility_item("Blink twice.", 0),
-            decision="accept",
-        )
-        ollama = ScriptedOllama([invalid, repaired])
-
-        review = asyncio.run(
-            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
-                request=request(
-                    "Blink twice.",
-                    language="en-US",
-                    route="robot_action",
-                    intent="capability:soridormi.blink_eyes",
-                ),
-                raw={
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Blink twice.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        }
-                    ],
-                },
-                generation_options={"temperature": 0},
-                prompt_family="goal_association.responsibility_coverage",
-                attempt=5,
-            )
-        )
-
-        self.assertEqual(review.decision, "accept")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "goal_association.responsibility_coverage.contract_repair",
-        )
-        self.assertIn("speech response does not cover requested body motion", ollama.prompts[1][0])
-
-    def test_responsibility_coverage_revises_nonverbatim_contract_repair(self):
-        invalid = responsibility_coverage(
-            responsibility_item("Blink twice.", 0),
-        )
-        invalid["items"][0]["candidate_goal_indices"] = [0, 0]
-        nonverbatim_repair = responsibility_coverage(
-            responsibility_item("Blink two times.", 0),
-        )
-        corrected = responsibility_coverage(
-            responsibility_item("Blink twice.", 0),
-        )
-        ollama = ScriptedOllama([invalid, nonverbatim_repair, corrected])
-
-        review = asyncio.run(
-            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
-                request=request(
-                    "Blink twice.",
-                    language="en-US",
-                    route="robot_action",
-                    intent="capability:soridormi.blink_eyes",
-                ),
-                raw={
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Blink twice.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        }
-                    ],
-                },
-                generation_options={"temperature": 0},
-                prompt_family="goal_association.responsibility_coverage",
-                attempt=5,
-            )
-        )
-
-        self.assertEqual(review.decision, "accept")
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(
-            ollama.prompts[2][1]["prompt_family"],
-            "goal_association.responsibility_coverage.contract_revision",
-        )
-        self.assertIn("must be exact, contiguous", ollama.prompts[2][0])
-
-    def test_responsibility_coverage_clears_noncovered_ownership_redundancy(self):
-        redundant = responsibility_coverage(
-            responsibility_item(
-                "Go forward 100 meters.",
-                0,
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("Bring water.", 0),
-            decision="reject",
-        )
-        ollama = ScriptedOllama([redundant])
-
-        review = asyncio.run(
-            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
-                request=request(
-                    "Go forward 100 meters. Bring water.",
-                    language="en-US",
-                    route="robot_action",
-                    intent="resource_delivery",
-                ),
-                raw={
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Bring water.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        }
-                    ],
-                },
-                generation_options={"temperature": 0},
-                prompt_family="goal_association.responsibility_coverage",
-                attempt=5,
-            )
-        )
-
-        self.assertEqual(review.decision, "reject")
-        self.assertEqual(review.items[0].candidate_goal_indices, [])
-        self.assertEqual(len(ollama.prompts), 1)
-
-    def test_responsibility_coverage_derives_complete_unjustified_inventory(self):
-        invalid = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-            unjustified_candidate_indices=[1, 2, 3, 4, 5, 6],
-        )
-        invalid["items"][0]["independently_satisfiable"] = True
-        repaired = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-            unjustified_candidate_indices=[1, 2, 3, 4, 5, 6],
-        )
-        ollama = ScriptedOllama([invalid, repaired])
-        raw = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": f"candidate {index}",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                }
-                for index in range(8)
-            ],
-        }
-
-        review = asyncio.run(
-            GoalAssociationResolver(ollama)._run_responsibility_coverage_audit(
-                request=request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                ),
-                raw=raw,
-                generation_options={"temperature": 0},
-                prompt_family="goal_association.responsibility_coverage",
-                attempt=5,
-            )
-        )
-
-        self.assertEqual(review.decision, "reject")
-        self.assertEqual(review.unjustified_candidate_indices, list(range(1, 8)))
-        self.assertEqual(len(ollama.prompts), 2)
-
-    def test_singing_derives_vocal_provider_contract(self):
-        goal = GoalAssociationModelGoal.model_validate(
-            {
-                "description": "边走边唱歌",
-                "output_mode": "singing",
-                "bindings": [],
-            }
-        )
-
-        self.assertEqual(goal.responsibility_kind, "vocal_output")
-        self.assertEqual(goal.execution_lane, "vocal")
-        self.assertTrue(goal.provider_required)
-
-    def test_output_mode_is_required(self):
-        with self.assertRaisesRegex(ValueError, "output_mode"):
-            GoalAssociationModelGoal.model_validate(
-                {
-                    "description": "Say hello",
-                    "bindings": [],
-                }
-            )
-
-    def test_host_execution_projection_fields_are_rejected(self):
-        with self.assertRaisesRegex(ValueError, "Extra inputs are not permitted"):
-            GoalAssociationModelGoal.model_validate(
-                {
-                    "description": "Sing a song",
-                    "output_mode": "singing",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "provider_required": True,
-                    "bindings": [],
-                }
-            )
-
-    def test_output_mode_derives_ordinary_speech_contract(self):
-        goal = GoalAssociationModelGoal.model_validate(
-            {
-                "description": "Say hello",
-                "output_mode": "speech",
-                "bindings": [],
-            }
-        )
-
-        self.assertEqual(goal.responsibility_kind, "vocal_output")
-        self.assertEqual(goal.execution_lane, "vocal")
-        self.assertFalse(goal.provider_required)
-
-    def test_vocal_goal_rejects_resource_responsibility(self):
-        with self.assertRaisesRegex(ValueError, "not resource acquisition"):
-            GoalAssociationModelGoal.model_validate(
-                {
-                    "description": "Sing a song",
-                    "output_mode": "singing",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "a song",
-                        "source_status": "unknown",
-                        "recipient_description": "requester",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                }
-            )
-
-    def test_physical_delivery_keeps_resource_responsibility(self):
-        goal = GoalAssociationModelGoal.model_validate(
-            {
-                "description": "Bring the requester a bottle of water",
-                "output_mode": "body_action",
-                "bindings": [],
-                "resource_responsibility": {
-                    "resource_kind": "physical_object",
-                    "resource_description": "a bottle of water",
-                    "source_status": "unknown",
-                    "recipient_description": "requester",
-                    "delivery_mode": "physical_handover",
-                },
-            }
-        )
-
-        self.assertIsNotNone(goal.resource_responsibility)
-
-    def test_live_decoder_schema_exposes_semantic_mode_not_host_invariants(self):
-        schema = GoalAssociationResolver._response_schema(
-            GoalSegmentationModelOutput,
-            [],
-            [],
-        )
-        goal_schema = schema["$defs"]["GoalAssociationModelGoal"]
-        required = set(goal_schema["required"])
-        properties = set(goal_schema["properties"])
-
-        self.assertIn("output_mode", required)
-        self.assertNotIn("responsibility_kind", properties)
-        self.assertNotIn("execution_lane", properties)
-        self.assertNotIn("provider_required", properties)
-        output_description = goal_schema["properties"]["output_mode"]["description"]
-        self.assertIn("Semantic work that completes this Goal", output_description)
-        self.assertIn("capability_work", output_description)
-
-    def test_output_mode_materializes_host_execution_invariants(self):
-        goal = GoalAssociationModelGoal.model_validate(
-            {
-                "description": "Check tomorrow's weather in Shanghai",
-                "output_mode": "capability_work",
-                "bindings": [],
-            }
-        )
-
-        self.assertEqual(goal.responsibility_kind, "capability_dependent")
-        self.assertEqual(goal.execution_lane, "activity")
-        self.assertTrue(goal.provider_required)
-        self.assertEqual(goal.media_operation, "none")
+from shared.chromie_contracts.resource import (
+    AcquireAndDeliverResource,
+    ResourceDescriptor,
+    ResourceRecipient,
+    ResourceSource,
+    project_resource_grounding,
+)
 
 
 class FakeOllama:
@@ -491,29 +51,93 @@ class ScriptedOllama:
         return payload
 
 
-def binding_audit(*bindings_by_goal):
+def binding(
+    name: str,
+    entity_type: str,
+    value: str,
+    *,
+    referent_id: str = "",
+) -> dict:
+    payload = {
+        "name": name,
+        "entity_type": entity_type,
+        "value": value,
+        "confidence": 1.0,
+    }
+    if referent_id:
+        payload["referent_id"] = referent_id
+    return payload
+
+
+def resource_responsibility(
+    *,
+    kind: str = "physical_object",
+    description: str = "一杯水",
+    quantity: str = "1",
+    attributes: list[dict] | None = None,
+    source_status: str = "unknown",
+    source_description: str = "",
+    source_bindings: list[dict] | None = None,
+    recipient: str = "用户",
+    recipient_referent_id: str | None = None,
+    delivery_mode: str | None = None,
+) -> dict:
+    recipient_payload = {"description": recipient}
+    if recipient_referent_id:
+        recipient_payload["referent_id"] = recipient_referent_id
     return {
-        "goal_bindings": [
-            {
-                "candidate_goal_index": index,
-                "bindings": bindings,
-                "reason_summary": (
-                    "Explicit material bindings audited for this Goal."
-                ),
-            }
-            for index, bindings in enumerate(bindings_by_goal)
-        ],
-        "reason_summary": "All candidate Goal bindings were audited.",
+        "resource": {
+            "kind": kind,
+            "description": description,
+            "quantity": quantity,
+            "attributes": list(attributes or []),
+        },
+        "source": {
+            "status": source_status,
+            "description": source_description,
+            "bindings": list(source_bindings or []),
+        },
+        "recipient": recipient_payload,
+        "delivery_mode": delivery_mode
+        or ("physical_handover" if kind == "physical_object" else "spoken_explanation"),
     }
 
 
-def responsibility_item(
-    source_excerpt,
-    *goal_indices,
-    role="responsibility",
-    coverage="covered",
-    independently_satisfiable=True,
-):
+def goal(
+    description: str,
+    output_mode: str,
+    *,
+    bindings: list[dict] | None = None,
+    resource: dict | None = None,
+    **extra,
+) -> dict:
+    payload = {
+        "description": description,
+        "output_mode": output_mode,
+        "bindings": list(bindings or []),
+        **extra,
+    }
+    if resource is not None:
+        payload["resource_responsibility"] = resource
+    return payload
+
+
+def create_goals(*goals: dict) -> dict:
+    return {
+        "decision": "create_goals",
+        "new_goals": list(goals),
+        "confidence": 1.0,
+        "reason_summary": "The candidate set represents the current responsibility.",
+    }
+
+
+def coverage_item(
+    source_excerpt: str,
+    *goal_indices: int,
+    role: str = "responsibility",
+    coverage: str = "covered",
+    independently_satisfiable: bool = True,
+) -> dict:
     return {
         "source_excerpt": source_excerpt,
         "role": role,
@@ -525,18 +149,10 @@ def responsibility_item(
     }
 
 
-def responsibility_coverage(
-    *items,
-    decision="accept",
-    unjustified_candidate_indices=None,
-):
+def certificate(*items: dict) -> dict:
     return {
-        "decision": decision,
         "items": list(items),
-        "unjustified_candidate_indices": list(
-            unjustified_candidate_indices or []
-        ),
-        "reason_summary": "Candidate Goals account for the audited user meaning.",
+        "reason_summary": "The item judgments prove candidate responsibility coverage.",
     }
 
 
@@ -544,16 +160,12 @@ def request(
     text: str,
     *,
     active_goals=None,
-    history=None,
-    language="zh-CN",
+    language: str = "zh-CN",
+    route: str = "chat",
+    intent: str = "conversation",
     discourse_referents=None,
-    discourse_focus=None,
-    recent_tool_evidence=None,
-    recent_goals=None,
-    route="chat",
-    intent="conversation",
     progress_candidates=None,
-):
+) -> AgentRunRequest:
     return AgentRunRequest(
         sid="sid-pr2",
         text=text,
@@ -561,42 +173,35 @@ def request(
         route_decision=RouteDecision(
             route=route,
             intent=intent,
-            confidence=0.8,
+            confidence=0.9,
             source="llm",
         ),
         context={
             "active_goal_snapshots": active_goals or [],
-            "recent_goal_snapshots": recent_goals or [],
-            "history": history or [],
+            "recent_goal_snapshots": [],
+            "history": [],
             "discourse_referents": discourse_referents or [],
-            "discourse_focus": discourse_focus or [],
-            "recent_tool_evidence": recent_tool_evidence or [],
+            "discourse_focus": [],
+            "recent_tool_evidence": [],
             "progress_candidates": progress_candidates or [],
         },
     )
 
 
-def active_goal(
-    goal_id: str,
-    description: str,
-    *,
-    bindings=None,
-    work_status="open",
-    responsibility_status="open",
-):
+def active_goal(goal_id: str, description: str) -> dict:
     return {
         "goal_id": goal_id,
         "goal_version": 1,
-        "responsibility_status": responsibility_status,
-        "work_status": work_status,
+        "responsibility_status": "open",
+        "work_status": "open",
         "goal": {
             "goal_id": goal_id,
             "version": 1,
-            "responsibility_status": responsibility_status,
+            "responsibility_status": "open",
             "description": description,
             "source_text": description,
             "beneficiary": "user",
-            "object": {"bindings": bindings or {}},
+            "object": {"bindings": {}},
             "constraints": {},
             "success_criteria": [],
             "metadata": {},
@@ -607,6081 +212,1035 @@ def active_goal(
     }
 
 
-class GoalAssociationModelOutputTests(unittest.TestCase):
-    def test_association_only_create_goals_branch_normalizes_to_associate(self):
-        output = GoalAssociationModelOutput.model_validate(
-            {
-                "decision": "create_goals",
-                "associations": [
-                    {
-                        "relationship": "modify",
-                        "target_goal_ids": ["goal-restaurant"],
-                        "confidence": 1.0,
-                        "reason_summary": "The user supplied the missing location.",
-                        "updated_description": (
-                            "Recommend restaurants near Chongqing Longxing Tianjie."
-                        ),
-                        "requires_replan": True,
-                    }
-                ],
-                "new_goals": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": "Update the existing Goal.",
-            }
+class GoalExecutionContractTests(unittest.TestCase):
+    def test_host_execution_projection_is_derived_from_output_mode(self):
+        item = GoalAssociationModelGoal.model_validate(
+            goal("Check tomorrow's weather.", "capability_work")
         )
 
-        self.assertEqual(output.decision, "associate")
-        self.assertEqual(len(output.associations), 1)
+        self.assertEqual(item.responsibility_kind, "capability_dependent")
+        self.assertEqual(item.execution_lane, "activity")
+        self.assertTrue(item.provider_required)
 
-
-class GoalAssociationResolverTests(unittest.TestCase):
-    def test_resource_source_resegmentation_preserves_one_delivery_goal(self):
-        invalid = {
-            "decision": "create_goals",
-            "new_goals": [
+    def test_model_cannot_author_host_execution_projection(self):
+        with self.assertRaises(ValidationError):
+            GoalAssociationModelGoal.model_validate(
                 {
-                    "description": "Pick up the red mug and hand it to me.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "object_color",
-                            "entity_type": "color",
-                            "value": "red",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "object_type",
-                            "entity_type": "physical_object",
-                            "value": "mug",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "red mug",
-                        "source_status": "known",
-                        "delivery_mode": "physical_handover",
-                    },
+                    **goal("Sing.", "singing"),
+                    "responsibility_kind": "executable_action",
                 }
+            )
+
+    def test_resource_contract_is_nested_and_top_level_bindings_are_read_only(self):
+        nested = resource_responsibility(
+            source_status="known",
+            source_description="前方100米处",
+            source_bindings=[
+                binding("distance", "distance", "100"),
+                binding("direction", "direction", "前方"),
             ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": (
-                        "Acquire and hand me the red mug, then report completion."
+        )
+        parsed = GoalAssociationModelGoal.model_validate(
+            goal("从前方100米处拿一杯水并交给用户。", "body_action", resource=nested)
+        )
+        self.assertEqual(parsed.resource_responsibility.resource.quantity, "1")
+        self.assertEqual(
+            [item.name for item in parsed.resource_responsibility.source.bindings],
+            ["distance", "direction"],
+        )
+
+        with self.assertRaisesRegex(ValueError, "authored only inside"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "从前方100米处拿一杯水并交给用户。",
+                    "body_action",
+                    bindings=[binding("distance", "distance", "100")],
+                    resource=nested,
+                )
+            )
+
+    def test_resource_quantity_requires_normalized_numeric_string(self):
+        with self.assertRaisesRegex(ValueError, "normalized numeric string"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring one bottle.",
+                    "body_action",
+                    resource=resource_responsibility(quantity="one"),
+                )
+            )
+
+    def test_resource_attributes_cannot_duplicate_canonical_quantity(self):
+        with self.assertRaisesRegex(ValueError, "duplicate canonical resource"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring one bottle.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        attributes=[binding("quantity", "quantity", "1")]
                     ),
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "object_color",
-                            "entity_type": "color",
-                            "value": "red",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "object_type",
-                            "entity_type": "physical_object",
-                            "value": "mug",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "red mug",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-                {
-                    "description": "Tell me when the handoff is finished.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": corrected["new_goals"][0][
-                        "description"
-                    ],
-                    "reason_summary": "The resource handoff is the positive effect.",
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "capability_result_delivery_only",
-                    "audible_content_summary": "",
-                    "final_goal_description": "",
-                    "reason_summary": (
-                        "The completion report depends on the handoff result."
+                )
+            )
+
+    def test_known_resource_source_requires_typed_source_bindings(self):
+        with self.assertRaisesRegex(ValueError, "source.bindings"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring the water from 100 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        attributes=[binding("distance", "distance", "100")],
+                        source_status="known",
+                        source_description="100 meters ahead",
                     ),
-                },
-            ],
-            "reason_summary": (
-                "The physical Goal owns its contingent completion delivery."
-            ),
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("Pick up the red mug and hand it to me", 0),
-            responsibility_item(
-                "tell me when you have finished",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-        )
-        ollama = ScriptedOllama(
-            [invalid, corrected, corrected, adjudication, coverage]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Pick up the red mug and hand it to me, then tell me when "
-                    "you have finished.",
-                    language="en-US",
-                    route="robot_action",
-                    intent="semantic_capability_planning",
                 )
             )
-        )
 
-        self.assertEqual(len(ollama.prompts), 5)
-        self.assertEqual(len(result.new_goals), 1)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.source.status, "unknown")
-        self.assertEqual(responsibility.delivery_mode, "physical_handover")
-        self.assertIn("report completion", result.new_goals[0].description)
-        review_prompt = ollama.prompts[2][0]
-        self.assertIn("provider-owned stages", review_prompt)
-        self.assertIn("Do not split pickup and handoff", review_prompt)
-        self.assertIn("not an independently satisfiable vocal_output", review_prompt)
-        self.assertIn("DTO to review JSON", review_prompt)
-        self.assertNotIn("No previous Goal DTO is supplied", review_prompt)
-        self.assertEqual(
-            ollama.prompts[3][1]["prompt_family"],
-            "goal_association.independence_adjudication",
-        )
-
-    def test_invalid_known_resource_source_uses_exact_contract_revision(self):
-        invalid = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Put the item over there.",
-                    "output_mode": "body_action",
-                    "media_operation": "none",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "the item",
-                        "source_status": "known",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.9,
-            "reason_summary": "The item is the resource.",
-        }
-        clarified = {
-            "decision": "clarify",
-            "new_goals": [],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "Which item do you mean, and where should I put it?",
-            "confidence": 0.7,
-            "reason_summary": "The resource and its source are unresolved.",
-        }
-        ollama = ScriptedOllama([invalid, clarified])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Could you put that over there?",
-                    language="en-US",
-                    route="robot_action",
-                    intent="capability:soridormi.look_at_person",
-                )
-            )
-        )
-
-        self.assertEqual(result.clarification, clarified["clarification"])
-        self.assertEqual(len(ollama.prompts), 2)
-        prompt, kwargs = ollama.prompts[1]
-        self.assertEqual(
-            kwargs["prompt_family"],
-            "goal_association.repair",
-        )
-        self.assertIn("known resource source requires", prompt)
-        self.assertIn("Previous model output JSON", prompt)
-        self.assertIn('"source_status":"known"', prompt)
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "schema_constrained_model_revision",
-        )
-
-    def test_information_query_location_cannot_be_used_as_known_source(self):
-        invalid = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Find good restaurants near Chongqing Longxing Paradise Walk.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "重庆龙兴天街",
-                            "confidence": 1.0,
-                        }
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "nearby good restaurants",
-                        "source_status": "known",
-                        "source_binding_names": ["location"],
-                        "delivery_mode": "spoken_explanation",
-                    },
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.95,
-            "reason_summary": "Need current local restaurant information.",
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Find good restaurants near Chongqing Longxing Paradise Walk.",
-                    "output_mode": "capability_work",
-                    "bindings": invalid["new_goals"][0]["bindings"],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "nearby good restaurants",
-                        "source_status": "provider_resolved",
-                        "source_description": "current external place information",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.95,
-            "reason_summary": "The location scopes the query; the provider resolves the source.",
-        }
-        ollama = ScriptedOllama([invalid, corrected])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "帮我找重庆龙兴天街附近好吃的餐厅。",
-                    route="tool",
-                    intent="capability:chromie.external_information.retrieve",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.source.status, "provider_resolved")
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["value"],
-            "重庆龙兴天街",
-        )
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "query-scope location bindings as source evidence",
-            ollama.prompts[1][0],
-        )
-
-    def test_resource_lookup_and_derived_answer_are_resegmented_as_one_goal(self):
-        bindings = [
-            {
-                "name": "location",
-                "entity_type": "city",
-                "value": "上海",
-                "confidence": 1.0,
-            },
-            {
-                "name": "date_scope",
-                "entity_type": "temporal_scope",
-                "value": "明天",
-                "confidence": 1.0,
-            },
-        ]
-        responsibility = {
-            "resource_kind": "information",
-            "resource_description": "weather forecast for Shanghai tomorrow",
-            "source_status": "unknown",
-            "delivery_mode": "spoken_explanation",
-        }
-        duplicated = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Check the weather forecast for Shanghai for tomorrow to determine if heavy rain is expected.",
-                    "output_mode": "capability_work",
-                    "bindings": bindings,
-                    "resource_responsibility": responsibility,
-                },
-                {
-                    "description": "Answer whether it will rain heavily in Shanghai tomorrow based on the retrieved weather information.",
-                    "output_mode": "capability_work",
-                    "bindings": [],
-                },
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "The model incorrectly split evidence acquisition from result delivery.",
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Check tomorrow's Shanghai forecast and answer whether heavy rain is expected.",
-                    "output_mode": "capability_work",
-                    "bindings": bindings,
-                    "resource_responsibility": responsibility,
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "The information resource Goal owns evidence acquisition and its derived answer.",
-        }
-        ollama = ScriptedOllama([duplicated, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "诶，明天上海会下大雨吗？",
-                    route="tool",
-                    intent="capability:chromie.weather.lookup",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn(
-            "resource_result_delivery_split_review",
-            result.metadata["semantic_review"]["triggers"],
-        )
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "goal_association.semantic_resegmentation",
-        )
-        self.assertIn(
-            "delivery owned by that resource Goal",
-            ollama.prompts[1][0],
-        )
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-
-    def test_tool_route_spoken_only_output_gets_fresh_responsibility_review(self):
-        spoken_only = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Recommend a noodle restaurant open now.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.9,
-            "reason_summary": "Answer conversationally.",
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Find a noodle restaurant that is open now.",
-                    "output_mode": "capability_work",
-                    "media_operation": "none",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "a current open noodle restaurant",
-                        "source_status": "provider_resolved",
-                        "source_description": "current external place information",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "Current opening status requires fresh evidence.",
-        }
-        ollama = ScriptedOllama([spoken_only, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Find me a noodle restaurant that's open right now.",
-                    language="en-US",
-                    route="tool",
-                    intent="capability:chromie.weather.lookup",
-                )
-            )
-        )
-
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "capability_dependent",
-        )
-        self.assertEqual(len(ollama.prompts), 2)
-        prompt, kwargs = ollama.prompts[1]
-        self.assertEqual(kwargs["prompt_family"], "goal_association.semantic_resegmentation")
-        self.assertIn("tool_route_spoken_responsibility_review", prompt)
-        self.assertIn("No previous Goal DTO is supplied", prompt)
-
-    def test_recommendation_route_spoken_only_output_gets_fresh_evidence_review(self):
-        spoken_only = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Recommend a noodle restaurant open now.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.9,
-            "reason_summary": "Answer conversationally.",
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Find a noodle restaurant that is open now.",
-                    "output_mode": "capability_work",
-                    "media_operation": "none",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "a current open noodle restaurant",
-                        "source_status": "provider_resolved",
-                        "source_description": "current external place information",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "Current opening status requires fresh evidence.",
-        }
-        ollama = ScriptedOllama([spoken_only, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Recommend a noodle restaurant that is open right now.",
-                    language="en-US",
-                    route="chat",
-                    intent="recommendation",
-                )
-            )
-        )
-
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "capability_dependent",
-        )
-        self.assertEqual(len(ollama.prompts), 2)
-        prompt, kwargs = ollama.prompts[1]
-        self.assertEqual(kwargs["prompt_family"], "goal_association.semantic_resegmentation")
-        self.assertIn("recommendation_route_spoken_responsibility_review", prompt)
-        self.assertIn("No previous Goal DTO is supplied", prompt)
-
-    def test_prompt_distinguishes_resource_identity_from_source_and_binds_counts(self):
-        ollama = FakeOllama(
-            {
-                "decision": "clarify",
-                "new_goals": [],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "Which object do you mean?",
-                "confidence": 0.7,
-                "reason_summary": "The object is unresolved.",
-            }
-        )
-
-        asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Put that over there, then blink twice.", language="en-US")
-            )
-        )
-        prompt = ollama.prompts[0][0]
-        self.assertIn("Resource identity is not source evidence", prompt)
-        self.assertIn("source_description or source_binding_names is mandatory", prompt)
-        self.assertIn("normalize its binding value to the equivalent numeric string", prompt)
-        self.assertIn("Description text alone is not parameter provenance", prompt)
-
-
-    def test_compound_walk_sing_blink_is_freshly_resegmented_with_typed_modes(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前走15秒。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "边走边唱歌。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "同时眨眼睛。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前走15秒。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "边走边唱歌。",
-                    "output_mode": "singing",
-                    "bindings": [],
-                },
-                {
-                    "description": "同时眨眼睛。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        audited_bindings = binding_audit(
-            [
-                {
-                    "name": "duration_s",
-                    "entity_type": "duration_seconds",
-                    "value": "15",
-                    "confidence": 1.0,
-                }
-            ],
-            [],
-            [],
-        )
-        coverage = responsibility_coverage(
-            responsibility_item("往前走个15秒", 0),
-            responsibility_item("边走边唱歌", 1),
-            responsibility_item("眨眼睛", 2),
-            responsibility_item(
-                "你好",
-                role="framing",
-                independently_satisfiable=False,
-            ),
-        )
-        ollama = ScriptedOllama([initial, reviewed, coverage, audited_bindings])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
-                    language="zh-CN",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-        self.assertNotIn('"output_mode":"body_action"', ollama.prompts[1][0])
-        self.assertEqual(
-            [
-                (
-                    goal.metadata["execution_lane"],
-                    goal.metadata["output_mode"],
-                    goal.metadata["provider_required"],
-                )
-                for goal in result.new_goals
-            ],
-            [
-                ("activity", "body_action", True),
-                ("vocal", "singing", True),
-                ("activity", "body_action", True),
-            ],
-        )
-        self.assertIsNone(result.new_goals[1].resource_responsibility)
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["duration_s"]["value"],
-            "15",
-        )
-        self.assertEqual(
-            result.metadata["binding_audit"]["strategy"],
-            "model_owned_material_parameter_audit",
-        )
-        self.assertEqual(
-            result.metadata["responsibility_coverage"]["final_decision"],
-            "accept",
-        )
-        projection = result.prompt_projection()
-        self.assertEqual(
-            projection["new_goals"][1]["metadata"],
-            {
-                "responsibility_kind": "vocal_output",
-                "execution_lane": "vocal",
-                "output_mode": "singing",
-                "provider_required": True,
-                "media_operation": "none",
-            },
-        )
-
-    def test_responsibility_coverage_rejects_persistently_collapsed_compound_goal(self):
-        collapsed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前走15秒，同时唱歌和眨眼睛。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "duration_s",
-                            "entity_type": "duration_seconds",
-                            "value": "15",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        rejected_coverage = responsibility_coverage(
-            responsibility_item("往前走个15秒", 0),
-            responsibility_item(
-                "边走边唱歌",
-                coverage="missing",
-            ),
-            responsibility_item(
-                "眨眼睛",
-                coverage="missing",
-            ),
-            decision="reject",
-        )
-        resegmented = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前走15秒。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "duration_s",
-                            "entity_type": "duration_seconds",
-                            "value": "15",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "边走边唱歌。",
-                    "output_mode": "singing",
-                    "bindings": [],
-                },
-                {
-                    "description": "同时眨眼睛。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        accepted_coverage = responsibility_coverage(
-            responsibility_item("往前走个15秒", 0),
-            responsibility_item("边走边唱歌", 1),
-            responsibility_item("眨眼睛", 2),
-        )
-        ollama = ScriptedOllama(
-            [
-                collapsed,
-                collapsed,
-                rejected_coverage,
-                resegmented,
-                accepted_coverage,
-                binding_audit([], [], []),
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
-                    language="zh-CN",
-                )
-            )
-        )
-
-        self.assertEqual(
-            [goal.metadata["output_mode"] for goal in result.new_goals],
-            ["body_action", "singing", "body_action"],
-        )
-        self.assertEqual(
-            result.metadata["responsibility_coverage"],
-            {
-                "attempted": True,
-                "succeeded": True,
-                "strategy": "independent_model_coverage_audit",
-                "initial_decision": "reject",
-                "final_decision": "accept",
-                "resegmented": True,
-                "attempt_count": 2,
-                "item_count": 3,
-            },
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.semantic_resegmentation",
-                "goal_association.responsibility_coverage",
-                "goal_association.responsibility_resegmentation",
-                "goal_association.responsibility_coverage_recheck",
-                "goal_association.binding_audit",
-            ],
-        )
-        coverage_prompt = ollama.prompts[2][0]
-        self.assertIn("independently satisfiable responsibility", coverage_prompt)
-        self.assertIn("provider availability", coverage_prompt)
-        self.assertIn("observable completion meaning", coverage_prompt)
-        resegmentation_prompt = ollama.prompts[3][0]
-        self.assertIn("responsibility-coverage audit JSON", resegmentation_prompt)
-        self.assertIn("No previous Goal DTO is supplied", resegmentation_prompt)
-        self.assertIn("Do not use clarification to explain", resegmentation_prompt)
-        self.assertIn(
-            "reason_summary that a constraint was 'integrated'",
-            resegmentation_prompt,
-        )
-        self.assertIn("source_binding_names", resegmentation_prompt)
-        self.assertIn("neither two Goals nor a bare body_action", resegmentation_prompt)
-        resegmentation_schema = ollama.prompts[3][1]["response_format"]
-        self.assertEqual(
-            resegmentation_schema["properties"]["decision"]["enum"],
-            ["create_goals"],
-        )
-        self.assertEqual(
-            resegmentation_schema["properties"]["new_goals"]["minItems"],
-            3,
-        )
-        self.assertEqual(
-            resegmentation_schema["properties"]["new_goals"]["maxItems"],
-            3,
-        )
-
-    def test_resegmentation_repair_restores_a_missing_resource_constraint(self):
-        incomplete = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        complete = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        initial_rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item(
-                "帮我拿杯水过来",
-                coverage="missing",
-            ),
-            decision="reject",
-            unjustified_candidate_indices=[0],
-        )
-        constraint_rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-        )
-        accepted = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                0,
-                role="constraint",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        invalid_complete = {
-            **complete,
-            "new_goals": [
-                {
-                    **complete["new_goals"][0],
-                    "bindings": [],
-                }
-            ],
-        }
-        ollama = ScriptedOllama(
-            [
-                incomplete,
-                initial_rejected,
-                incomplete,
-                constraint_rejected,
-                invalid_complete,
-                complete,
-                accepted,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["distance"]["value"],
-            "100",
-        )
-        assert result.new_goals[0].resource_responsibility is not None
-        self.assertEqual(
-            set(result.new_goals[0].resource_responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertEqual(
-            result.metadata["responsibility_coverage"]["attempt_count"],
-            3,
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.responsibility_resegmentation",
-                "goal_association.responsibility_coverage_recheck",
-                "goal_association.constraint_representation_repair",
-                "goal_association.final_resegmentation_contract_repair",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "final_resegmentation_contract_revision",
-        )
-        constraint_repair_prompt = ollama.prompts[4][0]
-        self.assertIn("Goal count, order, and output_mode", constraint_repair_prompt)
-        self.assertIn("reason_summary never represents", constraint_repair_prompt)
-        self.assertIn("source_binding_names", constraint_repair_prompt)
-
-    def test_coverage_owned_resource_survives_duplicate_goal_resegmentation(self):
-        resource_goal = {
-            "description": "从前方100米处拿一杯水并送给用户。",
-            "output_mode": "body_action",
-            "bindings": [
-                {
-                    "name": "distance",
-                    "entity_type": "distance",
-                    "value": "100",
-                    "confidence": 1.0,
-                }
-            ],
-            "resource_responsibility": {
-                "resource_kind": "physical_object",
-                "resource_description": "一杯水",
-                "resource_quantity": "1",
-                "source_status": "known",
-                "source_description": "前方100米处",
-                "source_binding_names": ["distance"],
-                "recipient_description": "用户",
-                "delivery_mode": "physical_handover",
-            },
-        }
-        duplicated = {
-            "decision": "create_goals",
-            "new_goals": [resource_goal, resource_goal],
-            "confidence": 1.0,
-        }
-        rejected = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-            unjustified_candidate_indices=[1],
-        )
-        dropped_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [resource_goal],
-            "confidence": 1.0,
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [duplicated, rejected, dropped_resource, corrected, accepted]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.responsibility_resegmentation",
-                "goal_association.responsibility_resegmentation_contract_repair",
-                "goal_association.responsibility_coverage_recheck",
-            ],
-        )
-        resegmentation_schema = ollama.prompts[2][1]["response_format"]
-        goal_ref = resegmentation_schema["properties"]["new_goals"]["items"][
-            "$ref"
-        ]
-        goal_schema = resegmentation_schema["$defs"][goal_ref.rsplit("/", 1)[-1]]
-        self.assertIn("resource_responsibility", goal_schema["required"])
-        self.assertNotIn(
-            {"type": "null"},
-            goal_schema["properties"]["resource_responsibility"].get(
-                "anyOf", []
-            ),
-        )
-
-    def test_initial_constraint_repair_preserves_resource_goal_ownership(self):
-        incomplete_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        complete_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-        )
-        accepted_complete_goal = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [
-                incomplete_resource,
-                rejected,
-                complete_resource,
-                accepted_complete_goal,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["distance"]["value"],
-            "100",
-        )
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.initial_constraint_representation_repair",
-                "goal_association.responsibility_coverage_constraint_repair",
-            ],
-        )
-        self.assertEqual(
-            result.metadata["responsibility_coverage"]["attempt_count"],
-            2,
-        )
-        self.assertFalse(
-            result.metadata["responsibility_coverage"]["resegmented"]
-        )
-        constraint_schema = ollama.prompts[2][1]["response_format"]
-        goal_list_schema = constraint_schema["properties"]["new_goals"]
-        self.assertEqual(goal_list_schema["minItems"], 1)
-        self.assertEqual(goal_list_schema["maxItems"], 1)
-        goal_ref = goal_list_schema["items"]["$ref"].rsplit("/", 1)[-1]
-        self.assertEqual(
-            constraint_schema["$defs"][goal_ref]["properties"]["bindings"][
-                "minItems"
-            ],
-            1,
-        )
-
-    def test_coverage_audit_count_prevents_resource_stage_split(self):
-        resource_goal = {
-            "description": "帮我拿杯水过来。",
-            "output_mode": "body_action",
-            "bindings": [],
-            "resource_responsibility": {
-                "resource_kind": "physical_object",
-                "resource_description": "一杯水",
-                "resource_quantity": "1",
-                "source_status": "unknown",
-                "recipient_description": "用户",
-                "delivery_mode": "physical_handover",
-            },
-        }
-        movement_goal = {
-            "description": "向前走100米。",
-            "output_mode": "body_action",
-            "bindings": [
-                {
-                    "name": "distance",
-                    "entity_type": "distance",
-                    "value": "100",
-                    "confidence": 1.0,
-                }
-            ],
-        }
-        split_resource = {
-            "decision": "create_goals",
-            "new_goals": [movement_goal, resource_goal],
-            "confidence": 1.0,
-        }
-        split_without_resource_contract = {
-            "decision": "create_goals",
-            "new_goals": [
-                movement_goal,
-                {
-                    "description": "帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "item",
-                            "entity_type": "physical_object",
-                            "value": "一杯水",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        complete_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        initial_rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", coverage="missing"),
-            decision="reject",
-            unjustified_candidate_indices=[0],
-        )
-        accepted_split = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0),
-            responsibility_item("帮我拿杯水过来", 1),
-        )
-        accepted_complete = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [
-                {
-                    "decision": "create_goals",
-                    "new_goals": [resource_goal],
-                    "confidence": 1.0,
-                },
-                initial_rejected,
-                complete_resource,
-                accepted_complete,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.responsibility_resegmentation",
-                "goal_association.responsibility_coverage_recheck",
-            ],
-        )
-        self.assertEqual(
-            result.metadata["responsibility_coverage"]["attempt_count"],
-            2,
-        )
-        goal_schema = ollama.prompts[2][1]["response_format"]["properties"][
-            "new_goals"
-        ]
-        self.assertEqual(goal_schema["minItems"], 1)
-        self.assertEqual(goal_schema["maxItems"], 1)
-
-    def test_resource_spatial_binding_gets_model_owned_source_alignment(self):
-        unaligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前100米拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        aligned = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                    },
-                }
-            ],
-        }
-        invalid_known_source = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "source_status": "known",
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [
-                unaligned,
-                accepted,
-                unaligned,
-                invalid_known_source,
-                aligned,
-                accepted,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.source.status, "known")
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.resource_source_alignment_review",
-                "goal_association.resource_source_alignment_residual_repair",
-                "goal_association.resource_source_alignment_residual_dto_repair",
-                "goal_association.responsibility_coverage_source_alignment",
-            ],
-        )
-        self.assertEqual(
-            result.metadata["resource_source_alignment"]["strategy"],
-            "model_owned_typed_binding_alignment",
-        )
-        self.assertEqual(
-            result.metadata["resource_source_alignment"]["attempt_count"],
-            3,
-        )
-        self.assertIn(
-            "Inspect the complete candidate DTO",
-            ollama.prompts[1][0],
-        )
-        source_schema = ollama.prompts[2][1]["response_format"]
-        source_goal_items = source_schema["properties"]["new_goals"]["items"]
-        source_goal_schema = source_schema["$defs"][
-            source_goal_items["$ref"].rsplit("/", 1)[-1]
-        ]
-        self.assertIn("resource_responsibility", source_goal_schema["required"])
-        self.assertNotIn(
-            {"type": "null"},
-            source_goal_schema["properties"]["resource_responsibility"].get(
-                "anyOf", []
-            ),
-        )
-
-    def test_source_alignment_repairs_silent_resource_contract_loss(self):
-        unaligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        dropped = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": unaligned["new_goals"][0]["bindings"],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        aligned = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [unaligned, accepted, dropped, aligned, accepted]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.source.status, "known")
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.resource_source_alignment_review",
-                "goal_association.resource_source_alignment_dto_repair",
-                "goal_association.responsibility_coverage_source_alignment",
-            ],
-        )
-        self.assertIn(
-            "must preserve resource responsibility ownership",
-            ollama.prompts[3][0],
-        )
-
-    def test_resource_quantity_binding_gets_model_owned_contract_alignment(self):
-        unaligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "quantity",
-                            "entity_type": "count",
-                            "value": "1",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "source_status": "known",
-                        "source_binding_names": ["distance"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        aligned = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "resource_quantity": "1",
-                        "source_description": "前方100米处",
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama([unaligned, accepted, aligned, accepted])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.quantity, "1")
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.resource_source_alignment_review",
-                "goal_association.responsibility_coverage_source_alignment",
-            ],
-        )
-        self.assertIn("typed amount/count", ollama.prompts[2][0])
-
-    def test_missing_resource_quantity_binding_gets_focused_semantic_audit(self):
-        unaligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "去往前走个100米，帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        quantity_binding = {
-            "name": "resource_count",
-            "entity_type": "count",
-            "value": "1",
-            "confidence": 1.0,
-        }
-        aligned = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "bindings": [
-                        *unaligned["new_goals"][0]["bindings"],
-                        quantity_binding,
-                    ],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "resource_quantity": "1",
-                    },
-                }
-            ],
-        }
-        partially_aligned = {
-            **aligned,
-            "new_goals": [
-                {
-                    **aligned["new_goals"][0],
-                    "resource_responsibility": {
-                        **aligned["new_goals"][0]["resource_responsibility"],
-                        "source_binding_names": ["distance"],
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [
-                unaligned,
-                accepted,
-                unaligned,
-                binding_audit(
-                    [*unaligned["new_goals"][0]["bindings"], quantity_binding]
-                ),
-                binding_audit(
-                    [*unaligned["new_goals"][0]["bindings"], quantity_binding]
-                ),
-                partially_aligned,
-                partially_aligned,
-                aligned,
-                accepted,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.quantity, "1")
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["resource_count"]["value"],
-            "1",
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.resource_source_alignment_review",
-                "goal_association.resource_quantity_binding_audit",
-                "goal_association.resource_binding_completeness_review",
-                "goal_association.resource_source_alignment_contract_repair",
-                "goal_association.resource_binding_reconciliation",
-                "goal_association.resource_binding_reconciliation_residual_repair",
-                "goal_association.responsibility_coverage_source_alignment",
-            ],
-        )
-        self.assertIn(
-            "trigger is not evidence",
-            ollama.prompts[3][0],
-        )
-        self.assertIn("not their physical volume", ollama.prompts[3][0])
-        self.assertIn("motion verb or adverb", ollama.prompts[3][0])
-        self.assertIn("distance does not subsume direction", ollama.prompts[4][0])
-        self.assertIn("provider-neutral direction", ollama.prompts[4][0])
-        self.assertIn("intentionally withheld", ollama.prompts[4][0])
-        self.assertNotIn("Prior binding audit JSON", ollama.prompts[4][0])
-        self.assertNotIn('"entity_type"', ollama.prompts[4][0])
-        self.assertIn(
-            "preceding binding reconciliation remained internally incomplete",
-            ollama.prompts[7][0],
-        )
-        audit_schema = ollama.prompts[3][1]["response_format"]
-        self.assertEqual(
-            audit_schema["properties"]["goal_bindings"]["minItems"],
-            1,
-        )
-        quantity_repair_schema = ollama.prompts[5][1]["response_format"]
-        self.assertEqual(
-            quantity_repair_schema["properties"]["new_goals"]["minItems"],
-            1,
-        )
-        self.assertEqual(
-            quantity_repair_schema["properties"]["new_goals"]["maxItems"],
-            1,
-        )
-        self.assertIn("not proof", ollama.prompts[6][0])
-        self.assertIn("collapse alternate binding names", ollama.prompts[6][0])
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-
-    def test_invalid_known_source_alignment_gets_bounded_dto_repair(self):
-        unbound = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "去往前走个100米，帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        invalid_alignment = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-                {
-                    "description": "重复拿水责任。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-            "reason_summary": (
-                "The distance and direction are linked through typed bindings."
-            ),
-        }
-        repaired_alignment = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "quantity",
-                            "entity_type": "count",
-                            "value": "1",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [unbound, accepted, invalid_alignment, repaired_alignment, accepted]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.quantity, "1")
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertEqual(
-            ollama.prompts[3][1]["prompt_family"],
-            "goal_association.resource_source_alignment_dto_repair",
-        )
-        repair_schema = ollama.prompts[3][1]["response_format"]
-        goal_schema = repair_schema["$defs"]["GoalAssociationModelGoal"]
-        resource_schema = repair_schema["$defs"][
-            "GoalAssociationModelResourceResponsibility"
-        ]
-        self.assertIn("bindings", goal_schema["required"])
-        self.assertIn("resource_responsibility", goal_schema["required"])
-        self.assertIn("source_binding_names", resource_schema["required"])
-        self.assertIn("Mechanical validation feedback", ollama.prompts[3][0])
-        self.assertIn("must preserve the fixed Goal count", ollama.prompts[3][0])
-        self.assertEqual(
-            result.metadata["resource_source_alignment"]["attempt_count"],
-            2,
-        )
-
-    def test_resource_identity_cannot_be_relabelled_as_source_evidence(self):
-        unaligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Go forward 100 meters and bring a cup of water.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "length",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "a cup of water",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "source_description": "",
-                        "source_binding_names": [],
-                        "recipient_description": "requester",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        invalid_alignment = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "bindings": [
-                        *unaligned["new_goals"][0]["bindings"],
-                        {
-                            "name": "target_item",
-                            "entity_type": "object",
-                            "value": "cup of water",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "source_status": "known",
-                        "source_description": "100 meters ahead",
-                        "source_binding_names": ["distance", "target_item"],
-                    },
-                }
-            ],
-        }
-        repaired_alignment = {
-            **unaligned,
-            "new_goals": [
-                {
-                    **unaligned["new_goals"][0],
-                    "bindings": [
-                        *unaligned["new_goals"][0]["bindings"],
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "forward",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "target_item",
-                            "entity_type": "object",
-                            "value": "cup of water",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        **unaligned["new_goals"][0]["resource_responsibility"],
-                        "source_status": "known",
-                        "source_description": "100 meters forward",
-                        "source_binding_names": ["distance", "direction"],
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [unaligned, accepted, invalid_alignment, repaired_alignment, accepted]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(
-            set(responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertNotIn("target_item", responsibility.source.bindings)
-        self.assertEqual(
-            ollama.prompts[3][1]["prompt_family"],
-            "goal_association.resource_source_alignment_dto_repair",
-        )
-        self.assertIn("non_source_semantics", ollama.prompts[3][0])
-        self.assertIn("Resource identity", ollama.prompts[3][0])
-
-    def test_audited_resource_constraint_requires_typed_binding_alignment(self):
-        unbound = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "去往前走个100米，帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        aligned = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "quantity",
-                            "entity_type": "count",
-                            "value": "1",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        quantity_unaligned = {
-            **aligned,
-            "new_goals": [
-                {
-                    **aligned["new_goals"][0],
-                    "resource_responsibility": {
-                        key: value
-                        for key, value in aligned["new_goals"][0][
-                            "resource_responsibility"
-                        ].items()
-                        if key != "resource_quantity"
-                    },
-                }
-            ],
-        }
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [
-                unbound,
-                accepted,
-                quantity_unaligned,
-                binding_audit(aligned["new_goals"][0]["bindings"]),
-                binding_audit(aligned["new_goals"][0]["bindings"]),
-                aligned,
-                accepted,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals[0].object["bindings"]), 3)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.quantity, "1")
-        alignment_schema = ollama.prompts[2][1]["response_format"]
-        goal_schema = alignment_schema["$defs"]["GoalAssociationModelGoal"]
-        self.assertIn("bindings", goal_schema["required"])
-        self.assertIn("coverage audit mapping", ollama.prompts[2][0])
-        self.assertIn(
-            "Independent responsibility-coverage audit JSON",
-            ollama.prompts[2][0],
-        )
-        self.assertIn("去往前走个100米", ollama.prompts[2][0])
-        self.assertEqual(
-            ollama.prompts[3][1]["prompt_family"],
-            "goal_association.resource_quantity_binding_audit",
-        )
-        self.assertEqual(
-            ollama.prompts[4][1]["prompt_family"],
-            "goal_association.resource_binding_completeness_review",
-        )
-        self.assertEqual(
-            ollama.prompts[5][1]["prompt_family"],
-            "goal_association.resource_source_alignment_contract_repair",
-        )
-        self.assertEqual(
-            result.metadata["resource_source_alignment"]["attempt_count"], 4
-        )
-
-    def test_invalid_initial_constraint_repair_gets_one_bounded_contract_revision(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        invalid_resegmentation = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-        )
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [initial, rejected, invalid_resegmentation, corrected, accepted]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "initial_constraint_representation_contract_revision",
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.initial_constraint_representation_repair",
-                "goal_association.initial_constraint_representation_contract_repair",
-                "goal_association.responsibility_coverage_constraint_repair",
-            ],
-        )
-        repair_prompt = ollama.prompts[3][0]
-        self.assertIn("known resource source requires", str(repair_prompt))
-
-    def test_invalid_resegmentation_after_constraint_repair_is_bounded(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        corrected_constraint = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        invalid_resegmentation = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                },
-            ],
-            "confidence": 1.0,
-        }
-        invalid_contract_repair = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        rejected = responsibility_coverage(
-            responsibility_item(
-                "去往前走个100米",
-                role="constraint",
-                coverage="missing",
-            ),
-            responsibility_item("帮我拿杯水过来", 0),
-            decision="reject",
-        )
-        accepted = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        missing_source_binding_revision = {
-            **corrected_constraint,
-            "new_goals": [
-                {
-                    **corrected_constraint["new_goals"][0],
-                    "bindings": [],
-                }
-            ],
-        }
-        corrected_binding_audit = binding_audit(
-            corrected_constraint["new_goals"][0]["bindings"]
-        )
-        ollama = ScriptedOllama(
-            [
-                initial,
-                rejected,
-                corrected_constraint,
-                rejected,
-                invalid_resegmentation,
-                invalid_contract_repair,
-                missing_source_binding_revision,
-                corrected_binding_audit,
-                accepted,
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="resource_delivery",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "responsibility_resegmentation_binding_revision",
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.initial_constraint_representation_repair",
-                "goal_association.responsibility_coverage_constraint_repair",
-                "goal_association.responsibility_resegmentation",
-                "goal_association.responsibility_resegmentation_contract_repair",
-                "goal_association.responsibility_resegmentation_contract_revision",
-                "goal_association.responsibility_resegmentation_binding_revision",
-                "goal_association.responsibility_coverage_recheck",
-            ],
-        )
-        repair_schema = ollama.prompts[5][1]["response_format"]
-        goal_schema = repair_schema["$defs"]["GoalAssociationModelGoal"]
-        resource_schema = repair_schema["$defs"][
-            "GoalAssociationModelResourceResponsibility"
-        ]
-        self.assertIn("bindings", goal_schema["required"])
-        self.assertIn("source_binding_names", resource_schema["required"])
-        binding_revision_prompt = ollama.prompts[7][0]
-        self.assertIn("missing_same_goal_binding", binding_revision_prompt)
-        self.assertIn("identical name on the same Goal", binding_revision_prompt)
-        self.assertEqual(
-            result.metadata["contract_repair"]["attempt_count"],
-            3,
-        )
-
-    def test_legacy_host_execution_fields_require_schema_repair(self):
-        invalid = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Say hello.",
-                    "output_mode": "speech",
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "provider_required": False,
-                    "bindings": [],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        repaired = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Say hello.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([invalid, repaired])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Say hello.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        repair_prompt, repair_kwargs = ollama.prompts[1]
-        self.assertEqual(repair_kwargs["prompt_family"], "goal_association.repair")
-        self.assertIn("Extra inputs are not permitted", repair_prompt)
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "schema_constrained_model_revision",
-        )
-        self.assertEqual(result.new_goals[0].metadata["output_mode"], "speech")
-        self.assertEqual(result.new_goals[0].metadata["execution_lane"], "vocal")
-        self.assertFalse(result.new_goals[0].metadata["provider_required"])
-
-
-    def test_empty_optional_referent_introduction_does_not_discard_weather_goal(self):
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": "Check Chongqing weather tomorrow.",
-                        "output_mode": "capability_work",
-                        "bindings": [
-                            {
-                                "name": "location",
-                                "entity_type": "place",
-                                "value": "重庆",
-                                "confidence": 1.0,
-                            },
-                            {
-                                "name": "date",
-                                "entity_type": "date",
-                                "value": "明天",
-                                "confidence": 1.0,
-                            },
+    def test_source_summary_cannot_supply_an_unbound_numeric_fact(self):
+        with self.assertRaisesRegex(ValueError, "numeric facts.*source.bindings"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring the water from 100 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        attributes=[binding("distance", "distance", "100m")],
+                        source_status="known",
+                        source_description="100 meters ahead",
+                        source_bindings=[
+                            binding("location_direction", "direction", "ahead")
                         ],
-                        "resource_responsibility": {
-                            "resource_kind": "information",
-                            "resource_description": "重庆明天的天气",
-                            "source_status": "provider_resolved",
-                            "source_description": "current weather information",
-                            "source_binding_names": ["location", "date"],
-                            "recipient_description": "requester",
-                            "delivery_mode": "spoken_explanation",
-                        },
-                    }
-                ],
-                "referent_updates": [
-                    {
-                        "operation": "introduce",
-                        "target_referent_ids": [],
-                        "target_goal_ids": [],
-                        "confidence": 1.0,
-                    }
-                ],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": "One information acquisition responsibility.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "帮我查一下重庆明天是晴天还是阴天。",
-                    route="tool",
-                    intent="capability:chromie.weather.lookup",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        responsibility = result.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.kind, "information")
-        self.assertNotIn(
-            "responsibility_variant",
-            responsibility.model_dump(mode="json"),
-        )
-        self.assertEqual(
-            responsibility.source.bindings["location"]["value"],
-            "重庆",
-        )
-        recovery = result.metadata["optional_contract_recovery"]
-        self.assertEqual(recovery["dropped_count"], 1)
-        self.assertEqual(len(ollama.prompts), 1)
-
-    def test_preassociation_clarify_route_does_not_force_goal_loss(self):
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": (
-                            "Recommend interesting places near the user."
-                        ),
-                        "output_mode": "capability_work",
-                        "bindings": [],
-                    }
-                ],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": (
-                    "The desired outcome is clear; capability planning may ask "
-                    "for a location binding later."
-                ),
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "帮我推荐附近好玩的地方。",
-                    route="clarify",
-                    intent="clarify_missing_location",
-                )
-            )
-        )
-
-        self.assertEqual(result.clarification, "")
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].description,
-            "Recommend interesting places near the user.",
-        )
-        prompt, kwargs = ollama.prompts[0]
-        self.assertIn(
-            "pre-association route and intent are advisory only", prompt
-        )
-        self.assertNotIn(
-            "an admitted clarify route requires", prompt
-        )
-        self.assertEqual(
-            kwargs["response_format"]["properties"]["decision"]["enum"],
-            ["create_goals", "clarify"],
-        )
-
-    def test_preassociation_clarify_route_can_still_ask_for_semantic_clarification(self):
-        ollama = FakeOllama(
-            {
-                "decision": "clarify",
-                "new_goals": [],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "你想找吃饭的地方，还是游玩的地方？",
-                "confidence": 0.8,
-                "reason_summary": "The requested outcome itself is ambiguous.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "附近有什么好地方？",
-                    route="clarify",
-                    intent="clarify_uncertain_request",
-                )
-            )
-        )
-
-        self.assertEqual(
-            result.clarification,
-            "你想找吃饭的地方，还是游玩的地方？",
-        )
-        self.assertEqual(result.new_goals, [])
-
-    def test_repeated_ungrounded_location_becomes_material_clarification(self):
-        invented_local = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "查询并告知用户今天的本地天气。",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "本地",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "date",
-                            "entity_type": "date",
-                            "value": "今天",
-                            "confidence": 1.0,
-                        },
-                    ],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "查询今天的天气。",
-        }
-        invented_current = {
-            **invented_local,
-            "new_goals": [
-                {
-                    "description": "查询并告知用户当前位置今天的天气。",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "当前位置",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "date",
-                            "entity_type": "date",
-                            "value": "今天",
-                            "confidence": 1.0,
-                        },
-                    ],
-                }
-            ],
-        }
-        clarified = {
-            "decision": "clarify",
-            "new_goals": [],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "你想查哪里的天气？",
-            "confidence": 1.0,
-            "reason_summary": "查询地点没有从当前输入或上下文中确定。",
-        }
-        ollama = ScriptedOllama(
-            [invented_local, invented_current, clarified]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "你好，今天天气怎么样？",
-                    language="zh-CN",
-                    route="tool",
-                    intent="capability:chromie.weather.lookup",
-                    progress_candidates=[
-                        {
-                            "candidate_id": "progress-weather",
-                            "kind": "capability",
-                            "capability_id": "chromie.weather.lookup",
-                            "args": {"location": "本地", "date": "today"},
-                            "intent": "chromie.weather.lookup",
-                            "confidence": 0.95,
-                        }
-                    ],
-                )
-            )
-        )
-
-        self.assertEqual(result.clarification, "你想查哪里的天气？")
-        self.assertEqual(result.new_goals, [])
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "goal_association.semantic_contract_resegmentation",
-        )
-        self.assertEqual(
-            ollama.prompts[2][1]["prompt_family"],
-            "goal_association.material_binding_clarification",
-        )
-        clarification_schema = ollama.prompts[2][1]["response_format"]
-        self.assertEqual(
-            clarification_schema["properties"]["decision"]["enum"],
-            ["clarify"],
-        )
-        self.assertEqual(
-            clarification_schema["properties"]["new_goals"]["maxItems"],
-            0,
-        )
-        self.assertIn(
-            "material semantic information required to define what Chromie owes",
-            ollama.prompts[2][0],
-        )
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "model_owned_material_binding_clarification",
-        )
-        self.assertEqual(
-            result.metadata["contract_repair"]["attempt_count"],
-            2,
-        )
-
-    def test_explicit_location_binding_repairs_non_verbatim_model_value(self):
-        mistranslated = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Check whether it is raining in Xiang County.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "place",
-                            "value": "Xiang County, Henan Province",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        repaired = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Check whether it is raining in 河南省内乡县.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "place",
-                            "value": "河南省内乡县",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([mistranslated, repaired])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("河南省内乡县现在下雨了吗？")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["value"],
-            "河南省内乡县",
-        )
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn("verbatim", ollama.prompts[1][0])
-
-    def test_indirect_location_repair_requires_copied_referent_provenance(self):
-        neixiang = {
-            "referent_id": "ref-neixiang",
-            "entity_type": "location",
-            "canonical_value": "内乡",
-            "scope_kind": "conversation",
-            "scope_ids": [],
-            "status": "foreground",
-            "confidence": 1.0,
-            "source_turn_id": "turn-neixiang",
-            "source_goal_ids": [],
-        }
-        missing_provenance = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "查询今天内乡是否下雨。",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "内乡",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "confidence": 1.0,
-        }
-        repaired = {
-            **missing_provenance,
-            "new_goals": [
-                {
-                    "description": "查询今天内乡是否下雨。",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "内乡",
-                            "referent_id": "ref-neixiang",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "resolved_references": [
-                {
-                    "surface_form": "那边",
-                    "entity_type": "location",
-                    "resolved_value": "内乡",
-                    "source": "discourse_referent",
-                    "referent_id": "ref-neixiang",
-                    "confidence": 1.0,
-                    "reason_summary": "内乡是当前前景地点。",
-                }
-            ],
-        }
-        ollama = ScriptedOllama([missing_provenance, repaired])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "今天那边下雨了吗？",
-                    discourse_referents=[neixiang],
-                    discourse_focus=["ref-neixiang"],
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.resolved_references[0].resolved_value, "内乡")
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["referent_id"],
-            "ref-neixiang",
-        )
-        self.assertIn(
-            "copy the supplied referent_id into both the location binding and "
-            "resolved_references",
-            ollama.prompts[1][0],
-        )
-
-    def test_capability_result_delivery_is_not_a_duplicate_spoken_goal(self):
-        ollama = ScriptedOllama(
-            [
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Look up today's weather.",
-                            "output_mode": "capability_work",
-                            "bindings": [
-                                {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "Neixiang County",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        },
-                        {
-                            "description": "Say the weather naturally.",
-                            "output_mode": "speech",
-                            "bindings": [
-                                {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "Neixiang County",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        },
-                    ],
-                    "confidence": 1.0,
-                },
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Look up and answer with today's weather.",
-                            "output_mode": "capability_work",
-                            "bindings": [
-                                {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "Neixiang County",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        }
-                    ],
-                    "confidence": 1.0,
-                },
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("How is today's weather in Neixiang County?", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "capability_dependent",
-        )
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("A trigger is not proof", ollama.prompts[1][0])
-        self.assertIn("Do not use phrase matching", ollama.prompts[1][0])
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-
-    def test_mixed_stable_knowledge_uses_fresh_model_resegmentation(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Determine why the Moon shines.",
-                    "output_mode": "capability_work",
-                    "media_operation": "none",
-                    "bindings": [],
-                },
-                {
-                    "description": "Remind the user to go to bed early tonight.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Explain that the Moon reflects sunlight.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                },
-                {
-                    "description": "Remind the user to go to bed early tonight.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([initial, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Tell me why the Moon shines, then remind me to go to bed early tonight.",
-                    language="en-US",
-                )
-            )
-        )
-
-        self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["vocal_output", "vocal_output"],
-        )
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-        self.assertNotIn("Determine why the Moon shines", ollama.prompts[1][0])
-
-    def test_invalid_followup_location_uses_fresh_model_resegmentation(self):
-        initial = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "Look up whether rain in Chongqing requires an umbrella.",
-                    "output_mode": "capability_work",
-                    "media_operation": "none",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "Chongqing",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Answer whether the user needs an umbrella.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "Answer whether the prior rain report means an umbrella is useful.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([initial, reviewed, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Do I need an umbrella when I go out?",
-                    language="en-US",
-                    active_goals=[
-                        active_goal(
-                            "goal-weather",
-                            "Report today's weather in Chongqing.",
-                            bindings={
-                                "location": {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "Chongqing",
-                                    "confidence": 1.0,
-                                }
-                            },
-                            work_status="done",
-                            responsibility_status="satisfied",
-                        )
-                    ],
-                    history=[
-                        {
-                            "role": "assistant",
-                            "content": "There are thunderstorms in Chongqing today.",
-                        }
-                    ],
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "vocal_output",
-        )
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-        self.assertNotIn("Look up whether rain", ollama.prompts[1][0])
-
-    def test_embodied_request_separates_movement_but_keeps_resource_delivery(self):
-        merged = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "跑出50米并帮用户拿一杯水，然后返回。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "回应用户的请求。",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前移动50米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "50米",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "拿一杯水并带回给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "resource",
-                            "entity_type": "physical_object",
-                            "value": "一杯水",
-                            "confidence": 1.0,
-                        }
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("往前给我跑个50米", 0),
-            responsibility_item("帮我拿杯水，然后回来", 1),
-        )
-        ollama = ScriptedOllama(
-            [merged, reviewed, reviewed, coverage, coverage]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("你能往前给我跑个50米，帮我拿杯水，然后回来吗？")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 5)
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["往前移动50米。", "拿一杯水并带回给用户。"],
-        )
-        self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "executable_action"],
-        )
-        self.assertEqual(
-            result.metadata["semantic_review"]["triggers"],
-            ["embodied_responsibility_decomposition"],
-        )
-        review_prompt = ollama.prompts[1][0]
-        self.assertIn("acknowledgement, confirmation", review_prompt)
-        self.assertIn("provider-owned stages", review_prompt)
-        self.assertIn("Do not split pickup and handoff", review_prompt)
-        self.assertIn("Identity shapes expression only", review_prompt)
-        self.assertEqual(
-            ollama.prompts[4][1]["prompt_family"],
-            "goal_association.resource_stage_responsibility_coverage",
-        )
-        focused_schema = ollama.prompts[4][1]["response_format"]
-        focused_item = focused_schema["$defs"][
-            "GoalResponsibilityCoverageItem"
-        ]
-        self.assertEqual(
-            focused_item["properties"]["source_excerpt"]["enum"],
-            ["往前给我跑个50米", "帮我拿杯水，然后回来"],
-        )
-        self.assertEqual(focused_schema["properties"]["items"]["minItems"], 2)
-        self.assertEqual(focused_schema["properties"]["items"]["maxItems"], 2)
-
-    def test_voice_log_instrumental_navigation_stays_inside_resource_goal(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "往前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("去往前走个100米，帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama([initial, initial, reviewed, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="semantic_capability_planning",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        goal = result.new_goals[0]
-        self.assertEqual(goal.description, "从前方100米处拿一杯水并送给用户。")
-        assert goal.resource_responsibility is not None
-        self.assertEqual(goal.resource_responsibility.resource.quantity, "1")
-        self.assertEqual(goal.resource_responsibility.source.status, "known")
-        self.assertEqual(
-            set(goal.resource_responsibility.source.bindings),
-            {"distance", "direction"},
-        )
-        self.assertIn(
-            "resource_provider_stage_split_review",
-            result.metadata["semantic_review"]["triggers"],
-        )
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_resource_stage_adjudication",
-        )
-        self.assertEqual(
-            ollama.prompts[2][1]["prompt_family"],
-            "goal_association.resource_stage_adjudication",
-        )
-        self.assertIn("instrumental source", ollama.prompts[1][0])
-        self.assertIn(
-            "Spatial direction, distance",
-            ollama.prompts[2][0],
-        )
-
-    def test_fresh_review_cannot_silently_drop_resource_responsibility(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "前往前方100米并取回一杯水。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-                {
-                    "description": "将水递给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        lost_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [initial, lost_resource, lost_resource, corrected, coverage]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="semantic_capability_planning",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_resource_contract_loss_adjudication",
-        )
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.semantic_resegmentation",
-                "goal_association.resource_contract_loss_adjudication",
-                "goal_association.resource_contract_loss_residual_repair",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-        resource_review_prompt = ollama.prompts[2][0]
-        self.assertIn(
-            "Two independent model passes disagreed",
-            resource_review_prompt,
-        )
-        self.assertIn("known-source bindings", resource_review_prompt)
-        residual_repair_prompt = ollama.prompts[3][0]
-        self.assertIn(
-            "still omitted resource_responsibility from every Goal",
-            residual_repair_prompt,
-        )
-
-    def test_resource_stage_review_cannot_silently_drop_resource_responsibility(
-        self,
-    ):
-        split = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                },
-            ],
-            "confidence": 1.0,
-        }
-        lost_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("去往前走个100米，帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama([split, split, lost_resource, corrected, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="semantic_capability_planning",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.semantic_resegmentation",
-                "goal_association.resource_stage_adjudication",
-                "goal_association.resource_stage_contract_loss_repair",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-        repair_prompt = ollama.prompts[3][0]
-        self.assertIn("contract loss, not a semantic decision", repair_prompt)
-        self.assertIn("independently owed", ollama.prompts[2][0])
-
-    def test_contract_resegmentation_cannot_silently_drop_resource_responsibility(
-        self,
-    ):
-        invalid_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "前往前方100米并取回一杯水。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "actions",
-                            "entity_type": "action_collection",
-                            "value": "walk and fetch",
-                            "confidence": 1.0,
-                        }
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "unknown",
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        lost_resource = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "向前走100米。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "帮我拿杯水过来。",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        corrected = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "从前方100米处拿一杯水并送给用户。",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "distance",
-                            "entity_type": "distance",
-                            "value": "100",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "direction",
-                            "entity_type": "direction",
-                            "value": "前方",
-                            "confidence": 1.0,
-                        },
-                    ],
-                    "resource_responsibility": {
-                        "resource_kind": "physical_object",
-                        "resource_description": "一杯水",
-                        "resource_quantity": "1",
-                        "source_status": "known",
-                        "source_description": "前方100米处",
-                        "source_binding_names": ["distance", "direction"],
-                        "recipient_description": "用户",
-                        "delivery_mode": "physical_handover",
-                    },
-                }
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("去往前走个100米", 0, role="constraint"),
-            responsibility_item("帮我拿杯水过来", 0),
-        )
-        ollama = ScriptedOllama(
-            [invalid_resource, lost_resource, corrected, coverage]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "去往前走个100米，帮我拿杯水过来。",
-                    route="robot_action",
-                    intent="semantic_capability_planning",
-                )
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertIsNotNone(result.new_goals[0].resource_responsibility)
-        self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.semantic_contract_resegmentation",
-                "goal_association.semantic_resegmentation",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-        self.assertIn(
-            "resource_contract_loss_review",
-            result.metadata["semantic_review"]["triggers"],
-        )
-
-    def test_negative_speech_constraint_stays_with_embodied_goal(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Nod twice.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "count",
-                            "entity_type": "number",
-                            "value": "2",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Acknowledge that no more weather details will be given.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Nod twice without giving more weather details.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "count",
-                            "entity_type": "number",
-                            "value": "2",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": (
-                        "Nod twice without giving more weather details."
                     ),
-                    "reason_summary": "The requested nod is a positive body effect.",
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "silence_or_omission_only",
-                    "audible_content_summary": "",
-                    "final_goal_description": "Do not give more weather details.",
-                    "reason_summary": (
-                        "Compliance consists only of omitting more weather details."
-                    ),
-                },
-            ],
-            "reason_summary": (
-                "The nod is independently requested; the prohibition is a delivery "
-                "constraint rather than spoken content."
-            ),
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("nod twice", 0),
-            responsibility_item(
-                "do not give me more weather details",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-        )
-        ollama = ScriptedOllama([initial, initial, adjudication, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Now nod twice, and do not give me more weather details.",
-                    language="en-US",
                 )
             )
-        )
 
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].description,
-            "Nod twice without giving more weather details.",
-        )
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "executable_action",
-        )
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_goal_independence_adjudication",
-        )
-        self.assertEqual(result.metadata["semantic_review"]["attempt_count"], 2)
-        review_prompt = ollama.prompts[1][0]
-        self.assertIn("No previous Goal DTO is supplied", review_prompt)
-        self.assertNotIn("Acknowledge that no more weather", review_prompt)
-        self.assertIn("not a request for a verbal acknowledgement", review_prompt)
-        self.assertIn("do not create a sibling", review_prompt)
-        self.assertIn("omitting its typed binding is invalid", review_prompt)
-        self.assertIn("description text alone is never enough", review_prompt)
-        adjudication_prompt = ollama.prompts[2][0]
-        self.assertIn("if the body action occurred", adjudication_prompt)
-        self.assertIn("sets a boundary on delivery", adjudication_prompt)
-        self.assertIn("every zero-based candidate Goal", adjudication_prompt)
-        self.assertIn("positive words, information", adjudication_prompt)
-        self.assertIn("silence_or_omission_only", adjudication_prompt)
-        self.assertIn(
-            "goal_association.independence_adjudication",
-            ollama.prompts[2][1]["prompt_family"],
-        )
-        adjudication_schema = ollama.prompts[2][1]["response_format"]
-        self.assertEqual(
-            adjudication_schema["$defs"][
-                "GoalIndependenceCandidateDecision"
-            ]["properties"]["candidate_goal_index"]["enum"],
-            [0, 1],
-        )
-        self.assertEqual(
-            adjudication_schema["$defs"][
-                "GoalIndependenceCandidateDecision"
-            ]["required"],
-            [
-                "candidate_goal_index",
-                "completion_mode",
-                "audible_content_summary",
-                "final_goal_description",
-                "reason_summary",
-            ],
-        )
-
-    def test_independence_adjudication_keeps_social_style_on_embodied_goal(self):
-        mixed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Blink twice while presenting the action cutely.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "count",
-                            "entity_type": "number",
-                            "value": "2",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Provide a cute acknowledgement.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": (
-                        "Blink twice while presenting the action cutely."
-                    ),
-                    "reason_summary": (
-                        "The blink is the requested positive effect and owns its style."
-                    ),
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "expression_style_constraint_only",
-                    "audible_content_summary": "",
-                    "final_goal_description": "",
-                    "reason_summary": (
-                        "The acknowledgement only promotes the action's social style."
-                    ),
-                },
-            ],
-            "reason_summary": (
-                "The social-presentation modifier belongs to the embodied effect."
-            ),
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("Blink twice", 0),
-            responsibility_item("be cute", 0, role="constraint"),
-        )
-        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Blink twice and be cute.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].description,
-            "Blink twice while presenting the action cutely.",
-        )
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "executable_action",
-        )
-        adjudication_prompt = ollama.prompts[2][0]
-        self.assertIn("expression_style_constraint_only", adjudication_prompt)
-        self.assertIn("not positive authored content", adjudication_prompt)
-        adjudication_schema = ollama.prompts[2][1]["response_format"]
-        completion_modes = adjudication_schema["$defs"][
-            "GoalIndependenceCandidateDecision"
-        ]["properties"]["completion_mode"]
-        self.assertIn("expression_style_constraint_only", completion_modes["enum"])
-        coverage_prompt = ollama.prompts[3][0]
-        self.assertIn("social-presentation modifier", coverage_prompt)
-        self.assertIn("role=constraint", coverage_prompt)
-        self.assertIn("broad desired social impression", coverage_prompt)
-        self.assertIn("unjustified_candidate_indices", coverage_prompt)
-
-    def test_independence_adjudication_preserves_requested_authored_content(self):
-        mixed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Blink twice.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "count",
-                            "entity_type": "number",
-                            "value": "2",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Tell a short joke.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": "Blink twice.",
-                    "reason_summary": "The requested blink is a positive body effect.",
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "independently_requested_authored_content",
-                    "audible_content_summary": "A short joke.",
-                    "final_goal_description": "Tell a short joke.",
-                    "reason_summary": "The user positively requested a joke to hear.",
-                },
-            ],
-            "reason_summary": "Both outcomes are independently requested.",
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("Blink twice", 0),
-            responsibility_item("tell me a short joke", 1),
-        )
-        ollama = ScriptedOllama([mixed, mixed, adjudication, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Blink twice and tell me a short joke.", language="en-US")
-            )
-        )
-
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Blink twice.", "Tell a short joke."],
-        )
-        self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "vocal_output"],
-        )
-
-    def test_independent_spoken_performance_survives_model_semantic_review(self):
-        mixed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Look up today's weather in Neixiang County.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "Neixiang County",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Sing a short song.",
-                    "output_mode": "singing",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": mixed["new_goals"][0]["description"],
-                    "reason_summary": "Weather lookup is the capability outcome.",
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "independently_requested_authored_content",
-                    "audible_content_summary": "A short song.",
-                    "final_goal_description": mixed["new_goals"][1]["description"],
-                    "reason_summary": "The song is independently requested content.",
-                },
-            ],
-            "reason_summary": "Both independently requested outcomes are preserved.",
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("Check today's weather in Neixiang County", 0),
-            responsibility_item("sing a short song", 1),
-        )
-        ollama = ScriptedOllama([mixed, mixed, coverage])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Check today's weather in Neixiang County and sing a short song.",
-                    language="en-US",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["capability_dependent", "vocal_output"],
-        )
-        self.assertEqual(result.new_goals[1].metadata["output_mode"], "singing")
-        self.assertIn("such as a song, joke", ollama.prompts[1][0])
-        self.assertEqual(
-            ollama.prompts[2][1]["prompt_family"],
-            "goal_association.responsibility_coverage",
-        )
-
-    def test_capability_result_recommendation_is_owned_by_capability_goal(self):
-        mixed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Check tomorrow's weather in Shanghai.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "Shanghai",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "date",
-                            "entity_type": "date",
-                            "value": "tomorrow",
-                            "confidence": 1.0,
-                        },
-                    ],
-                },
-                {
-                    "description": "Recommend whether to take an umbrella.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        adjudication = {
-            "candidate_decisions": [
-                {
-                    "candidate_goal_index": 0,
-                    "completion_mode": "positive_effect",
-                    "audible_content_summary": "",
-                    "final_goal_description": mixed["new_goals"][0]["description"],
-                    "reason_summary": "Fresh weather evidence is required.",
-                },
-                {
-                    "candidate_goal_index": 1,
-                    "completion_mode": "capability_result_delivery_only",
-                    "audible_content_summary": "",
-                    "final_goal_description": "",
-                    "reason_summary": (
-                        "The umbrella recommendation depends on the weather result."
-                    ),
-                },
-            ],
-            "reason_summary": (
-                "The capability Goal owns both evidence acquisition and delivery."
-            ),
-        }
-        ollama = ScriptedOllama([mixed, mixed, adjudication])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Check tomorrow's weather in Shanghai and tell me whether I "
-                    "should take an umbrella.",
-                    language="en-US",
-                    route="tool",
-                    intent="capability:chromie.weather.lookup",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "capability_dependent",
-        )
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_goal_independence_adjudication",
-        )
-        self.assertIn(
-            "capability_result_delivery_only",
-            ollama.prompts[2][0],
-        )
-        self.assertIn(
-            "contingent completion report",
-            ollama.prompts[2][0],
-        )
-        self.assertIn(
-            "pending work has finished depends on execution evidence",
-            ollama.prompts[2][1]["system"],
-        )
-
-    def test_compound_mixed_goal_triggers_binding_audit_without_host_word_rules(self):
-        self.assertTrue(
-            GoalAssociationResolver._binding_audit_required(
-                {
-                    "new_goals": [
-                        {
-                            "description": "Blink twice.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        },
-                        {
-                            "description": "Explain why leaves change color.",
-                            "output_mode": "speech",
-                            "bindings": [],
-                        },
-                    ]
-                }
-            )
-        )
-        self.assertFalse(
-            GoalAssociationResolver._binding_audit_required(
-                {
-                    "new_goals": [
-                        {
-                            "description": "Blink.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        }
-                    ]
-                }
-            )
-        )
-
-    def test_compound_numeric_binding_audit_recovers_duration(self):
-        segmented = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Turn in place.",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "Look at the user for 2 seconds.",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        audited_bindings = binding_audit(
-            [],
-            [
-                {
-                    "name": "duration_s",
-                    "entity_type": "duration_seconds",
-                    "value": "2",
-                    "confidence": 1.0,
-                }
-            ],
-        )
-        coverage = responsibility_coverage(
-            responsibility_item("Turn in place", 0),
-            responsibility_item("look at me for two seconds", 1),
-        )
-        ollama = ScriptedOllama([segmented, coverage, audited_bindings])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Turn in place, then look at me for two seconds.",
-                    language="en-US",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(
-            ollama.prompts[2][1]["prompt_family"],
-            "goal_association.binding_audit",
-        )
-        self.assertEqual(
-            result.new_goals[1].object["bindings"]["duration_s"]["value"],
-            "2",
-        )
-        self.assertEqual(
-            result.metadata["binding_audit"]["strategy"],
-            "model_owned_material_parameter_audit",
-        )
-        audit_schema = ollama.prompts[2][1]["response_format"]
-        self.assertEqual(
-            audit_schema["$defs"]["GoalBindingAuditItem"]["properties"]
-            ["candidate_goal_index"]["enum"],
-            [0, 1],
-        )
-
-    def test_failed_model_semantic_review_fails_closed(self):
-        mixed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Look up today's weather.",
-                    "output_mode": "capability_work",
-                    "bindings": [],
-                },
-                {
-                    "description": "Say the result.",
-                    "output_mode": "speech",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([mixed, "not-json"])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Check the weather and tell me the result.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.metadata["status"], "model_contract_failed")
-        self.assertTrue(result.metadata["semantic_review_attempted"])
-        self.assertFalse(result.metadata["semantic_review_succeeded"])
-        self.assertEqual(result.new_goals, [])
-        self.assertTrue(result.clarification)
-
-    def test_material_correction_after_contract_repair_gets_bound_replacement_goal(self):
-        initial = {
-            "decision": "associate",
-            "associations": [
-                {
-                    "relationship": "replace",
-                    "target_goal_ids": ["goal-weather"],
-                    "updated_description": "Check today's weather in Neixiang.",
-                    "confidence": 1.0,
-                }
-            ],
-            "new_goals": [],
-            "referent_updates": [
-                {
-                    "operation": "correct",
-                    "target_referent_ids": [],
-                    "confidence": 1.0,
-                }
-            ],
-            "resolved_references": [],
-            "confidence": 1.0,
-        }
-        repaired = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "Check today's weather in Neixiang.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {"name": "location", "entity_type": "place", "value": "内乡", "confidence": 1.0},
-                        {"name": "date", "entity_type": "date", "value": "today", "confidence": 1.0},
-                    ],
-                    "supersedes_goal_ids": ["goal-weather"],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "Check today's weather in Neixiang.",
-                    "output_mode": "capability_work",
-                    "supersedes_goal_ids": ["goal-weather"],
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "place",
-                            "value": "内乡",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "date",
-                            "entity_type": "date",
-                            "value": "today",
-                            "confidence": 1.0,
-                        },
-                    ],
-                }
-            ],
-            "referent_updates": [
-                {
-                    "operation": "introduce",
-                    "entity_type": "place",
-                    "canonical_value": "内乡",
-                    "scope_kind": "goal",
-                    "confidence": 1.0,
-                }
-            ],
-            "resolved_references": [],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([initial, repaired, reviewed])
-        existing_bindings = {
-            "location": {
-                "name": "location",
-                "entity_type": "place",
-                "value": "重庆",
-                "confidence": 1.0,
-            },
-            "date": {
-                "name": "date",
-                "entity_type": "date",
-                "value": "today",
-                "confidence": 1.0,
-            },
-        }
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "不是重庆，我说的是内乡。",
-                    active_goals=[
-                        active_goal(
-                            "goal-weather",
-                            "Check today's weather in Chongqing.",
-                            bindings=existing_bindings,
-                        )
-                    ],
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertEqual(result.associations, [])
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["value"],
-            "内乡",
-        )
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn(
-            "single_new_goal_with_retained_context",
-            result.metadata["semantic_review"]["triggers"],
-        )
-        self.assertEqual(result.new_goals[0].supersedes_goal_ids, ["goal-weather"])
-        self.assertIn("provenance-stable", ollama.prompts[2][0])
-        self.assertIn("Do not infer a correction from words", ollama.prompts[2][0])
-
-    def test_failed_semantic_review_preserves_successful_repair_evidence(self):
-        repaired = {
-            "decision": "associate",
-            "associations": [
-                {
-                    "relationship": "modify",
-                    "target_goal_ids": ["goal-weather"],
-                    "updated_description": "Check today's weather in Neixiang.",
-                    "confidence": 1.0,
-                }
-            ],
-            "new_goals": [],
-            "referent_updates": [],
-            "resolved_references": [],
-            "confidence": 1.0,
-        }
-        ollama = ScriptedOllama([{}, repaired, "not-json"])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "不是重庆，我说的是内乡。",
-                    active_goals=[
-                        active_goal(
-                            "goal-weather",
-                            "Check today's weather in Chongqing.",
-                        )
-                    ],
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 3)
-        self.assertTrue(result.metadata["contract_repair_attempted"])
-        self.assertTrue(result.metadata["contract_repair_succeeded"])
-        self.assertTrue(result.metadata["semantic_review_attempted"])
-        self.assertFalse(result.metadata["semantic_review_succeeded"])
-        self.assertIn("semantic review", result.reason_summary.lower())
-        self.assertEqual(result.new_goals, [])
-
-    def test_action_collection_review_repairs_merged_and_duplicated_goals(self):
-        ollama = ScriptedOllama(
-            [
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Walk while blinking and singing.",
-                            "output_mode": "body_action",
-                            "bindings": [
-                                {
-                                    "name": "actions",
-                                    "entity_type": "physical_action_set",
-                                    "value": "walking, blinking, singing",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        },
-                        {"description": "Sing a song.", "output_mode": "singing", "bindings": []},
-                    ],
-                    "confidence": 1.0,
-                },
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "Walk forward for 15 seconds.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        },
-                        {
-                            "description": "Blink eyes.",
-                            "output_mode": "body_action",
-                            "bindings": [],
-                        },
-                        {
-                            "description": "Sing a song.",
-                            "output_mode": "singing",
-                            "bindings": [],
-                        },
-                    ],
-                    "confidence": 1.0,
-                },
-                responsibility_coverage(
-                    responsibility_item("Walk for 15 seconds", 0),
-                    responsibility_item("blinking", 1),
-                    responsibility_item("singing", 2),
-                ),
-                binding_audit(
-                    [
-                        {
-                            "name": "duration_s",
-                            "entity_type": "duration_seconds",
-                            "value": "15",
-                            "confidence": 1.0,
-                        }
-                    ],
-                    [],
-                    [],
-                ),
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Walk for 15 seconds while blinking and singing.",
-                    language="en-US",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            [
-                "Walk forward for 15 seconds.",
-                "Blink eyes.",
-                "Sing a song.",
-            ],
-        )
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-        self.assertIn("No previous Goal DTO is supplied", ollama.prompts[1][0])
-        self.assertNotIn("physical_action_set", ollama.prompts[1][0])
-        self.assertEqual(
-            [goal.metadata["responsibility_kind"] for goal in result.new_goals],
-            ["executable_action", "executable_action", "vocal_output"],
-        )
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["duration_s"]["value"],
-            "15",
-        )
-        goal_schema = ollama.prompts[0][1]["response_format"]["$defs"][
-            "GoalAssociationModelGoal"
-        ]
-        self.assertIn("output_mode", goal_schema["required"])
-        self.assertNotIn("responsibility_kind", goal_schema["properties"])
-
-    def test_three_executable_actions_trigger_review_and_preserve_spoken_performance(self):
-        initial = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": (
-                        "Walk forward for 15 seconds while singing and blinking."
-                    ),
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "duration",
-                            "entity_type": "time_duration",
-                            "value": "15 seconds",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Sing while walking forward.",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-                {
-                    "description": "Blink eyes while walking forward.",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Walk forward for 15 seconds.",
-                    "output_mode": "body_action",
-                    "bindings": [
-                        {
-                            "name": "duration",
-                            "entity_type": "time_duration",
-                            "value": "15 seconds",
-                            "confidence": 1.0,
-                        }
-                    ],
-                },
-                {
-                    "description": "Sing while walking forward.",
-                    "output_mode": "singing",
-                    "bindings": [],
-                },
-                {
-                    "description": "Blink eyes while walking forward.",
-                    "output_mode": "body_action",
-                    "bindings": [],
-                },
-            ],
-            "confidence": 1.0,
-        }
-        coverage = responsibility_coverage(
-            responsibility_item("往前走个15秒", 0),
-            responsibility_item("边走边唱歌", 1),
-            responsibility_item("眨眼睛", 2),
-        )
-        ollama = ScriptedOllama(
-            [initial, reviewed, coverage, binding_audit([], [], [])]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertEqual(
-            result.metadata["semantic_review"]["triggers"],
-            ["multi_embodied_responsibility_review"],
-        )
-        self.assertEqual(
-            [
-                (
-                    goal.metadata["responsibility_kind"],
-                    goal.metadata["execution_lane"],
-                    goal.metadata["output_mode"],
-                    goal.metadata["provider_required"],
-                )
-                for goal in result.new_goals
-            ],
-            [
-                ("executable_action", "activity", "body_action", True),
-                ("vocal_output", "vocal", "singing", True),
-                ("executable_action", "activity", "body_action", True),
-            ],
-        )
-        review_prompt, review_kwargs = ollama.prompts[1]
-        self.assertIn("No previous Goal DTO is supplied", review_prompt)
-        self.assertNotIn("DTO to review JSON", review_prompt)
-        self.assertIn("semantic work and evidence that complete", review_prompt)
-        self.assertIn("vocal performance", review_prompt)
-        self.assertEqual(
-            review_kwargs["prompt_family"],
-            "goal_association.semantic_resegmentation",
-        )
-        self.assertEqual(
-            result.metadata["semantic_review"]["strategy"],
-            "model_owned_fresh_goal_resegmentation",
-        )
-
-    def test_associates_followup_before_creating_new_goal(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-coffee"], "confidence": 0.96, "reason_summary": "The user refined the coffee goal.", "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.96, "reason_summary": "Continuity before creation."})
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
-        self.assertEqual([item.relationship for item in result.associations], ["modify"])
-        self.assertEqual(result.associations[0].target_goal_ids, ["goal-coffee"])
-        self.assertEqual(result.new_goals, [])
-        self.assertEqual(result.metadata["authority"], "advisory")
-
-    def test_can_update_existing_goal_and_create_independent_new_goal(self):
-        ollama = FakeOllama(
-            {
-                "associations": [
-                    {
-                        "relationship": "modify",
-                        "target_goal_ids": ["goal-coffee"],
-                        "confidence": 0.91,
-                        "updated_description": "Get iced coffee",
-                    }
-                ],
-                "new_goals": [
-                    {
-                        "description": "Report the current weather.",
-                        "output_mode": "capability_work",
-                    }
-                ],
-                "confidence": 0.91,
-            }
-        )
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "咖啡要冰的，顺便查一下天气。",
-                    active_goals=[active_goal("goal-coffee", "Get coffee")],
-                )
-            )
-        )
-        self.assertEqual(len(result.associations), 1)
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(result.new_goals[0].description, "Report the current weather.")
-        self.assertTrue(result.new_goals[0].goal_id.startswith("goal_"))
-
-    def test_model_goal_transport_noise_is_rejected_and_host_owns_canonical_fields(self):
-        noisy = {
-            "new_goals": [
-                {
-                    "id": "goal_1",
-                    "source_text": "model-authored source",
-                    "constraints": {"invented": True},
-                    "success_criteria": ["model-authored criterion"],
-                    "description": "Respond to the greeting",
-                    "output_mode": "speech",
-                }
-            ],
-            "confidence": 0.94,
-        }
-        repaired = {
-            "new_goals": [
-                {
-                    "description": "Respond to the greeting",
-                    "output_mode": "speech",
-                }
-            ],
-            "confidence": 0.94,
-        }
-        ollama = ScriptedOllama([noisy, repaired])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Hello.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(ollama.prompts[1][1]["prompt_family"], "goal_association.repair")
-        self.assertEqual([goal.description for goal in result.new_goals], ["Respond to the greeting"])
-        self.assertTrue(result.new_goals[0].goal_id.startswith("goal_"))
-        self.assertNotEqual(result.new_goals[0].goal_id, "goal_1")
-        self.assertEqual(result.new_goals[0].source_text, "Hello.")
-        self.assertEqual(result.new_goals[0].constraints, {})
-        self.assertEqual(result.new_goals[0].success_criteria, ["Respond to the greeting"])
-        self.assertEqual(result.metadata["model_contract"], "GoalSegmentationModelOutput")
-        self.assertTrue(result.metadata["host_generated_identifiers"])
-
-
-    def test_missing_minimal_description_uses_one_model_repair(self):
-        ollama = ScriptedOllama([
-            {
-                "new_goals": [
-                    {"open_semantic_description": "Walk forward for one second"},
-                    {"open_semantic_description": "Blink twice"},
-                ],
-                "confidence": 0.9,
-            },
-            {
-                "new_goals": [
-                    {"description": "Walk forward for one second", "output_mode": "body_action"},
-                    {"description": "Blink twice", "output_mode": "body_action"},
-                ],
-                "confidence": 0.9,
-            },
-            responsibility_coverage(
-                responsibility_item("Walk forward for one second", 0),
-                responsibility_item("Blink twice", 1),
-            ),
-            binding_audit([], []),
-        ])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Walk forward for one second, then blink twice.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Walk forward for one second", "Blink twice"],
-        )
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn("open_semantic_description", ollama.prompts[1][0])
-        self.assertIn(
-            "Each new_goals item contains description, output_mode, optional media_operation, bindings, optional supersedes_goal_ids, and optional provider-neutral resource_responsibility only",
-            ollama.prompts[1][0],
-        )
-
-
-    def test_direct_explicit_location_uses_binding_and_referent_update(self):
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": "查询今晚重庆天气并判断是否炎热。",
-                        "output_mode": "capability_work",
-                        "bindings": [
-                            {
-                                "name": "location",
-                                "entity_type": "location",
-                                "value": "重庆",
-                                "confidence": 1.0,
-                            },
-                            {
-                                "name": "time_scope",
-                                "entity_type": "time",
-                                "value": "tonight",
-                                "confidence": 1.0,
-                            },
+    def test_typed_resource_fact_cannot_have_two_writable_owners(self):
+        with self.assertRaisesRegex(ValueError, "both resource attributes and source"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring the water from 100 meters ahead.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        attributes=[
+                            binding("distance_to_source", "distance", "100m")
                         ],
-                    }
-                ],
-                "referent_updates": [
-                    {
-                        "operation": "introduce",
-                        "entity_type": "location",
-                        "canonical_value": "重庆",
-                        "scope_kind": "goal",
-                        "confidence": 1.0,
-                        "reason_summary": "重庆是用户当前明确指定并且后续可能引用的地点。",
-                    }
-                ],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": "The user explicitly named the weather location.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("今天晚上重庆热不热？")
-            )
-        )
-
-        self.assertEqual(result.new_goals[0].object["bindings"]["location"]["value"], "重庆")
-        self.assertEqual(result.resolved_references, [])
-        self.assertEqual(result.referent_updates[0].referent.canonical_value, "重庆")
-        prompt = ollama.prompts[0][0]
-        self.assertIn("Do not emit resolved_references for an ordinary explicit entity mention", prompt)
-
-    def test_missing_resolved_reference_confidence_uses_contract_repair(self):
-        neixiang = {
-            "referent_id": "ref-neixiang",
-            "entity_type": "location",
-            "canonical_value": "内乡",
-            "scope_kind": "conversation",
-            "scope_ids": [],
-            "status": "foreground",
-            "confidence": 1.0,
-            "source_turn_id": "turn-neixiang",
-            "source_goal_ids": [],
-        }
-        ollama = ScriptedOllama(
-            [
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "查询今天内乡是否下雨。",
-                            "output_mode": "capability_work",
-                            "bindings": [
-                                {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "内乡",
-                                    "referent_id": "ref-neixiang",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        }
-                    ],
-                    "referent_updates": [],
-                    "resolved_references": [
-                        {
-                            "surface_form": "那边",
-                            "entity_type": "location",
-                            "resolved_value": "内乡",
-                            "source": "discourse_referent",
-                            "referent_id": "ref-neixiang",
-                        }
-                    ],
-                    "clarification": "",
-                    "confidence": 1.0,
-                    "reason_summary": "Resolve the foreground place.",
-                },
-                {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "description": "查询今天内乡是否下雨。",
-                            "output_mode": "capability_work",
-                            "bindings": [
-                                {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "内乡",
-                                    "referent_id": "ref-neixiang",
-                                    "confidence": 1.0,
-                                }
-                            ],
-                        }
-                    ],
-                    "referent_updates": [],
-                    "resolved_references": [
-                        {
-                            "surface_form": "那边",
-                            "entity_type": "location",
-                            "resolved_value": "内乡",
-                            "source": "discourse_referent",
-                            "referent_id": "ref-neixiang",
-                            "confidence": 1.0,
-                            "reason_summary": "内乡是当前前景地点。",
-                        }
-                    ],
-                    "clarification": "",
-                    "confidence": 1.0,
-                    "reason_summary": "Resolve the foreground place.",
-                },
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "今天那边下雨了没有？",
-                    discourse_referents=[neixiang],
-                    discourse_focus=["ref-neixiang"],
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.resolved_references[0].confidence, 1.0)
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn("Every resolved reference and referent update must include explicit confidence", ollama.prompts[1][0])
-
-    def test_location_correction_creates_scoped_referent_and_goal_binding(self):
-        chongqing = {
-            "referent_id": "ref-chongqing",
-            "entity_type": "location",
-            "canonical_value": "重庆",
-            "scope_kind": "goal",
-            "scope_ids": ["goal-chongqing-weather"],
-            "status": "foreground",
-            "confidence": 1.0,
-            "source_turn_id": "turn-chongqing",
-            "source_goal_ids": ["goal-chongqing-weather"],
-        }
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": "确认用户纠正的地点是内乡。",
-                        "output_mode": "speech",
-                        "bindings": [
-                            {
-                                "name": "location",
-                                "entity_type": "location",
-                                "value": "内乡",
-                                "confidence": 1.0,
-                            }
+                        source_status="known",
+                        source_description="100 meters ahead",
+                        source_bindings=[
+                            binding("location_offset", "distance", "100m")
                         ],
-                    }
-                ],
-                "referent_updates": [
-                    {
-                        "operation": "correct",
-                        "entity_type": "location",
-                        "canonical_value": "内乡",
-                        "target_referent_ids": ["ref-chongqing"],
-                        "scope_kind": "conversation",
-                        "confidence": 1.0,
-                        "reason_summary": "用户明确纠正地点为内乡。",
-                    }
-                ],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": "The current discourse location was corrected.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "不是重庆，是一个地名叫内乡。",
-                    discourse_referents=[chongqing],
-                    discourse_focus=["ref-chongqing"],
+                    ),
                 )
             )
-        )
 
-        self.assertEqual(len(result.referent_updates), 1)
-        update = result.referent_updates[0]
-        self.assertEqual(update.operation, "correct")
-        self.assertEqual(update.target_referent_ids, ["ref-chongqing"])
-        self.assertEqual(update.referent.canonical_value, "内乡")
-        binding = result.new_goals[0].object["bindings"]["location"]
-        self.assertEqual(binding["value"], "内乡")
-        self.assertEqual(binding["referent_id"], update.referent.referent_id)
-
-    def test_candidate_goal_location_clarification_gets_semantic_review(self):
-        chongqing = {
-            "referent_id": "ref-chongqing",
-            "entity_type": "location",
-            "canonical_value": "重庆",
-            "scope_kind": "goal",
-            "scope_ids": ["goal-chongqing-weather"],
-            "status": "foreground",
-            "confidence": 1.0,
-            "source_turn_id": "turn-chongqing",
-            "source_goal_ids": ["goal-chongqing-weather"],
-        }
-        proposed_clarification = {
-            "decision": "clarify",
-            "associations": [],
-            "new_goals": [],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "Which Neixiang do you mean?",
-            "confidence": 1.0,
-            "reason_summary": "The provider may find more than one place.",
-        }
-        reviewed = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "查询用户纠正后的内乡天气。",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "location",
-                            "value": "内乡",
-                            "confidence": 1.0,
-                        }
-                    ],
-                }
-            ],
-            "referent_updates": [
-                {
-                    "operation": "correct",
-                    "entity_type": "location",
-                    "canonical_value": "内乡",
-                    "target_referent_ids": ["ref-chongqing"],
-                    "scope_kind": "conversation",
-                    "confidence": 1.0,
-                    "reason_summary": "用户直接提供了新的地点绑定。",
-                }
-            ],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 1.0,
-            "reason_summary": "The exact replacement binding can be resolved downstream.",
-        }
-        ollama = ScriptedOllama([proposed_clarification, reviewed])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "不是重庆，我说的是内乡。",
-                    active_goals=[
-                        active_goal(
-                            "goal-chongqing-weather",
-                            "查询重庆今天的天气。",
-                            bindings={
-                                "location": {
-                                    "name": "location",
-                                    "entity_type": "location",
-                                    "value": "重庆",
-                                    "confidence": 1.0,
-                                }
-                            },
-                        )
-                    ],
-                    discourse_referents=[chongqing],
-                    discourse_focus=["ref-chongqing"],
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            result.metadata["semantic_review"]["triggers"],
-            ["candidate_goal_clarification_continuity"],
-        )
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["value"],
-            "内乡",
-        )
-        self.assertEqual(result.referent_updates[0].operation, "correct")
-        self.assertIn("provider canonicalization", ollama.prompts[1][0])
-
-    def test_pronoun_resolves_from_foreground_referent_not_stale_tool_evidence(self):
-        chongqing = {
-            "referent_id": "ref-chongqing",
-            "entity_type": "location",
-            "canonical_value": "重庆",
-            "scope_kind": "goal",
-            "scope_ids": ["goal-chongqing-weather"],
-            "status": "background",
-            "confidence": 1.0,
-            "source_turn_id": "turn-chongqing",
-            "source_goal_ids": ["goal-chongqing-weather"],
-        }
-        neixiang = {
-            "referent_id": "ref-neixiang",
-            "entity_type": "location",
-            "canonical_value": "内乡",
-            "scope_kind": "conversation",
-            "scope_ids": [],
-            "status": "foreground",
-            "confidence": 1.0,
-            "source_turn_id": "turn-neixiang",
-            "source_goal_ids": [],
-            "supersedes_referent_ids": ["ref-chongqing"],
-        }
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "description": "查询今天内乡是否下雨。",
-                        "output_mode": "capability_work",
-                        "bindings": [
-                            {
-                                "name": "location",
-                                "entity_type": "location",
-                                "value": "内乡",
-                                "referent_id": "ref-neixiang",
-                                "confidence": 1.0,
-                            },
-                            {
-                                "name": "date",
-                                "entity_type": "date",
-                                "value": "today",
-                                "confidence": 1.0,
-                            },
+    def test_equivalent_measurement_cannot_escape_cross_owner_check(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "equivalent typed measurement.*resource attributes and source",
+        ):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Retrieve the measurement from the supplied source.",
+                    "capability_work",
+                    resource=resource_responsibility(
+                        kind="information",
+                        description="the requested measurement",
+                        quantity="",
+                        attributes=[binding("distance", "measurement", "100m")],
+                        source_status="known",
+                        source_bindings=[
+                            binding(
+                                "location_description",
+                                "location_instruction",
+                                "100 meters ahead",
+                            )
                         ],
-                    }
-                ],
-                "referent_updates": [],
-                "resolved_references": [
-                    {
-                        "surface_form": "那边",
-                        "entity_type": "location",
-                        "resolved_value": "内乡",
-                        "source": "discourse_referent",
-                        "referent_id": "ref-neixiang",
-                        "confidence": 1.0,
-                        "reason_summary": "内乡是当前前景地点。",
-                    }
-                ],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": "The foreground location resolves the reference.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "今天那边下雨了没有？",
-                    discourse_referents=[chongqing, neixiang],
-                    discourse_focus=["ref-chongqing", "ref-neixiang"],
-                    recent_tool_evidence=[
-                        {
-                            "evidence_id": "old-chongqing",
-                            "tool_id": "chromie.weather.lookup",
-                            "request_args": {"location": "重庆", "date": "today"},
-                            "data": {"condition": "雷雨", "precipitation_probability": 65},
-                        }
-                    ],
-                    history=[
-                        {"role": "user", "text": "不是重庆，是一个地名叫内乡。"},
-                        {"role": "assistant", "text": "我明白了，内乡是河南省的一个县。"},
-                    ],
+                    ),
                 )
             )
-        )
 
-        self.assertEqual(result.resolved_references[0].resolved_value, "内乡")
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["location"]["value"],
-            "内乡",
-        )
-        prompt = ollama.prompts[0][0]
-        self.assertIn('"canonical_value":"内乡"', prompt)
-        self.assertNotIn("old-chongqing", prompt)
-        self.assertNotIn('"condition":"雷雨"', prompt)
-
-    def test_last_task_reference_is_associated_by_llm_semantics(self):
-        ollama = FakeOllama(
-            {
-                "decision": "associate",
-                "associations": [
-                    {
-                        "relationship": "reference",
-                        "target_goal_ids": ["goal-weather"],
-                        "confidence": 0.98,
-                        "reason_summary": (
-                            "The user's phrase refers to the previously described "
-                            "weather task in the supplied active Goal context."
-                        ),
-                    }
-                ],
-                "new_goals": [],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 0.98,
-                "reason_summary": "The model semantically selected the referenced Goal.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Please continue the last task I told you.",
-                    language="en-US",
-                    active_goals=[
-                        active_goal("goal-coffee", "Order an iced coffee"),
-                        active_goal("goal-weather", "Check the weather in Neixiang"),
-                    ],
-                    history=[
-                        {"role": "user", "text": "Check the weather in Neixiang."},
-                        {"role": "assistant", "text": "I will check it."},
-                    ],
+    def test_physical_resource_attributes_are_structurally_unwritable(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "physical resource.attributes must be empty",
+        ):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Bring the red bottle from the table.",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="the red bottle",
+                        attributes=[binding("color", "color", "red")],
+                        source_status="known",
+                        source_bindings=[
+                            binding("source_location", "place", "the table")
+                        ],
+                    ),
                 )
             )
-        )
 
-        self.assertEqual(len(result.associations), 1)
-        self.assertEqual(result.associations[0].relationship, "reference")
-        self.assertEqual(
-            result.associations[0].target_goal_ids,
-            ["goal-weather"],
+    def test_resource_kind_requires_its_semantic_completion_mode(self):
+        information = resource_responsibility(
+            kind="information",
+            description="tonight's Chongqing weather",
+            quantity="",
+            source_status="provider_resolved",
         )
-        prompt = ollama.prompts[0][0]
-        self.assertIn("the last task I told you", prompt)
-        self.assertIn("not from a Host phrase table", prompt)
-        self.assertIn('"goal_id":"goal-weather"', prompt)
-        self.assertIn('"goal_id":"goal-coffee"', prompt)
+        with self.assertRaisesRegex(ValueError, "output_mode=capability_work"):
+            GoalAssociationModelGoal.model_validate(
+                goal("Check tonight's weather.", "speech", resource=information)
+            )
 
-    def test_social_reaction_after_completed_weather_is_a_fresh_spoken_goal(self):
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "associations": [],
-                "new_goals": [
-                    {
-                        "description": "回应用户认为26度有点冷并准备赶紧离开的反应。",
-                        "output_mode": "speech",
-                        "bindings": [],
-                    }
-                ],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 1.0,
-                "reason_summary": (
-                    "The latest turn is a new conversational reaction and practical "
-                    "decision; the completed weather result is supporting context."
-                ),
-            }
+        parsed = GoalAssociationModelGoal.model_validate(
+            goal("Check tonight's weather.", "capability_work", resource=information)
         )
-        completed = active_goal(
-            "goal-weather",
-            "判断重庆一会儿是否会下大雨。",
-            work_status="done",
-                            responsibility_status="satisfied",
-        )
+        self.assertEqual(parsed.output_mode, "capability_work")
 
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "是得赶紧走啊。",
-                    recent_goals=[completed],
-                    history=[
-                        {"role": "assistant", "text": "重庆有雷雨和冰雹预报。"},
-                    ],
+    def test_vocal_goal_cannot_claim_resource_authority(self):
+        with self.assertRaisesRegex(ValueError, "output_mode=body_action"):
+            GoalAssociationModelGoal.model_validate(
+                goal(
+                    "Sing a song.",
+                    "singing",
+                    resource=resource_responsibility(),
                 )
             )
-        )
 
-        self.assertEqual(result.associations, [])
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(
-            result.new_goals[0].metadata["responsibility_kind"],
-            "vocal_output",
-        )
-        prompt = ollama.prompts[0][0]
-        self.assertIn("latest turn is a social reaction", prompt)
-        self.assertIn("prior delivered information remains context", prompt)
-        self.assertIn("Do not use continue or reference merely because the topic overlaps", prompt)
-
-    def test_recent_terminal_goal_remains_a_bounded_association_candidate(self):
-        ollama = FakeOllama(
-            {
-                "decision": "associate",
-                "associations": [
-                    {
-                        "relationship": "reference",
-                        "target_goal_ids": ["goal-weather"],
-                        "confidence": 0.99,
-                        "reason_summary": "The follow-up asks about the retained weather Goal.",
-                    }
-                ],
-                "new_goals": [],
-                "referent_updates": [],
-                "resolved_references": [],
-                "clarification": "",
-                "confidence": 0.99,
-                "reason_summary": "Continuity with the recent completed lookup.",
-            }
-        )
-        completed = active_goal(
-            "goal-weather",
-            "Check today's weather in Beijing",
-            work_status="done",
-                            responsibility_status="satisfied",
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "So is it hot or not?",
-                    language="en-US",
-                    recent_goals=[completed],
-                    history=[
-                        {"role": "user", "text": "Check today's weather in Beijing."},
-                        {"role": "assistant", "text": "Beijing is hot today."},
-                    ],
-                )
-            )
-        )
-
-        self.assertEqual(result.associations[0].target_goal_ids, ["goal-weather"])
-        self.assertEqual(result.new_goals, [])
-        prompt = ollama.prompts[0][0]
-        self.assertIn("retained recent terminal Goal", prompt)
-        self.assertIn('"responsibility_status":"satisfied"', prompt)
-
-    def test_schema_forbids_reference_objects_without_supplied_referents(self):
-        schema = GoalAssociationResolver._response_schema(
+    def test_resource_and_coverage_invariants_are_in_decoder_schemas(self):
+        goal_schema = GoalAssociationResolver._response_schema(
             GoalSegmentationModelOutput,
             [],
             [],
         )
+        Draft202012Validator.check_schema(goal_schema)
+        goal_validator = Draft202012Validator(goal_schema)
 
-        self.assertEqual(
-            schema["properties"]["resolved_references"]["maxItems"],
-            0,
-        )
-
-    def test_ambiguous_reference_returns_natural_clarification_only(self):
-        ollama = FakeOllama({"associations": [], "new_goals": [], "clarification": "你是说咖啡不用了，还是天气也不用查了？", "confidence": 0.58})
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("算了，不用了。", active_goals=[active_goal("goal-coffee", "Get coffee"), active_goal("goal-weather", "Check weather")])))
-        self.assertEqual(result.clarification, "你是说咖啡不用了，还是天气也不用查了？")
-        self.assertEqual(result.associations, [])
-        self.assertNotIn("goal-coffee", result.clarification)
-
-    def test_unknown_goal_target_is_rejected_and_falls_back_to_clarification(self):
-        ollama = FakeOllama({"associations": [{"relationship": "modify", "target_goal_ids": ["goal-invented"], "confidence": 0.99, "updated_description": "Get iced coffee"}], "new_goals": [], "confidence": 0.99})
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("冰的。", active_goals=[active_goal("goal-coffee", "Get coffee")])))
-        self.assertEqual(result.associations, [])
-        self.assertTrue(result.clarification)
-        self.assertEqual(result.metadata["status"], "needs_clarification")
-
-    def test_prompt_requires_continuity_before_creation_and_no_plan_step_goals(self):
-        ollama = FakeOllama({"associations": [{"relationship": "continue", "target_goal_ids": ["goal-a"], "confidence": 0.9}], "new_goals": [], "confidence": 0.9})
-        asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
+        weather = create_goals(
+            goal(
+                "Check tonight's Chongqing weather.",
+                "speech",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="tonight's Chongqing weather",
+                    quantity="",
+                    source_status="provider_resolved",
+                ),
             )
         )
-        prompt, kwargs = ollama.prompts[0]
-        self.assertIn("Resolve continuity before creation", prompt)
-        self.assertIn("Do not split implementation steps into goals", prompt)
-        self.assertIn("host owns all IDs", prompt)
-        self.assertIn('relationship must be copied exactly from ["continue","modify","clarify"', prompt)
-        self.assertIn("clarify means the current user turn supplies missing information", prompt)
-        self.assertIn("Use reference when the current turn asks to retrieve, restate", prompt)
-        self.assertIn("Do not use continue or reference merely because the topic overlaps", prompt)
-        self.assertNotIn("continues, modifies", prompt)
-        schema = kwargs["response_format"]
-        self.assertIsInstance(schema, dict)
-        self.assertEqual(
-            set(schema["properties"]),
-            {"decision", "associations", "new_goals", "referent_updates", "resolved_references", "clarification", "confidence", "reason_summary"},
+        weather.update(
+            referent_updates=[],
+            resolved_references=[],
+            clarification="",
         )
-        self.assertEqual(
-            schema["properties"]["decision"]["enum"],
-            ["associate", "create_goals", "clarify"],
-        )
-        self.assertIn("decision", schema["required"])
-        self.assertNotIn("oneOf", schema)
-        self.assertEqual(
-            set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
-            {
-                "description",
-                "output_mode",
-                "media_operation",
-                "bindings",
-                "resource_responsibility",
-                "progress_candidate_ids",
-                "related_goal_ids",
-                "supersedes_goal_ids",
-            },
-        )
-        resolved_reference_schema = schema["$defs"]["GoalAssociationModelResolvedReference"]
-        self.assertEqual(
-            resolved_reference_schema["properties"]["source"]["enum"],
-            ["discourse_referent", "active_goal_binding"],
-        )
-        self.assertIn("referent_id", resolved_reference_schema["required"])
-        self.assertIn("confidence", resolved_reference_schema["required"])
-        referent_update_schema = schema["$defs"]["GoalAssociationModelReferentUpdate"]
-        self.assertIn("confidence", referent_update_schema["required"])
+        self.assertTrue(list(goal_validator.iter_errors(weather)))
+        weather["new_goals"][0]["output_mode"] = "capability_work"
+        self.assertEqual(list(goal_validator.iter_errors(weather)), [])
 
-        self.assertEqual(
-            schema["$defs"]["GoalAssociationModelAssociation"]["properties"]["relationship"]["enum"],
-            [
-                "continue",
-                "modify",
-                "clarify",
-                "confirm",
-                "reject",
-                "cancel",
-                "pause",
-                "resume",
-                "merge",
-                "split",
-                "reference",
-            ],
+        untyped_known_source = create_goals(
+            goal(
+                "Bring water from 100 meters ahead.",
+                "body_action",
+                resource=resource_responsibility(
+                    attributes=[binding("distance", "distance", "100")],
+                    source_status="known",
+                    source_description="100 meters ahead",
+                ),
+            )
         )
+        untyped_known_source.update(
+            referent_updates=[],
+            resolved_references=[],
+            clarification="",
+        )
+        self.assertTrue(list(goal_validator.iter_errors(untyped_known_source)))
 
-
-    def test_progress_candidate_ids_are_decoder_constrained_and_materialized(self):
-        candidate = {
-            "candidate_id": "progress-weather-today",
-            "kind": "capability",
-            "capability_id": "chromie.weather.lookup",
-            "args": {"location": "Chongqing", "date": "today"},
-            "intent": "chromie.weather.lookup",
-            "confidence": 0.99,
-        }
-        payload = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
-                {
-                    "description": "Check today's Chongqing weather and answer whether heavy rain is expected.",
-                    "output_mode": "capability_work",
-                    "bindings": [
-                        {
-                            "name": "location",
-                            "entity_type": "place",
-                            "value": "Chongqing",
-                            "confidence": 1.0,
-                        },
-                        {
-                            "name": "date",
-                            "entity_type": "temporal_scope",
-                            "value": "today",
-                            "confidence": 1.0,
-                        },
+        typed_physical_attribute = create_goals(
+            goal(
+                "Bring the red bottle from the table.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="the red bottle",
+                    attributes=[binding("color", "color", "red")],
+                    source_status="known",
+                    source_bindings=[
+                        binding("source_location", "place", "the table")
                     ],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "today's Chongqing weather",
-                        "source_status": "provider_resolved",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                    "progress_candidate_ids": ["progress-weather-today"],
-                    "related_goal_ids": ["goal-dinner"],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.98,
-            "reason_summary": "The current read directly supports the new weather Goal and informs dinner planning.",
-        }
-        ollama = FakeOllama(payload)
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Will it rain heavily in Chongqing today?",
-                    language="en-US",
-                    route="tool",
-                    intent="chromie.weather.lookup",
-                    active_goals=[active_goal("goal-dinner", "Go out for dinner tonight")],
-                    progress_candidates=[candidate],
-                )
+                ),
             )
         )
-
-        schema = ollama.prompts[0][1]["response_format"]
-        goal_properties = schema["$defs"]["GoalAssociationModelGoal"]["properties"]
-        self.assertEqual(
-            goal_properties["progress_candidate_ids"]["items"]["enum"],
-            ["progress-weather-today"],
+        typed_physical_attribute.update(
+            referent_updates=[],
+            resolved_references=[],
+            clarification="",
         )
-        self.assertEqual(
-            goal_properties["related_goal_ids"]["items"]["enum"],
-            ["goal-dinner"],
+        self.assertTrue(list(goal_validator.iter_errors(typed_physical_attribute)))
+
+        coverage_schema = GoalAssociationResolver._coverage_certificate_response_schema(
+            1
         )
-        self.assertEqual(len(result.new_goals), 1)
-        goal = result.new_goals[0]
-        self.assertEqual(goal.related_goal_ids, ["goal-dinner"])
-        self.assertEqual(len(result.progress_bindings), 1)
-        self.assertEqual(result.progress_bindings[0].candidate_id, "progress-weather-today")
-        self.assertEqual(result.progress_bindings[0].goal_ids, [goal.goal_id])
-
-    def test_native_response_progress_binds_only_to_spoken_goal(self):
-        candidate = {
-            "candidate_id": "progress-native-answer",
-            "kind": "native_response",
-            "response_text": "I'm Chromie!",
-            "speech_act": "answer",
-            "intent": "identity_question",
-            "confidence": 0.99,
-        }
-        payload = {
-            "decision": "create_goals",
-            "new_goals": [
-                {
-                    "description": "Answer the user's identity question.",
-                    "output_mode": "speech",
-                    "media_operation": "none",
-                    "bindings": [],
-                    "progress_candidate_ids": ["progress-native-answer"],
-                    "related_goal_ids": [],
-                }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.99,
-            "reason_summary": "The ready native response directly satisfies the new spoken Goal.",
-        }
-        ollama = FakeOllama(payload)
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "What is your name?",
-                    language="en-US",
-                    route="chat",
-                    intent="identity_question",
-                    progress_candidates=[candidate],
-                )
+        Draft202012Validator.check_schema(coverage_schema)
+        coverage_validator = Draft202012Validator(coverage_schema)
+        invalid_context = certificate(
+            {
+                "source_excerpt": "I am a little tired",
+                "role": "context",
+                "coverage": "missing",
+                "independently_satisfiable": True,
+                "candidate_goal_indices": [],
+            }
+        )
+        self.assertTrue(list(coverage_validator.iter_errors(invalid_context)))
+        valid_context = certificate(
+            coverage_item(
+                "I am a little tired",
+                role="context",
+                independently_satisfiable=False,
             )
         )
+        self.assertEqual(list(coverage_validator.iter_errors(valid_context)), [])
 
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(len(result.progress_bindings), 1)
-        self.assertEqual(result.progress_bindings[0].candidate_id, "progress-native-answer")
-        self.assertEqual(
-            result.progress_bindings[0].goal_ids,
-            [result.new_goals[0].goal_id],
+    def test_resource_and_coverage_prompts_share_information_ownership(self):
+        resolver = GoalAssociationResolver(FakeOllama({}))
+        req = request(
+            "I am in chongqing now, please help me check whether it will rain "
+            "tonight and whether it it cold",
+            language="en-US",
+            route="tool",
+            intent="capability:chromie.weather.lookup",
         )
 
-    def test_unknown_progress_candidate_is_rejected(self):
-        payload = {
-            "decision": "create_goals",
-            "associations": [],
-            "new_goals": [
+        interpretation_prompt = resolver._build_prompt(
+            req,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+        self.assertIn(
+            "put a resolved place in resource.attributes as a binding named location",
+            interpretation_prompt,
+        )
+        self.assertIn(
+            "requested time and result aspects there as their own typed attributes",
+            interpretation_prompt,
+        )
+        self.assertNotIn(
+            "For weather, a resolved place belongs in a binding named location",
+            interpretation_prompt,
+        )
+
+        coverage_prompt = resolver._build_responsibility_coverage_prompt(
+            request=req,
+            raw=create_goals(
+                goal(
+                    "Check Chongqing weather tonight.",
+                    "capability_work",
+                    resource=resource_responsibility(
+                        kind="information",
+                        description="Chongqing weather tonight",
+                        quantity="",
+                        attributes=[
+                            binding("location", "location", "chongqing"),
+                            binding("time", "time", "tonight"),
+                            binding("aspects", "list", "rain, temperature"),
+                        ],
+                        source_status="provider_resolved",
+                    ),
+                )
+            ),
+        )
+        self.assertIn(
+            "Multiple aspects requested from one information result likewise remain "
+            "one responsibility",
+            coverage_prompt,
+        )
+        self.assertIn(
+            "requested location, time, and result aspects are covered only by "
+            "resource.attributes",
+            coverage_prompt,
+        )
+
+    def test_deterministic_resource_projection_is_frozen(self):
+        canonical = AcquireAndDeliverResource(
+            resource=ResourceDescriptor(
+                kind="physical_object",
+                description="一杯水",
+                quantity="1",
+                attributes={"temperature": binding("temperature", "temperature", "cold")},
+            ),
+            source=ResourceSource(
+                status="known",
+                description="前方100米处",
+                bindings={"distance": binding("distance", "distance", "100")},
+            ),
+            recipient=ResourceRecipient(description="用户"),
+            delivery_mode="physical_handover",
+        )
+        projection = project_resource_grounding(canonical)
+
+        self.assertEqual(
+            set(projection.bindings),
+            {"temperature", "distance", "quantity"},
+        )
+        self.assertEqual(
+            projection.provenance["distance"],
+            "resource_responsibility.source.bindings.distance",
+        )
+        with self.assertRaises(ValidationError):
+            projection.bindings = {}
+
+    def test_certificate_has_no_model_authored_verdict(self):
+        parsed = GoalResponsibilityCoverageCertificate.model_validate(
+            certificate(coverage_item("Blink twice.", 0))
+        )
+        self.assertEqual(len(parsed.items), 1)
+        with self.assertRaises(ValidationError):
+            GoalResponsibilityCoverageCertificate.model_validate(
                 {
-                    "description": "Check today's Chongqing weather.",
-                    "output_mode": "capability_work",
-                    "bindings": [],
-                    "resource_responsibility": {
-                        "resource_kind": "information",
-                        "resource_description": "today's Chongqing weather",
-                        "source_status": "provider_resolved",
-                        "delivery_mode": "spoken_explanation",
-                    },
-                    "progress_candidate_ids": ["invented-progress"],
-                    "related_goal_ids": [],
+                    **certificate(coverage_item("Blink twice.", 0)),
+                    "decision": "accept",
                 }
-            ],
-            "referent_updates": [],
-            "resolved_references": [],
-            "clarification": "",
-            "confidence": 0.9,
-            "reason_summary": "invalid candidate reference",
-        }
+            )
+
+
+class GoalAssociationTransactionTests(unittest.TestCase):
+    def _resolve(self, ollama, req: AgentRunRequest) -> GoalAssociationResolution:
+        return asyncio.run(GoalAssociationResolver(ollama).resolve(req))
+
+    def assert_transaction(
+        self,
+        result: GoalAssociationResolution,
+        ollama: ScriptedOllama | FakeOllama,
+        *,
+        terminal: str,
+        families: list[str],
+    ) -> None:
+        transaction = result.metadata["goal_semantic_transaction"]
+        self.assertEqual(result.resolution_status, terminal)
+        self.assertEqual(transaction["terminal_state"], terminal if terminal == "fail_closed" else "commit")
+        self.assertEqual(transaction["logical_invocation_count"], len(families))
+        self.assertEqual(transaction["logical_invocation_budget"], 5)
+        self.assertEqual(transaction["prompt_families"], families)
+        self.assertEqual(
+            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
+            families,
+        )
+
+    def test_ordinary_conversation_commits_after_required_coverage(self):
         ollama = ScriptedOllama(
             [
-                payload,
-                {
-                    "decision": "clarify",
-                    "associations": [],
-                    "new_goals": [],
-                    "referent_updates": [],
-                    "resolved_references": [],
-                    "clarification": "I need to verify what information to retrieve.",
-                    "confidence": 0.6,
-                    "reason_summary": "The progress reference was invalid.",
-                },
+                create_goals(goal("Acknowledge the greeting.", "speech")),
+                certificate(coverage_item("Hello", 0)),
             ]
         )
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Check the weather.",
-                    language="en-US",
-                    route="tool",
-                    intent="chromie.weather.lookup",
-                    progress_candidates=[],
-                )
+        result = self._resolve(ollama, request("Hello", language="en-US"))
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_effectful_goal_requires_one_immutable_coverage_certificate(self):
+        ollama = ScriptedOllama(
+            [
+                create_goals(goal("Blink twice.", "body_action")),
+                certificate(coverage_item("Blink twice.", 0)),
+            ]
+        )
+        result = self._resolve(
+            ollama,
+            request(
+                "Blink twice.",
+                language="en-US",
+                route="robot_action",
+                intent="blink",
+            ),
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertNotIn("decision", result.metadata["responsibility_coverage"]["certificate"])
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_primary_dto_gets_exactly_one_contract_repair(self):
+        invalid = create_goals(goal("Blink twice.", "invalid_mode"))
+        valid = create_goals(goal("Blink twice.", "body_action"))
+        ollama = ScriptedOllama(
+            [invalid, valid, certificate(coverage_item("Blink twice.", 0))]
+        )
+        result = self._resolve(
+            ollama,
+            request("Blink twice.", language="en-US", route="robot_action"),
+        )
+
+        self.assertTrue(
+            result.metadata["goal_semantic_transaction"]["contract_repair_attempted"]
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.contract_repair",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_invalid_contract_repair_fails_closed_without_third_call(self):
+        invalid = create_goals(goal("Blink twice.", "invalid_mode"))
+        ollama = ScriptedOllama([invalid, invalid])
+        result = self._resolve(
+            ollama,
+            request("Blink twice.", language="en-US", route="robot_action"),
+        )
+
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(result.associations, [])
+        self.assertEqual(result.clarification, "")
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="fail_closed",
+            families=[
+                "goal_association.primary",
+                "goal_association.contract_repair",
+            ],
+        )
+
+    def test_invalid_coverage_certificate_fails_closed_without_repair(self):
+        ollama = ScriptedOllama(
+            [
+                create_goals(goal("Blink twice.", "body_action")),
+                {"decision": "accept", "items": []},
+            ]
+        )
+        result = self._resolve(
+            ollama,
+            request("Blink twice.", language="en-US", route="robot_action"),
+        )
+
+        self.assertEqual(result.new_goals, [])
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="fail_closed",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+            ],
+        )
+
+    def test_semantic_reject_allows_one_fresh_interpretation_and_final_audit(self):
+        collapsed = create_goals(
+            goal("Walk, blink, and sing.", "body_action")
+        )
+        rejected = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("blink", 0),
+            coverage_item("sing", 0),
+        )
+        corrected = create_goals(
+            goal("Walk.", "body_action"),
+            goal("Blink.", "body_action"),
+            goal("Sing.", "singing"),
+        )
+        accepted = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("blink", 1),
+            coverage_item("sing", 2),
+        )
+        ollama = ScriptedOllama([collapsed, rejected, corrected, accepted])
+        result = self._resolve(
+            ollama,
+            request(
+                "Walk, blink, and sing.",
+                language="en-US",
+                route="robot_action",
+            ),
+        )
+
+        self.assertEqual(
+            [item.metadata["output_mode"] for item in result.new_goals],
+            ["body_action", "body_action", "singing"],
+        )
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+
+    def test_maximum_semantic_dag_is_five_calls(self):
+        invalid = create_goals(goal("Walk and sing.", "invalid_mode"))
+        collapsed = create_goals(goal("Walk and sing.", "body_action"))
+        rejected = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("sing", 0),
+        )
+        corrected = create_goals(
+            goal("Walk.", "body_action"),
+            goal("sing.", "singing"),
+        )
+        accepted = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("sing", 1),
+        )
+        ollama = ScriptedOllama(
+            [invalid, collapsed, rejected, corrected, accepted]
+        )
+        result = self._resolve(
+            ollama,
+            request("Walk and sing.", language="en-US", route="robot_action"),
+        )
+
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="resolved",
+            families=[
+                "goal_association.primary",
+                "goal_association.contract_repair",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+
+    def test_fresh_interpretation_has_no_dto_repair(self):
+        first = create_goals(goal("Walk and sing.", "body_action"))
+        rejected = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("sing", 0),
+        )
+        invalid_fresh = create_goals(goal("Walk.", "invalid_mode"))
+        ollama = ScriptedOllama([first, rejected, invalid_fresh])
+        result = self._resolve(
+            ollama,
+            request("Walk and sing.", language="en-US", route="robot_action"),
+        )
+
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="fail_closed",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+            ],
+        )
+
+    def test_final_coverage_reject_fails_closed(self):
+        first = create_goals(goal("Walk and sing.", "body_action"))
+        rejected = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("sing", 0),
+        )
+        corrected = create_goals(
+            goal("Walk.", "body_action"),
+            goal("Sing.", "singing"),
+        )
+        still_rejected = certificate(
+            coverage_item("Walk", 0),
+            coverage_item("sing", 0),
+        )
+        ollama = ScriptedOllama([first, rejected, corrected, still_rejected])
+        result = self._resolve(
+            ollama,
+            request("Walk and sing.", language="en-US", route="robot_action"),
+        )
+
+        self.assertEqual(result.new_goals, [])
+        self.assert_transaction(
+            result,
+            ollama,
+            terminal="fail_closed",
+            families=[
+                "goal_association.primary",
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
+            ],
+        )
+
+    def test_model_transport_failure_is_formal_fail_closed(self):
+        ollama = FakeOllama(
+            OllamaGenerationError(
+                "unavailable",
+                failure_class="provider_unavailable",
+                failure_domain="transport",
+                architecture_attribution="not_evaluated",
+                retryable=True,
             )
         )
-        self.assertFalse(result.progress_bindings)
-        self.assertTrue(result.clarification)
+        result = self._resolve(ollama, request("Hello", language="en-US"))
 
-    def test_invalid_enum_uses_one_schema_constrained_model_repair(self):
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(result.clarification, "")
+
+    def test_user_answerable_ambiguity_is_not_fail_closed(self):
         ollama = ScriptedOllama(
             [
                 {
-                    "associations": [
-                        {
-                            "relationship": "continues",
-                            "target_goal_ids": ["goal-a"],
-                            "confidence": 0.95,
-                        }
-                    ],
-                    "confidence": 0.95,
-                },
+                    "decision": "clarify",
+                    "clarification": "Which cup do you mean?",
+                    "confidence": 0.9,
+                    "reason_summary": "The intended cup is ambiguous.",
+                }
+            ]
+        )
+        result = self._resolve(
+            ollama,
+            request("Bring me that cup.", language="en-US", route="robot_action"),
+        )
+
+        self.assertEqual(result.resolution_status, "needs_clarification")
+        self.assertEqual(result.clarification, "Which cup do you mean?")
+        self.assertEqual(len(ollama.prompts), 1)
+
+
+class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
+    def _resolve(self, payloads, req: AgentRunRequest) -> GoalAssociationResolution:
+        return asyncio.run(
+            GoalAssociationResolver(ScriptedOllama(payloads)).resolve(req)
+        )
+
+    def test_instrumental_navigation_is_owned_by_resource_source(self):
+        resource = resource_responsibility(
+            source_status="known",
+            source_description="前方100米处",
+            source_bindings=[
+                binding("distance", "distance", "100"),
+                binding("direction", "direction", "前方"),
+            ],
+        )
+        result = self._resolve(
+            [
+                create_goals(
+                    goal(
+                        "从前方100米处拿一杯水并送给用户。",
+                        "body_action",
+                        resource=resource,
+                    )
+                ),
+                certificate(
+                    coverage_item("去往前走个100米", 0, role="constraint"),
+                    coverage_item("帮我拿杯水过来", 0),
+                ),
+            ],
+            request(
+                "去往前走个100米，帮我拿杯水过来。",
+                route="robot_action",
+                intent="resource_delivery",
+            ),
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        semantic = result.new_goals[0]
+        self.assertEqual(semantic.metadata["output_mode"], "body_action")
+        self.assertEqual(semantic.resource_responsibility.resource.quantity, "1")
+        self.assertEqual(
+            set(semantic.object["bindings"]),
+            {"distance", "direction", "quantity"},
+        )
+        self.assertEqual(
+            semantic.metadata["resource_grounding_projection"]["authority"],
+            "derived_read_only",
+        )
+
+    def test_user_water_probe_preserves_one_resource_goal_and_source_constraint(self):
+        resource = resource_responsibility(
+            description="a bottle of water",
+            source_status="known",
+            source_description="100 meters ahead",
+            source_bindings=[
+                binding("distance", "distance", "100"),
+                binding("direction", "direction", "ahead"),
+            ],
+            recipient="requester",
+        )
+        result = self._resolve(
+            [
+                create_goals(
+                    goal(
+                        "Bring the requester one bottle of water from 100 meters ahead.",
+                        "body_action",
+                        resource=resource,
+                    )
+                ),
+                certificate(
+                    coverage_item("bring me a bottle of water", 0),
+                    coverage_item(
+                        "the water is 100 meters ahead of you",
+                        0,
+                        role="constraint",
+                    ),
+                ),
+            ],
+            request(
+                "bring me a bottle of water, the water is 100 meters ahead of you",
+                language="en-US",
+                route="robot_action",
+                intent="capability:soridormi.acquire_and_deliver_resource",
+            ),
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        responsibility = result.new_goals[0].resource_responsibility
+        self.assertEqual(responsibility.resource.quantity, "1")
+        self.assertEqual(
+            set(responsibility.source.bindings),
+            {"distance", "direction"},
+        )
+        self.assertNotIn("distance", responsibility.resource.attributes)
+
+    def test_independent_walk_and_resource_delivery_remain_separate(self):
+        result = self._resolve(
+            [
+                create_goals(
+                    goal(
+                        "Walk 100 meters for exercise.",
+                        "body_action",
+                        bindings=[binding("distance", "distance", "100")],
+                    ),
+                    goal(
+                        "Bring the bottle from the table to me.",
+                        "body_action",
+                        resource=resource_responsibility(
+                            description="the bottle",
+                            source_status="known",
+                            source_description="the table",
+                            source_bindings=[
+                                binding("source_location", "place", "the table")
+                            ],
+                        ),
+                    ),
+                ),
+                certificate(
+                    coverage_item("Walk 100 meters for exercise", 0),
+                    coverage_item("bring the bottle from the table to me", 1),
+                ),
+            ],
+            request(
+                "Walk 100 meters for exercise, then bring the bottle from the table to me.",
+                language="en-US",
+                route="robot_action",
+            ),
+        )
+
+        self.assertEqual(len(result.new_goals), 2)
+        self.assertIsNone(result.new_goals[0].resource_responsibility)
+        self.assertIsNotNone(result.new_goals[1].resource_responsibility)
+
+    def test_information_scope_is_canonical_resource_attribute(self):
+        weather = resource_responsibility(
+            kind="information",
+            description="重庆明天的天气",
+            quantity="",
+            attributes=[
+                binding("location", "location", "重庆"),
+                binding("date", "date", "明天"),
+            ],
+            source_status="provider_resolved",
+        )
+        result = self._resolve(
+            [
+                create_goals(
+                    goal("查询并解释重庆明天的天气。", "capability_work", resource=weather)
+                ),
+                certificate(coverage_item("查重庆明天天气", 0)),
+            ],
+            request(
+                "帮我查重庆明天天气。",
+                route="tool",
+                intent="weather.lookup",
+            ),
+        )
+
+        canonical = result.new_goals[0].resource_responsibility
+        self.assertEqual(canonical.resource.kind, "information")
+        self.assertEqual(set(canonical.resource.attributes), {"location", "date"})
+        self.assertEqual(canonical.source.status, "provider_resolved")
+        self.assertEqual(canonical.source.bindings, {})
+
+    def test_user_weather_probe_is_one_information_responsibility(self):
+        weather = resource_responsibility(
+            kind="information",
+            description="whether it will rain and be cold in Chongqing tonight",
+            quantity="",
+            attributes=[
+                binding("location", "location", "chongqing"),
+                binding("time", "time", "tonight"),
+                binding("aspects", "list", "rain, temperature"),
+            ],
+            source_status="provider_resolved",
+        )
+        result = self._resolve(
+            [
+                create_goals(
+                    goal(
+                        "Check whether it will rain and be cold in Chongqing tonight.",
+                        "capability_work",
+                        resource=weather,
+                    )
+                ),
+                certificate(
+                    coverage_item("I am in chongqing now", role="context"),
+                    coverage_item(
+                        "please help me check whether it will rain tonight and whether it it cold",
+                        0,
+                        independently_satisfiable=False,
+                    ),
+                ),
+            ],
+            request(
+                "I am in chongqing now, please help me check whether it will rain tonight and whether it it cold",
+                language="en-US",
+                route="tool",
+                intent="capability:chromie.weather.lookup",
+            ),
+        )
+
+        self.assertEqual(len(result.new_goals), 1)
+        semantic = result.new_goals[0]
+        self.assertEqual(semantic.metadata["output_mode"], "capability_work")
+        self.assertEqual(
+            set(semantic.resource_responsibility.resource.attributes),
+            {"location", "time", "aspects"},
+        )
+
+    def test_user_joke_probe_acknowledges_tired_context_without_goal_ownership(self):
+        result = self._resolve(
+            [
+                create_goals(goal("Tell the user a joke.", "speech")),
+                certificate(
+                    coverage_item(
+                        "I am a litlle tired",
+                        role="context",
+                        independently_satisfiable=False,
+                    ),
+                    coverage_item("can you tell me a joke", 0),
+                ),
+            ],
+            request(
+                "I am a litlle tired, can you tell me a joke?",
+                language="en-US",
+                route="chat",
+                intent="tell_a_joke",
+            ),
+        )
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(result.new_goals[0].metadata["output_mode"], "speech")
+
+    def test_existing_goal_continuity_commits_without_creation_or_audit(self):
+        ollama = ScriptedOllama(
+            [
                 {
+                    "decision": "associate",
                     "associations": [
                         {
                             "relationship": "continue",
                             "target_goal_ids": ["goal-a"],
                             "confidence": 0.95,
+                            "reason_summary": "Continue the unfinished task.",
                         }
                     ],
                     "confidence": 0.95,
-                },
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.associations[0].relationship, "continue")
-        self.assertEqual(
-            result.metadata["contract_repair"]["strategy"],
-            "schema_constrained_model_revision",
-        )
-        repair_prompt, repair_kwargs = ollama.prompts[1]
-        self.assertIn('"continues"', repair_prompt)
-        self.assertIn("literal_error", repair_prompt)
-        self.assertIn("GoalAssociationModelOutput JSON Schema", repair_prompt)
-        self.assertIsInstance(repair_kwargs["response_format"], dict)
-
-    def test_explanation_followup_repairs_delta_free_clarify_to_reference(self):
-        ollama = ScriptedOllama(
-            [
-                {
-                    "decision": "associate",
-                    "associations": [
-                        {
-                            "relationship": "clarify",
-                            "target_goal_ids": ["goal-weather"],
-                            "confidence": 1.0,
-                            "reason_summary": (
-                                "The user asks for a definitive judgment from the "
-                                "weather evidence already delivered."
-                            ),
-                        }
-                    ],
-                    "new_goals": [],
-                    "referent_updates": [],
-                    "resolved_references": [],
-                    "clarification": "",
-                    "confidence": 1.0,
-                    "reason_summary": "The turn follows up on the retained Goal.",
-                },
-                {
-                    "decision": "associate",
-                    "associations": [
-                        {
-                            "relationship": "reference",
-                            "target_goal_ids": ["goal-weather"],
-                            "confidence": 1.0,
-                            "reason_summary": (
-                                "The user asks for an interpretation of evidence "
-                                "already delivered for this Goal."
-                            ),
-                        }
-                    ],
-                    "new_goals": [],
-                    "referent_updates": [],
-                    "resolved_references": [],
-                    "clarification": "",
-                    "confidence": 1.0,
-                    "reason_summary": "Reference the retained Goal without changing it.",
-                },
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request(
-                    "So is it hot or not?",
-                    recent_goals=[
-                        active_goal(
-                            "goal-weather",
-                            "Check whether today's weather in Beijing is hot.",
-                            work_status="done",
-                            responsibility_status="satisfied",
-                        )
-                    ],
-                    language="en-US",
-                )
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.associations[0].relationship, "reference")
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn(
-            "relationship=clarify requires updated_description or resolved_gap_ids",
-            ollama.prompts[1][0],
-        )
-
-    def test_failed_model_repair_fails_closed_without_a_third_call(self):
-        invalid = {
-            "associations": [
-                {
-                    "relationship": "continues",
-                    "target_goal_ids": ["goal-a"],
-                    "confidence": 0.95,
-                }
-            ],
-            "confidence": 0.95,
-        }
-        ollama = ScriptedOllama([invalid, invalid])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.metadata["status"], "model_contract_failed")
-        self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
-        self.assertTrue(result.metadata["contract_repair_attempted"])
-        self.assertFalse(result.metadata["contract_repair_succeeded"])
-        initial_ref = result.metadata["initial_raw_output_ref"]
-        self.assertGreater(initial_ref["chars"], 0)
-        self.assertRegex(initial_ref["digest"], r"^sha256:[0-9a-f]{64}$")
-        self.assertNotIn("initial_raw_output", result.metadata)
-        self.assertEqual(result.associations, [])
-        self.assertTrue(result.clarification)
-
-    def test_no_active_goals_schema_forbids_associations_and_requires_new_goal_or_clarification(self):
-        ollama = FakeOllama({
-            "new_goals": [{
-                "description": "Blink twice",
-                "output_mode": "body_action",
-                "source_text": "Blink twice",
-                "constraints": {},
-                "success_criteria": ["Blink twice"],
-            }],
-            "clarification": "",
-            "confidence": 0.95,
-        })
-
-        asyncio.run(GoalAssociationResolver(ollama).resolve(request("Blink twice", language="en-US")))
-
-        schema = ollama.prompts[0][1]["response_format"]
-        self.assertNotIn("associations", schema["properties"])
-        self.assertNotIn("GoalAssociationModelAssociation", schema.get("$defs", {}))
-        self.assertFalse(schema["additionalProperties"])
-        self.assertEqual(
-            schema["properties"]["decision"]["enum"],
-            ["create_goals", "clarify"],
-        )
-        self.assertIn("decision", schema["required"])
-        self.assertIn("new_goals", schema["required"])
-        self.assertIn("clarification", schema["required"])
-        self.assertNotIn("oneOf", schema)
-        prompt = ollama.prompts[0][0]
-        self.assertIn("contract intentionally has no associations field", prompt)
-        self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
-        self.assertIn("standalone social interaction", prompt)
-        self.assertIn(
-            "physical action and a conversational answer or spoken performance are independent goals",
-            prompt,
-        )
-        self.assertIn("acquisition and delivery stages that together constitute one human responsibility are one Goal", prompt)
-        self.assertIn("external search, evidence retrieval, evaluation, and spoken explanation", prompt)
-        self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
-        self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
-        self.assertIn(
-            "Conversational framing attached to a substantive responsibility",
-            ollama.prompts[0][1]["system"],
-        )
-        self.assertIn(
-            "one evidence acquisition satisfies both a factual lookup",
-            ollama.prompts[0][1]["system"],
-        )
-
-    def test_empty_greeting_segmentation_repairs_to_one_conversational_goal(self):
-        ollama = ScriptedOllama(
-            [
-                {
-                    "new_goals": [],
-                    "clarification": "",
-                    "confidence": 0.95,
-                    "reason_summary": "No responsibilities to segment.",
-                },
-                {
-                    "new_goals": [
-                        {"description": "Respond naturally to the user's greeting", "output_mode": "speech"}
-                    ],
-                    "clarification": "",
-                    "confidence": 0.98,
-                    "reason_summary": "The greeting is one conversational goal.",
-                },
-            ]
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Hello.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.clarification, "")
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Respond naturally to the user's greeting"],
-        )
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertIn("standalone social interaction", ollama.prompts[1][0])
-
-    def test_no_active_goal_fabricated_association_repairs_under_segmentation_contract(self):
-        invalid_live_output = {
-            "associations": [
-                {
-                    "relationship": "continue",
-                    "target_goal_ids": [],
-                    "confidence": 1.0,
-                    "reason_summary": "Continuity with no active goals",
                 }
             ]
-        }
-        ollama = ScriptedOllama(
-            [
-                invalid_live_output,
-                {
-                    "new_goals": [
-                        {"description": "Look at the user for two seconds", "output_mode": "body_action"},
-                        {"description": "Blink twice", "output_mode": "body_action"},
-                    ],
-                    "clarification": "",
-                    "confidence": 0.96,
-                    "reason_summary": "Two independent requested actions.",
-                },
-                responsibility_coverage(
-                    responsibility_item("Look at me for two seconds", 0),
-                    responsibility_item("blink twice", 1),
-                ),
-                binding_audit([], []),
-            ]
         )
-
         result = asyncio.run(
             GoalAssociationResolver(ollama).resolve(
-                request(
-                    "Look at me for two seconds, then blink twice.",
-                    language="en-US",
-                )
+                request("Continue.", active_goals=[active_goal("goal-a", "Do A")])
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 4)
-        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
-        self.assertEqual(result.associations, [])
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Look at the user for two seconds", "Blink twice"],
-        )
-        for _, kwargs in ollama.prompts:
-            self.assertNotIn("associations", kwargs["response_format"]["properties"])
-        self.assertIn("Existing-goal associations are structurally invalid", ollama.prompts[1][0])
-
-    def test_no_active_goal_repeated_fabrication_fails_closed_with_relevant_clarification(self):
-        invalid_live_output = {
-            "associations": [
-                {
-                    "relationship": "continue",
-                    "target_goal_ids": [],
-                    "confidence": 1.0,
-                }
-            ]
-        }
-        ollama = ScriptedOllama([invalid_live_output, invalid_live_output])
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Nod twice, then blink once.", language="en-US")
-            )
-        )
-
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(result.metadata["status"], "model_contract_failed")
-        self.assertEqual(
-            result.metadata["contract_schema"],
-            "GoalSegmentationModelOutput",
-        )
-        self.assertEqual(result.associations, [])
+        self.assertEqual(result.associations[0].target_goal_ids, ["goal-a"])
         self.assertEqual(result.new_goals, [])
-        self.assertNotIn("already doing", result.clarification)
-        self.assertIn("rephrase", result.clarification)
-
-    def test_no_active_goal_can_return_clarification_without_association(self):
-        ollama = FakeOllama(
-            {
-                "new_goals": [],
-                "clarification": "Which object should I look at?",
-                "confidence": 0.55,
-                "reason_summary": "The target is ambiguous.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("Look at it.", language="en-US")
-            )
-        )
-
-        self.assertEqual(result.associations, [])
-        self.assertEqual(result.new_goals, [])
-        self.assertEqual(result.clarification, "Which object should I look at?")
-
-    def test_create_goals_discriminant_ignores_inactive_clarification_branch(self):
-        ollama = FakeOllama(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {"description": "Check today's weather in Chongqing", "output_mode": "capability_work"}
-                ],
-                "clarification": (
-                    "The request is already explicit; this explanatory text belongs "
-                    "to no user-facing clarification branch."
-                ),
-                "confidence": 0.96,
-                "reason_summary": "One explicit information goal.",
-            }
-        )
-
-        result = asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("今天重庆热不热？", language="zh-CN")
-            )
-        )
-
-        self.assertEqual(result.clarification, "")
-        self.assertEqual(
-            [goal.description for goal in result.new_goals],
-            ["Check today's weather in Chongqing"],
-        )
         self.assertEqual(len(ollama.prompts), 1)
-        prompt = ollama.prompts[0][0]
-        self.assertNotIn("Cognitive Core interpretation output", prompt)
-        self.assertIn("runtime diagnostics", prompt)
 
-    def test_dynamic_schema_limits_existing_targets_to_active_goal_ids(self):
-        ollama = FakeOllama({
-            "associations": [{
-                "relationship": "continue",
-                "target_goal_ids": ["goal-a"],
-                "confidence": 0.95,
-            }],
-            "new_goals": [],
-            "clarification": "",
-            "confidence": 0.95,
-        })
-
-        asyncio.run(
-            GoalAssociationResolver(ollama).resolve(
-                request("continue", active_goals=[active_goal("goal-a", "Do A")], language="en-US")
+    def test_explicit_location_preserves_referent_provenance(self):
+        payload = create_goals(
+            goal(
+                "Check 重庆 weather.",
+                "capability_work",
+                bindings=[binding("location", "location", "重庆")],
             )
         )
+        payload["referent_updates"] = [
+            {
+                "operation": "introduce",
+                "entity_type": "location",
+                "canonical_value": "重庆",
+                "scope_kind": "goal",
+                "confidence": 1.0,
+            }
+        ]
+        result = self._resolve(
+            [payload, certificate(coverage_item("Check 重庆 weather", 0))],
+            request("Check 重庆 weather.", language="en-US"),
+        )
 
-        schema = ollama.prompts[0][1]["response_format"]
-        association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
+        referent = result.referent_updates[0].referent
+        self.assertIsNotNone(referent)
         self.assertEqual(
-            association_schema["properties"]["target_goal_ids"]["items"]["enum"],
-            ["goal-a"],
-        )
-        self.assertEqual(
-            association_schema["properties"]["target_goal_ids"]["minItems"],
-            1,
+            result.new_goals[0].object["bindings"]["location"]["referent_id"],
+            referent.referent_id,
         )
 
-    def test_model_failure_is_safe_and_advisory(self):
-        ollama = FakeOllama(RuntimeError("offline"))
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("继续。", active_goals=[active_goal("goal-a", "Do A")])))
-        self.assertEqual(result.metadata["status"], "model_unavailable")
-        self.assertFalse(result.metadata["contract_repair_attempted"])
-        self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(result.associations, [])
-        self.assertTrue(result.clarification)
 
-    def test_truncation_failure_reports_domain_without_causal_attribution(self):
-        error = OllamaGenerationError(
-            "structured JSON output was truncated",
-            failure_class="output_truncated",
-            failure_domain="llm_budget",
-            architecture_attribution="not_evaluated",
-            retryable=True,
-            details={"done_reason": "length", "num_predict": 512},
+class GoalAssociationResolutionContractTests(unittest.TestCase):
+    def test_fail_closed_is_the_only_empty_terminal_resolution(self):
+        failed = GoalAssociationResolution(
+            turn_id="turn-1",
+            resolution_status="fail_closed",
         )
-
-        result = asyncio.run(
-            GoalAssociationResolver(FakeOllama(error)).resolve(request("继续。"))
-        )
-
-        self.assertEqual(result.metadata["status"], "model_unavailable")
-        self.assertEqual(result.metadata["failure_class"], "output_truncated")
-        self.assertEqual(result.metadata["failure_domain"], "llm_budget")
-        self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
-        self.assertEqual(result.metadata["done_reason"], "length")
-
-    def test_resolution_contract_rejects_clarification_mixed_with_changes(self):
+        self.assertEqual(failed.prompt_projection()["resolution_status"], "fail_closed")
         with self.assertRaises(ValueError):
-            GoalAssociationResolution(turn_id="turn-1", clarification="Which one?", new_goals=[{"goal_id": "goal-new", "description": "New goal", "source_text": "New goal", "beneficiary": "user", "constraints": {}, "success_criteria": [], "metadata": {}}])
+            GoalAssociationResolution(turn_id="turn-1")
+
+    def test_legacy_clarification_infers_explicit_status(self):
+        resolution = GoalAssociationResolution(
+            turn_id="turn-1",
+            clarification="Which one?",
+        )
+        self.assertEqual(resolution.resolution_status, "needs_clarification")
+
+    def test_clarification_cannot_mix_with_goal_changes(self):
+        with self.assertRaises(ValueError):
+            GoalAssociationResolution(
+                turn_id="turn-1",
+                clarification="Which one?",
+                new_goals=[
+                    {
+                        "goal_id": "goal-new",
+                        "description": "New goal",
+                        "source_text": "New goal",
+                        "beneficiary": "user",
+                        "constraints": {},
+                        "success_criteria": [],
+                        "metadata": {},
+                    }
+                ],
+            )
 
 
 class OrchestratorGoalAssociationTests(unittest.TestCase):
@@ -6691,7 +1250,18 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
 
         class Client:
             async def resolve_goal_association(self, *args, **kwargs):
-                return GoalAssociationResolution(turn_id="turn-report", associations=[{"association_id": "assoc-report", "relationship": "continue", "target_goal_ids": ["goal-a"], "confidence": 0.9}], confidence=0.9)
+                return GoalAssociationResolution(
+                    turn_id="turn-report",
+                    associations=[
+                        {
+                            "association_id": "assoc-report",
+                            "relationship": "continue",
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.9,
+                        }
+                    ],
+                    confidence=0.9,
+                )
 
         async def run():
             assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -6701,78 +1271,54 @@ class OrchestratorGoalAssociationTests(unittest.TestCase):
             assistant.agent_client = Client()
             assistant.goal_association_report_tasks = set()
             assistant.session_log = lambda *args, **kwargs: None
-            decision = OrchestratorRouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm")
-            reviewed = assistant._schedule_goal_association_report(object(), user_text="继续。", session_id="sid", context={"history": [], "active_goal_snapshots": [active_goal("goal-a", "Do A")]}, decision=decision)
+            decision = OrchestratorRouteDecision(
+                route="chat",
+                intent="conversation",
+                confidence=0.8,
+                source="llm",
+            )
+            reviewed = assistant._schedule_goal_association_report(
+                object(),
+                user_text="继续。",
+                session_id="sid",
+                context={
+                    "history": [],
+                    "active_goal_snapshots": [active_goal("goal-a", "Do A")],
+                },
+                decision=decision,
+            )
             self.assertEqual(reviewed.route, "chat")
-            self.assertEqual(reviewed.metadata["goal_association_resolution"]["status"], "scheduled")
+            self.assertEqual(
+                reviewed.metadata["goal_association_resolution"]["status"],
+                "scheduled",
+            )
             pending = list(assistant.goal_association_report_tasks)
             if pending:
                 await asyncio.gather(*pending)
+
         asyncio.run(run())
 
     def test_off_is_noop(self):
         from orchestrator.orchestrator import VoiceAssistant
         from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
+
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.goal_association_mode = "off"
         assistant.enable_agent = True
-        decision = OrchestratorRouteDecision(route="chat", intent="conversation", confidence=0.8, source="llm")
-        reviewed = assistant._schedule_goal_association_report(object(), user_text="hello", session_id="sid", context={"active_goal_snapshots": []}, decision=decision)
+        decision = OrchestratorRouteDecision(
+            route="chat",
+            intent="conversation",
+            confidence=0.8,
+            source="llm",
+        )
+        reviewed = assistant._schedule_goal_association_report(
+            object(),
+            user_text="hello",
+            session_id="sid",
+            context={"active_goal_snapshots": []},
+            decision=decision,
+        )
         self.assertIs(reviewed, decision)
-
-
-    def test_substantive_request_framing_does_not_create_style_goals(self) -> None:
-        resolver = GoalAssociationResolver(FakeOllama({}))  # type: ignore[arg-type]
-        tool_request = AgentRunRequest(
-            sid="style-goal-guard",
-            text="你好，帮我查重庆天气热不热。",
-            language="zh-CN",
-            route_decision=RouteDecision(
-                route="tool",
-                intent="weather.lookup",
-                confidence=0.95,
-                source="llm",
-            ),
-            context={
-                "active_goal_snapshots": [],
-                "history": [],
-                "interaction_context": {
-                    "events": [{"event_id": "ledger-goal-marker"}]
-                },
-            },
-        )
-        prompt = resolver._build_prompt(
-            tool_request,
-            [],
-            output_type=GoalSegmentationModelOutput,
-        )
-
-        self.assertIn("politeness preamble", prompt)
-        self.assertIn("identity and personality shape expression only", prompt)
-        self.assertIn("one Goal when one capability result can satisfy both", prompt)
-        self.assertIn("not by the channel used later to report that outcome", prompt)
-        self.assertIn(
-            "output_mode is the completion discriminant",
-            prompt,
-        )
-        self.assertIn(
-            "The fact that a capability result will later be spoken",
-            prompt,
-        )
-        self.assertNotIn(
-            "capability_dependent/activity/capability_work/true",
-            prompt,
-        )
-        self.assertIn("ledger-goal-marker", prompt)
-        system_prompt = resolver._system_prompt(GoalSegmentationModelOutput)
-        self.assertIn(
-            "Conversational framing attached to a substantive responsibility",
-            system_prompt,
-        )
-        self.assertIn(
-            "one evidence acquisition satisfies both a factual lookup",
-            system_prompt,
-        )
 
 
 if __name__ == "__main__":

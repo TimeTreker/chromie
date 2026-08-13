@@ -292,7 +292,7 @@ not selected by phrase rules.
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b` for higher-quality continuity-before-creation and independent-goal segmentation. |
-| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a non-authoritative clarification result. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
@@ -312,8 +312,13 @@ default containers, persistence metadata, and the canonical
 immutable user turn, bounded dialogue/Goal state, and trusted evidence; prior
 routing labels, planner failures, and validator diagnostics are deliberately not
 semantic inputs. Contract validation may still invoke one bounded
-schema-constrained revision for genuinely malformed output; there is no local
-relationship synonym, phrase mapping, or word-form normalization fallback.
+schema-constrained revision for genuinely malformed primary output. Every new
+Goal candidate set then receives an immutable responsibility-coverage proof. A
+semantic rejection permits one fresh interpretation plus final proof; neither
+the fresh interpretation nor an invalid proof receives repair. The logical
+semantic DAG is capped at five calls. There is no local relationship synonym,
+phrase mapping, word-form normalization, resource-alignment workflow, or
+certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified `ORCH_COGNITIVE_RUNTIME_MODE=off`. Goal Association is an integrated stage in unified `apply`/`report_only`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |

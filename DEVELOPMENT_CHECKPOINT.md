@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 Status: current resume point
 Updated: 2026-08-13
-Base `main`: `94bcdce97ab915db0a51723fa8198f114d3d98bc`
+Base `main`: `0d15443a0fcb0184003d801e387c46d82f090036`
 This is the fast handoff for the next development session. It summarizes the
 current project shape and resume point; canonical owners linked below win if a
 conflict appears and this checkpoint should then be refreshed.
@@ -55,9 +55,10 @@ parallel manager objects.
 ## Settled boundaries
 - **Goal = canonical unfinished Responsibility.** Planning, waiting, confirmation,
   scheduling, running, retry/recovery, and provider state belong to Work/runtime.
-- **Responsibility completeness is contained.** High-risk compound Goal
-  segmentation uses a separate model-owned coverage audit; the Host checks only
-  mechanical coverage invariants and fails closed on repeated incompleteness.
+- **Responsibility completeness is contained.** Every newly proposed Goal set
+  uses an authority-ephemeral model-owned coverage certificate; the Host derives
+  only its verdict, allows at most one fresh interpretation, and fails closed on
+  invalid or repeatedly incomplete output.
 - **`output_mode` is the sole model-authored Goal execution discriminant.** The
   Host derives responsibility kind, execution lane, and provider requirement.
   Reverse inference and model-authored copies are not supported protocol.
@@ -74,6 +75,10 @@ parallel manager objects.
   the same physical actions are ordinary Activity. Social framing may justify a
   different compatible auxiliary cue, but never duplication, mutation, or
   completion of that explicit action. Idle liveliness is separate.
+- **A valid Social Attention `none` is terminal.** Courteous or lively preference
+  belongs in the primary decision context; no optional critic may override a
+  valid primary stillness decision. Only invalid primary DTO shape receives one
+  repair.
 - **Chromie is embodiment-independent.** Soridormi/MuJoCo is sufficient for the
   core embodied outcome; cognition must not know the backend, and physical-robot
   commissioning is optional provider work rather than a Chromie completion gate.
@@ -90,14 +95,12 @@ parallel manager objects.
   be cached; changing facts such as weather, news, prices, schedules, and law are
   acquired through trusted information paths.
 ## Recent architecture closure
-Current `main` already contains:
-- `84edc92` — Vocal becomes Chromie's exclusive personal voice domain;
-- `0ad8c47` — Social Attention becomes background behavioral decoration;
-- `26b0b52` — Goal Association proves Responsibility coverage;
-- `f8fecb7` — `output_mode` becomes the sole Goal execution discriminant;
-- `f255bdd` — mixed effectful-result entailment regression is retained;
-- `8dd97e4` — root-cause regressions align with current semantic contracts;
-- `94bcdce` — best-known technical architecture becomes the Charter default.
+Base `main` already contains the Vocal, Social Attention, Responsibility
+coverage, `output_mode`, entailment, and Charter closures through `0d15443`.
+The working tree now replaces Goal Association's review/alignment chain with a
+bounded five-invocation transaction, one nested resource authority plus frozen
+Planner projection, and no valid-`none` Social Attention critic. This is source
+work, not a new target-evidence claim.
 The compound failure that motivated several changes was conceptually
 `walk + sing + blink`: independently observable requested outcomes remain separate
 Responsibilities; an unavailable singing provider leaves an unavailable singing
@@ -125,17 +128,12 @@ Do not silently downgrade because authority is absent.
 This checkpoint does **not** grant blanket architecture authority to later
 sessions; use Charter governance when new authority is needed.
 ## Resume point
-Do not add another top-level architecture layer without new evidence. The current
-working tree closes the retained “walk forward 100 metres and bring water” defect at
-its earliest boundaries: one physical-resource Goal keeps direction, distance,
-quantity, recipient, and delivery ownership; Planner selects the complete advertised
-provider capability; internal contract failure never becomes user speech; background
-Social Attention may execute a bounded parallel cue. Live text/MuJoCo diagnostic
-`.chromie/acceptance/voice-log-water-fixed-67` passed with SID `50ebdc83`, two
-completed auxiliary `blink_eyes` event calls, real simulator motion, mocked resource
-acquisition/delivery evidence, natural pre/post speech, and final safe idle. The
-canonical source gate passes; remaining work is clean committed qualification. This does
-not prove literal 100-metre travel, physical water, microphone/speaker, or hardware.
+Do not add another top-level layer. Finish the canonical source gate, then clean
+committed qualification for the nested resource authority, derived Planner view,
+bounded coverage transaction, and terminal Social Attention `none`. Historical
+`.chromie/acceptance/voice-log-water-fixed-67` predates this refactor and is not
+current-tree proof; it proves neither literal 100-metre travel, physical water,
+microphone/speaker behavior, nor hardware.
 ## Resume and verification commands
 `docs/STATUS.md` owns implementation/evidence claims. Do not claim live-model,
 audio, MuJoCo, GPU, or physical-provider qualification unless that exact gate ran

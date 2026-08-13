@@ -84,13 +84,26 @@ separate technical surface without changing Chromie's Mind.
   "resource": {
     "kind": "physical_object",
     "description": "a bottle of water",
-    "quantity": "one",
+    "quantity": "1",
     "attributes": {}
   },
   "source": {
     "status": "known",
     "description": "100 meters ahead",
-    "bindings": {}
+    "bindings": {
+      "distance": {
+        "name": "distance",
+        "entity_type": "distance",
+        "value": "100",
+        "confidence": 1.0
+      },
+      "direction": {
+        "name": "direction",
+        "entity_type": "direction",
+        "value": "ahead",
+        "confidence": 1.0
+      }
+    }
   },
   "recipient": {
     "description": "requester",
@@ -109,12 +122,7 @@ Information example:
     "kind": "information",
     "description": "good nearby restaurant recommendations",
     "quantity": "",
-    "attributes": {}
-  },
-  "source": {
-    "status": "provider_resolved",
-    "description": "current external information",
-    "bindings": {
+    "attributes": {
       "location": {
         "name": "location",
         "entity_type": "place",
@@ -122,6 +130,11 @@ Information example:
         "confidence": 1.0
       }
     }
+  },
+  "source": {
+    "status": "provider_resolved",
+    "description": "current external information",
+    "bindings": {}
   },
   "recipient": {
     "description": "requester",
@@ -147,16 +160,63 @@ Those belong downstream.
 Goal Association decides whether the current turn creates, continues, modifies,
 or supplies missing information for a resource responsibility.
 
+`SemanticGoal.resource_responsibility` is the resource domain's sole writable
+semantic authority. Resource identity, kind, quantity, source, recipient, and
+delivery mode are authored exactly once there. A Goal description is a
+human-readable summary: it may be checked for material contradiction but never
+supplies, overrides, or repairs a typed resource fact. Generic Goal bindings and
+Planner argument views must not be separately model-authored copies of resource
+facts. When an existing consumer needs a flat quantity, source, recipient, or
+other resource parameter view, trusted code constructs a frozen deterministic
+projection from the canonical resource object and retains exact field provenance.
+The projection is absent from every model response schema and has no mutation or
+persistence authority.
+
+Resource source bindings live inside the canonical `ResourceSource.bindings`
+object. Information query-scope attributes live inside the canonical resource
+descriptor rather than masquerading as source evidence. Any temporary adapter for
+an older consumer is output-only, mechanically derived, and removed with that
+consumer; it is never accepted back as semantic input.
+
+At the Goal Association model boundary, a physical object's complete identity is
+written in `resource.description` and its normalized count in `quantity`;
+physical `resource.attributes` is closed. This makes acquisition location,
+distance, direction, and route structurally writable only in `source.bindings`,
+and recipient meaning writable only in `recipient`. Information resources keep
+`resource.attributes` as the typed owner for query location, time, aspects, and
+other provider-neutral query scope.
+
+`source.description` is a human-readable summary rather than typed source truth.
+Consequently, `source.status=known` requires at least one typed `source.bindings`
+entry. `unknown` carries neither description nor bindings, while
+`provider_resolved` delegates source selection without inventing a known source.
+Canonical validation also rejects an identical typed `(entity_type, value)` fact
+when it appears under both `resource.attributes` and `source.bindings`, even if
+the model gives the two copies different names. Normalized measurement aliases
+are equivalent for this check, so `100m` and `100 meters ahead` cannot evade the
+one-owner rule while unrelated units remain distinct. This enforces one writable
+owner without using field-name rules to decide which semantic role is correct.
+Likewise, an explicit numeric literal in `source.description` must appear in at
+least one typed source-binding value. This is a provenance check over the source
+classification the model already made; it does not infer source meaning from the
+user's words or move facts between owners.
+
 A fetch-and-deliver request is one Goal when navigation, locating, grasping,
 carrying, returning, and handover are provider-owned stages of one user outcome.
 Likewise, external search, evidence retrieval, evaluation, and natural
 explanation remain one information-resource responsibility. Weather therefore has
 `resource.kind=information`, while the Planner still selects the exact
 `chromie.weather.lookup` Capability rather than a generic hidden router.
+When the canonical information attributes include a day part such as `tonight`,
+the Planner must preserve that exact scope in the Capability arguments. A date
+like `today` is not equivalent. Exact completion requires provider output scoped
+to the requested period; daily or current observations cannot be promoted into
+narrower day-part evidence by response wording.
 
 A query-scope binding is not source evidence. A place, date, person, product, or other
-entity that tells a provider *what to search for* remains an ordinary Goal binding; it does not
-make `source.status=known`. `known` requires an actual user/discourse-supplied information source.
+entity that tells a provider *what to search for* remains a canonical
+`resource.attributes` binding; it does not make `source.status=known`. `known`
+requires an actual user/discourse-supplied information source.
 Otherwise Goal Association uses `unknown` or `provider_resolved` according to the intended
 contract. This prevents a location such as a neighborhood or city from being misrepresented as
 the source that supplied the requested information.
@@ -165,18 +225,18 @@ Physical-resource spatial bindings require an explicit semantic home. A directio
 distance, or location may describe the resource/acquisition route, the recipient, the
 delivery destination, or an independent requested effect; its type alone does not decide
 which. Goal Association's model owns that classification. Trusted code may detect that a
-typed spatial binding is still unlinked and require bounded model reconciliation, but it
-must not infer the role from a phrase or field name. The final DTO must represent the
-binding in the matching source/recipient/delivery contract or remove a redundant Goal
-alias after preserving the same meaning there. A `reason_summary` that calls the contract
-aligned cannot substitute for the actual fields, and repeated residual contradiction
-fails closed before planning.
+typed spatial fact is unowned and reject the DTO, but it must not infer the role from a
+phrase or field name. The final DTO represents the fact once in the matching
+source/recipient/delivery contract. A `reason_summary` cannot substitute for the actual
+field, and a repeated contradiction fails closed before planning rather than starting an
+alignment or residual-repair workflow.
 
 The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same
 evidence. Response/Tool Result Interpretation owns the natural delivery after acquisition. If a model promotes an evidence-dependent answer into another provider-required Goal with no
-independent bindings/resource contract, semantic review re-segments from the authoritative user
+independent bindings/resource contract, the bounded coverage proof rejects that
+candidate set and permits one fresh interpretation from the authoritative user
 turn rather than allowing duplicate provider calls.
 
 Separate Goals are still required for independently requested outcomes. For

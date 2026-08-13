@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 import re
@@ -32,6 +33,41 @@ _RESOURCE_IMPLEMENTATION_FIELDS = frozenset(
     }
 )
 _RESOURCE_FIELD_SEPARATOR = re.compile(r"[^a-z0-9]+")
+_NUMERIC_LITERAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
+)
+_MEASUREMENT_LITERAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_.])(?P<number>[-+]?(?:\d+(?:\.\d+)?|\.\d+))"
+    r"\s*(?P<unit>[A-Za-z\u4e00-\u9fff]+)"
+)
+_MEASUREMENT_UNIT_ALIASES = {
+    "meter": "m",
+    "meters": "m",
+    "metre": "m",
+    "metres": "m",
+    "米": "m",
+    "kilometer": "km",
+    "kilometers": "km",
+    "kilometre": "km",
+    "kilometres": "km",
+    "千米": "km",
+}
+
+
+def typed_measurement_facts(value: Any) -> set[tuple[Decimal, str]]:
+    """Return mechanically comparable number/unit facts from a typed value."""
+
+    facts: set[tuple[Decimal, str]] = set()
+    for match in _MEASUREMENT_LITERAL_RE.finditer(str(value or "")):
+        try:
+            number = Decimal(match.group("number"))
+        except InvalidOperation:
+            continue
+        unit = match.group("unit").strip().casefold()
+        unit = _MEASUREMENT_UNIT_ALIASES.get(unit, unit)
+        if unit:
+            facts.add((number, unit))
+    return facts
 
 
 def _reject_resource_implementation_fields(
@@ -58,6 +94,24 @@ def _reject_resource_implementation_fields(
                         path=f"{path}.{key}[{index}]",
                     )
     return value
+
+
+def _typed_binding_facts(bindings: dict[str, Any]) -> dict[tuple[str, str], str]:
+    """Return comparable typed facts without deciding their semantic owner."""
+
+    facts: dict[tuple[str, str], str] = {}
+    for name, binding in bindings.items():
+        if not isinstance(binding, dict):
+            continue
+        entity_type = " ".join(
+            str(binding.get("entity_type") or "").strip().casefold().split()
+        )
+        value = " ".join(
+            str(binding.get("value") or "").strip().casefold().split()
+        )
+        if entity_type and value:
+            facts[(entity_type, value)] = str(name)
+    return facts
 
 ResourceDeliveryMode = Literal[
     "physical_handover",
@@ -86,8 +140,32 @@ class ResourceDescriptor(BaseModel):
     @field_validator("attributes")
     @classmethod
     def reject_low_level_attributes(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return _reject_resource_implementation_fields(value, path="resource.attributes")
-
+        checked = _reject_resource_implementation_fields(
+            value,
+            path="resource.attributes",
+        )
+        reserved = {
+            "delivery_mode",
+            "item",
+            "quantity",
+            "recipient",
+            "resource",
+            "resource_description",
+            "resource_kind",
+            "resource_quantity",
+            "source",
+        }
+        duplicated = sorted(
+            str(name)
+            for name in checked
+            if str(name).strip().casefold().replace("-", "_") in reserved
+        )
+        if duplicated:
+            raise ValueError(
+                "resource attributes cannot duplicate canonical resource fields: "
+                + ", ".join(duplicated)
+            )
+        return checked
 
 class ResourceSource(BaseModel):
     """Semantic source binding without provider, coordinates, or implementation details."""
@@ -108,14 +186,58 @@ class ResourceSource(BaseModel):
     @field_validator("bindings")
     @classmethod
     def reject_low_level_bindings(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return _reject_resource_implementation_fields(value, path="resource.source.bindings")
+        checked = _reject_resource_implementation_fields(
+            value,
+            path="resource.source.bindings",
+        )
+        non_source = {
+            "amount",
+            "count",
+            "delivery_mode",
+            "item",
+            "quantity",
+            "recipient",
+            "resource",
+            "resource_description",
+            "resource_kind",
+            "resource_quantity",
+        }
+        duplicated = sorted(
+            str(name)
+            for name in checked
+            if str(name).strip().casefold().replace("-", "_") in non_source
+        )
+        if duplicated:
+            raise ValueError(
+                "resource source bindings cannot duplicate non-source authority: "
+                + ", ".join(duplicated)
+            )
+        return checked
 
     @model_validator(mode="after")
     def validate_source_shape(self) -> "ResourceSource":
-        if self.status == "known" and not (self.description or self.bindings):
-            raise ValueError("known resource source requires description or bindings")
+        if self.status == "known" and not self.bindings:
+            raise ValueError(
+                "known resource source requires typed source bindings; "
+                "source.description is summary only"
+            )
         if self.status == "unknown" and (self.description or self.bindings):
             raise ValueError("unknown resource source must not invent a source")
+        described_numbers = set(_NUMERIC_LITERAL_RE.findall(self.description))
+        bound_numbers = {
+            number
+            for binding in self.bindings.values()
+            if isinstance(binding, dict)
+            for number in _NUMERIC_LITERAL_RE.findall(
+                str(binding.get("value") or "")
+            )
+        }
+        unbound_numbers = sorted(described_numbers - bound_numbers)
+        if unbound_numbers:
+            raise ValueError(
+                "numeric facts in source.description require typed source.bindings "
+                "with the same value: " + ", ".join(unbound_numbers)
+            )
         return self
 
 
@@ -210,4 +332,107 @@ class AcquireAndDeliverResource(BaseModel):
             raise ValueError(
                 "information resource cannot use delivery_mode=physical_handover"
             )
+        attribute_facts = _typed_binding_facts(self.resource.attributes)
+        source_facts = _typed_binding_facts(self.source.bindings)
+        duplicate_facts = sorted(set(attribute_facts) & set(source_facts))
+        if duplicate_facts:
+            rendered = ", ".join(
+                f"resource.attributes.{attribute_facts[fact]}="
+                f"source.bindings.{source_facts[fact]}"
+                for fact in duplicate_facts
+            )
+            raise ValueError(
+                "one typed resource fact cannot be authored by both resource "
+                "attributes and source bindings: " + rendered
+            )
+        attribute_measurements = {
+            fact: str(name)
+            for name, binding in self.resource.attributes.items()
+            if isinstance(binding, dict)
+            for fact in typed_measurement_facts(binding.get("value"))
+        }
+        source_measurements = {
+            fact: str(name)
+            for name, binding in self.source.bindings.items()
+            if isinstance(binding, dict)
+            for fact in typed_measurement_facts(binding.get("value"))
+        }
+        duplicate_measurements = sorted(
+            set(attribute_measurements) & set(source_measurements)
+        )
+        if duplicate_measurements:
+            rendered = ", ".join(
+                f"resource.attributes.{attribute_measurements[fact]}="
+                f"source.bindings.{source_measurements[fact]}"
+                for fact in duplicate_measurements
+            )
+            raise ValueError(
+                "one equivalent typed measurement cannot be authored by both "
+                "resource attributes and source bindings: " + rendered
+            )
         return self
+
+
+class ResourceGroundingProjection(BaseModel):
+    """Frozen output-only flat view derived from one canonical resource Goal.
+
+    This object is never model-authored and never accepted as semantic input.  It
+    exists only for older Planner/consumer surfaces that still read flat Goal
+    bindings while the canonical resource contract remains authoritative.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    bindings: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    provenance: dict[str, str] = Field(default_factory=dict)
+
+
+def project_resource_grounding(
+    responsibility: AcquireAndDeliverResource,
+) -> ResourceGroundingProjection:
+    """Pure deterministic projection from canonical resource semantics."""
+
+    bindings: dict[str, dict[str, Any]] = {}
+    provenance: dict[str, str] = {}
+
+    def add_binding(name: str, value: Any, *, path: str) -> None:
+        if not isinstance(value, dict):
+            return
+        normalized_name = " ".join(str(name or "").strip().split())
+        if not normalized_name or normalized_name in bindings:
+            raise ValueError(
+                "resource grounding projection contains duplicate binding name="
+                f"{normalized_name!r}"
+            )
+        payload = dict(value)
+        payload["name"] = normalized_name
+        bindings[normalized_name] = payload
+        provenance[normalized_name] = path
+
+    for name, value in responsibility.resource.attributes.items():
+        add_binding(
+            name,
+            value,
+            path=f"resource_responsibility.resource.attributes.{name}",
+        )
+    for name, value in responsibility.source.bindings.items():
+        add_binding(
+            name,
+            value,
+            path=f"resource_responsibility.source.bindings.{name}",
+        )
+    if responsibility.resource.quantity:
+        add_binding(
+            "quantity",
+            {
+                "name": "quantity",
+                "entity_type": "quantity",
+                "value": responsibility.resource.quantity,
+                "confidence": 1.0,
+            },
+            path="resource_responsibility.resource.quantity",
+        )
+    return ResourceGroundingProjection(
+        bindings=bindings,
+        provenance=provenance,
+    )

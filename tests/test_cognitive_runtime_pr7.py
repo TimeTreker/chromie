@@ -815,7 +815,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_budget_failure_is_preserved_without_causal_attribution(self):
         association = GoalAssociationResolution(
             turn_id="turn-truncated",
-            clarification="请稍后重试。",
+            resolution_status="fail_closed",
             confidence=0.0,
             reason_summary="Goal association output was truncated.",
             metadata={
@@ -848,7 +848,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_goal_association_contract_failure_stops_before_any_planner(self):
         association = GoalAssociationResolution(
             turn_id="turn-contract-failed",
-            clarification="Please try again.",
+            resolution_status="fail_closed",
             confidence=0.0,
             reason_summary="Invalid structured output.",
             metadata={

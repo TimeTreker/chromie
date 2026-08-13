@@ -334,7 +334,9 @@ class ToolResultInterpreter:
             "evidence_id plus one JSON Pointer copied exactly from that evidence item's "
             "available_scalar_json_pointers. The pointer root is the evidence data object itself; "
             "never add a /data prefix and never invent or modify a field name. Preserve numbers "
-            "and named facts exactly. "
+            "and named facts exactly. A temporal qualifier in spoken_response must be "
+            "supported by an evidence field scoped to that same period; current or "
+            "whole-day values cannot support a narrower day-part claim. "
             "Conclusions may be phrased naturally but must be entailed by the selected exact facts, immutable per-goal Plan outcomes, and supplied Capability semantics. A provider completion signal proves only the declared outcome of the Capability that produced it. Do not broaden that evidence from an argument name, rationale, identity, superficial similarity, or ordinary expectation, and do not infer an undeclared effect, guarantee, resource transition, or completion of another responsibility. Treat explicit provider facts such as no_motion according to their declared meaning even when the request itself completed. Identity and personality shape expression only and never expand capability or evidence. Normally use one short sentence; use a second sentence only when it adds something genuinely useful. Return JSON only."
         )
 
